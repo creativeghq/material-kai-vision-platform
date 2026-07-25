@@ -6,13 +6,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Pencil, Trash2, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
+import { statusTone } from '@/utils/statusTone';
 import { marketingService, type MarketingTemplate } from '../services/marketingService';
 
 export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
@@ -118,7 +118,7 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
                   </td>
                   <td className="py-3 px-4 text-sm text-muted-foreground">{t.subject_template || '—'}</td>
                   <td className="py-3 px-4">
-                    <Badge className={t.is_active ? 'bg-green-600' : 'bg-gray-500'}>{t.is_active ? 'Ready' : 'Draft'}</Badge>
+                    <span className={`text-sm capitalize ${statusTone(t.is_active ? 'active' : 'draft')}`}>{t.is_active ? 'Ready' : 'Draft'}</span>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-1">

@@ -3,7 +3,6 @@ import { Plus, Trash2 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import {
   Table,
   TableBody,
@@ -45,15 +44,14 @@ import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pag
 
 const PAGE_SIZE = TABLE_PAGE_SIZE;
 
-// One consistent pill style for every relationship type — same shape/weight,
-// only a subtle accent colour differs (the old map made `certification` a bright
-// gradient while the rest were flat grey).
-const RELATIONSHIP_STYLES: Record<string, string> = {
-  primary: 'text-primary border-primary/30 bg-primary/5',
-  specification: 'text-sky-400 border-sky-400/30 bg-sky-400/5',
-  certification: 'text-emerald-400 border-emerald-400/30 bg-emerald-400/5',
-  supplementary: 'text-amber-400 border-amber-400/30 bg-amber-400/5',
-  related: 'text-muted-foreground border-border bg-muted/40',
+// Plain colored word per relationship type (house rule: no pill backgrounds in
+// table rows) — only the text tone differs per type.
+const RELATIONSHIP_TONE: Record<string, string> = {
+  primary: 'text-primary',
+  specification: 'text-sky-400',
+  certification: 'text-emerald-400',
+  supplementary: 'text-amber-400',
+  related: 'text-muted-foreground',
 };
 
 export const ProductAttachments: React.FC = () => {
@@ -234,12 +232,9 @@ export const ProductAttachments: React.FC = () => {
   };
 
   const getRelationshipBadge = (type: string) => (
-    <Badge
-      variant="outline"
-      className={`capitalize rounded-full font-normal ${RELATIONSHIP_STYLES[type] || RELATIONSHIP_STYLES.related}`}
-    >
+    <span className={`text-xs capitalize ${RELATIONSHIP_TONE[type] || RELATIONSHIP_TONE.related}`}>
       {type}
-    </Badge>
+    </span>
   );
 
   const productLabel = (id: string) => {

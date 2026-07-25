@@ -16,7 +16,6 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
   FilterBar,
@@ -339,31 +338,31 @@ export const RelevancyManagement: React.FC = () => {
 
   const getRelevanceBadge = (score: number) => {
     if (score >= 0.8) {
-      return <Badge className="bg-green-100 text-green-800 border-green-300">High ({(score * 100).toFixed(0)}%)</Badge>;
+      return <span className="text-xs text-emerald-600 dark:text-emerald-400">High ({(score * 100).toFixed(0)}%)</span>;
     } else if (score >= 0.6) {
-      return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Medium ({(score * 100).toFixed(0)}%)</Badge>;
+      return <span className="text-xs text-amber-600 dark:text-amber-400">Medium ({(score * 100).toFixed(0)}%)</span>;
     } else {
-      return <Badge className="bg-red-100 text-red-800 border-red-300">Low ({(score * 100).toFixed(0)}%)</Badge>;
+      return <span className="text-xs text-red-500 dark:text-red-400">Low ({(score * 100).toFixed(0)}%)</span>;
     }
   };
 
   const getRelTypeBadge = (type: string | null | undefined) => {
-    if (!type) return <Badge className="bg-gray-50 text-gray-500 border-gray-200">Unknown</Badge>;
-    const colors: Record<string, string> = {
-      source: 'bg-blue-50 text-blue-700 border-blue-200',
-      depicts: 'bg-purple-50 text-purple-700 border-purple-200',
-      illustrates: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      related: 'bg-gray-50 text-gray-700 border-gray-200',
-      component: 'bg-orange-50 text-orange-700 border-orange-200',
-      alternative: 'bg-pink-50 text-pink-700 border-pink-200',
-      variant: 'bg-teal-50 text-teal-700 border-teal-200',
-      example: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+    if (!type) return <span className="text-xs text-muted-foreground">Unknown</span>;
+    const tones: Record<string, string> = {
+      source: 'text-blue-500 dark:text-blue-400',
+      depicts: 'text-purple-600 dark:text-purple-400',
+      illustrates: 'text-indigo-600 dark:text-indigo-400',
+      related: 'text-muted-foreground',
+      component: 'text-orange-600 dark:text-orange-400',
+      alternative: 'text-pink-600 dark:text-pink-400',
+      variant: 'text-teal-600 dark:text-teal-400',
+      example: 'text-cyan-600 dark:text-cyan-400',
     };
 
     return (
-      <Badge className={colors[type] || colors.related}>
+      <span className={`text-xs ${tones[type] || 'text-muted-foreground'}`}>
         {type.charAt(0).toUpperCase() + type.slice(1)}
-      </Badge>
+      </span>
     );
   };
 

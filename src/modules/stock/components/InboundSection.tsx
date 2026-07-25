@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -23,10 +22,10 @@ const progressPct = (status: string) => {
   return i < 0 ? 0 : Math.round((i / (STAGES.length - 1)) * 100);
 };
 const statusTone = (status: string) =>
-  status === 'delivered' ? 'border-emerald-500/50 text-emerald-500'
-    : status === 'arrived' || status === 'discharged' || status === 'gate_out' ? 'border-primary/50 text-primary'
-    : status === 'unknown' || status === 'pending' ? 'border-muted-foreground/40 text-muted-foreground'
-    : 'border-amber-500/50 text-amber-500';
+  status === 'delivered' ? 'text-emerald-600 dark:text-emerald-400'
+    : status === 'arrived' || status === 'discharged' || status === 'gate_out' ? 'text-primary'
+    : status === 'unknown' || status === 'pending' ? 'text-muted-foreground'
+    : 'text-amber-600 dark:text-amber-400';
 
 export const InboundSection: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -109,7 +108,7 @@ export const InboundSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
                       </td>
                       <td className="px-4 py-2 text-xs text-muted-foreground">{[s.origin, s.destination].filter(Boolean).join(' → ') || '—'}</td>
                       <td className="px-4 py-2">
-                        <Badge variant="outline" className={statusTone(s.status)}>{STAGE_LABEL[s.status] ?? s.status}</Badge>
+                        <span className={`text-xs ${statusTone(s.status)}`}>{STAGE_LABEL[s.status] ?? s.status}</span>
                         <div className="mt-1 h-1 w-28 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{ width: `${progressPct(s.status)}%` }} /></div>
                       </td>
                       <td className="px-4 py-2 text-xs">{s.eta ?? '—'}</td>
@@ -211,7 +210,7 @@ const AddShipmentDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) =>
               </Select>
             </div>
           </div>
-          <div className="space-y-1"><Label>Carrier / line (optional)</Label><Input value={carrier} onChange={(e) => setCarrier(e.target.value)} placeholder="e.g. MSC, Maersk" /></div>
+          <div className="space-y-1"><Label>Carrier / Line (optional)</Label><Input value={carrier} onChange={(e) => setCarrier(e.target.value)} placeholder="e.g. MSC, Maersk" /></div>
           <div className="space-y-1">
             <Label>Link to purchase order (optional)</Label>
             <Select value={orderId} onValueChange={setOrderId}>

@@ -146,15 +146,15 @@ export const SystemAreasTab: React.FC<SystemAreasTabProps> = ({ flows, onOpenBui
                       <div className="flex items-center gap-2">
                         <span className="font-medium truncate">{area.title}</span>
                         {isEmpty ? (
-                          <Badge variant="outline" className="gap-1 bg-red-500/10 text-red-500">
+                          <span className="text-xs inline-flex items-center gap-1 text-red-500">
                             <AlertTriangle className="h-3 w-3" />
                             Empty
-                          </Badge>
+                          </span>
                         ) : (
-                          <Badge variant="outline" className="gap-1 bg-emerald-500/10 text-emerald-500">
+                          <span className="text-xs inline-flex items-center gap-1 text-emerald-500">
                             <Link2 className="h-3 w-3" />
                             Linked
-                          </Badge>
+                          </span>
                         )}
                       </div>
                       {area.description && (

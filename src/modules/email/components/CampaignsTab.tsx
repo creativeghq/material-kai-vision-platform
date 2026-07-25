@@ -7,8 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Send, Calendar, Users, BarChart3, Pause, Play, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { statusTone } from '@/utils/statusTone';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CreateCampaignModal } from './CreateCampaignModal';
@@ -36,15 +36,6 @@ interface Campaign {
   };
   created_at: string;
 }
-
-const statusColors = {
-  draft: 'bg-gray-500',
-  scheduled: 'bg-blue-500',
-  sending: 'bg-yellow-500',
-  sent: 'bg-green-500',
-  paused: 'bg-orange-500',
-  cancelled: 'bg-red-500',
-};
 
 const statusLabels = {
   draft: 'Draft',
@@ -198,9 +189,9 @@ export const CampaignsTab: React.FC = () => {
                       )}
                     </td>
                     <td className="py-3 px-4">
-                      <Badge className={statusColors[campaign.status]}>
+                      <span className={`text-sm capitalize ${statusTone(campaign.status)}`}>
                         {statusLabels[campaign.status]}
-                      </Badge>
+                      </span>
                     </td>
                     <td className="py-3 px-4">
                       {campaign.template ? (

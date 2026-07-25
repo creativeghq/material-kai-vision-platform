@@ -35,6 +35,7 @@ import { Input } from '@/components/core/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
 import { humanizeLabel } from '@/utils/humanize';
+import { statusTone } from '@/utils/statusTone';
 import { parseDecimalOr } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, useFilters } from '@/components/core/filters';
@@ -207,8 +208,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     catch (err: any) { toast({ title: 'Failed to set category', description: err?.message, variant: 'destructive' }); void load(); }
   };
 
-  const statusVariant = (s: string) => s === 'overdue' ? 'destructive' : s === 'paid' ? 'default' : 'outline';
-
   // Type-conditional header actions — shared by the dispatch (board) and table layouts so the
   // title/actions look identical whether the content is a Card table or the kanban board.
   const docActions = (
@@ -330,7 +329,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                           </td>
                           <td className="px-4 py-2 text-right">{formatMoney(i.total, i.currency)}</td>
                           <td className="px-4 py-2 text-right font-medium">{formatMoney(i.amount_due, i.currency)}</td>
-                          <td className="px-4 py-2 text-center"><Badge variant={statusVariant(i.status)} className="text-[10px]">{humanizeLabel(i.status)}</Badge></td>
+                          <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(i.status)}`}>{humanizeLabel(i.status)}</span></td>
                           <td className="px-4 py-2 text-center">{transmitted((i as any).fiscal_status) ? <span className="text-emerald-500" title="Transmitted to myDATA">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                           <td className="px-4 py-2 text-right">
                             <InvoiceActionsMenu invoiceId={i.id} financeBase={financeBase} status={i.status} fiscalStatus={(i as any).fiscal_status ?? null} fiscalMark={(i as any).fiscal_mark ?? null} onChanged={load} />
@@ -477,7 +476,7 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
                 <td className="px-4 py-2 text-right">{formatMoney(Number(r.subtotal_net) + Number(r.vat_amount), r.currency)}</td>
                 <td className="px-4 py-2">{r.is_active ? new Date(r.next_run_at).toLocaleDateString() : '—'}</td>
                 <td className="px-4 py-2 text-center">{r.auto_pay ? <span className="text-emerald-500">✓</span> : <span className="text-muted-foreground">—</span>}</td>
-                <td className="px-4 py-2 text-center"><Badge variant={r.is_active ? 'outline' : 'secondary'} className="text-[10px]">{r.is_active ? 'Active' : 'Paused'}</Badge></td>
+                <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(r.is_active ? 'active' : 'paused')}`}>{r.is_active ? 'Active' : 'Paused'}</span></td>
                 {!readOnly && (
                   <td className="px-4 py-2">
                     <div className="flex justify-end gap-1">
@@ -506,8 +505,6 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
 const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: any) => string }> = ({ rows, categoryName }) => {
   const [page, setPage] = useState(1);
   useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
-  const statusVar = (s: SupplierBillStatus) =>
-    s === 'paid' ? 'default' : s === 'overdue' || s === 'disputed' ? 'destructive' : 'outline';
   return (
     <Card>
       <div className="border-b border-border/60 px-4 py-2.5">
@@ -534,7 +531,7 @@ const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: 
                 <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName((b as any).category_id)}</td>
                 <td className="px-4 py-2 text-right">{formatMoney(b.total, b.currency)}</td>
                 <td className="px-4 py-2 text-right font-medium">{formatMoney(b.amount_due, b.currency)}</td>
-                <td className="px-4 py-2 text-center"><Badge variant={statusVar(b.status)} className="text-[10px]">{humanizeLabel(b.status)}</Badge></td>
+                <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(b.status)}`}>{humanizeLabel(b.status)}</span></td>
               </tr>
             ))}
           </tbody>
@@ -579,7 +576,7 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
             <td className="px-4 py-2 text-right font-medium">{formatMoney(c.amount, c.currency)}</td>
             <td className="px-4 py-2">
               {readOnly ? (
-                <Badge variant="outline" className="text-[10px]">{humanizeLabel(c.status)}</Badge>
+                <span className={`text-[10px] ${statusTone(c.status)}`}>{humanizeLabel(c.status)}</span>
               ) : (
                 <Select value={c.status} onValueChange={(v: any) => setStatus(c.id, v)}>
                   <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
@@ -641,12 +638,12 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
         {rows.map((d) => (
           <tr key={d.id} className="border-b border-border/30">
             <td className="px-4 py-2 font-mono text-xs">{d.delivery_note_number ?? <span className="text-muted-foreground">draft</span>}</td>
-            <td className="px-4 py-2"><Badge variant="outline" className="text-[10px]">{d.kind === 'receipt' ? 'Receipt' : 'Dispatch'}</Badge></td>
+            <td className="px-4 py-2"><span className="text-[10px] text-muted-foreground">{d.kind === 'receipt' ? 'Receipt' : 'Dispatch'}</span></td>
             <td className="px-4 py-2">{d.issued_at ? new Date(d.issued_at).toLocaleDateString() : new Date(d.created_at).toLocaleDateString()}</td>
             <td className="px-4 py-2 text-center">
-              <div className="flex items-center justify-center gap-1">
-                <Badge variant={d.status === 'draft' ? 'outline' : d.status === 'void' ? 'secondary' : 'default'} className="text-[10px]">{humanizeLabel(d.status)}</Badge>
-                {d.fiscal_mark && <Badge variant="secondary" className="text-[10px]" title={`MARK ${d.fiscal_mark}`}>myDATA ✓</Badge>}
+              <div className="flex items-center justify-center gap-2">
+                <span className={`text-[10px] ${statusTone(d.status)}`}>{humanizeLabel(d.status)}</span>
+                {d.fiscal_mark && <span className="text-[10px] text-emerald-500" title={`MARK ${d.fiscal_mark}`}>myDATA ✓</span>}
               </div>
             </td>
             <td className="px-4 py-2 text-right">
@@ -744,7 +741,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
         <th className="px-4 py-2 text-left">Reference</th>
         <th className="px-4 py-2 text-right">Amount</th>
         <th className="px-4 py-2 text-right">Allocated</th>
-        <th className="px-4 py-2 text-right w-24">Receipt / voucher</th>
+        <th className="px-4 py-2 text-right w-24">Receipt / Voucher</th>
       </tr>
     </thead>
     <tbody>
@@ -857,7 +854,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
                 : <CategoryCell value={cat} options={categories} onChange={(v) => setCategory(d.id, v)} />}
             </td>
             <td className="px-4 py-2 text-right font-medium">{formatMoney(d.total_gross ?? 0, d.currency)}</td>
-            <td className="px-4 py-2 text-center"><Badge variant={d.status === 'dismissed' ? 'secondary' : d.status === 'new' ? 'outline' : 'default'} className="text-[10px]">{humanizeLabel(d.status)}</Badge></td>
+            <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(d.status)}`}>{humanizeLabel(d.status)}</span></td>
             <td className="px-4 py-2 text-right">
               {!readOnly && workspaceId && (
                 <div className="flex justify-end">

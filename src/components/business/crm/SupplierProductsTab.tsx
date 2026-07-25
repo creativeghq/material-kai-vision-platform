@@ -8,6 +8,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { statusTone } from '@/utils/statusTone';
 import {
   PRODUCT_IMAGE_SELECT,
   getProductImageUrl,
@@ -185,9 +186,9 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
                       <TableCell>{cat ? formatMaterialCategory(cat) : '—'}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{maker ?? '—'}</TableCell>
                       <TableCell>
-                        <Badge variant={p.status === 'published' ? 'default' : 'outline'} className="text-[10px]">
+                        <span className={`text-xs capitalize ${statusTone(p.status ?? 'draft')}`}>
                           {p.status ?? 'draft'}
-                        </Badge>
+                        </span>
                       </TableCell>
                     </TableRow>
                   );

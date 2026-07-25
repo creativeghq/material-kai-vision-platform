@@ -15,6 +15,7 @@ import { hrService, type PayrollRun, type PayrollItem, type PayrollStatus, type 
 import { SectionHeader, EmptyState, hrMoney } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
+import { statusTone } from '@/utils/statusTone';
 
 const statusVariant: Record<PayrollStatus, 'secondary' | 'default' | 'outline'> = { draft: 'secondary', approved: 'default', paid: 'outline' };
 const money = (n: number | null | undefined, c: string) => hrMoney(n, c, { minDecimals: 0 });
@@ -83,10 +84,10 @@ export function PayrollSection({ workspaceId, canManage }: { workspaceId: string
                 {paginate(runs, page).map((r) => (
                   <TableRow key={r.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setOpenRun(r.id)}>
                     <TableCell className="font-medium">{r.period}</TableCell>
-                    <TableCell><Badge variant={statusVariant[r.status]}>{r.status}</Badge></TableCell>
+                    <TableCell><span className={`text-sm capitalize ${statusTone(r.status)}`}>{r.status}</span></TableCell>
                     <TableCell className="text-right">{money(r.total_gross, r.currency)}</TableCell>
                     <TableCell className="text-right">{money(r.total_net, r.currency)}</TableCell>
-                    <TableCell>{r.posted_finance_ref ? <Badge variant="outline" className="gap-1"><ArrowUpRight className="h-3 w-3" />Posted</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                    <TableCell>{r.posted_finance_ref ? <span className="text-sm text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1"><ArrowUpRight className="h-3 w-3" />Posted</span> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                     <TableCell className="text-right text-muted-foreground text-xs">Open →</TableCell>
                   </TableRow>
                 ))}
@@ -324,7 +325,7 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
             <p className="text-xs text-muted-foreground">Defaults are the Greek 2026 rates. These change yearly — adjust as needed. Set country to “None” to disable auto-tax and enter deductions manually.</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Country / mode</Label>
+                <Label>Country / Mode</Label>
                 <Select value={s.country_code} onValueChange={(v) => upd('country_code', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent><SelectItem value="GR">Greece (auto)</SelectItem><SelectItem value="none">None (manual)</SelectItem></SelectContent>

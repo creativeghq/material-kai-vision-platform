@@ -56,7 +56,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
@@ -295,10 +294,10 @@ const triggerLabels: Record<TriggerType, string> = {
 };
 
 const statusColors: Record<FlowStatus, string> = {
-  draft: 'bg-gray-500/10 text-gray-500',
-  active: 'bg-green-500/10 text-green-500',
-  paused: 'bg-amber-500/10 text-amber-500',
-  archived: 'bg-red-500/10 text-red-500',
+  draft: 'text-gray-500',
+  active: 'text-emerald-500',
+  paused: 'text-amber-500',
+  archived: 'text-red-500',
 };
 
 export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
@@ -510,25 +509,25 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <h4 className="font-medium truncate">{flow.name}</h4>
-                        <Badge variant="outline" className={statusColors[flow.status]}>
+                        <span className={`text-xs capitalize ${statusColors[flow.status]}`}>
                           {flow.status}
-                        </Badge>
+                        </span>
                         {flow.is_locked && (
-                          <Badge variant="outline" className="gap-1 bg-amber-500/10 text-amber-500">
+                          <span className="text-xs inline-flex items-center gap-1 text-amber-500">
                             <Lock className="h-3 w-3" />
                             Locked
-                          </Badge>
+                          </span>
                         )}
                         {flow.is_global ? (
-                          <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-500">
+                          <span className="text-xs inline-flex items-center gap-1 text-blue-500">
                             <Globe className="h-3 w-3" />
                             Global
-                          </Badge>
+                          </span>
                         ) : (
-                          <Badge variant="outline" className="gap-1 bg-violet-500/10 text-violet-500">
+                          <span className="text-xs inline-flex items-center gap-1 text-violet-500">
                             <Building2 className="h-3 w-3" />
                             Workspace
-                          </Badge>
+                          </span>
                         )}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">

@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney } from '@/modules/finance/services/financeService';
@@ -362,7 +361,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                 <div key={e.id} className="flex items-center gap-3 px-4 py-2 text-sm">
                   <div className="w-20 text-xs text-muted-foreground">{e.work_date}</div>
                   <div className="min-w-0 flex-1 truncate text-muted-foreground">{e.description}</div>
-                  <Badge variant="outline" className="text-[10px]">billed</Badge>
+                  <span className="text-[10px] capitalize text-muted-foreground">billed</span>
                   <div className="w-16 text-right text-xs">{hoursOf(e.minutes)}h</div>
                   <div className="w-20 text-right tabular-nums">{formatMoney(hoursOf(e.minutes) * Number(e.hourly_rate))}</div>
                 </div>

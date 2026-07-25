@@ -81,8 +81,8 @@ export const QuoteShippingCard: React.FC<{ quoteId: string; editable: boolean; o
             <div key={q.id} className="rounded-lg border border-border/60">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 bg-muted/10">
                 <div className="text-sm font-medium">{q.origin} → {q.destination} <span className="text-xs text-muted-foreground uppercase">· {q.mode}{q.container_type ? ` · ${q.container_type}` : ''}</span></div>
-                {q.status === 'pending' && <Badge variant="outline" className="border-amber-500/50 text-amber-500">Awaiting operator</Badge>}
-                {q.status === 'declined' && <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground">Declined</Badge>}
+                {q.status === 'pending' && <span className="text-xs text-amber-500">Awaiting operator</span>}
+                {q.status === 'declined' && <span className="text-xs text-muted-foreground">Declined</span>}
                 {q.status === 'quoted' && <Badge variant="outline" className="border-emerald-500/50 text-emerald-500">{q.offer_count} offer{q.offer_count === 1 ? '' : 's'}</Badge>}
               </div>
               {q.status === 'quoted' ? (

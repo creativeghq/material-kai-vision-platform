@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, ShieldCheck, Check, X, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supplierClaimsService, type SupplierClaimRequest } from '@/services/supplierClaimsService';
@@ -71,9 +70,9 @@ export default function SupplierClaimsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <Badge variant={c.risk_flag === 'low' ? 'secondary' : 'outline'} className="text-[10px]">
+                <span className={`text-[10px] ${c.risk_flag === 'low' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
                   {c.risk_flag === 'low' ? 'own VAT match' : 'needs review'}
-                </Badge>
+                </span>
                 <Button size="sm" variant="outline" className="rounded-full h-8" disabled={busyId === c.id} onClick={() => decide(c.id, false)}>
                   <X className="h-3.5 w-3.5 mr-1" /> Reject
                 </Button>

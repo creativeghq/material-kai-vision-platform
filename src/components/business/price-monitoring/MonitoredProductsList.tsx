@@ -9,7 +9,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
 import {
   Table,
@@ -26,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { refreshProduct, untrackProduct, trackProduct } from '@/services/priceMonitoringApi';
 import type { TrackedQuery } from '@/services/priceMonitoringApi';
+import { statusTone } from '@/utils/statusTone';
 import { buildMonitoredProductFilters } from './monitoredProductFilters';
 
 interface MonitoredProductsListProps {
@@ -181,7 +181,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
                             {tq.current_price.toFixed(2)} {tq.current_currency || ''}
                           </span>
                           {tq.current_price_verified ? (
-                            <Badge variant="outline" className="ml-2 text-xs">Verified</Badge>
+                            <span className={`ml-2 text-xs capitalize ${statusTone('verified')}`}>Verified</span>
                           ) : null}
                         </div>
                       ) : (
@@ -189,9 +189,9 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={tq.is_active ? 'default' : 'secondary'}>
+                      <span className={`text-xs capitalize ${statusTone(tq.is_active ? 'active' : 'paused')}`}>
                         {tq.is_active ? 'active' : 'paused'}
-                      </Badge>
+                      </span>
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                       {tq.last_refreshed_at

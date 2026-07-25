@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, Download, FileText, FileCheck, Receipt, Package, Wallet, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
+import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
@@ -20,27 +20,12 @@ const money = (v: number, currency: string) =>
   new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(v || 0);
 const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString() : '—');
 
-const STATUS_STYLES: Record<string, string> = {
-  paid: 'bg-emerald-500/10 text-emerald-400',
-  partially_paid: 'bg-amber-500/10 text-amber-400',
-  overdue: 'bg-red-500/10 text-red-400',
-  issued: 'bg-blue-500/10 text-blue-300',
-};
-
 const ORDER_STATUS_LABEL: Record<CustomerOrder['status'], string> = {
   draft: 'Pre-order', confirmed: 'Confirmed', partially_fulfilled: 'Partially delivered',
   fulfilled: 'Completed', cancelled: 'Cancelled',
 };
-const ORDER_STATUS_STYLE: Record<CustomerOrder['status'], string> = {
-  draft: 'text-muted-foreground', confirmed: 'bg-blue-500/10 text-blue-300',
-  partially_fulfilled: 'bg-amber-500/10 text-amber-400', fulfilled: 'bg-emerald-500/10 text-emerald-400',
-  cancelled: 'bg-red-500/10 text-red-400',
-};
 const PAYMENT_LABEL: Record<CustomerOrder['payment_status'], string> = {
   unpaid: 'Unpaid', partial: 'Partially paid', paid: 'Paid',
-};
-const PAYMENT_STYLE: Record<CustomerOrder['payment_status'], string> = {
-  unpaid: 'text-muted-foreground', partial: 'bg-amber-500/10 text-amber-400', paid: 'bg-emerald-500/10 text-emerald-400',
 };
 
 /**
@@ -159,9 +144,9 @@ export const MyDocumentsTab: React.FC = () => {
                     {d.amount_due > 0 && d.status !== 'paid' ? ` · ${money(d.amount_due, d.currency)} due` : ''}
                   </div>
                 </div>
-                <Badge variant="outline" className={`shrink-0 text-[10px] uppercase ${STATUS_STYLES[d.status] ?? 'text-muted-foreground'}`}>
+                <span className={`shrink-0 text-[10px] uppercase ${statusTone(d.status)}`}>
                   {d.status.replace('_', ' ')}
-                </Badge>
+                </span>
                 <Button size="sm" variant="ghost" className="h-7 gap-1 shrink-0" onClick={() => open(d.pdf_url)}>
                   <Download className="h-3.5 w-3.5" /> <span className="text-xs">PDF</span>
                 </Button>
@@ -239,8 +224,8 @@ const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
           <div className="text-sm font-medium truncate">Order {order.order_number ?? order.id.slice(0, 8)}</div>
           <div className="text-[11px] text-muted-foreground">{fmtDate(order.created_at)} · {money(order.total, order.currency)}</div>
         </div>
-        <Badge variant="outline" className={`shrink-0 text-[10px] ${ORDER_STATUS_STYLE[order.status]}`}>{ORDER_STATUS_LABEL[order.status]}</Badge>
-        <Badge variant="outline" className={`shrink-0 text-[10px] ${PAYMENT_STYLE[order.payment_status]}`}>{PAYMENT_LABEL[order.payment_status]}</Badge>
+        <span className={`shrink-0 text-[10px] capitalize ${statusTone(order.status)}`}>{ORDER_STATUS_LABEL[order.status]}</span>
+        <span className={`shrink-0 text-[10px] capitalize ${statusTone(order.payment_status)}`}>{PAYMENT_LABEL[order.payment_status]}</span>
       </button>
       {open && (
         <div className="border-t border-border/50 px-3 py-2">

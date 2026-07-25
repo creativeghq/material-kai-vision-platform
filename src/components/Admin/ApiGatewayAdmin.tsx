@@ -55,6 +55,7 @@ import {
   type ApiKey,
 } from '@/services/apiGateway/apiGatewayService';
 import { supabase } from '@/integrations/supabase/client';
+import { statusTone } from '@/utils/statusTone';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
@@ -306,9 +307,9 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <h4 className="font-medium text-sm">{key.key_name}</h4>
-                            <Badge className={key.is_active ? 'bg-green-500/20 text-green-700 text-xs' : 'bg-gray-200 text-gray-600 text-xs'}>
+                            <span className={`text-xs capitalize ${statusTone(key.is_active ? 'active' : 'revoked')}`}>
                               {key.is_active ? 'Active' : 'Revoked'}
-                            </Badge>
+                            </span>
                             {key.rate_limit_override && (
                               <Badge variant="outline" className="text-xs">{key.rate_limit_override} req/min</Badge>
                             )}
@@ -477,14 +478,14 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                         // Absolute index — a per-page index collides across pages.
                         <TableRow key={(recentLogsPage - 1) * TABLE_PAGE_SIZE + i}>
                           <TableCell className="font-mono text-xs max-w-[200px] truncate">{log.request_path}</TableCell>
-                          <TableCell><Badge variant="outline" className="text-xs">{log.request_method}</Badge></TableCell>
+                          <TableCell><span className="text-xs font-mono text-muted-foreground">{log.request_method}</span></TableCell>
                           <TableCell>
-                            <Badge className={
-                              (log.response_status ?? 0) >= 200 && (log.response_status ?? 0) < 300 ? 'bg-green-500/20 text-green-700 text-xs'
-                                : log.response_status === 429 ? 'bg-orange-500/20 text-orange-700 text-xs'
-                                : (log.response_status ?? 0) >= 400 ? 'bg-red-500/20 text-red-700 text-xs'
-                                : 'text-xs'
-                            }>{log.response_status ?? '—'}</Badge>
+                            <span className={`text-xs font-mono ${
+                              (log.response_status ?? 0) >= 200 && (log.response_status ?? 0) < 300 ? 'text-emerald-600 dark:text-emerald-400'
+                                : log.response_status === 429 ? 'text-amber-600 dark:text-amber-400'
+                                : (log.response_status ?? 0) >= 400 ? 'text-red-500 dark:text-red-400'
+                                : 'text-muted-foreground'
+                            }`}>{log.response_status ?? '—'}</span>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{log.response_time_ms != null ? `${log.response_time_ms}ms` : '—'}</TableCell>
                           <TableCell className="text-xs text-muted-foreground font-mono">{log.ip_address || '—'}</TableCell>

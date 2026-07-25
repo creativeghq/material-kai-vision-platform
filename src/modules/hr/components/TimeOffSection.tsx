@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Check, X, Loader2, CalendarDays, Send, ExternalLink } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -11,11 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { hrService, type Absence, type Employee, type AbsenceType, type AbsenceStatus, type ErganiLeaveType, type ErganiSubmission, ABSENCE_TYPE_LABELS } from '../services/hrService';
+import { hrService, type Absence, type Employee, type AbsenceType, type ErganiLeaveType, type ErganiSubmission, ABSENCE_TYPE_LABELS } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { statusTone } from '@/utils/statusTone';
 
-const absVariant: Record<AbsenceStatus, 'default' | 'secondary' | 'destructive'> = { approved: 'default', pending: 'secondary', rejected: 'destructive' };
 const empName = (e: Employee) => e.contact?.name || 'Unnamed';
 
 /** Sensible default Ergani leave code per our absence type (operator can change it before filing). */
@@ -93,15 +92,15 @@ export function TimeOffSection({ workspaceId, canManage }: { workspaceId: string
                     <TableCell>{ABSENCE_TYPE_LABELS[a.absence_type]}</TableCell>
                     <TableCell>{a.start_date}</TableCell><TableCell>{a.end_date}</TableCell>
                     <TableCell className="text-right">{a.working_days ?? '—'}</TableCell>
-                    <TableCell><Badge variant={absVariant[a.status]}>{a.status}</Badge></TableCell>
+                    <TableCell><span className={`text-sm capitalize ${statusTone(a.status)}`}>{a.status}</span></TableCell>
                     {erganiOn && (
                       <TableCell>
                         {filing?.status === 'submitted'
-                          ? <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30" title={`Protocol ${filing.protocol}`}>Filed · {filing.protocol}</Badge>
+                          ? <span className="text-sm text-emerald-600 dark:text-emerald-400" title={`Protocol ${filing.protocol}`}>Filed · {filing.protocol}</span>
                           : filing?.status === 'failed'
-                            ? <Badge variant="destructive" title={filing.error ?? ''}>Failed</Badge>
+                            ? <span className="text-sm text-red-500 dark:text-red-400" title={filing.error ?? ''}>Failed</span>
                             : filing?.status === 'cancelled'
-                              ? <Badge variant="secondary">Cancelled</Badge>
+                              ? <span className="text-sm text-muted-foreground">Cancelled</span>
                               : a.status === 'approved'
                                 ? <FileLeaveDialog workspaceId={workspaceId!} absence={a} leaveTypes={leaveTypes} onDone={load} />
                                 : <span className="text-xs text-muted-foreground">—</span>}

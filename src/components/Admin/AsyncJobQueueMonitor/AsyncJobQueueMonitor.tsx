@@ -72,6 +72,7 @@ import { hasRecentHeartbeat, getStatusBadge } from './components/StatusBadge';
 import { PipelineErrorsPanel } from './components/PipelineErrorsPanel';
 import { buildJobQueueFilters } from './jobQueueFilters';
 import { MIVAA_API_URL } from '@/config/mivaa';
+import { statusTone } from '@/utils/statusTone';
 
 export const AsyncJobQueueMonitor: React.FC = () => {
   const navigate = useNavigate();
@@ -3521,18 +3522,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                     </Badge>
                                   )}
 
-                                  {/* Status Badge */}
-                                  <Badge
-                                    className={`${product.product_id && productCosts[product.product_id] ? 'ml-2' : 'ml-auto'} shadow-none ${
-                                      isFailed ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20' :
-                                      isProcessing ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20' :
-                                      isCompleted ? 'bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20' :
-                                      'bg-white/5 text-muted-foreground border-white/10 hover:bg-white/10'
-                                    }`}
-                                    variant="outline"
+                                  {/* Status word */}
+                                  <span
+                                    className={`${product.product_id && productCosts[product.product_id] ? 'ml-2' : 'ml-auto'} text-xs uppercase ${statusTone(product.status)}`}
                                   >
                                     {product.status.toUpperCase()}
-                                  </Badge>
+                                  </span>
                                 </div>
                               </AccordionTrigger>
                               <AccordionContent className="pb-6 pt-2">

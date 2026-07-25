@@ -6,7 +6,6 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, Loader2, Users, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDistanceToNow } from 'date-fns';
@@ -141,8 +140,8 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
                     <td className="py-2 px-3 text-muted-foreground">{[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}</td>
                     <td className="py-2 px-3">
                       {c.unsubscribed
-                        ? <Badge variant="outline" className="text-muted-foreground">Unsubscribed</Badge>
-                        : <Badge className="bg-emerald-600">Subscribed</Badge>}
+                        ? <span className="text-sm capitalize text-muted-foreground">Unsubscribed</span>
+                        : <span className="text-sm capitalize text-emerald-600 dark:text-emerald-400">Subscribed</span>}
                     </td>
                   </tr>
                 ))}

@@ -25,7 +25,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
 import {
   Table,
@@ -77,9 +76,9 @@ interface BatchRunResult {
 }
 
 const BATCH_STATUS_COLOR: Record<string, string> = {
-  categorized: 'bg-green-100 text-green-800',
-  failed: 'bg-red-100 text-red-800',
-  skipped: 'bg-amber-100 text-amber-800',
+  categorized: 'text-emerald-600 dark:text-emerald-400',
+  failed: 'text-red-500 dark:text-red-400',
+  skipped: 'text-amber-600 dark:text-amber-400',
 };
 
 // Product-level aggregate fields that should not appear as individual metadata rows
@@ -284,21 +283,21 @@ export const MetadataManagement: React.FC = () => {
   const getConfidenceBadge = (confidence: number) => {
     if (confidence >= 0.9) {
       return (
-        <Badge className="bg-green-100 text-green-800 border-green-300">
+        <span className="text-xs text-emerald-600 dark:text-emerald-400">
           High ({confidence.toFixed(2)})
-        </Badge>
+        </span>
       );
     } else if (confidence >= 0.7) {
       return (
-        <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
+        <span className="text-xs text-amber-600 dark:text-amber-400">
           Medium ({confidence.toFixed(2)})
-        </Badge>
+        </span>
       );
     } else {
       return (
-        <Badge className="bg-red-100 text-red-800 border-red-300">
+        <span className="text-xs text-red-500 dark:text-red-400">
           Low ({confidence.toFixed(2)})
-        </Badge>
+        </span>
       );
     }
   };
@@ -705,19 +704,19 @@ export const MetadataManagement: React.FC = () => {
                         {r.status === 'skipped'     && <SkipForward className="h-4 w-4 text-amber-500 shrink-0" />}
                         <span className="flex-1 text-sm truncate">{r.name || r.id}</span>
                         {r.material_category && (
-                          <Badge variant="secondary" className="text-xs shrink-0">{r.material_category}</Badge>
+                          <span className="text-xs text-muted-foreground capitalize shrink-0">{r.material_category}</span>
                         )}
                         {r.zone_intent && (
-                          <Badge variant="outline" className="text-xs shrink-0">{r.zone_intent}</Badge>
+                          <span className="text-xs text-muted-foreground capitalize shrink-0">{r.zone_intent}</span>
                         )}
                         {r.reason && (
                           <span className="text-xs text-muted-foreground truncate max-w-48" title={r.reason}>
                             {r.reason}
                           </span>
                         )}
-                        <Badge className={`text-xs shrink-0 ${BATCH_STATUS_COLOR[r.status]}`}>
+                        <span className={`text-xs capitalize shrink-0 ${BATCH_STATUS_COLOR[r.status]}`}>
                           {r.status}
-                        </Badge>
+                        </span>
                       </div>
                     ))}
                   </div>

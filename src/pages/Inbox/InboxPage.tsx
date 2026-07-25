@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -758,7 +759,7 @@ const InboxPage: React.FC = () => {
                           <span className={`inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded-full border ${srcClass}`}>
                             <SrcIcon className="w-2.5 h-2.5" /> {srcLabel}
                           </span>
-                          {t.status !== 'open' && !t.archived_at && <Badge variant="outline" className="text-[10px] capitalize">{t.status}</Badge>}
+                          {t.status !== 'open' && !t.archived_at && <span className={`text-[10px] capitalize ${statusTone(t.status)}`}>{t.status}</span>}
                           {t.agent_state === 'active' && (
                             <Badge variant="outline" className="text-[10px] border-primary/40 text-primary"><Bot className="w-2.5 h-2.5 mr-0.5" />AI</Badge>
                           )}
@@ -1208,7 +1209,7 @@ const DetailsRail: React.FC<{
                     <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{q.quote_number || q.name || 'Quote'}</span>
                     <span className="text-xs text-muted-foreground shrink-0">{money(q.grand_total, q.currency)}</span>
-                    {q.status && <Badge variant="outline" className="text-[10px] capitalize shrink-0">{q.status}</Badge>}
+                    {q.status && <span className={`text-[10px] capitalize shrink-0 ${statusTone(q.status)}`}>{q.status}</span>}
                   </a>
                 ))}
               </div>
@@ -1226,7 +1227,7 @@ const DetailsRail: React.FC<{
                   <a key={p.id} href={`/projects/${p.id}`} className="flex items-center gap-2 text-sm py-1.5 px-2 -mx-2 rounded-lg hover:bg-accent transition-colors">
                     <FolderKanban className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{p.name || 'Project'}</span>
-                    {p.status && <Badge variant="outline" className="text-[10px] capitalize shrink-0">{p.status}</Badge>}
+                    {p.status && <span className={`text-[10px] capitalize shrink-0 ${statusTone(p.status)}`}>{p.status}</span>}
                     <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
                   </a>
                 ))}
@@ -1247,7 +1248,7 @@ const DetailsRail: React.FC<{
                     <AvatarFallback className={`text-[10px] ${avatarTint(info?.label)}`}>{initials(info?.label)}</AvatarFallback>
                   </Avatar>
                   <span className="flex-1 min-w-0 truncate">{info?.label || 'Participant'}</span>
-                  {p.thread_role === 'owner' && <Badge variant="outline" className="text-[10px]">owner</Badge>}
+                  {p.thread_role === 'owner' && <span className="text-[10px] text-muted-foreground capitalize">owner</span>}
                   {p.participant_type === 'agent' && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">AI</Badge>}
                 </div>
               );
@@ -1770,8 +1771,8 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
                           {ct.email && <span className="block text-[11px] text-muted-foreground truncate">{ct.email}</span>}
                         </span>
                         {ct.hasAccount
-                          ? <Badge variant="outline" className="text-[10px] shrink-0"><BadgeCheck className="w-2.5 h-2.5 mr-0.5" />Account</Badge>
-                          : <Badge variant="secondary" className="text-[10px] shrink-0">Link</Badge>}
+                          ? <span className="inline-flex items-center text-[10px] shrink-0 text-muted-foreground"><BadgeCheck className="w-2.5 h-2.5 mr-0.5" />Account</span>
+                          : <span className="text-[10px] shrink-0 text-muted-foreground">Link</span>}
                         {contactId === ct.id && <Check className="w-4 h-4 shrink-0" />}
                       </button>
                     ))}

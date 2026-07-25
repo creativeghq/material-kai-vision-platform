@@ -3,7 +3,7 @@ import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2 } fro
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import {
   Table,
   TableBody,
@@ -115,10 +115,10 @@ export const QuoteRequestsPage: React.FC = () => {
     const Icon = config.icon;
 
     return (
-      <Badge variant="secondary" className={config.color}>
+      <span className={`inline-flex items-center text-xs capitalize ${statusTone(status)}`}>
         <Icon className="h-3 w-3 mr-1" />
         {status}
-      </Badge>
+      </span>
     );
   };
 

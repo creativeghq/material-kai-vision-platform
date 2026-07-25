@@ -273,19 +273,13 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                                 <Package className="h-4 w-4 text-muted-foreground" />
                                 <h4 className="font-medium">{upsell.name}</h4>
                                 {isAccepted && (
-                                  <Badge className="bg-green-100 text-green-700 border-green-300">
-                                    Accepted
-                                  </Badge>
+                                  <span className="text-xs text-emerald-600 dark:text-emerald-400">Accepted</span>
                                 )}
                                 {isRejected && (
-                                  <Badge className="bg-red-100 text-red-700 border-red-300">
-                                    Rejected
-                                  </Badge>
+                                  <span className="text-xs text-red-500 dark:text-red-400">Rejected</span>
                                 )}
                                 {isPending && !isLocked && (
-                                  <Badge className="bg-amber-100 text-amber-700 border-amber-300">
-                                    Pending Decision
-                                  </Badge>
+                                  <span className="text-xs text-amber-600 dark:text-amber-400">Pending Decision</span>
                                 )}
                               </div>
                               {upsell.description && (

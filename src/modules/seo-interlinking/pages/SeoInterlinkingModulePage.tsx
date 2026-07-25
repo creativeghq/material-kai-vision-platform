@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/utils/edgeError';
-import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
@@ -221,19 +220,19 @@ export const SeoInterlinkingPanel: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         {r.last_crawl_error ? (
-                          <Badge variant="destructive" className="gap-1">
+                          <span className="inline-flex items-center gap-1 text-xs text-red-500 dark:text-red-400">
                             <AlertTriangle className="w-3 h-3" />
                             Error
-                          </Badge>
+                          </span>
                         ) : !r.is_active ? (
-                          <Badge variant="outline">Inactive</Badge>
+                          <span className="text-xs text-muted-foreground">Inactive</span>
                         ) : r.last_crawled_at && r.page_count > 0 ? (
-                          <Badge variant="default" className="gap-1">
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
                             <CheckCircle2 className="w-3 h-3" />
                             Healthy
-                          </Badge>
+                          </span>
                         ) : (
-                          <Badge variant="secondary">Pending</Badge>
+                          <span className="text-xs text-amber-600 dark:text-amber-400">Pending</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">

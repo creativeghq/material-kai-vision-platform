@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { getErrorMessage } from '@/core/errors/utils';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -467,13 +468,13 @@ export const CatalogBuilderPage: React.FC = () => {
                       <tr key={e.id} className="border-t">
                         <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</td>
                         <td className="px-3 py-2">
-                          <Badge variant={e.event_type === 'pdf_download' ? 'default' : 'secondary'} className="text-[10px] py-0">
+                          <span className="text-[10px] text-muted-foreground capitalize inline-flex items-center">
                             {e.event_type === 'pdf_download' ? <FileDown className="h-3 w-3 mr-1 inline" /> : <Eye className="h-3 w-3 mr-1 inline" />}
                             {e.event_type.replace(/_/g, ' ')}
-                          </Badge>
+                          </span>
                         </td>
                         <td className="px-3 py-2 font-medium text-sm">{e.email || '—'}</td>
-                        <td className="px-3 py-2"><Badge variant="outline" className="text-[10px] py-0">{e.matched_kind || '—'}</Badge></td>
+                        <td className="px-3 py-2"><span className="text-[10px] text-muted-foreground capitalize">{e.matched_kind || '—'}</span></td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{e.ip_address || '—'}</td>
                       </tr>
                     ))}
@@ -505,11 +506,11 @@ export const CatalogBuilderPage: React.FC = () => {
                         <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</td>
                         <td className="px-3 py-2 font-medium text-sm">{row.email}</td>
                         <td className="px-3 py-2">
-                          <Badge variant={row.granted_access ? 'default' : 'destructive'} className="text-[10px] py-0">
+                          <span className={`text-[10px] ${row.granted_access ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
                             {row.granted_access ? 'GRANTED' : 'DENIED'}
-                          </Badge>
+                          </span>
                         </td>
-                        <td className="px-3 py-2"><Badge variant="outline" className="text-[10px] py-0">{row.matched_kind}</Badge></td>
+                        <td className="px-3 py-2"><span className="text-[10px] text-muted-foreground capitalize">{row.matched_kind}</span></td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{row.ip_address || '—'}</td>
                       </tr>
                     ))}
@@ -585,11 +586,11 @@ export const CatalogBuilderPage: React.FC = () => {
                               <div className="space-y-0.5 max-h-72 overflow-y-auto">
                                 {batchRecipients[batch.send_batch_id]?.map((r) => (
                                   <div key={r.id} className="flex items-center gap-2 text-xs py-1 border-b border-border/40 last:border-b-0">
-                                    <Badge variant={r.status === 'sent' ? 'default' : r.status === 'failed' ? 'destructive' : 'outline'} className="text-[10px] py-0 shrink-0">
+                                    <span className={`text-[10px] capitalize shrink-0 ${statusTone(r.status)}`}>
                                       {r.status}
-                                    </Badge>
+                                    </span>
                                     <span className="font-mono">{r.recipient_email}</span>
-                                    {r.recipient_member_kind && <Badge variant="outline" className="text-[10px] py-0">{r.recipient_member_kind}</Badge>}
+                                    {r.recipient_member_kind && <span className="text-[10px] text-muted-foreground capitalize">{r.recipient_member_kind}</span>}
                                     {r.first_opened_at && <span title={new Date(r.first_opened_at).toLocaleString()}><Eye className="h-3 w-3 inline" /></span>}
                                     {r.first_downloaded_at && <span title={new Date(r.first_downloaded_at).toLocaleString()}><FileDown className="h-3 w-3 inline" /></span>}
                                     {r.status_message && <span className="text-muted-foreground italic">{r.status_message}</span>}

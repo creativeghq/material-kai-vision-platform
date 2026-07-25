@@ -8,23 +8,13 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Send, Calendar, Users, Play, Pause, Ban, Trash2, AlertTriangle, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { marketingService, type MarketingCampaign, type CampaignStatus } from '../services/marketingService';
+import { statusTone } from '@/utils/statusTone';
+import { marketingService, type MarketingCampaign } from '../services/marketingService';
 import { CreateMarketingCampaignModal } from './CreateMarketingCampaignModal';
 import { CampaignStatsDialog } from './CampaignStatsDialog';
-
-const STATUS_COLORS: Record<CampaignStatus, string> = {
-  draft: 'bg-gray-500',
-  scheduled: 'bg-blue-500',
-  sending: 'bg-yellow-500',
-  sent: 'bg-green-600',
-  partial_failure: 'bg-orange-500',
-  paused: 'bg-orange-600',
-  cancelled: 'bg-red-500',
-};
 
 export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: boolean }> = ({ workspaceId, byokReady }) => {
   const { toast } = useToast();
@@ -113,7 +103,7 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-4"><Badge className={STATUS_COLORS[c.status] || 'bg-gray-500'}>{c.status}</Badge></td>
+                    <td className="py-3 px-4"><span className={`text-sm capitalize ${statusTone(c.status)}`}>{c.status}</span></td>
                     <td className="py-3 px-4 text-sm">{c.template?.name || <span className="text-muted-foreground">—</span>}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1 text-sm"><Users className="h-4 w-4 text-muted-foreground" />{c.recipient_count}</div>

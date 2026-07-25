@@ -3,7 +3,7 @@ import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2, User
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import {
   Table,
   TableBody,
@@ -250,10 +250,10 @@ export const QuoteRequestsAdmin: React.FC = () => {
     const Icon = config.icon;
 
     return (
-      <Badge className={config.className}>
+      <span className={`inline-flex items-center text-xs capitalize ${statusTone(status)}`}>
         <Icon className="h-3 w-3 mr-1" />
         {status}
-      </Badge>
+      </span>
     );
   };
 
@@ -410,16 +410,9 @@ export const QuoteRequestsAdmin: React.FC = () => {
                     <TableCell>{getStatusBadge(quote.status)}</TableCell>
                     <TableCell>
                       {statusTag ? (
-                        <Badge
-                          style={{
-                            backgroundColor: statusTag.color + '20',
-                            color: statusTag.color,
-                            borderColor: statusTag.color,
-                          }}
-                          className="border"
-                        >
+                        <span className="text-xs" style={{ color: statusTag.color }}>
                           {statusTag.name}
-                        </Badge>
+                        </span>
                       ) : (
                         <span className="text-gray-400 text-sm">No tag</span>
                       )}

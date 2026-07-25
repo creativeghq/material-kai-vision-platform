@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -24,6 +23,7 @@ import {
   type ProjectFinanceSummary,
 } from '../../services/projectsService';
 import { humanizeLabel } from '@/utils/humanize';
+import { statusTone } from '@/utils/statusTone';
 
 const money = (n: number | null | undefined, c: string | null | undefined) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c || 'EUR' }).format(n);
@@ -98,13 +98,13 @@ export const FinanceTab: React.FC<{ projectId: string }> = ({ projectId }) => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium truncate">{r.label || r.id.slice(0, 8)}</p>
-                    <Badge variant="outline" className="text-[10px]">{KIND_LABEL[r.kind] || r.kind}</Badge>
+                    <span className="text-[10px] text-muted-foreground capitalize">{KIND_LABEL[r.kind] || r.kind}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">{r.issued_at ? new Date(r.issued_at).toLocaleDateString() : 'Draft'}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-medium">{money(r.total, r.currency)}</p>
-                  <Badge variant="outline" className="text-[10px] mt-1">{humanizeLabel(r.status)}</Badge>
+                  <span className={`mt-1 inline-block text-[10px] capitalize ${statusTone(r.status)}`}>{humanizeLabel(r.status)}</span>
                 </div>
                 {r.kind === 'invoice' && (
                   <Button size="sm" variant="ghost" onClick={() => navigate(`/finance/invoices/${r.id}`)}>Open</Button>

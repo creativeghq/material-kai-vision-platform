@@ -15,6 +15,7 @@ import {
   rejectRoleUpgradeRequest,
   type RoleUpgradeRequest,
 } from '@/services/roleUpgradeRequestService';
+import { statusTone } from '@/utils/statusTone';
 
 interface Props {
   userId: string;
@@ -172,9 +173,14 @@ interface RequestRowProps {
 
 const RequestRow: React.FC<RequestRowProps> = ({ request, onApprove, onReject }) => {
   const statusBadge = () => {
-    if (request.status === 'pending') return <Badge variant="secondary" className="gap-1.5"><Clock className="h-3 w-3" />Pending</Badge>;
-    if (request.status === 'approved') return <Badge className="bg-green-500/20 text-green-700 border-green-500/30 gap-1.5"><CheckCircle2 className="h-3 w-3" />Approved</Badge>;
-    return <Badge variant="destructive" className="gap-1.5"><XCircle className="h-3 w-3" />Rejected</Badge>;
+    const s = request.status;
+    const Icon = s === 'pending' ? Clock : s === 'approved' ? CheckCircle2 : XCircle;
+    const label = s === 'pending' ? 'Pending' : s === 'approved' ? 'Approved' : 'Rejected';
+    return (
+      <span className={`inline-flex items-center gap-1.5 text-xs capitalize ${statusTone(s)}`}>
+        <Icon className="h-3 w-3" />{label}
+      </span>
+    );
   };
 
   return (

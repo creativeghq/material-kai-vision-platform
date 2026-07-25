@@ -326,7 +326,7 @@ const GreekMarketplacesPage: React.FC = () => {
                       {searchResult.hits.map((hit, idx) => (
                         <tr key={`${hit.source}-${hit.product_url}-${idx}`} className="border-t border-white/5">
                           <td className="px-3 py-2">
-                            <Badge variant="outline" className="capitalize">{humanizeLabel(hit.source)}</Badge>
+                            <span className="text-xs text-muted-foreground capitalize">{humanizeLabel(hit.source)}</span>
                           </td>
                           <td className="px-3 py-2">{hit.retailer_name}</td>
                           <td className="px-3 py-2 text-right font-mono text-xs">

@@ -12,7 +12,7 @@ import {
   ArrowDownUp,
   Settings,
 } from 'lucide-react';
-import { QuoteStatusBadge } from '@/lib/quoteStatus';
+import { QuoteStatusWord } from '@/lib/quoteStatus';
 import { QuoteSettingsPage } from './QuoteSettingsPage';
 import { PageHeader } from '@/components/shared/PageHeader';
 
@@ -278,7 +278,7 @@ export const QuotesPage: React.FC = () => {
                       onClick={() => handleViewQuote(quote.id)}
                     >
                       <td className="px-6 py-2.5 font-medium">{quote.name || 'Untitled Quote'}</td>
-                      <td className="px-3 py-2.5"><QuoteStatusBadge status={quote.status} /></td>
+                      <td className="px-3 py-2.5"><QuoteStatusWord status={quote.status} /></td>
                       <td className="px-3 py-2.5 tabular-nums">{quote.total_items || quote.items?.length || 0}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{new Date(quote.created_at).toLocaleDateString()}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{new Date(quote.expires_at).toLocaleDateString()}</td>

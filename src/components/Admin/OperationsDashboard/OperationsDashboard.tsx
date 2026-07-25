@@ -205,6 +205,16 @@ const OperationsDashboardInner: React.FC = () => {
     'Text Chat':      'bg-gray-100 text-gray-600 border-gray-200',
   };
 
+  // Text-only tone per feature — plain colored word for the table row (no pill).
+  const FEATURE_TONE: Record<string, string> = {
+    'VR World':          'text-purple-600 dark:text-purple-400',
+    'Video Walkthrough': 'text-blue-500 dark:text-blue-400',
+    'Interior Design':   'text-amber-600 dark:text-amber-400',
+    'Materials Board':   'text-emerald-600 dark:text-emerald-400',
+    'AI Image':          'text-pink-600 dark:text-pink-400',
+    'Text Chat':         'text-muted-foreground',
+  };
+
 
   // Server-paged table loaders. They report the exact row count so the footer readout describes the
   // whole table instead of whatever slice happened to be fetched for the tiles.
@@ -933,7 +943,7 @@ const OperationsDashboardInner: React.FC = () => {
                       const outputTokens = estimateTokens(chat.content);
                       const cost = calculateCost(model, inputTokens, outputTokens);
                       const featureType = getFeatureType(chat.metadata);
-                      const featureColorClass = FEATURE_COLORS[featureType] || 'bg-gray-100 text-gray-600 border-gray-200';
+                      const featureTone = FEATURE_TONE[featureType] || 'text-muted-foreground';
                       // Extra detail for specific features
                       const genStatus = chat.metadata?.worldData?.status || chat.metadata?.videoData?.status;
                       const boardMode = chat.metadata?.materialsBoardData?.board_mode;
@@ -947,7 +957,7 @@ const OperationsDashboardInner: React.FC = () => {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${featureColorClass}`}>
+                              <span className={`text-xs ${featureTone}`}>
                                 {featureType}
                               </span>
                               {(genStatus || boardMode) && (
@@ -958,9 +968,9 @@ const OperationsDashboardInner: React.FC = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="capitalize">
+                            <span className="text-xs text-muted-foreground capitalize">
                               {chat.metadata?.agentId || 'kai'}
-                            </Badge>
+                            </span>
                           </TableCell>
                           <TableCell>
                             <code className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded border border-border">
@@ -1227,14 +1237,14 @@ const OperationsDashboardInner: React.FC = () => {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs">{svc.category}</Badge>
+                            <span className="text-xs text-muted-foreground">{svc.category}</span>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">per {svc.unit}</TableCell>
                           <TableCell className="text-right font-mono text-sm text-muted-foreground">
                             {svc.raw > 0 ? `$${svc.raw.toFixed(4)}` : <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm">
-                            {svc.billed != null ? `$${svc.billed.toFixed(4)}` : <Badge variant="secondary" className="text-xs">Plan-based</Badge>}
+                            {svc.billed != null ? `$${svc.billed.toFixed(4)}` : <span className="text-xs text-muted-foreground">Plan-based</span>}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm">
                             {svc.key === 'resend-email'

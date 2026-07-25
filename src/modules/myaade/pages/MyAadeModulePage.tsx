@@ -181,7 +181,7 @@ const MyAadeModulePage: React.FC = () => {
                           <span className="text-muted-foreground">·</span>
                           <span className="flex-1">{act.description}</span>
                           {act.kind_description && (
-                            <Badge variant="outline" className="text-[10px] shrink-0">{act.kind_description}</Badge>
+                            <span className="text-[10px] text-muted-foreground capitalize shrink-0">{act.kind_description}</span>
                           )}
                         </div>
                       ))}

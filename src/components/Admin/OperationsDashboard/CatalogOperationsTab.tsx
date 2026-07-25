@@ -18,10 +18,10 @@ import {
   ExternalLink, User as UserIcon,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { FilterBar, applyFilters, type FilterValues } from '@/components/core/filters';
+import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import {
   catalogsService,
@@ -202,7 +202,7 @@ export const CatalogOperationsTab: React.FC = () => {
                           <div className="font-medium">{s.title}</div>
                           {s.slug && <div className="text-xs text-muted-foreground">/c/{s.slug}</div>}
                         </td>
-                        <td className="px-3 py-2"><Badge variant="outline">{s.status}</Badge></td>
+                        <td className="px-3 py-2"><span className={`text-xs capitalize ${statusTone(s.status)}`}>{s.status}</span></td>
                         <td className="px-3 py-2 text-right">{s.page_views}</td>
                         <td className="px-3 py-2 text-right">{s.pdf_downloads}</td>
                         <td className="px-3 py-2 text-right">{s.gate_grants} / <span className={s.gate_denials > 0 ? 'text-destructive' : ''}>{s.gate_denials}</span></td>
@@ -248,13 +248,13 @@ export const CatalogOperationsTab: React.FC = () => {
                       <tr key={e.id} className="border-t hover:bg-muted/20">
                         <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</td>
                         <td className="px-3 py-2">
-                          <Badge variant={e.event_type === 'pdf_download' ? 'default' : 'secondary'} className="text-[10px] py-0">
+                          <span className="inline-flex items-center text-xs text-muted-foreground capitalize">
                             {e.event_type === 'pdf_download' ? <FileDown className="h-3 w-3 mr-1 inline" /> : <Eye className="h-3 w-3 mr-1 inline" />}
                             {(e.event_type ?? 'event').replace(/_/g, ' ')}
-                          </Badge>
+                          </span>
                         </td>
                         <td className="px-3 py-2 font-medium">{e.email || '—'}</td>
-                        <td className="px-3 py-2"><Badge variant="outline" className="text-[10px] py-0">{e.matched_kind || '—'}</Badge></td>
+                        <td className="px-3 py-2"><span className="text-xs text-muted-foreground capitalize">{e.matched_kind || '—'}</span></td>
                         <td className="px-3 py-2 text-xs">
                           <button className="hover:underline text-primary" onClick={() => navigate(`/admin/catalogs/${e.catalog_id}`)}>
                             {e.catalog_title || e.catalog_id.slice(0, 8)}
@@ -302,11 +302,11 @@ export const CatalogOperationsTab: React.FC = () => {
                         <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</td>
                         <td className="px-3 py-2 font-medium">{row.email}</td>
                         <td className="px-3 py-2">
-                          <Badge variant={row.granted_access ? 'default' : 'destructive'} className="text-[10px] py-0">
+                          <span className={`text-xs font-medium ${row.granted_access ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
                             {row.granted_access ? 'GRANTED' : 'DENIED'}
-                          </Badge>
+                          </span>
                         </td>
-                        <td className="px-3 py-2"><Badge variant="outline" className="text-[10px] py-0">{row.matched_kind}</Badge></td>
+                        <td className="px-3 py-2"><span className="text-xs text-muted-foreground capitalize">{row.matched_kind}</span></td>
                         <td className="px-3 py-2 text-xs">
                           <button className="hover:underline text-primary" onClick={() => navigate(`/admin/catalogs/${row.catalog_id}`)}>
                             {row.catalog_title || row.catalog_id.slice(0, 8)}

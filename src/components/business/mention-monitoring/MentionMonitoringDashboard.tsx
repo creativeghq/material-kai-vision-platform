@@ -8,13 +8,13 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Sparkles, RefreshCw, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { TrackedMention } from '@/services/mentionMonitoringApi';
+import { statusTone } from '@/utils/statusTone';
 import { buildTrackedMentionFilters } from './mentionFilters';
 
 const MentionMonitoringDashboard: React.FC = () => {
@@ -120,11 +120,11 @@ const MentionMonitoringDashboard: React.FC = () => {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="text-[10px]">{r.subject_type}</Badge>
+                        <span className="text-[10px] text-muted-foreground capitalize">{r.subject_type}</span>
                         {r.is_active ? (
-                          <Badge className="text-[10px] bg-green-500/20 text-green-300 border-green-500/40">Active</Badge>
+                          <span className={`text-[10px] capitalize ${statusTone('active')}`}>Active</span>
                         ) : (
-                          <Badge className="text-[10px] bg-gray-500/20 text-gray-300">Inactive</Badge>
+                          <span className={`text-[10px] capitalize ${statusTone('inactive')}`}>Inactive</span>
                         )}
                         <span className="font-medium text-sm truncate">
                           {r.subject_label}

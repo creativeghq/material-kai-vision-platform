@@ -9,7 +9,6 @@ import {
 } from '@/components/core/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Eye, Loader2, Trash2, FileText, Code, Globe, Package, RefreshCw } from 'lucide-react';
 import { FilterBar, applyFiltersToQuery, type FilterValues } from '@/components/core/filters';
 import { buildMaterialsDataFilters } from './materialsDataFilters';
@@ -188,23 +187,23 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
   };
 
   const getSourceBadge = (sourceType: string | null | undefined) => {
-    if (!sourceType) return <Badge variant="outline">Unknown</Badge>;
+    if (!sourceType) return <span className="text-xs text-muted-foreground">Unknown</span>;
 
     const badges = {
-      pdf_processing: { label: 'PDF', icon: FileText, color: 'bg-blue-100 text-blue-700' },
-      xml_import: { label: 'XML', icon: Code, color: 'bg-green-100 text-green-700' },
-      web_scraping: { label: 'Web', icon: Globe, color: 'bg-purple-100 text-purple-700' },
+      pdf_processing: { label: 'PDF', icon: FileText, color: 'text-blue-600 dark:text-blue-400' },
+      xml_import: { label: 'XML', icon: Code, color: 'text-emerald-600 dark:text-emerald-400' },
+      web_scraping: { label: 'Web', icon: Globe, color: 'text-purple-600 dark:text-purple-400' },
     };
 
     const badge = badges[sourceType as keyof typeof badges];
-    if (!badge) return <Badge variant="outline">{sourceType}</Badge>;
+    if (!badge) return <span className="text-xs text-muted-foreground capitalize">{sourceType}</span>;
 
     const Icon = badge.icon;
     return (
-      <Badge className={`${badge.color} flex items-center gap-1`}>
+      <span className={`inline-flex items-center gap-1 text-xs ${badge.color}`}>
         <Icon className="h-3 w-3" />
         {badge.label}
-      </Badge>
+      </span>
     );
   };
 
@@ -280,16 +279,16 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                     <TableCell className="font-medium">{getProductName(product)}</TableCell>
                     <TableCell>{getSourceBadge(product.source_type)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">
+                      <span className="text-xs text-muted-foreground capitalize">
                         {category}
-                      </Badge>
+                      </span>
                     </TableCell>
                     <TableCell>
                       {product.text_embedding_1024 ? (
-                        <Badge className="bg-green-100 text-green-700">Embedded</Badge>
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400">Embedded</span>
                       ) : (
                         <div className="flex items-center gap-1">
-                          <Badge variant="destructive">Missing</Badge>
+                          <span className="text-xs text-red-500 dark:text-red-400">Missing</span>
                           <Button
                             variant="ghost"
                             size="sm"

@@ -653,12 +653,11 @@ function GapsGainsTab({ data }: { data: GapsGainsData }) {
         {filtered.map((topic, i) => (
           <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
             <div className="flex items-center gap-3">
-              <Badge
-                variant="secondary"
-                className={topic.type === 'gap' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}
+              <span
+                className={`text-sm capitalize ${topic.type === 'gap' ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}
               >
                 {topic.type}
-              </Badge>
+              </span>
               <span className="text-sm">{topic.topic}</span>
             </div>
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -802,13 +801,13 @@ function ResearchTab({ data }: { data: ResearchTabData }) {
                 <span className="text-sm">{term.term}</span>
                 <span className="text-xs text-center">{term.usage}x</span>
                 <span className="text-center">
-                  <Badge variant="outline" className={`text-xs ${
-                    imp === 'high' ? 'border-red-300 text-red-600' :
-                    imp === 'medium' ? 'border-yellow-300 text-yellow-600' :
-                    'border-gray-300 text-gray-500'
+                  <span className={`text-xs capitalize ${
+                    imp === 'high' ? 'text-red-500 dark:text-red-400' :
+                    imp === 'medium' ? 'text-amber-600 dark:text-amber-400' :
+                    'text-muted-foreground'
                   }`}>
                     {imp}
-                  </Badge>
+                  </span>
                 </span>
                 <span className="flex justify-center">
                   <TrendIcon trend={term.trend} />
@@ -1041,7 +1040,7 @@ function InterlinkingTab({ data, markdown }: { data: InterlinkingData; markdown:
                   <span className="text-sm truncate">{link.anchor}</span>
                 </div>
                 <code className="text-xs text-muted-foreground truncate max-w-[40%]">{link.href}</code>
-                <Badge variant="outline" className="text-[10px] flex-shrink-0">{link.kind}</Badge>
+                <span className="text-[10px] text-muted-foreground capitalize flex-shrink-0">{link.kind}</span>
               </div>
             ))}
           </div>

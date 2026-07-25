@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Loader2, FileText, Download, Trash2, Wand2, ScanLine, Receipt, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { statusTone } from '@/utils/statusTone';
 import {
   hrService, type AccountingDoc, type Reconciliation, ACCT_KIND_GROUP_LABELS,
 } from '../services/hrService';
@@ -14,7 +14,6 @@ import { SectionHeader, EmptyState, fileToBase64, hrMoney } from './_shared';
 
 const money = (n: number | null | undefined, c: string) => hrMoney(n, c, { nullDash: true });
 const thisMonth = () => new Date().toISOString().slice(0, 7);
-const statusVariant: Record<string, 'secondary' | 'default' | 'destructive'> = { uploaded: 'secondary', analyzed: 'default', error: 'destructive' };
 
 export function AccountingSection({ workspaceId, canManage }: { workspaceId: string | null; canManage: boolean }) {
   const { toast } = useToast();
@@ -73,7 +72,7 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
     <div className="space-y-4">
       <SectionHeader
         title="Accounting documents"
-        subtitle="Upload the month's statutory payment docs (EFKA / tax / APD) — AI reads the Payment ID & amounts"
+        subtitle="Upload the month's statutory payment docs (EFKA / Tax / APD) — AI reads the Payment ID & amounts"
         actions={
           <div className="flex items-center gap-2">
             <Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} className="h-9 w-40" />
@@ -101,7 +100,7 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
                       <div className="font-medium truncate">{d.name}</div>
                       <div className="text-xs text-muted-foreground">{d.doc_kind || 'Not analyzed'}{d.extracted?.kind_group ? ` · ${ACCT_KIND_GROUP_LABELS[d.extracted.kind_group] ?? d.extracted.kind_group}` : ''}{d.status === 'analyzed' && d.ai_confidence != null ? ` · ${Math.round((d.ai_confidence || 0) * 100)}% confidence` : ''}</div>
                     </div>
-                    <Badge variant={statusVariant[d.status]}>{d.status}</Badge>
+                    <span className={`text-xs capitalize ${statusTone(d.status)}`}>{d.status}</span>
                     {canManage && d.status !== 'analyzed' && (
                       <Button size="sm" variant="outline" className="rounded-full h-8" disabled={busy === d.id} onClick={() => analyze(d)} title="AI OCR — credits charged by actual usage">
                         {busy === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ScanLine className="h-4 w-4 mr-1" />Analyze</>}
@@ -147,7 +146,7 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
                   <div key={i} className="flex items-center justify-between gap-2 text-xs border-b border-border/30 py-1">
                     <span className="capitalize">{m.obligation?.replace('_', ' ')}</span>
                     <span className="text-muted-foreground">{m.document_name || '—'}{m.payment_id ? ` · ${m.payment_id}` : ''}</span>
-                    <Badge variant={m.status === 'matched' ? 'default' : m.status === 'mismatch' ? 'destructive' : 'secondary'}>{m.status}</Badge>
+                    <span className={`text-xs capitalize ${statusTone(m.status === 'matched' ? 'match' : m.status)}`}>{m.status}</span>
                   </div>
                 ))}
               </div>

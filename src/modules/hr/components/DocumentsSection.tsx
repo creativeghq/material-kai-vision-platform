@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Loader2, FolderOpen, FileText, Download, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Label } from '@/components/core/ui/label';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
@@ -60,7 +59,7 @@ export function DocumentsSection({ workspaceId, canManage }: { workspaceId: stri
                 {paginate(docs, page).map((d) => (
                   <TableRow key={d.id}>
                     <TableCell className="font-medium flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" />{d.name}</TableCell>
-                    <TableCell><Badge variant="outline">{DOC_TYPE_LABELS[d.doc_type]}</Badge></TableCell>
+                    <TableCell><span className="text-sm text-muted-foreground capitalize">{DOC_TYPE_LABELS[d.doc_type]}</span></TableCell>
                     <TableCell>{d.employee?.contact?.name || '—'}</TableCell>
                     <TableCell className="text-muted-foreground">{d.created_at?.slice(0, 10)}</TableCell>
                     <TableCell className="text-right">

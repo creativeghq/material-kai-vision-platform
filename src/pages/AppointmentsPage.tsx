@@ -7,6 +7,7 @@ import {
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/core/ui/sheet';
@@ -335,9 +336,9 @@ export const AppointmentsPage: React.FC<{ embedded?: boolean }> = ({ embedded = 
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <Badge className={`text-xs border ${STATUS_COLORS[appt.status]}`}>
+                    <span className={`text-xs capitalize ${statusTone(appt.status)}`}>
                       {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
-                    </Badge>
+                    </span>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </div>

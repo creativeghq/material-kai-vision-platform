@@ -1018,7 +1018,7 @@ export const CompanyDetailPage: React.FC = () => {
                           </TableCell>
                           <TableCell>
                             {contact.is_primary && (
-                              <Badge variant="secondary">Primary</Badge>
+                              <span className="text-xs text-muted-foreground capitalize">Primary</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right">

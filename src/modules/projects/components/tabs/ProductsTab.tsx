@@ -28,6 +28,7 @@ import {
   type ProjectProductStatus,
   type ProjectProductWithDisplay,
 } from '../../services/projectsService';
+import { statusTone } from '@/utils/statusTone';
 
 const STATUS_LABELS: Record<ProjectProductStatus, string> = {
   selection: 'Selection',
@@ -35,14 +36,6 @@ const STATUS_LABELS: Record<ProjectProductStatus, string> = {
   ordered: 'Ordered',
   shipped: 'Shipped',
   delivered: 'Delivered',
-};
-
-const STATUS_TONES: Record<ProjectProductStatus, string> = {
-  selection: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  confirmed: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
-  ordered: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  shipped: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
-  delivered: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
 };
 
 const money = (n: number | null | undefined, c: string | null | undefined) =>
@@ -181,7 +174,7 @@ export const ProductsTab: React.FC<{ projectId: string; workspaceId?: string | n
                   ))}
                 </SelectContent>
               </Select>
-              <Badge variant="outline" className={`hidden md:inline-flex ${STATUS_TONES[r.status]}`}>{STATUS_LABELS[r.status]}</Badge>
+              <span className={`hidden md:inline-flex text-xs capitalize ${statusTone(r.status)}`}>{STATUS_LABELS[r.status]}</span>
 
               <div className="text-right w-[110px]">
                 <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Reference</p>
@@ -339,7 +332,7 @@ const AddProductDialog: React.FC<{
         ) : (
           <div className="space-y-2">
             <div className="space-y-1"><Label>Name</Label><Input value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="e.g. Bespoke oak door" /></div>
-            <div className="space-y-1"><Label>SKU / ref (optional)</Label><Input value={customSku} onChange={(e) => setCustomSku(e.target.value)} /></div>
+            <div className="space-y-1"><Label>SKU / Ref (optional)</Label><Input value={customSku} onChange={(e) => setCustomSku(e.target.value)} /></div>
           </div>
         )}
 

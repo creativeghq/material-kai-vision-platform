@@ -21,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
-import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -371,9 +370,9 @@ export const MaterialSuggestionsPanel: React.FC<{ embedded?: boolean }> = ({ emb
                               {(suggestion.confidence * 100).toFixed(0)}%
                             </span>
                           </div>
-                          <Badge className="border border-border bg-background text-foreground">
+                          <span className="text-xs text-muted-foreground capitalize">
                             {suggestion.source}
-                          </Badge>
+                          </span>
                         </div>
                       </div>
                     ))}

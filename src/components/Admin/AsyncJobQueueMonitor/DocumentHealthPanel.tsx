@@ -365,13 +365,13 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
                       </p>
                     </div>
                     {p.missing_critical.length === 0 ? (
-                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px]">
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
                         All critical fields present
-                      </Badge>
+                      </span>
                     ) : (
-                      <Badge variant="outline" className="bg-amber-50 border-amber-200 text-amber-800 text-[10px]">
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400">
                         {p.missing_critical.length} missing
-                      </Badge>
+                      </span>
                     )}
                   </div>
 

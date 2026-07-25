@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, Package, AlertTriangle, PackageX, ArrowLeftRight, ClipboardList, Warehouse as WarehouseIcon, PackageCheck, Inbox, Coins, ShoppingCart } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { stockService, type StockOverview, type StockValuation, type LowStockItem } from '../services/stockService';
@@ -153,7 +152,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
                     <td className="px-4 py-2 font-mono text-xs">{it.sku ?? '—'}</td>
                     <td className="px-4 py-2 text-right">
                       {it.qty_on_hand}
-                      <Badge variant="outline" className="ml-2 border-amber-500/50 text-amber-500"><AlertTriangle className="h-3 w-3 mr-1" />low</Badge>
+                      <span className="ml-2 inline-flex items-center text-xs text-amber-600 dark:text-amber-400"><AlertTriangle className="h-3 w-3 mr-1" />low</span>
                     </td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{it.reorder_point}</td>
                     <td className="px-4 py-2 text-right">

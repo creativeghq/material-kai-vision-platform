@@ -20,7 +20,6 @@ import { companiesAPI } from '@/services/crm.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
-import { Badge } from '@/components/core/ui/badge';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
@@ -291,11 +290,11 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
                         <span className="text-xs text-muted-foreground">Checking…</span>
                       ) : match ? (
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <Badge variant="default" className="text-[10px]">
+                          <span className="text-[10px] inline-flex items-center text-emerald-600 dark:text-emerald-400">
                             <Check className="h-3 w-3 mr-1" /> Linked
-                          </Badge>
+                          </span>
                           {match.is_supplier && (
-                            <Badge variant="secondary" className="text-[10px]">Supplier</Badge>
+                            <span className="text-[10px] text-muted-foreground">Supplier</span>
                           )}
                           {match.vat_number && (
                             <span className="text-[10px] font-mono text-muted-foreground">
@@ -304,7 +303,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
                           )}
                         </div>
                       ) : (
-                        <Badge variant="outline" className="text-[10px]">Not in CRM</Badge>
+                        <span className="text-[10px] text-muted-foreground">Not in CRM</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">

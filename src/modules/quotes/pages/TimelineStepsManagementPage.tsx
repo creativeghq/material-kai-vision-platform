@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Loader2, GitBranch, ArrowUp, ArrowDown, GripVertical, Save } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import {
   Table,
   TableBody,
@@ -400,9 +400,9 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={step.is_active ? 'default' : 'secondary'}>
+                        <span className={`text-xs capitalize ${statusTone(step.is_active ? 'active' : 'inactive')}`}>
                           {step.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -507,9 +507,9 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
                         {step.description || <span className="text-gray-400 italic">No description</span>}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={step.is_active ? 'default' : 'secondary'}>
+                        <span className={`text-xs capitalize ${statusTone(step.is_active ? 'active' : 'inactive')}`}>
                           {step.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
+                        </span>
                       </TableCell>
                       <TableCell>
                         <span className="text-gray-600">{step.display_order}</span>

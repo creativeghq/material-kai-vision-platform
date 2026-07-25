@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Network, Save, Link2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
@@ -159,7 +158,7 @@ const MarketplaceNetworkPage: React.FC = () => {
                   return (
                     <tr key={r.id} className="border-b border-border/30">
                       <td className="px-4 py-2 font-medium">{r.name}</td>
-                      <td className="px-4 py-2"><Badge variant="outline" className="text-[10px] uppercase">{rankOf(r)}</Badge></td>
+                      <td className="px-4 py-2"><span className="text-[10px] uppercase text-muted-foreground">{rankOf(r)}</span></td>
                       <td className="px-4 py-2 text-muted-foreground">{r.parent_workspace_id ? (nameById[r.parent_workspace_id] ?? '—') : '—'}</td>
                       <td className="px-4 py-2">
                         {canEdit ? (

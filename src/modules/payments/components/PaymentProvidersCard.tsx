@@ -8,6 +8,7 @@ import { CreditCard, Sliders, CheckCircle2, Sparkles, Loader2 } from 'lucide-rea
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { registeredModules } from '@/modules/_core';
@@ -80,7 +81,7 @@ export const PaymentProvidersCard: React.FC<{ workspaceId: string }> = ({ worksp
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{p.name}</span>
                       {entitled
-                        ? <Badge className="rounded-full border-0 bg-emerald-500/15 text-[10px] text-emerald-500"><CheckCircle2 className="mr-1 h-3 w-3" />Enabled</Badge>
+                        ? <span className={`inline-flex items-center text-[10px] capitalize ${statusTone('enabled')}`}><CheckCircle2 className="mr-1 h-3 w-3" />Enabled</span>
                         : price ? <Badge className="rounded-full border-0 bg-muted text-[10px]">{price}</Badge> : null}
                     </div>
                     <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{p.description}</div>

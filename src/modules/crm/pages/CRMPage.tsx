@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { leadScoreTint } from '@/modules/crm/services/leadScoring';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import {
@@ -615,9 +616,9 @@ export const CRMManagement: React.FC = () => {
                             </Select>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">{professionalTypeLabel(user.professional_type) || '-'}</TableCell>
-                          <TableCell><Badge variant="secondary">{humanizeLabel(user.subscription_tier)}</Badge></TableCell>
+                          <TableCell><span className="text-xs text-muted-foreground capitalize">{humanizeLabel(user.subscription_tier)}</span></TableCell>
                           <TableCell><div className="flex items-center gap-2"><CreditCard className="h-4 w-4 text-muted-foreground" />{user.credits || 0}</div></TableCell>
-                          <TableCell><Badge variant={user.status === 'active' ? 'default' : 'secondary'}>{humanizeLabel(user.status)}</Badge></TableCell>
+                          <TableCell><span className={`text-xs capitalize ${statusTone(user.status)}`}>{humanizeLabel(user.status)}</span></TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button variant="ghost" size="sm" onClick={() => handleResetPassword(user.email)} title="Reset password"><Key className="h-4 w-4 text-blue-500" /></Button>

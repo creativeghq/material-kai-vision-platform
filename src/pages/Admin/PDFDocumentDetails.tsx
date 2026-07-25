@@ -466,9 +466,9 @@ export const PDFDocumentDetails: React.FC = () => {
                       {paginate(document.chunks, chunksPage).map((chunk) => (
                         <TableRow key={chunk.id}>
                           <TableCell>
-                            <Badge variant="outline">
+                            <span className="text-xs text-muted-foreground capitalize">
                               {chunk.category || 'general'}
-                            </Badge>
+                            </span>
                           </TableCell>
                           <TableCell className="max-w-md">
                             <p className="truncate">
@@ -617,7 +617,7 @@ export const PDFDocumentDetails: React.FC = () => {
                       {paginate(document.document_entities, entitiesPage).map((entity) => (
                         <TableRow key={entity.id}>
                           <TableCell>
-                            <Badge>{entity.entity_type}</Badge>
+                            <span className="text-xs text-muted-foreground capitalize">{entity.entity_type}</span>
                           </TableCell>
                           <TableCell className="font-medium">
                             {entity.name}

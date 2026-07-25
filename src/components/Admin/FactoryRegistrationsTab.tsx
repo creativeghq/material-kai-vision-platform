@@ -108,9 +108,9 @@ export const FactoryRegistrationsTab: React.FC = () => {
   };
 
   const statusColor = (s: string) => {
-    if (s === 'pending') return 'bg-amber-500/10 text-amber-700 border-amber-500/30';
-    if (s === 'approved') return 'bg-green-500/10 text-green-700 border-green-500/30';
-    return 'bg-destructive/10 text-destructive border-destructive/30';
+    if (s === 'pending') return 'text-amber-600 dark:text-amber-400';
+    if (s === 'approved') return 'text-emerald-600 dark:text-emerald-400';
+    return 'text-destructive';
   };
 
   if (loading) {
@@ -147,8 +147,8 @@ export const FactoryRegistrationsTab: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm">{req.company_name}</p>
-                      <Badge variant="outline" className="text-xs capitalize">{req.professional_type}</Badge>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${statusColor(req.status)}`}>
+                      <span className="text-xs capitalize text-muted-foreground">{req.professional_type}</span>
+                      <span className={`text-xs font-medium capitalize ${statusColor(req.status)}`}>
                         {req.status}
                       </span>
                     </div>

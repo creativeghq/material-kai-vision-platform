@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, DollarSign, Loader2, Package, ArrowUp, ArrowDown, Users } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import {
   Table,
   TableBody,
@@ -335,9 +335,9 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
                       </TableCell>
                       <TableCell>{formatPrice(upsell.price)}</TableCell>
                       <TableCell>
-                        <Badge variant={upsell.is_active ? 'default' : 'secondary'}>
+                        <span className={`text-xs capitalize ${statusTone(upsell.is_active ? 'active' : 'inactive')}`}>
                           {upsell.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -499,9 +499,9 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={upsell.is_active ? 'default' : 'secondary'}>
+                          <span className={`text-xs capitalize ${statusTone(upsell.is_active ? 'active' : 'inactive')}`}>
                             {upsell.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Tooltip>

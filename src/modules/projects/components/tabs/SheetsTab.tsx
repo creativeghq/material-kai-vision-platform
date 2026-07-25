@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { FileImage, Loader2, ArrowRight, Palette } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { projectsService } from '../../services/projectsService';
 import { humanizeLabel } from '@/utils/humanize';
+import { statusTone } from '@/utils/statusTone';
 
 interface SheetsTabProps {
   projectId: string;
@@ -21,13 +21,6 @@ const SHEET_TYPE_LABEL: Record<string, string> = {
   elevation_render_pair: 'Elevation / Render',
   ffe_schedule: 'FF&E Schedule',
   full_deck: 'Full Deck',
-};
-
-const STATUS_TONE: Record<string, string> = {
-  pending: 'bg-muted text-muted-foreground border-border',
-  generating: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  ready: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  failed: 'bg-destructive/15 text-destructive border-destructive/30',
 };
 
 type Sheet = Awaited<ReturnType<typeof projectsService.listProjectSheets>>[number];
@@ -114,9 +107,9 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId }) => {
                       Created {new Date(s.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                     </p>
                   </div>
-                  <Badge variant="outline" className={`text-xs ${STATUS_TONE[s.status] || ''}`}>
+                  <span className={`text-xs capitalize ${statusTone(s.status)}`}>
                     {humanizeLabel(s.status)}
-                  </Badge>
+                  </span>
                   {s.pdf_storage_path && (
                     <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                   )}

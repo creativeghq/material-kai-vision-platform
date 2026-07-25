@@ -9,6 +9,7 @@ import { CalendarDays, Clock, Mail, MessageSquare, Loader2, Check, Trash2, Build
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import { crmMeetingsService, type CrmMeeting } from '@/services/crmMeetingsService';
 import { getErrorMessage } from '@/core/errors/utils';
@@ -71,7 +72,7 @@ export const ProfileMeetingsTab: React.FC = () => {
               {m.party_name}
             </button>
           )}
-          {m.status === 'done' && <Badge variant="secondary" className="text-[10px]">Done</Badge>}
+          {m.status === 'done' && <span className={`text-[10px] capitalize ${statusTone(m.status)}`}>Done</span>}
           {isUpcoming(m) && m.remind_email && (
             <Badge variant="outline" className="gap-1 text-[10px]"><Mail className="h-3 w-3" /> Email{m.reminder_sent_at ? ' · sent' : ''}</Badge>
           )}

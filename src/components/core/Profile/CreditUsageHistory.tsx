@@ -294,9 +294,9 @@ export const CreditUsageHistory: React.FC = () => {
                           </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-normal">
+                          <span className="text-xs text-muted-foreground capitalize">
                             {category}
-                          </Badge>
+                          </span>
                         </TableCell>
                         <TableCell className="hidden whitespace-nowrap text-xs text-muted-foreground md:table-cell">
                           {formatDate(t.created_at)}

@@ -540,18 +540,17 @@ export const SearchAnalyticsDashboard = () => {
 
                 return (
                   <div key={index} className="flex items-center gap-4">
-                    <Badge
-                      variant={
+                    <span
+                      className={`inline-block w-20 text-center text-xs font-medium ${
                         priority === 'high'
-                          ? 'destructive'
+                          ? 'text-red-500 dark:text-red-400'
                           : priority === 'medium'
-                            ? 'default'
-                            : 'secondary'
-                      }
-                      className="w-20 justify-center"
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-muted-foreground'
+                      }`}
                     >
                       {priority.toUpperCase()}
-                    </Badge>
+                    </span>
                     <div className="flex-1">
                       <div className="font-medium">{material.material_name}</div>
                       <div className="text-sm text-muted-foreground">
@@ -841,7 +840,7 @@ export const SearchAnalyticsDashboard = () => {
                     <Badge variant="outline" className="font-mono shrink-0">#{i + 1}</Badge>
                     <span className="font-medium truncate">{q.query_text}</span>
                     {q.is_product_name && (
-                      <Badge variant="secondary" className="shrink-0 text-xs">product-name</Badge>
+                      <span className="shrink-0 text-xs text-muted-foreground">product-name</span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-sm shrink-0">

@@ -5,8 +5,9 @@ import {
 } from '@/components/core/ui/sheet';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
-import { listRuns, cancelRun, formatDuration, statusColor } from '@/services/backgroundAgents';
+import { listRuns, cancelRun, formatDuration } from '@/services/backgroundAgents';
 import type { BackgroundAgent, AgentRun } from '@/services/backgroundAgents';
+import { statusTone } from '@/utils/statusTone';
 import { AgentLogsViewer } from './AgentLogsViewer';
 import { JobResearchSavedJobsPanel } from './JobResearchSavedJobsPanel';
 import { TechRadarFindingsPanel } from './TechRadarFindingsPanel';
@@ -88,9 +89,9 @@ export function AgentRunHistoryDrawer({ agent, open, onClose }: AgentRunHistoryD
                   ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
 
-                <Badge className={`text-xs ${statusColor(run.status)}`}>
+                <span className={`text-xs capitalize ${statusTone(run.status)}`}>
                   {run.status}
-                </Badge>
+                </span>
 
                 <span className="text-xs text-muted-foreground capitalize">{run.triggered_by}</span>
 

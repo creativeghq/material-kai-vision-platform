@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw, ShieldCheck, AlertTriangle, Wrench, Check, EyeOff, Loader2 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Switch } from '@/components/core/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
@@ -16,9 +15,9 @@ import {
 } from '@/services/dataIntegrityService';
 
 const sevTone: Record<IntegritySeverity, string> = {
-  critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-  warning: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  info: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+  critical: 'text-red-500 dark:text-red-400',
+  warning: 'text-amber-600 dark:text-amber-400',
+  info: 'text-sky-600 dark:text-sky-400',
 };
 
 export default function DataHealthPage() {
@@ -154,7 +153,7 @@ export default function DataHealthPage() {
                         return (
                           <TableRow key={f.id}>
                             <TableCell><div className="font-medium">{c?.title ?? f.check_key}</div><div className="text-[11px] text-muted-foreground">{f.domain}</div></TableCell>
-                            <TableCell><Badge variant="outline" className={sevTone[f.severity]}>{f.severity}</Badge></TableCell>
+                            <TableCell><span className={`text-xs capitalize ${sevTone[f.severity]}`}>{f.severity}</span></TableCell>
                             <TableCell className="text-xs"><div>{f.entity_table}</div><div className="font-mono text-muted-foreground">{f.entity_id?.slice(0, 8)}</div></TableCell>
                             <TableCell className="text-[11px] text-muted-foreground max-w-[280px] truncate font-mono">{JSON.stringify(f.detail)}</TableCell>
                             <TableCell className="text-right whitespace-nowrap">
@@ -163,7 +162,7 @@ export default function DataHealthPage() {
                                   {busyKey === f.check_key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Wrench className="h-3.5 w-3.5 mr-1" /> Heal</>}
                                 </Button>
                               )}
-                              <Button variant="ghost" size="sm" onClick={() => ignoreFinding(f.id)} title="Accept / won't-fix"><EyeOff className="h-3.5 w-3.5 mr-1" /> Ignore</Button>
+                              <Button variant="ghost" size="sm" onClick={() => ignoreFinding(f.id)} title="Accept / Won't-fix"><EyeOff className="h-3.5 w-3.5 mr-1" /> Ignore</Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -198,7 +197,7 @@ export default function DataHealthPage() {
                       <TableRow key={c.key}>
                         <TableCell><div className="font-medium">{c.title}</div><div className="text-[11px] text-muted-foreground max-w-[420px]">{c.description}</div></TableCell>
                         <TableCell className="text-xs">{c.domain}</TableCell>
-                        <TableCell><Badge variant="outline" className={sevTone[c.severity]}>{c.severity}</Badge></TableCell>
+                        <TableCell><span className={`text-xs capitalize ${sevTone[c.severity]}`}>{c.severity}</span></TableCell>
                         <TableCell className="text-center"><Switch checked={c.is_enabled} onCheckedChange={(v) => toggleCheck(c.key, v)} /></TableCell>
                         <TableCell className="text-center">
                           {c.can_autoheal

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock, LogIn, LogOut, Loader2, Settings, Copy, Check, Bell, Smartphone } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
@@ -107,10 +106,10 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
                     <TableCell className="text-sm text-muted-foreground">{fmtTime(r.work_start_time)}–{fmtTime(r.work_end_time)}</TableCell>
                     <TableCell>
                       {r.clocked_in
-                        ? <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">In{r.last_is_late ? ' · late' : ''}</Badge>
+                        ? <span className="text-sm text-emerald-600 dark:text-emerald-400">In{r.last_is_late ? ' · late' : ''}</span>
                         : r.last_punch_type === 'departure'
-                          ? <Badge variant="secondary">Out</Badge>
-                          : <Badge variant="outline">—</Badge>}
+                          ? <span className="text-sm text-muted-foreground">Out</span>
+                          : <span className="text-sm text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {r.last_at ? new Date(r.last_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
@@ -195,7 +194,7 @@ function SettingsDialog({ workspaceId, settings, onSaved }: { workspaceId: strin
                   {candidates.map((c) => (
                     <label key={c.user_id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer">
                       <input type="checkbox" checked={s.notify_user_ids.includes(c.user_id)} onChange={() => toggleUser(c.user_id)} />
-                      <span>{c.name}</span>{c.role && <Badge variant="outline" className="ml-auto text-[10px]">{c.role}</Badge>}
+                      <span>{c.name}</span>{c.role && <span className="ml-auto text-[10px] text-muted-foreground capitalize">{c.role}</span>}
                     </label>
                   ))}
                 </div>

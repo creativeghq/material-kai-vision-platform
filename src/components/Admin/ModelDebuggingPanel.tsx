@@ -257,13 +257,13 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'working':
-        return 'bg-green-500/20 text-green-600 border-green-200';
+        return 'text-emerald-600 dark:text-emerald-400';
       case 'failing':
-        return 'bg-red-500/20 text-red-600 border-red-200';
+        return 'text-red-500 dark:text-red-400';
       case 'untested':
-        return 'bg-yellow-500/20 text-yellow-600 border-yellow-200';
+        return 'text-amber-600 dark:text-amber-400';
       default:
-        return 'bg-gray-500/20 text-gray-600 border-gray-200';
+        return 'text-muted-foreground';
     }
   };
 
@@ -504,15 +504,15 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(model.status)}>
+                        <span className={`inline-flex items-center text-xs ${getStatusColor(model.status)}`}>
                           {getStatusIcon(model.status)}
                           <span className="ml-1 capitalize">
                             {model.status}
                           </span>
-                        </Badge>
-                        <Badge className="border border-border bg-background text-foreground text-xs">
+                        </span>
+                        <span className="text-xs text-muted-foreground capitalize">
                           {model.type}
-                        </Badge>
+                        </span>
                       </div>
                     </div>
                   </AccordionTrigger>

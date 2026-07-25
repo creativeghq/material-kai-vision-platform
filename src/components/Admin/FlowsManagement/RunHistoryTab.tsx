@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { flowService } from '@/services/flows';
 import type { Flow, FlowRun, FlowRunStep, FlowRunStatus } from '@/services/flows';
@@ -22,12 +21,12 @@ import { useToast } from '@/hooks/use-toast';
 import { buildFlowRunFilters } from './flowRunFilters';
 
 const statusConfig: Record<FlowRunStatus, { icon: React.ElementType; color: string; label: string }> = {
-  pending: { icon: Clock, color: 'text-gray-500 bg-gray-500/10', label: 'Pending' },
-  running: { icon: Loader2, color: 'text-blue-500 bg-blue-500/10', label: 'Running' },
-  completed: { icon: CheckCircle2, color: 'text-emerald-500 bg-emerald-500/10', label: 'Completed' },
-  failed: { icon: XCircle, color: 'text-red-500 bg-red-500/10', label: 'Failed' },
-  cancelled: { icon: XCircle, color: 'text-amber-500 bg-amber-500/10', label: 'Cancelled' },
-  timed_out: { icon: AlertTriangle, color: 'text-orange-500 bg-orange-500/10', label: 'Timed Out' },
+  pending: { icon: Clock, color: 'text-gray-500', label: 'Pending' },
+  running: { icon: Loader2, color: 'text-blue-500', label: 'Running' },
+  completed: { icon: CheckCircle2, color: 'text-emerald-500', label: 'Completed' },
+  failed: { icon: XCircle, color: 'text-red-500', label: 'Failed' },
+  cancelled: { icon: XCircle, color: 'text-amber-500', label: 'Cancelled' },
+  timed_out: { icon: AlertTriangle, color: 'text-orange-500', label: 'Timed Out' },
 };
 
 const stepStatusColors: Record<string, string> = {
@@ -164,15 +163,15 @@ export function RunHistoryTab() {
                     ) : (
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
-                    <Badge variant="outline" className={cfg.color}>
+                    <span className={`text-xs inline-flex items-center ${cfg.color}`}>
                       <StatusIcon className={`h-3 w-3 mr-1 ${run.status === 'running' ? 'animate-spin' : ''}`} />
                       {cfg.label}
-                    </Badge>
+                    </span>
                     {run.is_test_run && (
-                      <Badge variant="outline" className="text-purple-500 bg-purple-500/10">
+                      <span className="text-xs inline-flex items-center text-purple-500">
                         <TestTube className="h-3 w-3 mr-1" />
                         Test
-                      </Badge>
+                      </span>
                     )}
                     <span className="text-sm font-medium">
                       {run.trigger_type}
@@ -219,13 +218,13 @@ export function RunHistoryTab() {
                             <span className="font-medium min-w-[80px]">
                               {step.node_label || step.node_type}
                             </span>
-                            <Badge variant="outline" className="text-[10px] h-5">
+                            <span className="text-[10px] text-muted-foreground">
                               {step.node_type}
-                            </Badge>
+                            </span>
                             {step.branch_taken && (
-                              <Badge variant="outline" className="text-[10px] h-5 text-amber-600">
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400">
                                 {step.branch_taken}
-                              </Badge>
+                              </span>
                             )}
                             {step.duration_ms !== null && (
                               <span className="text-muted-foreground">

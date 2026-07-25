@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -172,7 +171,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
                 <div className="flex-1 min-w-[180px]">
                   <div className="flex items-center gap-2">
                     <p className="font-medium truncate">{it.name}</p>
-                    <Badge variant="outline" className="text-[10px]">{TYPE_LABELS[it.item_type] || it.item_type}</Badge>
+                    <span className="text-[10px] text-muted-foreground capitalize">{TYPE_LABELS[it.item_type] || it.item_type}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">{specSummary(it) || 'No spec yet'}</p>
                 </div>
@@ -241,7 +240,7 @@ const WINDOW_FIELDS: Array<{ key: keyof PurchaseItemDetails; label: string; type
 const OTHER_FIELDS: Array<{ key: keyof PurchaseItemDetails; label: string; type?: 'number'; options?: string[] }> = [
   { key: 'width_mm', label: 'Width (mm)', type: 'number' },
   { key: 'height_mm', label: 'Height (mm)', type: 'number' },
-  { key: 'finish', label: 'Finish / material' },
+  { key: 'finish', label: 'Finish / Material'},
 ];
 
 const PurchaseItemDialog: React.FC<{

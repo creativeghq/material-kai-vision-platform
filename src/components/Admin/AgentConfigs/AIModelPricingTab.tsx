@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { edgeError } from '@/utils/edgeError';
+import { statusTone } from '@/utils/statusTone';
 
 interface ModelPricing {
   id: string;
@@ -420,26 +421,22 @@ export const AIModelPricingTab: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{model.model_name}</p>
                           {!model.is_active && (
-                            <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground border-muted-foreground/30">
-                              Retired
-                            </Badge>
+                            <span className={`text-xs capitalize ${statusTone('Retired')}`}>Retired</span>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground font-mono">{model.model_key}</p>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={PROVIDER_COLORS[model.provider] || 'bg-gray-100 text-gray-700'}>
-                        {model.provider}
-                      </Badge>
+                      <span className="text-xs text-muted-foreground capitalize">{model.provider}</span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs">
+                      <span className="text-xs text-muted-foreground capitalize">
                         {model.billing_type === 'token_based' && 'Token'}
                         {model.billing_type === 'time_based' && `Time (${model.gpu_type || 'GPU'})`}
                         {model.billing_type === 'per_generation' && 'Per Gen'}
                         {model.billing_type === 'per_unit' && `Per ${model.unit_label || 'unit'}`}
-                      </Badge>
+                      </span>
                     </TableCell>
                     <TableCell className="text-right">
                       {editingId === model.id ? (

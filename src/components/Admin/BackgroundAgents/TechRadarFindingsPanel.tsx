@@ -11,11 +11,11 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink, RefreshCw, Radar } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { statusTone } from '@/utils/statusTone';
 
 interface Props {
   /** tech_radar_subjects.id carried in background_agents.config.subject_id */
@@ -135,7 +135,7 @@ export function TechRadarFindingsPanel({ subjectId }: Props) {
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded border ${ring.cls}`}>{ring.label}</span>
                       <span className="text-[10px] text-muted-foreground">{f.category}</span>
-                      {f.is_new && <Badge variant="secondary" className="text-[10px]">new</Badge>}
+                      {f.is_new && <span className={`text-[10px] capitalize ${statusTone('new')}`}>new</span>}
                       {f.status !== 'new' && <span className="text-[10px] text-muted-foreground">· {f.status}</span>}
                     </div>
                     <div className="text-sm font-medium">{f.title}</div>

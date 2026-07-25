@@ -230,13 +230,12 @@ function ProductRow({ product, onView, surplus }: { product: RawProduct; onView:
 
       {/* Category */}
       <div className="hidden xs:flex items-center gap-1.5 shrink-0">
-        <Badge
-          variant="outline"
-          className="text-[10px] px-1.5 py-0 h-4 rounded font-normal capitalize"
-          style={{ color, borderColor: `${color}50` }}
+        <span
+          className="text-[10px] font-normal capitalize"
+          style={{ color }}
         >
           {displayCat}
-        </Badge>
+        </span>
         {surplus && (
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 rounded font-normal border-emerald-500/50 text-emerald-500" title="Available as surplus on the Marketplace">
             Surplus €{surplus.price}

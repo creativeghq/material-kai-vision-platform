@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { Share2, Users, RefreshCw, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { Button } from '@/components/core/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useNavigate } from 'react-router-dom';
@@ -197,14 +198,9 @@ export const SocialMediaAccountsPage: React.FC = () => {
                         ) : '—'}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={account.is_active
-                            ? 'text-green-600 border-green-200 bg-green-50 text-[10px]'
-                            : 'text-muted-foreground text-[10px]'}
-                        >
+                        <span className={`text-[10px] capitalize ${account.is_active ? statusTone('active') : 'text-muted-foreground'}`}>
                           {account.is_active ? 'Active' : 'Disconnected'}
-                        </Badge>
+                        </span>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {timeAgo(account.last_synced_at)}

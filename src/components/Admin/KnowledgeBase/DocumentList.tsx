@@ -19,7 +19,6 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import {
   Dialog,
@@ -48,6 +47,7 @@ import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError, edgeErrorMessage } from '@/utils/edgeError';
 import { FilterBar, applyFiltersToQuery, countActive, type FilterValues } from '@/components/core/filters';
+import { statusTone } from '@/utils/statusTone';
 import { buildKbDocFilters, type KbFilterCategory } from './kbDocFilters';
 
 interface DocumentListProps {
@@ -498,14 +498,9 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-      draft: 'secondary',
-      published: 'default',
-      archived: 'destructive',
-    };
-    return <Badge variant={variants[status] || 'default'}>{status}</Badge>;
-  };
+  const getStatusBadge = (status: string) => (
+    <span className={`text-xs capitalize ${statusTone(status)}`}>{status}</span>
+  );
 
   const getEmbeddingStatusIcon = (status?: string) => {
     if (status === 'success') return <CheckCircle className="h-4 w-4 text-green-500" />;
@@ -538,9 +533,9 @@ export const DocumentList: React.FC<DocumentListProps> = ({
 
   const getVisibilityBadge = (visibility?: string) =>
     visibility === 'private' ? (
-      <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" />Private</Badge>
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground capitalize"><Lock className="h-3 w-3" />Private</span>
     ) : (
-      <Badge variant="secondary" className="gap-1"><Globe className="h-3 w-3" />Public</Badge>
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground capitalize"><Globe className="h-3 w-3" />Public</span>
     );
 
   return (

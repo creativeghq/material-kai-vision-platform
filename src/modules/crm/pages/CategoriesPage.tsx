@@ -502,7 +502,7 @@ const CategoryMembersDialog: React.FC<{
               <div className="text-xs text-muted-foreground">Search results</div>
               {searchResults.map((r) => (
                 <div key={`${r.kind}-${r.id}`} className="flex items-center gap-2 text-sm py-1">
-                  <Badge variant="outline" className="text-[10px] py-0">{r.kind}</Badge>
+                  <span className="text-[10px] text-muted-foreground capitalize">{r.kind}</span>
                   <span className="font-medium">{r.name}</span>
                   {r.email && <span className="text-xs text-muted-foreground">{r.email}</span>}
                   <Button size="sm" variant="ghost" className="ml-auto" onClick={() => handleAdd(r)}>
@@ -525,8 +525,8 @@ const CategoryMembersDialog: React.FC<{
               <div className="space-y-1">
                 {members.map((m) => (
                   <div key={m.id} className="flex items-center gap-2 text-sm border-b py-2">
-                    <Badge variant="outline" className="text-[10px] py-0">{m.member_kind}</Badge>
-                    <Badge variant={m.source === 'auto' ? 'secondary' : 'default'} className="text-[10px] py-0">{m.source}</Badge>
+                    <span className="text-[10px] text-muted-foreground capitalize">{m.member_kind}</span>
+                    <span className="text-[10px] text-muted-foreground capitalize">{m.source}</span>
                     <span className="font-medium truncate">{m.display_name || '(unnamed)'}</span>
                     <span className="text-xs text-muted-foreground truncate">{m.display_email || ''}</span>
                     <Button size="sm" variant="ghost" className="ml-auto" onClick={() => handleRemove(m.id)}>

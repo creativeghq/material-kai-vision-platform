@@ -670,7 +670,7 @@ const FinancePage: React.FC = () => {
                               {r.quote_number ?? r.name ?? r.id.slice(0, 8)}
                             </Link>
                             <div className="text-xs text-muted-foreground">
-                              {r.days_since_activity ?? '—'}d idle · <Badge variant="outline" className="ml-1 text-[10px]">{r.status}</Badge>
+                              {r.days_since_activity ?? '—'}d idle · <span className={`ml-1 text-[10px] capitalize ${statusTone(r.status)}`}>{r.status}</span>
                             </div>
                           </div>
                           <div className="text-right">
@@ -713,7 +713,7 @@ const FinancePage: React.FC = () => {
                             <div className="text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 {mD && <span title="Transmitted to myDATA" className="text-emerald-500 text-xs">mD ✓</span>}
-                                <Badge variant={i.status === 'overdue' ? 'destructive' : i.status === 'paid' ? 'default' : 'outline'} className="text-[10px]">{i.status}</Badge>
+                                <span className={`text-[10px] capitalize ${statusTone(i.status)}`}>{i.status}</span>
                               </div>
                               <div className="mt-1 text-sm font-medium">{formatMoney(i.amount_due, i.currency)}</div>
                             </div>
@@ -1539,7 +1539,6 @@ const TopProductsCard: React.FC<{ rows: SalesPerProductRow[]; onViewAll?: () => 
 /** Most recent sales orders with fulfilment + payment status. */
 const RecentOrdersCard: React.FC<{ rows: OrderListRow[]; onViewAll?: () => void }> = ({ rows, onViewAll }) => {
   const recent = useMemo(() => rows.slice(0, 6), [rows]);
-  const payVariant = (s: string) => (s === 'paid' ? 'default' : s === 'partial' ? 'secondary' : 'outline');
   return (
     <InsightCard title="Recent orders" icon={ShoppingCart} onViewAll={onViewAll} isEmpty={recent.length === 0} empty="No sales orders yet.">
       <ul className="divide-y divide-border/40">
@@ -1554,8 +1553,8 @@ const RecentOrdersCard: React.FC<{ rows: OrderListRow[]; onViewAll?: () => void 
             <div className="flex items-center gap-2 shrink-0">
               <div className="flex flex-col items-end gap-1">
                 <div className="flex items-center gap-1">
-                  <Badge variant="outline" className="text-[10px]">{ORDER_STATUS_LABEL[o.status]}</Badge>
-                  <Badge variant={payVariant(o.payment_status)} className="text-[10px]">{ORDER_PAYMENT_LABEL[o.payment_status]}</Badge>
+                  <span className={`text-[10px] ${statusTone(o.status)}`}>{ORDER_STATUS_LABEL[o.status]}</span>
+                  <span className={`text-[10px] ${statusTone(o.payment_status)}`}>{ORDER_PAYMENT_LABEL[o.payment_status]}</span>
                 </div>
                 <div className="text-sm font-medium">{formatMoney(Number(o.total || 0), o.currency)}</div>
               </div>

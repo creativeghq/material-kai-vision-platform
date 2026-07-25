@@ -6,6 +6,7 @@ import { financeService, formatMoney } from '@/modules/finance/services/financeS
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/core/ui/alert';
@@ -561,17 +562,12 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                                 <Gift className="h-4 w-4 text-muted-foreground" />
                                 <p className="font-medium">{qu.upsell?.name || 'Unknown Extra'}</p>
                                 {isDecided && (
-                                  <Badge
-                                    variant={qu.customer_accepted ? 'default' : 'destructive'}
-                                    className={qu.customer_accepted ? 'bg-green-600' : ''}
-                                  >
+                                  <span className={`text-xs ${qu.customer_accepted ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
                                     {qu.customer_accepted ? 'Accepted' : 'Rejected'}
-                                  </Badge>
+                                  </span>
                                 )}
                                 {!isDecided && (
-                                  <Badge variant="outline" className="border-yellow-500 text-yellow-700">
-                                    Pending Decision
-                                  </Badge>
+                                  <span className="text-xs text-amber-600 dark:text-amber-400">Pending Decision</span>
                                 )}
                               </div>
                               {qu.upsell?.description && (
@@ -700,9 +696,9 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                         {step.notes && (
                           <p className="text-xs text-foreground mt-1 bg-muted/50 rounded px-2 py-1">{step.notes}</p>
                         )}
-                        <Badge variant="outline" className="mt-2 rounded-full text-xs capitalize">
+                        <span className={`mt-2 inline-block text-xs capitalize ${statusTone(step.status)}`}>
                           {step.status.replace('_', ' ')}
-                        </Badge>
+                        </span>
                       </div>
                     </div>
                   ))}

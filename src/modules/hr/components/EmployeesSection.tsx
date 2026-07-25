@@ -3,7 +3,6 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Plus, ExternalLink, Loader2, Pencil, Users, Mail } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Skeleton } from '@/components/core/ui/skeleton';
@@ -18,11 +17,11 @@ import {
 } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
 import { parseDecimal } from '@/utils/decimal';
+import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildEmployeeFilters } from './hrFilters';
 
-const statusVariant: Record<EmployeeStatus, 'default' | 'secondary' | 'outline'> = { active: 'default', on_leave: 'secondary', terminated: 'outline' };
 const empName = (e: Employee) => e.contact?.name || [e.contact?.first_name, e.contact?.last_name].filter(Boolean).join(' ') || 'Unnamed';
 
 export function EmployeesSection({ workspaceId, canManage }: { workspaceId: string | null; canManage: boolean }) {
@@ -86,11 +85,11 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
               <TableBody>
                 {paginate(filtered, page).map((e) => (
                   <TableRow key={e.id}>
-                    <TableCell className="font-medium">{empName(e)}{e.on_leave_today && <Badge variant="secondary" className="ml-2">On leave</Badge>}</TableCell>
+                    <TableCell className="font-medium">{empName(e)}{e.on_leave_today && <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">On leave</span>}</TableCell>
                     <TableCell>{e.contact?.position || '—'}</TableCell>
                     <TableCell>{deptName(e.department_id)}</TableCell>
                     <TableCell>{e.employment_type ? EMPLOYMENT_TYPE_LABELS[e.employment_type] : '—'}</TableCell>
-                    <TableCell><Badge variant={statusVariant[e.status]}>{EMPLOYEE_STATUS_LABELS[e.status]}</Badge></TableCell>
+                    <TableCell><span className={`text-sm capitalize ${statusTone(e.status)}`}>{EMPLOYEE_STATUS_LABELS[e.status]}</span></TableCell>
                     <TableCell className="text-right">{e.total_absence_days}</TableCell>
                     <TableCell className="text-right">{e.remaining_leave_days}</TableCell>
                     <TableCell className="text-right">

@@ -21,10 +21,11 @@ import { ChatActivityTab }     from './ChatActivityTab';
 import { buildAgentRunFilters } from './backgroundAgentFilters';
 import {
   listAgents, listAllRuns, cancelRun,
-  formatDuration, statusColor, isStuck,
+  formatDuration, isStuck,
 } from '@/services/backgroundAgents';
 import type { AgentRun, BackgroundAgent } from '@/services/backgroundAgents';
 import { useToast } from '@/hooks/use-toast';
+import { statusTone } from '@/utils/statusTone';
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
   completed:  <CheckCircle className="h-4 w-4 text-green-500"                 />,
@@ -259,10 +260,10 @@ export function BackgroundAgentsPage() {
         <div className="space-y-2">
           {/* Agent-level health rows — styled identically to task rows */}
           {agentAlerts.map(al => {
-            const badgeClass =
+            const toneClass =
               al.kind === 'disabled'
-                ? 'text-gray-500 bg-gray-50'
-                : 'text-yellow-600 bg-yellow-50';
+                ? 'text-muted-foreground'
+                : 'text-amber-600 dark:text-amber-400';
             const statusLabel =
               al.kind === 'disabled' ? 'disabled' : 'never ran';
             return (
@@ -289,11 +290,11 @@ export function BackgroundAgentsPage() {
                   </span>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <Badge className={`text-xs ${badgeClass}`}>{statusLabel}</Badge>
+                    <span className={`text-xs capitalize ${toneClass}`}>{statusLabel}</span>
 
-                    <Badge variant="outline" className="text-xs capitalize">
+                    <span className="text-xs text-muted-foreground capitalize">
                       {al.agent.trigger_type}
-                    </Badge>
+                    </span>
 
                     {al.agent.schedule && (
                       <Badge variant="outline" className="text-xs font-mono">
@@ -347,14 +348,14 @@ export function BackgroundAgentsPage() {
                   </span>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <Badge className={`text-xs ${statusColor(run.status as any)}`}>
+                    <span className={`text-xs capitalize ${statusTone(run.status)}`}>
                       {run.status}
-                    </Badge>
+                    </span>
 
                     {stuck && (
-                      <Badge className="text-xs bg-yellow-500/20 text-yellow-600 border-yellow-500/40">
+                      <span className="text-xs inline-flex items-center text-amber-600 dark:text-amber-400">
                         <AlertTriangle className="h-3 w-3 mr-1" />stuck
-                      </Badge>
+                      </span>
                     )}
 
                     {run.recovery_attempts > 0 && (

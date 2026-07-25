@@ -22,7 +22,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -33,6 +32,7 @@ import {
   type SeoResearchRun, type SeoTrackedDomain, type SeoDomainAuditSnapshot,
 } from '@/services/seoToolkitApi';
 import { SeoInterlinkingPanel } from '@/modules/seo-interlinking/pages/SeoInterlinkingModulePage';
+import { statusTone } from '@/utils/statusTone';
 
 const fmtNum = (n: any): string => {
   const v = Number(n);
@@ -246,9 +246,9 @@ const KeywordResearchTab: React.FC = () => {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="outline" className="text-[10px]">{r.kind}</Badge>
-                      {r.country_code && <Badge className="text-[10px] bg-white/10">{r.country_code}</Badge>}
-                      {r.success ? null : <Badge className="text-[10px] bg-red-500/20 text-red-300 border-red-500/40">Failed</Badge>}
+                      <span className="text-[10px] text-muted-foreground capitalize">{r.kind}</span>
+                      {r.country_code && <span className="text-[10px] text-muted-foreground">{r.country_code}</span>}
+                      {r.success ? null : <span className={`text-[10px] capitalize ${statusTone('failed')}`}>Failed</span>}
                       <span className="font-medium text-sm truncate">{r.label || r.subject}</span>
                     </div>
                     <div className="text-xs text-muted-foreground space-x-4">
@@ -364,11 +364,11 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {d.is_active ? (
-                          <Badge className="text-[10px] bg-green-500/20 text-green-300 border-green-500/40">Active</Badge>
+                          <span className={`text-[10px] capitalize ${statusTone('active')}`}>Active</span>
                         ) : (
-                          <Badge className="text-[10px] bg-gray-500/20 text-gray-300">Inactive</Badge>
+                          <span className={`text-[10px] capitalize ${statusTone('inactive')}`}>Inactive</span>
                         )}
-                        {d.country_code && <Badge variant="outline" className="text-[10px]">{d.country_code}</Badge>}
+                        {d.country_code && <span className="text-[10px] text-muted-foreground">{d.country_code}</span>}
                         <span className="font-medium text-sm truncate">{d.display_label || d.domain}</span>
                         {d.display_label && (
                           <span className="text-xs text-muted-foreground">· {d.domain}</span>

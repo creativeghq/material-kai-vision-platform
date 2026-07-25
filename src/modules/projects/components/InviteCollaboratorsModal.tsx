@@ -5,9 +5,6 @@ import {
   Loader2,
   Trash2,
   Send,
-  CheckCircle2,
-  Clock,
-  Ban,
   Copy,
 } from 'lucide-react';
 
@@ -22,7 +19,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import { projectsService, type ProjectCollaborator } from '../services/projectsService';
 
@@ -117,10 +114,10 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
   };
 
   const statusBadge = (c: ProjectCollaborator) => {
-    if (c.revoked_at) return <Badge variant="outline" className="text-xs bg-muted text-muted-foreground"><Ban className="h-3 w-3 mr-1" />Revoked</Badge>;
-    if (new Date(c.expires_at) < new Date()) return <Badge variant="outline" className="text-xs bg-amber-500/15 text-amber-300 border-amber-500/30"><Clock className="h-3 w-3 mr-1" />Expired</Badge>;
-    if (c.accepted_at) return <Badge variant="outline" className="text-xs bg-emerald-500/15 text-emerald-300 border-emerald-500/30"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>;
-    return <Badge variant="outline" className="text-xs bg-blue-500/15 text-blue-300 border-blue-500/30"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+    if (c.revoked_at) return <span className={`text-xs capitalize ${statusTone('revoked')}`}>Revoked</span>;
+    if (new Date(c.expires_at) < new Date()) return <span className={`text-xs capitalize ${statusTone('expired')}`}>Expired</span>;
+    if (c.accepted_at) return <span className={`text-xs capitalize ${statusTone('active')}`}>Active</span>;
+    return <span className={`text-xs capitalize ${statusTone('pending')}`}>Pending</span>;
   };
 
   return (

@@ -13,7 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
-import { QuoteStatusBadge } from '@/lib/quoteStatus';
+import { QuoteStatusWord } from '@/lib/quoteStatus';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -183,7 +183,7 @@ export const SalesPage: React.FC = () => {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
-                        <td className="px-3 py-2.5"><QuoteStatusBadge status={q.status} /></td>
+                        <td className="px-3 py-2.5"><QuoteStatusWord status={q.status} /></td>
                         <td className="px-3 py-2.5 tabular-nums">{q.total_items || q.items?.length || 0}</td>
                         <td className="px-3 py-2.5 text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</td>
                         <td className="px-6 py-2.5 text-right">

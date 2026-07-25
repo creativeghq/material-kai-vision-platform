@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Clock, Loader2, History, CalendarRange, Trash2, Plus, Download } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
@@ -84,7 +83,7 @@ export function PunchHistoryDialog({ workspaceId, employeeId, name, onChanged }:
           <div className="divide-y divide-border/40">
             {paginate(punches, page).map((p) => (
               <div key={p.id} className="flex items-center gap-2 py-2 text-sm">
-                <Badge variant={p.punch_type === 'arrival' ? 'default' : 'secondary'} className="w-14 justify-center">{p.punch_type === 'arrival' ? 'In' : 'Out'}</Badge>
+                <span className={`text-sm font-medium w-10 ${p.punch_type === 'arrival' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>{p.punch_type === 'arrival' ? 'In' : 'Out'}</span>
                 <input type="datetime-local" defaultValue={toLocalInput(p.punched_at)} onBlur={(e) => { const v = e.target.value; if (v && new Date(v).toISOString() !== p.punched_at) editTime(p, v); }}
                   className="bg-transparent border border-border/50 rounded px-2 py-1 text-xs" disabled={busy === p.id} />
                 {p.is_late && <span className="text-xs text-amber-500">late</span>}

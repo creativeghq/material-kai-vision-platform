@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import {
   FilterBar,
   applyFiltersToQuery,
@@ -129,13 +129,6 @@ const FILTER_GROUPS: FilterGroupDef[] = [
     ],
   },
 ];
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  reviewed: 'bg-blue-100 text-blue-800 border-blue-200',
-  merged: 'bg-green-100 text-green-800 border-green-200',
-  dismissed: 'bg-gray-100 text-gray-600 border-gray-200',
-};
 
 const CONFIDENCE_COLORS: Record<string, string> = {
   high: 'text-red-600',
@@ -457,12 +450,9 @@ export function DuplicateDetectionPage() {
                       ) : '—'}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`capitalize text-xs ${STATUS_COLORS[pair.status] ?? ''}`}
-                      >
+                      <span className={`capitalize text-xs ${statusTone(pair.status)}`}>
                         {pair.status}
-                      </Badge>
+                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">

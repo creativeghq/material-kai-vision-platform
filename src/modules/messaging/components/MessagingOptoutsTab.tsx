@@ -6,7 +6,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, UserX, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -172,9 +171,9 @@ export const MessagingOptoutsTab: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <Badge variant="outline">
+                      <span className="text-sm capitalize text-muted-foreground">
                         {sourceLabels[optout.source] || optout.source}
-                      </Badge>
+                      </span>
                     </td>
                     <td className="py-3 px-4">
                       <span className="text-sm text-muted-foreground">

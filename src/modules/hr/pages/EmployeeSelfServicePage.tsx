@@ -6,7 +6,6 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -18,8 +17,7 @@ import {
   ABSENCE_TYPE_LABELS, EMPLOYMENT_TYPE_LABELS, DOC_TYPE_LABELS,
 } from '../services/hrService';
 import { HrStat, EmptyState } from '../components/_shared';
-
-const absVariant = { approved: 'default', pending: 'secondary', rejected: 'destructive' } as const;
+import { statusTone } from '@/utils/statusTone';
 
 export default function EmployeeSelfServicePage() {
   const { activeWorkspaceId, activeWorkspace, loading: wsLoading } = useWorkspace();
@@ -124,9 +122,9 @@ export default function EmployeeSelfServicePage() {
                           <span className="font-medium capitalize">{p.punch_type === 'arrival' ? 'In' : 'Out'}</span>
                           <span className="text-muted-foreground">{new Date(p.punched_at).toLocaleString()}</span>
                         </div>
-                        <Badge variant={p.status === 'submitted' ? 'default' : p.status === 'failed' ? 'destructive' : 'secondary'} title={p.ergani_protocol ?? ''}>
+                        <span className={`text-sm ${p.status === 'submitted' ? 'text-emerald-600 dark:text-emerald-400' : p.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'}`} title={p.ergani_protocol ?? ''}>
                           {p.status === 'submitted' ? `Ergani · ${p.ergani_protocol ?? 'filed'}` : p.status === 'failed' ? 'Ergani failed' : 'Recorded'}
-                        </Badge>
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -189,7 +187,7 @@ export default function EmployeeSelfServicePage() {
                     {absences.map((a) => (
                       <div key={a.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                         <div><span className="font-medium">{ABSENCE_TYPE_LABELS[a.absence_type]}</span><span className="text-muted-foreground"> · {a.start_date} → {a.end_date} · {a.working_days ?? '—'}d</span></div>
-                        <Badge variant={absVariant[a.status]}>{a.status}</Badge>
+                        <span className={`text-sm capitalize ${statusTone(a.status)}`}>{a.status}</span>
                       </div>
                     ))}
                   </div>
@@ -205,7 +203,7 @@ export default function EmployeeSelfServicePage() {
                   <div className="divide-y divide-border/40">
                     {docs.map((d) => (
                       <div key={d.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                        <div className="flex items-center gap-2"><span className="font-medium">{d.name}</span><Badge variant="outline">{DOC_TYPE_LABELS[d.doc_type]}</Badge></div>
+                        <div className="flex items-center gap-2"><span className="font-medium">{d.name}</span><span className="text-sm text-muted-foreground capitalize">{DOC_TYPE_LABELS[d.doc_type]}</span></div>
                         <Button variant="ghost" size="sm" disabled={busy === d.id} onClick={() => viewDoc(d.id)}><Download className="h-4 w-4" /></Button>
                       </div>
                     ))}

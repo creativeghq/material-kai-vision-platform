@@ -19,6 +19,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { FlowBuilderTab } from '@/components/Admin/FlowsManagement/FlowBuilderTab';
 import { flowService } from '@/services/flows';
@@ -42,13 +43,6 @@ const TRIGGER_LABELS: Record<string, string> = {
   product_added: 'Product added',
   'inbox.message_received': 'Inbox message',
   appointment_booked: 'Appointment booked',
-};
-
-const STATUS_STYLES: Record<string, string> = {
-  active: 'bg-green-500/10 text-green-500',
-  paused: 'bg-amber-500/10 text-amber-500',
-  draft: 'bg-gray-500/10 text-gray-500',
-  archived: 'bg-red-500/10 text-red-500',
 };
 
 export default function FlowsPage() {
@@ -238,7 +232,7 @@ export default function FlowsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <h3 className="font-medium truncate">{flow.name}</h3>
-                        <Badge variant="outline" className={STATUS_STYLES[flow.status] || ''}>{flow.status}</Badge>
+                        <span className={`text-xs capitalize ${statusTone(flow.status)}`}>{flow.status}</span>
                         {failed && (
                           <Badge variant="outline" className="gap-1 bg-red-500/10 text-red-500">
                             <AlertTriangle className="h-3 w-3" />

@@ -6,26 +6,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { RefreshCw, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingLog, MessagingChannelType, MessageStatus } from '../services';
 import { buildMessagingLogFilters } from './messagingFilters';
 import { humanizeLabel } from '@/utils/humanize';
+import { statusTone } from '@/utils/statusTone';
 import { format } from 'date-fns';
 
 const WhatsAppIcon = <MessageCircle className="h-4 w-4 text-green-500" />;
-
-const statusColors: Record<MessageStatus, string> = {
-  queued: 'bg-gray-500',
-  sent: 'bg-blue-500',
-  delivered: 'bg-green-500',
-  read: 'bg-emerald-500',
-  failed: 'bg-red-500',
-  rejected: 'bg-red-700',
-  expired: 'bg-orange-500',
-};
 
 export const MessagingLogsTab: React.FC = () => {
   const [logs, setLogs] = useState<MessagingLog[]>([]);
@@ -145,9 +135,9 @@ export const MessagingLogsTab: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <Badge className={statusColors[log.status]}>
+                      <span className={`text-sm capitalize ${statusTone(log.status)}`}>
                         {humanizeLabel(log.status)}
-                      </Badge>
+                      </span>
                       {log.error_message && (
                         <div className="text-xs text-red-500 mt-1" title={log.error_message}>
                           {log.error_message.substring(0, 30)}...

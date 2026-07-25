@@ -29,6 +29,7 @@ import {
   type InvestmentMetrics,
 } from '../services/realEstateService';
 import { contractsService, type Contract } from '@/services/contractsService';
+import { statusTone } from '@/utils/statusTone';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { CmaReportDialog } from '../components/CmaReportDialog';
@@ -304,7 +305,7 @@ export default function PropertyWorkbench() {
                 <F label="Subtype"><Input value={form.subtype ?? ''} onChange={(e) => set('subtype', e.target.value)} placeholder="apartment, warehouse, plot…" /></F>
                 <F label="Transaction"><Sel value={form.transaction_type} opts={TRANSACTION_TYPES} onChange={(v) => set('transaction_type', v)} /></F>
                 <F label="Status"><Sel value={form.listing_status} opts={LISTING_STATUSES} onChange={(v) => set('listing_status', v)} /></F>
-                <F label="Vendor / owner (CRM)" wide><ContactSearchDropdown selectedContactId={form.vendor_contact_id ?? null} onSelect={(id) => set('vendor_contact_id', id)} placeholder="Link the seller/owner contact…" /></F>
+                <F label="Vendor / Owner (CRM)" wide><ContactSearchDropdown selectedContactId={form.vendor_contact_id ?? null} onSelect={(id) => set('vendor_contact_id', id)} placeholder="Link the seller/owner contact…" /></F>
                 <Chk label="Open for all agents (visible to the whole team)" checked={!!form.open_for_all} onChange={(v) => set('open_for_all', v)} />
               </FormSection>
             )}
@@ -360,9 +361,9 @@ export default function PropertyWorkbench() {
                   </FormSection>
                 )}
                 {isCommercial && (
-                  <FormSection title="Commercial / business" icon={Building2}>
+                  <FormSection title="Commercial / Business" icon={Building2}>
                     <F label="Gross area (m²)"><NumInput v={form.gross_area} on={(x) => set('gross_area', x)} /></F>
-                    <F label="Net / usable area (m²)"><NumInput v={form.net_area} on={(x) => set('net_area', x)} /></F>
+                    <F label="Net / Usable area (m²)"><NumInput v={form.net_area} on={(x) => set('net_area', x)} /></F>
                     <F label="Frontage / πρόσοψη (m)"><NumInput v={form.frontage} on={(x) => set('frontage', x)} /></F>
                     <F label="Ceiling height (m)"><NumInput v={form.ceiling_height} on={(x) => set('ceiling_height', x)} /></F>
                     <F label="Floors included"><NumInput v={form.floors_included} on={(x) => set('floors_included', x)} /></F>
@@ -373,7 +374,7 @@ export default function PropertyWorkbench() {
                     <F label="Power capacity (kVA)"><NumInput v={form.power_capacity_kva} on={(x) => set('power_capacity_kva', x)} /></F>
                     <F label="Occupancy status"><Input value={form.occupancy_status ?? ''} onChange={(e) => set('occupancy_status', e.target.value)} placeholder="vacant / tenanted" /></F>
                     <F label="Current rent"><NumInput v={form.current_rent} on={(x) => set('current_rent', x)} /></F>
-                    <F label="Yield / cap rate (%)"><NumInput v={form.cap_rate} on={(x) => set('cap_rate', x)} /></F>
+                    <F label="Yield / Cap rate (%)"><NumInput v={form.cap_rate} on={(x) => set('cap_rate', x)} /></F>
                     <F label="Lease expiry"><Input type="date" value={form.lease_expiry ?? ''} onChange={(e) => set('lease_expiry', e.target.value)} /></F>
                     <ChkGrid items={[['three_phase_power', 'Three-phase (τριφασικό)'], ['storefront_windows', 'Storefront (βιτρίνα)'], ['loading_dock', 'Loading dock'], ['goods_lift', 'Goods lift'], ['fire_safety_cert', 'Fire-safety cert'], ['accessibility_amea', 'Accessibility (ΑμεΑ)']]} form={form} set={set} />
                   </FormSection>
@@ -389,7 +390,7 @@ export default function PropertyWorkbench() {
                   </FormSection>
                 )}
                 {isLand && (
-                  <FormSection title="Land / plot" icon={Ruler}>
+                  <FormSection title="Land / Plot" icon={Ruler}>
                     <F label="Plot area (m²)"><NumInput v={form.plot_area} on={(x) => set('plot_area', x)} /></F>
                     <F label="Building coefficient (ΣΔ)"><NumInput v={form.building_coefficient} on={(x) => set('building_coefficient', x)} /></F>
                     <F label="Coverage ratio"><NumInput v={form.coverage_ratio} on={(x) => set('coverage_ratio', x)} /></F>
@@ -398,7 +399,7 @@ export default function PropertyWorkbench() {
                     <F label="Land use / zoning"><Input value={form.land_use ?? ''} onChange={(e) => set('land_use', e.target.value)} /></F>
                     <F label="Road frontage (m)"><NumInput v={form.frontage_to_road} on={(x) => set('frontage_to_road', x)} /></F>
                     <F label="Distance to sea (m)"><NumInput v={form.distance_to_sea} on={(x) => set('distance_to_sea', x)} /></F>
-                    <F label="Slope / terrain"><Input value={form.slope ?? ''} onChange={(e) => set('slope', e.target.value)} /></F>
+                    <F label="Slope / Terrain"><Input value={form.slope ?? ''} onChange={(e) => set('slope', e.target.value)} /></F>
                     <ChkGrid items={[['buildable', 'Buildable (άρτιο)'], ['inside_city_plan', 'Inside city plan'], ['within_settlement', 'Within settlement'], ['road_access', 'Road access'], ['corner_plot', 'Corner plot']]} form={form} set={set} />
                     <F label="Utilities available (comma)" wide><Input value={form.utilities_available ?? ''} onChange={(e) => set('utilities_available', e.target.value)} placeholder="water, electricity, sewage, gas" /></F>
                     <F label="Legal clearances (comma)" wide><Input value={form.legal_clearances ?? ''} onChange={(e) => set('legal_clearances', e.target.value)} placeholder="topographic, forestry, archaeological" /></F>
@@ -611,21 +612,9 @@ export default function PropertyWorkbench() {
   );
 }
 
-const OFFER_TINT: Record<string, string> = {
-  offered: 'bg-amber-500/15 text-amber-500', countered: 'bg-blue-500/15 text-blue-500',
-  accepted: 'bg-emerald-500/15 text-emerald-500', rejected: 'bg-muted text-muted-foreground', withdrawn: 'bg-muted text-muted-foreground',
-};
 const offerMoney = (n: number, ccy: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n);
 
 // ── Lettings / property management (#281) ──
-const LEDGER_TINT: Record<string, string> = {
-  due: 'bg-amber-500/10 text-amber-500', paid: 'bg-emerald-500/10 text-emerald-500',
-  overdue: 'bg-red-500/10 text-red-500', waived: 'bg-muted text-muted-foreground',
-};
-const WO_TINT: Record<string, string> = {
-  open: 'bg-amber-500/10 text-amber-500', in_progress: 'bg-blue-500/10 text-blue-500',
-  completed: 'bg-emerald-500/10 text-emerald-500', cancelled: 'bg-muted text-muted-foreground',
-};
 const Stat: React.FC<{ label: string; value: string; accent?: boolean }> = ({ label, value, accent }) => (
   <div className={`dashboard-card p-3 ${accent ? 'ring-1 ring-primary/30' : ''}`}>
     <div className="text-[11px] text-muted-foreground">{label}</div>
@@ -771,7 +760,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
                 <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                   <span className="w-24 shrink-0 text-muted-foreground">{new Date(c.due_date).toLocaleDateString()}</span>
                   <span className="font-medium">{offerMoney(c.amount, c.currency)}</span>
-                  <Badge className={`${LEDGER_TINT[c.status]} rounded-full border-0 text-[10px] capitalize`}>{c.status}</Badge>
+                  <span className={`text-[10px] capitalize ${statusTone(c.status)}`}>{c.status}</span>
                   <div className="ml-auto flex items-center gap-1.5">
                     {c.invoice_id
                       ? <Link to={`/finance/invoices/${c.invoice_id}`}><Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-primary"><FileText className="mr-1 h-3 w-3" /> Invoice</Button></Link>
@@ -811,7 +800,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
             {wos.map((w) => (
               <div key={w.id} className="flex items-start gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2"><span className="font-medium">{w.title}</span><Badge className={`${WO_TINT[w.status]} rounded-full border-0 text-[10px] capitalize`}>{w.status.replace('_', ' ')}</Badge>{w.priority !== 'normal' && <Badge className="rounded-full border-0 bg-muted text-[10px] capitalize">{w.priority}</Badge>}</div>
+                  <div className="flex items-center gap-2"><span className="font-medium">{w.title}</span><span className={`text-[10px] capitalize ${statusTone(w.status)}`}>{w.status.replace('_', ' ')}</span>{w.priority !== 'normal' && <span className="text-[10px] capitalize text-muted-foreground">{w.priority}</span>}</div>
                   {w.description && <div className="mt-0.5 text-xs text-muted-foreground">{w.description}</div>}
                   <div className="mt-0.5 text-xs text-muted-foreground">{[w.contractor_name, w.cost != null ? offerMoney(w.cost, ccy) : null, new Date(w.reported_at).toLocaleDateString()].filter(Boolean).join(' · ')}</div>
                 </div>
@@ -1072,7 +1061,7 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
           {offers.map((o) => (
             <div key={o.id} className="flex items-start gap-4 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2"><span className="font-semibold">{offerMoney(o.amount, o.currency)}</span><Badge className={`${OFFER_TINT[o.status]} rounded-full border-0 text-[11px] capitalize`}>{o.status.replace('_', ' ')}</Badge></div>
+                <div className="flex items-center gap-2"><span className="font-semibold">{offerMoney(o.amount, o.currency)}</span><span className={`text-[11px] capitalize ${statusTone(o.status)}`}>{o.status.replace('_', ' ')}</span></div>
                 <div className="mt-0.5 text-xs text-muted-foreground">{o.buyer?.name || o.buyer_name || 'Buyer'} · {new Date(o.created_at).toLocaleDateString()}</div>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {o.proof_of_funds && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">Proof of funds</span>}
@@ -1145,7 +1134,7 @@ const TransactionTab: React.FC<{ ws: string | null; propertyId: string; canEdit:
           <Input placeholder="Counterparty name (buyer/vendor)" value={f.counterparty_name ?? ''} onChange={(e) => setF((p) => ({ ...p, counterparty_name: e.target.value }))} />
           <Input type="email" placeholder="Counterparty email" value={f.counterparty_email ?? ''} onChange={(e) => setF((p) => ({ ...p, counterparty_email: e.target.value }))} />
           <Input type="number" placeholder="Value (optional)" value={f.value ?? ''} onChange={(e) => setF((p) => ({ ...p, value: e.target.value }))} />
-          <Textarea placeholder="Body / terms (markdown)" className="col-span-full" rows={3} value={f.body_markdown ?? ''} onChange={(e) => setF((p) => ({ ...p, body_markdown: e.target.value }))} />
+          <Textarea placeholder="Body / Terms (markdown)" className="col-span-full" rows={3} value={f.body_markdown ?? ''} onChange={(e) => setF((p) => ({ ...p, body_markdown: e.target.value }))} />
           <div className="col-span-full flex gap-2"><Button size="sm" className="rounded-full" onClick={create} disabled={busy || !f.title}>Create</Button><Button size="sm" variant="ghost" className="rounded-full" onClick={() => setAdding(false)}>Cancel</Button></div>
         </CardContent></Card>
       ) : <Button variant="outline" size="sm" className="rounded-full" onClick={() => setAdding(true)}><FileSignature className="mr-1.5 h-4 w-4" /> New transaction document</Button>)}
@@ -1158,7 +1147,7 @@ const TransactionTab: React.FC<{ ws: string | null; propertyId: string; canEdit:
                 <div className="truncate font-medium">{c.title}</div>
                 <div className="text-xs text-muted-foreground capitalize">{(c.contract_type ?? '').replace(/_/g, ' ')}{c.counterparty_name ? ` · ${c.counterparty_name}` : ''}</div>
               </div>
-              <Badge className={`rounded-full border-0 text-[11px] capitalize ${c.status === 'signed' ? 'bg-emerald-500/15 text-emerald-500' : c.status === 'sent' ? 'bg-amber-500/15 text-amber-500' : 'bg-muted text-muted-foreground'}`}>{c.status}</Badge>
+              <span className={`text-[11px] capitalize ${statusTone(c.status)}`}>{c.status}</span>
               {canEdit && c.status === 'draft' && <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={() => send(c.id)}><Send className="mr-1 h-3.5 w-3.5" /> Send</Button>}
             </div>
           ))}

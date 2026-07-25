@@ -129,20 +129,20 @@ export const PriceLookupsCard: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {r.zero_result ? (
-                          <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400">
+                          <span className="inline-flex items-center text-xs text-amber-600 dark:text-amber-400">
                             <XCircle className="h-3 w-3 mr-1" />
                             no match
-                          </Badge>
+                          </span>
                         ) : (
                           <Badge variant="outline" className="text-xs">
                             {r.result_count ?? 0} match{(r.result_count ?? 0) === 1 ? '' : 'es'}
                           </Badge>
                         )}
                         {isCommitted && (
-                          <Badge variant="outline" className="text-xs border-emerald-500/40 text-emerald-400">
+                          <span className="inline-flex items-center text-xs text-emerald-600 dark:text-emerald-400">
                             <TrendingUp className="h-3 w-3 mr-1" />
                             used
-                          </Badge>
+                          </span>
                         )}
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
                           {new Date(r.created_at).toLocaleString()}

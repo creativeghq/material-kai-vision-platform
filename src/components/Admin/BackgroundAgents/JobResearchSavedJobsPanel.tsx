@@ -24,6 +24,7 @@ import {
   jobResearchService, type JobListing, type JobUserAction,
 } from '@/services/jobResearchService';
 import { formatDistanceToNow } from 'date-fns';
+import { statusTone } from '@/utils/statusTone';
 
 interface JobResearchSavedJobsPanelProps {
   /** The `tracked_job_id` carried in the background_agents.config blob. */
@@ -116,7 +117,7 @@ export function JobResearchSavedJobsPanel({ trackedJobId }: JobResearchSavedJobs
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Briefcase className="h-4 w-4 text-primary" />
-        <span className="text-xs font-medium">Saved / applied jobs (last 90 days)</span>
+        <span className="text-xs font-medium">Saved / Applied jobs (last 90 days)</span>
       </div>
 
       <Tabs value={filter} onValueChange={v => setFilter(v as Filter)}>
@@ -155,9 +156,9 @@ export function JobResearchSavedJobsPanel({ trackedJobId }: JobResearchSavedJobs
                       <ExternalLink className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
                     </a>
                     {l.user_action && (
-                      <Badge variant="outline" className="text-[10px] capitalize shrink-0">
+                      <span className={`text-[10px] capitalize shrink-0 ${statusTone(l.user_action)}`}>
                         {l.user_action}
-                      </Badge>
+                      </span>
                     )}
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
@@ -196,7 +197,7 @@ export function JobResearchSavedJobsPanel({ trackedJobId }: JobResearchSavedJobs
                       variant="ghost"
                       className="h-6 text-[11px]"
                       onClick={() => onMark(l, null)}
-                      title="Dismiss / clear status"
+                      title="Dismiss / Clear status"
                     >
                       <X className="h-3 w-3 mr-1" />Dismiss
                     </Button>

@@ -20,9 +20,9 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
-import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { statusTone } from '@/utils/statusTone';
 import {
   financeService,
   type QuoteActivity,
@@ -182,11 +182,11 @@ export const QuoteActivityPanel: React.FC<Props> = ({ quoteId }) => {
                         <span className="font-medium text-foreground">{KIND_LABEL[a.kind]}</span>
                         <span>· {new Date(a.created_at).toLocaleString()}</span>
                         {a.scheduled_for && (
-                          <Badge variant={overdue ? 'destructive' : 'outline'} className="text-[10px]">
+                          <span className={`text-[10px] ${statusTone(a.completed_at ? 'completed' : overdue ? 'overdue' : 'scheduled')}`}>
                             {a.completed_at ? 'completed' : overdue ? 'overdue' : 'scheduled'}
                             {' · '}
                             {new Date(a.scheduled_for).toLocaleString()}
-                          </Badge>
+                          </span>
                         )}
                       </div>
                       {a.body && <div className="text-sm">{a.body}</div>}

@@ -44,3 +44,20 @@ export function QuoteStatusBadge({ status }: { status: string }) {
     </Badge>
   );
 }
+
+// Plain-colored-word form for use INSIDE table/list rows (house rule: no pill tags in tables).
+// Keep `QuoteStatusBadge` for page/modal headers where the pill is appropriate.
+const QUOTE_STATUS_WORD_TONE: Record<string, string> = {
+  draft: 'text-muted-foreground',
+  submitted: 'text-amber-600 dark:text-amber-400',
+  quoted: 'text-blue-600 dark:text-blue-400',
+  accepted: 'text-emerald-600 dark:text-emerald-400',
+  rejected: 'text-red-500 dark:text-red-400',
+  expired: 'text-muted-foreground',
+};
+
+export function QuoteStatusWord({ status }: { status: string }) {
+  const config = getQuoteStatusConfig(status);
+  const tone = QUOTE_STATUS_WORD_TONE[status] ?? 'text-muted-foreground';
+  return <span className={`text-xs font-medium ${tone}`}>{config.label}</span>;
+}

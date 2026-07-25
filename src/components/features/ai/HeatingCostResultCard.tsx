@@ -6,7 +6,6 @@
 
 import { Trophy } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
 import type { HeatingCostResult } from '@/lib/calculators/heatingCostComparison';
 
 function eur(v: number): string {
@@ -36,7 +35,7 @@ export function HeatingCostResultCard({ result }: { result: HeatingCostResult })
                   <span className="flex items-center gap-1.5">
                     {m.label}
                     {m.rank === 1 && (
-                      <Badge variant="outline" className="rounded-full text-[10px] border-primary/40 text-primary h-4 px-1.5">best</Badge>
+                      <span className="text-[10px] font-medium text-primary">best</span>
                     )}
                   </span>
                   <span className="tabular-nums font-medium">{eur(m.annualCostEur)}</span>

@@ -221,22 +221,20 @@ export function LogViewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefresh, values, page]);
 
-  // Get level badge color
+  // Get level as a plain colored word (no pill) — house rule for table/detail rows.
   const getLevelBadge = (level: string) => {
-    switch (level) {
-      case 'DEBUG':
-        return <Badge variant="secondary" className="text-xs">DEBUG</Badge>;
-      case 'INFO':
-        return <Badge variant="default" className="text-xs bg-blue-500">INFO</Badge>;
-      case 'WARNING':
-        return <Badge variant="default" className="text-xs bg-yellow-500">WARNING</Badge>;
-      case 'ERROR':
-        return <Badge variant="destructive" className="text-xs">ERROR</Badge>;
-      case 'CRITICAL':
-        return <Badge variant="destructive" className="text-xs bg-red-700">CRITICAL</Badge>;
-      default:
-        return <Badge variant="outline" className="text-xs">UNKNOWN</Badge>;
-    }
+    const tone: Record<string, string> = {
+      DEBUG: 'text-muted-foreground',
+      INFO: 'text-blue-500 dark:text-blue-400',
+      WARNING: 'text-amber-600 dark:text-amber-400',
+      ERROR: 'text-red-500 dark:text-red-400',
+      CRITICAL: 'text-red-600 dark:text-red-400',
+    };
+    return (
+      <span className={`text-xs font-medium ${tone[level] || 'text-muted-foreground'}`}>
+        {tone[level] ? level : 'UNKNOWN'}
+      </span>
+    );
   };
 
   // Format timestamp

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, GitBranch, Loader2, CheckCircle2, Circle, Clock, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { Textarea } from '@/components/core/ui/textarea';
 import {
   Select,
@@ -114,17 +114,10 @@ export const ProjectTimelineModal: React.FC<ProjectTimelineModalProps> = ({
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { bg: string; text: string; border: string }> = {
-      completed: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
-      in_progress: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
-      skipped: { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
-      pending: { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
-    };
-    const variant = variants[status] || variants.pending;
     return (
-      <Badge className={`${variant.bg} ${variant.text} ${variant.border} border`}>
-        {status.replace('_', ' ').toUpperCase()}
-      </Badge>
+      <span className={`text-xs font-medium uppercase ${statusTone(status)}`}>
+        {status.replace('_', ' ')}
+      </span>
     );
   };
 

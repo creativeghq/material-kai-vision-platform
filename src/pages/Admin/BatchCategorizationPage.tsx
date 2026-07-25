@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -30,12 +29,6 @@ interface BatchRunResult {
   results: CategorizeResult[];
   message: string;
 }
-
-const STATUS_COLOR: Record<string, string> = {
-  categorized: 'bg-green-100 text-green-800',
-  failed:      'bg-red-100 text-red-800',
-  skipped:     'bg-amber-100 text-amber-800',
-};
 
 export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boolean }) => {
   const navigate = useNavigate();
@@ -254,23 +247,23 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
                   <span className="flex-1 text-sm truncate">{r.name || r.id}</span>
 
                   {r.material_category && (
-                    <Badge variant="secondary" className="text-xs shrink-0">
+                    <span className="text-xs text-muted-foreground capitalize shrink-0">
                       {r.material_category}
-                    </Badge>
+                    </span>
                   )}
                   {r.zone_intent && (
-                    <Badge variant="outline" className="text-xs shrink-0">
+                    <span className="text-xs text-muted-foreground capitalize shrink-0">
                       {r.zone_intent}
-                    </Badge>
+                    </span>
                   )}
                   {r.reason && (
                     <span className="text-xs text-muted-foreground truncate max-w-48" title={r.reason}>
                       {r.reason}
                     </span>
                   )}
-                  <Badge className={`text-xs shrink-0 ${STATUS_COLOR[r.status]}`}>
+                  <span className={`text-xs capitalize shrink-0 ${r.status === 'categorized' ? 'text-emerald-600 dark:text-emerald-400' : r.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
                     {r.status}
-                  </Badge>
+                  </span>
                 </div>
               ))}
             </div>

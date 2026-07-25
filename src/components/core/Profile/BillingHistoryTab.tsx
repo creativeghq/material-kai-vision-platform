@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Receipt, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
+import { directionTone } from '@/utils/statusTone';
 import {
   Table,
   TableBody,
@@ -66,10 +66,8 @@ export const BillingHistoryTab: React.FC = () => {
   const getTransactionBadge = (t: Transaction) => {
     const isCredit = Number(t.amount ?? 0) >= 0;
     const label = (t.transaction_type || (isCredit ? 'credit' : 'debit')).replace(/_/g, ' ');
-    return isCredit ? (
-      <Badge variant="default" className="bg-green-500 capitalize">{label}</Badge>
-    ) : (
-      <Badge variant="secondary" className="capitalize">{label}</Badge>
+    return (
+      <span className={`text-xs capitalize ${directionTone(isCredit ? 'in' : 'out')}`}>{label}</span>
     );
   };
 

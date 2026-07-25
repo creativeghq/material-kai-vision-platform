@@ -2,15 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, Sparkles, ShoppingCart, TrendingUp, TrendingDown, Minus, AlertTriangle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { stockService, type ForecastCandidate } from '../services/stockService';
 
 const TrendBadge: React.FC<{ t: ForecastCandidate['trend'] }> = ({ t }) => {
-  if (t === 'accelerating') return <Badge variant="outline" className="border-amber-500/50 text-amber-500"><TrendingUp className="h-3 w-3 mr-1" />rising</Badge>;
-  if (t === 'slowing') return <Badge variant="outline" className="border-muted-foreground/40 text-muted-foreground"><TrendingDown className="h-3 w-3 mr-1" />slowing</Badge>;
-  return <Badge variant="outline" className="border-border text-muted-foreground"><Minus className="h-3 w-3 mr-1" />steady</Badge>;
+  if (t === 'accelerating') return <span className="inline-flex items-center text-xs text-amber-600 dark:text-amber-400"><TrendingUp className="h-3 w-3 mr-1" />rising</span>;
+  if (t === 'slowing') return <span className="inline-flex items-center text-xs text-muted-foreground"><TrendingDown className="h-3 w-3 mr-1" />slowing</span>;
+  return <span className="inline-flex items-center text-xs text-muted-foreground"><Minus className="h-3 w-3 mr-1" />steady</span>;
 };
 
 export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
@@ -98,7 +97,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
                   <td className="px-4 py-2 font-medium">
                     {c.name} <span className="text-xs text-muted-foreground">/ {c.unit}</span>
                     {c.stockout_before_reorder && (
-                      <Badge variant="outline" className="ml-2 border-destructive/50 text-destructive"><AlertTriangle className="h-3 w-3 mr-1" />stockout risk</Badge>
+                      <span className="ml-2 inline-flex items-center text-xs text-destructive"><AlertTriangle className="h-3 w-3 mr-1" />stockout risk</span>
                     )}
                     {c.sku && <div className="font-mono text-[11px] text-muted-foreground">{c.sku}</div>}
                   </td>

@@ -6,23 +6,14 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Send, Calendar, Users, Play, Pause, Trash2, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { messagingCampaignService, MessagingCampaign } from '../services/messagingCampaignService';
 import { humanizeLabel } from '@/utils/humanize';
+import { statusTone } from '@/utils/statusTone';
 import { format } from 'date-fns';
 
 const WhatsAppIcon = <MessageCircle className="h-4 w-4 text-green-500" />;
-
-const statusColors: Record<string, string> = {
-  draft: 'bg-gray-500',
-  scheduled: 'bg-blue-500',
-  sending: 'bg-yellow-500',
-  sent: 'bg-green-500',
-  paused: 'bg-orange-500',
-  cancelled: 'bg-red-500',
-};
 
 export const MessagingCampaignsTab: React.FC = () => {
   const [campaigns, setCampaigns] = useState<MessagingCampaign[]>([]);
@@ -199,9 +190,9 @@ export const MessagingCampaignsTab: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <Badge className={statusColors[campaign.status]}>
+                      <span className={`text-sm capitalize ${statusTone(campaign.status)}`}>
                         {humanizeLabel(campaign.status)}
-                      </Badge>
+                      </span>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1">

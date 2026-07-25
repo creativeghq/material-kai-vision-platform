@@ -81,28 +81,28 @@ const formatDuration = (ms: number | null): string => {
 };
 
 const StatusBadge: React.FC<{ status: string | null }> = ({ status }) => {
-  if (!status) return <Badge variant="outline">Never run</Badge>;
+  if (!status) return <span className="text-xs text-muted-foreground">Never run</span>;
   if (status === 'succeeded') {
     return (
-      <Badge className="bg-green-600 hover:bg-green-700">
+      <span className="text-xs inline-flex items-center text-emerald-600 dark:text-emerald-400">
         <CheckCircle2 className="h-3 w-3 mr-1" />
         Success
-      </Badge>
+      </span>
     );
   }
   if (status === 'failed') {
     return (
-      <Badge variant="destructive">
+      <span className="text-xs inline-flex items-center text-red-500 dark:text-red-400">
         <XCircle className="h-3 w-3 mr-1" />
         Failed
-      </Badge>
+      </span>
     );
   }
   return (
-    <Badge variant="secondary">
+    <span className="text-xs inline-flex items-center capitalize text-amber-600 dark:text-amber-400">
       <Clock className="h-3 w-3 mr-1" />
       {status}
-    </Badge>
+    </span>
   );
 };
 
@@ -257,9 +257,9 @@ export const CronJobsPanel: React.FC = () => {
                     </td>
                     <td className="px-6 py-3 text-right">
                       {j.active ? (
-                        <Badge className="bg-green-600 hover:bg-green-700">on</Badge>
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400">on</span>
                       ) : (
-                        <Badge variant="outline">off</Badge>
+                        <span className="text-xs text-muted-foreground">off</span>
                       )}
                     </td>
                   </tr>

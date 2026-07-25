@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Share2, Plus, Trash2, Loader2, RefreshCw, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -227,9 +227,9 @@ export const SocialAccountsTab: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-sm">{platform?.label ?? account.platform}</p>
-                    <Badge variant="outline" className="text-[10px] text-green-600 border-green-200 bg-green-50">
+                    <span className={`text-[10px] capitalize ${statusTone('connected')}`}>
                       Connected
-                    </Badge>
+                    </span>
                   </div>
                   <p className="text-xs text-muted-foreground truncate">
                     {account.handle ? `@${account.handle}` : account.display_name ?? '—'}

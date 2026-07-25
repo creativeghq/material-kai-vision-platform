@@ -8,6 +8,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { projectsService } from '../../services/projectsService';
 import { humanizeLabel } from '@/utils/humanize';
+import { statusTone } from '@/utils/statusTone';
 
 interface QuotesTabProps {
   projectId: string;
@@ -33,15 +34,6 @@ interface ChainGroup {
   /** Sorted by revision_number ascending (rev 1 first) */
   revisions: QuoteRow[];
 }
-
-const STATUS_TONES: Record<string, string> = {
-  draft: 'bg-muted text-muted-foreground border-border',
-  submitted: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  quoted: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  accepted: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  rejected: 'bg-destructive/15 text-destructive border-destructive/30',
-  expired: 'bg-muted text-muted-foreground border-border',
-};
 
 const formatMoney = (amount: number | null, currency: string | null) => {
   if (!amount) return '—';
@@ -154,9 +146,9 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-medium">{formatMoney(q.grand_total, q.currency)}</p>
-                      <Badge variant="outline" className={`text-xs mt-1 ${STATUS_TONES[q.status] || ''}`}>
+                      <span className={`mt-1 inline-block text-xs capitalize ${statusTone(q.status)}`}>
                         {humanizeLabel(q.status)}
-                      </Badge>
+                      </span>
                     </div>
                     <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   </button>

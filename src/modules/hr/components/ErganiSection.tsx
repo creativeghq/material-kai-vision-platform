@@ -16,9 +16,9 @@ import { SectionHeader, EmptyState } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 const statusBadge = (s: string) =>
-  s === 'submitted' ? <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">Submitted</Badge>
-  : s === 'failed' ? <Badge variant="destructive">Failed</Badge>
-  : <Badge variant="secondary">Cancelled</Badge>;
+  s === 'submitted' ? <span className="text-sm text-emerald-600 dark:text-emerald-400">Submitted</span>
+  : s === 'failed' ? <span className="text-sm text-red-500 dark:text-red-400">Failed</span>
+  : <span className="text-sm text-muted-foreground">Cancelled</span>;
 
 /** Ergani "dd/mm/yyyy hh:mm" (or the row's created_at) → yyyymmdd for the PDF fetch. */
 function toYyyymmdd(submitDate: string | null, createdAt: string): string {

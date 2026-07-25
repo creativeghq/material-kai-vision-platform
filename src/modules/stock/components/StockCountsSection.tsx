@@ -17,9 +17,9 @@ import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildStockCountFilters } from './stockCountFilters';
 
 const STATUS_META: Record<string, { cls: string; label: string }> = {
-  draft: { cls: 'border-amber-500/50 text-amber-500', label: 'Draft' },
-  posted: { cls: 'border-emerald-500/50 text-emerald-500', label: 'Posted' },
-  cancelled: { cls: 'border-muted-foreground/40 text-muted-foreground', label: 'Cancelled' },
+  draft: { cls: 'text-amber-600 dark:text-amber-400', label: 'Draft' },
+  posted: { cls: 'text-emerald-600 dark:text-emerald-400', label: 'Posted' },
+  cancelled: { cls: 'text-muted-foreground', label: 'Cancelled' },
 };
 
 export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
@@ -102,7 +102,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
                   <tr key={c.id} className="border-b border-border/30">
                     <td className="px-4 py-2 whitespace-nowrap text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</td>
                     <td className="px-4 py-2">{c.warehouse?.name ?? '—'}</td>
-                    <td className="px-4 py-2"><Badge variant="outline" className={meta.cls}>{meta.label}</Badge></td>
+                    <td className="px-4 py-2"><span className={`text-sm ${meta.cls}`}>{meta.label}</span></td>
                     <td className="px-4 py-2 text-muted-foreground truncate max-w-[16rem]">{c.note ?? '—'}</td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{c.adjusted_lines ?? '—'}</td>
                     <td className="px-4 py-2 text-right">

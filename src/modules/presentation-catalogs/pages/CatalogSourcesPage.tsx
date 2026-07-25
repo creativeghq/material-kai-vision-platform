@@ -9,6 +9,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { catalogsService, type CatalogSourcePdf } from '@/services/catalogsService';
+import { statusTone } from '@/utils/statusTone';
 
 export const CatalogSourcesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -143,7 +144,7 @@ export const CatalogSourcesPage: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium truncate">{s.original_filename}</span>
-                    <Badge variant="outline">{s.status}</Badge>
+                    <span className={`text-xs capitalize ${statusTone(s.status)}`}>{s.status}</span>
                     {s.manufacturer_name && <Badge variant="secondary">{s.manufacturer_name}</Badge>}
                   </div>
                   <div className="flex gap-3 text-xs text-muted-foreground mt-1">

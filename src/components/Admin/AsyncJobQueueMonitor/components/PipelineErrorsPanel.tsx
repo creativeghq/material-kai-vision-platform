@@ -187,9 +187,7 @@ export function PipelineErrorsPanel({ jobId, failureSummary }: Props) {
                       <span className="font-mono text-foreground/80">{err.product_name}</span>
                     )}
                     {err.stage && (
-                      <Badge variant="outline" className="text-[10px] border-white/20 px-1 py-0">
-                        {err.stage}
-                      </Badge>
+                      <span className="text-[10px] text-muted-foreground">{err.stage}</span>
                     )}
                     {err.occurred_at && (
                       <span className="ml-auto text-[10px] text-muted-foreground">

@@ -6,12 +6,12 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { humanizeLabel } from '@/utils/humanize';
+import { statusTone } from '@/utils/statusTone';
 
 interface Recipient {
   id: string;
@@ -91,22 +91,11 @@ export const RecipientsTab: React.FC<RecipientsTabProps> = ({ campaignId }) => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-gray-500',
-      sending: 'bg-blue-500',
-      sent: 'bg-green-500',
-      failed: 'bg-red-500',
-      bounced: 'bg-orange-500',
-      complained: 'bg-purple-500',
-    };
-
-    return (
-      <Badge className={colors[status] || 'bg-gray-500'}>
-        {humanizeLabel(status)}
-      </Badge>
-    );
-  };
+  const getStatusBadge = (status: string) => (
+    <span className={`text-sm capitalize ${statusTone(status)}`}>
+      {humanizeLabel(status)}
+    </span>
+  );
 
   const filteredRecipients = recipients.filter(r =>
     r.email.toLowerCase().includes(searchQuery.toLowerCase()),

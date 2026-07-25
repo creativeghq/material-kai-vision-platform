@@ -12,6 +12,7 @@ import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { statusTone } from '@/utils/statusTone';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 import {
@@ -440,9 +441,9 @@ export const PushNotificationsTab: React.FC = () => {
                       {sub.endpoint}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={sub.is_active ? 'default' : 'secondary'}>
+                      <span className={`text-sm capitalize ${statusTone(sub.is_active ? 'active' : 'inactive')}`}>
                         {sub.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
+                      </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(sub.created_at).toLocaleDateString()}

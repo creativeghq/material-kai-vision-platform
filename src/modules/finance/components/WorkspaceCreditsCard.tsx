@@ -149,7 +149,7 @@ export const WorkspaceCreditsCard: React.FC<{ workspaceId: string }> = ({ worksp
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium truncate">{m.name || m.email || m.user_id.slice(0, 8)}</div>
                       <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] capitalize">{m.role}</Badge>
+                        <span className="text-[10px] capitalize text-muted-foreground">{m.role}</span>
                         <span>spent {m.spent_this_month.toFixed(2)} this month</span>
                         {m.monthly_limit != null
                           ? <span>· {Math.max(0, m.monthly_limit - m.spent_this_month).toFixed(2)} left</span>

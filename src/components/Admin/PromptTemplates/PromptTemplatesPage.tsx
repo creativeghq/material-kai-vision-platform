@@ -17,7 +17,6 @@ import {
   CardTitle,
 } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import {
   Table,
   TableBody,
@@ -111,33 +110,33 @@ export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded
   };
 
   const getIndustryBadge = (industry: string | null) => {
-    if (!industry) return <Badge variant="outline">General</Badge>;
+    if (!industry) return <span className="text-xs text-muted-foreground">General</span>;
 
-    const colors: Record<string, string> = {
-      construction: 'bg-orange-100 text-orange-700 border-orange-200',
-      interior_design: 'bg-purple-100 text-purple-700 border-purple-200',
-      general: 'bg-blue-100 text-blue-700 border-blue-200',
+    const tones: Record<string, string> = {
+      construction: 'text-orange-600 dark:text-orange-400',
+      interior_design: 'text-purple-600 dark:text-purple-400',
+      general: 'text-blue-500 dark:text-blue-400',
     };
 
     return (
-      <Badge className={colors[industry] || 'bg-gray-100 text-gray-700'}>
+      <span className={`text-xs capitalize ${tones[industry] || 'text-muted-foreground'}`}>
         {industry.replace('_', ' ')}
-      </Badge>
+      </span>
     );
   };
 
   const getStageBadge = (stage: string) => {
-    const colors: Record<string, string> = {
-      metadata_extraction: 'bg-green-100 text-green-700 border-green-200',
-      discovery: 'bg-blue-100 text-blue-700 border-blue-200',
-      classification: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      chunking: 'bg-pink-100 text-pink-700 border-pink-200',
+    const tones: Record<string, string> = {
+      metadata_extraction: 'text-emerald-600 dark:text-emerald-400',
+      discovery: 'text-blue-500 dark:text-blue-400',
+      classification: 'text-amber-600 dark:text-amber-400',
+      chunking: 'text-pink-600 dark:text-pink-400',
     };
 
     return (
-      <Badge className={colors[stage] || 'bg-gray-100 text-gray-700'}>
+      <span className={`text-xs capitalize ${tones[stage] || 'text-muted-foreground'}`}>
         {stage.replace('_', ' ')}
-      </Badge>
+      </span>
     );
   };
 
@@ -257,13 +256,9 @@ export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded
                       <TableCell className="text-muted-foreground">v{template.version}</TableCell>
                       <TableCell>
                         {template.is_active ? (
-                          <Badge className="bg-green-100 text-green-700 border-green-200">
-                            Active
-                          </Badge>
+                          <span className="text-xs text-emerald-600 dark:text-emerald-400">Active</span>
                         ) : (
-                          <Badge variant="outline">
-                            Inactive
-                          </Badge>
+                          <span className="text-xs text-muted-foreground">Inactive</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">

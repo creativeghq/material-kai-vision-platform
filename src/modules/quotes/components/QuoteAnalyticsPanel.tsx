@@ -206,12 +206,11 @@ export const QuoteAnalyticsPanel: React.FC<Props> = ({
                         <span className="text-xs text-muted-foreground ml-1">({e.metadata.method})</span>
                       )}
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={`text-[10px] ${e.view_context === 'public' ? 'border-primary/40 text-primary' : ''}`}
+                    <span
+                      className={`text-[10px] capitalize ${e.view_context === 'public' ? 'text-primary' : 'text-muted-foreground'}`}
                     >
                       {CONTEXT_LABEL[e.view_context] ?? e.view_context}
-                    </Badge>
+                    </span>
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap ml-3">
                     {new Date(e.created_at).toLocaleString()}

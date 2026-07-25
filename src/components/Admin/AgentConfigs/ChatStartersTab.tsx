@@ -26,6 +26,7 @@ import {
 import { Switch } from '@/components/core/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { statusTone } from '@/utils/statusTone';
 
 const GLOBAL_WORKSPACE = '00000000-0000-0000-0000-000000000000';
 
@@ -280,10 +281,10 @@ export const ChatStartersTab: React.FC = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap mb-1">
                                 <span className="text-sm font-medium">{r.name}</span>
-                                {r.is_default && <Badge variant="outline" className="text-[10px]">Default</Badge>}
-                                {!r.is_active && <Badge variant="outline" className="text-[10px]"><EyeOff className="h-2.5 w-2.5 mr-0.5" />Inactive</Badge>}
-                                {r.configuration?.visibility === 'admin' && <Badge variant="outline" className="text-[10px]">Admin</Badge>}
-                                {r.configuration?.requires_image && <Badge variant="outline" className="text-[10px]"><ImageIcon className="h-2.5 w-2.5 mr-0.5" />Image</Badge>}
+                                {r.is_default && <span className="text-[10px] text-muted-foreground capitalize">Default</span>}
+                                {!r.is_active && <span className={`text-[10px] inline-flex items-center capitalize ${statusTone('inactive')}`}><EyeOff className="h-2.5 w-2.5 mr-0.5" />Inactive</span>}
+                                {r.configuration?.visibility === 'admin' && <span className="text-[10px] text-muted-foreground capitalize">Admin</span>}
+                                {r.configuration?.requires_image && <span className="text-[10px] inline-flex items-center text-muted-foreground capitalize"><ImageIcon className="h-2.5 w-2.5 mr-0.5" />Image</span>}
                                 {r.configuration?.skill_hint && <Badge variant="outline" className="text-[10px]">skill: {r.configuration.skill_hint}</Badge>}
                                 {r.configuration?.credit_estimate && (
                                   <span className="text-[10px] text-muted-foreground">~{r.configuration.credit_estimate} cr</span>
@@ -463,7 +464,7 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
               <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All users</SelectItem>
-                <SelectItem value="admin">Admin / owner only</SelectItem>
+                <SelectItem value="admin">Admin / Owner only</SelectItem>
               </SelectContent>
             </Select>
           </div>

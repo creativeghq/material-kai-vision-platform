@@ -391,15 +391,15 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-500/20 text-green-600';
+        return 'text-emerald-600 dark:text-emerald-400';
       case 'processing':
-        return 'bg-blue-500/20 text-blue-600';
+        return 'text-blue-500 dark:text-blue-400';
       case 'pending':
-        return 'bg-yellow-500/20 text-yellow-600';
+        return 'text-amber-600 dark:text-amber-400';
       case 'failed':
-        return 'bg-red-500/20 text-red-600';
+        return 'text-red-500 dark:text-red-400';
       default:
-        return 'bg-gray-500/20 text-gray-600';
+        return 'text-muted-foreground';
     }
   };
 
@@ -623,9 +623,9 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                               {job.document_info?.name ||
                                 `Job ${job.job_id.slice(0, 8)}`}
                             </div>
-                            <Badge className={getStatusColor(job.status)}>
+                            <span className={`text-xs capitalize ${getStatusColor(job.status)}`}>
                               {job.status}
-                            </Badge>
+                            </span>
                           </div>
 
                           <div className="space-y-2">
@@ -969,9 +969,9 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                           {job.job_type ?? '—'}
                         </TableCell>
                         <TableCell>
-                          <Badge className={getStatusColor(job.status ?? '')}>
+                          <span className={`text-xs capitalize ${getStatusColor(job.status ?? '')}`}>
                             {job.status ?? 'unknown'}
-                          </Badge>
+                          </span>
                         </TableCell>
                         <TableCell>{formatJobDuration(job)}</TableCell>
                         <TableCell>

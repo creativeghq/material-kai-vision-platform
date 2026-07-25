@@ -2,15 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, PackagePlus, PackageMinus, SlidersHorizontal, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
-import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { stockService, type StockMovement } from '../services/stockService';
 
 const DIR_META: Record<string, { icon: React.ElementType; label: string; cls: string }> = {
-  in: { icon: PackagePlus, label: 'Received', cls: 'text-emerald-500 border-emerald-500/50' },
-  out: { icon: PackageMinus, label: 'Issued', cls: 'text-destructive border-destructive/50' },
-  adjust: { icon: SlidersHorizontal, label: 'Adjusted', cls: 'text-amber-500 border-amber-500/50' },
+  in: { icon: PackagePlus, label: 'Received', cls: 'text-emerald-600 dark:text-emerald-400' },
+  out: { icon: PackageMinus, label: 'Issued', cls: 'text-red-500 dark:text-red-400' },
+  adjust: { icon: SlidersHorizontal, label: 'Adjusted', cls: 'text-amber-600 dark:text-amber-400' },
 };
 
 const fmtWhen = (iso: string) => {
@@ -89,7 +88,7 @@ export const MovementsSection: React.FC<{ workspaceId: string }> = ({ workspaceI
                       {r.item?.name ?? '—'}
                       {r.item?.sku && <span className="ml-2 font-mono text-[11px] text-muted-foreground">{r.item.sku}</span>}
                     </td>
-                    <td className="px-4 py-2"><Badge variant="outline" className={meta.cls}><Icon className="h-3 w-3 mr-1" />{meta.label}</Badge></td>
+                    <td className="px-4 py-2"><span className={`text-sm inline-flex items-center ${meta.cls}`}><Icon className="h-3 w-3 mr-1" />{meta.label}</span></td>
                     <td className="px-4 py-2 text-right font-medium">{r.quantity}{r.item?.unit ? <span className="text-xs text-muted-foreground"> {r.item.unit}</span> : null}</td>
                     <td className="px-4 py-2 text-muted-foreground">{r.reason ?? '—'}</td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">{r.source_type ?? 'manual'}</td>

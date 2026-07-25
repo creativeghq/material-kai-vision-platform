@@ -8,12 +8,12 @@ import { useNavigate } from 'react-router-dom';
 import { FileText, Loader2, Plus, ArrowRight, Receipt } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { humanizeLabel } from '@/utils/humanize';
+import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { projectsService } from '../../services/projectsService';
@@ -101,13 +101,13 @@ export const BillingTab: React.FC<{ projectId: string }> = ({ projectId }) => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-medium truncate">{inv.internal_number}</p>
-                  <Badge variant="outline" className="text-[10px]">{inv.invoice_kind}{inv.progress_pct ? ` ${inv.progress_pct}%` : ''}</Badge>
+                  <span className="text-[10px] text-muted-foreground capitalize">{inv.invoice_kind}{inv.progress_pct ? ` ${inv.progress_pct}%` : ''}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">{inv.issued_at ? new Date(inv.issued_at).toLocaleDateString() : 'Draft'}</p>
               </div>
               <div className="text-right shrink-0">
                 <p className="font-medium">{money(inv.total, inv.currency)}</p>
-                <Badge variant="outline" className="text-[10px] mt-1">{humanizeLabel(inv.status)}</Badge>
+                <span className={`mt-1 inline-block text-[10px] capitalize ${statusTone(inv.status)}`}>{humanizeLabel(inv.status)}</span>
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
             </button>

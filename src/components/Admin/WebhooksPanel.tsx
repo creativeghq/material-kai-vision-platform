@@ -107,28 +107,28 @@ const formatDuration = (ms: number | null): string => {
 
 // flow_runs uses 'completed'/'failed'; webhook_calls uses 'success'/'failed'/'pending'.
 const StatusBadge: React.FC<{ status: string | null }> = ({ status }) => {
-  if (!status) return <Badge variant="outline">Never fired</Badge>;
+  if (!status) return <span className="text-xs text-muted-foreground">Never fired</span>;
   if (status === 'completed' || status === 'success' || status === 'succeeded') {
     return (
-      <Badge className="bg-green-600 hover:bg-green-700">
+      <span className="inline-flex items-center text-xs text-emerald-600 dark:text-emerald-400">
         <CheckCircle2 className="h-3 w-3 mr-1" />
         Success
-      </Badge>
+      </span>
     );
   }
   if (status === 'failed') {
     return (
-      <Badge variant="destructive">
+      <span className="inline-flex items-center text-xs text-red-500 dark:text-red-400">
         <XCircle className="h-3 w-3 mr-1" />
         Failed
-      </Badge>
+      </span>
     );
   }
   return (
-    <Badge variant="secondary">
+    <span className="inline-flex items-center text-xs text-amber-600 dark:text-amber-400">
       <Clock className="h-3 w-3 mr-1" />
       {status}
-    </Badge>
+    </span>
   );
 };
 
@@ -277,9 +277,9 @@ export const WebhooksPanel: React.FC = () => {
                       </td>
                       <td className="px-3 py-3">
                         {r.status === 'active' ? (
-                          <Badge className="bg-green-600 hover:bg-green-700">Active</Badge>
+                          <span className="text-xs text-emerald-600 dark:text-emerald-400">Active</span>
                         ) : (
-                          <Badge variant="outline">{r.status}</Badge>
+                          <span className="text-xs text-muted-foreground capitalize">{r.status}</span>
                         )}
                       </td>
                       <td className="px-3 py-3 text-muted-foreground">{formatRelative(r.last_run_at)}</td>
@@ -349,9 +349,9 @@ export const WebhooksPanel: React.FC = () => {
                       <td className="px-3 py-3 text-right text-muted-foreground">{r.pending}</td>
                       <td className="px-6 py-3 text-right">
                         {r.is_active ? (
-                          <Badge className="bg-green-600 hover:bg-green-700">on</Badge>
+                          <span className="text-xs text-emerald-600 dark:text-emerald-400">on</span>
                         ) : (
-                          <Badge variant="outline">off</Badge>
+                          <span className="text-xs text-muted-foreground">off</span>
                         )}
                       </td>
                     </tr>
@@ -384,7 +384,7 @@ export const WebhooksPanel: React.FC = () => {
                     <th className="py-2 pr-3 font-medium">Fired</th>
                     <th className="py-2 pr-3 font-medium">Result</th>
                     <th className="py-2 pr-3 font-medium">Duration</th>
-                    <th className="py-2 font-medium">Payload / error</th>
+                    <th className="py-2 font-medium">Payload / Error</th>
                   </tr>
                 </thead>
                 <tbody>

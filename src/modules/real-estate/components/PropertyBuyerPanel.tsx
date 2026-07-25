@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { realEstateService, type BuyerRequirement, type ContactExt, type PropertyListItem } from '../services/realEstateService';
 import { scoreLead } from '@/modules/crm/services/leadScoring';
+import { statusTone } from '@/utils/statusTone';
 
 // #249 — real-estate panel on the CRM contact page: buyer profile (budget / pre-approval / seller AVM)
 // + saved searches with an on-demand match against the workspace inventory.
@@ -57,8 +58,8 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
   const propRow = (p: PropertyListItem & { interest_type?: string }) => (
     <Link key={p.id} to={`/properties/${p.id}`} className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/50">
       <span className="min-w-0 flex-1 truncate">{p.title || 'Listing'} <span className="text-muted-foreground">{[p.town, p.region].filter(Boolean).join(', ')}</span></span>
-      {p.interest_type && <Badge className="rounded-full border-0 bg-muted text-[10px] capitalize">{p.interest_type.replace('_', ' ')}</Badge>}
-      <Badge className="rounded-full border-0 bg-muted text-[10px] capitalize">{p.listing_status.replace('_', ' ')}</Badge>
+      {p.interest_type && <span className="text-[10px] capitalize text-muted-foreground">{p.interest_type.replace('_', ' ')}</span>}
+      <span className={`text-[10px] capitalize ${statusTone(p.listing_status)}`}>{p.listing_status.replace('_', ' ')}</span>
       <span className="shrink-0 font-medium">{money2(p.price, p.currency)}</span>
     </Link>
   );
@@ -73,7 +74,7 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
         </CardContent></Card>
       )}
       <Card><CardContent className="p-4">
-        <div className="mb-3 flex flex-wrap items-center gap-2"><Home className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Buyer / seller profile</span>
+        <div className="mb-3 flex flex-wrap items-center gap-2"><Home className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Buyer / Seller profile</span>
           {score && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title={score.rationale}>Lead {score.lead_score} · Health {score.health_score}</Badge>}
           <Button size="sm" variant="ghost" className="ml-auto rounded-full" disabled={scoring} onClick={async () => {
             if (!ws) return; setScoring(true);

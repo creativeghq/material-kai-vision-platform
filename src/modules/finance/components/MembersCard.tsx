@@ -8,7 +8,6 @@ import { Link } from 'react-router-dom';
 import { Loader2, Users, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -62,7 +61,7 @@ export const MembersCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                     <div className="text-sm font-medium">{m.profile?.full_name || m.profile?.email || m.user_id.slice(0, 8)}</div>
                     {m.profile?.email && <div className="text-xs text-muted-foreground">{m.profile.email}</div>}
                   </div>
-                  <Badge variant="outline" className="text-[10px] capitalize">{m.role === 'realestate_agent' ? 'Estate Agent' : m.role}</Badge>
+                  <span className="text-[10px] capitalize text-muted-foreground">{m.role === 'realestate_agent' ? 'Estate Agent' : m.role}</span>
                 </div>
               ))}
             </div>

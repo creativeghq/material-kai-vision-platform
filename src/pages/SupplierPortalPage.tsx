@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, PackageCheck, Truck, RefreshCw, Inbox } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -118,7 +119,7 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
               PO {o.order_number} <span className="text-muted-foreground font-normal">· {o.buyer_name}</span>
             </CardTitle>
             <span className="flex items-center gap-2 shrink-0">
-              {o.supplier_status && <Badge variant="secondary" className="text-[10px] capitalize">{o.supplier_status}</Badge>}
+              {o.supplier_status && <span className={`text-[10px] capitalize ${statusTone(o.supplier_status)}`}>{o.supplier_status}</span>}
               <Badge variant="outline" className="text-[10px] tabular-nums">{o.total} {o.currency}</Badge>
             </span>
           </CardHeader>

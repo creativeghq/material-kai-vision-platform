@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
-import { Badge } from '@/components/core/ui/badge';
 import { Loader2, Link2, Image as ImageIcon, FileText, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -107,13 +106,13 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
   };
 
   const getSourceBadge = (sourceType: string) => {
-    const badges: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
-      pdf_processing: { label: 'PDF', variant: 'default' },
-      xml_import: { label: 'XML', variant: 'secondary' },
-      web_scraping: { label: 'Web', variant: 'outline' },
+    const tones: Record<string, { label: string; color: string }> = {
+      pdf_processing: { label: 'PDF', color: 'text-blue-600 dark:text-blue-400' },
+      xml_import: { label: 'XML', color: 'text-emerald-600 dark:text-emerald-400' },
+      web_scraping: { label: 'Web', color: 'text-purple-600 dark:text-purple-400' },
     };
-    const badge = badges[sourceType] || { label: sourceType, variant: 'outline' };
-    return <Badge variant={badge.variant}>{badge.label}</Badge>;
+    const badge = tones[sourceType] || { label: sourceType, color: 'text-muted-foreground' };
+    return <span className={`text-xs ${badge.color}`}>{badge.label}</span>;
   };
 
   return (

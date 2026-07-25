@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Switch } from '@/components/core/ui/switch';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
+import { statusTone } from '@/utils/statusTone';
 import { messagingService, MessagingTemplate } from '../services';
 import type { MessageType } from '../services/types';
 
@@ -178,9 +179,9 @@ export const MessagingTemplatesTab: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <Badge className={categoryColors[template.category]}>
+                      <span className="text-sm capitalize text-muted-foreground">
                         {template.category}
-                      </Badge>
+                      </span>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex flex-wrap gap-1">
@@ -197,12 +198,9 @@ export const MessagingTemplatesTab: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <Badge
-                        variant={template.is_approved ? 'default' : 'secondary'}
-                        className={template.is_approved ? 'bg-green-500' : ''}
-                      >
+                      <span className={`text-sm capitalize ${statusTone(template.approval_status)}`}>
                         {template.approval_status}
-                      </Badge>
+                      </span>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-2">

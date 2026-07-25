@@ -13,6 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/modules/finance/services/financeService';
+import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { deliveryNotesService, type DispatchQueueOrder } from '@/modules/finance/services/deliveryNotesService';
 
@@ -191,7 +192,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                           </td>
                           <td className="px-2 py-2 text-xs text-muted-foreground whitespace-nowrap">
                             {o.lines.length} line{o.lines.length === 1 ? '' : 's'}
-                            {o.has_shortfall && <Badge variant="destructive" className="ml-2 gap-1 text-[10px]"><AlertTriangle className="h-3 w-3" /> short</Badge>}
+                            {o.has_shortfall && <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-red-500 dark:text-red-400"><AlertTriangle className="h-3 w-3" /> short</span>}
                           </td>
                           <td className="px-2 py-2 text-right text-xs whitespace-nowrap">{formatMoney(o.total, o.currency)}</td>
                           <td className="px-2 py-2 text-right whitespace-nowrap">
@@ -203,7 +204,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                               )}
                               {!readOnly && o.dispatch && (
                                 <>
-                                  <Badge variant="outline" className="text-[10px]">draft {o.dispatch.number ?? ''}</Badge>
+                                  <span className={`text-[10px] ${statusTone('draft')}`}>draft {o.dispatch.number ?? ''}</span>
                                   <Button size="sm" variant="ghost" disabled={busy === o.invoice_id} onClick={() => printNote(o)} title="Print dispatch note">
                                     <FileText className="h-3.5 w-3.5" />
                                   </Button>

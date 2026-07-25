@@ -5,6 +5,7 @@ import { marketplacePricingService } from '@/services/marketplacePricingService'
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
@@ -1318,9 +1319,9 @@ export const QuoteDetailPage: React.FC = () => {
                               <Gift className="h-4 w-4 text-muted-foreground" />
                               <h4 className="font-medium">{upsell.name}</h4>
                               {quoteUpsell.customer_accepted !== null && (
-                                <Badge variant={quoteUpsell.customer_accepted ? 'default' : 'destructive'}>
+                                <span className={`text-xs ${quoteUpsell.customer_accepted ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
                                   {quoteUpsell.customer_accepted ? 'Accepted' : 'Rejected'}
-                                </Badge>
+                                </span>
                               )}
                             </div>
                             {upsell.description && (
@@ -1520,19 +1521,6 @@ export const QuoteDetailPage: React.FC = () => {
                         }
                       };
 
-                      const getStatusBadgeColor = (status: string) => {
-                        switch (status) {
-                          case 'completed':
-                            return 'bg-green-100 text-green-700 border-green-200';
-                          case 'in_progress':
-                            return 'bg-blue-100 text-blue-700 border-blue-200';
-                          case 'skipped':
-                            return 'bg-muted text-muted-foreground border-muted';
-                          default:
-                            return 'bg-muted/50 text-muted-foreground border-muted';
-                        }
-                      };
-
                       const isEditingNote = editingTimelineNotes[item.id] !== undefined;
                       const currentNote = isEditingNote ? editingTimelineNotes[item.id] : (item.notes || '');
 
@@ -1558,9 +1546,9 @@ export const QuoteDetailPage: React.FC = () => {
                                   </Badge>
                                 )}
                               </div>
-                              <Badge className={`border ${getStatusBadgeColor(item.status)}`}>
+                              <span className={`text-xs capitalize ${statusTone(item.status)}`}>
                                 {item.status.replace('_', ' ')}
-                              </Badge>
+                              </span>
                             </div>
                             {step.description && (
                               <p className="text-sm text-muted-foreground mb-3">{step.description}</p>

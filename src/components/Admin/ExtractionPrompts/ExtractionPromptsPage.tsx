@@ -221,33 +221,33 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
 
   const getStageBadge = (stage: string) => {
     const colors: Record<string, string> = {
-      discovery: 'bg-blue-100 text-blue-700 border-blue-200',
-      entity_creation: 'bg-green-100 text-green-700 border-green-200',
-      image_analysis: 'bg-purple-100 text-purple-700 border-purple-200',
-      chunking: 'bg-pink-100 text-pink-700 border-pink-200',
-      scraping: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+      discovery: 'text-blue-600 dark:text-blue-400',
+      entity_creation: 'text-green-600 dark:text-green-400',
+      image_analysis: 'text-purple-600 dark:text-purple-400',
+      chunking: 'text-pink-600 dark:text-pink-400',
+      scraping: 'text-cyan-600 dark:text-cyan-400',
     };
 
     return (
-      <Badge className={colors[stage] || 'bg-gray-100 text-gray-700'}>
+      <span className={`text-xs capitalize ${colors[stage] || 'text-muted-foreground'}`}>
         {stage.replace('_', ' ')}
-      </Badge>
+      </span>
     );
   };
 
   const getCategoryBadge = (category: string) => {
     const colors: Record<string, string> = {
-      products: 'bg-orange-100 text-orange-700 border-orange-200',
-      material_properties: 'bg-teal-100 text-teal-700 border-teal-200',
-      certificates: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-      logos: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-      materials: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+      products: 'text-orange-600 dark:text-orange-400',
+      material_properties: 'text-teal-600 dark:text-teal-400',
+      certificates: 'text-yellow-600 dark:text-yellow-400',
+      logos: 'text-indigo-600 dark:text-indigo-400',
+      materials: 'text-emerald-600 dark:text-emerald-400',
     };
 
     return (
-      <Badge className={colors[category] || 'bg-gray-100 text-gray-700'}>
+      <span className={`text-xs capitalize ${colors[category] || 'text-muted-foreground'}`}>
         {category.replace('_', ' ')}
-      </Badge>
+      </span>
     );
   };
 
@@ -351,15 +351,15 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
                       {prompt.name || `${prompt.stage} - ${prompt.category}`}
                     </TableCell>
                     <TableCell>
-                      <Badge className={
-                        prompt.prompt_type === 'agent' ? 'bg-blue-100 text-blue-700' :
-                        prompt.prompt_type === 'extraction' ? 'bg-green-100 text-green-700' :
-                        prompt.prompt_type === 'template' ? 'bg-purple-100 text-purple-700' :
-                        prompt.prompt_type === 'search' ? 'bg-orange-100 text-orange-700' :
-                        'bg-gray-100 text-gray-700'
-                      }>
+                      <span className={`text-xs capitalize ${
+                        prompt.prompt_type === 'agent' ? 'text-blue-600 dark:text-blue-400' :
+                        prompt.prompt_type === 'extraction' ? 'text-green-600 dark:text-green-400' :
+                        prompt.prompt_type === 'template' ? 'text-purple-600 dark:text-purple-400' :
+                        prompt.prompt_type === 'search' ? 'text-orange-600 dark:text-orange-400' :
+                        'text-muted-foreground'
+                      }`}>
                         {prompt.prompt_type || 'extraction'}
-                      </Badge>
+                      </span>
                     </TableCell>
                     <TableCell>{getStageBadge(prompt.stage)}</TableCell>
                     <TableCell>{getCategoryBadge(prompt.category)}</TableCell>

@@ -22,6 +22,7 @@ import { Loader2, Plus, Trash2, Landmark, Star, Wallet, CreditCard, Globe, Bankn
 import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, type BankAccountBalance, type BankAccountKind } from '@/modules/finance/services/financeService';
 import { parseDecimalOr } from '@/utils/decimal';
+import { statusTone } from '@/utils/statusTone';
 
 const KIND_META: Record<BankAccountKind, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
   bank: { label: 'Bank', icon: Landmark },
@@ -174,7 +175,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
                         <span className="text-sm font-medium truncate">{r.name}</span>
                         {r.is_default && <Badge variant="outline" className="text-[10px]">Default</Badge>}
                         {r.show_on_invoice && <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-500">On invoice</Badge>}
-                        {!r.is_active && <Badge variant="secondary" className="text-[10px]">Inactive</Badge>}
+                        {!r.is_active && <span className={`text-[10px] capitalize ${statusTone('inactive')}`}>Inactive</span>}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
                         {Meta.label} · {r.currency}
@@ -244,7 +245,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
               <div className="space-y-1">
                 <Label className="text-xs">{refLabelFor(form.kind)}</Label>
                 <Input className="h-9 text-sm" value={form.accountRef} onChange={(e) => patch('accountRef', e.target.value)}
-                  placeholder={form.kind === 'card' ? 'Last 4 or full card number' : 'Account number / reference'} />
+                  placeholder={form.kind === 'card' ? 'Last 4 or full card number' : 'Account number / Reference'} />
               </div>
             )}
             <div className="space-y-1">

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { useActivePaymentProviders } from '../services/invoiceProviderService';
 
 interface Props { embedded?: boolean }
@@ -71,10 +71,10 @@ export const ProvidersPanel: React.FC<Props> = (_props) => {
                     <p className="font-medium truncate">{p.name}</p>
                     <p className="text-xs text-muted-foreground font-mono">{p.slug}</p>
                   </div>
-                  <Badge variant="outline" className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                  <span className={`inline-flex items-center text-xs capitalize ${statusTone('active')}`}>
                     <CheckCircle2 className="h-3 w-3 mr-1" />
                     Active
-                  </Badge>
+                  </span>
                   <Button asChild variant="outline" size="sm">
                     <Link to={`/admin/modules/${p.slug}/settings`}>
                       <Sliders className="h-3.5 w-3.5 mr-1" />

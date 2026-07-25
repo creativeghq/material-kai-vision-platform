@@ -100,23 +100,23 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
   }, [buildQuery]);
 
   const getSourceBadge = (sourceType: string | null | undefined) => {
-    if (!sourceType) return <Badge variant="outline">Unknown</Badge>;
+    if (!sourceType) return <span className="text-xs text-muted-foreground">Unknown</span>;
 
     const badges = {
-      pdf_processing: { label: 'PDF', icon: FileText, color: 'bg-blue-100 text-blue-700' },
-      xml_import: { label: 'XML', icon: Code, color: 'bg-green-100 text-green-700' },
-      web_scraping: { label: 'Web', icon: Globe, color: 'bg-purple-100 text-purple-700' },
+      pdf_processing: { label: 'PDF', icon: FileText, color: 'text-blue-600 dark:text-blue-400' },
+      xml_import: { label: 'XML', icon: Code, color: 'text-emerald-600 dark:text-emerald-400' },
+      web_scraping: { label: 'Web', icon: Globe, color: 'text-purple-600 dark:text-purple-400' },
     };
 
     const badge = badges[sourceType as keyof typeof badges];
-    if (!badge) return <Badge variant="outline">{sourceType}</Badge>;
+    if (!badge) return <span className="text-xs text-muted-foreground capitalize">{sourceType}</span>;
 
     const Icon = badge.icon;
     return (
-      <Badge className={`${badge.color} flex items-center gap-1`}>
+      <span className={`inline-flex items-center gap-1 text-xs ${badge.color}`}>
         <Icon className="h-3 w-3" />
         {badge.label}
-      </Badge>
+      </span>
     );
   };
 
@@ -172,9 +172,9 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
                       <TableCell>{getSourceBadge(chunk.source_type)}</TableCell>
                       <TableCell>
                         {chunk.text_embedding ? (
-                          <Badge className="bg-green-100 text-green-700">Yes</Badge>
+                          <span className="text-xs text-emerald-600 dark:text-emerald-400">Yes</span>
                         ) : (
-                          <Badge variant="secondary">No</Badge>
+                          <span className="text-xs text-muted-foreground">No</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">

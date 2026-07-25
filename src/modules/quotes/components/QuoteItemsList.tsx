@@ -407,7 +407,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                   {displayName}
                                 </p>
                                 {isCustom && (
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/30 text-primary/70 flex-shrink-0">Custom</Badge>
+                                  <span className="text-[10px] text-primary/70 capitalize flex-shrink-0">Custom</span>
                                 )}
                               </div>
                               {(isCustom ? item.custom_sku : item.product?.sku) && (
@@ -478,12 +478,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                             {isSavingPrice ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin ml-auto text-muted-foreground" />
                             ) : callForPrice && !editPricing ? (
-                              <Badge
-                                variant="outline"
-                                className={`text-[10px] px-1.5 py-0 whitespace-nowrap ${awaitingSupplier ? 'border-amber-500/40 text-amber-600' : 'border-primary/30 text-primary/80'}`}
+                              <span
+                                className={`text-[10px] whitespace-nowrap ${awaitingSupplier ? 'text-amber-600' : 'text-primary/80'}`}
                               >
                                 {awaitingSupplier ? 'Awaiting supplier' : 'Call for price'}
-                              </Badge>
+                              </span>
                             ) : editPricing ? (
                               <div className="space-y-1">
                                 <PriceCell

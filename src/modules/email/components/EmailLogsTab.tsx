@@ -6,7 +6,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, useFilters } from '@/components/core/filters';
@@ -15,6 +14,7 @@ import { buildEmailLogFilters } from './emailFilters';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { humanizeLabel } from '@/utils/humanize';
+import { statusTone } from '@/utils/statusTone';
 
 export const EmailLogsTab: React.FC = () => {
   const [logs, setLogs] = useState<EmailLog[]>([]);
@@ -65,18 +65,9 @@ export const EmailLogsTab: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      sent: 'default',
-      delivered: 'default',
-      queued: 'secondary',
-      bounced: 'destructive',
-      complained: 'destructive',
-      failed: 'destructive',
-    };
-
-    return <Badge variant={variants[status] || 'outline'}>{humanizeLabel(status)}</Badge>;
-  };
+  const getStatusBadge = (status: string) => (
+    <span className={`text-sm capitalize ${statusTone(status)}`}>{humanizeLabel(status)}</span>
+  );
 
   const exportLogs = () => {
     const csv = [

@@ -27,6 +27,7 @@ function MarkdownEditor(props: React.ComponentProps<typeof MarkdownEditorLazy>) 
   );
 }
 import { Badge } from '@/components/core/ui/badge';
+import { statusTone } from '@/utils/statusTone';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { FilterBar, useFilters } from '@/components/core/filters';
@@ -228,7 +229,7 @@ const DocsPage: React.FC = () => {
                   >
                     <div className="font-medium truncate flex items-center gap-2">
                       {d.title}
-                      {d.status === 'draft' && <Badge variant="outline" className="text-[10px]">draft</Badge>}
+                      {d.status === 'draft' && <span className={`text-[10px] capitalize ${statusTone('draft')}`}>draft</span>}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">{(d.tags ?? []).join(', ') || '—'}</div>
                   </button>

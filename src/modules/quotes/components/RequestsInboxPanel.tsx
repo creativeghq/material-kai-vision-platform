@@ -12,7 +12,6 @@ import { useNavigate } from 'react-router-dom';
 import { Inbox, Loader2, ArrowRight, ArrowUpCircle, CheckCircle2, XCircle, Send, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -23,11 +22,11 @@ const money = (n: number | null, c: string | null) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c || 'EUR' }).format(n);
 
 const TONE: Record<string, string> = {
-  new: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  in_review: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  priced: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  escalated: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
-  cancelled: 'bg-muted text-muted-foreground border-border',
+  new: 'text-blue-400',
+  in_review: 'text-amber-400',
+  priced: 'text-emerald-400',
+  escalated: 'text-purple-400',
+  cancelled: 'text-muted-foreground',
 };
 
 export const RequestsInboxPanel: React.FC = () => {
@@ -174,7 +173,7 @@ export const RequestsInboxPanel: React.FC = () => {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium truncate">{r.requester?.name ?? 'Child workspace'}</span>
                           <span className="text-xs text-muted-foreground">{r.quote?.quote_number || r.quote?.name || `Quote ${r.quote_id.slice(0, 8)}`}</span>
-                          <Badge variant="outline" className={`text-[10px] ${TONE[r.status] || ''}`}>{r.status.replace('_', ' ')}</Badge>
+                          <span className={`text-[10px] capitalize ${TONE[r.status] || 'text-muted-foreground'}`}>{r.status.replace('_', ' ')}</span>
                         </div>
                         <div className="text-xs text-muted-foreground">{money(r.amount, r.currency)} · {new Date(r.created_at).toLocaleDateString()}</div>
                       </div>
@@ -230,9 +229,9 @@ export const RequestsInboxPanel: React.FC = () => {
                                     </span>
                                   )}
                                   {line.status === 'declined' && (
-                                    <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground border-border">
+                                    <span className="text-[10px] text-muted-foreground">
                                       Declined{line.decline_reason ? ` · ${line.decline_reason}` : ''}
-                                    </Badge>
+                                    </span>
                                   )}
                                 </div>
                               );
@@ -285,7 +284,7 @@ export const RequestsInboxPanel: React.FC = () => {
                           </Button>
                         </>
                       )}
-                      <Badge variant="outline" className={`text-[10px] ${TONE[r.status] || ''}`}>{r.status.replace('_', ' ')}</Badge>
+                      <span className={`text-[10px] capitalize ${TONE[r.status] || 'text-muted-foreground'}`}>{r.status.replace('_', ' ')}</span>
                     </div>
                     {isOpen && (
                       <div className="bg-muted/20 px-4 pb-3">

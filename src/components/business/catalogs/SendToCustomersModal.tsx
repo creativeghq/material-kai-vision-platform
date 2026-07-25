@@ -213,7 +213,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
                         <div key={r.email} className="flex items-center gap-2">
                           <span className="font-mono">{r.email}</span>
                           {r.display_name && <span>· {r.display_name}</span>}
-                          <Badge variant="outline" className="text-[10px] py-0 ml-auto">{r.member_kind}</Badge>
+                          <span className="ml-auto text-[10px] capitalize text-muted-foreground">{r.member_kind}</span>
                         </div>
                       ))}
                       {recipients.length > 30 && <div className="italic">…and {recipients.length - 30} more</div>}

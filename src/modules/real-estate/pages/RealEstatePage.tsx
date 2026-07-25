@@ -16,15 +16,10 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
-import { realEstateService, feedUrl, type PropertyListItem, type ListingStatus, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement, type PropertyInvestment, type InvestmentPortfolio } from '../services/realEstateService';
+import { realEstateService, feedUrl, type PropertyListItem, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement, type PropertyInvestment, type InvestmentPortfolio } from '../services/realEstateService';
+import { statusTone } from '@/utils/statusTone';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
 
-const STATUS_VARIANT: Record<ListingStatus, string> = {
-  draft: 'bg-muted text-muted-foreground', active: 'bg-emerald-500/15 text-emerald-500',
-  under_offer: 'bg-amber-500/15 text-amber-500', sold: 'bg-blue-500/15 text-blue-500',
-  rented: 'bg-blue-500/15 text-blue-500', withdrawn: 'bg-muted text-muted-foreground',
-  archived: 'bg-muted text-muted-foreground',
-};
 const money = (n: number | null, ccy: string) => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
 const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
@@ -168,7 +163,7 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
               <button key={v.id} onClick={() => navigate(`/properties/${v.property_id}`)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted/40">
                 <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <div className="flex-1"><div className="font-medium">{new Date(v.scheduled_at).toLocaleString()}</div><div className="text-xs text-muted-foreground">{v.property?.title || 'Listing'}</div></div>
-                <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{v.status.replace('_', ' ')}</Badge>
+                <span className={`text-[11px] capitalize ${statusTone(v.status)}`}>{v.status.replace('_', ' ')}</span>
               </button>
             ))}</div>
           )}
@@ -179,7 +174,7 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
             <div className="divide-y divide-border">{d.recent_leads.map((q) => (
               <button key={q.id} onClick={() => navigate(`/properties/${q.property_id}`)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted/40">
                 <div className="flex-1"><div className="font-medium">{q.name || 'Anonymous'}</div><div className="text-xs text-muted-foreground">{q.property?.title || 'Listing'}</div></div>
-                <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{q.status.replace('_', ' ')}</Badge>
+                <span className={`text-[11px] capitalize ${statusTone(q.status)}`}>{q.status.replace('_', ' ')}</span>
               </button>
             ))}</div>
           )}
@@ -264,7 +259,7 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
           <div className="flex shrink-0 items-center gap-2">
             {r.is_public && <Globe className="h-3.5 w-3.5 text-emerald-500" aria-label="Public" />}
             {r.view_count > 0 && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Eye className="h-3 w-3" />{r.view_count}</span>}
-            <Badge className={`${STATUS_VARIANT[r.listing_status]} rounded-full border-0 text-[11px] capitalize`}>{r.listing_status.replace('_', ' ')}</Badge>
+            <span className={`text-[11px] capitalize ${statusTone(r.listing_status)}`}>{r.listing_status.replace('_', ' ')}</span>
           </div>
         </button>
       ))}
@@ -501,7 +496,7 @@ const AddLeadButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onAd
             <div><label className="mb-1 block text-xs text-muted-foreground">Property they’re interested in</label><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
             <div className="grid grid-cols-2 gap-2">{field('name', 'Name')}{field('email', 'Email', 'email')}</div>
             {field('phone', 'Phone')}
-            <textarea placeholder="Notes / what they’re after…" rows={2} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" value={f.message ?? ''} onChange={(e) => setF((p) => ({ ...p, message: e.target.value }))} />
+            <textarea placeholder="Notes / What they’re after…" rows={2} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" value={f.message ?? ''} onChange={(e) => setF((p) => ({ ...p, message: e.target.value }))} />
           </div>
           <DialogFooter>
             <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>
@@ -618,7 +613,7 @@ const SellersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
               <div className="mt-0.5 truncate text-xs text-muted-foreground">{s.owned_property_address || '—'}{s.owned_property_value != null ? ` · est. ${money(s.owned_property_value, 'EUR')}` : ''}</div>
             </div>
             {s.contact?.lead_score != null && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title="Lead score">{s.contact.lead_score}</Badge>}
-            <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{(s.contact?.lead_status || 'new').replace('_', ' ')}</Badge>
+            <span className={`text-[11px] capitalize ${statusTone(s.contact?.lead_status || 'new')}`}>{(s.contact?.lead_status || 'new').replace('_', ' ')}</span>
           </button>
           <div className="pr-3"><DeleteIconButton title="Remove seller" confirmText={`Remove ${s.contact?.name || 'this person'} from the sellers list? Their CRM contact stays — only the seller role is removed.`} onDelete={() => realEstateService.unlinkContact(ws as string, s.crm_contact_id).then(load)} /></div>
         </div>
@@ -649,7 +644,7 @@ const ViewingsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
           <button onClick={() => navigate(`/properties/${v.property_id}`)} className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left text-sm">
             <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1"><div className="font-medium">{new Date(v.scheduled_at).toLocaleString()}</div><div className="text-xs text-muted-foreground">{v.property?.title || 'Listing'} · <span className="capitalize">{v.type.replace('_', ' ')}</span></div></div>
-            <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{v.status.replace('_', ' ')}</Badge>
+            <span className={`text-[11px] capitalize ${statusTone(v.status)}`}>{v.status.replace('_', ' ')}</span>
           </button>
           <div className="pr-3"><DeleteIconButton title="Delete viewing" confirmText="Delete this viewing from the calendar?" onDelete={() => realEstateService.deleteViewing(ws as string, v.id).then(load)} /></div>
         </div>
@@ -693,7 +688,7 @@ const BuyersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
             <div className="font-medium">{r.contact?.name || 'Buyer'} {r.label && <span className="text-xs text-muted-foreground">· {r.label}</span>}</div>
             <div className="mt-0.5 truncate text-xs text-muted-foreground">{summariseCriteria(r.criteria)}</div>
           </button>
-          {!r.is_active && <Badge className="rounded-full border-0 bg-muted text-[11px]">paused</Badge>}
+          {!r.is_active && <span className={`text-[11px] ${statusTone('paused')}`}>paused</span>}
           <Button size="sm" variant="ghost" className="rounded-full" title="Copy buyer portal link" onClick={() => copyPortal(r.portal_token)}><LinkIcon className="mr-1 h-3.5 w-3.5" /> Portal</Button>
           <DeleteIconButton title="Delete buyer" confirmText={`Delete the saved search for ${r.contact?.name || 'this buyer'}? Their CRM contact stays.`} onDelete={() => realEstateService.deleteBuyerRequirement(ws as string, r.id).then(load)} />
         </div>
@@ -731,7 +726,7 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
                     <div className="font-medium">{t.property?.title || 'Rental'} <span className="text-xs text-muted-foreground">· {t.tenant?.name || 'no tenant'}</span></div>
                     <div className="mt-0.5 text-xs text-muted-foreground">{money(t.rent_amount, t.currency)}{freq(t)} · from {new Date(t.start_date).toLocaleDateString()}</div>
                   </div>
-                  <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{t.status}</Badge>
+                  <span className={`text-[11px] capitalize ${statusTone(t.status)}`}>{t.status}</span>
                 </button>
                 <div className="pr-3"><DeleteIconButton title="Delete tenancy" confirmText={`Delete the tenancy for ${t.property?.title || 'this rental'}? Rent charges and history for it are removed.`} onDelete={() => realEstateService.deleteTenancy(ws as string, t.id).then(load)} /></div>
               </div>
@@ -747,7 +742,7 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
               <button key={w.id} onClick={() => navigate(`/properties/${w.property_id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left text-sm hover:bg-muted/40">
                 <Wrench className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <div className="flex-1"><div className="font-medium">{w.title}</div><div className="text-xs text-muted-foreground">{w.property?.title || 'Property'}</div></div>
-                <Badge className="rounded-full border-0 bg-muted text-[11px] capitalize">{w.priority}</Badge>
+                <span className="text-[11px] capitalize text-muted-foreground">{w.priority}</span>
               </button>
             ))}
           </div></CardContent></Card>
@@ -790,7 +785,7 @@ const SalesPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
               <div className="text-right">
                 <div className="text-sm font-semibold text-emerald-500">{money(s.commission_base, s.currency)}</div>
                 {s.invoice_id
-                  ? <Badge className="rounded-full border-0 bg-primary/15 text-[10px] capitalize">{s.invoice_status || 'invoiced'}</Badge>
+                  ? <span className={`text-[10px] capitalize ${statusTone(s.invoice_status || 'invoiced')}`}>{s.invoice_status || 'invoiced'}</span>
                   : <span className="text-[10px] text-muted-foreground">not invoiced</span>}
               </div>
             </button>

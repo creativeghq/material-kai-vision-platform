@@ -349,7 +349,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                             <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                             <span className="w-5 text-muted-foreground">{idx + 1}</span>
                             <span className="flex-1 truncate">{s.title || SHEET_TYPE_LABELS[s.sheet_type as SheetType] || s.sheet_type}</span>
-                            <Badge variant="outline" className="text-xs">{SHEET_TYPE_LABELS[s.sheet_type as SheetType] || s.sheet_type}</Badge>
+                            <span className="text-xs text-muted-foreground capitalize">{SHEET_TYPE_LABELS[s.sheet_type as SheetType] || s.sheet_type}</span>
                             <span className="text-xs text-muted-foreground hidden sm:inline">{s.moodboard_title}</span>
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveSheet(id, -1)} disabled={idx === 0}>↑</Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => moveSheet(id, 1)} disabled={idx === form.selectedSheetIds.length - 1}>↓</Button>

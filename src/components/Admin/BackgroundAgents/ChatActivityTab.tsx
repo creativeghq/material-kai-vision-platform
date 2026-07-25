@@ -283,7 +283,7 @@ export function ChatActivityTab() {
 
                             <div className="flex items-center gap-2 shrink-0">
                               {c.zero_result && (
-                                <Badge variant="outline" className="text-[10px] text-yellow-600">zero-result</Badge>
+                                <span className="text-[10px] text-amber-600 dark:text-amber-400">zero-result</span>
                               )}
                               {typeof c.result_count === 'number' && c.result_count > 0 && (
                                 <Badge variant="outline" className="text-[10px]">{c.result_count} results</Badge>

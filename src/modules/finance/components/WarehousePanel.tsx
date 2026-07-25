@@ -5,7 +5,6 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -236,9 +235,9 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                     <td className="px-4 py-2 font-medium">
                       {it.name} <span className="text-xs text-muted-foreground">/ {it.unit}</span>
                       {listed && (
-                        <Badge variant="outline" className="ml-2 border-emerald-500/50 text-emerald-500">
+                        <span className="ml-2 inline-flex items-center text-xs text-emerald-500">
                           <Store className="h-3 w-3 mr-1" />listed €{listed.price}
-                        </Badge>
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-2 font-mono text-xs">
@@ -252,7 +251,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                     <td className="px-4 py-2 text-muted-foreground">{it.location ?? '—'}</td>
                     <td className="px-4 py-2 text-right font-medium">
                       {it.qty_on_hand}
-                      {low && <Badge variant="outline" className="ml-2 border-amber-500/50 text-amber-500"><AlertTriangle className="h-3 w-3 mr-1" />low</Badge>}
+                      {low && <span className="ml-2 inline-flex items-center text-xs text-amber-500"><AlertTriangle className="h-3 w-3 mr-1" />low</span>}
                     </td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{it.qty_reserved}</td>
                     <td className="px-4 py-2 text-right text-muted-foreground">{it.reorder_point}</td>
@@ -596,7 +595,7 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
 const CONDITIONS: { value: ListingCondition; label: string }[] = [
   { value: 'new', label: 'New' },
   { value: 'open_box', label: 'Open box' },
-  { value: 'remnant', label: 'Remnant / offcut' },
+  { value: 'remnant', label: 'Remnant / Offcut'},
   { value: 'lot', label: 'Mixed lot' },
 ];
 const DELIVERY: { value: DeliveryOption; label: string }[] = [
@@ -752,7 +751,7 @@ const ListToMarketplaceDialog: React.FC<{
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>Batch / lot</Label><Input value={batchLot} onChange={(e) => setBatchLot(e.target.value)} placeholder="optional" /></div>
+            <div className="space-y-1"><Label>Batch / Lot</Label><Input value={batchLot} onChange={(e) => setBatchLot(e.target.value)} placeholder="optional" /></div>
             <div className="space-y-1"><Label>Location</Label><Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Athens" /></div>
             <div className="space-y-1">
               <Label>Delivery</Label>
