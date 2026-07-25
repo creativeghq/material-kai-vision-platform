@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Check, X } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -22,6 +22,7 @@ import {
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
+import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
 import { edgeErrorMessage } from '@/utils/edgeError';
@@ -848,6 +849,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   // linked to the order. `expensePrefill` seeds the dialog from the specific line (or the whole order).
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [expensePrefill, setExpensePrefill] = useState<{ amount?: number; description?: string; categoryId?: string; supplier?: { companyId?: string | null; name?: string | null } } | null>(null);
+  // "Record payment" (money in) now uses the standard Record Payment modal, attached to the order.
+  const [recordPayOpen, setRecordPayOpen] = useState(false);
   // Running balance per account, so you can see what's in an account while choosing it.
   const [acctBalance, setAcctBalance] = useState<Map<string, number>>(new Map());
   const [creatingAccount, setCreatingAccount] = useState(false);
@@ -973,21 +976,6 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   const METHOD_FOR_KIND: Record<string, string> = { cash: 'cash', card: 'card', bank: 'bank_transfer', online: 'bank_transfer', other: 'other' };
   const accountKind = (id: string): string => bankAccounts.find((a) => a.id === id)?.kind ?? '';
   const methodForAccount = (id: string): string => METHOD_FOR_KIND[accountKind(id)] ?? 'cash';
-  const openPay = (dir: 'in' | 'out') => {
-    if (!order) return;
-    setEditingPaymentId(null);
-    setPayDir(dir);
-    setPayIssueDoc(false);
-    setPayReason(''); setPaySupplier(null); setPaySupplierSearch(''); setPaySupplierOpts([]);
-    setPayAccountId(defaultAccountId()); setPayMethod(methodForAccount(defaultAccountId()));
-    setPayCounterpartyBankId(''); setPayDate(new Date().toISOString().slice(0, 10));
-    // Money out: no prefill — the operator types what they're actually paying (which supplier +
-    // how much is their call, not the whole order balance). Money in: prefill the remaining
-    // receivable (rounded to cents so no float dust), a sensible "customer pays the balance" default.
-    setPayAmt(dir === 'out' ? '' : String(Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100)));
-    setPayOpen(true);
-  };
-
   // Per-line "Mark as paid" — record this line's cost as a real supplier bill + payment, linked to
   // the order. Pre-fills amount (line cost), payee (line supplier if set), and the order's category;
   // the dialog just needs the account (and confirmation).
@@ -1003,15 +991,15 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     setExpenseOpen(true);
   };
 
-  // Pay a specific supplier straight from the "what we owe" rollup — money out, pre-filled.
+  // Pay a specific supplier straight from the "what we owe" rollup — records a real expense (bill +
+  // payment) via the standard expense modal, pre-filled with the supplier + owed amount.
   const openPaySupplier = (sup: { id: string; name: string }, owed: number) => {
-    setEditingPaymentId(null);
-    setPayDir('out'); setPayIssueDoc(false); setPayReason('');
-    setPaySupplier(sup); setPaySupplierSearch(''); setPaySupplierOpts([]);
-    setPayAccountId(defaultAccountId()); setPayMethod(methodForAccount(defaultAccountId()));
-    setPayCounterpartyBankId(''); setPayDate(new Date().toISOString().slice(0, 10));
-    setPayAmt(String(Math.max(0, owed)));
-    setPayOpen(true);
+    setExpensePrefill({
+      amount: Math.round(Math.max(0, owed) * 100) / 100,
+      categoryId: order?.category_id ?? undefined,
+      supplier: { companyId: sup.id, name: sup.name },
+    });
+    setExpenseOpen(true);
   };
 
   // No account yet → create a "Cash" account on the fly so the user is never blocked.
@@ -1350,13 +1338,13 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     {/* The order moves REAL cash only: money in (received) / money out (sent). */}
-                    <DropdownMenuItem className="items-start" onClick={() => openPay('in')}>
+                    <DropdownMenuItem className="items-start" onClick={() => setRecordPayOpen(true)}>
                       <ArrowDownLeft className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />
                       <span className="flex flex-col"><span>Record payment</span><span className="text-[10px] text-muted-foreground">Money received from the customer.</span></span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="items-start" onClick={() => openPay('out')}>
+                    <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({ categoryId: order.category_id ?? undefined }); setExpenseOpen(true); }}>
                       <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
-                      <span className="flex flex-col"><span>Record expense</span><span className="text-[10px] text-muted-foreground">Money paid to a supplier / refunded.</span></span>
+                      <span className="flex flex-col"><span>Record expense</span><span className="text-[10px] text-muted-foreground">A supplier bill paid — same form as everywhere (Payables &amp; P&amp;L).</span></span>
                     </DropdownMenuItem>
                     {/* Settle from the customer's on-account credit — no new cash movement. */}
                     {order.order_type === 'sales' && creditToApply > 0.005 && (
@@ -1996,6 +1984,20 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         orderId={order.id}
         prefill={expensePrefill ?? { amount: Math.round(lineCostTotal * 100) / 100, description: `Cost of goods — order ${order.order_number ?? order.id.slice(0, 8)}`, categoryId: order.category_id ?? undefined }}
         onCreated={() => { setExpenseOpen(false); void load(order.id); onChanged(); }}
+      />
+    )}
+    {/* Money in on the order uses the standard Record Payment modal, attached to the order (settles
+        its open invoice if any, else records as customer credit tagged to the order). */}
+    {order && order.order_type === 'sales' && (
+      <RecordPaymentDialog
+        workspaceId={order.workspace_id}
+        open={recordPayOpen}
+        onOpenChange={setRecordPayOpen}
+        orderId={order.id}
+        initialCounterparty={{ companyId: order.customer_company_id, contactId: order.customer_contact_id }}
+        defaultAmount={outstanding > 0.005 ? outstanding : undefined}
+        presetInvoiceId={(fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id}
+        onSaved={() => { setRecordPayOpen(false); void load(order.id); onChanged(); }}
       />
     )}
     {connectEmailGate}

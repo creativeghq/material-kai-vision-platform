@@ -40,7 +40,12 @@ export const RecordPaymentDialog: React.FC<{
   /** Tie the payment to a specific party when there's no allocation target
    *  (e.g. opened from a CRM party page → records as customer credit). */
   initialCounterparty?: { contactId?: string | null; companyId?: string | null } | null;
-}> = ({ workspaceId, open, onOpenChange, onSaved, preset, initialCounterparty }) => {
+  /** Attach the payment to an order (tags order_id → shows + settles on that order) and seed the
+   *  amount / target invoice. Used so the order's "Record payment" uses THIS modal, not an inline view. */
+  orderId?: string;
+  defaultAmount?: number;
+  presetInvoiceId?: string;
+}> = ({ workspaceId, open, onOpenChange, onSaved, preset, initialCounterparty, orderId, defaultAmount, presetInvoiceId }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -64,9 +69,9 @@ export const RecordPaymentDialog: React.FC<{
     if (!open) return;
     const initialKind = preset?.direction ?? 'received';
     setKind(initialKind);
-    setAmount(''); setMethod('cash'); setPaidAt(new Date().toISOString().slice(0, 10));
+    setAmount(defaultAmount != null && defaultAmount > 0 ? String(defaultAmount) : ''); setMethod('cash'); setPaidAt(new Date().toISOString().slice(0, 10));
     setCategoryId(''); setReference(''); setNotes('');
-    setTargetInvoiceId(preset && preset.direction === 'received' ? preset.targetId : '');
+    setTargetInvoiceId(preset && preset.direction === 'received' ? preset.targetId : (presetInvoiceId ?? ''));
     setInvoiceId(preset?.direction === 'refund' ? preset.targetId : '');
     setIssueCreditNote(true);
     setSendReceipt(true);
@@ -167,6 +172,7 @@ export const RecordPaymentDialog: React.FC<{
         counterpartyContactId,
         allocations,
         bankAccountId: bankAccountId || null,
+        orderId: orderId ?? null,
         sendReceipt: kind === 'received' ? sendReceipt : false,
       });
       if (creditNoteFiscalError) {
