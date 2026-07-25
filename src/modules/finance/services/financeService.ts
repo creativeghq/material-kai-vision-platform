@@ -1297,6 +1297,8 @@ const _financeServiceCore = {
     supplierBillNumber?: string;
     supplierCompanyId?: string;
     supplierContactId?: string;
+    /** One-off supplier name when the supplier is NOT a saved CRM company/contact. */
+    supplierName?: string | null;
     currency?: string;
     subtotalNet: number;
     vatAmount: number;
@@ -1316,6 +1318,7 @@ const _financeServiceCore = {
         supplier_bill_number: input.supplierBillNumber ?? null,
         supplier_company_id: input.supplierCompanyId ?? null,
         supplier_contact_id: input.supplierContactId ?? null,
+        supplier_name: (input.supplierCompanyId || input.supplierContactId) ? null : (input.supplierName?.trim() || null),
         currency: input.currency ?? 'EUR',
         subtotal_net: input.subtotalNet,
         vat_amount: input.vatAmount,
@@ -1346,6 +1349,8 @@ const _financeServiceCore = {
     reference?: string;
     supplierCompanyId?: string;
     supplierContactId?: string;
+    /** One-off payee name when the supplier is NOT a saved CRM company/contact. */
+    supplierName?: string | null;
     currency?: string;
     subtotalNet: number;
     vatAmount: number;
@@ -1360,9 +1365,8 @@ const _financeServiceCore = {
     /** The supplier's own bank (crm_bank_accounts) the money was paid to, on a Bank Payment. */
     counterpartyBankAccountId?: string | null;
   }): Promise<{ billId: string; paymentId: string | null }> {
-    // A supplier bill requires a counterparty (DB CHECK supplier_bills_supplier_required) —
-    // needed for AP/myDATA/statements/spend-per-supplier. Callers must supply a payee.
-    if (!input.supplierCompanyId && !input.supplierContactId) {
+    // A supplier bill needs a payee — a saved CRM supplier OR a one-off free-text name.
+    if (!input.supplierCompanyId && !input.supplierContactId && !input.supplierName?.trim()) {
       throw new Error('An expense needs a supplier / payee.');
     }
     const currency = input.currency ?? 'EUR';
@@ -1375,6 +1379,7 @@ const _financeServiceCore = {
       supplierBillNumber: input.reference || undefined,
       supplierCompanyId: input.supplierCompanyId,
       supplierContactId: input.supplierContactId,
+      supplierName: input.supplierName,
       currency,
       subtotalNet,
       vatAmount,
@@ -1396,6 +1401,7 @@ const _financeServiceCore = {
         paidAt: input.paidAt ?? new Date().toISOString(),
         counterpartyCompanyId: input.supplierCompanyId ?? null,
         counterpartyContactId: input.supplierContactId ?? null,
+        counterpartyName: (input.supplierCompanyId || input.supplierContactId) ? null : (input.supplierName ?? null),
         reference: input.reference || null,
         notes: input.description ?? null,
         categoryId: input.categoryId,

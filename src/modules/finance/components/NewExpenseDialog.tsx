@@ -25,7 +25,8 @@ import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service'
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimalOr } from '@/utils/decimal';
 
-interface Party { type: 'company' | 'contact'; id: string; label: string }
+// type 'adhoc' → a one-off payee not saved in CRM; `id` is null and `label` holds the typed name.
+interface Party { type: 'company' | 'contact' | 'adhoc'; id: string | null; label: string }
 
 interface Props {
   workspaceId: string;
@@ -109,7 +110,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   // Load the picked payee's own bank accounts (for the Bank Payment "paid to their bank" selector).
   useEffect(() => {
-    if (!open || !party) { setPayeeBanks([]); return; }
+    if (!open || !party || !party.id) { setPayeeBanks([]); return; }  // one-off payee has no CRM banks
     let cancelled = false;
     crmBankAccountsAPI.list(party.type === 'company' ? { companyId: party.id } : { contactId: party.id })
       .then((banks) => { if (!cancelled) setPayeeBanks(banks); })
@@ -184,8 +185,10 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setBusy(true);
       // Business rollup: a supplier contact attached to a supplier company is attributed to
       // the BUSINESS — same rule as supplier bills / customer docs.
-      let cpCompanyId = party?.type === 'company' ? party.id : undefined;
-      let cpContactId = party?.type === 'contact' ? party.id : undefined;
+      let cpCompanyId = party?.type === 'company' ? (party.id ?? undefined) : undefined;
+      let cpContactId = party?.type === 'contact' ? (party.id ?? undefined) : undefined;
+      // One-off payee not in CRM — recorded as a free-text supplier name on the bill.
+      const adhocSupplierName = party?.type === 'adhoc' ? party.label : undefined;
       if (cpContactId && !cpCompanyId) {
         const rolled = await financeService.resolvePrimaryCompanyId(cpContactId).catch(() => null);
         if (rolled) { cpCompanyId = rolled; cpContactId = undefined; }
@@ -197,6 +200,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         reference: reference.trim() || undefined,
         supplierCompanyId: cpCompanyId,
         supplierContactId: cpContactId,
+        supplierName: adhocSupplierName,
         currency,
         subtotalNet: parseDecimalOr(subtotalNet, 0),
         vatAmount: parseDecimalOr(vatAmount, 0),
@@ -285,12 +289,12 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             <Label>Supplier / payee *</Label>
             {party ? (
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
-                <span className="text-sm">{party.label}</span>
+                <span className="text-sm">{party.label}{party.type === 'adhoc' && <span className="ml-1.5 text-[10px] text-muted-foreground">· one-off, not in CRM</span>}</span>
                 <Button size="sm" variant="ghost" onClick={() => setParty(null)}>Change</Button>
               </div>
             ) : (
               <div className="relative">
-                <Input placeholder="Search or type a new payee (landlord, utility…)" value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
+                <Input placeholder="Search a supplier, or type any payee name…" value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
                 {partyOptions.length > 0 && (
                   <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md">
                     {partyOptions.map((o) => (
@@ -302,11 +306,18 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     ))}
                   </div>
                 )}
-                {partySearch.trim().length >= 2 && partyOptions.length === 0 && (
-                  <Button type="button" size="sm" variant="outline" className="mt-1" disabled={creatingParty} onClick={createParty}>
-                    {creatingParty ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
-                    Create supplier “{partySearch.trim()}”
-                  </Button>
+                {partySearch.trim().length >= 2 && (
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" disabled={creatingParty} onClick={createParty}>
+                      {creatingParty ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+                      Create supplier “{partySearch.trim()}”
+                    </Button>
+                    {/* One-off payee: recorded as a free-text name on the bill, no CRM record. */}
+                    <Button type="button" size="sm" variant="ghost"
+                      onClick={() => { setParty({ type: 'adhoc', id: null, label: partySearch.trim() }); setPartySearch(''); setPartyOptions([]); }}>
+                      Use “{partySearch.trim()}” once <span className="ml-1 text-[10px] text-muted-foreground">not saved</span>
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
