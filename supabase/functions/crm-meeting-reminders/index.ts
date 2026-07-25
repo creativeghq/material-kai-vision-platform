@@ -77,8 +77,21 @@ serve(withApiLogging('crm-meeting-reminders', async (req) => {
         if (res.ok) emailed++; else failed++;
       }
 
-      // WhatsApp reminder: needs a connected WhatsApp channel + approved template per workspace.
-      if (m.remind_whatsapp) whatsappPending++;
+      // WhatsApp reminder: direct WhatsApp send needs a connected per-workspace channel +
+      // an approved template (+ the Zernio Inbox add-on). Until that's wired, deliver the
+      // reminder through the in-app bell so the toggle is a real reminder, not a silent no-op.
+      if (m.remind_whatsapp && m.owner_user_id) {
+        const { error: notifErr } = await supabase.from('user_notifications').insert({
+          user_id: m.owner_user_id,
+          title: `Meeting reminder: ${m.subject || 'Meeting'}`,
+          body: `${party ? `With ${party}. ` : ''}${whenLong}`,
+          type: 'info',
+          action_url: '/profile?tab=calendar',
+          is_read: false,
+          metadata: { feature: 'crm_meeting_reminder', meeting_id: m.id, channel: 'whatsapp_bell_fallback' },
+        });
+        if (notifErr) failed++; else whatsappPending++;
+      }
 
       await supabase.from('crm_meetings').update({ reminder_sent_at: new Date().toISOString() }).eq('id', m.id);
     } catch (_) {
