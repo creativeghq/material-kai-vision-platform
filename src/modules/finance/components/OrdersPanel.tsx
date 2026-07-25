@@ -254,7 +254,6 @@ export const OrdersPanel: React.FC<{
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
           <CardTitle className="text-sm flex items-center gap-2">
             <ShoppingCart className="h-4 w-4" /> Orders
-            <span className="text-[10px] font-normal text-muted-foreground">· sales &amp; purchase</span>
           </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Filters only matter on the global Finance list. Inside a single party the list is
