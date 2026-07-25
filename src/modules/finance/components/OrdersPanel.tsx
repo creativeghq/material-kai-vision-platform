@@ -1102,7 +1102,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
       if (alsoIssue) { await createInvoice(); return; }
       await load(order.id);
       onChanged();
-      toast({ title: wasEdit ? 'Payment updated' : (payDir === 'in' ? 'Money in recorded' : 'Money out recorded') });
+      toast({ title: wasEdit ? 'Saved' : (payDir === 'in' ? 'Payment recorded' : 'Expense recorded') });
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
@@ -1166,7 +1166,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   // Delete a payment off the order (reverses the cash). Trigger recomputes payment_status on delete.
   const deletePay = async (p: { id: string; amount: number; currency: string; direction: 'in' | 'out' }) => {
     if (!order) return;
-    if (!window.confirm(`Delete this ${p.direction === 'in' ? 'money in' : 'money out'} of ${formatMoney(Number(p.amount), p.currency)}? This removes the cash from the order and your finance balances.`)) return;
+    if (!window.confirm(`Delete this ${p.direction === 'in' ? 'payment' : 'expense'} of ${formatMoney(Number(p.amount), p.currency)}? This removes the cash from the order and your finance balances.`)) return;
     setSaving(true);
     try {
       await ordersService.deleteOrderPayment(p.id, order.id);
@@ -1350,11 +1350,11 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                     {/* The order moves REAL cash only: money in (received) / money out (sent). */}
                     <DropdownMenuItem className="items-start" onClick={() => openPay('in')}>
                       <ArrowDownLeft className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />
-                      <span className="flex flex-col"><span>Record money in</span><span className="text-[10px] text-muted-foreground">Cash received from the customer.</span></span>
+                      <span className="flex flex-col"><span>Record payment</span><span className="text-[10px] text-muted-foreground">Money received from the customer.</span></span>
                     </DropdownMenuItem>
                     <DropdownMenuItem className="items-start" onClick={() => openPay('out')}>
                       <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
-                      <span className="flex flex-col"><span>Record money out</span><span className="text-[10px] text-muted-foreground">Cash paid to the supplier / refunded.</span></span>
+                      <span className="flex flex-col"><span>Record expense</span><span className="text-[10px] text-muted-foreground">Money paid to a supplier / refunded.</span></span>
                     </DropdownMenuItem>
                     {/* Settle from the customer's on-account credit — no new cash movement. */}
                     {order.order_type === 'sales' && creditToApply > 0.005 && (
@@ -1637,10 +1637,9 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                 {/* Header — what this panel does + close. */}
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold flex items-center gap-1.5">
-                    {editingPaymentId && <span className="text-muted-foreground font-normal">Edit ·</span>}
                     {payDir === 'in'
-                      ? <><ArrowDownLeft className="h-4 w-4 text-emerald-500" /> Money in (received)</>
-                      : <><ArrowUpRight className="h-4 w-4 text-red-400" /> Money out (sent)</>}
+                      ? <><ArrowDownLeft className="h-4 w-4 text-emerald-500" /> {editingPaymentId ? 'Edit payment' : 'Record payment'}</>
+                      : <><ArrowUpRight className="h-4 w-4 text-red-400" /> {editingPaymentId ? 'Edit expense' : 'Record expense'}</>}
                   </span>
                   <Button size="icon" variant="ghost" className="h-7 w-7 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
                     onClick={() => { setPayOpen(false); setEditingPaymentId(null); }} title="Cancel" aria-label="Cancel">
@@ -1882,7 +1881,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
             {/* Attached payments */}
             {fin && (fin.payments.length > 0 || fin.creditApplied.length > 0) && (
               <div className="rounded-md border border-border/60">
-                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Payments</div>
+                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Payments &amp; expenses</div>
                 {/* Credit re-homed onto this order from an on-account payment — no fresh cash, so it's
                     read-only here (to reverse it, un-apply from the source payment). Counts in Received. */}
                 {fin.creditApplied.map((c) => (
@@ -1892,7 +1891,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                         Applied from account credit
                         {c.counterparty_name && <span className="text-muted-foreground">{c.direction === 'in' ? ' · from ' : ' · to '}<span className="text-foreground/80">{c.counterparty_name}</span></span>}
                       </span>
-                      <span className="text-[11px] text-muted-foreground">{new Date(c.paid_at).toLocaleDateString()} · {c.direction === 'in' ? 'Money in' : 'Money out'} · account credit</span>
+                      <span className="text-[11px] text-muted-foreground">{new Date(c.paid_at).toLocaleDateString()} · {c.direction === 'in' ? 'Payment' : 'Expense'} · account credit</span>
                     </span>
                     <span className={`tabular-nums shrink-0 ${c.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(c.amount, c.currency)}</span>
                   </div>
@@ -1910,7 +1909,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                           ? <span className="text-muted-foreground">{p.direction === 'in' ? ' · from ' : ' · to '}<span className="text-foreground/80">{who}</span></span>
                           : (p.direction === 'out' && <span className="text-muted-foreground italic"> · to (no supplier set)</span>)}
                       </span>
-                      <span className="text-[11px] text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'Money in' : 'Money out'}{p.method ? ` · ${paymentMethodLabel(p.method)}` : ''}{acctName ? ` · ${acctName}` : ''}</span>
+                      <span className="text-[11px] text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'Payment' : 'Expense'}{p.method ? ` · ${paymentMethodLabel(p.method)}` : ''}{acctName ? ` · ${acctName}` : ''}</span>
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>
@@ -1951,7 +1950,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
             )}
 
             <p className="text-[11px] text-muted-foreground">
-              Money in / money out above is real cash on this order (a payment received / sent). Marking a catalog
+              Payments / expenses above are real cash on this order (money received from the customer / paid out). Marking a catalog
               line delivered moves warehouse stock (sales out / purchase in) and auto-advances the status. The
               receipt/invoice is the separate Create document action.
             </p>
