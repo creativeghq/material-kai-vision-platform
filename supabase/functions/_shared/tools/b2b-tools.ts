@@ -24,7 +24,21 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 type B2BChunkSink = ((chunk: any) => void) | undefined;
 
 import { debitExternalServiceCredits } from '../credit-utils.ts';
+import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { getToolPrompt } from '../prompt-utils.ts';
+
+/**
+ * Entry affordability gate for a paid B2B tool: reserve the tool's expected cost
+ * (blocks a 0/under-credit caller BEFORE any upstream spend), then release it —
+ * the tool's own per-unit debitExternalServiceCredits calls charge the actual cost.
+ * Returns a user-facing message to return straight from the tool when blocked, else null.
+ */
+async function b2bAffordabilityGate(userId: string, ceiling: number, opType: string): Promise<string | null> {
+  const gate = await reserveCredits(supabase, userId, undefined, ceiling, opType);
+  if (!gate.ok) return gate.message;
+  await refundCredits(supabase, userId, undefined, ceiling, opType);
+  return null;
+}
 
 // ============================================================================
 // B2B RESEARCH TOOLS FOR INSIGHTS AGENT
@@ -125,6 +139,8 @@ const B2B_ALL_COUNTRIES = Object.values(B2B_REGIONS).flatMap((r) => r.countries)
 export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (status: string) => void, onChunk?: B2BChunkSink) => {
   return tool(
     async ({ country, region, category, limit = 30, _workflow_run_id }) => {
+      const _blocked = await b2bAffordabilityGate(userId, 5, 'b2b_manufacturer_search');
+      if (_blocked) return _blocked;
       const runId = _workflow_run_id || crypto.randomUUID();
       const emitter = createWorkflowEmitter({ onChunk, definition_id: 'b2b-research', run_id: runId });
       emitter.plan({ title: `${category} manufacturers`, subtitle: country || region || 'global', metadata: { country, region, category, limit } });
@@ -276,6 +292,8 @@ export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (st
 export const createCompanyWebsiteScrapeTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ url, extract }) => {
+      const _blocked = await b2bAffordabilityGate(userId, 15, 'company_website_scrape');
+      if (_blocked) return _blocked;
       try {
         const startTime = Date.now();
 
@@ -486,6 +504,8 @@ ${markdown.substring(0, 15000)}`;
 export const createCompanyEnrichmentTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ company_name, domain, country }) => {
+      const _blocked = await b2bAffordabilityGate(userId, 5, 'company_enrichment');
+      if (_blocked) return _blocked;
       try {
         const startTime = Date.now();
 
@@ -617,6 +637,8 @@ export const createCompanyEnrichmentTool = (userId: string, onProgress?: (status
 export const createContactDiscoveryTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ domain, roles, first_name, last_name, full_name, company_name }) => {
+      const _blocked = await b2bAffordabilityGate(userId, 6, 'contact_discovery');
+      if (_blocked) return _blocked;
       try {
         const startTime = Date.now();
         const isPersonSearch = !!(first_name || last_name || full_name);
@@ -913,6 +935,8 @@ export const createContactDiscoveryTool = (userId: string, onProgress?: (status:
 export const createEmailValidateTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ email, emails }) => {
+      const _blocked = await b2bAffordabilityGate(userId, 5, 'email_validate');
+      if (_blocked) return _blocked;
       try {
         const emailsToValidate = emails || (email ? [email] : []);
         if (emailsToValidate.length === 0) {

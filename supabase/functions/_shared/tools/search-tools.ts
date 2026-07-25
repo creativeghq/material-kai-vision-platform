@@ -11,6 +11,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+import { reserveCredits, refundCredits } from '../credit-reserve.ts';
+
 // MIVAA's /api/rag/* search endpoints now require authentication (audit #217 C4).
 // The agent is trusted infrastructure: it authenticates as the Material Kai platform
 // service with MIVAA_API_KEY and passes the user's workspace_id, which MIVAA trusts
@@ -437,6 +439,11 @@ export const createInspirationUrlTool = (
 ) => {
   return tool(
     async ({ url, focus = 'all' }) => {
+      // Gate BEFORE any upstream spend (Firecrawl scrape + Haiku): block a 0-credit
+      // caller; the per-step debits below charge the actual cost.
+      const _gate = await reserveCredits(supabase, userId, workspaceId, 3, 'inspiration_url_analysis');
+      if (!_gate.ok) return JSON.stringify({ success: false, error: _gate.message });
+      await refundCredits(supabase, userId, workspaceId, 3, 'inspiration_url_analysis');
       try {
         onChunk?.({ type: 'tool_progress', status: `Scraping design inspiration from ${url}...`, timestamp: Date.now() });
 
