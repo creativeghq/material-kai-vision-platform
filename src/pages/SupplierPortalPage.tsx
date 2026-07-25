@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, PackageCheck, Truck, RefreshCw, Inbox } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supplierClaimsService, type SupplierInboundOrder } from '@/services/supplierClaimsService';
+import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
 
 /**
  * #247 / Workstream F — supplier portal. A claimed supplier sees the purchase
@@ -36,6 +37,17 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
   }, [activeWorkspaceId, toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Incoming POs span every buyer, so give the list a search + status filter.
+  const filterGroups = useMemo<FilterGroupDef[]>(() => [{
+    key: 'general', label: 'General', icon: Inbox,
+    fields: [
+      { key: 'q', type: 'text', label: 'Search', placeholder: 'PO number / buyer…', accessor: (o: SupplierInboundOrder) => [o.order_number, o.buyer_name] },
+      { key: 'status', type: 'multi', label: 'Status', options: optionsFromRows(orders, (o) => o.supplier_status), accessor: (o: SupplierInboundOrder) => o.supplier_status },
+    ],
+  }], [orders]);
+  const { values: filterValues, setValues: setFilterValues, filtered: ordersView, previewCount } =
+    useFilters<SupplierInboundOrder>(orders, filterGroups);
 
   const act = async (orderId: string, status: 'acknowledged' | 'shipped') => {
     if (!activeWorkspaceId) return;
@@ -69,9 +81,14 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
             </div>
           </div>
         )}
-        <Button size="sm" variant="outline" onClick={load} disabled={loading} className="rounded-full">
-          <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {orders.length > 0 && (
+            <FilterBar groups={filterGroups} values={filterValues} onChange={setFilterValues} previewCount={previewCount} title="Filter incoming orders" />
+          )}
+          <Button size="sm" variant="outline" onClick={load} disabled={loading} className="rounded-full">
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -90,7 +107,11 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
         <Card className="dashboard-card border-0">
           <CardContent className="py-10 text-center text-sm text-muted-foreground">No incoming orders yet.</CardContent>
         </Card>
-      ) : orders.map((o) => (
+      ) : ordersView.length === 0 ? (
+        <Card className="dashboard-card border-0">
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">No orders match the filter.</CardContent>
+        </Card>
+      ) : ordersView.map((o) => (
         <Card key={o.order_id} className="dashboard-card border-0">
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-3">
             <CardTitle className="text-sm font-medium">

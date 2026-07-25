@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Loader2, Trash2, Paperclip, Send, FileText, Check, X, ExternalLink, MapPin, UserPlus,
 } from 'lucide-react';
@@ -19,6 +19,7 @@ import {
 } from '@/modules/finance/services/tripExpenseService';
 import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
 
 interface Props {
   workspaceId: string;
@@ -49,7 +50,19 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [workspaceId, canReview]);
   // Switching scope (mine ↔ team) is a different list; deleting a card shrinks the current one.
   useEffect(() => { setPage(1); }, [workspaceId, canReview]);
-  useEffect(() => { setPage((p) => clampPage(p, reports.length)); }, [reports.length]);
+
+  // The card list can grow long — filter by search / type / status.
+  const filterGroups = useMemo<FilterGroupDef[]>(() => [{
+    key: 'general', label: 'General', icon: FileText,
+    fields: [
+      { key: 'q', type: 'text', label: 'Search', placeholder: 'Title / destination…', accessor: (r: TripExpenseReport) => [r.title, r.destination] },
+      { key: 'card_type', type: 'multi', label: 'Type', options: optionsFromRows(reports, (r) => r.card_type, (t) => EXPENSE_CARD_TYPE_LABEL[t as ExpenseCardType] ?? String(t)), accessor: (r: TripExpenseReport) => r.card_type },
+      { key: 'status', type: 'multi', label: 'Status', options: optionsFromRows(reports, (r) => r.status, (s) => TRIP_STATUS_LABEL[s as TripStatus] ?? String(s)), accessor: (r: TripExpenseReport) => r.status },
+    ],
+  }], [reports]);
+  const { values: filterValues, setValues: setFilterValues, filtered: reportsView, previewCount } =
+    useFilters<TripExpenseReport>(reports, filterGroups);
+  useEffect(() => { setPage((p) => clampPage(p, reportsView.length)); }, [reportsView.length]);
 
   const load = async () => {
     try {
@@ -76,6 +89,9 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {reports.length > 0 && (
+            <FilterBar groups={filterGroups} values={filterValues} onChange={setFilterValues} previewCount={previewCount} title="Filter expense cards" />
+          )}
           {canReview && (
             <Button variant="outline" onClick={() => setRequestOpen(true)}><UserPlus className="h-4 w-4 mr-1" /> Request from teammate</Button>
           )}
@@ -90,10 +106,12 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
               <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
             ) : reports.length === 0 ? (
               <div className="p-8 text-center text-sm text-muted-foreground">No trip cards yet.</div>
+            ) : reportsView.length === 0 ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">No cards match the filter.</div>
             ) : (
               <>
               <ul className="divide-y divide-border/40">
-                {paginate(reports, page).map((r) => (
+                {paginate(reportsView, page).map((r) => (
                   <li key={r.id}>
                     <button
                       type="button"
@@ -118,7 +136,7 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
                   </li>
                 ))}
               </ul>
-              <TablePagination page={page} total={reports.length} onPageChange={setPage} label="cards" />
+              <TablePagination page={page} total={reportsView.length} onPageChange={setPage} label="cards" />
               </>
             )}
           </CardContent>
