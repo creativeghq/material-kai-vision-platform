@@ -6,6 +6,14 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { crypto } from 'https://deno.land/std@0.168.0/crypto/mod.ts';
+// Deno-native Web Push (RFC 8291 payload encryption + RFC 8292 VAPID). Uses only
+// SubtleCrypto primitives — no Node polyfills — so it runs on the edge runtime.
+import {
+  ApplicationServer,
+  importVapidKeys,
+  PushMessageError,
+} from 'jsr:@negrel/webpush@^0.5.0';
+import { decodeBase64Url, encodeBase64Url } from 'jsr:@std/encoding@^1/base64url';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -34,6 +42,66 @@ interface WebhookEndpoint {
 // =====================================================
 // PUSH NOTIFICATION HANDLER
 // =====================================================
+
+/**
+ * The platform stores the VAPID keys the way `web-push generate-vapid-keys` /
+ * vapidkeys.com emit them: raw base64url. The public key is the 65-byte
+ * uncompressed P-256 point (`0x04 || X(32) || Y(32)`, rendered `BN…`) — the same
+ * value the browser passes as `applicationServerKey`; the private key is the raw
+ * 32-byte scalar. `@negrel/webpush.importVapidKeys` wants JWK, so convert here.
+ */
+function rawVapidKeysToJwk(
+  publicKeyB64Url: string,
+  privateKeyB64Url: string,
+): { publicKey: JsonWebKey; privateKey: JsonWebKey } {
+  const pub = decodeBase64Url(publicKeyB64Url);
+  if (pub.length !== 65 || pub[0] !== 0x04) {
+    throw new Error(
+      'VAPID_PUBLIC_KEY is not a 65-byte uncompressed P-256 point (expected base64url of 0x04||X||Y)',
+    );
+  }
+  const x = encodeBase64Url(pub.slice(1, 33));
+  const y = encodeBase64Url(pub.slice(33, 65));
+  // Re-encode the scalar so stray padding / standard-base64 input normalizes.
+  const d = encodeBase64Url(decodeBase64Url(privateKeyB64Url));
+
+  return {
+    publicKey: { kty: 'EC', crv: 'P-256', x, y, ext: true },
+    privateKey: { kty: 'EC', crv: 'P-256', x, y, d, ext: true },
+  };
+}
+
+// One ApplicationServer per worker, rebuilt only if the key material / subject
+// changes (e.g. a rotated key picked up by the secrets bootstrap).
+let _appServerPromise: Promise<ApplicationServer> | null = null;
+let _appServerFingerprint = '';
+
+async function getApplicationServer(
+  publicKey: string,
+  privateKey: string,
+  subject: string,
+): Promise<ApplicationServer> {
+  const fingerprint = `${publicKey}::${subject}`;
+  if (!_appServerPromise || _appServerFingerprint !== fingerprint) {
+    _appServerFingerprint = fingerprint;
+    _appServerPromise = (async () => {
+      const vapidKeys = await importVapidKeys(
+        rawVapidKeysToJwk(publicKey, privateKey),
+        { extractable: false },
+      );
+      return await ApplicationServer.new({
+        contactInformation: subject,
+        vapidKeys,
+      });
+    })().catch((err) => {
+      // Don't cache a failed build — next call retries.
+      _appServerPromise = null;
+      throw err;
+    });
+  }
+  return _appServerPromise;
+}
+
 async function sendPushNotifications(
   subscriptions: PushSubscription[],
   notification: {
@@ -43,51 +111,88 @@ async function sendPushNotifications(
     icon?: string;
     badge?: string;
   }
-): Promise<{ success: number; failed: number; results: any[] }> {
-  const vapidPublicKey = () => Deno.env.get('VAPID_PUBLIC_KEY') || '';
-  const vapidPrivateKey = () => Deno.env.get('VAPID_PRIVATE_KEY') || '';
-  const vapidSubject = () => Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@materialkai.com';
+): Promise<{ success: number; failed: number; skipped?: number; reason?: string; results: any[] }> {
+  const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY') || '';
+  const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY') || '';
+  const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@materialkai.com';
 
-  if (!vapidPublicKey() || !vapidPrivateKey()) {
-    throw new Error('VAPID keys not configured');
+  // Not configured → clean skip, don't crash the whole dispatch.
+  if (!vapidPublicKey || !vapidPrivateKey) {
+    console.warn('VAPID keys not configured — skipping push send');
+    return {
+      success: 0,
+      failed: 0,
+      skipped: subscriptions.length,
+      reason: 'vapid_not_configured',
+      results: [],
+    };
   }
+
+  const appServer = await getApplicationServer(vapidPublicKey, vapidPrivateKey, vapidSubject);
+
+  // RFC 8291 encrypts this JSON blob as the message plaintext. Keep the wire
+  // shape the (future) service-worker `push` handler expects, unchanged.
+  const payload = JSON.stringify({
+    notification: {
+      title: notification.title,
+      body: notification.body,
+      icon: notification.icon,
+      badge: notification.badge,
+      data: notification.data,
+    },
+  });
+
+  // Endpoints the push service reports as permanently gone (404/410) — the
+  // subscription no longer exists, so deactivate the row after the fan-out.
+  const deadEndpoints: string[] = [];
 
   const results = await Promise.allSettled(
     subscriptions.map(async (sub) => {
       try {
-        // Use web-push library (would need to be imported)
-        // For now, we'll use fetch directly to the push service
-        const pushController = new AbortController();
-        const pushTimeout = setTimeout(() => pushController.abort(), 15_000);
-        const response = await fetch(sub.endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'TTL': '86400', // 24 hours
-          },
-          body: JSON.stringify({
-            notification: {
-              title: notification.title,
-              body: notification.body,
-              icon: notification.icon,
-              badge: notification.badge,
-              data: notification.data,
-            },
-          }),
-          signal: pushController.signal,
-        }).finally(() => clearTimeout(pushTimeout));
+        // Map the DB row shape (endpoint, p256dh_key, auth_key) onto the
+        // library's PushSubscription shape. The library forges the VAPID JWT
+        // Authorization header + performs ECDH/HKDF/AES-128-GCM (aes128gcm)
+        // encryption and POSTs to sub.endpoint with the correct headers.
+        const subscriber = appServer.subscribe({
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh_key, auth: sub.auth_key },
+        });
 
-        if (!response.ok) {
-          throw new Error(`Push failed: ${response.status} ${response.statusText}`);
-        }
+        await subscriber.pushTextMessage(payload, { ttl: 86400 }); // 24h
 
         return { success: true, endpoint: sub.endpoint };
       } catch (error) {
-        console.error('Push notification failed:', error);
-        return { success: false, endpoint: sub.endpoint, error: error.message };
+        const status = error instanceof PushMessageError ? error.response.status : undefined;
+        const gone = status === 404 || status === 410;
+        if (gone) deadEndpoints.push(sub.endpoint);
+
+        const message = error instanceof PushMessageError
+          ? error.toString()
+          : (error instanceof Error ? error.message : String(error));
+        console.error('Push notification failed:', message);
+
+        return { success: false, endpoint: sub.endpoint, error: message, gone };
       }
     })
   );
+
+  // Best-effort dead-subscription cleanup: flip is_active=false so flow-engine
+  // (which only selects is_active=true rows) stops resurfacing them. Match on
+  // endpoint since the caller passes only endpoint/keys, not the row id.
+  if (deadEndpoints.length > 0) {
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      await supabase
+        .from('push_subscriptions')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .in('endpoint', deadEndpoints);
+    } catch (cleanupError) {
+      console.error('Failed to deactivate dead push subscriptions:', cleanupError);
+    }
+  }
 
   const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
   const failedCount = results.length - successCount;
