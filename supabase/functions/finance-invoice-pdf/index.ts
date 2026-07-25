@@ -380,7 +380,28 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     const templateId = inv.template_id || fs?.invoice_template_id || 'classic';
     const spec = getSpec(templateId);
     const colors = toPdfColors(resolveColorsHex(templateId, inv.template_colors ?? fs?.invoice_template_colors));
-    const pdfBytes = await buildPdf({ inv, items, fs, customer, branch, lang, logo, spec, colors, priorBalance });
+
+    // Pay / view-online link (invoices only, when enabled + still payable). Mint a token if
+    // the invoice has none / an expired one — mint_invoice_pay_token persists it on the row.
+    let payUrl: string | null = null;
+    if (kind === 'invoice' && fs?.invoice_show_pay_link !== false
+        && inv.status !== 'void' && inv.status !== 'credit_noted'
+        && Number(inv.amount_due ?? inv.total ?? 0) > 0.005) {
+      try {
+        let token = inv.pay_token as string | null;
+        const exp = inv.pay_token_expires_at ? new Date(inv.pay_token_expires_at) : null;
+        if (!token || (exp && exp.getTime() < Date.now())) {
+          const { data: tk } = await supabase.rpc('mint_invoice_pay_token', { p_invoice_id: inv.id, p_ttl_days: 90 });
+          if (tk) token = tk as string;
+        }
+        if (token) {
+          const base = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/$/, '');
+          payUrl = `${base}/pay/${token}`;
+        }
+      } catch { /* pay link is best-effort — never block the PDF */ }
+    }
+
+    const pdfBytes = await buildPdf({ inv, items, fs, customer, branch, lang, logo, spec, colors, priorBalance, payUrl });
 
     const path = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
@@ -398,10 +419,14 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   }
 }));
 
-async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null }): Promise<Uint8Array> {
-  const { inv, items, fs, customer, branch, lang, logo, spec, colors, priorBalance } = d;
+async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null }): Promise<Uint8Array> {
+  const { inv, items, fs, customer, branch, lang, logo, spec, colors, priorBalance, payUrl } = d;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
+  // Effective notes: the invoice's own notes, else the workspace default footer
+  // (finance_settings.default_invoice_notes) — so documents created outside the
+  // New Invoice dialog (POS, order→invoice, storefront) still print the footer.
+  const effNotes = inv.print_terms !== false ? (inv.notes || fs?.default_invoice_notes || '') : '';
   const currency = inv.currency ?? 'EUR';
   const money = (n: any) => fmtMoney(n, currency, lang);
   // Template colors shadow the monochrome defaults so the rest of the layout code is unchanged.
@@ -440,18 +465,27 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   };
 
   // ── Header (template-aware) ──
-  const issuerName = fs?.business_name || '';
+  // Bilingual issuer: on an English document prefer the *_en identity fields (name / address /
+  // city / tax office / activity), falling back to the base (Greek) value when a translation
+  // is missing. VAT, ΓΕΜΗ, phone, email, website, postal code are language-neutral.
+  const en = lang === 'en';
+  const bizName = (en ? (fs?.business_name_en || fs?.business_name) : fs?.business_name) || '';
+  const bizAddress = en ? (fs?.business_address_en || fs?.business_address) : fs?.business_address;
+  const bizCity = en ? (fs?.business_city_en || fs?.business_city) : fs?.business_city;
+  const bizTaxOffice = en ? (fs?.business_tax_office_en || fs?.business_tax_office) : fs?.business_tax_office;
+  const bizProfession = en ? (fs?.business_profession_en || fs?.business_profession) : fs?.business_profession;
+  const issuerName = bizName;
   const title = docTitle(inv.document_type, L, inv.status);
   const isPreInvoice = title === L.preInvoice;
   const issuerLines = [
-    [fs?.business_address, fs?.business_street_number].filter(Boolean).join(' '),
-    [fs?.business_postal_code, fs?.business_city].filter(Boolean).join(' '),
+    [bizAddress, fs?.business_street_number].filter(Boolean).join(' '),
+    [fs?.business_postal_code, bizCity].filter(Boolean).join(' '),
     fs?.business_vat ? `${L.vatNo}: ${fs.business_vat}` : '',
-    fs?.business_tax_office ? `${L.taxOffice}: ${fs.business_tax_office}` : '',
-    fs?.business_profession ? `${L.profession}: ${fs.business_profession}` : '',
+    bizTaxOffice ? `${L.taxOffice}: ${bizTaxOffice}` : '',
+    bizProfession ? `${L.profession}: ${bizProfession}` : '',
     [fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '', fs?.business_email || ''].filter(Boolean).join('  ·  '),
     fs?.business_website ? `${L.website}: ${fs.business_website}` : '',
-    fs?.business_gemh ? `${L.registry}: ${fs.business_gemh}` : '',
+    fs?.business_gemi ? `${L.registry}: ${fs.business_gemi}` : '',
     branch ? `${L.establishment} #${branch.branch_code}: ${[branch.name, branch.address, branch.street_number, branch.postal_code, branch.city].filter(Boolean).join(' ')}` : '',
   ].filter(Boolean) as string[];
   const metaRows: [string, string][] = [
@@ -558,6 +592,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     [customer.postal_code, customer.city].filter(Boolean).join(' '),
     customer.vat_number ? `${L.vatNo}: ${customer.vat_number}` : '',
     customer.tax_office ? `${L.taxOffice}: ${customer.tax_office}` : '',
+    [customer.phone ? `${L.phone} ${customer.phone}` : '', customer.email || ''].filter(Boolean).join('  ·  '),
   ].filter(Boolean) : [];
 
   if (isCommercial) {
@@ -696,9 +731,9 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   // otherwise the multi-rate VAT analysis.
   let vy = y;
   if (isCommercial) {
-    if (inv.print_terms !== false && inv.notes) {
+    if (effNotes) {
       text(L.notes, M, vy, 8, bold, MUTED); vy -= 13;
-      for (const nl of wrap(inv.notes, font, 8.5, right - M - 240)) { text(nl, M, vy, 8.5, font, MUTED); vy -= 11; }
+      for (const nl of wrap(effNotes, font, 8.5, right - M - 240)) { text(nl, M, vy, 8.5, font, MUTED); vy -= 11; }
     }
     if (inv.order_notes) {
       vy -= 3;
@@ -804,6 +839,14 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   }
   y = Math.min(y, vy) - 6;
 
+  // ── VAT-suspension / reverse-charge legal note ──
+  // When ΦΠΑ is suspended (e.g. art. 39a), the paper document must say so — the flag was
+  // already transmitted to myDATA but never surfaced on the customer copy until now.
+  if (inv.vat_payment_suspension) {
+    if (y < M + 80) newPage();
+    text(L.vatSuspended, M, y, 9, bold, colors.accent); y -= 14;
+  }
+
   // ── Payment method + bank details ──
   const PAY_LABELS: Record<number, string> = { 1: 'Cash', 2: 'Check', 3: 'On credit', 4: 'Web banking', 5: 'POS / e-POS', 6: 'IRIS', 7: 'Domestic account', 8: 'Foreign account' };
   const payBits: string[] = [];
@@ -836,6 +879,23 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
     y -= 4;
   }
 
+  // ── Pay / view online (→ /pay/{token}) — a scannable QR + the link, so the customer
+  //    holding the PDF can open their online page and pay. Distinct from the myDATA verify
+  //    QR (that one proves the document to the tax authority; this one takes payment). ──
+  if (payUrl) {
+    if (y < M + 100) newPage();
+    const qs = 64;
+    const blockTop = y;
+    drawQr(page, payUrl, right - qs, blockTop - qs, qs);
+    textR(L.scanToPay, right, blockTop - qs - 9, 7, font, MUTED);
+    text(L.payOnline, M, blockTop - 10, 9, bold, colors.accent);
+    let py = blockTop - 24;
+    for (const ul of wrap(payUrl, font, 8.5, right - M - qs - 16)) {
+      text(ul, M, py, 8.5, font, spec.headerStyle === 'sidebar' ? colors.accent : MUTED); py -= 11;
+    }
+    y = Math.min(py, blockTop - qs - 12) - 8;
+  }
+
   // ── Movement block (9.3 / invoice-with-shipping) ── (commercial shows ship-to in header columns)
   if (!isCommercial && inv.has_shipping) {
     if (y < M + 120) newPage();
@@ -852,10 +912,10 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   }
 
   // ── Notes / terms (gated by print_terms) + info box ── (commercial renders notes on the left)
-  if (!isCommercial && inv.print_terms !== false && inv.notes) {
+  if (!isCommercial && effNotes) {
     if (y < M + 90) newPage();
     text(L.notes, M, y, 8, bold, MUTED); y -= 12;
-    for (const nl of wrap(inv.notes, font, 8.5, right - M - 130)) { text(nl, M, y, 8.5, font, MUTED); y -= 11; }
+    for (const nl of wrap(effNotes, font, 8.5, right - M - 130)) { text(nl, M, y, 8.5, font, MUTED); y -= 11; }
     y -= 2;
   }
   if (!isCommercial && inv.order_notes) {
@@ -1025,13 +1085,18 @@ async function buildPaymentReceiptPdf(d: {
   // ── Issuer identity, home-badged (reference layout) ──
   const iy = Math.min(logo ? leftBottom - 16 : topY - 20, topY - 20);
   drawBadge(page, 'home', M + 9, iy - 9, 9, ACC);
-  text(fs?.business_name || '', M + 26, iy - 12, 15, bold, INK);
+  const rEn = lang === 'en';
+  const rBizName = (rEn ? (fs?.business_name_en || fs?.business_name) : fs?.business_name) || '';
+  const rBizAddress = rEn ? (fs?.business_address_en || fs?.business_address) : fs?.business_address;
+  const rBizCity = rEn ? (fs?.business_city_en || fs?.business_city) : fs?.business_city;
+  const rBizTaxOffice = rEn ? (fs?.business_tax_office_en || fs?.business_tax_office) : fs?.business_tax_office;
+  text(rBizName, M + 26, iy - 12, 15, bold, INK);
   const issuerLines = [
-    [fs?.business_address, fs?.business_street_number, fs?.business_postal_code, fs?.business_city].filter(Boolean).join(', '),
+    [rBizAddress, fs?.business_street_number, fs?.business_postal_code, rBizCity].filter(Boolean).join(', '),
     fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '',
     fs?.business_email || '',
     fs?.business_vat ? `${L.vatNo}: ${fs.business_vat}` : '',
-    fs?.business_tax_office ? `${L.taxOffice}: ${fs.business_tax_office}` : '',
+    rBizTaxOffice ? `${L.taxOffice}: ${rBizTaxOffice}` : '',
   ].filter(Boolean) as string[];
   let jy = iy - 26;
   for (const l of issuerLines) {

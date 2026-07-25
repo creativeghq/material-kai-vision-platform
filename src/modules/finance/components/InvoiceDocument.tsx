@@ -240,9 +240,52 @@ export function InvoiceDocument({
             {totalRow(L.due2, money(data.totals.amountDue), { bold: true })}
           </div>
         )}
+        <PriorBalance />
       </div>
     </div>
   );
+
+  // Carry-forward block (previous balance / credit + total outstanding). Never feeds `grand`.
+  const PriorBalance = () => {
+    if (data.priorBalance == null) return null;
+    const due = data.totals.amountDue;
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    return (
+      <div style={{ marginTop: 4, borderTop: `1px solid ${colors.line}`, paddingTop: 4 }}>
+        {data.priorBalance > 0 ? (
+          <>
+            {totalRow(L.prevBalance, money(data.priorBalance))}
+            {totalRow(L.totalWithPrev, money(r2(due + data.priorBalance)), { bold: true })}
+          </>
+        ) : (
+          <>
+            {totalRow(L.prevCredit, `- ${money(Math.abs(data.priorBalance))}`)}
+            {totalRow(L.totalWithPrev, money(Math.max(0, r2(due + data.priorBalance))), { bold: true })}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Pay / view online — QR + link to the hosted /pay/{token} page.
+  const PayOnline = () => {
+    if (!data.payUrl) return null;
+    return (
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12, padding: '10px 12px', border: `1px solid ${colors.line}`, borderRadius: 6 }}>
+        <QRCodeSVG value={data.payUrl} size={64} level="M" />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: colors.accent }}>{L.payOnline}</div>
+          <div style={{ fontSize: 8.5, ...muted, wordBreak: 'break-all' }}>{data.payUrl}</div>
+          <div style={{ fontSize: 7.5, ...muted, marginTop: 2 }}>{L.scanToPay}</div>
+        </div>
+      </div>
+    );
+  };
+
+  const VatSuspended = () =>
+    data.vatSuspended ? (
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: colors.accent, marginBottom: 10 }}>{L.vatSuspended}</div>
+    ) : null;
 
   // ── Payment + bank ──
   const Payment = () => {
@@ -322,9 +365,11 @@ export function InvoiceDocument({
       <Customer />
       <Items />
       <Totals />
+      <VatSuspended />
       <Payment />
       <Shipping />
       <Notes />
+      <PayOnline />
       <Fiscal />
     </>
   );
@@ -457,9 +502,12 @@ export function InvoiceDocument({
                 {totalRow(L.due2, money(data.totals.amountDue), { bold: true })}
               </div>
             )}
+            <PriorBalance />
           </div>
         </div>
+        <VatSuspended />
         <Payment />
+        <PayOnline />
         {data.fiscal && (
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 9, fontWeight: 700, ...muted }}>{L.mark}</div>

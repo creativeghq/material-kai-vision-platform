@@ -93,5 +93,11 @@ export interface InvoiceRenderData {
   /** Customer note entered when the order was placed (shown under the invoice notes). */
   orderNotes?: string | null;
   infoBox?: string | null;
+  /** True when ΦΠΑ is suspended (art. 39a etc.) — prints a legal note on the document. */
+  vatSuspended?: boolean;
+  /** Carry-forward: what the customer owed BEFORE this document (>0 owes, <0 in credit). */
+  priorBalance?: number | null;
+  /** Hosted /pay/{token} URL — prints a "Pay / view online" link + QR. */
+  payUrl?: string | null;
   fiscal?: { mark?: string; uid?: string; qrUrl?: string | null } | null;
 }

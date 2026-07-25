@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
+import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,6 +32,8 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
   const [templateId, setTemplateId] = useState<string>(DEFAULT_TEMPLATE_ID);
   const [colors, setColors] = useState<InvoiceColors>(() => getTemplateSpec(DEFAULT_TEMPLATE_ID).defaultColors);
   const [defaultNotes, setDefaultNotes] = useState('');
+  const [showPayLink, setShowPayLink] = useState(true);
+  const [showPrevBalance, setShowPrevBalance] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +46,8 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
         setTemplateId(tid);
         setColors(resolveColors(tid, s.invoice_template_colors));
         setDefaultNotes((s as any).default_invoice_notes ?? '');
+        setShowPayLink((s as any).invoice_show_pay_link !== false);
+        setShowPrevBalance((s as any).invoice_show_previous_balance !== false);
       } catch (err: any) {
         if (!cancelled) toast({ title: 'Failed to load template settings', description: err?.message, variant: 'destructive' });
       } finally {
@@ -74,6 +79,8 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
         invoice_template_id: templateId,
         invoice_template_colors: colors,
         default_invoice_notes: defaultNotes.trim() || null,
+        invoice_show_pay_link: showPayLink,
+        invoice_show_previous_balance: showPrevBalance,
       });
       toast({ title: 'Invoice template saved' });
     } catch (err: any) {
@@ -147,6 +154,23 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
             placeholder="e.g. Payment due within 30 days. Goods remain our property until paid in full."
           />
           <p className="text-[11px] text-muted-foreground">Pre-fills the Notes field on every new invoice (you can still edit it per invoice). Printed at the bottom of the invoice.</p>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <Label className="text-xs">Show "Pay / view online" link + QR</Label>
+              <p className="text-[11px] text-muted-foreground">Prints a scannable QR + link to the hosted payment page on payable invoices (PDF and email).</p>
+            </div>
+            <Switch checked={showPayLink} onCheckedChange={setShowPayLink} />
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <Label className="text-xs">Show customer's previous balance</Label>
+              <p className="text-[11px] text-muted-foreground">Prints the carry-forward (previous balance / credit) and total outstanding below the invoice total.</p>
+            </div>
+            <Switch checked={showPrevBalance} onCheckedChange={setShowPrevBalance} />
+          </div>
         </div>
 
         <div className="flex justify-end">

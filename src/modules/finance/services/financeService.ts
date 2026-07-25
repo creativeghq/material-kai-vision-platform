@@ -1995,6 +1995,10 @@ export interface FinanceSettings {
   invoice_template_colors: Record<string, string>;
   /** Default footer notes prefilled onto every new invoice (editable per-invoice). */
   default_invoice_notes: string | null;
+  /** Print a "Pay / view online" link + QR (→ /pay/{token}) on payable invoices. */
+  invoice_show_pay_link: boolean;
+  /** Print the customer's carry-forward (previous balance / credit) below the total. */
+  invoice_show_previous_balance: boolean;
   /** How an approved trip card posts to the ledger: planned_payment (auto-reimburse) | none. */
   trip_expense_reimbursement_mode: 'planned_payment' | 'none';
   updated_at: string;
@@ -2241,6 +2245,7 @@ const _financeServiceV2 = {
       'risk_warn_over_credit_limit','risk_block_over_credit_limit',
       'min_order_value','default_credit_limit','risk_block_min_order','risk_block_unpaid_invoice',
       'invoice_template_id','invoice_template_colors','default_invoice_notes',
+      'invoice_show_pay_link','invoice_show_previous_balance',
       'trip_expense_reimbursement_mode',
     ] as const) {
       if (patch[k] !== undefined) allowed[k] = patch[k];

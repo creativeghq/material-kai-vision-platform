@@ -93,7 +93,33 @@ export function InvoicePreviewModal({
         const spec = getTemplateSpec(templateId);
         const colors = resolveColors(templateId, invoice.template_colors ?? settings?.invoice_template_colors);
         const bankAccounts = await financeService.listInvoiceBankAccounts(workspaceId);
-        const data = buildInvoiceRenderData({ invoice, items: items ?? [], settings, customer, branch, order, logoUrl, bankAccounts });
+
+        // Pay/view-online link — reuse an existing, unexpired token (the PDF step is what
+        // mints; the preview just reflects what's already there).
+        let payUrl: string | null = null;
+        if ((settings as any)?.invoice_show_pay_link !== false && invoice.pay_token
+            && Number(invoice.amount_due ?? 0) > 0.005 && invoice.status !== 'void' && invoice.status !== 'credit_noted') {
+          const exp = invoice.pay_token_expires_at ? new Date(invoice.pay_token_expires_at) : null;
+          if (!exp || exp.getTime() > Date.now()) payUrl = `${window.location.origin}/pay/${invoice.pay_token}`;
+        }
+
+        // Carry-forward balance (same RPC + gate the PDF uses).
+        let priorBalance: number | null = null;
+        if ((settings as any)?.invoice_show_previous_balance !== false && (invoice.customer_company_id || invoice.customer_contact_id)) {
+          try {
+            const { data: pb } = await (supabase.rpc as any)('get_customer_prior_balance', {
+              p_workspace_id: workspaceId,
+              p_company_id: invoice.customer_company_id ?? null,
+              p_contact_id: invoice.customer_company_id ? null : (invoice.customer_contact_id ?? null),
+              p_exclude_invoice_id: invoice.id,
+              p_as_of: invoice.issued_at ?? null,
+            });
+            const v = (pb as any)?.prior_balance;
+            if (typeof v === 'number' && Math.abs(v) >= 0.01) priorBalance = v;
+          } catch { /* informational only */ }
+        }
+
+        const data = buildInvoiceRenderData({ invoice, items: items ?? [], settings, customer, branch, order, logoUrl, bankAccounts, payUrl, priorBalance });
 
         if (!cancelled) setResolved({ spec, colors, data });
       } catch (err: any) {

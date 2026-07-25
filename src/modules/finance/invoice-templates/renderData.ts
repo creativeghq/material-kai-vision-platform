@@ -22,6 +22,10 @@ export interface BuildRenderInput {
   /** Treasury accounts flagged "Show on invoice" — the single source of printed bank
    *  details (finance_bank_accounts). When omitted, no bank lines are shown. */
   bankAccounts?: Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>;
+  /** Carry-forward balance BEFORE this document (from get_customer_prior_balance). */
+  priorBalance?: number | null;
+  /** Hosted /pay/{token} URL (reused from invoice.pay_token; not minted in preview). */
+  payUrl?: string | null;
 }
 
 export function formatInvoiceMoney(value: any, currency: string, lang: Lang): string {
@@ -34,22 +38,28 @@ export function formatInvoiceMoney(value: any, currency: string, lang: Lang): st
 }
 
 export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderData {
-  const { invoice: inv, items, settings: fs, customer, branch, order, logoUrl, bankAccounts } = input;
+  const { invoice: inv, items, settings: fs, customer, branch, order, logoUrl, bankAccounts, priorBalance, payUrl } = input;
   // English is the default; Greek only when explicitly chosen (until translations launch).
   const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
   const L = INVOICE_LABELS[lang];
   const currency = inv.currency ?? 'EUR';
 
-  // ── Issuer ──
+  // ── Issuer ── bilingual: prefer *_en identity fields on an English document.
+  const en = lang === 'en';
+  const bizName = (en ? (fs?.business_name_en || fs?.business_name) : fs?.business_name) || '';
+  const bizAddress = en ? (fs?.business_address_en || fs?.business_address) : fs?.business_address;
+  const bizCity = en ? (fs?.business_city_en || fs?.business_city) : fs?.business_city;
+  const bizTaxOffice = en ? (fs?.business_tax_office_en || fs?.business_tax_office) : fs?.business_tax_office;
+  const bizProfession = en ? (fs?.business_profession_en || fs?.business_profession) : fs?.business_profession;
   const issuerLines = [
-    [fs?.business_address, fs?.business_street_number].filter(Boolean).join(' '),
-    [fs?.business_postal_code, fs?.business_city].filter(Boolean).join(' '),
+    [bizAddress, fs?.business_street_number].filter(Boolean).join(' '),
+    [fs?.business_postal_code, bizCity].filter(Boolean).join(' '),
     fs?.business_vat ? `${L.vatNo}: ${fs.business_vat}` : '',
-    fs?.business_tax_office ? `${L.taxOffice}: ${fs.business_tax_office}` : '',
-    fs?.business_profession ? `${L.profession}: ${fs.business_profession}` : '',
+    bizTaxOffice ? `${L.taxOffice}: ${bizTaxOffice}` : '',
+    bizProfession ? `${L.profession}: ${bizProfession}` : '',
     [fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '', fs?.business_email || ''].filter(Boolean).join('  ·  '),
     fs?.business_website ? `${L.website}: ${fs.business_website}` : '',
-    fs?.business_gemh ? `${L.registry}: ${fs.business_gemh}` : '',
+    fs?.business_gemi ? `${L.registry}: ${fs.business_gemi}` : '',
     branch ? `${L.establishment} #${branch.branch_code}: ${[branch.name, branch.address, branch.street_number, branch.postal_code, branch.city].filter(Boolean).join(' ')}` : '',
   ].filter(Boolean) as string[];
 
@@ -159,7 +169,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     title: invoiceDocTitle(inv.document_type, L, inv.status),
     isPreInvoice: invoiceDocTitle(inv.document_type, L, inv.status) === L.preInvoice,
     labels: L,
-    issuer: { name: fs?.business_name || '', lines: issuerLines, logoUrl: inv.logo_mode === 'none' ? null : (logoUrl ?? null) },
+    issuer: { name: bizName, lines: issuerLines, logoUrl: inv.logo_mode === 'none' ? null : (logoUrl ?? null) },
     customer: { name: custName, lines: custLines },
     meta,
     items: rows,
@@ -175,9 +185,13 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       accounts,
     },
     shipping,
-    notes: inv.print_terms !== false ? (inv.notes || null) : null,
+    // Effective notes: invoice notes, else the workspace default footer.
+    notes: inv.print_terms !== false ? (inv.notes || fs?.default_invoice_notes || null) : null,
     orderNotes: order?.notes || null,
     infoBox: inv.info_box || null,
+    vatSuspended: !!inv.vat_payment_suspension,
+    priorBalance: (typeof priorBalance === 'number' && Math.abs(priorBalance) >= 0.01) ? priorBalance : null,
+    payUrl: payUrl ?? null,
     fiscal: inv.fiscal_mark ? {
       mark: String(inv.fiscal_mark),
       uid: inv.fiscal_uid || undefined,
