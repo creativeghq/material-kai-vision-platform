@@ -20,6 +20,10 @@ export interface CapabilityDef {
   label: string;
   /** Which Hub this capability lives under (for launcher grouping + reverse handoff). */
   hub?: HubId;
+  /** Overrides the "Open in {…}" button label when the capability has its own dedicated page
+   *  distinct from the Hub landing (e.g. Contracts is grouped under Finance but opens /contracts,
+   *  so the button should read "Contracts Hub", not "Finance Hub"). Defaults to the Hub label. */
+  openInLabel?: string;
   /** Canonical page route (the "open the page" target). Omit for agent-only capabilities. */
   pageRoute?: string;
   /** Owning agent id (agent-chat AGENT_CONFIGS / roster), e.g. 'interior-designer', 'social-media'. */
@@ -85,8 +89,8 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   { id: 'invoice', label: 'Invoice', hub: 'finance', pageRoute: '/finance', agentId: 'kai', agentTool: 'manage_finance', toolkitId: 'finance', recordTable: 'invoices', moduleSlug: 'sales-finance' },
   // App-level Finance (the `invoice` entry above is the record-level capability on the same page).
   { id: 'finance', label: 'Finance', hub: 'finance', pageRoute: '/finance', agentId: 'kai', agentTool: 'manage_finance', toolkitId: 'finance', moduleSlug: 'sales-finance' },
-  { id: 'contract', label: 'Contracts', hub: 'finance', pageRoute: '/contracts', agentId: 'erp', agentTool: 'manage_contracts', toolkitId: 'contracts', recordTable: 'contracts', moduleSlug: 'contracts' },
-  { id: 'warehouse', label: 'Warehouse', hub: 'finance', pageRoute: '/warehouse', agentId: 'kai', agentTool: 'manage_stock', toolkitId: 'stock', moduleSlug: 'stock' },
+  { id: 'contract', label: 'Contracts', hub: 'finance', openInLabel: 'Contracts Hub', pageRoute: '/contracts', agentId: 'erp', agentTool: 'manage_contracts', toolkitId: 'contracts', recordTable: 'contracts', moduleSlug: 'contracts' },
+  { id: 'warehouse', label: 'Warehouse', hub: 'finance', openInLabel: 'Warehouse', pageRoute: '/warehouse', agentId: 'kai', agentTool: 'manage_stock', toolkitId: 'stock', moduleSlug: 'stock' },
 
   // ── People ──
   { id: 'hr', label: 'HR', hub: 'people', pageRoute: '/hr', agentId: 'kai', agentTool: 'manage_hr', toolkitId: 'hr', moduleSlug: 'hr' },
@@ -128,9 +132,11 @@ export const RESULT_RECORD_KEY: Record<string, string> = {
   contract_sent: 'contract_id',
 };
 
-/** The human Hub label ("Finance Hub") for a capability, for the "Open in {Hub}" button. */
+/** The "Open in {…}" button label for a capability: the capability's own `openInLabel`
+ *  override when set (a dedicated page distinct from its Hub landing), else the Hub label. */
 export function capabilityHubLabel(id: string): string | undefined {
   const cap = getCapability(id);
+  if (cap?.openInLabel) return cap.openInLabel;
   if (!cap?.hub) return undefined;
   return HUBS.find((h) => h.id === cap.hub)?.label;
 }
