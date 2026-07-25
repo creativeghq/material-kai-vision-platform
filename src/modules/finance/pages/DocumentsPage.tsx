@@ -744,7 +744,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
         <th className="px-4 py-2 text-left">Reference</th>
         <th className="px-4 py-2 text-right">Amount</th>
         <th className="px-4 py-2 text-right">Allocated</th>
-        <th className="px-4 py-2 text-right w-24">Receipt</th>
+        <th className="px-4 py-2 text-right w-24">Receipt / voucher</th>
       </tr>
     </thead>
     <tbody>
@@ -763,7 +763,13 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
                 {p.direction === 'in' ? 'Received' : (p.credit_number ? 'Refund' : 'Paid')}
               </span>
             </td>
-            <td className="px-4 py-2 truncate max-w-[180px]" title={p.party_name ?? undefined}>{p.party_name ?? '—'}</td>
+            <td className="px-4 py-2 truncate max-w-[180px]" title={p.party_name ?? undefined}>
+              {p.party_name
+                ? ((p.counterparty_company_id || p.counterparty_contact_id)
+                    ? <Link to={`${crmBase}/${p.counterparty_company_id ? 'companies' : 'contacts'}/${p.counterparty_company_id ?? p.counterparty_contact_id}`} className="text-primary hover:underline">{p.party_name}</Link>
+                    : p.party_name)
+                : '—'}
+            </td>
             <td className="px-4 py-2">
               {p.order_id
                 ? <Link to={`${financeBase}?tab=doc_orders&order=${p.order_id}`} className="text-primary hover:underline text-xs">{p.order_number ?? 'open'}</Link>
@@ -786,7 +792,8 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
       })}
     </tbody>
   </table>
-);
+  );
+};
 
 const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string }> = ({ rows, workspaceId, readOnly, onChanged, categories, categoryName }) => {
   const { toast } = useToast();
