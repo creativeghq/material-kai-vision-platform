@@ -1,17 +1,17 @@
 /**
  * Recommendations Service
- * Handles interaction tracking and fetching recommendations
+ * Handles user interaction tracking (view/click/rate/quote/share) — feeds the
+ * live `user_material_interactions` analytics via the `recommendations-api`
+ * edge function's `/track-interaction` route.
+ *
+ * NOTE: the recommendation-scoring reads (getRecommendationsForUser /
+ * getSimilarMaterials) were removed — that scoring engine was never populated
+ * and always returned empty. Live product recommendations live in
+ * `productRecommendationsService` (product_edges RPCs). This service is
+ * tracking-only.
  */
 
 import { supabase } from '@/integrations/supabase/client';
-
-export interface Recommendation {
-  material_id: string;
-  score: number;
-  confidence: number;
-  algorithm: string;
-  metadata?: Record<string, any>;
-}
 
 export class RecommendationsService {
   /**
@@ -91,74 +91,4 @@ export class RecommendationsService {
   static async trackShare(materialId: string, metadata?: Record<string, any>): Promise<void> {
     await this.trackInteraction(materialId, 'share', 3.0, metadata);
   }
-
-  /**
-   * Get personalized recommendations for current user
-   */
-  static async getRecommendationsForUser(
-    limit: number = 20,
-    algorithm: 'user_user' | 'item_item' | 'hybrid' = 'user_user',
-  ): Promise<Recommendation[]> {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return [];
-
-      const workspaceId = localStorage.getItem('current_workspace_id');
-      if (!workspaceId) return [];
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/recommendations-api/for-user?workspace_id=${workspaceId}&limit=${limit}&algorithm=${algorithm}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        },
-      );
-
-      if (!response.ok) {
-        console.error('Failed to fetch recommendations:', await response.text());
-        return [];
-      }
-
-      const { data } = await response.json();
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching recommendations:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get materials similar to a specific material
-   */
-  static async getSimilarMaterials(materialId: string, limit: number = 10): Promise<Recommendation[]> {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return [];
-
-      const workspaceId = localStorage.getItem('current_workspace_id');
-      if (!workspaceId) return [];
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/recommendations-api/similar-materials/${materialId}?workspace_id=${workspaceId}&limit=${limit}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        },
-      );
-
-      if (!response.ok) {
-        console.error('Failed to fetch similar materials:', await response.text());
-        return [];
-      }
-
-      const { data } = await response.json();
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching similar materials:', error);
-      return [];
-    }
-  }
 }
-
