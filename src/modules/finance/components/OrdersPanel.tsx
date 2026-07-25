@@ -1316,6 +1316,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   // A sales order to a company (B2B) issues an invoice; to a bare contact (retail) a receipt.
   // myDATA finalises the exact document type at issue; this just labels the action correctly.
   const salesDocKind: 'invoice' | 'receipt' = order?.customer_company_id ? 'invoice' : 'receipt';
+  // Currency symbol for field labels (falls back to the ISO code for currencies we don't map).
+  const curSym = order ? (({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[order.currency] ?? order.currency) : '';
   // Total cost of goods on the lines — offered as an "Add expense" (supplier bill) on a sales order.
   const lineCostTotal = items.reduce((a, it) => a + (Number(it.unit_cost) || 0) * (Number(it.quantity) || 0), 0);
 
@@ -1650,11 +1652,8 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                 {/* Labelled fields — one consistent grid, aligned, full-width inputs. */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Amount</Label>
-                    <div className="flex items-center gap-2">
-                      <Input className="h-9 flex-1 text-right" type="text" inputMode="decimal" placeholder="0.00" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
-                      <span className="text-sm text-muted-foreground w-8">{order.currency}</span>
-                    </div>
+                    <Label className="text-xs text-muted-foreground">Amount ({curSym})</Label>
+                    <Input className="h-9 w-full text-right" type="text" inputMode="decimal" placeholder="0.00" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
                   </div>
 
                   <div className="space-y-1">
