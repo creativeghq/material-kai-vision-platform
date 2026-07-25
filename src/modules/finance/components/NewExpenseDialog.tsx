@@ -36,7 +36,13 @@ interface Props {
   /** Link the expense to an order (so it shows on that order) + seed the amount/description. Used by
    *  the order's "Add expense" to turn a line cost into a real supplier bill in one step. */
   orderId?: string;
-  prefill?: { amount?: number; description?: string };
+  prefill?: {
+    amount?: number;
+    description?: string;
+    categoryId?: string;
+    /** Pre-select the payee: a CRM supplier (companyId + display name) or a one-off name. */
+    supplier?: { companyId?: string | null; name?: string | null };
+  };
 }
 
 export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, orderId, prefill }) => {
@@ -112,13 +118,21 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     }).catch(() => setBankAccounts([]));
   }, [open, workspaceId]);
 
-  // Seed amount/description when opened from an order's "Add expense" (turning a line cost into a bill).
+  // Seed amount/description/category/payee when opened from an order's "Mark as paid" / "Add expense"
+  // (turning a line cost into a real bill). Keyed on the prefill amount too, so re-opening for a
+  // different line re-seeds.
   useEffect(() => {
     if (!open || !prefill) return;
     if (prefill.amount != null) { setSubtotalNet(String(prefill.amount)); setVatAmount('0'); }
     if (prefill.description) setDescription(prefill.description);
+    if (prefill.categoryId) setCategoryId(prefill.categoryId);
+    if (prefill.supplier?.companyId) {
+      setParty({ type: 'company', id: prefill.supplier.companyId, label: prefill.supplier.name || 'Supplier' });
+    } else if (prefill.supplier?.name) {
+      setParty({ type: 'adhoc', id: null, label: prefill.supplier.name });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, orderId]);
+  }, [open, orderId, prefill?.amount, prefill?.supplier?.companyId, prefill?.supplier?.name]);
 
   // Load the picked payee's own bank accounts (for the Bank Payment "paid to their bank" selector).
   useEffect(() => {

@@ -578,6 +578,8 @@ export const ordersService = {
     /** Open targets to settle: invoices for money-in, supplier_bills for money-out. */
     targets?: Array<{ id: string; amount_due: number; type: 'invoice' | 'supplier_bill' }>;
     fxRateToBase?: number;
+    /** Payment date (ISO). Defaults to now when omitted. */
+    paidAt?: string;
   }): Promise<string> {
     const { financeService } = await import('@/modules/finance/services/financeService');
     // Greedy allocate across the open targets, oldest-first, capped at the payment amount.
@@ -607,6 +609,7 @@ export const ordersService = {
       // Ad-hoc payee only when money-out to a non-CRM supplier (no company id given).
       counterpartyName: input.direction === 'out' && !input.supplierCompanyId ? (input.supplierName ?? null) : null,
       counterpartyBankAccountId: input.counterpartyBankAccountId ?? null,
+      paidAt: input.paidAt ?? undefined,
       allocations,
     });
   },
@@ -624,6 +627,8 @@ export const ordersService = {
     counterpartyBankAccountId?: string | null;
     /** Ad-hoc (non-CRM) payee name — set only when there's no counterpartyCompanyId. */
     counterpartyName?: string | null;
+    /** Payment date (ISO) — omit to leave unchanged. */
+    paidAt?: string;
   }): Promise<void> {
     const { data: allocs, error: aErr } = await supabase
       .from('payment_allocations').select('id, invoice_id, supplier_bill_id, amount').eq('payment_id', input.paymentId);
@@ -636,6 +641,7 @@ export const ordersService = {
       bank_account_id: input.bankAccountId, counterparty_company_id: input.counterpartyCompanyId, counterparty_contact_id: input.counterpartyContactId,
       counterparty_bank_account_id: input.counterpartyBankAccountId ?? null,
       counterparty_name: input.counterpartyCompanyId ? null : (input.counterpartyName ?? null),
+      ...(input.paidAt ? { paid_at: input.paidAt } : {}),
     }).eq('id', input.paymentId).eq('order_id', input.orderId);
     if (error) throw error;
     // Re-sync the single allocation amount so the settled invoice/bill matches the new cash amount.

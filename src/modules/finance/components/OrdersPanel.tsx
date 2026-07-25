@@ -838,12 +838,16 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   const [bankAccounts, setBankAccounts] = useState<Awaited<ReturnType<typeof financeService.listBankAccounts>>>([]);
   const [payAccountId, setPayAccountId] = useState<string>('');
   const [payMethod, setPayMethod] = useState<string>('cash');
+  // Payment date (Record-Payment parity) — defaults to today; editable per payment.
+  const [payDate, setPayDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   // The counterparty's OWN bank this money moved to/from (offered on a Bank Payment). Loaded from
   // the customer (money-in) or the picked supplier (money-out); optional.
   const [counterpartyBanks, setCounterpartyBanks] = useState<CrmBankAccount[]>([]);
   const [payCounterpartyBankId, setPayCounterpartyBankId] = useState<string>('');
-  // "Add expense" — turn the order's line cost (COGS) into a real supplier bill linked to the order.
+  // "Add expense" / per-line "Mark as paid" — turn a line cost (COGS) into a real supplier bill
+  // linked to the order. `expensePrefill` seeds the dialog from the specific line (or the whole order).
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [expensePrefill, setExpensePrefill] = useState<{ amount?: number; description?: string; categoryId?: string; supplier?: { companyId?: string | null; name?: string | null } } | null>(null);
   // Running balance per account, so you can see what's in an account while choosing it.
   const [acctBalance, setAcctBalance] = useState<Map<string, number>>(new Map());
   const [creatingAccount, setCreatingAccount] = useState(false);
@@ -976,12 +980,27 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     setPayIssueDoc(false);
     setPayReason(''); setPaySupplier(null); setPaySupplierSearch(''); setPaySupplierOpts([]);
     setPayAccountId(defaultAccountId()); setPayMethod(methodForAccount(defaultAccountId()));
-    setPayCounterpartyBankId('');
+    setPayCounterpartyBankId(''); setPayDate(new Date().toISOString().slice(0, 10));
     // Money out: no prefill — the operator types what they're actually paying (which supplier +
     // how much is their call, not the whole order balance). Money in: prefill the remaining
     // receivable (rounded to cents so no float dust), a sensible "customer pays the balance" default.
     setPayAmt(dir === 'out' ? '' : String(Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100)));
     setPayOpen(true);
+  };
+
+  // Per-line "Mark as paid" — record this line's cost as a real supplier bill + payment, linked to
+  // the order. Pre-fills amount (line cost), payee (line supplier if set), and the order's category;
+  // the dialog just needs the account (and confirmation).
+  const openLineExpense = (it: { description: string; unit_cost: number | null; quantity: number; supplier_company_id: string | null }) => {
+    if (!order) return;
+    const cost = it.unit_cost != null ? Math.round(Number(it.unit_cost) * Number(it.quantity) * 100) / 100 : 0;
+    setExpensePrefill({
+      amount: cost,
+      description: `Cost — ${it.description}`,
+      categoryId: order.category_id ?? undefined,
+      supplier: it.supplier_company_id ? { companyId: it.supplier_company_id, name: supplierNames.get(it.supplier_company_id) ?? null } : undefined,
+    });
+    setExpenseOpen(true);
   };
 
   // Pay a specific supplier straight from the "what we owe" rollup — money out, pre-filled.
@@ -990,7 +1009,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     setPayDir('out'); setPayIssueDoc(false); setPayReason('');
     setPaySupplier(sup); setPaySupplierSearch(''); setPaySupplierOpts([]);
     setPayAccountId(defaultAccountId()); setPayMethod(methodForAccount(defaultAccountId()));
-    setPayCounterpartyBankId('');
+    setPayCounterpartyBankId(''); setPayDate(new Date().toISOString().slice(0, 10));
     setPayAmt(String(Math.max(0, owed)));
     setPayOpen(true);
   };
@@ -1060,6 +1079,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
           counterpartyContactId: payDir === 'in' ? (order.customer_contact_id ?? null) : null,
           counterpartyName: payDir === 'out' && !paySupplier?.id ? (paySupplier?.name ?? null) : null,
           counterpartyBankAccountId: payMethod === 'bank_transfer' ? (payCounterpartyBankId || null) : null,
+          paidAt: payDate ? new Date(payDate).toISOString() : undefined,
         });
       } else {
         // Money in → settle the order's open invoice(s); money out → cash to the supplier
@@ -1073,6 +1093,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
           bankAccountId: payAccountId, supplierCompanyId: paySupplier?.id ?? null,
           supplierName: !paySupplier?.id ? (paySupplier?.name ?? null) : null, targets,
           counterpartyBankAccountId: payMethod === 'bank_transfer' ? (payCounterpartyBankId || null) : null,
+          paidAt: payDate ? new Date(payDate).toISOString() : undefined,
         });
       }
       const wasEdit = !!editingPaymentId;
@@ -1113,13 +1134,14 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   };
 
   // Edit an existing payment: pre-fill the pay panel from the row and flip it into update mode.
-  const editPay = async (p: { id: string; direction: 'in' | 'out'; amount: number; reference: string | null; method: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_bank_account_id?: string | null; counterparty_name?: string | null }) => {
+  const editPay = async (p: { id: string; direction: 'in' | 'out'; amount: number; reference: string | null; method: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_bank_account_id?: string | null; counterparty_name?: string | null; paid_at?: string }) => {
     setEditingPaymentId(p.id);
     setPayDir(p.direction);
     setPayIssueDoc(false);
     setPayAmt(String(p.amount));
     setPayReason(p.reference ?? '');
     setPayMethod(p.method || 'cash');
+    setPayDate(p.paid_at ? new Date(p.paid_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
     setPayAccountId(p.bank_account_id ?? defaultAccountId());
     setPayCounterpartyBankId(p.counterparty_bank_account_id ?? '');
     setPaySupplierSearch(''); setPaySupplierOpts([]);
@@ -1343,7 +1365,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                     )}
                     {/* Turn the line cost (what the goods cost YOU) into a real supplier bill/expense. */}
                     {order.order_type === 'sales' && lineCostTotal > 0.005 && (
-                      <DropdownMenuItem className="items-start" onClick={() => setExpenseOpen(true)}>
+                      <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({ amount: Math.round(lineCostTotal * 100) / 100, description: `Cost of goods — order ${order.order_number ?? order.id.slice(0, 8)}`, categoryId: order.category_id ?? undefined }); setExpenseOpen(true); }}>
                         <Receipt className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
                         <span className="flex flex-col"><span>Add expense (cost of goods)</span><span className="text-[10px] text-muted-foreground">Record the {formatMoney(lineCostTotal, order.currency)} line cost as a supplier bill — Payables &amp; P&amp;L.</span></span>
                       </DropdownMenuItem>
@@ -1458,9 +1480,17 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                       <span className="min-w-0">
                         <span className="block truncate">{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
                         {/* #6/#7 — who supplies this line (and therefore who we owe). Any line, catalog or ad-hoc. */}
-                        <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ itemId: it.id, productId: it.product_id ?? null, label: it.description, currentId: it.supplier_company_id ?? null })}>
-                          {supName ? <><Building2 className="h-2.5 w-2.5" /> {supName}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
-                        </button>
+                        <span className="inline-flex items-center gap-2">
+                          <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ itemId: it.id, productId: it.product_id ?? null, label: it.description, currentId: it.supplier_company_id ?? null })}>
+                            {supName ? <><Building2 className="h-2.5 w-2.5" /> {supName}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
+                          </button>
+                          {/* Mark this line's cost as paid → records a real supplier bill + payment on the order. */}
+                          {lineCost != null && lineCost > 0.005 && order.order_type === 'sales' && (
+                            <button type="button" className="text-[10px] text-red-400 hover:text-foreground inline-flex items-center gap-0.5" title="Record this cost as a paid supplier bill" onClick={() => openLineExpense(it)}>
+                              <Receipt className="h-2.5 w-2.5" /> Mark paid
+                            </button>
+                          )}
+                        </span>
                       </span>
                       <span className="text-right tabular-nums">{Number(it.quantity)}</span>
                       <span className="text-muted-foreground text-xs">{unitLabel}</span>
@@ -1695,6 +1725,11 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Reason</Label>
                     <Input className="h-9 w-full" value={payReason} onChange={(e) => setPayReason(e.target.value)} placeholder={payDir === 'in' ? 'e.g. pre-payment, deposit' : 'e.g. deposit to supplier'} />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Date</Label>
+                    <Input className="h-9 w-full" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
                   </div>
 
                   {/* Bank Payment → which of the counterparty's OWN banks the money moved to/from
@@ -1961,7 +1996,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         open={expenseOpen}
         onOpenChange={setExpenseOpen}
         orderId={order.id}
-        prefill={{ amount: Math.round(lineCostTotal * 100) / 100, description: `Cost of goods — order ${order.order_number ?? order.id.slice(0, 8)}` }}
+        prefill={expensePrefill ?? { amount: Math.round(lineCostTotal * 100) / 100, description: `Cost of goods — order ${order.order_number ?? order.id.slice(0, 8)}`, categoryId: order.category_id ?? undefined }}
         onCreated={() => { setExpenseOpen(false); void load(order.id); onChanged(); }}
       />
     )}
