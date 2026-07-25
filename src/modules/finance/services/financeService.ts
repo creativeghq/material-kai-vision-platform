@@ -514,22 +514,43 @@ const _financeServiceCore = {
   },
 
   /**
-   * (Re)send the payment receipt (απόδειξη είσπραξης) to the customer by email. Goes through the
-   * seeded `payment_received` Flow (never a hardcoded email-api call), same path as the automatic
-   * send on money-in. Returns whether a customer email was on file (the flow no-ops the email step
-   * when there isn't one). Inbound payments only.
+   * (Re)send the payment voucher to the counterparty by email — direction-aware, via Flows (never a
+   * hardcoded email-api call). Money IN → the customer's receipt (απόδειξη είσπραξης) through the
+   * seeded `payment_received` flow. Money OUT → the supplier's payment voucher (απόδειξη πληρωμής)
+   * through the seeded `payment_sent` flow. Returns whether an email was on file for that party (the
+   * flow no-ops its email step when there isn't one).
    */
   async emailPaymentReceipt(paymentId: string): Promise<{ emailed: boolean; email: string | null }> {
     const { data: p, error } = await supabase.from('payments')
       .select('id, workspace_id, amount, currency, direction, counterparty_company_id, counterparty_contact_id')
       .eq('id', paymentId).single();
     if (error) throw error;
-    if ((p as any).direction !== 'in') throw new Error('Only inbound payments have a customer receipt.');
+    const out = (p as any).direction === 'out';
     const party = await resolvePartyContactInfo((p as any).counterparty_company_id, (p as any).counterparty_contact_id);
     const currency = (p as any).currency ?? 'EUR';
     const amount = `${Number((p as any).amount).toFixed(2)} ${currency}`;
     let receiptUrl: string | null = null;
-    try { receiptUrl = (await financeService.generatePaymentReceiptPdf(paymentId)).pdf_url; } catch { /* receipt optional */ }
+    try { receiptUrl = (await financeService.generatePaymentReceiptPdf(paymentId)).pdf_url; } catch { /* voucher optional */ }
+    if (out) {
+      // Supplier payment voucher — the "Paid to" acknowledgment, via the payment_sent flow.
+      const receiptLine = receiptUrl ? `<p><a href="${receiptUrl}">Download the payment voucher</a></p>` : '';
+      flowEventService.emit('payment_sent', {
+        type: 'payment_sent',
+        user_id: party.userId ?? undefined,
+        supplier_email: party.email ?? undefined,
+        supplier_name: party.name ?? undefined,
+        payment_id: paymentId,
+        amount,
+        currency,
+        workspace_id: (p as any).workspace_id,
+        receipt_url: receiptUrl ?? undefined,
+        receipt_line: receiptLine,
+        title: `Payment voucher — ${amount}`,
+        body: `A payment of ${amount} to ${party.name ?? 'this supplier'} has been recorded. ${receiptUrl ? 'The voucher is attached below.' : ''}`.trim(),
+        action_url: '/finance?tab=doc_payments',
+      });
+      return { emailed: !!party.email, email: party.email ?? null };
+    }
     const receiptLine = receiptUrl ? `<p><a href="${receiptUrl}">Download your receipt</a></p>` : '';
     flowEventService.emit('payment_received', {
       type: 'payment_received',

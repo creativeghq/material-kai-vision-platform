@@ -30,7 +30,7 @@ const MODULE_SLUG = 'flows-toolkit';
 // the (non-member) person booking, without a workspace_id, so a tenant flow could never match it.
 // Re-add either only once a trusted server-side emitter stamps workspace_id.
 const TENANT_TRIGGERS = [
-  'scheduled', 'quote_approved', 'invoice_paid', 'payment_received',
+  'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
   'inbox.message_received',
 ] as const;
 const TENANT_ACTIONS = [
@@ -152,7 +152,7 @@ export const createManageFlowsTool = (
         'Create and manage SIMPLE workspace automations ("Flows") for the current user\'s workspace.',
         'A flow = one TRIGGER (an event) + one or more ACTIONS that run when it fires. Scoped to this workspace only.',
         '',
-        'Allowed triggers: scheduled (cron), quote_approved, invoice_paid, payment_received,',
+        'Allowed triggers: scheduled (cron), quote_approved, invoice_paid, payment_received, payment_sent,',
         '  inbox.message_received.',
         'Allowed actions: send_email, send_whatsapp, create_notification, send_agent_message,',
         '  send_campaign (dispatch an Email-Marketing campaign by campaign_id).',

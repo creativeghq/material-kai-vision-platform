@@ -83,9 +83,12 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const total = parseDecimalOr(subtotalNet, 0) + parseDecimalOr(vatAmount, 0);
 
   // Draft persistence — survives navigating away + reopening; cleared on Save / Cancel.
+  // DISABLED in order mode: an order expense is seeded authoritatively from the line/order every
+  // open, so a shared draft (from a prior general "Add expense") must never restore stale values
+  // over the Order category / the line's supplier. Only the general expense form keeps a draft.
   const clearDraft = useSessionDraft(
     `fin-expense:${workspaceId}`,
-    open,
+    open && !orderId,
     { categoryId, description, reference, currency, subtotalNet, vatAmount, issuedAt, dueAt, notes, paidNow, bankAccountId, method, repeat, party },
     (d) => {
       setCategoryId(d?.categoryId ?? '');
@@ -111,10 +114,12 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (!open || !workspaceId) return;
     void financeCategoriesService.list(workspaceId).then((cats) => {
       setCategories(cats);
-      // Order-attached expense → default to the protected "Order" category (unless one is prefilled).
-      if (orderId && !prefill?.categoryId) {
+      // Order-attached expense → the category is AUTHORITATIVE: the explicit prefill, else the
+      // protected "Order" category. Overwrite (not `cur ||`) so a stale value from a prior open
+      // of this (persistent) dialog never wins over the Order default.
+      if (orderId) {
         const orderCat = cats.find((c) => c.is_system);
-        if (orderCat) setCategoryId((cur) => cur || orderCat.id);
+        setCategoryId(prefill?.categoryId || orderCat?.id || '');
       }
     }).catch(() => setCategories([]));
     // Balances (not just names) so the picker can show what's left in each account.
@@ -126,11 +131,28 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workspaceId, orderId]);
 
-  // Seed amount/description/category/payee when opened from an order's "Mark as paid" / "Add expense"
-  // (turning a line cost into a real bill). Keyed on the prefill amount too, so re-opening for a
-  // different line re-seeds.
+  // Seed when opened from an order's "Mark as paid" / "Add expense" (turning a line cost into a bill).
+  // In ORDER MODE this is AUTHORITATIVE + resets the form to a clean state every open (the dialog is
+  // persistent, so last-open values would otherwise linger): amount + supplier come straight from the
+  // line/order, everything else resets to defaults. The Order category is applied by the load effect.
   useEffect(() => {
-    if (!open || !prefill) return;
+    if (!open) return;
+    if (orderId) {
+      setSubtotalNet(prefill?.amount != null ? String(prefill.amount) : '0');
+      setVatAmount('0');
+      setDescription(prefill?.description ?? '');
+      setReference(''); setNotes(''); setCurrency('EUR'); setRepeat('none');
+      setPaidNow(true); setDueAt('');
+      setIssuedAt(new Date().toISOString().slice(0, 10));
+      // Supplier: set from the line/order, or CLEAR (so a prior line's supplier never carries over).
+      if (prefill?.supplier?.companyId) setParty({ type: 'company', id: prefill.supplier.companyId, label: prefill.supplier.name || 'Supplier' });
+      else if (prefill?.supplier?.name) setParty({ type: 'adhoc', id: null, label: prefill.supplier.name });
+      else setParty(null);
+      setPartySearch('');
+      return;
+    }
+    // General mode: only apply the fields that were prefilled (keeps the draft-restore behavior).
+    if (!prefill) return;
     if (prefill.amount != null) { setSubtotalNet(String(prefill.amount)); setVatAmount('0'); }
     if (prefill.description) setDescription(prefill.description);
     if (prefill.categoryId) setCategoryId(prefill.categoryId);
@@ -140,7 +162,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setParty({ type: 'adhoc', id: null, label: prefill.supplier.name });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, orderId, prefill?.amount, prefill?.supplier?.companyId, prefill?.supplier?.name]);
+  }, [open, orderId, prefill?.amount, prefill?.description, prefill?.categoryId, prefill?.supplier?.companyId, prefill?.supplier?.name]);
 
   // Load the picked payee's own bank accounts (for the Bank Payment "paid to their bank" selector).
   useEffect(() => {

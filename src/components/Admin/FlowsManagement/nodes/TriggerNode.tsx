@@ -76,6 +76,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   invoice_issued: FileText,
   receipt_issued: FileCheck,
   payment_received: CheckCircle2,
+  payment_sent: CheckCircle2,
   'purchase_order.sent': Send,
   'purchase_order.received': Package,
   material_alert: Zap,
