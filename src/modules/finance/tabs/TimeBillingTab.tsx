@@ -15,6 +15,7 @@ import { formatMoney } from '@/modules/finance/services/financeService';
 import { timeTrackingService, type TimeEntry, type TimeReportUserRow, type TimeReportContactRow } from '@/modules/finance/services/timeTrackingService';
 import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
 
 interface Props { workspaceId: string }
 type Customer = { type: 'company' | 'contact'; id: string; label: string };
@@ -127,11 +128,24 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
   const unbilled = useMemo(() => entries.filter((e) => e.is_billable && !e.billed_invoice_id), [entries]);
   const billed = useMemo(() => entries.filter((e) => e.billed_invoice_id), [entries]);
 
+  // You bill one customer at a time, so a customer facet (plus date + text) is the key filter here.
+  const ubName = (e: TimeEntry) => names[partyKey(e)] || (partyKey(e) ? '—' : 'No customer');
+  const unbilledFilterGroups = useMemo<FilterGroupDef[]>(() => [{
+    key: 'general', label: 'General', icon: Clock,
+    fields: [
+      { key: 'q', type: 'text', label: 'Search', placeholder: 'What / customer…', accessor: (e: TimeEntry) => [e.description, ubName(e)] },
+      { key: 'customer', type: 'multi', label: 'Customer', options: optionsFromRows(unbilled, ubName), accessor: (e: TimeEntry) => ubName(e) },
+      { key: 'work_date', type: 'dateRange', label: 'Date', accessor: (e: TimeEntry) => e.work_date },
+    ],
+  }], [unbilled, names]);
+  const { values: ubFilterValues, setValues: setUbFilterValues, filtered: unbilledView, previewCount: ubPreview } =
+    useFilters<TimeEntry>(unbilled, unbilledFilterGroups);
+
   const [unbilledPage, setUnbilledPage] = useState(1);
   const [billedPage, setBilledPage] = useState(1);
   // Billing or deleting entries moves them between the two lists — clamp both so neither
   // is left showing an empty page. (Selection is by id, so it survives paging.)
-  useEffect(() => { setUnbilledPage((p) => clampPage(p, unbilled.length)); }, [unbilled.length]);
+  useEffect(() => { setUnbilledPage((p) => clampPage(p, unbilledView.length)); }, [unbilledView.length]);
   useEffect(() => { setBilledPage((p) => clampPage(p, billed.length)); }, [billed.length]);
 
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -214,27 +228,34 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
 
       {/* Unbilled + bill action */}
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
+        <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
           <CardTitle className="text-sm">Unbilled time</CardTitle>
-          {selectedRows.length > 0 && (
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-muted-foreground">{selectedRows.length} selected · {formatMoney(selectedTotal)}</span>
-              <Button size="sm" className="rounded-full" disabled={billing || mixedCustomers} onClick={bill}>
-                {billing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <FilePlus2 className="h-3.5 w-3.5 mr-1" />} Create invoice
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-3 text-xs">
+            {selectedRows.length > 0 && (
+              <>
+                <span className="text-muted-foreground">{selectedRows.length} selected · {formatMoney(selectedTotal)}</span>
+                <Button size="sm" className="rounded-full" disabled={billing || mixedCustomers} onClick={bill}>
+                  {billing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <FilePlus2 className="h-3.5 w-3.5 mr-1" />} Create invoice
+                </Button>
+              </>
+            )}
+            {unbilled.length > 0 && (
+              <FilterBar groups={unbilledFilterGroups} values={ubFilterValues} onChange={setUbFilterValues} previewCount={ubPreview} title="Filter unbilled time" />
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
           ) : unbilled.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No unbilled time. Log some above.</p>
+          ) : unbilledView.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No entries match the filter.</p>
           ) : (
             <>
             <div className="divide-y divide-border/40">
               {mixedCustomers && <p className="px-4 py-1.5 text-[11px] text-amber-500">Selected entries span multiple customers — invoice one customer at a time.</p>}
-              {paginate(unbilled, unbilledPage).map((e) => (
+              {paginate(unbilledView, unbilledPage).map((e) => (
                 <label key={e.id} className="flex cursor-pointer items-center gap-3 px-4 py-2 text-sm hover:bg-muted/30">
                   <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} />
                   <div className="w-20 text-xs text-muted-foreground">{e.work_date}</div>
@@ -246,7 +267,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                 </label>
               ))}
             </div>
-            <TablePagination page={unbilledPage} total={unbilled.length} onPageChange={setUnbilledPage} label="entries" />
+            <TablePagination page={unbilledPage} total={unbilledView.length} onPageChange={setUnbilledPage} label="entries" />
             </>
           )}
         </CardContent>
