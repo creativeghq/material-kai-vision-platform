@@ -10,7 +10,6 @@ import {
   Save,
   Edit2,
   Key,
-  Activity,
   FileText,
   Building2,
 } from 'lucide-react';
@@ -554,10 +553,6 @@ export const UserDetailPage: React.FC = () => {
               <CreditCard className="h-4 w-4 mr-2" />
               Subscription & Credits
             </TabsTrigger>
-            <TabsTrigger value="activity">
-              <Activity className="h-4 w-4 mr-2" />
-              Activity
-            </TabsTrigger>
             <TabsTrigger value="ai-usage">
               <FileText className="h-4 w-4 mr-2" />
               AI Usage
@@ -784,27 +779,6 @@ export const UserDetailPage: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          {/* Activity Tab */}
-          <TabsContent value="activity" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Recent Activity
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>Activity tracking coming soon</p>
-                  <p className="text-sm mt-1">
-                    This section will show user login history, actions, and usage statistics
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* AI Usage Tab */}

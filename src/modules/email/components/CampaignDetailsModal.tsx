@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Users, BarChart3, Settings, Trash2, Play, Pause, Mail } from 'lucide-react';
+import { X, Users, BarChart3, Trash2, Play, Pause, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -353,10 +353,6 @@ export const CampaignDetailsModal: React.FC<CampaignDetailsModalProps> = ({
               <Users className="h-4 w-4 mr-2" />
               Recipients ({campaign.recipient_count})
             </TabsTrigger>
-            <TabsTrigger value="settings">
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -435,13 +431,6 @@ export const CampaignDetailsModal: React.FC<CampaignDetailsModalProps> = ({
           {/* Recipients Tab */}
           <TabsContent value="recipients">
             <RecipientsTab campaignId={campaign.id} />
-          </TabsContent>
-
-          {/* Settings Tab - Placeholder */}
-          <TabsContent value="settings">
-            <div className="p-8 text-center text-muted-foreground">
-              Campaign settings coming soon
-            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>
