@@ -10,11 +10,16 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="real-estate.html">Real Estate</a> / Syndication</div>
   <h1>Real Estate · Portal syndication</h1>
-  <div class="routes"><span class="badge route">/real-estate</span> <span class="badge gated">Estate Agent</span></div>
+  <div class="routes"><span class="badge route">/properties</span> <span class="badge gated">Estate Agent</span></div>
   <p class="lead">Syndication is how your listings leave MaterialsHub and appear on <strong>external property portals</strong> — the aggregator sites where buyers search. Instead of re-typing every property into each portal by hand, you expose your live inventory in a format the portal understands, and the portal ingests it automatically. It lives in its own dedicated <strong>“Portal syndication feed”</strong> tab inside the <a href="real-estate.html">Real Estate</a> workspace.</p>
 
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/real-estate/syndication.png" alt="Real Estate — Syndication tab">
+    <figcaption>The <strong>Syndication</strong> tab — expose your live inventory to external property portals (OpenImmo, Kyero and a generic XML feed) so they ingest your listings automatically.</figcaption>
+  </figure>
+
   <h2>Where it is</h2>
-  <p>Open <span class="badge route">/real-estate</span> and choose the <strong>Portal syndication feed</strong> tab, alongside <em>Overview</em>, <em>Listings</em>, <em>Leads</em>, <em>Buyers</em>, <em>Viewings</em> and <em>Sales</em>. Syndication used to sit on the Overview dashboard; it was moved out into its own tab so the feed configuration has room of its own and doesn't clutter the agent dashboard.</p>
+  <p>Open <span class="badge route">/properties</span> and choose the <strong>Portal syndication feed</strong> tab, alongside <em>Overview</em>, <em>Listings</em>, <em>Leads</em>, <em>Buyers</em>, <em>Viewings</em> and <em>Sales</em>. Syndication used to sit on the Overview dashboard; it was moved out into its own tab so the feed configuration has room of its own and doesn't clutter the agent dashboard.</p>
 
   <h2>What syndication actually does</h2>
   <p>A portal feed is a machine-readable export of your properties. You turn the feed on, pick the <strong>format</strong> the destination portal expects, and MaterialsHub renders your listings into that format. Two things are worth being clear about up front:</p>

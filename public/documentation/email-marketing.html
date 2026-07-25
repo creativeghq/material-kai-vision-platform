@@ -10,10 +10,15 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Email Marketing</div>
   <h1>Email Marketing <span class="badge gated">Pro add-on · BYOK</span></h1>
-  <div class="routes"><span class="badge route">/apps/email-marketing</span></div>
+  <div class="routes"><span class="badge route">/marketing/email</span></div>
   <p class="lead">Email Marketing lets you design email templates in a visual builder and send <strong>bulk campaigns to your CRM audiences</strong>. Crucially, it is <strong>bring-your-own-key (BYOK) only</strong>: every campaign sends from <em>your own</em> verified <strong>Resend</strong> account and domain — there is <strong>no shared platform sender</strong>. That means your campaigns come from <em>your</em> domain (better deliverability and trust), and you're never sending marketing mail through someone else's reputation. This guide covers the whole path: enabling the app, the exact BYOK setup (what to paste and where), building a template, and sending a campaign.</p>
 
   <div class="callout warn"><p><strong>BYOK is mandatory here.</strong> Until the workspace has its <strong>own Resend API key + a verified sender</strong>, campaigns <strong>cannot send</strong> — the app shows <em>“Configure your Resend account to start sending.”</em> There is deliberately no platform fallback for marketing mail.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/email-marketing/overview.png" alt="Email Marketing — Campaigns tab">
+    <figcaption>Email Marketing at <span class="badge route">/marketing/email</span> — four tabs run the whole flow: <strong>Campaigns</strong>, <strong>Templates</strong>, <strong>Contacts</strong> and <strong>Setup</strong>. <strong>Create Campaign</strong> is top-right.</figcaption>
+  </figure>
 
   <h2>Step 1 — Enable the app</h2>
   <p>Email Marketing is a <strong>Pro add-on</strong>. Enable it from the <a href="apps.html">App Launcher</a> (or <a href="account-modules.html">Profile → Modules</a>): find it under <strong>Available to add</strong> and click enable. As a paid add-on it goes through <strong>checkout</strong> (bound to a Stripe product); once billing is set up it becomes active and appears in your launcher. A member without owner rights can <strong>request</strong> it instead (the owner is notified to approve).</p>
@@ -43,8 +48,18 @@
   <p>Save. The status flips from <em>“Configure your Resend account…”</em> to <strong>“Your Resend sender is configured”</strong> / <strong>“Ready to send.”</strong> Campaigns will now send from your domain.</p>
   <div class="callout"><p><strong>Sending limits.</strong> Volume is <strong>metered by a platform-controlled daily cap</strong> (a safety ceiling on how many a workspace can send per day) on top of whatever your own Resend plan allows. The key + sender are configured per <strong>workspace</strong>, so each tenant sends under its own identity and reputation.</p></div>
 
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/email-marketing/setup.png" alt="Email Marketing — Setup tab">
+    <figcaption>The <strong>Setup</strong> tab shows the BYOK status and links straight to the workspace email card, so you can confirm your Resend key and verified sender are in place before sending.</figcaption>
+  </figure>
+
   <h2>Step 3 — Build an email template</h2>
   <p>Open the app's <strong>Templates</strong> tab and design your email in the <strong>visual builder</strong> (the same drag-and-drop GrapesJS builder used across the platform) — layout, images, buttons and text, no HTML required. Save it; it becomes selectable when you create a campaign. Each template can carry a default subject (a campaign can override it).</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/email-marketing/templates.png" alt="Email Marketing — Templates tab">
+    <figcaption>The <strong>Templates</strong> tab — each saved template becomes selectable when you build a campaign.</figcaption>
+  </figure>
 
   <h2>Step 4 — Create and send a campaign</h2>
   <p>On the <strong>Campaigns</strong> tab, click <strong>New Email Campaign</strong> and fill in:</p>
@@ -60,6 +75,11 @@
     </tbody>
   </table></div>
   <p>Your <a href="crm-categories.html">CRM categories</a> are how you segment — build the audience there once and reuse it across campaigns.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/email-marketing/contacts.png" alt="Email Marketing — Contacts tab">
+    <figcaption>The <strong>Contacts</strong> tab shows the audience your campaigns draw from — resolved from your <a href="crm.html">CRM</a> contacts and categories at send time.</figcaption>
+  </figure>
 
   <h2>Step 5 — Track delivery</h2>
   <p>Each campaign shows <strong>Delivery stats</strong> pulled back from Resend — how many were delivered, and the outcomes — so you can see how a send actually performed rather than just that it was queued.</p>

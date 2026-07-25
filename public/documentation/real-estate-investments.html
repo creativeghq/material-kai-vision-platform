@@ -10,10 +10,15 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="real-estate.html">Real Estate</a> / Investments</div>
   <h1>Real Estate · Investments <span class="badge gated">Pro add-on</span></h1>
-  <div class="routes"><span class="badge route">/real-estate</span></div>
+  <div class="routes"><span class="badge route">/properties</span></div>
   <p class="lead">Investments is an investment-analysis tool for property: you describe a deal — what you'd pay for it, what it costs to get in, how it's financed and what rent it earns — and it works out whether the numbers stack up. It computes the standard property-investment returns (yields, cap rate, cash-on-cash and monthly cash flow) for each property, then rolls every property you've modelled into a single <strong>portfolio</strong> view. It answers "is this a good buy, and how is my whole portfolio doing?" without a spreadsheet.</p>
 
-  <div class="callout"><p><strong>Where:</strong> Investments is a <strong>sibling paid add-on</strong> to <a href="real-estate.html">Real Estate</a> — a separate Pro-tier module (manifest name "Investments", parent "real-estate"). Enable it from the <a href="apps.html">App Launcher</a>; it then surfaces as an extra <strong>Investments</strong> tab inside the Real Estate workspace at <span class="badge route">/real-estate</span>. It <strong>requires the Real Estate module</strong> — it extends that workspace rather than standing alone.</p></div>
+  <div class="callout"><p><strong>Where:</strong> Investments is a <strong>sibling paid add-on</strong> to <a href="real-estate.html">Real Estate</a> — a separate Pro-tier module (manifest name "Investments", parent "real-estate"). Enable it from the <a href="apps.html">App Launcher</a>; it then surfaces as an extra <strong>Investments</strong> tab inside the Real Estate workspace at <span class="badge route">/properties</span>. It <strong>requires the Real Estate module</strong> — it extends that workspace rather than standing alone.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/real-estate/investments.png" alt="Real Estate — Investments tab">
+    <figcaption>The <strong>Investments</strong> tab (the analysis add-on) — yield, cap rate, cash-on-cash and monthly cash flow per property, rolled up into a single portfolio view.</figcaption>
+  </figure>
 
   <h2>How it fits</h2>
   <p>Real Estate ships with two sibling add-ons. <a href="real-estate-lettings.html">Property Management</a> handles lettings — the <em>actual</em> rent you collect, tenancies and statements. <strong>Investments</strong> is the other one, and it works the other way round: it's forward-looking <em>analysis</em>, modelling the expected returns of a deal before (or while) you hold it. Enabling either one adds its own tab to the same Real Estate workspace; you can run both together, use the modelled rent in Investments alongside the real rent tracked in Property Management, and feed real outcomes into your books through <a href="finance.html">Finance</a>.</p>
