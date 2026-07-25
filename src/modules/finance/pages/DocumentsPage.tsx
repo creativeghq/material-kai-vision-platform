@@ -568,7 +568,7 @@ const ChequesTable: React.FC<{ rows: Cheque[]; readOnly: boolean; onChanged: () 
         )}
         {rows.map((c) => (
           <tr key={c.id} className="border-b border-border/30">
-            <td className="px-4 py-2"><Badge variant={c.direction === 'in' ? 'default' : 'outline'} className="text-[10px]">{c.direction === 'in' ? 'Received' : 'Issued'}</Badge></td>
+            <td className="px-4 py-2"><span className={c.direction === 'in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>{c.direction === 'in' ? 'Received' : 'Issued'}</span></td>
             <td className="px-4 py-2 font-mono text-xs">{c.cheque_number ?? '—'}</td>
             <td className="px-4 py-2">{c.bank ?? '—'}</td>
             <td className={`px-4 py-2 ${overdue(c) ? 'text-destructive font-medium' : ''}`}>{c.due_date ?? '—'}</td>
@@ -751,7 +751,9 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
           <tr key={p.id} className="border-b border-border/30">
             <td className="px-4 py-2">{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}</td>
             <td className="px-4 py-2">
-              <Badge variant={p.direction === 'in' ? 'default' : 'outline'} className="text-[10px]">{p.direction === 'in' ? 'Received' : 'Paid out'}</Badge>
+              <span className={p.direction === 'in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
+                {p.direction === 'in' ? 'Received' : (p.credit_number ? 'Refund' : 'Paid')}
+              </span>
             </td>
             <td className="px-4 py-2 truncate max-w-[180px]" title={p.party_name ?? undefined}>{p.party_name ?? '—'}</td>
             <td className="px-4 py-2">
