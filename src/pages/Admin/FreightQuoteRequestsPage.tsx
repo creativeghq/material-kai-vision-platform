@@ -157,7 +157,7 @@ const AnswerDialog: React.FC<{ request: PendingQuoteRequest | null; onOpenChange
           <div className="space-y-2">
             {offers.map((o, i) => (
               <div key={i} className="grid grid-cols-12 gap-2 items-end">
-                <div className="col-span-5 space-y-1"><Label className="text-xs">Carrier / forwarder</Label><Input value={o.carrier} onChange={(e) => setOffers((r) => r.map((x, j) => j === i ? { ...x, carrier: e.target.value } : x))} /></div>
+                <div className="col-span-5 space-y-1"><Label className="text-xs">Carrier / Forwarder</Label><Input value={o.carrier} onChange={(e) => setOffers((r) => r.map((x, j) => j === i ? { ...x, carrier: e.target.value } : x))} /></div>
                 <div className="col-span-3 space-y-1"><Label className="text-xs">Price</Label><Input value={o.amount} onChange={(e) => setOffers((r) => r.map((x, j) => j === i ? { ...x, amount: e.target.value } : x))} inputMode="decimal" /></div>
                 <div className="col-span-2 space-y-1"><Label className="text-xs">Ccy</Label><Input value={o.currency} onChange={(e) => setOffers((r) => r.map((x, j) => j === i ? { ...x, currency: e.target.value } : x))} /></div>
                 <div className="col-span-1 space-y-1"><Label className="text-xs">Days</Label><Input value={o.transit} onChange={(e) => setOffers((r) => r.map((x, j) => j === i ? { ...x, transit: e.target.value } : x))} inputMode="numeric" /></div>

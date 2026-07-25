@@ -31,7 +31,7 @@ import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 const REQUIRED_ISSUER_FIELDS: { key: string; label: string }[] = [
   { key: 'business_name', label: 'Company name' },
   { key: 'business_vat', label: 'VAT number' },
-  { key: 'business_profession', label: 'Activity / profession' },
+  { key: 'business_profession', label: 'Activity / Profession'},
   { key: 'business_tax_office', label: 'Tax office (ΔΟΥ)' },
   { key: 'business_address', label: 'Street' },
   { key: 'business_street_number', label: 'Street number' },

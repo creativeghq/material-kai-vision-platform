@@ -322,7 +322,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
               <p className="text-xs font-medium">Order rules <span className="text-muted-foreground font-normal">— defaults; each customer can override these in CRM</span></p>
               <div className="grid grid-cols-2 gap-3">
                 <label className="space-y-1">
-                  <span className="block text-[11px] text-muted-foreground">Default credit / balance hold (€)</span>
+                  <span className="block text-[11px] text-muted-foreground">Default credit / Balance hold (€)</span>
                   <input type="text" inputMode="decimal" value={settings.default_credit_limit ?? ''}
                     onChange={(e) => set('default_credit_limit', e.target.value === '' ? null : parseDecimal(e.target.value))}
                     placeholder="No limit" className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-xs" />
@@ -511,7 +511,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <BackdropSlot
-                title="Cover / page backdrop"
+                title="Cover / Page backdrop"
                 previewUrl={coverPreviewUrl}
                 uploading={uploading === 'cover'}
                 onPick={() => coverInputRef.current?.click()}
@@ -523,7 +523,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
             <div>
               <BackdropSlot
-                title="Back cover / footer (optional)"
+                title="Back cover / Footer (optional)"
                 previewUrl={footerPreviewUrl}
                 uploading={uploading === 'footer'}
                 onPick={() => footerInputRef.current?.click()}
@@ -740,7 +740,7 @@ const DigestPanel: React.FC<DigestPanelProps> = ({ settings, onPatch, onSave, sa
       </div>
 
       <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
-        <div className="text-xs font-medium">Preview / test</div>
+        <div className="text-xs font-medium">Preview / Test</div>
         <div className="flex gap-2">
           <Input placeholder="your@email.com" value={testEmail} onChange={(e) => setTestEmail(e.target.value)} />
           <Button type="button" variant="outline" onClick={() => sendNow('test')} disabled={sending !== null}>

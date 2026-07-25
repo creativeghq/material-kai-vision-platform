@@ -40,9 +40,9 @@ export const FactoryAccessRequestsTab: React.FC = () => {
   };
 
   const statusColor = (s: string) =>
-    s === 'pending' ? 'bg-amber-500/10 text-amber-700 border-amber-500/30'
-    : s === 'approved' ? 'bg-green-500/10 text-green-700 border-green-500/30'
-    : 'bg-destructive/10 text-destructive border-destructive/30';
+    s === 'pending' ? 'text-amber-600 dark:text-amber-400'
+    : s === 'approved' ? 'text-emerald-600 dark:text-emerald-400'
+    : 'text-destructive';
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
@@ -71,7 +71,7 @@ export const FactoryAccessRequestsTab: React.FC = () => {
                     <p className="font-semibold text-sm">{req.requester_workspace_name || req.requester_workspace_id.slice(0, 8)}</p>
                     <span className="text-xs text-muted-foreground">→</span>
                     <p className="text-sm">{req.factory_name || req.factory_user_id.slice(0, 8)}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${statusColor(req.status)}`}>{req.status}</span>
+                    <span className={`text-xs font-medium capitalize ${statusColor(req.status)}`}>{req.status}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Requested {new Date(req.created_at).toLocaleDateString()}</p>
                   {req.message && <p className="text-sm text-muted-foreground mt-2 italic">“{req.message}”</p>}

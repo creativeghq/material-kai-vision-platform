@@ -69,7 +69,7 @@ export const COLOR_ROLE_LABELS: Record<InvoiceColorRole, string> = {
   tableHeaderBg: 'Table header',
   text: 'Text',
   muted: 'Secondary text',
-  line: 'Lines / borders',
+  line: 'Lines / Borders',
 };
 
 export function getTemplateSpec(templateId: string | null | undefined): InvoiceTemplateSpec {

@@ -103,7 +103,7 @@ export const PaymentRowActions: React.FC<{
         <button type="button" title="Edit (bank, method, reference…)" className="text-muted-foreground hover:text-primary disabled:opacity-40" disabled={busy} onClick={() => setEditOpen(true)}>
           <Pencil className="h-3.5 w-3.5" />
         </button>
-        <button type="button" title="Delete / issue return" className="text-muted-foreground hover:text-destructive disabled:opacity-40" disabled={busy} onClick={startDelete}>
+        <button type="button" title="Delete / Issue return" className="text-muted-foreground hover:text-destructive disabled:opacity-40" disabled={busy} onClick={startDelete}>
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
         </button>
       </div>
@@ -133,7 +133,7 @@ export const PaymentRowActions: React.FC<{
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Bank / cash account</Label>
+              <Label className="text-xs">Bank / Cash account</Label>
               <Select value={bankAccountId} onValueChange={setBankAccountId}>
                 <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>

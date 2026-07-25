@@ -242,7 +242,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     <Dialog open={descOpen} onOpenChange={setDescOpen}>
       <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
         <DialogHeader><DialogTitle>Change description</DialogTitle></DialogHeader>
-        <Textarea value={descValue} onChange={(e) => setDescValue(e.target.value)} rows={4} placeholder="Internal note / description for this document…" />
+        <Textarea value={descValue} onChange={(e) => setDescValue(e.target.value)} rows={4} placeholder="Internal note / Description for this document…" />
         <DialogFooter>
           <Button variant="outline" onClick={() => setDescOpen(false)}>Cancel</Button>
           <Button onClick={saveDesc} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}</Button>

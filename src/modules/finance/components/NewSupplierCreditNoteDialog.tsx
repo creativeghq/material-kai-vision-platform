@@ -236,7 +236,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
                 const lineNet = round2(qty * up); const lineTotal = round2(lineNet * (1 + pctOf(l.vatCode) / 100));
                 return (
                   <div key={l.id} className="grid grid-cols-[1fr_60px_84px_88px_84px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
-                    <Input className="h-8 text-sm" value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} placeholder="Item / reason" />
+                    <Input className="h-8 text-sm" value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} placeholder="Item / Reason" />
                     <Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.qty} onChange={(e) => setLine(l.id, { qty: e.target.value })} />
                     <Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.unitPrice} onChange={(e) => setLine(l.id, { unitPrice: e.target.value })} placeholder="0.00" />
                     <Select value={l.vatCode} onValueChange={(v) => setLine(l.id, { vatCode: v })}>
@@ -258,8 +258,8 @@ export const NewSupplierCreditNoteDialog: React.FC<{
           </div>
 
           <div className="space-y-1">
-            <Label>Reason / notes</Label>
-            <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Returned goods / pricing correction" />
+            <Label>Reason / Notes</Label>
+            <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Returned goods / Pricing correction" />
           </div>
 
           <label className="flex cursor-pointer items-center justify-between rounded-md border border-border/60 px-3 py-2">

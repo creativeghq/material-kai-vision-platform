@@ -61,7 +61,7 @@ async function buildPartyLookup(refs: PartyRef[]): Promise<Map<string, { name: s
 function partyOf(map: Map<string, { name: string; vat: string }>, ref: PartyRef): { name: string; vat: string } {
   if (ref.company_id) return map.get(`c:${ref.company_id}`) ?? { name: '', vat: '' };
   if (ref.contact_id) return map.get(`p:${ref.contact_id}`) ?? { name: '', vat: '' };
-  return { name: 'Retail / walk-in', vat: '' };
+  return { name: 'Retail / Walk-in', vat: '' };
 }
 
 export const accountingExportService = {

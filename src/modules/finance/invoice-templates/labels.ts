@@ -42,7 +42,7 @@ export const INVOICE_LABELS: Record<Lang, Record<string, string>> = {
     price: 'Price', discount: 'Discount', priceAfterDiscount: 'Price after Discount',
     withheld: 'Withholding', total: 'Amount due', paid: 'Paid', due2: 'Balance',
     prevBalance: 'Previous balance', prevCredit: 'Previous credit', totalWithPrev: 'Total outstanding',
-    vatSuspended: 'VAT payment suspended', payOnline: 'Pay / view online', scanToPay: 'Scan to pay online',
+    vatSuspended: 'VAT payment suspended', payOnline: 'Pay / View online', scanToPay: 'Scan to pay online',
     fees: 'Fees', stamp: 'Stamp duty', otherTaxes: 'Other taxes', deductions: 'Deductions',
     digitalFee: 'Digital transaction fee', related: 'Related doc',
     paymentMethod: 'Payment method', bank: 'Bank account', registry: 'Reg. no.', website: 'Website',

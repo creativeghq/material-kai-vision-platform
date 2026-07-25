@@ -96,7 +96,7 @@ export function TechRadarReviewModal({ state, onClose, onSubmit }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Component / area (optional)</Label>
+              <Label className="text-xs">Component / Area (optional)</Label>
               <Input value={component} onChange={(e) => setComponent(e.target.value)} placeholder="ocr" />
             </div>
             <div>

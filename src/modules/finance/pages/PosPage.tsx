@@ -869,7 +869,7 @@ const PosPage: React.FC = () => {
               {(zReport.by_vat || []).map((r, i) => <Row key={i} label={`VAT ${r.rate}%`} value={`net ${formatMoney(r.net, currency)} · vat ${formatMoney(r.vat, currency)}`} muted />)}
               <div className="border-t border-border/60 my-1" />
               <Row label="Opening float" value={formatMoney(zReport.opening_float, currency)} />
-              <Row label="Cash in / out" value={`${formatMoney(zReport.cash_in, currency)} / ${formatMoney(zReport.cash_out, currency)}`} />
+              <Row label="Cash in / Out" value={`${formatMoney(zReport.cash_in, currency)} / ${formatMoney(zReport.cash_out, currency)}`} />
               <Row label="Expected cash" value={formatMoney(zReport.expected_cash, currency)} />
               {zReport.counted_cash != null && <Row label="Counted cash" value={formatMoney(zReport.counted_cash, currency)} />}
               {zReport.cash_variance != null && <Row label="Variance" value={formatMoney(zReport.cash_variance, currency)} danger={zReport.cash_variance !== 0} />}

@@ -47,7 +47,7 @@ const BILLING: Field[] = [
   { key: 'business_other', label: 'Other', bilingual: true, placeholder: 'e.g. branch / notes' },
 ];
 const CUSTOMER_CONTACT: Field[] = [
-  { key: 'contact_title', label: 'Display name / brand', bilingual: true, placeholder: 'Acme Tiles' },
+  { key: 'contact_title', label: 'Display name / Brand', bilingual: true, placeholder: 'Acme Tiles' },
   { key: 'contact_email', label: 'Contact email', placeholder: 'hello@acme.gr' },
   { key: 'contact_phone', label: 'Company phone', placeholder: '+30 210 1234567' },
   { key: 'contact_fax', label: 'Fax', placeholder: '+30 210 1234568' },
@@ -69,7 +69,7 @@ const COMPANY_TYPES = [
   'Medium business (11–50 people)', 'Large business (50+ people)',
 ];
 const MAIN_ACTIVITIES = [
-  { group: 'Commerce', items: ['Retail & Wholesale', 'Retail only', 'Wholesale only', 'Food service / café'] },
+  { group: 'Commerce', items: ['Retail & Wholesale', 'Retail only', 'Wholesale only', 'Food service / Café'] },
   { group: 'Services', items: ['Architect/Engineer/Contractor', 'Lawyer/Notary', 'Accounting services', 'Psychologists/Therapists', 'Technical trade (Electrician/Plumber/etc.)', 'Healthcare professional', 'Tourism/Accommodation', 'NGO', 'Other'] },
 ];
 

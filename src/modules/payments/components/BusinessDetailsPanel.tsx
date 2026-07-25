@@ -127,7 +127,7 @@ export const BusinessDetailsPanel: React.FC<Props> = (_props) => {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Legal / trading name *" value={fields.business_name} onChange={update('business_name')} disabled={saving} placeholder="Acme Materials GmbH" />
+          <Field label="Legal / Trading name *" value={fields.business_name} onChange={update('business_name')} disabled={saving} placeholder="Acme Materials GmbH" />
           <Field label="VAT number" value={fields.business_vat} onChange={update('business_vat')} disabled={saving} placeholder="EL123456789" />
           <Field label="Tax office" value={fields.business_tax_office} onChange={update('business_tax_office')} disabled={saving} />
           <Field label="Phone" value={fields.business_phone} onChange={update('business_phone')} disabled={saving} />

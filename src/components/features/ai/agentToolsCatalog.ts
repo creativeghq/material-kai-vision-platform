@@ -1265,7 +1265,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Start tracking mentions for a brand.',
         promptTemplate: 'Start tracking mentions for "{{subject}}" across {{sources}}. Configure alerts for spikes and negative sentiment.',
         form: [
-          { key: 'subject', label: 'Brand / product / keyword to track', kind: 'text', required: true, placeholder: 'Flobali' },
+          { key: 'subject', label: 'Brand / Product / Keyword to track', kind: 'text', required: true, placeholder: 'Flobali' },
           { key: 'sources', label: 'Sources', kind: 'select', default: 'news, blogs, RSS and LLM responses', options: [
             { value: 'news, blogs, RSS and LLM responses', label: 'News + blogs + RSS + LLM (all)' },
             { value: 'news and blogs', label: 'News + blogs only' },
@@ -1404,7 +1404,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Track a new job search for me.',
         promptTemplate: 'Track a job search for "{{keywords}}"{{remote}} and send me a daily digest. Confirm the scope before saving.',
         form: [
-          { key: 'keywords', label: 'Role / keywords', kind: 'text', required: true, placeholder: 'senior python developer' },
+          { key: 'keywords', label: 'Role / Keywords', kind: 'text', required: true, placeholder: 'senior python developer' },
           { key: 'remote', label: 'Remote only?', kind: 'select', default: ' (remote only)', options: [
             { value: ' (remote only)', label: 'Remote only' },
             { value: '', label: 'Any location' },
@@ -1684,7 +1684,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Review "{{solution}}" against our current stack and tell me if we should adopt it.',
         run: { tool: 'review_solution' },
         form: [
-          { key: 'solution', label: 'Solution / library', kind: 'text', required: true, placeholder: 'Drizzle ORM' },
+          { key: 'solution', label: 'Solution / Library', kind: 'text', required: true, placeholder: 'Drizzle ORM' },
         ],
       },
       {
@@ -1693,7 +1693,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Track "{{solution}}" on the tech radar.',
         run: { tool: 'track_tech_radar' },
         form: [
-          { key: 'solution', label: 'Solution / library', kind: 'text', required: true, placeholder: 'Drizzle ORM' },
+          { key: 'solution', label: 'Solution / Library', kind: 'text', required: true, placeholder: 'Drizzle ORM' },
         ],
       },
     ],
@@ -1796,7 +1796,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         generation: { imageKeys: ['photo'], mode: 'image-edit' },
         form: [
           { key: 'photo', label: 'Your room photo', kind: 'image', required: true, help: 'Upload a photo of the room you want to restyle.' },
-          { key: 'material', label: 'Material / finish to apply', kind: 'text', required: true, placeholder: 'e.g. warm oak herringbone, Carrara marble, matte charcoal microcement' },
+          { key: 'material', label: 'Material / Finish to apply', kind: 'text', required: true, placeholder: 'e.g. warm oak herringbone, Carrara marble, matte charcoal microcement' },
           { key: 'surface', label: 'Apply to', kind: 'select', default: 'floor', options: [
             { value: 'floor', label: 'Floor' },
             { value: 'wall', label: 'Wall' },
@@ -1888,7 +1888,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         generation: { imageKeys: ['plan'], mode: 'floor-plan-render' },
         form: [
           { key: 'plan', label: '2D floor plan', kind: 'image', required: true, help: 'Upload a top-down 2D floor-plan image.' },
-          { key: 'notes', label: 'Style / notes (optional)', kind: 'textarea', placeholder: 'e.g. warm minimal, oak floors, large windows' },
+          { key: 'notes', label: 'Style / Notes (optional)', kind: 'textarea', placeholder: 'e.g. warm minimal, oak floors, large windows' },
         ],
       },
       {
@@ -2058,7 +2058,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Find what pages LLMs cite when answering questions about "{{keyword}}".',
         run: { tool: 'seo_llm_mentions_search' },
         form: [
-          { key: 'keyword', label: 'Keyword / topic', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
+          { key: 'keyword', label: 'Keyword / Topic', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
         ],
       },
     ],
@@ -2183,8 +2183,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         workflow_id: 'b2b-research',
         promptTemplate: 'Find {{count}} {{industry}} manufacturers in {{country}}, then scrape + enrich the promising ones.',
         form: [
-          { key: 'industry', label: 'Industry / product', kind: 'text', required: true, placeholder: 'porcelain tile' },
-          { key: 'country', label: 'Country / region', kind: 'text', required: true, placeholder: 'Spain' },
+          { key: 'industry', label: 'Industry / Product', kind: 'text', required: true, placeholder: 'porcelain tile' },
+          { key: 'country', label: 'Country / Region', kind: 'text', required: true, placeholder: 'Spain' },
           { key: 'count', label: 'How many?', kind: 'number', default: '10' },
         ],
       },

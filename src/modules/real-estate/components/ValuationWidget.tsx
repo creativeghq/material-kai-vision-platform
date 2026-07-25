@@ -63,7 +63,7 @@ export const ValuationWidget: React.FC<{ userId: string }> = ({ userId }) => {
           <Input required type="email" placeholder="Email" value={f.email} onChange={(e) => set('email', e.target.value)} />
           <Input placeholder="Phone (optional)" value={f.phone} onChange={(e) => set('phone', e.target.value)} />
           <Input placeholder="Property address" value={f.address} onChange={(e) => set('address', e.target.value)} />
-          <Input placeholder="Town / area" value={f.town} onChange={(e) => set('town', e.target.value)} />
+          <Input placeholder="Town / Area" value={f.town} onChange={(e) => set('town', e.target.value)} />
           <select className="h-9 rounded-md border bg-background px-2 text-sm" value={f.property_type} onChange={(e) => set('property_type', e.target.value)}>
             {['residential', 'commercial', 'land'].map((o) => <option key={o} value={o}>{o}</option>)}
           </select>

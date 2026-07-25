@@ -159,7 +159,7 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <Label className="text-xs">Show "Pay / view online" link + QR</Label>
+              <Label className="text-xs">Show "Pay / View online" link + QR</Label>
               <p className="text-[11px] text-muted-foreground">Prints a scannable QR + link to the hosted payment page on payable invoices (PDF and email).</p>
             </div>
             <Switch checked={showPayLink} onCheckedChange={setShowPayLink} />

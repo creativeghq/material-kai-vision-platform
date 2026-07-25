@@ -323,7 +323,7 @@ function AddApplicantDialog({ workspaceId, postingId, onDone }: { workspaceId: s
             <div className="space-y-1"><Label>Phone</Label><Input value={f.phone} onChange={(e) => upd('phone', e.target.value)} /></div>
           </div>
           <div className="space-y-1"><Label>Headline</Label><Input value={f.headline} onChange={(e) => upd('headline', e.target.value)} placeholder="Senior Frontend Engineer @ Acme" /></div>
-          <div className="space-y-1"><Label>Source</Label><Input value={f.source} onChange={(e) => upd('source', e.target.value)} placeholder="LinkedIn / referral / website" /></div>
+          <div className="space-y-1"><Label>Source</Label><Input value={f.source} onChange={(e) => upd('source', e.target.value)} placeholder="LinkedIn / Referral / Website" /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>

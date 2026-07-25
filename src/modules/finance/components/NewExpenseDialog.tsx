@@ -332,7 +332,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               )}
             </div>
             <div className="space-y-1">
-              <Label>Reference / bill #</Label>
+              <Label>Reference / Bill #</Label>
               <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="optional — e.g. DEH-2026/06" />
             </div>
           </div>
@@ -343,7 +343,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           </div>
 
           <div className="space-y-1">
-            <Label>Supplier / payee *</Label>
+            <Label>Supplier / Payee *</Label>
             {party ? (
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                 <span className="text-sm">{party.label}{party.type === 'adhoc' && <span className="ml-1.5 text-[10px] text-muted-foreground">· one-off, not in CRM</span>}</span>

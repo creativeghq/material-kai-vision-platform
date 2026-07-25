@@ -114,7 +114,7 @@ export const CustomerFinanceRulesCard: React.FC<Target> = ({ companyId, contactI
       <CardContent className="p-5 space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className="space-y-1">
-            <span className="block text-[11px] text-muted-foreground">Credit / balance hold (€)</span>
+            <span className="block text-[11px] text-muted-foreground">Credit / Balance hold (€)</span>
             <input type="text" inputMode="decimal" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)}
               placeholder={`Default: ${hint(defaults?.credit_limit)}`} className="h-8 w-full rounded border border-border/60 bg-background px-2 text-right text-sm" />
           </label>

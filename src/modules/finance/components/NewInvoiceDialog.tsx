@@ -91,8 +91,8 @@ interface Props {
 
 const DOC_FAMILY: Record<string, string> = {
   '1': 'Sales invoices', '2': 'Service invoices', '3': 'Proof of expense', '5': 'Credit notes',
-  '6': 'Self-billing', '7': 'Contracts', '8': 'Rents / special', '9': 'Delivery notes',
-  '11': 'Retail receipts', '13': 'Retail / expenses', '14': 'Cross-border', '15': 'Contractor',
+  '6': 'Self-billing', '7': 'Contracts', '8': 'Rents / Special', '9': 'Delivery notes',
+  '11': 'Retail receipts', '13': 'Retail / Expenses', '14': 'Cross-border', '15': 'Contractor',
   '16': 'Other', '17': 'Other',
 };
 function groupDocTypes(types: { code: string; description: string }[]) {
@@ -1146,7 +1146,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             {/* Line items */}
             <section className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Items / services</Label>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Items / Services</Label>
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
                     <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={pricesIncludeVat} onChange={(e) => setPricesIncludeVat(e.target.checked)} />
@@ -1235,7 +1235,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         <div className="grid grid-cols-2 gap-2 border-t border-border/40 bg-muted/20 p-3 sm:grid-cols-3">
                           <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">SKU</Label><Input className="h-7 text-xs" value={l.sku} onChange={(e) => update(idx, { sku: e.target.value })} /></div>
                           <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Color</Label><Input className="h-7 text-xs" value={l.color} onChange={(e) => update(idx, { color: e.target.value })} /></div>
-                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Size / format</Label><Input className="h-7 text-xs" value={l.size} onChange={(e) => update(idx, { size: e.target.value })} /></div>
+                          <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Size / Format</Label><Input className="h-7 text-xs" value={l.size} onChange={(e) => update(idx, { size: e.target.value })} /></div>
                           <div className="space-y-1">
                             <Label className="text-[10px] text-muted-foreground">Measurement unit</Label>
                             <Select value={l.measurement_unit_code || 'none'} onValueChange={(v) => update(idx, { measurement_unit_code: v === 'none' ? '' : v })}>

@@ -42,7 +42,7 @@ export function buildAgingFilters(
       fields: [
         {
           key: 'q', type: 'text', label: 'Search',
-          placeholder: side === 'ar' ? 'Search customer / number…' : 'Search supplier / bill #…',
+          placeholder: side === 'ar' ? 'Search customer / Number…' : 'Search supplier / Bill #…',
           accessor: (r: AgingRow) => [r.party_name, r.internal_number, r.supplier_bill_number, r.description, r.category_name],
         },
         {

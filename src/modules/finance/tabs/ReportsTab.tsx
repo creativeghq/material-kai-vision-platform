@@ -52,7 +52,7 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   { value: 'top_customer_outstanding', label: 'Top outstanding customers', group: 'outstanding', period: 'snapshot' },
   { value: 'top_supplier_outstanding', label: 'Top outstanding suppliers', group: 'outstanding', period: 'snapshot' },
   // Tasks
-  { value: 'open_tasks', label: 'Open tasks / follow-ups', group: 'tasks', period: 'snapshot' },
+  { value: 'open_tasks', label: 'Open tasks / Follow-ups', group: 'tasks', period: 'snapshot' },
 ];
 
 const GROUP_LABELS: Record<ReportGroup, string> = {

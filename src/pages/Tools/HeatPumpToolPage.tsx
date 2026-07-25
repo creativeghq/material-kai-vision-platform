@@ -101,7 +101,7 @@ export default function HeatPumpToolPage() {
             </div>
 
             <div>
-              <Label>Insulation / building era</Label>
+              <Label>Insulation / Building era</Label>
               <Select value={insulation} onValueChange={(v) => setInsulation(v as InsulationLevel)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -133,7 +133,7 @@ export default function HeatPumpToolPage() {
                 </Select>
               </div>
               <div>
-                <Label>Glazing / exposure</Label>
+                <Label>Glazing / Exposure</Label>
                 <Select value={glazing} onValueChange={(v) => setGlazing(v as GlazingExposure)}>
                   <SelectTrigger>
                     <SelectValue />

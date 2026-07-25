@@ -121,7 +121,7 @@ function ListingDetailModal({
               {listing.material_category && <Badge variant="outline" className="capitalize">{formatMaterialCategory(listing.material_category)}</Badge>}
             </div>
             <p className="text-muted-foreground flex items-center gap-1.5"><Tag className="h-4 w-4" />{listing.qty_remaining} {listing.unit} available</p>
-            {listing.batch_lot && <p className="text-muted-foreground">Batch / lot: <span className="text-foreground">{listing.batch_lot}</span></p>}
+            {listing.batch_lot && <p className="text-muted-foreground">Batch / Lot:<span className="text-foreground">{listing.batch_lot}</span></p>}
             <p className="text-muted-foreground flex items-center gap-1.5"><Truck className="h-4 w-4" />{DELIVERY_LABEL[listing.delivery_option] ?? listing.delivery_option}</p>
             {listing.location_city && <p className="text-muted-foreground flex items-center gap-1.5"><MapPin className="h-4 w-4" />{[listing.location_city, listing.location_region].filter(Boolean).join(', ')}</p>}
           </div>

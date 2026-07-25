@@ -62,8 +62,8 @@ const CATALOG_BUILD: WorkflowDefinition = {
         { name: 'layout', label: 'Layout', type: 'select', defaultValue: 'list',
           hint: 'How materials are laid out in the PDF.',
           options: [
-            { value: 'list', label: 'List / table', description: 'Compact quote-style table with columns (best for offers & proformas).' },
-            { value: 'grid', label: 'Grid / cards', description: 'Large image card per material (best for visual presentation).' },
+            { value: 'list', label: 'List / Table', description: 'Compact quote-style table with columns (best for offers & proformas).' },
+            { value: 'grid', label: 'Grid / Cards', description: 'Large image card per material (best for visual presentation).' },
           ],
         },
         { name: 'proforma', label: 'Add totals (Προσφορά / offer)', type: 'checkbox', defaultValue: false,
@@ -359,7 +359,7 @@ const B2B_RESEARCH: WorkflowDefinition = {
     { id: 'search',    order: 1, title: 'Search manufacturers', icon: 'Search', tool_id: 'b2b_manufacturer_search',
       awaits_user_input: true,
       input_schema: [
-        { name: 'industry', label: 'Industry / product type', required: true, placeholder: 'porcelain tiles' },
+        { name: 'industry', label: 'Industry / Product type', required: true, placeholder: 'porcelain tiles' },
         { name: 'country',  label: 'Country',                 required: true, placeholder: 'Spain' },
         { name: 'count',    label: 'How many results?', type: 'number', defaultValue: 10 },
       ],

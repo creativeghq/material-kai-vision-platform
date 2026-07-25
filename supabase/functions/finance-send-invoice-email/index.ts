@@ -73,7 +73,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
       }
       if (token) {
         const base = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/$/, '');
-        payLinkHtml = `<p style="margin:18px 0"><a href="${base}/pay/${token}" style="display:inline-block;background:#7a1f5c;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:600">View / pay online »</a></p>`;
+        payLinkHtml = `<p style="margin:18px 0"><a href="${base}/pay/${token}" style="display:inline-block;background:#7a1f5c;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:600">View / Pay online »</a></p>`;
       }
     }
   } catch (e) {

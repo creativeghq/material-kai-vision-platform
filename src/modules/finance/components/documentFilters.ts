@@ -48,7 +48,7 @@ export function buildDocumentFilters(
           fields: [
             {
               key: 'q', type: 'text', label: 'Search',
-              placeholder: 'Search reference / counterparty…',
+              placeholder: 'Search reference / Counterparty…',
               accessor: (r) => [r.reference, r.counterparty_name, r.method && paymentMethodLabel(r.method)],
             },
             {
@@ -107,7 +107,7 @@ export function buildDocumentFilters(
           fields: [
             {
               key: 'q', type: 'text', label: 'Search',
-              placeholder: 'Search number / customer…',
+              placeholder: 'Search number / Customer…',
               accessor: (r) => [r.internal_number, r.customer_name, categoryName(r.category_id)],
             },
             { key: 'status', type: 'multi', label: 'Status', options: statusOptions(rows), accessor: (r) => r.status },
@@ -155,7 +155,7 @@ export function buildDocumentFilters(
           fields: [
             {
               key: 'q', type: 'text', label: 'Search',
-              placeholder: 'Search number / reason…',
+              placeholder: 'Search number / Reason…',
               accessor: (r) => [r.credit_note_number, r.reason],
             },
             {

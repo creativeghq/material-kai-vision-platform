@@ -39,12 +39,12 @@ function money(cents: number, currency: string | null): string {
   return `${symbol}${(cents / 100).toFixed(2)}`;
 }
 
-const STATUS_VARIANT: Record<string, string> = {
-  active: 'bg-green-100 text-green-700 border-green-200',
-  trialing: 'bg-blue-100 text-blue-700 border-blue-200',
-  canceling: 'bg-amber-100 text-amber-700 border-amber-200',
-  canceled: 'bg-gray-100 text-gray-600 border-gray-200',
-  past_due: 'bg-red-100 text-red-700 border-red-200',
+const STATUS_TONE: Record<string, string> = {
+  active: 'text-emerald-600 dark:text-emerald-400',
+  trialing: 'text-blue-500 dark:text-blue-400',
+  canceling: 'text-amber-600 dark:text-amber-400',
+  canceled: 'text-muted-foreground',
+  past_due: 'text-red-500 dark:text-red-400',
 };
 
 // One table per module, so each keeps its own page — a component rather than inline JSX
@@ -62,7 +62,7 @@ const SubscriberTable: React.FC<{ module: ModuleOverviewRow }> = ({ module: m })
           <TableRow>
             <TableHead>Workspace</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Renews / ends</TableHead>
+            <TableHead>Renews / Ends</TableHead>
             <TableHead>Since</TableHead>
           </TableRow>
         </TableHeader>
@@ -71,7 +71,7 @@ const SubscriberTable: React.FC<{ module: ModuleOverviewRow }> = ({ module: m })
             <TableRow key={`${m.module_slug}:${s.workspace_id}`}>
               <TableCell className="font-medium">{s.workspace_name || s.workspace_id.slice(0, 8)}</TableCell>
               <TableCell>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_VARIANT[s.status] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                <span className={`text-xs capitalize ${STATUS_TONE[s.status] || 'text-muted-foreground'}`}>
                   {s.status}
                 </span>
               </TableCell>

@@ -98,7 +98,7 @@ export const StripeConfigPanel: React.FC<Props> = (_props) => {
 
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle className="text-base font-light">Product / price IDs</CardTitle>
+          <CardTitle className="text-base font-light">Product / Price IDs</CardTitle>
           <CardDescription>
             Stripe product + price IDs are stored as platform secrets so they can be rotated
             without a redeploy. Edit them on the <strong>Keys</strong> tab:

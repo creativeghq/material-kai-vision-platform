@@ -137,7 +137,7 @@ export const RecordPaymentDialog: React.FC<{
           workspaceId,
           invoiceId,
           amount: amt,
-          reason: reference || notes || 'Refund / return',
+          reason: reference || notes || 'Refund / Return',
           correlated: true,
           submitFiscal: true,
         });
@@ -218,7 +218,7 @@ export const RecordPaymentDialog: React.FC<{
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="received">Received from customer</SelectItem>
-                  <SelectItem value="refund">Refund / return (to customer)</SelectItem>
+                  <SelectItem value="refund">Refund / Return (to customer)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -318,7 +318,7 @@ export const RecordPaymentDialog: React.FC<{
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
               <Label>Reference</Label>
-              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bank ref / cheque no. / credit note" />
+              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bank ref / Cheque no. / Credit note" />
             </div>
             <div className="space-y-1">
               <Label>Notes</Label>

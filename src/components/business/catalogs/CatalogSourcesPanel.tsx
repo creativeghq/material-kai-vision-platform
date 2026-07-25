@@ -165,7 +165,7 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1 flex-1 min-w-[180px]">
-              <Label className="text-xs">Manufacturer / label (optional)</Label>
+              <Label className="text-xs">Manufacturer / Label (optional)</Label>
               <Input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="e.g. Spring discounts 2026" />
             </div>
             <input
