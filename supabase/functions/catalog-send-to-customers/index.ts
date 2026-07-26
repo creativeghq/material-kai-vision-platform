@@ -100,7 +100,7 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
 
     const { data: catalog, error: catErr } = await supabase
       .from('presentation_catalogs')
-      .select('id, owner_user_id, workspace_id, title, subtitle, slug, status, pdf_url')
+      .select('id, owner_user_id, workspace_id, title, subtitle, slug, status')
       .eq('id', body.catalog_id)
       .single();
     if (catErr || !catalog) return jsonResponse({ success: false, error: 'Catalog not found' }, 404);

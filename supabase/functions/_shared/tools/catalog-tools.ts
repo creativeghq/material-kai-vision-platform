@@ -57,7 +57,8 @@ function emitWorkflowPlan(onChunk: ChunkSink, args: {
 
 function emitWorkflowStep(onChunk: ChunkSink, args: {
   catalog_id: string;
-  step_id: 'create' | 'attach' | 'extract' | 'add_extra' | 'images' | 'generate' | 'publish' | 'send';
+  // NB: no 'send' step — sending to customers is UI-only (SendToCustomersModal), never an agent workflow step.
+  step_id: 'create' | 'attach' | 'extract' | 'add_extra' | 'images' | 'generate' | 'publish';
   status: 'pending' | 'running' | 'awaiting_input' | 'done' | 'failed' | 'skipped';
   status_line?: string;
   input?: Record<string, any>;

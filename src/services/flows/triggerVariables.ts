@@ -50,6 +50,14 @@ const withStandard = (extra: TriggerVariable[]): TriggerVariable[] => [...STANDA
  * payload or only the standard envelope; callers fall back to STANDARD_VARIABLES.
  */
 export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
+  catalog_sent_to_customers: withStandard([
+    { key: 'catalog_id', label: 'Catalog ID', note: 'The catalog that was emailed.' },
+    { key: 'catalog_title', label: 'Catalog title', note: 'Title of the catalog.' },
+    { key: 'send_batch_id', label: 'Send batch ID', note: 'Groups this dispatch’s recipients.' },
+    { key: 'recipients_count', label: 'Recipients', note: 'How many customers were targeted.' },
+    { key: 'sent_count', label: 'Sent', note: 'How many were emailed successfully.' },
+    { key: 'failed_count', label: 'Failed', note: 'How many failed to send.' },
+  ]),
   hire_me_received: withStandard([
     { key: 'from_name', label: 'Sender name', note: 'Name of the person sending the hire request.' },
     { key: 'from_email', label: 'Sender email', note: 'Email of the person sending the hire request.' },

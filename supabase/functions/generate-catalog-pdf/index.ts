@@ -229,7 +229,8 @@ Deno.serve(withApiLogging('generate-catalog-pdf', async (req: Request) => {
         status: catalog.status === 'published' ? 'published' : 'ready',
         status_message: null,
         pdf_storage_path: storagePath,
-        pdf_url: signed?.signedUrl ?? null,
+        // Invariant #8: do NOT persist the signed URL on a private bucket — it expires. Store only the
+        // storage path; both readers (builder page + catalog-access) re-sign fresh on demand.
         pdf_generated_at: new Date().toISOString(),
         page_count: pageCount,
       })
