@@ -295,6 +295,285 @@ async function enrichViaApollo(
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// find-competitors — similar / competing businesses for a seed company.
+// Apollo (structured, when APOLLO_API_KEY is set) → Anthropic web_search fallback.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface CompetitorOrg {
+  name: string;
+  website: string | null;
+  domain: string | null;
+  industry: string | null;
+  city: string | null;
+  country: string | null;
+  employee_count: string | null;
+  linkedin: string | null;
+  description: string | null;
+  source: 'apollo' | 'web_search';
+}
+
+interface CompetitorSeed {
+  name: string | null;
+  industry: string | null;
+  kadCodes: string[];
+  city: string | null;
+  country: string | null;
+  excludeDomains: string[];
+  limit: number;
+  workspaceId: string | null;
+}
+
+/** Reduce a URL/domain to a bare lowercase host ("acme.com") for de-dupe/exclusion. */
+function toDomain(v: unknown): string | null {
+  const s = cleanStr(v);
+  if (!s) return null;
+  return s.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].toLowerCase() || null;
+}
+
+/** Structured-output tool the competitor web-search pass is forced to emit. */
+const COMPETITORS_TOOL = {
+  name: 'record_competitors',
+  description: 'Record the list of real competing / similar businesses found in the research.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      competitors: {
+        type: 'array',
+        description: 'Distinct real companies that compete with or closely resemble the seed business.',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Company name' },
+            website: { type: ['string', 'null'], description: 'Official homepage URL' },
+            industry: { type: ['string', 'null'], description: 'Primary industry / sector' },
+            city: { type: ['string', 'null'], description: 'Head-office city' },
+            country: { type: ['string', 'null'], description: 'Country name' },
+            description: { type: ['string', 'null'], description: 'One-sentence description of what it does' },
+          },
+          required: ['name'],
+        },
+      },
+    },
+    required: ['competitors'],
+  },
+};
+
+function mapApolloOrg(org: any): CompetitorOrg {
+  return {
+    name: cleanStr(org?.name) ?? '',
+    website: normalizeUrl(org?.website_url || org?.primary_domain),
+    domain: toDomain(org?.primary_domain || org?.website_url),
+    industry: cleanStr(org?.industry),
+    city: cleanStr(org?.city),
+    country: cleanStr(org?.country),
+    employee_count: org?.estimated_num_employees ? String(org.estimated_num_employees) : null,
+    linkedin: normalizeUrl(org?.linkedin_url),
+    description: cleanStr(org?.short_description || org?.seo_description),
+    source: 'apollo',
+  };
+}
+
+/** Apollo similar-company search by industry/ΚΑΔ keywords + location. Only when APOLLO_API_KEY is set. */
+async function findCompetitorsViaApollo(
+  admin: any, userId: string, workspaceId: string | null, seed: CompetitorSeed,
+): Promise<CompetitorOrg[] | null> {
+  if (!APOLLO_API_KEY) return null;
+  try {
+    const keywords = [seed.industry, ...seed.kadCodes].filter(Boolean) as string[];
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20_000);
+    const res = await fetch('https://api.apollo.io/api/v1/mixed_companies/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'X-Api-Key': APOLLO_API_KEY },
+      body: JSON.stringify({
+        q_organization_keyword_tags: keywords.length ? keywords : undefined,
+        organization_locations: seed.country ? [seed.country] : undefined,
+        page: 1,
+        per_page: Math.min(seed.limit + 5, 25),
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const data = await res.json();
+    // Charged even on zero results (the search ran).
+    await debitExternalServiceCredits(admin, userId, 'apollo-competitors', 'find_competitors_apollo', 1, { seed: seed.name }, workspaceId);
+    const orgs = Array.isArray(data?.organizations) ? data.organizations : [];
+    const selfName = (seed.name ?? '').toLowerCase();
+    return orgs
+      .map(mapApolloOrg)
+      .filter((o: CompetitorOrg) => o.name && o.name.toLowerCase() !== selfName);
+  } catch (e) {
+    console.warn('[company-enrich] apollo competitors failed:', (e as Error)?.message);
+    return null;
+  }
+}
+
+/** Anthropic web_search fallback — lists competitors, then forces a structured extraction. */
+async function findCompetitorsViaWebSearch(
+  admin: any, userId: string, workspaceId: string | null, seed: CompetitorSeed,
+): Promise<CompetitorOrg[] | null> {
+  if (!ANTHROPIC_API_KEY) return null;
+  try {
+    const scopeBits = [
+      seed.industry ? `in the ${seed.industry} sector` : '',
+      seed.kadCodes.length ? `(activity codes ${seed.kadCodes.slice(0, 5).join(', ')})` : '',
+      seed.country ? `operating in ${seed.country}` : '',
+      seed.city ? `around ${seed.city}` : '',
+    ].filter(Boolean).join(' ');
+    const target = seed.name ? `the business "${seed.name}"` : `a business ${scopeBits}`;
+    const researchQuery =
+      `Find up to ${seed.limit} real companies that compete with or are closely similar to ${target} ${scopeBits}. ` +
+      `For each competitor give the company name, official website, head-office city/country, and a one-sentence ` +
+      `description of what it does. Prefer direct competitors in the same market. ${seed.name ? `Exclude "${seed.name}" itself. ` : ''}` +
+      `Only list companies you can actually find — do not invent names.`;
+
+    let inTok = 0, outTok = 0;
+    const research = await anthropic({
+      model: 'claude-haiku-4-5',
+      max_tokens: 2560,
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+      messages: [{ role: 'user', content: researchQuery }],
+    });
+    inTok += research?.usage?.input_tokens ?? 0;
+    outTok += research?.usage?.output_tokens ?? 0;
+    const researchText = (research.content as any[])
+      ?.filter((b) => b.type === 'text').map((b) => b.text).join('\n') || '';
+
+    let list: any[] = [];
+    try {
+      const extract = await anthropic({
+        model: 'claude-haiku-4-5',
+        max_tokens: 1536,
+        tools: [COMPETITORS_TOOL],
+        tool_choice: { type: 'tool', name: 'record_competitors' },
+        messages: [{
+          role: 'user',
+          content: `From the research below, fill record_competitors with the distinct real companies found. ` +
+            `Use null for any field not clearly stated.\n\n<research>\n${researchText.slice(0, 14000)}\n</research>`,
+        }],
+      });
+      inTok += extract?.usage?.input_tokens ?? 0;
+      outTok += extract?.usage?.output_tokens ?? 0;
+      const toolUse = (extract.content as any[])?.find((b) => b.type === 'tool_use');
+      list = Array.isArray(toolUse?.input?.competitors) ? toolUse.input.competitors : [];
+    } catch {
+      list = [];
+    }
+
+    // Cost log + debit (2 Haiku calls + web_search surcharge).
+    try {
+      const inputCost = (inTok / 1_000_000) * 0.80;
+      const outputCost = (outTok / 1_000_000) * 4.00;
+      const rawCost = inputCost + outputCost + 0.05;
+      const billedCost = rawCost * 1.5;
+      const credits = Math.round(billedCost * 100 * 100) / 100;
+      await admin.rpc('debit_credits', {
+        p_user_id: userId,
+        p_amount: credits,
+        p_operation_type: 'find_competitors_web_search',
+        p_description: `Competitor discovery (${seed.name ?? seed.industry ?? 'company'})`,
+        p_metadata: { name: seed.name, industry: seed.industry, country: seed.country },
+        p_workspace_id: workspaceId,
+      });
+      await admin.from('ai_usage_logs').insert({
+        user_id: userId,
+        workspace_id: workspaceId,
+        operation_type: 'find_competitors_web_search',
+        model_name: 'claude-haiku-4-5',
+        input_tokens: inTok,
+        output_tokens: outTok,
+        input_cost_usd: inputCost,
+        output_cost_usd: outputCost,
+        raw_cost_usd: rawCost,
+        markup_multiplier: 1.5,
+        billed_cost_usd: billedCost,
+        credits_debited: credits,
+        module_slug: 'crm',
+        metadata: { feature: 'find_competitors', provider: 'anthropic', name: seed.name },
+        created_at: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.warn('[company-enrich] competitor cost log failed:', (e as Error)?.message);
+    }
+
+    const selfName = (seed.name ?? '').toLowerCase();
+    return list
+      .map((c): CompetitorOrg => ({
+        name: cleanStr(c?.name) ?? '',
+        website: normalizeUrl(c?.website),
+        domain: toDomain(c?.website),
+        industry: cleanStr(c?.industry),
+        city: cleanStr(c?.city),
+        country: cleanStr(c?.country),
+        employee_count: null,
+        linkedin: null,
+        description: cleanStr(c?.description),
+        source: 'web_search',
+      }))
+      .filter((c) => c.name && c.name.toLowerCase() !== selfName);
+  } catch (e) {
+    console.warn('[company-enrich] web-search competitors failed:', (e as Error)?.message);
+    return null;
+  }
+}
+
+/** Handle the `find-competitors` action: seed → Apollo/web-search → de-duped competitor list. */
+async function handleFindCompetitors(userId: string, body: any): Promise<Response> {
+  const admin = createClient(supabaseUrl, supabaseServiceKey);
+  const seed: CompetitorSeed = {
+    name: cleanStr(body?.name),
+    industry: cleanStr(body?.industry),
+    kadCodes: Array.isArray(body?.kad_codes)
+      ? (body.kad_codes.filter((x: unknown) => typeof x === 'string') as string[]).slice(0, 10)
+      : [],
+    city: cleanStr(body?.city),
+    country: cleanStr(body?.country_name) || cleanStr(body?.country),
+    excludeDomains: Array.isArray(body?.exclude_domains)
+      ? (body.exclude_domains.map(toDomain).filter(Boolean) as string[])
+      : [],
+    limit: Math.min(Math.max(Number(body?.limit) || 10, 1), 25),
+    workspaceId: cleanStr(body?.workspace_id),
+  };
+  if (!seed.name && !seed.industry && seed.kadCodes.length === 0) {
+    return jsonResponse({ error: 'Provide at least a company name, industry, or ΚΑΔ codes.' }, 400);
+  }
+
+  // Affordability gate up front (invariant #10); refund immediately, each provider debits its actual cost.
+  const gate = await reserveCredits(admin, userId, seed.workspaceId ?? undefined, ENRICH_CREDIT_CEILING, 'find_competitors');
+  if (!gate.ok) return jsonResponse({ error: 'insufficient_credits', message: gate.message }, 402);
+  await refundCredits(admin, userId, seed.workspaceId ?? undefined, ENRICH_CREDIT_CEILING, 'find_competitors');
+
+  const skipped: string[] = [];
+  let competitors: CompetitorOrg[] = [];
+  let source: 'apollo' | 'web_search' | 'none' = 'none';
+
+  const viaApollo = await findCompetitorsViaApollo(admin, userId, seed.workspaceId ?? null, seed);
+  if (viaApollo && viaApollo.length) { competitors = viaApollo; source = 'apollo'; }
+  else skipped.push(APOLLO_API_KEY ? 'apollo' : 'apollo (no APOLLO_API_KEY)');
+
+  // Web-search fallback when Apollo is unavailable or returned nothing.
+  if (competitors.length === 0) {
+    const viaWeb = await findCompetitorsViaWebSearch(admin, userId, seed.workspaceId ?? null, seed);
+    if (viaWeb && viaWeb.length) { competitors = viaWeb; source = 'web_search'; }
+    else skipped.push(ANTHROPIC_API_KEY ? 'web_search' : 'web_search (no ANTHROPIC_API_KEY)');
+  }
+
+  // Drop the seed company's own domains + de-dupe by domain/name.
+  const ex = new Set(seed.excludeDomains);
+  const seen = new Set<string>();
+  competitors = competitors.filter((c) => {
+    if (c.domain && ex.has(c.domain)) return false;
+    const key = c.domain || c.name.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, seed.limit);
+
+  return jsonResponse({ ok: true, source, competitors, skipped });
+}
+
 /** Merge: primary wins per-field, secondary fills only the blanks. */
 function mergeFields(primary: Partial<EnrichFields>, secondary: Partial<EnrichFields>): EnrichFields {
   const out: EnrichFields = { ...EMPTY_FIELDS };
@@ -319,6 +598,13 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
     if (!user) return jsonResponse({ error: 'Unauthorized' }, 401);
 
     const body = await req.json().catch(() => ({}));
+
+    // Competitor discovery is a distinct action on this fn (merge-functions rule) — seed a
+    // company's identity → similar/competing businesses. Returns before the enrich flow.
+    if (cleanStr(body?.action) === 'find-competitors') {
+      return await handleFindCompetitors(user.id, body);
+    }
+
     const name = cleanStr(body?.name);
     const countryName = cleanStr(body?.country_name) || cleanStr(body?.country);
     const vat = cleanStr(body?.vat_number);

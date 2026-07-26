@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
   CustomerAccountOverview,
@@ -33,6 +33,7 @@ import { CategoryAssignmentPicker } from '@/components/business/catalogs/Categor
 import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
+import { CompanyMarketTab } from '@/modules/crm/components/market/CompanyMarketTab';
 import { type TimelinePerson } from '@/components/business/crm/CrmActivityTimeline';
 import { CrmRecordActivity, type CrmRecordActivityHandle } from '@/components/business/crm/CrmRecordActivity';
 import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
@@ -775,6 +776,9 @@ export const CompanyDetailPage: React.FC = () => {
                 {company.is_supplier && (
                   <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Products</TabsTrigger>
                 )}
+                {company.is_supplier && !isNew && (
+                  <TabsTrigger value="market" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><TrendingUp className="h-4 w-4 mr-2"/>Market</TabsTrigger>
+                )}
                 <TabsTrigger value="social" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Globe className="h-4 w-4 mr-2"/>Social &amp; Web</TabsTrigger>
               </TabsList>
 
@@ -948,6 +952,24 @@ export const CompanyDetailPage: React.FC = () => {
           {company.is_supplier && (
             <TabsContent value="products" className="space-y-4">
               <SupplierProductsTab workspaceId={activeWorkspaceId ?? ''} companyId={company.id}/>
+            </TabsContent>
+          )}
+
+          {company.is_supplier && !isNew && (
+            <TabsContent value="market" className="space-y-4">
+              <CompanyMarketTab
+                workspaceId={activeWorkspaceId ?? null}
+                companyId={company.id}
+                company={{
+                  name: company.name,
+                  industry: company.industry,
+                  kad_codes: company.kad_codes,
+                  city: company.city,
+                  country: company.country,
+                  vat_number: company.vat_number,
+                  website: company.website,
+                }}
+              />
             </TabsContent>
           )}
 
