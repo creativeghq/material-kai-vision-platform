@@ -14,6 +14,7 @@ import { VatCountryCombobox } from '@/components/core/VatCountryCombobox';
 import { validateVatViaVies } from '@/services/viesService';
 import { enrichCompany } from '@/services/companyEnrichService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
+import { gemiService, type GemiLookupResult } from '@/services/gemiService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 
@@ -75,6 +76,36 @@ function prefillFromAade(res: AadeLookupResult, vatNumber: string): Record<strin
   };
 }
 
+/**
+ * Merge a ΓΕΜΗ lookup into the accumulated prefill (mirrors CompanyDetailPage's GEMI chain +
+ * server-side mergeKad). ΑΑΔΕ never returns the GEMI number, legal form, or status, so ΓΕΜΗ fills
+ * those and contributes its own ΚΑΔ activities WITHOUT clobbering the ΑΑΔΕ entries already present.
+ */
+function mergeGemiIntoPrefill(prefill: Record<string, any>, g: GemiLookupResult): Record<string, any> {
+  const gm = g.gemi;
+  const existing: Array<{ code: string | null; source?: string; primary?: boolean; description?: string | null }> =
+    Array.isArray(prefill.kad_all) ? prefill.kad_all : [];
+  // Keep every non-ΓΕΜΗ entry (i.e. the ΑΑΔΕ ones) and de-dupe against codes already present.
+  const keptOther = existing.filter((x) => x && x.source !== 'gemi');
+  const seen = new Set(keptOther.map((x) => x.code));
+  const gemiKad = (gm.activities || [])
+    .filter((a) => a.code)
+    .map((a) => ({ code: String(a.code), description: a.description ?? null, source: 'gemi', primary: /κ[υύ]ρι/i.test(a.type ?? '') }))
+    .filter((x) => !seen.has(x.code));
+  const kad_all = [...keptOther, ...gemiKad];
+  const kad_codes = [...new Set(kad_all.map((x) => x.code).filter(Boolean) as string[])];
+  return {
+    ...prefill,
+    gemi_number: gm.ar_gemi,
+    gemi_legal_form: gm.legal_form,
+    gemi_status: gm.status,
+    gemi_data: g.raw ?? null,
+    gemi_data_at: g.checked_at,
+    kad_all,
+    kad_codes,
+  };
+}
+
 export const AddCompanyModal: React.FC<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -92,7 +123,7 @@ export const AddCompanyModal: React.FC<{
   const [statusLine, setStatusLine] = useState<string | null>(null);
   // Prefill accumulated from a VAT lookup (carried into the create form).
   const [prefill, setPrefill] = useState<Record<string, any>>({});
-  const [verified, setVerified] = useState<null | { name: string | null; address: string | null; source: 'aade' | 'vies' }>(null);
+  const [verified, setVerified] = useState<null | { name: string | null; address: string | null; source: 'aade' | 'vies'; gemiNumber?: string | null }>(null);
 
   // Draft persistence — a half-filled "add company" survives navigating away +
   // reopening; cleared once you continue to the create form.
@@ -192,6 +223,21 @@ export const AddCompanyModal: React.FC<{
           if (pf.name) setName(pf.name);
           setVerified({ name: pf.vat_validated_name ?? pf.name, address: pf.vat_validated_address, source: 'aade' });
           toast({ title: 'ΑΑΔΕ data fetched', description: pf.name ? `Imported ${pf.name}.` : 'Business details imported.' });
+
+          // ΓΕΜΗ (Greek Commercial Registry): pulls the GEMI number — which ΑΑΔΕ does NOT return —
+          // plus legal form/status, and merges its ΚΑΔ into the ΑΑΔΕ set. Best-effort: a ΓΕΜΗ miss or
+          // outage never blocks the ΑΑΔΕ import the operator just got.
+          setStatusLine('Checking ΓΕΜΗ registry…');
+          try {
+            const g = await gemiService.lookup({ afm, reason: 'crm_enrichment', workspaceId: activeWorkspaceId ?? undefined });
+            if ('ok' in g && g.ok && g.gemi.ar_gemi) {
+              setPrefill((p) => mergeGemiIntoPrefill(p, g));
+              setVerified((v) => (v ? { ...v, gemiNumber: g.gemi.ar_gemi } : v));
+              toast({ title: 'ΓΕΜΗ number added', description: `Γ.Ε.ΜΗ.: ${g.gemi.ar_gemi}` });
+            }
+          } catch { /* ΓΕΜΗ is a best-effort add-on; ignore failures */ }
+          finally { setStatusLine(null); }
+
           await runEnrichment(pf.name || name, 'Greece', vat);
         }
         return;
@@ -339,6 +385,7 @@ export const AddCompanyModal: React.FC<{
                       <span className="text-foreground font-medium">{verified.name || 'Verified'}</span>
                       {verified.address && <span className="text-muted-foreground"> · {verified.address}</span>}
                       <span className="text-muted-foreground"> ({verified.source.toUpperCase()})</span>
+                      {verified.gemiNumber && <span className="text-muted-foreground"> · Γ.Ε.ΜΗ. {verified.gemiNumber}</span>}
                     </div>
                   </div>
                 )}
