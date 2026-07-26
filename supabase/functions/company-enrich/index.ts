@@ -214,9 +214,9 @@ async function enrichViaWebSearch(
     });
     await admin.from('ai_usage_logs').insert({
       user_id: userId,
+      workspace_id: workspaceId,
       operation_type: 'company_enrich_web_search',
       model_name: 'claude-haiku-4-5',
-      api_provider: 'anthropic',
       input_tokens: inTok,
       output_tokens: outTok,
       input_cost_usd: inputCost,
@@ -225,7 +225,8 @@ async function enrichViaWebSearch(
       markup_multiplier: 1.5,
       billed_cost_usd: billedCost,
       credits_debited: credits,
-      metadata: { feature: 'company_enrich', sub_feature: 'web_search', name },
+      module_slug: 'crm',
+      metadata: { feature: 'company_enrich', sub_feature: 'web_search', provider: 'anthropic', name },
       created_at: new Date().toISOString(),
     });
   } catch (e) {
