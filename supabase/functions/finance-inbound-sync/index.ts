@@ -97,6 +97,14 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     const { data: fs } = await supabase.from('finance_settings').select('inbound_last_mark').eq('workspace_id', workspaceId).maybeSingle();
     const watermark = fs?.inbound_last_mark || '0';
 
+    // Default landing category for synced expenses: the workspace's locked "myAADE" system
+    // category (auto-seeded into every workspace). New docs are stamped with it so they
+    // arrive classified instead of uncategorized; the operator can still recategorize.
+    const { data: myaadeCat } = await supabase
+      .from('finance_categories')
+      .select('id').eq('workspace_id', workspaceId).eq('system_key', 'myaade').maybeSingle();
+    const myaadeCategoryId: string | null = myaadeCat?.id ?? null;
+
     let xml: string;
     try {
       const res = await fetch(`${baseUrl}/RequestDocs?mark=${encodeURIComponent(watermark)}`, {
@@ -154,6 +162,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         total_vat: num(pickTag(summaryB, 'totalVatAmount')),
         total_gross: num(pickTag(summaryB, 'totalGrossValue')),
         lines,
+        category_id: myaadeCategoryId,
         raw: { xml: b.slice(0, 20000) },
       };
       const { error } = await supabase.from('inbound_documents').upsert(row, { onConflict: 'workspace_id,mark', ignoreDuplicates: true });

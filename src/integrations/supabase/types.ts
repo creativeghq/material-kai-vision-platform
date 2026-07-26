@@ -7227,9 +7227,11 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          is_system: boolean
           kind: string
           margin_pct: number | null
           name: string
+          system_key: string | null
           workspace_id: string
         }
         Insert: {
@@ -7237,9 +7239,11 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_system?: boolean
           kind?: string
           margin_pct?: number | null
           name: string
+          system_key?: string | null
           workspace_id: string
         }
         Update: {
@@ -7247,9 +7251,11 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_system?: boolean
           kind?: string
           margin_pct?: number | null
           name?: string
+          system_key?: string | null
           workspace_id?: string
         }
         Relationships: [

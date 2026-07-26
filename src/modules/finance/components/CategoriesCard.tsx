@@ -75,7 +75,9 @@ export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
               <div key={c.id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
                 <span>{c.name}</span>
                 <div className="flex items-center gap-3">
-                  {c.is_system && <span className="text-[10px] text-muted-foreground" title="Built-in &quot;Orders&quot; category — every workspace has one; auto-attached to order costs. Can't be renamed or deleted.">System</span>}
+                  {c.is_system && <span className="text-[10px] text-muted-foreground" title={c.system_key === 'myaade'
+                    ? 'Built-in "myAADE" category — every workspace has one; the default landing category for expenses synced from myDATA. Can\'t be renamed or deleted.'
+                    : 'Built-in "Orders" category — every workspace has one; auto-attached to order costs. Can\'t be renamed or deleted.'}>System</span>}
                   <span className="text-[10px] capitalize text-muted-foreground">{humanizeLabel(c.kind)}</span>
                   <div className="flex items-center gap-1" title="Default sell margin % — auto-prices received goods in this category">
                     <input type="text" inputMode="decimal" defaultValue={c.margin_pct ?? ''} placeholder="Margin"
