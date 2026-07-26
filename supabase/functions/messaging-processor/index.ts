@@ -133,10 +133,24 @@ serve(withApiLogging('messaging-processor', async (req) => {
         .or('channel_type.eq.whatsapp,channel_type.eq.all');
       const optedOut = new Set((optouts || []).map((o) => o.phone_number));
 
+      // T2-5 — enforce the channel's CUMULATIVE daily send cap (was only a per-request size guard in
+      // send-bulk; the cron blew past it unchecked). Count today's sends for this channel and cap this
+      // tick's batch to what's left; if the cap is hit, skip the campaign until after midnight UTC.
+      let batchLimit = BATCH_SIZE;
+      if (channel.daily_quota && channel.daily_quota > 0) {
+        const startOfDay = new Date(); startOfDay.setUTCHours(0, 0, 0, 0);
+        const { count: sentToday } = await supabase
+          .from('messaging_logs').select('id', { count: 'exact', head: true })
+          .eq('channel_id', channel.id).gte('created_at', startOfDay.toISOString());
+        const remaining = channel.daily_quota - (sentToday ?? 0);
+        if (remaining <= 0) continue;
+        batchLimit = Math.min(BATCH_SIZE, remaining);
+      }
+
       const { data: pending } = await supabase
         .from('messaging_campaign_recipients').select('*')
         .eq('campaign_id', campaign.id).eq('status', 'pending')
-        .lt('retry_count', MAX_RETRIES).limit(BATCH_SIZE);
+        .lt('retry_count', MAX_RETRIES).limit(batchLimit);
 
       if (!pending?.length) {
         const { count: remaining } = await supabase

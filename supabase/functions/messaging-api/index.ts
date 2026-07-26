@@ -262,8 +262,16 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         if (!channel) throw new Error('No WhatsApp channel configured');
         if (!channel.zernio_account_id) throw new Error('Channel is not linked to a Zernio account.');
         { const gate = await requireMessaging(channel.workspace_id ?? auth.workspace_id); if (gate) return gate; }
-        if (channel.daily_quota && body.recipients.length > channel.daily_quota) {
-          throw new Error(`Recipient count (${body.recipients.length}) exceeds channel daily quota (${channel.daily_quota})`);
+        // T2-5 — cumulative daily cap: count what the channel already sent TODAY, not just this request's
+        // size, so many small requests can't blow past the quota.
+        if (channel.daily_quota && channel.daily_quota > 0) {
+          const startOfDay = new Date(); startOfDay.setUTCHours(0, 0, 0, 0);
+          const { count: sentToday } = await supabaseClient
+            .from('messaging_logs').select('id', { count: 'exact', head: true })
+            .eq('channel_id', channel.id).gte('created_at', startOfDay.toISOString());
+          if ((sentToday ?? 0) + body.recipients.length > channel.daily_quota) {
+            throw new HttpError(429, `Channel daily quota reached (${sentToday ?? 0}/${channel.daily_quota} sent today; this request is ${body.recipients.length}).`);
+          }
         }
 
         let template: any = null;
