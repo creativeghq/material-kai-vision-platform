@@ -24,6 +24,24 @@ function svcClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 }
 
+/** Call any edge function AS the user (so its authenticate() + workspace checks apply). */
+async function callEdge(jwt: string, path: string, payload: Record<string, unknown>): Promise<any> {
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${jwt}`, apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const text = await resp.text();
+    let parsed: any = {};
+    try { parsed = text ? JSON.parse(text) : {}; } catch { parsed = { error: text }; }
+    if (!resp.ok) return { ok: false, status: resp.status, error: parsed?.error || `${path} failed (${resp.status})` };
+    return { ok: true, data: parsed };
+  } catch (e) {
+    return { ok: false, error: `${path} call failed: ${(e as Error).message}` };
+  }
+}
+
 /** Call a zernio-api action AS the user (so its auth + workspace checks apply). */
 async function callZernio(jwt: string, payload: Record<string, unknown>): Promise<any> {
   try {
@@ -90,7 +108,7 @@ export const createManageSocialTool = (
   }
 
   return tool(
-    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at }: any) => {
+    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, prompt }: any) => {
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const ws = workspaceId!;
@@ -187,6 +205,23 @@ export const createManageSocialTool = (
         return JSON.stringify({ success: true, result: res.data });
       }
 
+      if (action === 'generate_content') {
+        if (!topic || !platform) return JSON.stringify({ success: false, error: 'generate_content needs a topic and a platform.' });
+        const res = await callEdge(jwt!, 'generate-social-content', { topic, platform, tone, workspace_id: ws });
+        if (!res.ok || res.data?.success === false) return JSON.stringify({ success: false, error: res.data?.error || res.error });
+        onChunk?.({ type: 'social_content_generated', platform, data: res.data, timestamp: Date.now() });
+        return JSON.stringify({ success: true, ...res.data, message: 'Draft caption + hashtags generated. Review, then use publish/schedule.' });
+      }
+
+      if (action === 'generate_image') {
+        if (!prompt) return JSON.stringify({ success: false, error: 'generate_image needs a prompt.' });
+        const res = await callEdge(jwt!, 'generate-social-image', { prompt, platform, workspace_id: ws });
+        if (!res.ok || res.data?.success === false) return JSON.stringify({ success: false, error: res.data?.error || res.error });
+        const url = res.data?.image_url ?? res.data?.url ?? null;
+        onChunk?.({ type: 'social_image_generated', platform: platform ?? null, image_url: url, timestamp: Date.now() });
+        return JSON.stringify({ success: true, image_url: url, message: 'Image generated. Pass it in image_urls[] on publish/schedule.' });
+      }
+
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
     },
     {
@@ -203,17 +238,23 @@ export const createManageSocialTool = (
         '  best_time        → recommended posting window for an account (account_id or platform).',
         '  account_insights → follower/engagement insights for an account (or the whole workspace if none given).',
         '  post_analytics   → sync + return analytics for the workspace\'s published posts.',
+        '  generate_content → AI-draft a caption + hashtags for a topic on a platform (topic + platform).',
+        '  generate_image   → AI-generate an image from a prompt; returns an image_url to attach on publish.',
         '',
+        'Typical flow: generate_content (+ generate_image) → review with the user → publish/schedule.',
         'Always confirm the copy, target account, and (for schedule) the exact time with the user before publishing.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics']),
+        action: z.enum(['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'generate_content', 'generate_image']),
         account_id: z.string().uuid().optional().describe('Target connected account id.'),
-        platform: z.string().optional().describe("Platform name (e.g. 'instagram', 'facebook', 'linkedin') to resolve the account when there is one per platform."),
+        platform: z.string().optional().describe("Platform name (e.g. 'instagram', 'facebook', 'linkedin') to resolve the account, or the target platform for generate_content/generate_image."),
         caption: z.string().optional().describe('Post text/caption (publish/schedule).'),
         hashtags: z.array(z.string()).optional().describe('Optional hashtags, appended to the caption.'),
         image_urls: z.array(z.string()).optional().describe('Optional image URLs to attach.'),
         scheduled_at: z.string().optional().describe('ISO datetime for schedule.'),
+        topic: z.string().optional().describe('generate_content: what the post is about.'),
+        tone: z.string().optional().describe('generate_content: optional tone (e.g. playful, professional).'),
+        prompt: z.string().optional().describe('generate_image: the image description.'),
       }),
     },
   );

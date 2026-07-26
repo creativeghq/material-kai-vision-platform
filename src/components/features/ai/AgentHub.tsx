@@ -393,6 +393,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   social_best_time: 'Best time to post',
   social_insights: 'Social insights',
   social_post_analytics: 'Post analytics',
+  social_content_generated: 'Caption drafted',
+  social_image_generated: 'Image generated',
   // Quotes
   quotes_list: 'Quotes',
   // Misc
