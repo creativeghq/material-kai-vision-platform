@@ -71,6 +71,7 @@ import { PartiesTab } from '@/modules/finance/tabs/PartiesTab';
 import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import TripExpensesPanel from '@/modules/finance/components/TripExpensesPanel';
 import { SourcingBoardPanel } from '@/modules/finance/components/SourcingBoardPanel';
+import { CompanyAssetsPanel } from '@/components/business/assets/CompanyAssetsPanel';
 import type { FinanceSettings } from '@/modules/finance/services/financeService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
@@ -529,6 +530,9 @@ const FinancePage: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="trip_cards" className="w-full justify-start">
               <Plane className="h-4 w-4 mr-2" /> Expense cards
+            </TabsTrigger>
+            <TabsTrigger value="assets" className="w-full justify-start">
+              <Boxes className="h-4 w-4 mr-2" /> Assets
             </TabsTrigger>
             {!isAccountant && (
               <TabsTrigger value="time" className="w-full justify-start">
@@ -1060,6 +1064,10 @@ const FinancePage: React.FC = () => {
 
           <TabsContent value="sourcing" className="space-y-4">
             <SourcingBoardPanel workspaceId={workspaceId} />
+          </TabsContent>
+
+          <TabsContent value="assets" className="space-y-4">
+            <CompanyAssetsPanel workspaceId={workspaceId} canManage={!isAccountant} context="finance" />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-4">

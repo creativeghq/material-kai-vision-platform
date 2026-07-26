@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet, Clock, Receipt, Landmark,
+  Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet, Clock, Receipt, Landmark, Package,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -19,12 +19,13 @@ import { OnboardingSection } from '../components/OnboardingSection';
 import { DocumentsSection } from '../components/DocumentsSection';
 import { PayrollSection } from '../components/PayrollSection';
 import { AccountingSection } from '../components/AccountingSection';
+import { CompanyAssetsPanel } from '@/components/business/assets/CompanyAssetsPanel';
 
 // Tabs whose data loads DIRECTLY from the DB (fast, RLS-gated) are PRELOADED on page open so the
 // first click is instant — no skeleton "blink". Every tab (including the edge-backed
 // attendance/ergani/accounting) also stays MOUNTED once visited, so a revisit never re-flashes.
 // (Edge-backed tabs aren't preloaded — they'd fire an edge call on open even if never opened.)
-const PRELOAD_TABS = ['overview', 'employees', 'departments', 'timeoff', 'recruitment', 'onboarding', 'documents', 'payroll'];
+const PRELOAD_TABS = ['overview', 'employees', 'departments', 'timeoff', 'recruitment', 'onboarding', 'documents', 'payroll', 'assets'];
 
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="flex w-full items-center gap-2 px-3 pt-3 pb-1">
@@ -93,6 +94,7 @@ export default function HRPage() {
 
             <SectionLabel>Records</SectionLabel>
             <TabsTrigger value="documents" className="w-full justify-start"><FolderOpen className="h-4 w-4 mr-2" /> Documents</TabsTrigger>
+            <TabsTrigger value="assets" className="w-full justify-start"><Package className="h-4 w-4 mr-2" /> Assets</TabsTrigger>
             <TabsTrigger value="payroll" className="w-full justify-start"><Wallet className="h-4 w-4 mr-2" /> Payroll</TabsTrigger>
             <TabsTrigger value="accounting" className="w-full justify-start"><Receipt className="h-4 w-4 mr-2" /> Accounting</TabsTrigger>
 
@@ -116,6 +118,7 @@ export default function HRPage() {
             <TabsContent value="recruitment" forceMount={fm('recruitment')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><RecruitmentSection {...sectionProps} /></TabsContent>
             <TabsContent value="onboarding" forceMount={fm('onboarding')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><OnboardingSection {...sectionProps} /></TabsContent>
             <TabsContent value="documents" forceMount={fm('documents')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><DocumentsSection {...sectionProps} /></TabsContent>
+            <TabsContent value="assets" forceMount={fm('assets')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><CompanyAssetsPanel workspaceId={ws} canManage={canManage} context="hr" /></TabsContent>
             <TabsContent value="payroll" forceMount={fm('payroll')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><PayrollSection {...sectionProps} /></TabsContent>
             <TabsContent value="accounting" forceMount={fm('accounting')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><AccountingSection {...sectionProps} /></TabsContent>
             <TabsContent value="ergani" forceMount={fm('ergani')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><ErganiSection {...sectionProps} /></TabsContent>
