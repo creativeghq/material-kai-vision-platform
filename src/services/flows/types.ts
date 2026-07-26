@@ -17,15 +17,11 @@ export type TriggerType =
   | 'quote_requested'
   | 'quote_approved'
   | 'quote_rejected'
-  | 'contract_created'
-  | 'image_uploaded'
-  | 'document_processed'
-  | 'product_added'
+  | 'contract_signed'
   | 'search_executed'
   | 'model_3d_created'
   | 'vr_world_created'
   | 'agent_search_completed'
-  | 'agent_image_analyzed'
   | 'product_added_to_quote'
   | 'moodboard_created'
   | 'moodboard_item_added'
@@ -217,16 +213,7 @@ export interface QuoteRequestedTriggerConfig {
 
 export interface QuoteApprovedTriggerConfig {}
 export interface QuoteRejectedTriggerConfig {}
-export interface ContractCreatedTriggerConfig {}
-export interface ImageUploadedTriggerConfig {
-  filter_category?: string;
-}
-export interface DocumentProcessedTriggerConfig {
-  filter_status?: 'success' | 'failed';
-}
-export interface ProductAddedTriggerConfig {
-  filter_source?: 'pdf_processing' | 'web_scraping' | 'xml_import' | 'manual';
-}
+export interface ContractSignedTriggerConfig {}
 
 export interface SearchExecutedTriggerConfig {
   filter_agent?: string;
@@ -237,10 +224,6 @@ export interface VRWorldCreatedTriggerConfig {}
 
 export interface AgentSearchCompletedTriggerConfig {
   filter_agent?: string;
-}
-
-export interface AgentImageAnalyzedTriggerConfig {
-  filter_category?: string;
 }
 
 export interface ProductAddedToQuoteTriggerConfig {
@@ -311,15 +294,11 @@ export type TriggerConfigMap = {
   quote_requested: QuoteRequestedTriggerConfig;
   quote_approved: QuoteApprovedTriggerConfig;
   quote_rejected: QuoteRejectedTriggerConfig;
-  contract_created: ContractCreatedTriggerConfig;
-  image_uploaded: ImageUploadedTriggerConfig;
-  document_processed: DocumentProcessedTriggerConfig;
-  product_added: ProductAddedTriggerConfig;
+  contract_signed: ContractSignedTriggerConfig;
   search_executed: SearchExecutedTriggerConfig;
   model_3d_created: Model3DCreatedTriggerConfig;
   vr_world_created: VRWorldCreatedTriggerConfig;
   agent_search_completed: AgentSearchCompletedTriggerConfig;
-  agent_image_analyzed: AgentImageAnalyzedTriggerConfig;
   product_added_to_quote: ProductAddedToQuoteTriggerConfig;
   moodboard_created: MoodboardCreatedTriggerConfig;
   moodboard_item_added: MoodboardItemAddedTriggerConfig;

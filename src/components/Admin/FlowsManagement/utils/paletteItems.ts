@@ -48,9 +48,6 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'agent_search_completed', group: 'AI & 3D',
     label: 'Agent Search Done', description: 'Agent search returns results', icon: 'SearchCheck', color: 'emerald',
     defaultData: { label: 'Agent Search Done', category: 'trigger', triggerType: 'agent_search_completed', config: {} } as TriggerNodeData },
-  { type: 'triggerNode', category: 'trigger', subType: 'agent_image_analyzed', group: 'AI & 3D',
-    label: 'Image Analyzed', description: 'Agent image analysis completes', icon: 'ScanEye', color: 'emerald',
-    defaultData: { label: 'Image Analyzed', category: 'trigger', triggerType: 'agent_image_analyzed', config: {} } as TriggerNodeData },
 
   // ── Quotes (product-to-quote) ──
   { type: 'triggerNode', category: 'trigger', subType: 'product_added_to_quote', group: 'Quotes',
@@ -488,7 +485,7 @@ export const actionPaletteItems = paletteItems.filter(i => i.category === 'actio
 export const TENANT_ALLOWED_SUBTYPES: ReadonlySet<string> = new Set<string>([
   // triggers
   'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
-  'inbox.message_received', 'product_added', 'appointment_booked',
+  'inbox.message_received', 'appointment_booked',
   // actions (send_sms is the engine's WhatsApp alias)
   'send_email', 'send_sms', 'create_notification', 'send_agent_message',
 ]);

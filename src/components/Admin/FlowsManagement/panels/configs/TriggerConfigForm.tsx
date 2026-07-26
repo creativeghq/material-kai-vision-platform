@@ -279,13 +279,6 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
       );
     }
 
-    case 'agent_image_analyzed':
-      return (
-        <div className="text-xs text-muted-foreground">
-          Fires when agent image analysis completes. Available data: image_id, category, analysis JSON, user_id.
-        </div>
-      );
-
     case 'product_added_to_quote': {
       const cfg = config as ProductAddedToQuoteTriggerConfig;
       return (
