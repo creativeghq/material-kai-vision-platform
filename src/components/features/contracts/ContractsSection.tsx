@@ -2,7 +2,7 @@
 // Pass a `subject` (e.g. { customer_company_id } or { hr_employee_id } or { project_id }) when
 // mounting under a specific entity; omit it for a standalone workspace-wide list (finance).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, FileSignature, Plus, Link2, Ban, CheckCircle2, Send } from 'lucide-react';
+import { Loader2, FileSignature, Plus, Link2, Ban, CheckCircle2, Send, Download } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -20,6 +20,7 @@ const STATUS_TONE: Record<ContractStatus, string> = {
   signed: 'text-emerald-600 border-emerald-500/40',
   declined: 'text-destructive border-destructive/40',
   void: 'text-muted-foreground border-border line-through',
+  expired: 'text-muted-foreground border-border line-through',
 };
 
 const TYPE_OPTIONS: Record<ContractContext, string[]> = {
@@ -160,6 +161,17 @@ export const ContractsSection: React.FC<{
     catch (err: any) { toast({ title: 'Could not void', description: err?.message, variant: 'destructive' }); }
   };
 
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  const downloadPdf = async (c: Contract) => {
+    setPdfBusy(c.id);
+    try {
+      const url = await contractsService.generatePdf(c.id);
+      window.open(url, '_blank', 'noopener');
+    } catch (err: any) {
+      toast({ title: 'Could not generate PDF', description: err?.message, variant: 'destructive' });
+    } finally { setPdfBusy(null); }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -210,6 +222,11 @@ export const ContractsSection: React.FC<{
                 )}
                 {c.status === 'sent' && c.sign_token && (
                   <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => copyLink(c)} title="Copy signing link"><Link2 className="h-3.5 w-3.5 mr-1" /> Copy link</Button>
+                )}
+                {c.status === 'signed' && (
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => downloadPdf(c)} disabled={pdfBusy === c.id} title="Download the signed contract PDF">
+                    {pdfBusy === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Download className="h-3.5 w-3.5 mr-1" /> PDF</>}
+                  </Button>
                 )}
                 {c.status !== 'signed' && c.status !== 'void' && (
                   <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => voidContract(c)} title="Void"><Ban className="h-3.5 w-3.5" /></Button>

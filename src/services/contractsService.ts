@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/utils/edgeError';
 
 export type ContractContext = 'hr' | 'finance' | 'project' | 'realestate';
-export type ContractStatus = 'draft' | 'sent' | 'signed' | 'declined' | 'void';
+export type ContractStatus = 'draft' | 'sent' | 'signed' | 'declined' | 'void' | 'expired';
 
 export interface Contract {
   id: string;
@@ -101,6 +101,14 @@ export const contractsService = {
   async void(workspaceId: string, id: string): Promise<Contract> {
     const { contract } = await call<{ contract: Contract }>({ action: 'void', workspace_id: workspaceId, id });
     return contract;
+  },
+
+  /** Render the contract (terms + signatures) to a PDF and return a fresh signed URL to download. */
+  async generatePdf(contractId: string): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('generate-contract-pdf', { body: { contract_id: contractId } });
+    if (error) throw new Error(await edgeErrorMessage(error));
+    if (!data?.success || !data?.url) throw new Error(data?.error || 'Could not generate the contract PDF.');
+    return data.url as string;
   },
 
   // ── Public (signer page) ──
