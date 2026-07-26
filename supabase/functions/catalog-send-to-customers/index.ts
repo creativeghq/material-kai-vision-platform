@@ -117,7 +117,8 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
       return jsonResponse({ success: false, error: 'Catalog has no public slug.' }, 422);
     }
 
-    const { data: rec, error: recErr } = await supabase.rpc('crm_categories_resolve_recipients', {
+    const { data: rec, error: recErr } = await supabase.rpc('crm_categories_resolve_recipients_ws', {
+      p_workspace_id: catalog.workspace_id,
       p_category_ids: body.category_ids,
     });
     if (recErr) return jsonResponse({ success: false, error: recErr.message }, 500);

@@ -14,6 +14,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { toPublic } from '../_shared/real-estate.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -230,6 +231,17 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
         owned_property_address: [String(body?.address ?? '').trim(), town].filter(Boolean).join(', ') || null,
         owned_property_value: estimate,
       }, { onConflict: 'crm_contact_id' });
+      // T2-2: this is a genuine new-lead moment that writes crm_contacts directly (bypassing crm-api),
+      // so it must fire crm_contact_created itself — otherwise the agency's "new lead → notify/assign"
+      // automation never runs for its highest-value inbound. Notify workspace owners/admins.
+      try {
+        await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'crm_contact_created', (uid: string) => ({
+          type: 'crm_contact_created', workspace_id: workspaceId, user_id: uid,
+          contact_id: contact.id, contact_name: name, lead_source: 'valuation_request',
+          title: 'New seller lead', body: `${name} requested a property valuation.`,
+          action_url: `/crm/contacts/${contact.id}`,
+        }));
+      } catch { /* best-effort */ }
     }
     return json({ estimate, range_low: low, range_high: high, currency: 'EUR', comps_count: perSqm.length, median_per_sqm: medianPerSqm });
   }

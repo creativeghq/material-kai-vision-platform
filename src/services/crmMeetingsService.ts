@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import type { CrmActivityTarget } from './crmActivitiesService';
 
 export interface CrmMeeting {
@@ -36,8 +37,12 @@ class CrmMeetingsService {
   }): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');
+    // Always stamp the workspace (fall back to the user's active workspace) — a null workspace_id made
+    // the meeting invisible to the agent's "what meetings do I have?" (which filters by workspace) and
+    // forced its reminder to send from the platform sender even in a BYOK-Resend tenant.
+    const workspaceId = input.workspaceId ?? getActiveWorkspaceId(user.id);
     const { error } = await supabase.from('crm_meetings').insert({
-      workspace_id: input.workspaceId ?? null,
+      workspace_id: workspaceId,
       owner_user_id: user.id,
       target_kind: input.target?.kind ?? null,
       target_id: input.target?.id ?? null,

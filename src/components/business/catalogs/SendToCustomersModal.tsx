@@ -61,7 +61,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
     }
     setPreviewing(true);
     try {
-      const res = await crmCategoriesService.resolveRecipients(categoryIds);
+      const res = await crmCategoriesService.resolveRecipients(catalog.workspace_id, categoryIds);
       setRecipients(res);
     } catch (err) {
       toast({ title: 'Preview failed', description: getErrorMessage(err), variant: 'destructive' });

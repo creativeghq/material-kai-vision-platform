@@ -351,9 +351,12 @@ class CrmCategoriesService {
     }
   }
 
-  async resolveRecipients(categoryIds: string[]): Promise<ResolvedRecipient[]> {
+  /** Resolve category members to email recipients, scoped to the caller's workspace (membership-guarded
+   *  RPC — the previous unscoped variant leaked emails across all tenants). */
+  async resolveRecipients(workspaceId: string, categoryIds: string[]): Promise<ResolvedRecipient[]> {
     if (categoryIds.length === 0) return [];
-    const { data, error } = await supabase.rpc('crm_categories_resolve_recipients', {
+    const { data, error } = await supabase.rpc('crm_categories_resolve_recipients_ws', {
+      p_workspace_id: workspaceId,
       p_category_ids: categoryIds,
     });
     if (error) throw error;
