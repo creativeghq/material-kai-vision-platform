@@ -593,7 +593,7 @@ export const createGeneratePurchaseSheetTool = (
       description:
         "Render a project's purchase items (doors/windows) into a PDF: a combined schedule table " +
         'and/or per-item specification sheets with door-swing / window glyph drawings. ' +
-        "mode='schedule' for the table only, 'per_item' for spec pages only, 'both' (default) for both. " +
+        "mode='schedule' for the table only, 'per_item' for spec pages only, 'both' (default) for both, 'order' for the per-item supplier order sheet. " +
         'Use when the user says "make the purchase sheet", "send the door schedule to the supplier", etc.',
       schema: z.object({
         project_id: z.string().optional().describe('UUID of the project'),

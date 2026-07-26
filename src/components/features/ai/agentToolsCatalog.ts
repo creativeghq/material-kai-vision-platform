@@ -1345,6 +1345,61 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'real-estate',
+    name: 'Real Estate',
+    description: 'Manage property listings, valuations, viewings and leads.',
+    icon: 'Building2',
+    moduleSlug: 'real-estate',
+    tool_ids: ['manage_real_estate'],
+    quick_starts: [
+      { label: 'My listings', description: 'List active properties', prompt: 'Show my real-estate listings.', icon: 'ListChecks' },
+      { label: 'New listing', description: 'Create a property listing', prompt: 'Create a new property listing — I\'ll give you the details.', icon: 'Plus' },
+    ],
+  },
+  {
+    id: 'sourcing',
+    name: 'Sourcing',
+    description: 'Find a supplier for a product and draft / send a purchase order.',
+    icon: 'ShoppingCart',
+    tool_ids: ['source_product', 'create_purchase_order', 'send_purchase_order'],
+    quick_starts: [
+      { label: 'Source a product', description: 'Find a supplier', prompt: 'Help me source a product from a supplier.', icon: 'Search' },
+    ],
+  },
+  {
+    id: 'trip-expenses',
+    name: 'Trip Expenses',
+    description: 'Create trip/expense cards, add lines and submit them for approval.',
+    icon: 'ReceiptText',
+    tool_ids: ['create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card'],
+    quick_starts: [
+      { label: 'My trip cards', description: 'List expense cards', prompt: 'Show my trip expense cards.', icon: 'ListChecks' },
+      { label: 'New trip card', description: 'Start a trip expense card', prompt: 'Start a new trip expense card for me.', icon: 'Plus' },
+    ],
+  },
+  {
+    id: 'expenses',
+    name: 'Expenses',
+    description: 'Record a business operating expense as a categorized supplier bill.',
+    icon: 'ReceiptText',
+    moduleSlug: 'finance',
+    tool_ids: ['record_expense', 'list_recent_expenses'],
+    quick_starts: [
+      { label: 'Recent expenses', description: 'List recent expenses', prompt: 'Show my recent expenses.', icon: 'ListChecks' },
+      { label: 'Record an expense', description: 'Log a business cost', prompt: 'Record a business expense — I\'ll give you the details.', icon: 'Plus' },
+    ],
+  },
+  {
+    id: 'docs',
+    name: 'Workspace Docs',
+    description: 'Search your workspace\'s internal documents.',
+    icon: 'FileText',
+    tool_ids: ['search_workspace_docs'],
+    quick_starts: [
+      { label: 'Search docs', description: 'Find something in your docs', prompt: 'Search my workspace documents for…', icon: 'Search' },
+    ],
+  },
+  {
     id: 'messaging',
     name: 'WhatsApp',
     description: 'Send WhatsApp messages to customers via your connected channels (send asks to Approve first).',

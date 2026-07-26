@@ -1273,6 +1273,24 @@ async function executeAgent(
     'projects': {
       tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'],
     },
+    // These clusters were MISSING — their tools are declared on agents (kai / property-advisor) but
+    // had no toolkit home, so the startup filter stripped them and load_toolkit couldn't reach them
+    // → whole surfaces (real-estate, sourcing, trip cards, docs, expenses) were dead from chat.
+    'real-estate': {
+      tool_ids: ['manage_real_estate'],
+    },
+    'sourcing': {
+      tool_ids: ['source_product', 'create_purchase_order', 'send_purchase_order'],
+    },
+    'trip-expenses': {
+      tool_ids: ['create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card'],
+    },
+    'expenses': {
+      tool_ids: ['record_expense', 'list_recent_expenses'],
+    },
+    'docs': {
+      tool_ids: ['search_workspace_docs'],
+    },
     'quotes': {
       tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes'],
     },
@@ -1351,6 +1369,21 @@ async function executeAgent(
 
   const META_TOOLS = ['load_toolkit'];
 
+  // PREVENTION (root cause of the real-estate/sourcing/trip/docs orphaning): every tool declared on
+  // an agent MUST live in some SERVER_TOOLKITS cluster (or be a meta-tool), otherwise the startup
+  // filter strips it for non-curated agents AND load_toolkit can't reach it — a silent capability
+  // loss with zero error. Surface any drift once per cold start so a new tool can't slip through.
+  if (!(globalThis as any).__agentToolkitAuditLogged) {
+    (globalThis as any).__agentToolkitAuditLogged = true;
+    try {
+      const homed = new Set<string>(META_TOOLS);
+      for (const def of Object.values(SERVER_TOOLKITS)) for (const t of def.tool_ids) homed.add(t);
+      const orphans = new Set<string>();
+      for (const cfg of Object.values(AGENT_CONFIGS) as any[]) for (const t of (cfg?.tools ?? [])) if (!homed.has(t)) orphans.add(t);
+      if (orphans.size) console.error(`[agent-chat] ORPHANED TOOLS — declared on an agent but in NO toolkit (stripped at startup, unreachable via load_toolkit): ${[...orphans].join(', ')}`);
+    } catch (e) { console.warn('[agent-chat] toolkit audit failed', e); }
+  }
+
   // Resolve toolkits → tool IDs. Core is always included.
   const toolkitToolIds = new Set<string>();
   for (const [id, def] of Object.entries(SERVER_TOOLKITS)) {
@@ -1366,7 +1399,7 @@ async function executeAgent(
   // Curated specialists (#132) bind their WHOLE toolkit by default — the point of a
   // specialist is that its focused kit is ready without a load_toolkit hop. The
   // generalist (kai) stays lean (core + load_toolkit) to keep context small.
-  const CURATED_SPECIALISTS = new Set(['erp', 'product-business', 'marketing', 'social-media']);
+  const CURATED_SPECIALISTS = new Set(['erp', 'product-business', 'marketing', 'social-media', 'property-advisor']);
   const baseTools = CURATED_SPECIALISTS.has(agentId)
     ? [...config.tools]
     : config.tools.filter((t) => toolkitToolIds.has(t));

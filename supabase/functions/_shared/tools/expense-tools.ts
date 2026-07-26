@@ -139,7 +139,9 @@ export const createListExpensesTool = (userId: string, workspaceId: string, onCh
         .order('issued_at', { ascending: false, nullsFirst: false })
         .limit(Math.min(Math.max(limit ?? 15, 1), 50));
       if (error) throw error;
-      onChunk?.({ type: 'expenses_list', data: { count: data?.length || 0 } });
+      // Ship the rows in the chunk (not just a count) so the card renders line items, like the
+      // finance-tools list chunks — a count-only chunk rendered an empty-looking card.
+      onChunk?.({ type: 'expenses_list', data: { count: data?.length || 0, expenses: data || [] } });
       return JSON.stringify({ success: true, expenses: data || [] });
     } catch (e: any) {
       return JSON.stringify({ success: false, error: e?.message || 'Could not list expenses' });
