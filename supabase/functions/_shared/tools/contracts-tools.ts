@@ -59,7 +59,7 @@ export const createManageContractsTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, status, context, contract_id, confirm }) => {
+    async ({ action, status, context, contract_id, confirm, title, counterparty_name, counterparty_email, value, currency }) => {
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
 
@@ -69,6 +69,33 @@ export const createManageContractsTool = (
         const contracts = r.data?.contracts ?? [];
         onChunk?.({ type: 'contracts_list', workspace_id: workspaceId, contracts, timestamp: Date.now() });
         return JSON.stringify({ success: true, count: contracts.length, contracts: contracts.slice(0, 15) });
+      }
+
+      if (action === 'get') {
+        if (!contract_id) return JSON.stringify({ success: false, error: 'get needs a contract_id.' });
+        const r = await callContracts({ action: 'get', workspace_id: workspaceId, id: contract_id }, jwt);
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `contracts-api ${r.status}` });
+        return JSON.stringify({ success: true, contract: r.data?.contract ?? null, signatures: r.data?.signatures ?? [] });
+      }
+
+      if (action === 'create') {
+        if (!title) return JSON.stringify({ success: false, error: 'create needs a title.' });
+        if (!context) return JSON.stringify({ success: false, error: 'create needs a context (hr | finance | project | realestate).' });
+        const r = await callContracts({
+          action: 'create', workspace_id: workspaceId, context, title,
+          counterparty_name, counterparty_email, value, currency,
+        }, jwt);
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `contracts-api ${r.status}` });
+        const c = r.data?.contract;
+        onChunk?.({ type: 'contract_created', contract_id: c?.id, title: c?.title, timestamp: Date.now() });
+        return JSON.stringify({ success: true, contract: c, message: `Draft contract "${c?.title}" created. Use action=send to email the signing link.` });
+      }
+
+      if (action === 'void') {
+        if (!contract_id) return JSON.stringify({ success: false, error: 'void needs a contract_id.' });
+        const r = await callContracts({ action: 'void', workspace_id: workspaceId, id: contract_id }, jwt);
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `contracts-api ${r.status}` });
+        return JSON.stringify({ success: true, voided: true, contract_id });
       }
 
       if (action === 'send') {
@@ -105,14 +132,20 @@ export const createManageContractsTool = (
     {
       name: 'manage_contracts',
       description:
-        'Contracts & e-signature: list contracts and send a DRAFT contract for signature. SENDING emails '
-        + 'the counterparty a signing link — it ALWAYS asks the user to Approve/Decline first (never set '
-        + 'confirm:true yourself; the UI sets it on approval).',
+        'Contracts & e-signature: list/get contracts, create a draft, void a contract, and send a DRAFT '
+        + 'for signature. CREATE makes a draft (then use SEND). SENDING emails the counterparty a signing '
+        + 'link — it ALWAYS asks the user to Approve/Decline first (never set confirm:true yourself; the UI '
+        + 'sets it on approval).',
       schema: z.object({
-        action: z.enum(['list', 'send']).default('list'),
+        action: z.enum(['list', 'get', 'create', 'void', 'send']).default('list'),
         status: z.string().optional().describe('list: filter by status (draft/sent/signed/…).'),
-        context: z.enum(['hr', 'finance', 'project']).optional().describe('list: filter by context.'),
-        contract_id: z.string().optional().describe('send: the draft contract UUID.'),
+        context: z.enum(['hr', 'finance', 'project', 'realestate']).optional().describe('list: filter by context. create: the contract context (required).'),
+        contract_id: z.string().optional().describe('get/void/send: the contract UUID.'),
+        title: z.string().optional().describe('create: the contract title (required).'),
+        counterparty_name: z.string().optional().describe('create: the other party\'s name.'),
+        counterparty_email: z.string().optional().describe('create: the other party\'s email (used to email the signing link on send).'),
+        value: z.number().optional().describe('create: optional contract value.'),
+        currency: z.string().optional().describe('create: optional currency (e.g. EUR).'),
         confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
       }),
     },

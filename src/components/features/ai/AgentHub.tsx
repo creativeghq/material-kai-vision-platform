@@ -300,6 +300,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   messaging_sent: 'WhatsApp sent',
   // Contracts
   contracts_list: 'Contracts',
+  contract_created: 'Contract drafted',
   contract_sent: 'Contract sent for signature',
   // Customer Inbox
   inbox_threads_list: 'Customer conversations',

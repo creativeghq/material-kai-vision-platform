@@ -20,6 +20,7 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { escapeHtml } from '../_shared/html.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -188,7 +189,7 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
   if (action === 'get') {
     const id = String(body?.id ?? '');
     if (!id) return json({ error: 'id is required' }, 400);
-    const { data, error } = await asUser.from('contracts').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await asUser.from('contracts').select('*').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
     if (error) return json({ error: error.message }, 400);
     if (!data) return json({ error: 'not found' }, 404);
     const { data: sigs } = await asUser.from('contract_signatures').select('*').eq('contract_id', id).order('signed_at', { ascending: true });
@@ -200,7 +201,7 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
     if (!id) return json({ error: 'id is required' }, 400);
     const patch = pick(body, WRITABLE);
     if (Object.keys(patch).length === 0) return json({ error: 'nothing to update' }, 400);
-    const { data, error } = await asUser.from('contracts').update(patch).eq('id', id).select().maybeSingle();
+    const { data, error } = await asUser.from('contracts').update(patch).eq('id', id).eq('workspace_id', workspaceId).select().maybeSingle();
     if (error) return json({ error: error.message }, error.code === '42501' ? 403 : 400);
     if (!data) return json({ error: 'not found' }, 404);
     return json({ contract: data });
@@ -213,16 +214,44 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
     const expires = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
     const { data, error } = await asUser.from('contracts')
       .update({ status: 'sent', sign_token: token, sign_token_expires_at: expires, sent_at: new Date().toISOString() })
-      .eq('id', id).select().maybeSingle();
+      .eq('id', id).eq('workspace_id', workspaceId).select().maybeSingle();
     if (error) return json({ error: error.message }, error.code === '42501' ? 403 : 400);
     if (!data) return json({ error: 'not found' }, 404);
-    return json({ contract: data, sign_token: token, sign_path: `/sign/${token}` });
+
+    // Actually email the counterparty the signing link (the whole point of "send"). Best-effort — the
+    // token/link is still returned so the caller can copy it if the email can't go out. Transactional
+    // (a signing request), so it uses the workspace's own sender via workspace_id.
+    let emailed = false;
+    const toEmail = String((data as { counterparty_email?: string }).counterparty_email ?? '').trim();
+    if (toEmail) {
+      try {
+        const appBase = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
+        const signUrl = `${appBase}/sign/${token}`;
+        const title = String((data as { title?: string }).title ?? 'a contract');
+        const party = String((data as { counterparty_name?: string }).counterparty_name ?? '').trim();
+        const html = `<p>${party ? `Hello ${escapeHtml(party)},` : 'Hello,'}</p>`
+          + `<p>You have a document to review and sign: <strong>${escapeHtml(title)}</strong>.</p>`
+          + `<p><a href="${signUrl}">Open and sign the document</a></p>`
+          + `<p>This link expires in 30 days. If you weren't expecting this, you can ignore this email.</p>`;
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/email-api`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SERVICE_KEY}` },
+          body: JSON.stringify({
+            action: 'send', to: toEmail, subject: `Signature requested: ${title}`,
+            html, emailType: 'transactional', workspace_id: workspaceId,
+            tags: { feature: 'contracts', contract_id: id },
+          }),
+        });
+        emailed = resp.ok;
+      } catch (_) { /* best-effort; link still returned */ }
+    }
+    return json({ contract: data, sign_token: token, sign_path: `/sign/${token}`, emailed });
   }
 
   if (action === 'void') {
     const id = String(body?.id ?? '');
     if (!id) return json({ error: 'id is required' }, 400);
-    const { data, error } = await asUser.from('contracts').update({ status: 'void', sign_token: null }).eq('id', id).select().maybeSingle();
+    const { data, error } = await asUser.from('contracts').update({ status: 'void', sign_token: null }).eq('id', id).eq('workspace_id', workspaceId).select().maybeSingle();
     if (error) return json({ error: error.message }, error.code === '42501' ? 403 : 400);
     if (!data) return json({ error: 'not found' }, 404);
     return json({ contract: data });

@@ -35,6 +35,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'quote_rejected', group: 'Quotes',
     label: 'Quote Rejected', description: 'Quote is rejected', icon: 'XCircle', color: 'emerald',
     defaultData: { label: 'Quote Rejected', category: 'trigger', triggerType: 'quote_rejected', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'contract_signed', group: 'Contracts',
+    label: 'Contract Signed', description: 'A counterparty signed a contract', icon: 'ClipboardCheck', color: 'emerald',
+    defaultData: { label: 'Contract Signed', category: 'trigger', triggerType: 'contract_signed', config: {} } as TriggerNodeData },
   // ── AI & 3D ──
   { type: 'triggerNode', category: 'trigger', subType: 'search_executed', group: 'AI & 3D',
     label: 'Search Executed', description: 'Agent search performed', icon: 'Search', color: 'emerald',
@@ -485,7 +488,7 @@ export const actionPaletteItems = paletteItems.filter(i => i.category === 'actio
 export const TENANT_ALLOWED_SUBTYPES: ReadonlySet<string> = new Set<string>([
   // triggers
   'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
-  'inbox.message_received', 'appointment_booked',
+  'inbox.message_received', 'appointment_booked', 'contract_signed',
   // actions (send_sms is the engine's WhatsApp alias)
   'send_email', 'send_sms', 'create_notification', 'send_agent_message',
 ]);
