@@ -19,7 +19,11 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
   const [aiBusy, setAiBusy] = useState(false);
   const [aiRan, setAiRan] = useState(false);
   const [reordering, setReordering] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [page, setPage] = useState(1);
+
+  // Flagged = will run short (stockout risk or below reorder point) AND has a supplier to order from.
+  const flagged = rows.filter((c) => c.has_supplier && (c.stockout_before_reorder || c.below_reorder));
 
   const load = async () => {
     setLoading(true);
@@ -58,6 +62,25 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
     finally { setReordering(null); }
   };
 
+  // Draft a replenishment PO for every flagged item in one go (each is an independent, credit-metered
+  // reorder → its supplier's draft PO). Sequential so a mid-run failure stops cleanly.
+  const reorderAll = async () => {
+    if (flagged.length === 0) return;
+    if (!confirm(`Draft replenishment POs for ${flagged.length} flagged item(s)? This costs 2 credits each (${flagged.length * 2} total).`)) return;
+    setBulkBusy(true);
+    let drafted = 0; let failed = 0;
+    try {
+      for (const c of flagged) {
+        setReordering(c.warehouse_item_id);
+        try {
+          const r = await stockService.reorder(workspaceId, c.warehouse_item_id, c.recommended_order_qty ? { quantity: c.recommended_order_qty } : {});
+          if (r.ok) drafted++; else failed++;
+        } catch { failed++; }
+      }
+      toast({ title: 'Bulk reorder complete', description: `${drafted} PO(s) drafted${failed ? ` · ${failed} skipped (no supplier / error)` : ''}.` });
+    } finally { setBulkBusy(false); setReordering(null); }
+  };
+
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
@@ -65,9 +88,16 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
           <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Resupply forecast</CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">Consumption velocity → days of cover vs supplier lead time. Items that will run out before a reorder lands are flagged.</p>
         </div>
-        <Button size="sm" className="rounded-full shrink-0" disabled={aiBusy || loading || rows.length === 0} onClick={runAi}>
-          {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="h-4 w-4 mr-1" /> AI forecast (5 cr)</>}
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {flagged.length > 0 && (
+            <Button size="sm" variant="outline" className="rounded-full" disabled={bulkBusy || loading} onClick={reorderAll}>
+              {bulkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ShoppingCart className="h-4 w-4 mr-1" /> Reorder all flagged ({flagged.length})</>}
+            </Button>
+          )}
+          <Button size="sm" className="rounded-full" disabled={aiBusy || loading || rows.length === 0} onClick={runAi}>
+            {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="h-4 w-4 mr-1" /> AI forecast (5 cr)</>}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         {loading ? (
@@ -113,7 +143,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
                     </td>
                   )}
                   <td className="px-4 py-2 text-right">
-                    <Button size="sm" variant="outline" className="rounded-full h-7 text-xs" disabled={!c.has_supplier || reordering === c.warehouse_item_id} title={c.has_supplier ? 'Draft a purchase order' : 'No supplier configured for this product'} onClick={() => reorder(c)}>
+                    <Button size="sm" variant="outline" className="rounded-full h-7 text-xs" disabled={!c.has_supplier || bulkBusy || reordering === c.warehouse_item_id} title={c.has_supplier ? 'Draft a purchase order' : 'No supplier configured for this product'} onClick={() => reorder(c)}>
                       {reordering === c.warehouse_item_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><ShoppingCart className="h-3.5 w-3.5 mr-1" /> Reorder</>}
                     </Button>
                   </td>

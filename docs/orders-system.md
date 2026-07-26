@@ -51,6 +51,14 @@ runs the normal "Issue invoice" path (gapless number + myDATA transmit).
 items (idempotent, links `invoices.order_id`). POS `finalizeSale` calls it with `mark_delivered=true`,
 so every POS receipt becomes a **fulfilled, paid, delivered** order.
 
+### Stock reservation (auto, 2026-07-26)
+Confirming a **sales** order (or adding a line to a confirmed one) auto-**reserves** free stock for its
+catalog lines: a trigger runs `reserve_order_stock` → `reconcile_order_item_reservation`, which holds
+`(ordered − delivered)` per line against the covering warehouse (pinned `warehouse_id` → default →
+fullest), **capped at free stock** (`qty_on_hand − qty_reserved`) so it never over-reserves. Delivering
+consumes the hold (reserved → dispatched); cancelling the order releases it; lowering a line trims it.
+This is why `qty_reserved` is now meaningful for plain orders — not just the #237 sourcing/commit path.
+
 ### Payments → `payment_status`
 Trigger on `payments` calls `recompute_order_payment_status(order_id)`: sales order paid = Σ
 payments(`in`, order_id); purchase order paid = Σ payments(`out`, order_id) → `unpaid`/`partial`/`paid`.
@@ -61,9 +69,19 @@ On the order detail: **Received** (payments in) − **Paid to suppliers** (payme
 
 ### Dispatch (invoice-driven — not duplicated)
 Dispatch + warehouse stock is the existing flow: a **paid invoice flagged for shipping** appears on
-the **Dispatch board**, which cuts the delivery note and writes `stock_movements`. Catalog lines
+the **Dispatch board**, which cuts the delivery note and moves stock. Catalog lines
 (`product_id`) move stock; ad-hoc lines (and `update_warehouse=false`) stay off-warehouse. The order
 detail links to the Dispatch board for sales orders.
+
+**Single decrement ledger (2026-07-26).** Issuing a dispatch note no longer writes stock movements
+directly when the note fulfils an order — `issue_delivery_note` resolves the order (via `order_id` or
+`invoices.order_id`) and routes each matched line through **`deliver_order_line`**, which moves stock
+by the *delta* against `order_items.quantity_delivered`. So a line ships **exactly once** whether the
+user sets delivered on the order OR cuts the dispatch note (setting both is now idempotent, not a
+double-decrement). `update_warehouse=false` / ad-hoc lines are skipped automatically. Standalone
+warehouse issues/receipts (a delivery note with no order) keep the direct `record_stock_movement`
+path. The board pins the matched warehouse onto `order_items.warehouse_id` so the delta ships from the
+same stock row.
 
 ### Business-contact rollup (XOR-aware)
 A quote/invoice created for a contact who belongs to a business rolls up to that **company**
@@ -100,4 +118,5 @@ OpenAPI (`public/api/openapi-edge.json`).
   linked; the order shows them).
 - AR / AP tabs grouped **by order** (received-vs-owed + profit per order).
 - Planning: per-customer expected payments by due-day with tick-when-paid, linked to the settling payment.
-- Honoring `order_items.update_warehouse` inside the dispatch stock-matching (today product_id presence already gates it).
+- ~~Honoring `order_items.update_warehouse` inside the dispatch stock-matching~~ — **done 2026-07-26**: dispatch routes through `deliver_order_line`, which honors it.
+- Per-line warehouse **picker** in the order editor — `order_items.warehouse_id` exists + is auto-pinned on reserve/dispatch; a manual dropdown is not yet exposed (rarely needed).

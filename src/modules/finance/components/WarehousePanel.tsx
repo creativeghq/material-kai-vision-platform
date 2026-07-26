@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store, Coins, Tag, Boxes } from 'lucide-react';
+import { Loader2, Plus, PackagePlus, PackageMinus, Trash2, AlertTriangle, Search, Package, X, ArrowLeftRight, Store, Coins, Tag, Boxes, Upload } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
+import { stockService, type OpeningStockLine } from '@/modules/stock/services/stockService';
 import {
   marketplaceService, type ActiveListingSummary, type ListingCondition, type DeliveryOption,
 } from '@/services/marketplaceService';
@@ -28,6 +29,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [addWhOpen, setAddWhOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   // Active marketplace listings keyed by warehouse_item_id — drives the "Listed" row badge.
   const [listings, setListings] = useState<Record<string, ActiveListingSummary>>({});
   const [listItem, setListItem] = useState<WarehouseItem | null>(null);
@@ -184,6 +186,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button size="sm" variant="outline" onClick={() => setAddWhOpen(true)} className="rounded-full"><Plus className="h-4 w-4 mr-1" /> Warehouse</Button>
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} className="rounded-full" disabled={!selectedWh}><Upload className="h-4 w-4 mr-1" /> Import</Button>
           <Button size="sm" onClick={() => setAddOpen(true)} className="rounded-full" disabled={!selectedWh}><Plus className="h-4 w-4 mr-1" /> Add item</Button>
         </div>
       </CardHeader>
@@ -284,6 +287,8 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
       <AddItemDialog open={addOpen} onOpenChange={setAddOpen} workspaceId={workspaceId} warehouseId={selectedWh} onAdded={async () => { setAddOpen(false); await load(); }} />
       <EditItemCatalogDialog item={editItem} onOpenChange={(v) => { if (!v) setEditItem(null); }} onSaved={async () => { setEditItem(null); await load(selectedWh); }} />
       <AddWarehouseDialog open={addWhOpen} onOpenChange={setAddWhOpen} workspaceId={workspaceId} onAdded={async (id) => { setAddWhOpen(false); await load(id); }} />
+      <ImportOpeningStockDialog open={importOpen} onOpenChange={setImportOpen} workspaceId={workspaceId} warehouseId={selectedWh}
+        warehouseName={warehouses.find((w) => w.id === selectedWh)?.name ?? ''} onImported={async () => { setImportOpen(false); await load(selectedWh); }} />
       <ListToMarketplaceDialog
         item={listItem}
         workspaceId={workspaceId}
@@ -303,6 +308,87 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
  * (facet canonicalization → Voyage text_embedding_1024 → vector DB) — never a
  * free-text orphan that bypasses the product pipeline.
  */
+/**
+ * Opening-balance import — paste "SKU, Qty[, Name, ReorderPoint]" rows to seed a warehouse.
+ * Rows matched to a catalog product by SKU get linked automatically; unmatched SKUs create a
+ * plain stock row. Each row sets the on-hand via an audited 'adjust' movement server-side
+ * (`import_opening_stock`), so re-pasting the same sheet is a reconcile, not a double-count.
+ */
+const ImportOpeningStockDialog: React.FC<{
+  open: boolean; onOpenChange: (v: boolean) => void; workspaceId: string; warehouseId: string;
+  warehouseName: string; onImported: () => void;
+}> = ({ open, onOpenChange, workspaceId, warehouseId, warehouseName, onImported }) => {
+  const { toast } = useToast();
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const parsed = useMemo<{ lines: OpeningStockLine[]; bad: number }>(() => {
+    const out: OpeningStockLine[] = [];
+    let bad = 0;
+    for (const raw of text.split('\n')) {
+      const line = raw.trim();
+      if (!line) continue;
+      // skip an optional header row
+      if (/^\s*sku\b/i.test(line) && /qty|quantity/i.test(line)) continue;
+      const cols = line.split(/[,\t;]/).map((c) => c.trim());
+      const sku = cols[0] || '';
+      const qty = parseDecimal(cols[1] ?? '');
+      if (!sku || qty == null || !Number.isFinite(qty)) { bad++; continue; }
+      const l: OpeningStockLine = { sku, qty };
+      if (cols[2]) l.name = cols[2];
+      if (cols[3]) { const rp = parseDecimal(cols[3]); if (rp != null) l.reorder_point = rp; }
+      out.push(l);
+    }
+    return { lines: out, bad };
+  }, [text]);
+
+  const run = async () => {
+    if (!warehouseId || parsed.lines.length === 0) return;
+    setBusy(true);
+    try {
+      const res = await stockService.importOpeningStock(workspaceId, warehouseId, parsed.lines);
+      toast({
+        title: 'Opening stock imported',
+        description: `${res.created} created · ${res.updated} updated${res.error_count ? ` · ${res.error_count} skipped` : ''}.`,
+      });
+      setText('');
+      onImported();
+    } catch (err: any) {
+      toast({ title: 'Import failed', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Import opening stock{warehouseName ? ` → ${warehouseName}` : ''}</DialogTitle>
+          <DialogDescription>
+            One row per line: <code>SKU, Qty</code> (optionally <code>, Name, ReorderPoint</code>). Commas, tabs or
+            semicolons work — paste straight from a spreadsheet. SKUs are matched to catalog products automatically.
+          </DialogDescription>
+        </DialogHeader>
+        <Textarea
+          rows={10} value={text} onChange={(e) => setText(e.target.value)}
+          placeholder={'SKU, Qty, Name, Reorder\nTILE-WHT-60, 120, White tile 60x60, 20\nOAK-PLANK-15, 45'}
+          className="font-mono text-xs"
+        />
+        <div className="text-xs text-muted-foreground">
+          {parsed.lines.length} valid row{parsed.lines.length === 1 ? '' : 's'}
+          {parsed.bad > 0 && <span className="text-amber-500"> · {parsed.bad} unparseable line{parsed.bad === 1 ? '' : 's'} skipped</span>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" className="rounded-full" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button className="rounded-full" onClick={run} disabled={busy || parsed.lines.length === 0}>
+            {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+            Import {parsed.lines.length || ''}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 interface CatalogProduct { id: string; name: string; sku: string | null; unit: string }
 
 const productUnit = (row: any): string =>

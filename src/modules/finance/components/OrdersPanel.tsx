@@ -400,7 +400,7 @@ const NewOrderModal: React.FC<{
   const [items, setItems] = useState<Line[]>([blankLine()]);
   // Per-line product lookup — the Description field IS a catalog search.
   const [activeLine, setActiveLine] = useState<number | null>(null);
-  const [lineProdOpts, setLineProdOpts] = useState<Array<{ id: string; name: string }>>([]);
+  const [lineProdOpts, setLineProdOpts] = useState<Array<{ id: string; name: string; free?: number | null }>>([]);
   const [project, setProject] = useState<{ id: string; name: string } | null>(null);
   const [projectSearch, setProjectSearch] = useState('');
   const [projectOpts, setProjectOpts] = useState<Array<{ id: string; name: string }>>([]);
@@ -484,10 +484,23 @@ const NewOrderModal: React.FC<{
     if (term.length < 2) { setLineProdOpts([]); return; }
     const t = setTimeout(async () => {
       const { data } = await supabase.from('products').select('id, name').ilike('name', `%${term}%`).limit(8);
-      setLineProdOpts((data ?? []) as Array<{ id: string; name: string }>);
+      const prods = (data ?? []) as Array<{ id: string; name: string }>;
+      // Surface free stock (on-hand − reserved) per result so availability is visible before picking.
+      let freeByProduct = new Map<string, number>();
+      if (isSales && prods.length) {
+        const { data: wi } = await supabase.from('warehouse_items')
+          .select('product_id, qty_on_hand, qty_reserved')
+          .eq('workspace_id', workspaceId).in('product_id', prods.map((p) => p.id));
+        for (const r of (wi ?? []) as any[]) {
+          if (!r.product_id) continue;
+          const free = (Number(r.qty_on_hand) || 0) - (Number(r.qty_reserved) || 0);
+          freeByProduct.set(r.product_id, (freeByProduct.get(r.product_id) ?? 0) + free);
+        }
+      }
+      setLineProdOpts(prods.map((p) => ({ ...p, free: isSales ? (freeByProduct.get(p.id) ?? 0) : null })));
     }, 200);
     return () => clearTimeout(t);
-  }, [activeLine, items, open]);
+  }, [activeLine, items, open, isSales, workspaceId]);
 
   const setItem = (i: number, patch: Partial<Line>) => setItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
   const addLine = () => setItems((ls) => [...ls, blankLine()]);
@@ -706,7 +719,14 @@ const NewOrderModal: React.FC<{
                     {activeLine === i && lineProdOpts.length > 0 && (
                       <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
                         {lineProdOpts.map((p) => (
-                          <button key={p.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => pickProduct(i, p)}>{p.name}</button>
+                          <button key={p.id} type="button" className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => pickProduct(i, p)}>
+                            <span className="truncate">{p.name}</span>
+                            {p.free != null && (
+                              <span className={`shrink-0 text-[11px] tabular-nums ${p.free > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                                {p.free > 0 ? `${p.free} free` : 'out of stock'}
+                              </span>
+                            )}
+                          </button>
                         ))}
                       </div>
                     )}

@@ -38,7 +38,8 @@ Workspace-scoped inventory. Each workspace lazily gets one default "Main" wareho
 - **Receive / Issue / Adjust** → `record_stock_movement(p_item_id, p_direction, p_quantity, p_reason, p_source_type, p_source_id)` (checks `is_workspace_finance_manager`, updates `qty_on_hand`, inserts one movement).
 - **Transfer** → `transfer_stock(p_from_item_id, p_to_warehouse_id, p_qty)`: validates `is_workspace_member`, sufficient stock, **same-workspace** target (cross-tenant transfer impossible by construction); debits source (`out`), find-or-creates the matching item in the target (by `product_id` else `sku`), credits target (`in`). Both movements carry `source_type='transfer'`.
 - **Intake from inbound myDATA** → `inbound_doc_receive_to_warehouse(p_doc_id, p_mappings)`: iterates `{item_id, quantity}` mappings (validates each target belongs to the same workspace), records `in` movements (`source_type='inbound_document'`, `reason='myDATA inbound <mark>'`), marks the document `received`. Line→item mapping is **manual** (no auto SKU match).
-- **Delivery notes** also move stock: `issue_delivery_note` calls `record_stock_movement` for every line with a `warehouse_item_id`.
+- **Delivery notes** also move stock: for an order-linked dispatch note `issue_delivery_note` routes each line through `deliver_order_line` (single `order_items.quantity_delivered` ledger — no double-decrement with the Orders UI); a standalone note (no order) calls `record_stock_movement` per line with a `warehouse_item_id`.
+- **Opening-balance import** → `import_opening_stock(ws, warehouse, lines[])`: bulk-seed a warehouse from pasted `SKU, Qty[, Name, ReorderPoint]` rows. SKUs auto-match catalog products; each row sets on-hand via an audited `adjust` movement (re-paste = reconcile, not double-count). UI: **Inventory → Import**.
 
 Frontend: `WarehousePanel.tsx` (warehouse selector, item table, receive/issue/transfer/delete, `AddItemDialog` catalog search + `AddDealerProductDialog`, `AddWarehouseDialog`); `inboundService.ts` + `InboundSetupCard.tsx` + the Expenses (Inbox) tab in `DocumentsPage`. Mounted in the Finance "Warehouse" tab (`FinancePage.tsx`).
 
@@ -51,7 +52,8 @@ discards a draft. `stock_overview(ws)` powers the module dashboard KPIs. All fou
 `authenticated`-only, self-guarded on membership (reads) or finance-manager + `stock` entitlement (writes).
 
 ### Gaps
-- `qty_reserved` is now co-written by the #237 sourcing spine + marketplace listings (was "never written").
+- `qty_reserved` is now co-written by the #237 sourcing spine + marketplace listings + **plain sales-order auto-reservation** (2026-07-26, see [orders-system.md](orders-system.md)) — was "never written".
+- **Resupply → bulk reorder** (2026-07-26): the Resupply tab has a **Reorder all flagged** action that drafts a replenishment PO for every stockout-risk / below-reorder item with a supplier (per-item, 2 cr each), on top of the existing per-row Reorder.
 - ~~No DB UNIQUE on `(workspace_id, warehouse_id, product_id)`~~ — **fixed**: `uniq_warehouse_items_ws_wh_product` (partial, `product_id not null`).
 - ~~`warehouses` write is `is_workspace_member`~~ — **fixed**: tightened to `is_workspace_finance_manager` (+ `stock` entitlement).
 - Transfer target selection uses `window.prompt()` with >2 warehouses (placeholder UX).

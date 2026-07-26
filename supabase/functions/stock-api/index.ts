@@ -391,6 +391,20 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         return json({ reorder: data }, 201);
       }
 
+      // ── Opening-balance import (bulk seed a warehouse) ───────────────────────
+      case 'import-opening-stock': {
+        const warehouseId = String(body?.warehouse_id ?? '').trim();
+        const lines = Array.isArray(body?.lines) ? body.lines : null;
+        if (!warehouseId) return json({ error: 'target warehouse is required' }, 400);
+        if (!lines || lines.length === 0) return json({ error: 'lines must be a non-empty array' }, 400);
+        if (lines.length > 5000) return json({ error: 'too many lines (max 5000 per import)' }, 400);
+        const { data, error } = await usr.rpc('import_opening_stock', {
+          p_workspace_id: workspaceId, p_warehouse_id: warehouseId, p_lines: lines,
+        });
+        if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
+        return json({ result: data }, 201);
+      }
+
       case 'list-movements': {
         let q = usr.from('stock_movements')
           .select('*, item:warehouse_items!stock_movements_item_id_fkey ( id, name, sku, unit )')

@@ -89,6 +89,24 @@ export interface ReorderResult {
   item_name?: string;
 }
 
+export interface OpeningStockLine {
+  product_id?: string | null;
+  sku?: string | null;
+  name?: string | null;
+  unit?: string | null;
+  qty: number;
+  reorder_point?: number | null;
+  location?: string | null;
+}
+
+export interface OpeningStockImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  error_count: number;
+  errors: { line: number; error: string }[];
+}
+
 export interface ForecastCandidate {
   warehouse_item_id: string;
   name: string;
@@ -238,6 +256,10 @@ export const stockService = {
   // ── Reorder (Stock → Sourcing bridge) — credit-metered ──────────────────────
   reorder: (ws: string, item_id: string, opts: { quantity?: number; supplier_product_id?: string } = {}) =>
     call<{ reorder: ReorderResult }>('reorder', ws, { item_id, ...opts }).then((r) => r.reorder),
+
+  // ── Opening-balance import (bulk seed a warehouse) ──────────────────────────
+  importOpeningStock: (ws: string, warehouse_id: string, lines: OpeningStockLine[]) =>
+    call<{ result: OpeningStockImportResult }>('import-opening-stock', ws, { warehouse_id, lines }).then((r) => r.result),
 
   // ── Stocktake ──────────────────────────────────────────────────────────────
   listCounts: (ws: string) => call<{ counts: StockCount[] }>('list-counts', ws).then((r) => r.counts),
