@@ -542,9 +542,10 @@ async function assertCanAddParticipant(
 
   if (!callerRole) throw new HttpError(403, 'You are not a member of this thread\'s workspace');
 
-  // Agent participants are inert until Phase 2.
+  // Agents are attached/detached via the `set_agent` action (which manages the agent participant
+  // + agent_state), not through add_participant.
   if (target.type === 'agent') {
-    throw new HttpError(400, 'Agent takeover is a Phase 2 capability');
+    throw new HttpError(400, 'Use set_agent to hand a thread to (or take it back from) the assistant.');
   }
 
   // A client (converted/end-user customer) may only add their dealer/sales team — never
@@ -701,9 +702,12 @@ async function insertMessageAndNotify(
         message: body,
         attachmentUrl: undefined,
       });
+      // Store the returned message id as `wamid` so the zernio-webhook-handler's
+      // message.delivered|read|failed handler (which matches `metadata->>wamid`) can apply
+      // delivery/read receipts to THIS outbound message. Keep `relay` for debugging.
       await db
         .from('inbox_messages')
-        .update({ metadata: { channel: 'whatsapp', relay: res } })
+        .update({ metadata: { channel: 'whatsapp', wamid: (res as { messageId?: string })?.messageId ?? null, relay: res } })
         .eq('id', (msg as { id: string }).id);
     }
   }
@@ -1004,8 +1008,8 @@ async function handleJwtAction(
       // Manual hand-to-agent / hand-back (§9). Members only.
       const threadId = String(payload.thread_id || '');
       const state = String(payload.agent_state || '');
-      if (!threadId || !['off', 'suggesting', 'active'].includes(state)) {
-        throw new HttpError(400, 'thread_id and a valid agent_state are required');
+      if (!threadId || !['off', 'active'].includes(state)) {
+        throw new HttpError(400, 'thread_id and a valid agent_state (off|active) are required');
       }
       const thread = await getThreadOrThrow(db, threadId);
       const access = await resolveThreadAccess(db, userId, thread, operator);

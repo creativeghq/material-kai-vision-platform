@@ -2,8 +2,11 @@
  * Inbox Tools — agent-chat surface for the multi-tenant customer Inbox (#209 / #275).
  *
  * ONE tool, actions:
- *   - list  — recent customer conversations (optionally by status)
- *   - reply — send a reply into a conversation (CONFIRM-gated: it's a real customer-facing message)
+ *   - list     — recent customer conversations (optionally by status)
+ *   - reply    — send a reply into a conversation (CONFIRM-gated: it's a real customer-facing message)
+ *   - status   — set a thread open/snoozed/closed
+ *   - handover — hand a thread to the AI assistant (agent_state=active) or take it back (off)
+ *   - label    — set the thread's labels
  *
  * `reply` is a customer-facing send → confirm-gated (Approve/Decline). Everything runs through the
  * validated inbox-api as the user (JWT) — its directional ACL/scope applies. Module `inbox` +
@@ -59,9 +62,33 @@ export const createManageInboxTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, status, thread_id, body, internal_note, confirm }) => {
+    async ({ action, status, thread_id, body, internal_note, confirm, agent_state, label_ids }) => {
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
+
+      // Set a thread's status (open / snoozed / closed) — e.g. "close this conversation".
+      if (action === 'status') {
+        if (!thread_id || !status) return JSON.stringify({ success: false, error: 'status action needs thread_id and status (open|snoozed|closed).' });
+        const r = await callInbox('set_status', { thread_id, status }, jwt);
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `inbox-api ${r.status}` });
+        return JSON.stringify({ success: true, thread_id, status });
+      }
+
+      // Hand a thread to the AI assistant, or take it back — e.g. "let the bot handle this".
+      if (action === 'handover') {
+        if (!thread_id || (agent_state !== 'off' && agent_state !== 'active')) return JSON.stringify({ success: false, error: 'handover needs thread_id and agent_state (active to hand to the bot, off to take it back).' });
+        const r = await callInbox('set_agent', { thread_id, agent_state }, jwt);
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `inbox-api ${r.status}` });
+        return JSON.stringify({ success: true, thread_id, agent_state });
+      }
+
+      // Set the labels on a thread — e.g. "label this urgent". Replaces the current label set.
+      if (action === 'label') {
+        if (!thread_id) return JSON.stringify({ success: false, error: 'label needs thread_id and label_ids[].' });
+        const r = await callInbox('set_thread_labels', { thread_id, label_ids: Array.isArray(label_ids) ? label_ids : [] }, jwt);
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `inbox-api ${r.status}` });
+        return JSON.stringify({ success: true, thread_id, label_ids: label_ids ?? [] });
+      }
 
       if (action === 'list') {
         const r = await callInbox('list_threads', status ? { status } : {}, jwt);
@@ -107,15 +134,18 @@ export const createManageInboxTool = (
     {
       name: 'manage_inbox',
       description:
-        'Customer Inbox: list conversations and reply to one. A customer-facing reply ALWAYS asks the '
-        + 'user to Approve/Decline first (never set confirm:true yourself). Use internal_note:true for a '
-        + 'private team note (not sent to the customer, no confirmation).',
+        'Customer Inbox: list conversations, reply, set status (close/reopen/snooze), hand a thread '
+        + 'to/from the AI assistant, or set its labels. A customer-facing reply ALWAYS asks the user to '
+        + 'Approve/Decline first (never set confirm:true yourself). Use internal_note:true for a private '
+        + 'team note (not sent to the customer, no confirmation).',
       schema: z.object({
-        action: z.enum(['list', 'reply']).default('list'),
-        status: z.string().optional().describe('list: filter by thread status (open/closed/…).'),
-        thread_id: z.string().optional().describe('reply: the conversation id.'),
+        action: z.enum(['list', 'reply', 'status', 'handover', 'label']).default('list'),
+        status: z.string().optional().describe('list: filter by thread status. status action: open|snoozed|closed.'),
+        thread_id: z.string().optional().describe('the conversation id (reply/status/handover/label).'),
         body: z.string().optional().describe('reply: the message text.'),
         internal_note: z.boolean().optional().describe('reply: post as a private internal note instead of a customer-facing message (no confirmation).'),
+        agent_state: z.enum(['off', 'active']).optional().describe('handover: active = hand the thread to the AI; off = take it back.'),
+        label_ids: z.array(z.string()).optional().describe('label: the full set of label ids for the thread (replaces the current set).'),
         confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
       }),
     },

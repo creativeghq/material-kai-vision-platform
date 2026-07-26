@@ -264,7 +264,7 @@ export const inboxApi = {
   setStatus(thread_id: string, status: InboxThreadStatus) {
     return call<{ ok: boolean }>('set_status', { thread_id, status });
   },
-  setAgent(thread_id: string, agent_state: 'off' | 'suggesting' | 'active', agent_id?: string) {
+  setAgent(thread_id: string, agent_state: 'off' | 'active', agent_id?: string) {
     return call<{ ok: boolean; agent_state: string }>('set_agent', { thread_id, agent_state, agent_id });
   },
   getAgentSettings(workspace_id: string) {
