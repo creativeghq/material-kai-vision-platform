@@ -37,6 +37,7 @@ import {
   Check,
   Code2,
   ShieldCheck,
+  Building2,
 } from 'lucide-react';
 import { logger } from '@/config';
 
@@ -189,6 +190,16 @@ const AGENTS: AgentDefinition[] = [
     description: 'SEO research & audits, content, brand-mention & LLM visibility',
     icon: TrendingUp,
     color: 'text-emerald-500',
+    requiredRole: 'member',
+    available: true,
+    defaultModel: 'anthropic/claude-opus-4-8',
+  },
+  {
+    id: 'property-advisor',
+    name: 'Estate',
+    description: 'Real estate — listings, valuations, viewings, offers, leads, lettings',
+    icon: Building2,
+    color: 'text-teal-500',
     requiredRole: 'member',
     available: true,
     defaultModel: 'anthropic/claude-opus-4-8',
