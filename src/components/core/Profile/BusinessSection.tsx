@@ -231,6 +231,36 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
     toast({ title: 'Business profile pre-filled from AADE' });
   };
 
+  const [syncingInvoicing, setSyncingInvoicing] = useState(false);
+  /** One-way sync: copy this saved business identity into the workspace's invoicing profile
+   *  (finance_settings) — the copy invoices + myDATA actually use. Resolves the two-copies drift
+   *  (Profile→crm_companies vs Finance→finance_settings) without forcing a canonical table. */
+  const copyToInvoicing = async () => {
+    if (!activeWorkspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
+    setSyncingInvoicing(true);
+    try {
+      const { error } = await supabase.from('finance_settings').upsert({
+        workspace_id: activeWorkspaceId,
+        business_name: business.name || null,
+        business_vat: business.vat_number || null,
+        business_tax_office: business.tax_office || null,
+        business_profession: business.profession || null,
+        business_address: business.street || null,
+        business_street_number: business.street_number || null,
+        business_postal_code: business.postal_code || null,
+        business_city: business.city || null,
+        business_country: business.country || null,
+        business_phone: business.phone || null,
+        business_email: business.email || null,
+        updated_at: new Date().toISOString(),
+      } as any, { onConflict: 'workspace_id' });
+      if (error) throw error;
+      toast({ title: 'Copied to invoicing profile', description: 'Finance → Business Identity now matches this — that copy is what invoices + myDATA use.' });
+    } catch (err: any) {
+      toast({ title: 'Copy failed', description: err?.message, variant: 'destructive' });
+    } finally { setSyncingInvoicing(false); }
+  };
+
   const startEdit = () => {
     setBusinessForm({ ...business });
     setPendingEntityType(entityType);
@@ -354,9 +384,18 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
             <Building2 className="h-5 w-5 text-primary" />Business
           </CardTitle>
           {!editing ? (
-            <Button size="sm" onClick={startEdit} disabled={loading}>
-              <Pencil className="h-3.5 w-3.5 mr-1.5" />Edit
-            </Button>
+            <div className="flex gap-2">
+              {entityType === 'business' && business.name && activeWorkspaceId && (
+                <Button size="sm" variant="outline" onClick={copyToInvoicing} disabled={syncingInvoicing}
+                  title="Copy this identity into Finance → Business Identity (the copy invoices + myDATA use)">
+                  {syncingInvoicing ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CornerDownLeft className="h-3.5 w-3.5 mr-1.5" />}
+                  Copy to invoicing
+                </Button>
+              )}
+              <Button size="sm" onClick={startEdit} disabled={loading}>
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />Edit
+              </Button>
+            </div>
           ) : (
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={cancelEdit}>
