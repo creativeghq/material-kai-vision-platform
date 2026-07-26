@@ -117,7 +117,7 @@ export const MoodboardSavePopover: React.FC<MoodboardSavePopoverProps> = ({
                 key={mb.id}
                 onClick={() => handleSave(mb)}
                 disabled={saving === mb.id}
-                className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-accent text-sm transition-colors disabled:opacity-60"
+                className="group w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-accent text-sm transition-colors disabled:opacity-60"
               >
                 <span className="truncate text-left">{mb.title}</span>
                 {saving === mb.id

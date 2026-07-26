@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 
 import {
@@ -13,8 +13,10 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { quotesService } from '../services/QuotesService';
 import { ProjectPickerInline } from '@/modules/projects/components/ProjectPickerInline';
+import { CustomerPicker, type QuoteCustomer } from '@/modules/quotes/components/CustomerPicker';
 
 interface CreateQuoteModalProps {
   open: boolean;
@@ -34,7 +36,29 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
   const [quoteName, setQuoteName] = useState('');
   const [notes, setNotes] = useState('');
   const [projectId, setProjectId] = useState<string | null>(defaultProjectId);
+  const [customer, setCustomer] = useState<QuoteCustomer | null>(null);
   const [processing, setProcessing] = useState(false);
+
+  // When a project is picked and no customer is set yet, inherit the project's client so pricing +
+  // email + invoicing all resolve against the right party.
+  useEffect(() => {
+    if (!projectId || customer) return;
+    let cancelled = false;
+    void supabase.from('projects').select('client_company_id, client_contact_id').eq('id', projectId).single()
+      .then(async ({ data }) => {
+        if (cancelled || !data) return;
+        const companyId = (data as any).client_company_id as string | null;
+        const contactId = (data as any).client_contact_id as string | null;
+        if (companyId) {
+          const { data: c } = await supabase.from('crm_companies').select('name').eq('id', companyId).maybeSingle();
+          if (!cancelled) setCustomer({ type: 'company', id: companyId, label: `${(c as any)?.name ?? 'Customer'} (company)` });
+        } else if (contactId) {
+          const { data: c } = await supabase.from('crm_contacts').select('name').eq('id', contactId).maybeSingle();
+          if (!cancelled) setCustomer({ type: 'contact', id: contactId, label: (c as any)?.name ?? 'Customer' });
+        }
+      });
+    return () => { cancelled = true; };
+  }, [projectId, customer]);
 
   const handleCreate = async () => {
     if (!quoteName.trim()) {
@@ -52,6 +76,8 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
         name: quoteName,
         notes: notes || undefined,
         project_id: projectId,
+        customer_company_id: customer?.type === 'company' ? customer.id : null,
+        customer_contact_id: customer?.type === 'contact' ? customer.id : null,
       });
 
       toast({
@@ -62,6 +88,7 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
       onSuccess(newQuote.id, quoteName);
       setQuoteName('');
       setNotes('');
+      setCustomer(null);
       onClose();
     } catch (error) {
       console.error('Error creating quote:', error);
@@ -115,6 +142,9 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
             hideRoomPicker
             disabled={processing}
           />
+
+          <CustomerPicker value={customer} onChange={setCustomer} disabled={processing} />
+          <p className="-mt-2 text-[11px] text-muted-foreground">Sets customer-level pricing, the email recipient, and the bill-to on invoicing.</p>
 
           <div className="flex gap-3 pt-4">
             <Button

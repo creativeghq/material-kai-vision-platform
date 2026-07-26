@@ -352,6 +352,9 @@ export interface MoodBoard {
   /** Lifecycle status. 'completed' lets the storage-retention sweep purge the
    *  board's regenerable sheet PDFs (they rebuild on open). Defaults to 'active'. */
   status?: 'active' | 'completed' | 'archived';
+  /** Set by the dormancy cron when an idle board is scheduled for hard-deletion; surfaced in-app
+   *  as an at-risk badge + "Keep active" rescue so a user isn't silently deleted. */
+  deletionScheduledAt?: string | null;
 }
 
 export interface MoodBoardItem {

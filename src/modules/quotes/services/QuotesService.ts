@@ -389,6 +389,10 @@ export class QuotesService {
       notes?: string;
       status?: Quote['status'];
       custom_request_text?: string;
+      // A quote born without a customer can be given one later (drives pricing/email/invoicing).
+      // Pass exactly one; the other is nulled so the pair stays mutually exclusive.
+      customer_company_id?: string | null;
+      customer_contact_id?: string | null;
     },
   ): Promise<Quote> {
     const { data: quote, error } = await supabase

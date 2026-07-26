@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Plus, FileText, Loader2, Download, ExternalLink, Pencil, Trash2, AlertCircle, RotateCw, Copy, Share2, Check } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
@@ -19,8 +18,10 @@ import {
   SHEET_TYPE_CREDITS,
 } from '@/services/moodboardSheetsService';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { SheetTypePreviewModal } from '@/components/features/sheets/SheetTypePreviewModal';
 import { SheetWizardModal, type SheetWizardResult } from '@/components/features/sheets/SheetWizardModal';
+import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
 
 interface MoodboardSheetsTabProps {
   moodboardId: string;
@@ -40,6 +41,9 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
   full_deck: 'Multi-page presentation deck assembling outputs from other tools',
 };
 
+// Sheet types finished on a drawing canvas (SheetCanvasCard) rather than up-front wizard inputs.
+const INTERACTIVE_SHEET_TYPES = new Set<SheetType>(['annotated_render', 'elevation_render_pair', 'lighting_plan', 'plumbing_plan']);
+
 const SHEET_GROUPS: { label: string; types: SheetType[] }[] = [
   { label: 'Boards', types: ['material_board', 'color_palette', 'concept_board', 'area_breakdown'] },
   { label: 'Plans', types: ['lighting_plan', 'plumbing_plan', 'annotated_render', 'elevation_render_pair'] },
@@ -48,7 +52,6 @@ const SHEET_GROUPS: { label: string; types: SheetType[] }[] = [
 ];
 
 export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardSheetsTabProps) {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [sheets, setSheets] = useState<PresentationSheet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +63,20 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
   // The guided creation wizard (replaces the seeded-chat handoff).
   const [wizardType, setWizardType] = useState<SheetType | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  // The in-tab canvas for interactive sheets — mounts SheetCanvasCard DIRECTLY so finishing a
+  // paid draft is deterministic (was a prose /agent-hub prompt that only worked if the LLM
+  // happened to call the sheet tool → paid-but-stuck when it didn't).
+  const [canvasSheet, setCanvasSheet] = useState<PresentationSheet | null>(null);
+
+  const openCanvas = async (sheetId: string) => {
+    try {
+      const sheet = await moodboardSheetsService.get(sheetId);
+      if (sheet) setCanvasSheet(sheet);
+      else toast({ title: 'Sheet not found', variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Could not open the canvas', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+    }
+  };
 
   const reloadSheets = async () => {
     try {
@@ -111,9 +128,7 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
     void reloadSheets();
     if (res.is_interactive) {
       toast({ title: 'Draft created', description: 'Finishing it in the canvas…' });
-      const params = new URLSearchParams();
-      params.set('prompt', `Continue editing sheet ${res.sheet_id} (${SHEET_TYPE_LABELS[res.sheet_type]}, "${res.title}") on moodboard ${moodboardId}.`);
-      navigate(`/agent-hub?${params.toString()}`);
+      void openCanvas(res.sheet_id);
     } else {
       toast({ title: 'Sheet ready', description: `${res.title} generated${res.credits_charged ? ` · ${res.credits_charged} cr` : ''}.` });
     }
@@ -152,12 +167,10 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
   };
 
   const handleEdit = (sheet: PresentationSheet) => {
-    const params = new URLSearchParams();
-    params.set(
-      'prompt',
-      `Continue editing sheet ${sheet.id} (${SHEET_TYPE_LABELS[sheet.sheet_type]}, "${sheet.title}") on moodboard ${moodboardId}.`,
-    );
-    navigate(`/agent-hub?${params.toString()}`);
+    // Interactive sheets edit in the in-tab canvas; passive sheets have no canvas — re-run the
+    // wizard for them (their inputs are collected up-front, not drawn).
+    if (INTERACTIVE_SHEET_TYPES.has(sheet.sheet_type)) void openCanvas(sheet.id);
+    else { setWizardType(sheet.sheet_type); setWizardOpen(true); }
   };
 
   const handleRetry = async (sheet: PresentationSheet) => {
@@ -231,6 +244,25 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
         presetType={wizardType ?? undefined}
         onCreated={handleSheetCreated}
       />
+
+      {/* Deterministic in-tab canvas for interactive sheets (no LLM round-trip). */}
+      <Dialog open={!!canvasSheet} onOpenChange={(o) => { if (!o) { setCanvasSheet(null); void reloadSheets(); } }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{canvasSheet ? SHEET_TYPE_LABELS[canvasSheet.sheet_type] : 'Sheet'}</DialogTitle>
+            <DialogDescription className="sr-only">Finish this sheet on the canvas.</DialogDescription>
+          </DialogHeader>
+          {canvasSheet && (
+            <SheetCanvasCard
+              sheetId={canvasSheet.id}
+              sheetType={canvasSheet.sheet_type}
+              moodboardId={moodboardId}
+              initialData={canvasSheet.data ?? {}}
+              title={canvasSheet.title}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* New Tool launcher */}
       <div className="flex items-center justify-between flex-wrap gap-3">

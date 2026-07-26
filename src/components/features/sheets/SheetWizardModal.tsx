@@ -84,6 +84,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [quoteId, setQuoteId] = useState('');
   const [heroUrl, setHeroUrl] = useState('');
+  const [planUrl, setPlanUrl] = useState('');
   const [subtitle, setSubtitle] = useState('');
   const [backdropKind, setBackdropKind] = useState<'upload' | 'rect'>('upload');
   const [backdropUrl, setBackdropUrl] = useState('');
@@ -110,7 +111,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
     setMoodboardId(presetMoodboardId ?? '');
     setTitle('');
     setStepIdx(0);
-    setProductIds([]); setImageUrls([]); setQuoteId(''); setHeroUrl(''); setSubtitle('');
+    setProductIds([]); setImageUrls([]); setQuoteId(''); setHeroUrl(''); setPlanUrl(''); setSubtitle('');
     setBackdropKind('upload'); setBackdropUrl(''); setRectW(''); setRectH('');
     setElevationUrl(''); setIncludedSheetIds([]);
   }, [open, presetType, presetMoodboardId]);
@@ -213,7 +214,12 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
         return { data: { quote_id: quoteId } };
       case 'area_breakdown':
         if (!heroUrl) return { error: 'Add a hero render image.' };
-        return { data: { hero_image_url: heroUrl, ...(subtitle ? { subtitle } : {}) } };
+        return { data: {
+          hero_image_url: heroUrl,
+          ...(planUrl ? { plan_image_url: planUrl } : {}),
+          ...(elevationUrl ? { elevation_image_url: elevationUrl } : {}),
+          ...(subtitle ? { subtitle } : {}),
+        } };
       case 'lighting_plan':
       case 'plumbing_plan':
         if (backdropKind === 'upload') {
@@ -383,6 +389,8 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
             {!loadingData && type === 'area_breakdown' && (
               <div className="space-y-2">
                 <ImagePick label="Hero render" value={heroUrl} onChange={setHeroUrl} items={items} onUpload={uploadImage} />
+                <ImagePick label="Dimensioned plan (optional)" value={planUrl} onChange={setPlanUrl} items={items} onUpload={uploadImage} />
+                <ImagePick label="Elevation (optional)" value={elevationUrl} onChange={setElevationUrl} items={items} onUpload={uploadImage} />
                 <div><Label className="text-xs">Subtitle (optional)</Label><Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g. Modern Bathroom Design" /></div>
               </div>
             )}

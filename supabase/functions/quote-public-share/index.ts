@@ -91,6 +91,27 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     if (!signer_name || typeof signer_name !== 'string' || signer_name.trim().length < 2) {
       return jsonResponse({ error: 'A signer name is required to accept.' }, 400);
     }
+
+    // Mirror the in-app acceptQuote guards — a public signer must not be able to accept a quote the
+    // app would refuse. Without these, the accept trigger materializes an order + pre-invoice off
+    // incomplete totals (expired offer, unpriced "call for price" lines, or undecided upsells).
+    {
+      const { data: gq } = await supabase.from('quotes').select('status, expires_at').eq('id', quote.id).maybeSingle();
+      const g = gq as { status?: string; expires_at?: string } | null;
+      if (g?.status === 'expired' || (g?.expires_at && new Date(g.expires_at).getTime() < Date.now())) {
+        return jsonResponse({ error: 'This quote has expired. Please request an updated quote.' }, 409);
+      }
+      const { count: unpriced } = await supabase.from('quote_items')
+        .select('id', { count: 'exact', head: true }).eq('quote_id', quote.id).neq('pricing_status', 'priced');
+      if ((unpriced ?? 0) > 0) {
+        return jsonResponse({ error: 'This quote has line(s) awaiting a price and cannot be accepted yet. Please contact the sender.' }, 409);
+      }
+      const { count: pendingUpsells } = await supabase.from('quote_upsells')
+        .select('id', { count: 'exact', head: true }).eq('quote_id', quote.id).is('customer_accepted', null);
+      if ((pendingUpsells ?? 0) > 0) {
+        return jsonResponse({ error: 'This quote has optional extra(s) still to be decided. Please contact the sender.' }, 409);
+      }
+    }
     const canonical = JSON.stringify({
       id: quote.id,
       grand_total: quote.grand_total,
@@ -119,6 +140,15 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     if (quote.status !== 'accepted') {
       await supabase.from('quotes').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', quote.id);
       if (plan?.id) await supabase.from('project_plans').update({ status: 'approved' }).eq('id', plan.id);
+      // Parity with the in-app path: seed the project timeline so a share-accepted quote isn't left
+      // without steps (the admin otherwise has to "Initialize All Steps" by hand).
+      const { count: tlCount } = await supabase.from('quote_timeline').select('id', { count: 'exact', head: true }).eq('quote_id', quote.id);
+      if ((tlCount ?? 0) === 0) {
+        const { data: steps } = await supabase.from('timeline_steps').select('id').eq('is_active', true).order('display_order', { ascending: true });
+        if (steps && steps.length) {
+          await supabase.from('quote_timeline').insert(steps.map((s: any) => ({ quote_id: quote.id, timeline_step_id: s.id, status: 'pending' })));
+        }
+      }
     }
     return jsonResponse({ ok: true, accepted: true, signed_at: new Date().toISOString() });
   }

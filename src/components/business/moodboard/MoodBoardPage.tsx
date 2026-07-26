@@ -31,7 +31,7 @@ import {
   type CreateMoodBoardData,
 } from '@/services/moodboardAPI';
 import type { MoodBoard } from '@/types/materials';
-import { quotesService } from '@/modules/quotes/services/QuotesService';
+import { createProposalFromMoodboard } from '@/components/business/moodboard/createProposalFromMoodboard';
 import { useNavigate } from 'react-router-dom';
 import { DashboardCard } from '@/components/core/DesignSystem/DashboardCard';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -111,51 +111,16 @@ export const MoodBoardPage = () => {
   };
 
   const handleCreateProposal = async (moodboardId: string, moodboardTitle: string) => {
-    const moodboard = moodboards.find(b => b.id === moodboardId);
-    if (!moodboard || !moodboard.items || moodboard.items.length === 0) {
-      toast({
-        title: 'Error',
-        description: 'Cannot create proposal from empty moodboard',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setCreatingProposal(moodboardId);
     try {
-      // Create a new quote
-      const quote = await quotesService.createQuote({
-        name: `Proposal from ${moodboardTitle}`,
-        notes: `Created from moodboard: ${moodboardTitle}`,
-      });
-
-      // Add all moodboard items to the quote
-      for (const item of moodboard.items) {
-        if (item.material_id) {
-          await quotesService.addItem({
-            quote_id: quote.id,
-            product_id: item.material_id,
-            quantity: 1,
-            notes: item.notes || '',
-            added_from: 'moodboard',
-          });
-        }
-      }
-
-      toast({
-        title: 'Proposal Created',
-        description: `Quote created with ${moodboard.items.length} items from "${moodboardTitle}"`,
-      });
-
-      // Navigate to the quote builder
-      navigate(`/quotes?quote=${quote.id}`);
-    } catch (error) {
+      // Shared path with the detail page: carries project + client + moodboard_id FK and adds
+      // every item (catalog + non-catalog). Was a divergent copy that dropped all three.
+      const { quoteId, itemCount } = await createProposalFromMoodboard(moodboardId, moodboardTitle);
+      toast({ title: 'Proposal Created', description: `Quote created with ${itemCount} items from "${moodboardTitle}"` });
+      navigate(`/quotes?quote=${quoteId}`);
+    } catch (error: any) {
       console.error('Error creating proposal:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create proposal from moodboard',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error?.message ?? 'Failed to create proposal from moodboard', variant: 'destructive' });
     } finally {
       setCreatingProposal(null);
     }

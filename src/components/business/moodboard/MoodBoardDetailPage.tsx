@@ -33,7 +33,7 @@ import type { Product } from '@/components/features/products/types';
 import { PinterestImportModal } from './PinterestImportModal';
 import { MoodboardProductSearchModal } from './MoodboardProductSearchModal';
 import { RecommendationsService } from '@/services/recommendationsService';
-import { quotesService } from '@/modules/quotes/services/QuotesService';
+import { createProposalFromMoodboard } from '@/components/business/moodboard/createProposalFromMoodboard';
 import { supabase } from '@/integrations/supabase/client';
 import { getProductName, getManufacturer } from '@/utils/productMetadata';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -167,6 +167,17 @@ export const MoodBoardDetailPage: React.FC = () => {
     }
   };
 
+  const handleKeepActive = async () => {
+    if (!moodboard) return;
+    try {
+      await moodboardAPI.keepActive(moodboard.id);
+      setMoodboard({ ...moodboard, deletionScheduledAt: null });
+      toast({ title: 'Kept active', description: 'This board will no longer be auto-deleted.' });
+    } catch {
+      toast({ title: 'Error', description: 'Could not keep the board active', variant: 'destructive' });
+    }
+  };
+
   const handleToggleShare = async () => {
     if (!moodboard) return;
     const newPublic = !moodboard.isPublic;
@@ -206,54 +217,11 @@ export const MoodBoardDetailPage: React.FC = () => {
     }
     setCreatingProposal(true);
     try {
-      // Carry the board's project + its client through, so the quote is billable and shows up in
-      // the project's Quotes/Billing/Finance tabs instead of being an orphaned, customer-less quote.
-      let projectId: string | null = null;
-      let customerCompanyId: string | null = null;
-      let customerContactId: string | null = null;
-      try {
-        const { data: mb } = await supabase.from('moodboards').select('project_id').eq('id', moodboard.id).single();
-        projectId = (mb as any)?.project_id ?? null;
-        if (projectId) {
-          const { data: proj } = await supabase.from('projects').select('client_company_id, client_contact_id').eq('id', projectId).single();
-          customerCompanyId = (proj as any)?.client_company_id ?? null;
-          customerContactId = (proj as any)?.client_contact_id ?? null;
-        }
-      } catch { /* non-fatal — quote still created, just without the links */ }
-
-      const quote = await quotesService.createQuote({
-        name: `Proposal from ${moodboard.title}`,
-        notes: `Created from moodboard: ${moodboard.title}`,
-        project_id: projectId,
-        customer_company_id: customerCompanyId,
-        customer_contact_id: customerContactId,
-        moodboard_id: moodboard.id,
-      });
-      // Add EVERY item — catalog products as product lines, non-catalog (pinned inspiration /
-      // Pinterest imports) as custom lines — so nothing is silently dropped.
-      for (const item of items) {
-        if (item.material_id) {
-          await quotesService.addItem({
-            quote_id: quote.id,
-            product_id: item.material_id,
-            quantity: 1,
-            notes: item.notes || '',
-            added_from: 'manual',
-          });
-        } else {
-          await quotesService.addCustomItem({
-            quote_id: quote.id,
-            custom_product_name: (item as any).media_title || 'Inspiration item',
-            custom_image_url: (item as any).media_url || undefined,
-            quantity: 1,
-            notes: item.notes || '',
-          });
-        }
-      }
-      toast({ title: 'Proposal Created', description: `Quote created with ${items.length} items` });
-      navigate(`/quotes?quote=${quote.id}`);
-    } catch {
-      toast({ title: 'Error', description: 'Failed to create proposal', variant: 'destructive' });
+      const { quoteId, itemCount } = await createProposalFromMoodboard(moodboard.id, moodboard.title);
+      toast({ title: 'Proposal Created', description: `Quote created with ${itemCount} items` });
+      navigate(`/quotes?quote=${quoteId}`);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error?.message ?? 'Failed to create proposal', variant: 'destructive' });
     } finally {
       setCreatingProposal(false);
     }
@@ -363,6 +331,18 @@ export const MoodBoardDetailPage: React.FC = () => {
           </Button>
         }
       />
+
+      {/* At-risk banner — a dormant board scheduled for hard-deletion, with an in-app rescue so the
+          user isn't silently deleted after missing the email/bell warnings. */}
+      {moodboard.deletionScheduledAt && (
+        <div className="mt-4 mx-2 sm:mx-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm">
+            <span className="font-medium text-amber-600">Scheduled for deletion</span>{' '}
+            <span className="text-muted-foreground">— this board has been idle and will be removed on {new Date(moodboard.deletionScheduledAt).toLocaleDateString()}.</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={handleKeepActive}>Keep active</Button>
+        </div>
+      )}
 
       {/* ── Hero Section ─────────────────────────────────────────────────── */}
       {/* Fixed 240px on mobile clipped the title off the top: the bottom-anchored

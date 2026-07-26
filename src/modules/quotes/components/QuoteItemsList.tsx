@@ -671,13 +671,14 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 )}
                               </div>
 
-                              {/* Delivery Date — admin edits via editPricing, customer sees only when showPricing (quoted/accepted) */}
-                              {(editPricing || (showPricing && item.delivery_date)) && (
+                              {/* Delivery Date — editable via the always-on `editable` path (like room /
+                                  installation) OR the pricing tab; customers see it read-only once quoted. */}
+                              {(editable || editPricing || (showPricing && item.delivery_date)) && (
                                 <div className="space-y-1">
                                   <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                                     <Truck className="h-3 w-3" /> Expected Delivery
                                   </label>
-                                  {editPricing ? (
+                                  {(editable || editPricing) && onUpdateItem ? (
                                     <Input
                                       type="date"
                                       defaultValue={item.delivery_date || ''}

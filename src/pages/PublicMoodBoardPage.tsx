@@ -141,7 +141,9 @@ export default function PublicMoodBoardPage() {
   const materialItems = items.filter((i) => i.material_id && i.material);
   const mediaItems = items.filter((i) => i.media_url && !i.material_id);
   const isOwner = !!userId && board!.user_id === userId;
-  const canRequestQuote = materialItems.length > 0 && !isOwner;
+  // Any non-empty board can generate a lead — media-only boards submit inspiration items as custom
+  // quote lines (see moodboardAPI.requestQuoteFromMoodboard), so the CTA isn't hidden on them.
+  const canRequestQuote = (materialItems.length > 0 || mediaItems.length > 0) && !isOwner;
 
   const RequestQuoteButton = ({ className = '' }: { className?: string }) => (
     <Button

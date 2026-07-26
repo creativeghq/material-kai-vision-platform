@@ -131,8 +131,20 @@ class MoodBoardAPI {
         items,
         createdAt: new Date(board.created_at),
         updatedAt: new Date(board.updated_at),
+        status: board.status ?? 'active',
+        deletionScheduledAt: board.deletion_scheduled_at ?? null,
       };
     });
+  }
+
+  /** Cancel a scheduled dormancy deletion — clears the warning/deletion markers and touches the
+   *  board so the idle clock restarts. The in-app "Keep active" rescue for an at-risk board. */
+  async keepActive(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('moodboards')
+      .update({ dormancy_warned_at: null, dormancy_reminder_at: null, deletion_scheduled_at: null, updated_at: new Date().toISOString() } as any)
+      .eq('id', id);
+    if (error) throw error;
   }
 
   // Get a specific moodboard by ID
@@ -158,6 +170,7 @@ class MoodBoardAPI {
       projectId: (data as any).project_id ?? null,
       roomId: (data as any).room_id ?? null,
       status: (data as any).status ?? 'active',
+      deletionScheduledAt: (data as any).deletion_scheduled_at ?? null,
     };
   }
 
@@ -601,27 +614,39 @@ class MoodBoardAPI {
 
     const { data: items, error: itemsErr } = await supabase
       .from('moodboard_items')
-      .select('material_id, notes')
+      .select('material_id, notes, media_title, media_url')
       .eq('moodboard_id', moodboardId);
     if (itemsErr) throw itemsErr;
-    const products = (items || []).filter((i) => i.material_id);
-    if (products.length === 0) {
-      throw new Error('This moodboard has no products to quote.');
+    const allItems = items || [];
+    if (allItems.length === 0) {
+      throw new Error('This moodboard is empty.');
     }
 
-    // Build + submit a quote owned by the requester from the board's products.
+    // Build + submit a quote owned by the requester from EVERY board item — catalog products as
+    // product lines, media-only (AI / Pinterest / VR) as custom lines — so a purely-inspirational
+    // board (no catalog products) can still generate a lead instead of a hidden CTA.
     const quote = await quotesService.createQuote({
       name: `Quote request: ${board.title}`,
       notes: `Requested from shared moodboard "${board.title}"`,
     });
-    for (const item of products) {
-      await quotesService.addItem({
-        quote_id: quote.id,
-        product_id: item.material_id as string,
-        quantity: 1,
-        notes: item.notes || '',
-        added_from: 'moodboard',
-      });
+    for (const item of allItems) {
+      if (item.material_id) {
+        await quotesService.addItem({
+          quote_id: quote.id,
+          product_id: item.material_id as string,
+          quantity: 1,
+          notes: item.notes || '',
+          added_from: 'moodboard',
+        });
+      } else {
+        await quotesService.addCustomItem({
+          quote_id: quote.id,
+          custom_product_name: (item as any).media_title || 'Inspiration item',
+          custom_image_url: (item as any).media_url || undefined,
+          quantity: 1,
+          notes: item.notes || '',
+        });
+      }
     }
     await quotesService.submitQuote(quote.id, `From moodboard: ${board.title}`);
 

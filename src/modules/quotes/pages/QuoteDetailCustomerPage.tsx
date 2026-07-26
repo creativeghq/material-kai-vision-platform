@@ -719,6 +719,8 @@ export const QuoteDetailCustomerPage: React.FC = () => {
         onOpenChange={setShowAddProducts}
         quoteId={quote.id}
         existingProductIds={quote.items?.map(item => item.product_id) || []}
+        customerCompanyId={(quote as any).customer_company_id}
+        customerContactId={(quote as any).customer_contact_id}
         onProductsAdded={loadQuoteDetails}
       />
     </div>

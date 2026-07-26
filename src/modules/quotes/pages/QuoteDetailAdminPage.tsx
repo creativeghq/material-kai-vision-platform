@@ -14,6 +14,7 @@ import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '../services/QuotesService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
+import { CustomerPicker, type QuoteCustomer } from '@/modules/quotes/components/CustomerPicker';
 import { masterRequestsService } from '@/services/masterRequestsService';
 import { quotePDFService } from '../services/QuotePDFService';
 import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
@@ -872,6 +873,16 @@ export const QuoteDetailPage: React.FC = () => {
           )}
         </div>
 
+        {/* Customer — editable so a quote created without one (the common case from the New Quote
+            modal / Add-to-Quote) can be given a party: drives pricing pyramid, email recipient,
+            bill-to on invoicing. */}
+        <QuoteCustomerRow
+          quoteId={quote.id}
+          companyId={quote.customer_company_id ?? null}
+          contactId={quote.customer_contact_id ?? null}
+          onSaved={loadQuoteDetails}
+        />
+
         {/* Bill-to address — choose the customer's main address or one of their sub-units.
             Self-hides when the party has no sub-units. Propagates to the invoice on conversion. */}
         {(quote.customer_company_id || quote.customer_contact_id) && (
@@ -1652,6 +1663,42 @@ export const QuoteDetailPage: React.FC = () => {
           onProductsAdded={loadQuoteDetails}
         />
       )}
+    </div>
+  );
+};
+
+/** Editable customer on the quote — resolves the current party's name, lets the operator set/change
+ *  it, and writes the mutually-exclusive company/contact pair back via updateQuote. */
+const QuoteCustomerRow: React.FC<{ quoteId: string; companyId: string | null; contactId: string | null; onSaved: () => void }> = ({ quoteId, companyId, contactId, onSaved }) => {
+  const [cust, setCust] = useState<QuoteCustomer | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (companyId) {
+        const { data } = await supabase.from('crm_companies').select('name').eq('id', companyId).maybeSingle();
+        if (!cancelled) setCust({ type: 'company', id: companyId, label: `${(data as any)?.name ?? 'Customer'} (company)` });
+      } else if (contactId) {
+        const { data } = await supabase.from('crm_contacts').select('name').eq('id', contactId).maybeSingle();
+        if (!cancelled) setCust({ type: 'contact', id: contactId, label: (data as any)?.name ?? 'Customer' });
+      } else if (!cancelled) setCust(null);
+    })();
+    return () => { cancelled = true; };
+  }, [companyId, contactId]);
+
+  return (
+    <div className="max-w-md">
+      <CustomerPicker
+        value={cust}
+        label="Customer"
+        onChange={async (v) => {
+          setCust(v);
+          await quotesService.updateQuote(quoteId, {
+            customer_company_id: v?.type === 'company' ? v.id : null,
+            customer_contact_id: v?.type === 'contact' ? v.id : null,
+          });
+          onSaved();
+        }}
+      />
     </div>
   );
 };
