@@ -180,6 +180,7 @@ export const MarketplaceTab: React.FC = () => {
   const { user } = useAuth();
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [values, setValues] = useState<FilterValues>({});
   // Highest price seen so far — the slider end must not shrink as the result set narrows.
   const [priceCeiling, setPriceCeiling] = useState(1000);
@@ -217,7 +218,12 @@ export const MarketplaceTab: React.FC = () => {
     }
   };
   const removeAlert = async (id: string) => {
-    try { await marketplaceService.deleteWantList(id); await loadAlerts(); } catch { /* noop */ }
+    try {
+      await marketplaceService.deleteWantList(id);
+      await loadAlerts();
+    } catch (err: any) {
+      toast({ title: 'Could not delete alert', description: err?.message, variant: 'destructive' });
+    }
   };
 
   const load = async () => {
@@ -227,11 +233,18 @@ export const MarketplaceTab: React.FC = () => {
       const rows = await marketplaceService.browse({ ...toBrowseFilters(values), limit: PAGE_LIMIT });
       if (mySeq === seq.current) {
         setListings(rows);
+        setLoadError(false);
         const max = Math.max(0, ...rows.map((r) => Number(r.price) || 0));
         setPriceCeiling((prev) => Math.max(prev, Math.ceil(max / 100) * 100));
       }
-    } catch {
-      if (mySeq === seq.current) setListings([]);
+    } catch (err: any) {
+      // Distinguish a load failure from a genuinely empty marketplace — otherwise a backend/RLS/network
+      // hiccup reads as "nothing for sale" and the user leaves.
+      if (mySeq === seq.current) {
+        setListings([]);
+        setLoadError(true);
+        toast({ title: 'Could not load the marketplace', description: err?.message || 'Please try again.', variant: 'destructive' });
+      }
     } finally {
       if (mySeq === seq.current) setLoading(false);
     }
@@ -309,7 +322,9 @@ export const MarketplaceTab: React.FC = () => {
           {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-60 rounded-2xl skeleton" />)}
         </div>
       ) : count === 0 ? (
-        <Empty text="No surplus listings yet — be the first to list from your warehouse." />
+        <Empty text={loadError
+          ? "Couldn't load the marketplace — check your connection and try again."
+          : 'No surplus listings yet — be the first to list from your warehouse.'} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {listings.map((l) => <ListingCard key={l.id} l={l} onOpen={setSelected} />)}

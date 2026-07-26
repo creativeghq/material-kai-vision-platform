@@ -1212,11 +1212,13 @@ const _financeServiceCore = {
     amount: number; invoice_id: string; internal_number: string | null;
     currency: string | null; total: number | null; fiscal_mark: string | null; status: string | null;
   }>> {
+    // payment_allocations has no `target_type` column — the target is whichever *_id FK is set.
+    // Invoice allocations are the rows with a non-null invoice_id (the embed resolves via that FK).
     const { data, error } = await supabase
       .from('payment_allocations')
-      .select('amount, target_type, invoice:invoices(id, internal_number, currency, total, fiscal_mark, status)')
+      .select('amount, invoice_id, invoice:invoices(id, internal_number, currency, total, fiscal_mark, status)')
       .eq('payment_id', paymentId)
-      .eq('target_type', 'invoice');
+      .not('invoice_id', 'is', null);
     if (error) throw error;
     return (data ?? [])
       .filter((r: any) => r.invoice)

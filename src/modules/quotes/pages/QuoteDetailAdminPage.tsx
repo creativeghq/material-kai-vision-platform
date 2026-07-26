@@ -109,7 +109,17 @@ export const QuoteDetailPage: React.FC = () => {
       financeService.getSettings(ws).then((s) => {
         setNegMarginPolicy((s as any)?.negative_margin_policy || 'warn');
         setSalesCanSeeCost((s as any)?.sales_can_see_cost !== false);
-      }).catch(() => {});
+      }).catch(() => {
+        // Fail SAFE instead of silently keeping the permissive defaults: hide cost from sales (rather
+        // than defaulting to visible) and tell the operator the finance policy didn't load — so a
+        // workspace configured to BLOCK negative-margin quotes isn't silently shown as warn-only.
+        setSalesCanSeeCost(false);
+        toast({
+          title: 'Finance settings could not be loaded',
+          description: 'Cost is hidden and margin controls may be limited until this loads — refresh to retry.',
+          variant: 'destructive',
+        });
+      });
     }
   }, [quote?.id]);
 

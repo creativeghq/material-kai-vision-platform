@@ -137,12 +137,21 @@ export const ContractsSection: React.FC<{
     } finally { setBusy(false); }
   };
 
+  // Returns true only if the clipboard write actually succeeded. In a non-secure context or when
+  // permission is denied, navigator.clipboard.writeText rejects — the caller must then SHOW the URL,
+  // because the signing link is delivered nowhere else.
+  const tryCopy = async (text: string): Promise<boolean> => {
+    try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
+  };
+
   const send = async (c: Contract) => {
     try {
       const { sign_path } = await contractsService.send(workspaceId, c.id);
       const url = `${window.location.origin}${sign_path}`;
-      await navigator.clipboard.writeText(url).catch(() => {});
-      toast({ title: 'Signing link ready', description: 'Copied to clipboard — send it to the signer.' });
+      const copied = await tryCopy(url);
+      toast(copied
+        ? { title: 'Signing link ready', description: 'Copied to clipboard — send it to the signer.' }
+        : { title: 'Signing link ready — copy it manually', description: url });
       await load();
     } catch (err: any) {
       toast({ title: 'Could not send', description: err?.message, variant: 'destructive' });
@@ -151,8 +160,11 @@ export const ContractsSection: React.FC<{
 
   const copyLink = async (c: Contract) => {
     if (!c.sign_token) return;
-    await navigator.clipboard.writeText(`${window.location.origin}/sign/${c.sign_token}`).catch(() => {});
-    toast({ title: 'Signing link copied' });
+    const url = `${window.location.origin}/sign/${c.sign_token}`;
+    const copied = await tryCopy(url);
+    toast(copied
+      ? { title: 'Signing link copied' }
+      : { title: 'Copy failed — here is the link', description: url });
   };
 
   const voidContract = async (c: Contract) => {

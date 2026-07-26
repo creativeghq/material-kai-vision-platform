@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLES } from '@/auth/roles';
 import { workspaceManagementService, REFERRAL_STORAGE_KEY, INVITE_STORAGE_KEY } from '@/services/workspaceManagementService';
 import { ACTIVE_WORKSPACE_KEY } from '@/utils/activeWorkspace';
+import { toast } from 'sonner';
 
 /**
  * WorkspaceContext — the single source of truth for the *active* workspace and
@@ -121,20 +122,37 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     setLoading(true);
 
-    // Redeem a pending referral (signed-up under a dealer/architect) before reading memberships.
-    try {
-      const ref = localStorage.getItem(REFERRAL_STORAGE_KEY);
-      if (ref) {
-        localStorage.removeItem(REFERRAL_STORAGE_KEY);
-        await workspaceManagementService.redeemReferral(ref).catch(() => {});
+    // Redeem a pending referral / role-carrying invite before reading memberships.
+    // The token is consumed (removed) ONLY on a definitive server response — success OR a permanent
+    // rejection (expired/used, ok:false). A THROW (network/transient) keeps the token so the next
+    // context load retries, instead of the old code that deleted it up-front and swallowed the result
+    // → a transient failure permanently lost the user's workspace role with no feedback.
+    const redeemPending = async (
+      storageKey: string,
+      redeem: (code: string) => Promise<{ ok: boolean; error?: string }>,
+      label: string,
+    ) => {
+      let code: string | null = null;
+      try { code = localStorage.getItem(storageKey); } catch { return; /* localStorage unavailable */ }
+      if (!code) return;
+      try {
+        const res = await redeem(code);
+        // definitive response (ok true or false) → consume it
+        try { localStorage.removeItem(storageKey); } catch { /* ignore */ }
+        if (!res?.ok) {
+          toast.error(`Could not apply your ${label}`, {
+            description: res?.error || 'The link may have expired or already been used.',
+          });
+        }
+      } catch {
+        // transient failure — keep the token; the next load will retry.
+        toast.error(`Couldn't apply your ${label} — retrying shortly`, {
+          description: 'Check your connection; it will be applied automatically.',
+        });
       }
-      // Redeem a pending role-carrying invite (?invite=) — sales rep / accountant.
-      const inv = localStorage.getItem(INVITE_STORAGE_KEY);
-      if (inv) {
-        localStorage.removeItem(INVITE_STORAGE_KEY);
-        await workspaceManagementService.redeemInvite(inv).catch(() => {});
-      }
-    } catch { /* localStorage unavailable */ }
+    };
+    await redeemPending(REFERRAL_STORAGE_KEY, (c) => workspaceManagementService.redeemReferral(c), 'referral');
+    await redeemPending(INVITE_STORAGE_KEY, (c) => workspaceManagementService.redeemInvite(c), 'invitation');
 
     const { data, error } = await supabase
       .from('workspace_members')
