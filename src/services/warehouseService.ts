@@ -38,6 +38,10 @@ export interface WarehouseItemCatalogFields {
   taric_code?: string | null;
   mydata_classification_type?: string | null;
   mydata_classification_category?: string | null;
+  // Operational fields — editable after creation (previously only settable at create time).
+  reorder_point?: number;
+  location?: string | null;
+  unit?: string;
 }
 
 export const warehouseService = {
@@ -115,16 +119,21 @@ export const warehouseService = {
     return (data as any).id as string;
   },
 
-  /** Update a stock item's #207 catalog-depth fields (codes / classification). */
+  /** Update a stock item's catalog-depth fields (#207 codes/classification) and/or its operational
+   *  fields (reorder point, location, unit). Only the keys present in `fields` are written, so a
+   *  caller editing just the reorder point never clears the codes and vice-versa. RLS enforces
+   *  finance-manager + the 'stock' entitlement (same gate as stock-api). */
   async updateItemCatalog(id: string, fields: WarehouseItemCatalogFields): Promise<void> {
-    const { error } = await supabase.from('warehouse_items').update({
-      barcode: fields.barcode ?? null,
-      serial_number: fields.serial_number ?? null,
-      cpv_code: fields.cpv_code ?? null,
-      taric_code: fields.taric_code ?? null,
-      mydata_classification_type: fields.mydata_classification_type ?? null,
-      mydata_classification_category: fields.mydata_classification_category ?? null,
-    }).eq('id', id);
+    const patch: Record<string, unknown> = {};
+    for (const k of [
+      'barcode', 'serial_number', 'cpv_code', 'taric_code',
+      'mydata_classification_type', 'mydata_classification_category',
+      'reorder_point', 'location', 'unit',
+    ] as const) {
+      if (fields[k] !== undefined) patch[k] = fields[k];
+    }
+    if (Object.keys(patch).length === 0) return;
+    const { error } = await supabase.from('warehouse_items').update(patch).eq('id', id);
     if (error) throw error;
   },
 

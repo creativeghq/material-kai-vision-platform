@@ -367,6 +367,10 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   stock_adjusted: 'Stock updated',
   stock_reordered: 'Reorder drafted',
   stock_forecast: 'Resupply forecast',
+  stock_forecast_preview: 'Resupply preview',
+  stock_transferred: 'Stock transferred',
+  stock_pending: 'Pending intake',
+  stock_pending_resolved: 'Intake resolved',
   // HR management
   hr_employees: 'Employees',
   hr_overview: 'HR overview',

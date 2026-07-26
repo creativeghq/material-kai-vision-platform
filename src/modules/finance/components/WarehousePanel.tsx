@@ -540,6 +540,10 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
   const [taric, setTaric] = useState('');
   const [clsType, setClsType] = useState('');
   const [clsCategory, setClsCategory] = useState('');
+  // Operational fields — editable after creation (were create-only before).
+  const [reorderPoint, setReorderPoint] = useState('');
+  const [location, setLocation] = useState('');
+  const [unit, setUnit] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -547,17 +551,22 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
     setBarcode(item.barcode ?? ''); setSerial(item.serial_number ?? '');
     setCpv(item.cpv_code ?? ''); setTaric(item.taric_code ?? '');
     setClsType(item.mydata_classification_type ?? ''); setClsCategory(item.mydata_classification_category ?? '');
+    setReorderPoint(String(item.reorder_point ?? 0)); setLocation(item.location ?? ''); setUnit(item.unit ?? '');
   }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async () => {
     if (!item) return;
     try {
       setBusy(true);
+      const rp = Number(reorderPoint);
       await warehouseService.updateItemCatalog(item.id, {
         barcode: barcode.trim() || null, serial_number: serial.trim() || null,
         cpv_code: cpv.trim() || null, taric_code: taric.trim() || null,
         mydata_classification_type: clsType.trim() || null,
         mydata_classification_category: clsCategory.trim() || null,
+        reorder_point: Number.isFinite(rp) && rp >= 0 ? rp : 0,
+        location: location.trim() || null,
+        unit: unit.trim() || 'pcs',
       });
       toast({ title: 'Item updated' });
       onSaved();
@@ -569,8 +578,11 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Codes &amp; classification — {item.name}</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Edit item — {item.name}</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1"><Label className="text-xs">Reorder point</Label><Input type="number" min={0} value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} placeholder="0" /></div>
+          <div className="space-y-1"><Label className="text-xs">Unit</Label><Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="pcs" /></div>
+          <div className="space-y-1 col-span-2"><Label className="text-xs">Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="aisle / bin" /></div>
           <div className="space-y-1"><Label className="text-xs">Barcode</Label><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></div>
           <div className="space-y-1"><Label className="text-xs">Serial number (S/N)</Label><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
           <div className="space-y-1"><Label className="text-xs">CPV code</Label><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></div>

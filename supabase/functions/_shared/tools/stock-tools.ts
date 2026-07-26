@@ -92,8 +92,30 @@ export const createManageStockTool = (
     return { ok: false, error: 'Provide item_id or item_query.' };
   }
 
+  /** Resolve a warehouse by id or fuzzy name → one row, or a clarification error. */
+  async function resolveWarehouse(ws: string, warehouse_id?: string, query?: string): Promise<
+    { ok: true; warehouse: any } | { ok: false; error: string; candidates?: any[] }
+  > {
+    const res = await callStockApi(jwt!, ws, 'list-warehouses', {});
+    if (!res.ok) return { ok: false, error: res.error };
+    const whs: any[] = res.data?.warehouses ?? [];
+    if (warehouse_id) {
+      const hit = whs.find((w) => w.id === warehouse_id);
+      if (!hit) return { ok: false, error: 'No warehouse with that id in this workspace.' };
+      return { ok: true, warehouse: hit };
+    }
+    if (query) {
+      const q = query.trim().toLowerCase();
+      const matches = whs.filter((w) => `${w.name} ${w.code ?? ''}`.toLowerCase().includes(q));
+      if (matches.length === 0) return { ok: false, error: `No warehouse matching "${query}".` };
+      if (matches.length > 1) return { ok: false, error: `Multiple warehouses match "${query}". Ask the user which one.`, candidates: matches.slice(0, 8).map((w) => ({ id: w.id, name: w.name, code: w.code })) };
+      return { ok: true, warehouse: matches[0] };
+    }
+    return { ok: false, error: 'Provide to_warehouse_id or warehouse_query.' };
+  }
+
   return tool(
-    async ({ action, item_id, item_query, direction, quantity, reason }: any) => {
+    async ({ action, item_id, item_query, direction, quantity, reason, to_warehouse_id, warehouse_query, pending_id }: any) => {
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const ws = workspaceId!;
@@ -183,6 +205,50 @@ export const createManageStockTool = (
         return JSON.stringify({ success: true, item: resolved.item.name, direction, quantity: qty, qty_on_hand: res.data?.qty_on_hand, message: `${verb} ${qty} ${resolved.item.unit} of ${resolved.item.name}. On hand: ${res.data?.qty_on_hand}.` });
       }
 
+      if (action === 'forecast_preview') {
+        // FREE deterministic forecast (no Claude ranking, no credits) — a quick preview before the
+        // user opts into the credit-metered AI forecast.
+        const res = await callStockApi(jwt!, ws, 'forecast');
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        const cands = (res.data?.forecast?.candidates ?? []).slice(0, 20).map((c: any) => ({
+          item: c.name, sku: c.sku, qty_on_hand: c.qty_on_hand, reorder_point: c.reorder_point,
+          days_of_cover: c.days_of_cover, avg_daily_usage: c.avg_daily_usage, warehouse_item_id: c.warehouse_item_id,
+        }));
+        onChunk?.({ type: 'stock_forecast_preview', candidates: cands, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: cands.length, candidates: cands, message: cands.length ? 'Free forecast preview (deterministic). Run "forecast" for the AI-ranked resupply plan (5 credits).' : 'Nothing is trending toward a stock-out.' });
+      }
+
+      if (action === 'transfer') {
+        const qty = Number(quantity);
+        if (!Number.isFinite(qty) || qty <= 0) return JSON.stringify({ success: false, error: 'quantity must be a positive number.' });
+        const from = await resolveItem(ws, item_id, item_query);
+        if (!from.ok) return JSON.stringify({ success: false, error: from.error, candidates: (from as any).candidates });
+        const to = await resolveWarehouse(ws, to_warehouse_id, warehouse_query);
+        if (!to.ok) return JSON.stringify({ success: false, error: to.error, candidates: (to as any).candidates });
+        const res = await callStockApi(jwt!, ws, 'transfer', { from_item_id: from.item.id, to_warehouse_id: to.warehouse.id, quantity: qty });
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        onChunk?.({ type: 'stock_transferred', item: from.item.name, to_warehouse: to.warehouse.name, quantity: qty, timestamp: Date.now() });
+        return JSON.stringify({ success: true, item: from.item.name, to_warehouse: to.warehouse.name, quantity: qty, message: `Transferred ${qty} ${from.item.unit} of ${from.item.name} to ${to.warehouse.name}.` });
+      }
+
+      if (action === 'list_pending') {
+        const res = await callStockApi(jwt!, ws, 'list-pending');
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        const pending = (res.data?.pending ?? []).map((p: any) => ({
+          id: p.id, name: p.name, sku: p.sku, unit: p.unit, quantity: p.quantity, unit_cost: p.unit_cost, raw_description: p.raw_description,
+        }));
+        onChunk?.({ type: 'stock_pending', pending, timestamp: Date.now() });
+        return JSON.stringify({ success: true, count: pending.length, pending, message: pending.length ? 'Pending intake items awaiting approval. Use approve_pending / dismiss_pending with the id.' : 'No pending intake items.' });
+      }
+
+      if (action === 'approve_pending' || action === 'dismiss_pending') {
+        if (!pending_id) return JSON.stringify({ success: false, error: 'pending_id is required (get it from list_pending).' });
+        const res = await callStockApi(jwt!, ws, action === 'approve_pending' ? 'approve-pending' : 'dismiss-pending', { pending_id: String(pending_id) });
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        onChunk?.({ type: 'stock_pending_resolved', pending_id, action, timestamp: Date.now() });
+        return JSON.stringify({ success: true, pending_id, action, message: action === 'approve_pending' ? 'Approved — the item was added to the warehouse catalog.' : 'Dismissed the pending intake item.' });
+      }
+
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
     },
     {
@@ -203,9 +269,15 @@ export const createManageStockTool = (
         '                    cheapest). Give item_id OR item_query, optional quantity (else tops back up above the',
         '                    reorder point, rounded to MOQ). Routes to the in-app supplier portal if the supplier',
         '                    is a tenant, else email. COSTS 2 CREDITS. Confirm with the user before calling.',
+        '  forecast_preview → FREE deterministic resupply preview (days-of-cover per item). No credits.',
         '  forecast        → AI resupply forecast: ranks which items will run out soonest (consumption velocity',
         '                    + trend vs supplier lead time) and recommends order quantities. COSTS 5 CREDITS.',
-        '                    Confirm with the user before calling.',
+        '                    Confirm with the user before calling. (Suggest forecast_preview first — it\'s free.)',
+        '  transfer        → move stock of ONE item into another warehouse. Give item_id OR item_query,',
+        '                    to_warehouse_id OR warehouse_query, and quantity.',
+        '  list_pending    → intake items (AI-extracted from supplier expenses) awaiting approval.',
+        '  approve_pending → approve a pending intake item into the catalog. Give pending_id (from list_pending).',
+        '  dismiss_pending → dismiss a pending intake item. Give pending_id (from list_pending).',
         '',
         'Examples:',
         '  "what\'s low on stock?"          → action=list_low_stock',
@@ -213,15 +285,21 @@ export const createManageStockTool = (
         '  "receive 50 white tiles"          → action=adjust_stock, item_query="white tile", direction="in", quantity=50',
         '  "set stock of SKU-123 to 12"      → action=adjust_stock, item_query="SKU-123", direction="adjust", quantity=12',
         '  "reorder the white tiles"         → action=reorder, item_query="white tile"',
-        'If a query matches multiple items, ask the user which one before writing.',
+        '  "move 10 oak planks to the annex"  → action=transfer, item_query="oak plank", warehouse_query="annex", quantity=10',
+        '  "what needs reordering?" (free)    → action=forecast_preview',
+        '  "approve the pending intake items" → action=list_pending, then approve_pending per id',
+        'If a query matches multiple items/warehouses, ask the user which one before writing.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['overview', 'check_stock', 'list_low_stock', 'list_movements', 'adjust_stock', 'reorder', 'forecast']),
-        item_id: z.string().uuid().optional().describe('Target stock item id (adjust_stock).'),
-        item_query: z.string().optional().describe('Fuzzy name or SKU to search/resolve (check_stock, adjust_stock).'),
+        action: z.enum(['overview', 'check_stock', 'list_low_stock', 'list_movements', 'adjust_stock', 'reorder', 'forecast', 'forecast_preview', 'transfer', 'list_pending', 'approve_pending', 'dismiss_pending']),
+        item_id: z.string().uuid().optional().describe('Target stock item id (adjust_stock, transfer).'),
+        item_query: z.string().optional().describe('Fuzzy name or SKU to search/resolve (check_stock, adjust_stock, transfer).'),
         direction: z.enum(DIRECTIONS as unknown as [string, ...string[]]).optional().describe('in=receive, out=issue, adjust=set exact on-hand (adjust_stock).'),
-        quantity: z.number().optional().describe('Quantity for adjust_stock.'),
+        quantity: z.number().optional().describe('Quantity for adjust_stock / transfer.'),
         reason: z.string().optional().describe('Optional movement reason note.'),
+        to_warehouse_id: z.string().uuid().optional().describe('Destination warehouse id (transfer).'),
+        warehouse_query: z.string().optional().describe('Fuzzy destination warehouse name/code to resolve (transfer).'),
+        pending_id: z.string().uuid().optional().describe('Pending intake item id (approve_pending / dismiss_pending).'),
       }),
     },
   );
