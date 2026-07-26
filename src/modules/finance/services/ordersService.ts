@@ -346,19 +346,16 @@ export const ordersService = {
   async settledByOrder(orderIds: string[]): Promise<Map<string, number>> {
     const out = new Map<string, number>();
     if (orderIds.length === 0) return out;
-    const { data } = await supabase
-      .from('payment_allocations')
-      .select('order_id, amount, payment:payments(direction)')
-      .in('order_id', orderIds);
+    // Model B (#280 corrected): an order settles on allocations against IT directly OR against the
+    // invoices/bills that belong to it. Paying an order's invoice is an invoice-targeted allocation
+    // (order_id NULL by the one-target constraint), so a plain `.eq('order_id', …)` missed it and
+    // fully-paid orders read as unpaid. `get_order_settlements` applies the join in SQL so this
+    // agrees with recompute_order_payment_status and getOrderFinance.
+    const { data } = await supabase.rpc('get_order_settlements', { p_order_ids: orderIds });
     // A sales order settles on money IN; a purchase order on money OUT. We don't know each order's
-    // type here, so bucket both directions and let the caller net per order type. In practice an
-    // order only ever has allocations of its own settlement direction, so summing the matching
-    // direction is safe — we return the net (in − out) and the caller uses its sign.
-    for (const a of (data ?? []) as Array<{ order_id: string; amount: number; payment: { direction: 'in' | 'out' } | { direction: 'in' | 'out' }[] | null }>) {
-      const dir = Array.isArray(a.payment) ? a.payment[0]?.direction : a.payment?.direction;
-      if (!dir) continue;
-      const signed = dir === 'in' ? Number(a.amount) : -Number(a.amount);
-      out.set(a.order_id, (out.get(a.order_id) ?? 0) + signed);
+    // type here, so return the net (in − out) and let the caller use its sign.
+    for (const r of (data ?? []) as Array<{ order_id: string; settled_in: number; settled_out: number }>) {
+      out.set(r.order_id, Number(r.settled_in) - Number(r.settled_out));
     }
     return out;
   },
@@ -502,11 +499,13 @@ export const ordersService = {
     // applied here). Shown read-only in the Payments list so a credit-settled order isn't blank.
     creditApplied: Array<{ allocation_id: string; payment_id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; counterparty_name: string | null }>;
   }> {
-    const [inv, bills, pay, alloc] = await Promise.all([
+    const [inv, bills, pay, alloc, settlement] = await Promise.all([
       supabase.from('invoices').select('id, internal_number, status, total, amount_due, currency').eq('order_id', orderId),
       supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency').eq('order_id', orderId),
       supabase.from('payments').select('id, direction, amount, currency, paid_at, method, reference, notes, bank_account_id, counterparty_company_id, counterparty_contact_id, counterparty_bank_account_id, counterparty_name').eq('order_id', orderId).order('paid_at', { ascending: false }),
       supabase.from('payment_allocations').select('id, amount, payment_id, payments!inner(direction, order_id, currency, paid_at, counterparty_company_id, counterparty_contact_id)').eq('order_id', orderId),
+      // Canonical settlement (model B): allocations against this order OR its invoices/bills.
+      supabase.rpc('get_order_settlements', { p_order_ids: [orderId] }),
     ]);
     const rawPayments = (pay.data ?? []) as Array<{ id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; method: string | null; reference: string | null; notes: string | null; bank_account_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null; counterparty_bank_account_id: string | null; counterparty_name: string | null }>;
     type AllocRow = { id: string; amount: number; payment_id: string; payments: { direction: 'in' | 'out'; order_id: string | null; currency: string; paid_at: string; counterparty_company_id: string | null; counterparty_contact_id: string | null } | null };
@@ -544,9 +543,12 @@ export const ordersService = {
       + creditApplied.filter((c) => c.direction === 'in').reduce((s, c) => s + c.amount, 0);
     const paid_out = rawPayments.filter((p) => p.direction === 'out').reduce((s, p) => s + Number(p.amount), 0)
       + creditApplied.filter((c) => c.direction === 'out').reduce((s, c) => s + c.amount, 0);
-    // Canonical settlement (allocation ledger) — drives `outstanding` / payment_status agreement.
-    const settled_in = allocRows.filter((a) => a.payments?.direction === 'in').reduce((s, a) => s + Number(a.amount), 0);
-    const settled_out = allocRows.filter((a) => a.payments?.direction === 'out').reduce((s, a) => s + Number(a.amount), 0);
+    // Canonical settlement (model B, #280 corrected) — drives `outstanding` / payment_status
+    // agreement. Counts allocations against this order OR its invoices/bills, so paying the order's
+    // invoice settles the order. Order-direct-only summing (the old code) missed invoice payments.
+    const settleRow = ((settlement.data ?? []) as Array<{ settled_in: number; settled_out: number }>)[0];
+    const settled_in = Number(settleRow?.settled_in ?? 0);
+    const settled_out = Number(settleRow?.settled_out ?? 0);
     return {
       invoices: (inv.data ?? []) as Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>,
       supplierBills: (bills.data ?? []) as Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>,

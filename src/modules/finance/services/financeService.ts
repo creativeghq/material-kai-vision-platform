@@ -1438,6 +1438,52 @@ const _financeServiceCore = {
     return { billId: bill.id, paymentId };
   },
 
+  /**
+   * Settle an EXISTING open supplier bill — books a money-out payment allocated to the bill so it
+   * drops out of Payables. This is the money-out mirror of settling an invoice with the "For" picker
+   * in RecordPaymentDialog. DISTINCT from `createExpense` (which creates a NEW bill and pays it): use
+   * this to pay a bill that already exists (from NewSupplierBillDialog, an unpaid expense, the
+   * recurring-expense cron, or the agent), so paying it never duplicates the payable.
+   */
+  async paySupplierBill(input: {
+    workspaceId: string;
+    supplierBillId: string;
+    amount: number;
+    method?: PaymentMethod;
+    paidAt?: string;
+    bankAccountId?: string | null;
+    counterpartyBankAccountId?: string | null;
+    reference?: string | null;
+    notes?: string | null;
+    categoryId?: string | null;
+  }): Promise<string> {
+    const { data: bill, error } = await supabase
+      .from('supplier_bills')
+      .select('supplier_company_id, supplier_contact_id, currency, category_id')
+      .eq('id', input.supplierBillId)
+      .single();
+    if (error) throw error;
+    const b = bill as { supplier_company_id: string | null; supplier_contact_id: string | null; currency: string | null; category_id: string | null };
+    return this.recordPayment({
+      workspaceId: input.workspaceId,
+      direction: 'out',
+      amount: input.amount,
+      currency: b.currency ?? 'EUR',
+      method: input.method ?? 'bank_transfer',
+      paidAt: input.paidAt ?? new Date().toISOString(),
+      counterpartyCompanyId: b.supplier_company_id,
+      counterpartyContactId: b.supplier_contact_id,
+      reference: input.reference ?? null,
+      notes: input.notes ?? null,
+      // Inherit the bill's P&L category so the cash-out lands in the same bucket as the cost.
+      categoryId: input.categoryId ?? b.category_id ?? null,
+      bankAccountId: input.bankAccountId ?? null,
+      counterpartyBankAccountId: input.method === 'bank_transfer' ? (input.counterpartyBankAccountId ?? null) : null,
+      allocations: [{ target_id: input.supplierBillId, target_type: 'supplier_bill', amount: input.amount }],
+      sendReceipt: false,
+    });
+  },
+
   // -------- Recurring expenses (auto-generate a bill each period) --------
 
   /** Compute the first future run date one cadence-step after an anchor date. */

@@ -11,6 +11,12 @@ export interface Cheque {
   currency: string;
   due_date: string | null;
   status: 'pending' | 'cleared' | 'bounced' | 'cancelled';
+  counterparty_company_id: string | null;
+  counterparty_contact_id: string | null;
+  invoice_id: string | null;
+  supplier_bill_id: string | null;
+  bank_account_id: string | null;
+  payment_id: string | null;
   notes: string | null;
   created_at: string;
 }
@@ -29,6 +35,12 @@ export const chequesService = {
   async create(workspaceId: string, input: {
     direction: 'in' | 'out'; chequeNumber?: string; bank?: string; amount: number;
     currency?: string; dueDate?: string; notes?: string;
+    /** Optional counterparty + settlement target, so clearing settles the right document. */
+    counterpartyCompanyId?: string | null;
+    counterpartyContactId?: string | null;
+    invoiceId?: string | null;
+    supplierBillId?: string | null;
+    bankAccountId?: string | null;
   }): Promise<string> {
     const { data, error } = await supabase.from('cheques').insert({
       workspace_id: workspaceId,
@@ -39,13 +51,23 @@ export const chequesService = {
       currency: input.currency || 'EUR',
       due_date: input.dueDate || null,
       notes: input.notes || null,
+      counterparty_company_id: input.counterpartyCompanyId || null,
+      counterparty_contact_id: input.counterpartyContactId || null,
+      invoice_id: input.invoiceId || null,
+      supplier_bill_id: input.supplierBillId || null,
+      bank_account_id: input.bankAccountId || null,
     } as any).select('id').single();
     if (error) throw error;
     return (data as any).id;
   },
 
+  /**
+   * Set a cheque's status via the RPC — clearing it books a `cheque` payment (settling the linked
+   * invoice/bill, or moving cash on-account when unlinked); reverting a cleared cheque deletes that
+   * payment so cash + the settled document unwind. Never a bare column flip.
+   */
   async setStatus(id: string, status: Cheque['status']): Promise<void> {
-    const { error } = await supabase.from('cheques').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await supabase.rpc('set_cheque_status', { p_cheque_id: id, p_status: status });
     if (error) throw error;
   },
 };

@@ -62,6 +62,7 @@ import { OrderAgingInlineEditor } from '@/modules/finance/components/OrderAgingI
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
+import { PaySupplierBillDialog, type PayableBillRef } from '@/modules/finance/components/PaySupplierBillDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
@@ -195,6 +196,7 @@ const FinancePage: React.FC = () => {
   }, [searchParams, setSearchParams, isAccountant]);
   const [scnOpen, setScnOpen] = useState(false);
   const [scnBillId, setScnBillId] = useState<string | undefined>(undefined);
+  const [payBill, setPayBill] = useState<PayableBillRef | null>(null);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
 
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
@@ -977,9 +979,14 @@ const FinancePage: React.FC = () => {
                                 <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Open order
                               </Button>
                             ) : (
-                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
-                                <FileMinus className="h-3.5 w-3.5 mr-1" /> Credit
-                              </Button>
+                              <span className="inline-flex items-center gap-1">
+                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPayBill({ id: r.id, supplier_bill_number: r.supplier_bill_number, party_name: r.party_name, amount_due: r.amount_due })} title="Record a payment against this bill (settles it)">
+                                  <Banknote className="h-3.5 w-3.5 mr-1" /> Pay
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
+                                  <FileMinus className="h-3.5 w-3.5 mr-1" /> Credit
+                                </Button>
+                              </span>
                             )}
                           </td>
                         )}
@@ -1135,6 +1142,13 @@ const FinancePage: React.FC = () => {
         onOpenChange={setScnOpen}
         supplierBillId={scnBillId}
         onCreated={async () => { setScnOpen(false); if (workspaceId) await loadAll(workspaceId); }}
+      />
+      <PaySupplierBillDialog
+        workspaceId={workspaceId}
+        bill={payBill}
+        open={!!payBill}
+        onOpenChange={(v) => { if (!v) setPayBill(null); }}
+        onSaved={async () => { setPayBill(null); if (workspaceId) await loadAll(workspaceId); }}
       />
     </div>
   );

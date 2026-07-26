@@ -100,10 +100,16 @@ export const RecordPaymentDialog: React.FC<{
   }, [open, workspaceId, preset]);
 
   // Received → open invoices. Refund → any issued invoice (usually paid).
-  const pickableInvoices = useMemo(
-    () => (kind === 'refund' ? invoices : invoices.filter((i) => Number(i.amount_due) > 0)),
-    [invoices, kind],
-  );
+  // When opened from a party page (initialCounterparty set) the picker is HARD-SCOPED to that
+  // party — otherwise the list showed every customer's invoices and picking the wrong one silently
+  // reattributed the payment to a different customer (Tier 0.2 data-integrity fix).
+  const pickableInvoices = useMemo(() => {
+    const base = kind === 'refund' ? invoices : invoices.filter((i) => Number(i.amount_due) > 0);
+    if (!initialCounterparty?.companyId && !initialCounterparty?.contactId) return base;
+    return base.filter((i) =>
+      (initialCounterparty.companyId && i.customer_company_id === initialCounterparty.companyId) ||
+      (initialCounterparty.contactId && i.customer_contact_id === initialCounterparty.contactId));
+  }, [invoices, kind, initialCounterparty]);
   const selectedInvoice = useMemo(() => invoices.find((i) => i.id === invoiceId), [invoices, invoiceId]);
   const selectedTarget = useMemo(() => invoices.find((i) => i.id === targetInvoiceId) ?? null, [invoices, targetInvoiceId]);
 

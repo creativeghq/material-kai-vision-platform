@@ -181,6 +181,10 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
         subtotal_net: totalNet, vat_rate: vatRate, vat_amount: totalVat, total: totalGross,
         prices_include_vat: true,
         payment_method_code: 7, // card (online)
+        // Online store sells physical goods → the paid invoice must land on the dispatch board
+        // (listDispatchQueue filters has_shipping=true AND status='paid'), where issuing the
+        // dispatch note moves stock. Without this the order was a dead end after payment.
+        has_shipping: true,
         notes: orderNotes,
         pay_token: payToken,
         pay_token_expires_at: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
