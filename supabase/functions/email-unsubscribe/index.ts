@@ -16,6 +16,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { withApiLogging } from '../_shared/api-logger.ts';
+import { escapeHtml } from '../_shared/html.ts';
 
 function html(status: number, title: string, body: string): Response {
   return new Response(
@@ -47,7 +49,7 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-serve(async (req) => {
+serve(withApiLogging('email-unsubscribe', async (req) => {
   await bootstrapForFunction();
   const url = new URL(req.url);
   const ws = (url.searchParams.get('w') || '').trim();
@@ -69,7 +71,7 @@ serve(async (req) => {
 
   // GET → confirmation page (a POST form) so link-prefetch can't opt someone out by accident.
   if (req.method === 'GET') {
-    const esc = email.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const esc = escapeHtml(email);
     return html(200, 'Unsubscribe',
       `<h1>Unsubscribe from marketing emails?</h1>
        <p><strong>${esc}</strong> will stop receiving marketing emails from this sender. Transactional messages (receipts, account notices) are unaffected.</p>
@@ -97,4 +99,4 @@ serve(async (req) => {
   }
 
   return html(405, 'Method not allowed', '<h1>Method not allowed</h1>');
-});
+}));

@@ -18,6 +18,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { getTrustedClientIp } from '../_shared/client-ip.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -120,8 +121,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     });
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
     const version_hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
-    const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim()
-      || req.headers.get('cf-connecting-ip') || null;
+    const ip = getTrustedClientIp(req);
 
     // link the originating plan, if any
     const { data: plan } = await supabase.from('project_plans').select('id').eq('quote_id', quote.id).maybeSingle();

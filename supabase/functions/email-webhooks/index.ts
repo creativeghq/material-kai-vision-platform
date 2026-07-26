@@ -44,6 +44,14 @@ interface ResendWebhookEvent {
   };
 }
 
+/** Constant-time string compare — avoids a timing side-channel when checking the webhook signature. */
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 /**
  * Verify Resend webhook signature (Svix-based HMAC-SHA256).
  * Returns true if the signature is valid.
@@ -80,7 +88,7 @@ async function verifyResendSignature(
     const signatures = svixSignature.split(' ');
     return signatures.some((sig) => {
       const sigValue = sig.replace(/^v1,/, '');
-      return sigValue === computedSignature;
+      return timingSafeEqualStr(sigValue, computedSignature);
     });
   } catch (err) {
     console.error('Signature verification error:', err);

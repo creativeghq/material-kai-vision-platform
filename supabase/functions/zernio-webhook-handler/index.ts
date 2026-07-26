@@ -133,9 +133,14 @@ async function matchOrCreateContact(
   name: string | null,
   createdBy: string | null,
 ): Promise<string | null> {
+  // `phone` originates from the webhook payload (sender.phoneNumber). Strip everything that isn't a
+  // digit or '+' before building the PostgREST .or() filter — a crafted value containing `,`/`)`/
+  // `and(...)` would otherwise alter the query grammar (filter injection). A valid E.164 phone is
+  // only `+` and digits, so this is loss-free for legitimate input.
+  const safePhone = phone.replace(/[^\d+]/g, '');
   const { data: existing } = await supabase
     .from('crm_contacts').select('id')
-    .eq('workspace_id', workspaceId).or(`phone.eq.${phone},mobile.eq.${phone}`).limit(1).maybeSingle();
+    .eq('workspace_id', workspaceId).or(`phone.eq.${safePhone},mobile.eq.${safePhone}`).limit(1).maybeSingle();
   if (existing?.id) return existing.id;
   // crm_contacts.created_by is NOT NULL — fall back to the workspace owner.
   const owner = createdBy || (await resolveWorkspaceOwner(supabase, workspaceId));

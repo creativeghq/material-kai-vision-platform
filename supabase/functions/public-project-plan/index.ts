@@ -17,6 +17,7 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { evaluateFormula, computeLinePricing, round2 } from '../_shared/blueprint/formula.ts';
+import { getTrustedClientIp } from '../_shared/client-ip.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -25,10 +26,10 @@ const ANON_DAILY_QUOTA = 2; // combined across public tools, mirrors MIVAA
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
+// Trusted proxy hop (invariant #10) — never the client-spoofable leftmost x-forwarded-for entry.
 function clientIp(req: Request): string {
-  const xff = req.headers.get('x-forwarded-for');
-  if (xff) return xff.split(',')[0].trim();
-  return req.headers.get('cf-connecting-ip') || '0.0.0.0';
+  const ip = getTrustedClientIp(req);
+  return ip === 'unknown' ? '0.0.0.0' : ip;
 }
 
 async function verifyTurnstile(token: string, ip: string): Promise<boolean> {

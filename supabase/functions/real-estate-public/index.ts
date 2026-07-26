@@ -15,6 +15,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { toPublic, matchesCriteria, estimateFromMedianPerSqm } from '../_shared/real-estate.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { getTrustedClientIp } from '../_shared/client-ip.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -26,7 +27,7 @@ function json(body: any, status = 200): Response {
 const PUBLIC_LEAD_HOURLY_LIMIT = 8;
 async function enforceLeadRateLimit(supabase: any, req: Request, action: string, workspaceId: string | null): Promise<Response | null> {
   try {
-    const ipRaw = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('cf-connecting-ip') || 'unknown';
+    const ipRaw = getTrustedClientIp(req);
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ipRaw));
     const ipHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 40);
     const sinceIso = new Date(Date.now() - 3600_000).toISOString();
