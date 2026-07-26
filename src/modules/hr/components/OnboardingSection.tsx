@@ -79,6 +79,14 @@ export function OnboardingSection({ workspaceId, canManage }: { workspaceId: str
                           {t.status === 'done' ? <CheckCircle2 className="h-4 w-4 text-success" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
                         </button>
                         <span className={`text-sm flex-1 ${t.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>{t.title}</span>
+                        {t.due_date && (
+                          <span
+                            className={`text-[10px] shrink-0 ${t.status !== 'done' && new Date(t.due_date) < new Date(new Date().toDateString()) ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
+                            title={t.status !== 'done' && new Date(t.due_date) < new Date(new Date().toDateString()) ? 'Overdue' : 'Due date'}
+                          >
+                            due {new Date(t.due_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                          </span>
+                        )}
                         {canManage && <button onClick={() => del(t.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>}
                       </div>
                     ))}

@@ -935,41 +935,9 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       return json({ ok: true, invited, role_note: roleNote });
     }
 
-    // ─────────────────────────── ANALYTICS ───────────────────────────
-    case 'analytics': {
-      const [{ data: emps }, { data: summaries }, { data: depts }, { data: apps }, { data: posts }, { data: onb }, { data: lastRun }] = await Promise.all([
-        supabase.from('hr_employees').select('id, status, department_id').eq('workspace_id', workspaceId),
-        supabase.from('vw_hr_employee_absence_summary').select('total_absence_days, days_by_type, on_leave_today').eq('workspace_id', workspaceId),
-        supabase.from('hr_departments').select('id, name').eq('workspace_id', workspaceId),
-        supabase.from('hr_applications').select('stage').eq('workspace_id', workspaceId),
-        supabase.from('hr_job_postings').select('status').eq('workspace_id', workspaceId),
-        supabase.from('hr_onboarding_tasks').select('status').eq('workspace_id', workspaceId),
-        supabase.from('hr_payroll_runs').select('period, total_net, currency, status').eq('workspace_id', workspaceId).order('period', { ascending: false }).limit(1),
-      ]);
-      const deptName = new Map((depts ?? []).map((d: any) => [d.id, d.name]));
-      const headByDept: Record<string, number> = {};
-      for (const e of (emps ?? [])) { const n = e.department_id ? (deptName.get(e.department_id) as string) : 'Unassigned'; headByDept[n] = (headByDept[n] ?? 0) + 1; }
-      const absenceByType: Record<string, number> = {};
-      let totalAbsence = 0, onLeave = 0;
-      for (const s of (summaries ?? [])) { totalAbsence += Number(s.total_absence_days ?? 0); if (s.on_leave_today) onLeave++; for (const [k, v] of Object.entries((s.days_by_type ?? {}) as Record<string, number>)) absenceByType[k] = (absenceByType[k] ?? 0) + Number(v ?? 0); }
-      const funnel: Record<string, number> = {};
-      for (const a of (apps ?? [])) funnel[a.stage] = (funnel[a.stage] ?? 0) + 1;
-      return json({
-        analytics: {
-          headcount: (emps ?? []).length,
-          active: (emps ?? []).filter((e: any) => e.status === 'active').length,
-          on_leave_today: onLeave,
-          total_absence_days: totalAbsence,
-          absence_by_type: absenceByType,
-          headcount_by_department: headByDept,
-          departments: (depts ?? []).length,
-          open_positions: (posts ?? []).filter((p: any) => p.status === 'open').length,
-          recruitment_funnel: funnel,
-          onboarding_pending: (onb ?? []).filter((t: any) => t.status === 'pending').length,
-          last_payroll: (lastRun ?? [])[0] ?? null,
-        },
-      });
-    }
+    // NOTE: the former `analytics` edge action was removed — it re-implemented the
+    // `hr_overview_analytics` RPC that the Overview page (hrService.analytics) already calls
+    // directly, so it was dead code that would silently drift from the RPC.
 
     // ── Attendance: admin clock, PIN, today's board, settings ─────────────────
     case 'clock-employee': {

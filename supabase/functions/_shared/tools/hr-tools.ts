@@ -131,7 +131,7 @@ export const createManageHrTool = (
   }
 
   return tool(
-    async ({ action, employee_id, employee_name, absence_type, start_date, end_date, note, from_date, to_date, name, email, position, department, employment_type }: any) => {
+    async ({ action, employee_id, employee_name, absence_id, absence_type, start_date, end_date, note, from_date, to_date, name, email, position, department, employment_type }: any) => {
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const ws = workspaceId!;
@@ -221,6 +221,25 @@ export const createManageHrTool = (
         });
       }
 
+      // ── Read: pending leave requests awaiting a decision (so they can be approved in chat) ──
+      if (action === 'list_pending') {
+        const res = await callHrApi(jwt!, ws, 'list-absences', { status: 'pending' });
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        const pending = (res.data?.absences ?? []).map((a: any) => ({
+          absence_id: a.id, employee: a.employee?.contact?.name ?? 'Employee', employee_id: a.employee_id,
+          absence_type: a.absence_type, start_date: a.start_date, end_date: a.end_date, working_days: a.working_days,
+        }));
+        return JSON.stringify({ success: true, count: pending.length, pending });
+      }
+
+      // ── Write: approve / reject a pending absence (manager action) ─────────────
+      if (action === 'approve_absence' || action === 'reject_absence') {
+        if (!absence_id) return JSON.stringify({ success: false, error: 'absence_id is required — use list_pending to find it.' });
+        const res = await callHrApi(jwt!, ws, action === 'approve_absence' ? 'approve-absence' : 'reject-absence', { absence_id });
+        if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+        return JSON.stringify({ success: true, absence: res.data?.absence ?? res.data, message: `Absence ${action === 'approve_absence' ? 'approved' : 'rejected'}.` });
+      }
+
       // ── Write: add an employee ─────────────────────────────────────────────
       if (action === 'add_employee') {
         if (!name || !String(name).trim()) return JSON.stringify({ success: false, error: 'name is required to add an employee.' });
@@ -252,8 +271,10 @@ export const createManageHrTool = (
         '  list_employees  → the employee roster with status + total absence days + remaining leave.',
         '  overview        → headcount, active, on-leave-today, pending requests, absence days by type.',
         '  who_is_on_leave → approved absences overlapping a window (from_date/to_date; defaults to this week).',
+        '  list_pending    → leave requests awaiting a decision (with absence_id, so they can be approved here).',
         '  record_absence  → log an absence (goes in as PENDING approval). Give employee_id OR employee_name,',
         '                    absence_type (vacation|sick|unpaid|other), start_date, end_date (YYYY-MM-DD), optional note.',
+        '  approve_absence / reject_absence → decide a pending request by absence_id (from list_pending).',
         '  add_employee    → create an employee (name required; optional email/position/department/employment_type).',
         '',
         'Examples:',
@@ -264,9 +285,10 @@ export const createManageHrTool = (
         'If a name matches multiple employees, ask the user which one before writing.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list_employees', 'overview', 'who_is_on_leave', 'record_absence', 'add_employee']),
+        action: z.enum(['list_employees', 'overview', 'who_is_on_leave', 'list_pending', 'record_absence', 'approve_absence', 'reject_absence', 'add_employee']),
         employee_id: z.string().uuid().optional().describe('Target employee (record_absence).'),
         employee_name: z.string().optional().describe('Fuzzy employee name to resolve (record_absence).'),
+        absence_id: z.string().uuid().optional().describe('Target absence (approve_absence/reject_absence) — get it from list_pending.'),
         absence_type: z.enum(ABSENCE_TYPES as unknown as [string, ...string[]]).optional(),
         start_date: z.string().optional().describe('YYYY-MM-DD (record_absence).'),
         end_date: z.string().optional().describe('YYYY-MM-DD (record_absence).'),

@@ -225,7 +225,9 @@ export async function handleAccounting(action: string, ctx: AcctCtx): Promise<Re
           if (!category) continue;
           const { data: pp } = await supabase.from('planned_payments')
             .select('id, notes').eq('workspace_id', workspaceId).eq('category', category).ilike('title', `%${period}%`).limit(1).maybeSingle();
-          if (pp) {
+          // Idempotent: re-running "Prepare period" (expected after fixing a doc) must not append
+          // the same "Payment ID:" line again.
+          if (pp && !String(pp.notes ?? '').includes(`Payment ID: ${pid}`)) {
             await supabase.from('planned_payments').update({ notes: `${pp.notes ?? ''}\nPayment ID: ${pid}`.trim() }).eq('id', pp.id);
             stamped++;
           }
