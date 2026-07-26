@@ -229,13 +229,17 @@ export function parseRfCode(rawBody: string): string | null {
 export const vivaProvider: PaymentProvider = {
   slug: 'viva',
   label: 'Viva.com',
-  methods: ['card', 'bank_reference'],
+  // RF / bank_reference is intentionally NOT offered yet: the 2054 account-transaction settlement
+  // path is unverified against live Viva behaviour (the RF parser + retrieval endpoint are guesses),
+  // so taking a bank transfer risks a paid-but-unsettled order. Re-add 'bank_reference' only after a
+  // live demo transaction proves the 2054→order settlement loop end-to-end. Card is fully wired.
+  methods: ['card'],
   currencies: VIVA_CURRENCIES,
 
   async resolveContext(supabase: any, workspaceId: string): Promise<PaymentProviderContext | null> {
     const { data, error } = await supabase
       .from('workspace_viva_config')
-      .select('client_id, client_secret, merchant_id, api_key, source_code, environment, enabled, methods')
+      .select('client_id, client_secret, merchant_id, api_key, source_code, environment, enabled, methods, webhook_verified_at')
       .eq('workspace_id', workspaceId)
       .maybeSingle();
 
@@ -245,8 +249,19 @@ export const vivaProvider: PaymentProvider = {
     }
     // BYOK: no row, disabled, or incomplete credentials → this tenant cannot charge.
     // We deliberately do NOT fall back to any operator-level Viva account.
+    //
+    // CRITICAL (settlement invariant): this gate is the AUTHORITATIVE "can Viva be offered?" check —
+    // the customer pay page offers a provider purely on resolveContext≠null. It MUST require everything
+    // the settlement loop needs, or a customer can pay a charge that can never be recorded:
+    //   • merchant_id — the ONLY key viva-webhooks uses to map an inbound delivery back to this
+    //     workspace. Missing it ⇒ the webhook drops every delivery ⇒ paid-but-unsettled.
+    //   • api_key — required by retrieveVivaTransaction, the webhook's security read-back boundary.
+    //   • webhook_verified_at — proves the tenant actually completed webhook setup, so deliveries arrive.
+    // (Previously only client_id+client_secret were required, matching the client-side "connected"
+    // definition to the server's; the two had diverged.)
     if (!data || !data.enabled) return null;
     if (!data.client_id || !data.client_secret) return null;
+    if (!data.merchant_id || !data.api_key || !data.webhook_verified_at) return null;
 
     return {
       workspaceId,
@@ -264,6 +279,14 @@ export const vivaProvider: PaymentProvider = {
   },
 
   async createCharge(input: CreateChargeInput, ctx: PaymentProviderContext): Promise<ChargeResult> {
+    // Honor the tenant's ENABLED method subset at charge time, not just the provider's full capability.
+    // Discovery intersects `methods`, but a crafted request could ask for a method the seller disabled
+    // (e.g. bank_reference on a card-only workspace) — the dispatch validates against provider.methods,
+    // so enforce the per-tenant subset here too.
+    const enabled = String(ctx.credentials.__methods ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (enabled.length && !enabled.includes(input.method)) {
+      throw new Error(`Payment method "${input.method}" is not enabled for this workspace.`);
+    }
     const hosts = vivaHosts(ctx.isSandbox);
     const { orderCode } = await createVivaOrder(input, ctx);
 

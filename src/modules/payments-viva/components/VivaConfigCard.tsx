@@ -335,16 +335,17 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm">RF code (bank transfer)</p>
+              <p className="text-sm">RF code (bank transfer) <span className="text-amber-500">— coming soon</span></p>
               <p className="text-xs text-muted-foreground">
                 Greek merchants only. The buyer pays from their banking app using a 20-digit
-                reference — no IBAN needed.
+                reference — no IBAN needed. Temporarily unavailable while we finish verifying the
+                bank-transfer settlement flow; only card is offered at checkout for now.
               </p>
             </div>
             <Switch
-              checked={(status?.methods ?? []).includes('bank_reference')}
+              checked={false}
               onCheckedChange={(on) => toggleMethod('bank_reference', on)}
-              disabled={saving || !credsReady}
+              disabled
             />
           </div>
 
