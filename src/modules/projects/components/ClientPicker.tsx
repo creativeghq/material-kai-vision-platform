@@ -101,7 +101,10 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
       const { data, error } = await (supabase as any)
         .from('crm_contacts')
         .insert({
-          user_id: user.id,
+          // NB: do NOT set user_id — that column is the platform-user↔contact link (one per user).
+          // Binding a new CLIENT contact to the creator's user_id creates a second self-contact and
+          // breaks GET /contacts/by-user/{creator} (.single() → "multiple rows"). created_by is the
+          // right attribution field.
           created_by: user.id,
           workspace_id: getActiveWorkspaceId(user.id) ?? undefined,
           name: displayName,
