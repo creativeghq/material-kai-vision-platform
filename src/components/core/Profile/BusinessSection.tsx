@@ -9,6 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
+import { VatCountryCombobox } from '@/components/core/VatCountryCombobox';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
@@ -569,26 +570,12 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
                   />
                 </FormField>
                 <FormField label="VAT country">
-                  <Select
-                    value={businessForm.country_code || '__unset'}
-                    onValueChange={(v) => setBusinessForm({ ...businessForm, country_code: v === '__unset' ? '' : v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Not set" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__unset">Not set</SelectItem>
-                      {VAT_COUNTRY_OPTIONS.map((o) => (
-                        <SelectItem key={o.code} value={o.code}>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[10px] w-7">{o.code}</span>
-                            <span>{o.name}</span>
-                            {o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <VatCountryCombobox
+                    value={businessForm.country_code || ''}
+                    onChange={(v) => setBusinessForm({ ...businessForm, country_code: v })}
+                    allowUnset
+                    triggerClassName="w-full"
+                  />
                 </FormField>
               </div>
             )}

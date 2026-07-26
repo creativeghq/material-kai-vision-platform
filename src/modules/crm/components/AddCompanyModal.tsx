@@ -7,12 +7,10 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/core/ui/select';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
+import { VatCountryCombobox } from '@/components/core/VatCountryCombobox';
 import { validateVatViaVies } from '@/services/viesService';
 import { enrichCompany } from '@/services/companyEnrichService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
@@ -313,16 +311,11 @@ export const AddCompanyModal: React.FC<{
               <div className="space-y-2">
                 <Label className="text-xs">VAT / ΑΦΜ lookup (optional)</Label>
                 <div className="flex gap-2">
-                  <Select value={countryCode} onValueChange={setCountryCode}>
-                    <SelectTrigger className="w-28 shrink-0"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {VAT_COUNTRY_OPTIONS.map((o) => (
-                        <SelectItem key={o.code} value={o.code}>
-                          <span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <VatCountryCombobox
+                    value={countryCode}
+                    onChange={(v) => setCountryCode(v || 'EL')}
+                    triggerClassName="w-32 shrink-0"
+                  />
                   <Input
                     value={vatNumber}
                     onChange={(e) => setVatNumber(e.target.value)}

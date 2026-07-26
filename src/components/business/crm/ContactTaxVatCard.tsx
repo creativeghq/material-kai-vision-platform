@@ -3,11 +3,7 @@ import { Receipt } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { Badge } from '@/components/core/ui/badge';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/core/ui/select';
-import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
+import { VatCountryCombobox } from '@/components/core/VatCountryCombobox';
 
 interface ContactTaxVatCardProps {
   vatNumber: string | null;
@@ -57,23 +53,13 @@ export const ContactTaxVatCard: React.FC<ContactTaxVatCardProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="vat_country">Country</Label>
-            <Select value={countryCode || '__unset'} onValueChange={handleCountry}>
-              <SelectTrigger id="vat_country">
-                <SelectValue placeholder="Not set" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__unset">Not set</SelectItem>
-                {VAT_COUNTRY_OPTIONS.map((o) => (
-                  <SelectItem key={o.code} value={o.code}>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] w-7">{o.code}</span>
-                      <span>{o.name}</span>
-                      {o.eu && <Badge variant="outline" className="text-[9px] py-0">EU</Badge>}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <VatCountryCombobox
+              id="vat_country"
+              value={countryCode || ''}
+              onChange={(v) => handleCountry(v || '__unset')}
+              allowUnset
+              triggerClassName="w-full"
+            />
           </div>
           <div className="space-y-1.5 md:col-span-2">
             <Label htmlFor="vat_number">VAT number</Label>
