@@ -301,6 +301,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Contracts
   contracts_list: 'Contracts',
   contract_created: 'Contract drafted',
+  doc_saved: 'Document saved',
+  doc_suggestion_submitted: 'Edit suggested',
   contract_sent: 'Contract sent for signature',
   // Customer Inbox
   inbox_threads_list: 'Customer conversations',

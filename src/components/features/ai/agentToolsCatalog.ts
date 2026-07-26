@@ -1403,11 +1403,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'docs',
     name: 'Workspace Docs',
-    description: 'Search your workspace\'s internal documents.',
+    description: 'Search, write, and propose edits to your workspace\'s internal documents.',
     icon: 'FileText',
-    tool_ids: ['search_workspace_docs'],
+    tool_ids: ['search_workspace_docs', 'manage_docs'],
     quick_starts: [
       { label: 'Search docs', description: 'Find something in your docs', prompt: 'Search my workspace documents for…', icon: 'Search' },
+      { label: 'Write a doc', description: 'Draft a new internal doc', prompt: 'Write a workspace doc about…', icon: 'Plus' },
     ],
   },
   {
@@ -1425,12 +1426,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'crm',
     name: 'CRM',
-    description: 'Add companies to the CRM from a VAT / ΑΦΜ number (ΑΑΔΕ / VIES lookup → create).',
+    description: 'Add companies from a VAT/ΑΦΜ (ΑΑΔΕ/VIES) and refresh existing companies from ΑΑΔΕ.',
     icon: 'Building2',
     moduleSlug: 'crm',
-    tool_ids: ['create_company_from_vat'],
+    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade'],
     quick_starts: [
       { label: 'Company from VAT', description: 'Look up a VAT/ΑΦΜ and add the company', prompt: 'Add a company to the CRM from a VAT or ΑΦΜ number — ask me for it.', icon: 'Plus' },
+      { label: 'Refresh from ΑΑΔΕ', description: 'Update an existing company from ΑΑΔΕ', prompt: 'Refresh a company\'s details from ΑΑΔΕ — I\'ll tell you which one.', icon: 'RefreshCw' },
     ],
   },
   {

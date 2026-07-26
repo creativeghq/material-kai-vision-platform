@@ -869,10 +869,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // is not. If Docs becomes a paid/gated module, add an is_workspace_entitled('docs') check at
       // the push site. Tenancy is safe either way: workspaceId is server-derived + the FTS is scoped.
       'search_workspace_docs',
+      'manage_docs',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
       // CRM roster query — "which businesses have ΚΑΔ X?" + create-from-VAT (all users; workspace-scoped)
-      'search_crm_by_kad', 'create_company_from_vat',
+      'search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -1044,7 +1045,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites',
       'price_lookup', 'product_analysis', 'business_analysis', 'dispatch_background_task',
       // Price monitoring + CRM-from-VAT (Pepper is the product/business agent)
-      'track_product_prices', 'get_price_summary', 'create_company_from_vat',
+      'track_product_prices', 'get_price_summary', 'create_company_from_vat', 'enrich_company_from_aade',
     ],
   },
   marketing: {
@@ -1245,7 +1246,7 @@ async function executeAgent(
       tool_ids: ['manage_finance'],
     },
     'crm': {
-      tool_ids: ['create_company_from_vat'],
+      tool_ids: ['create_company_from_vat', 'enrich_company_from_aade'],
     },
     'messaging': {
       tool_ids: ['manage_messaging'],
@@ -1299,7 +1300,7 @@ async function executeAgent(
       tool_ids: ['manage_company_assets'],
     },
     'docs': {
-      tool_ids: ['search_workspace_docs'],
+      tool_ids: ['search_workspace_docs', 'manage_docs'],
     },
     'quotes': {
       tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes'],
@@ -1546,7 +1547,7 @@ async function executeAgent(
   // Each module does top-level await for @langchain/core + zod.
   // Loading them at boot exceeds the 2s Supabase Edge Runtime limit.
   const needsSearch = config.tools.some((t: string) => ['knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url'].includes(t));
-  const needsDocs = config.tools.includes('search_workspace_docs');
+  const needsDocs = config.tools.includes('search_workspace_docs') || config.tools.includes('manage_docs');
   const needsGen = config.tools.some((t: string) => ['generate_3d'].includes(t));
   const needsOps = config.tools.some((t: string) => ['check_server_health', 'query_sentry', 'cost_estimation'].includes(t));
   const needsDb = config.tools.includes('query_database');
@@ -1593,7 +1594,7 @@ async function executeAgent(
   const needsMyHr = config.tools.includes('manage_my_hr');
   const needsStock = config.tools.includes('manage_stock');
   const needsRealEstate = config.tools.includes('manage_real_estate');
-  const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat'].includes(t));
+  const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade'].includes(t));
   const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes'].includes(t));
   const needsSocial = config.tools.includes('manage_social');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
@@ -1644,6 +1645,7 @@ async function executeAgent(
   ]);
 
   const createDocsSearchTool = docsMod?.createDocsSearchTool;
+  const createManageDocsTool = docsMod?.createManageDocsTool;
   const createSearchTool = searchMod?.createSearchTool;
   const createVisualSearchTool = searchMod?.createVisualSearchTool;
   const createKnowledgeBaseSearchTool = searchMod?.createKnowledgeBaseSearchTool;
@@ -1809,6 +1811,9 @@ async function executeAgent(
   if (config.tools.includes('search_workspace_docs') && createDocsSearchTool) {
     tools.push(createDocsSearchTool(workspaceId));
   }
+  if (config.tools.includes('manage_docs') && createManageDocsTool) {
+    tools.push(createManageDocsTool(userId, workspaceId, onChunk));
+  }
 
   // CRM roster query — "which businesses have ΚΑΔ X?" (all users; workspace-scoped, free).
   if (config.tools.includes('search_crm_by_kad') && crmToolsMod?.createCrmKadSearchTool) {
@@ -1816,6 +1821,9 @@ async function executeAgent(
   }
   if (config.tools.includes('create_company_from_vat') && crmToolsMod?.createCompanyFromVatTool) {
     tools.push(crmToolsMod.createCompanyFromVatTool(userId, workspaceId, userJwt, onChunk));
+  }
+  if (config.tools.includes('enrich_company_from_aade') && crmToolsMod?.createEnrichCompanyFromAadeTool) {
+    tools.push(crmToolsMod.createEnrichCompanyFromAadeTool(userId, workspaceId, userJwt, onChunk));
   }
 
   // Material search (text-based 7-vector fusion) — now with search_spec support

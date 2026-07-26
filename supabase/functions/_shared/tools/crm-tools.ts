@@ -182,3 +182,61 @@ export const createCompanyFromVatTool = (
     },
   );
 };
+
+/**
+ * Enrich an EXISTING CRM company from ΑΑΔΕ (the agent equivalent of the company page's
+ * "Fetch from ΑΑΔΕ" button — #275 parity). Resolves the company by id or fuzzy name, then calls
+ * myaade-rgwspublic2 with the company_id so the edge does the authoritative write-back (structured
+ * columns + 90-day cache). The edge enforces is_workspace_finance_manager on the caller's JWT.
+ */
+export const createEnrichCompanyFromAadeTool = (
+  _userId: string,
+  workspaceId: string,
+  jwt: string | undefined,
+  onChunk?: (chunk: AnyRow) => void,
+) => {
+  return tool(
+    async ({ company_id, company_query }: { company_id?: string; company_query?: string }) => {
+      // Resolve the company (service-role read, explicitly workspace-scoped).
+      let q = supabase.from('crm_companies').select('id, name, vat_number, country_code').eq('workspace_id', workspaceId);
+      if (company_id) q = q.eq('id', company_id);
+      else if (company_query) q = q.ilike('name', `%${company_query}%`);
+      else return JSON.stringify({ success: false, error: 'Provide company_id or company_query.' });
+      const { data: matches, error } = await q.limit(8);
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      if (!matches || matches.length === 0) return JSON.stringify({ success: false, error: 'No matching company in this workspace.' });
+      if (matches.length > 1) {
+        return JSON.stringify({ success: false, error: `Multiple companies match "${company_query}". Ask which one.`, candidates: matches.map((c: AnyRow) => ({ id: c.id, name: c.name, vat: c.vat_number })) });
+      }
+      const company = matches[0];
+      const digits = String(company.vat_number || '').replace(/[^0-9]/g, '');
+      const cc = String(company.country_code || '').toUpperCase();
+      const isGreek = cc === 'EL' || cc === 'GR' || (!cc && digits.length === 9);
+      if (!digits) return JSON.stringify({ success: false, error: `"${company.name}" has no VAT/ΑΦΜ on file to look up.` });
+      if (!isGreek) return JSON.stringify({ success: false, error: 'ΑΑΔΕ enrichment is Greek-only. For EU companies use VIES via create/update flows.' });
+
+      onChunk?.({ type: 'tool_progress', status: `Fetching ΑΑΔΕ details for ${company.name}…`, timestamp: Date.now() });
+      const r = await callEdge('myaade-rgwspublic2', { afm: digits, workspace_id: workspaceId, company_id: company.id }, jwt);
+      if (!r.ok || r.data?.ok === false) return JSON.stringify({ success: false, error: r.data?.message || r.error || 'ΑΑΔΕ lookup failed (are your workspace ΑΑΔΕ codes configured, and are you a finance manager?).' });
+      const b = r.data?.basic_rec || {};
+      onChunk?.({ type: 'crm_company_created', data: { company: { id: company.id, name: b.onomasia || company.name }, source: 'aade', enriched: true }, timestamp: Date.now() });
+      return JSON.stringify({
+        success: true, company_id: company.id, source: r.data?.source ?? 'aade',
+        enriched: { name: b.onomasia, commercial_title: b.commer_title, tax_office: b.doy_descr, active: r.data?.valid_afm },
+        message: `Enriched "${b.onomasia || company.name}" from ΑΑΔΕ${r.data?.source === 'cache' ? ' (cached)' : ''}.`,
+      });
+    },
+    {
+      name: 'enrich_company_from_aade',
+      description:
+        'Refresh an EXISTING CRM company\'s details from the Greek ΑΑΔΕ registry (legal/commercial name, '
+        + 'address, tax office, activity, active status). Give company_id or company_query (fuzzy name). '
+        + 'Greek ΑΦΜ only; the company must already have a VAT on file. Use for "update <company> from ΑΑΔΕ" '
+        + '/ "refresh the tax details for …". Requires the workspace ΑΑΔΕ codes + finance-manager permission.',
+      schema: z.object({
+        company_id: z.string().optional().describe('The crm company UUID to enrich.'),
+        company_query: z.string().optional().describe('Fuzzy company name to resolve (if you don\'t have the id).'),
+      }),
+    },
+  );
+};
