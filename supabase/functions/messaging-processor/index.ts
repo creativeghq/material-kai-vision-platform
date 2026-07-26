@@ -19,6 +19,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { zernioKey, sendWhatsAppMessage } from '../_shared/zernio.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 
 const BATCH_SIZE = 10;
 const MAX_RETRIES = 3;
@@ -82,7 +83,7 @@ serve(withApiLogging('messaging-processor', async (req) => {
     const { data: activeCampaigns } = await supabase
       .from('campaigns')
       .select(`
-        id, name, channel_type, messaging_template_id, messaging_channel_id,
+        id, name, channel_type, messaging_template_id, messaging_channel_id, created_by,
         template:messaging_templates(*),
         channel:messaging_channels(*)
       `)
@@ -105,6 +106,24 @@ serve(withApiLogging('messaging-processor', async (req) => {
       }
       if (!channel.zernio_account_id) {
         console.warn(`Campaign ${campaign.id} channel has no Zernio account, skipping`);
+        continue;
+      }
+
+      // T2-1 — the cron send path must enforce the same gates as messaging-api's `send`:
+      const wsId: string | null = channel.workspace_id ?? null;
+      const ownerId: string | null = campaign.created_by ?? null;
+      // (a) entitlement/module: a workspace without the messaging add-on must not get free bulk delivery.
+      if (wsId) {
+        const { data: entitled } = await supabase.rpc('is_workspace_entitled', { p_workspace_id: wsId, p_module_slug: 'messaging' });
+        if (entitled !== true) {
+          await supabase.from('campaigns').update({ status: 'paused', metadata: { blocked_reason: 'not_entitled', blocked_message: 'The Messaging add-on is not active for this workspace.' } }).eq('id', campaign.id);
+          continue;
+        }
+      }
+      // (b) template validation: WhatsApp rejects a cold/marketing freeform send outside the 24h window —
+      // a template row with no approved Meta template name would mark every recipient failed. Block early.
+      if (!template.whatsapp_template_name) {
+        await supabase.from('campaigns').update({ status: 'paused', metadata: { blocked_reason: 'template_not_approved', blocked_message: 'This campaign\'s template has no approved WhatsApp template name.' } }).eq('id', campaign.id);
         continue;
       }
 
@@ -139,6 +158,20 @@ serve(withApiLogging('messaging-processor', async (req) => {
             .update({ status: 'opted_out', error_message: 'Recipient has opted out' })
             .eq('id', recipient.id);
           continue;
+        }
+
+        // T2-1 — debit the campaign owner BEFORE the send (invariant #10), mirroring messaging-api.
+        // Out of credits → re-queue the recipient and pause the campaign so it resumes on top-up
+        // (don't churn the whole list into 'failed'). No owner → skip metering (shouldn't happen).
+        let debitedCredits = 0;
+        if (ownerId) {
+          const debit = await debitExternalServiceCredits(supabase, ownerId, 'zernio-whatsapp', 'messaging_campaign_whatsapp', 1, { to: recipient.phone_number });
+          if (!debit.success) {
+            await supabase.from('messaging_campaign_recipients').update({ status: 'pending' }).eq('id', recipient.id);
+            await supabase.from('campaigns').update({ status: 'paused', metadata: { blocked_reason: 'insufficient_credits', blocked_message: 'Paused — the workspace owner is out of credits. Resumes automatically once credits are added.' } }).eq('id', campaign.id);
+            break;
+          }
+          debitedCredits = debit.credits_debited ?? 1;
         }
 
         await supabase.from('messaging_campaign_recipients').update({ status: 'sending' }).eq('id', recipient.id);
@@ -183,6 +216,14 @@ serve(withApiLogging('messaging-processor', async (req) => {
           stats.messagesSent++;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          // Refund the credit for this failed attempt — the next retry tick re-debits, so a message
+          // is only ever billed for a send that actually left.
+          if (ownerId && debitedCredits > 0) {
+            await supabase.rpc('refund_credits', {
+              p_user_id: ownerId, p_amount: debitedCredits, p_operation_type: 'messaging_campaign_whatsapp_refund',
+              p_description: 'Refund: WhatsApp campaign send failed', p_metadata: { to: recipient.phone_number }, p_workspace_id: null,
+            }).then(() => {}, () => {});
+          }
           await supabase.from('messaging_campaign_recipients').update({
             status: 'pending',
             error_message: errorMessage,

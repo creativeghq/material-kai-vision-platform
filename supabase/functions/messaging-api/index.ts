@@ -118,6 +118,11 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
     const auth = await authenticate(req);
     if (!auth.success) throw new HttpError(401, auth.error || 'Unauthorized');
     const user = auth.user;
+    // Service-role / secret-key callers (e.g. the Flows send_whatsapp action via flow-engine) have NO
+    // user — `user.id` would crash and every WhatsApp automation would 500. Use a null-safe billing id:
+    // when there's no user, skip the internal per-recipient debit (the flow-engine already debited for
+    // that path — debiting here too would double-charge). A real session/partner caller still debits.
+    const billingUserId: string | null = auth.userId ?? user?.id ?? null;
 
     // Zernio is the engine for every WhatsApp action. Fail with a clean 503 +
     // admin-actionable settings path when the key is absent (mirrors the old
@@ -188,14 +193,18 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
           // Debit BEFORE the WhatsApp send (invariant #10 — fail-closed). A caller with no
           // credits is blocked before the message is delivered; the charge is refunded if the
-          // send itself fails. Per-recipient debit keeps accounting exact.
-          const debit = await debitExternalServiceCredits(
-            supabaseClient, user.id, 'zernio-whatsapp', 'messaging_whatsapp', 1,
-            { to },
-          );
-          if (!debit.success) {
-            results.push({ to, success: false, error: debit.error || 'Insufficient credits' });
-            continue;
+          // send itself fails. Per-recipient debit keeps accounting exact. Skipped for service-role
+          // callers (no billingUserId) — that path is billed upstream by the flow-engine.
+          let debit: { success: boolean; credits_debited?: number; error?: string } = { success: true, credits_debited: 0 };
+          if (billingUserId) {
+            debit = await debitExternalServiceCredits(
+              supabaseClient, billingUserId, 'zernio-whatsapp', 'messaging_whatsapp', 1,
+              { to },
+            );
+            if (!debit.success) {
+              results.push({ to, success: false, error: debit.error || 'Insufficient credits' });
+              continue;
+            }
           }
 
           let result: any;
@@ -211,7 +220,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               templateParams: template ? orderedTemplateParams(template, body.templateVariables || {}) : undefined,
             });
           } catch (sendErr) {
-            await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
+            if (billingUserId && debit.credits_debited) await refundWhatsAppCredits(supabaseClient, billingUserId, debit.credits_debited, to);
             results.push({ to, success: false, error: sendErr instanceof Error ? sendErr.message : String(sendErr) });
             continue;
           }
@@ -219,7 +228,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
           if (result.success) {
             await supabaseClient.from('messaging_logs').insert({
-              created_by: user.id,
+              created_by: billingUserId,
               workspace_id: channel.workspace_id ?? auth.workspace_id, // #250 B6: tenant scope
               channel_id: channel.id,
               channel_type: 'whatsapp',
@@ -233,8 +242,8 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               sent_at: new Date().toISOString(),
             });
           } else {
-            // Send returned a soft failure — refund the pre-charged credit.
-            await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
+            // Send returned a soft failure — refund the pre-charged credit (only if we debited).
+            if (billingUserId && debit.credits_debited) await refundWhatsAppCredits(supabaseClient, billingUserId, debit.credits_debited, to);
           }
         }
 
@@ -271,15 +280,18 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
           // Debit BEFORE each send (invariant #10 — fail-closed). Out-of-credits stops the
           // blast before delivery; per-recipient debit keeps bulk accounting exact and each
-          // charge is refunded if its send fails.
-          const debit = await debitExternalServiceCredits(
-            supabaseClient, user.id, 'zernio-whatsapp', 'messaging_bulk_whatsapp', 1,
-            { to },
-          );
-          if (!debit.success) {
-            results.push({ to, success: false, error: debit.error || 'Insufficient credits' });
-            // Stop the bulk run once the owner is out of credits — no point retrying every row.
-            break;
+          // charge is refunded if its send fails. Skipped for service-role callers (billed upstream).
+          let debit: { success: boolean; credits_debited?: number; error?: string } = { success: true, credits_debited: 0 };
+          if (billingUserId) {
+            debit = await debitExternalServiceCredits(
+              supabaseClient, billingUserId, 'zernio-whatsapp', 'messaging_bulk_whatsapp', 1,
+              { to },
+            );
+            if (!debit.success) {
+              results.push({ to, success: false, error: debit.error || 'Insufficient credits' });
+              // Stop the bulk run once the owner is out of credits — no point retrying every row.
+              break;
+            }
           }
 
           let result: any;
@@ -293,7 +305,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               templateParams: template ? orderedTemplateParams(template, vars) : undefined,
             });
           } catch (sendErr) {
-            await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
+            if (billingUserId && debit.credits_debited) await refundWhatsAppCredits(supabaseClient, billingUserId, debit.credits_debited, to);
             results.push({ to, success: false, error: sendErr instanceof Error ? sendErr.message : String(sendErr) });
             await new Promise((res) => setTimeout(res, 50));
             continue;
@@ -302,7 +314,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
           if (result.success) {
             await supabaseClient.from('messaging_logs').insert({
-              created_by: user.id,
+              created_by: billingUserId,
               workspace_id: channel.workspace_id ?? auth.workspace_id, // #250 B6: tenant scope
               channel_id: channel.id,
               channel_type: 'whatsapp',
@@ -483,9 +495,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // Channels / templates / logs / analytics (DB reads)
       // ─────────────────────────────────────────────────────────────
       case 'channels': {
+        // Tenancy (#250 invariant #1): these read actions use the RLS-bypassing service-role client and
+        // are NOT operator-gated, so they MUST filter by the caller's workspace or any authenticated user
+        // could enumerate every tenant's WhatsApp channels (waba_id/phone_number_id). No workspace → none.
+        if (!auth.workspace_id) return jsonResponse({ channels: [] });
         const { data, error } = await supabaseClient
           .from('messaging_channels').select('*')
           .eq('channel_type', 'whatsapp')
+          .eq('workspace_id', auth.workspace_id)
           .order('is_default', { ascending: false });
         if (error) throw error;
         return jsonResponse({ channels: data });
@@ -501,10 +518,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       case 'logs': {
+        // Tenancy: without a workspace filter any user could read every tenant's customer phone numbers
+        // + message bodies. Scope to the caller's workspace.
+        if (!auth.workspace_id) return jsonResponse({ logs: [], total: 0 });
         const { limit = 50, offset = 0, status } = requestBody;
         let query = supabaseClient
           .from('messaging_logs').select('*', { count: 'exact' })
           .eq('channel_type', 'whatsapp')
+          .eq('workspace_id', auth.workspace_id)
           .order('created_at', { ascending: false })
           .range(offset, offset + limit - 1);
         if (status) query = query.eq('status', status);
@@ -514,12 +535,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       case 'analytics': {
+        if (!auth.workspace_id) return jsonResponse({ total: 0, totalSent: 0, totalDelivered: 0, totalRead: 0, totalFailed: 0, deliveryRate: 0, readRate: 0, failureRate: 0, byStatus: {}, dailyData: [] });
         const { startDate, endDate } = requestBody;
         const start = startDate || new Date(Date.now() - 30 * 86400000).toISOString();
         const end = endDate || new Date().toISOString();
         const { data: logs } = await supabaseClient
           .from('messaging_logs').select('status')
           .eq('channel_type', 'whatsapp')
+          .eq('workspace_id', auth.workspace_id)
           .gte('created_at', start).lte('created_at', end);
 
         const byStatus: Record<string, number> = {};
