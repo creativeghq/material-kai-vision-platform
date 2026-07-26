@@ -1837,6 +1837,28 @@
     "response": "{success, pdf_url, pdf_storage_path, page_count}"
   },
   {
+    "name": "generate-contract-pdf",
+    "tag": "Finance",
+    "summary": "Render a signed/draft contract to PDF",
+    "description": "Renders the contract (with any collected signatures) to a PDF, overwrites it at pdf-documents/contract-output/{contract_id}.pdf (private bucket), and returns a 7-day signed URL. Requires a signed-in user; the caller is reconciled against the contract's workspace before rendering (#250 invariant 1).",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "contract_id",
+        "type": "string",
+        "required": true,
+        "desc": "contracts row ID to render"
+      }
+    ],
+    "response": "{success, url, storage_path, page_count}"
+  },
+  {
     "name": "generate-quote-pdf",
     "tag": "Quotes",
     "summary": "Generate or return cached PDF for a quote",
