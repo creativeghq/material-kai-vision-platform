@@ -100,6 +100,9 @@ export interface TripExpenseItem {
   review_notes: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  /** Set once the billable line has been on-charged to a customer as a draft invoice. */
+  billed_invoice_id: string | null;
+  billed_at: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -244,6 +247,67 @@ export const tripExpenseService = {
   async removeItem(id: string): Promise<void> {
     const { error } = await supabase.from('trip_expense_items').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  /**
+   * Rebill approved, billable, not-yet-billed trip-expense items to a customer as a draft invoice
+   * (one line per expense), stamping billed_invoice_id so a line can't be double-billed. Mirrors
+   * timeTrackingService.billToInvoice. Returns the new invoice id.
+   */
+  async billToClient(
+    workspaceId: string,
+    customer: { type: 'company' | 'contact'; id: string },
+    itemIds: string[],
+    vatRate = 24,
+  ): Promise<string> {
+    if (itemIds.length === 0) throw new Error('No expenses selected');
+    const { data: items, error: selErr } = await supabase
+      .from('trip_expense_items').select('*')
+      .in('id', itemIds).eq('workspace_id', workspaceId)
+      .eq('billable', true).is('billed_invoice_id', null);
+    if (selErr) throw selErr;
+    const rows = (items ?? []) as TripExpenseItem[];
+    if (rows.length === 0) throw new Error('Selected expenses are already billed or not billable');
+
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const totalNet = round2(rows.reduce((s, r) => s + Number(r.amount), 0));
+    const vatAmount = round2(totalNet * vatRate / 100);
+
+    const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: workspaceId });
+    if (numErr) throw numErr;
+
+    const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
+      workspace_id: workspaceId,
+      internal_number: draftNumber as string,
+      customer_company_id: customer.type === 'company' ? customer.id : null,
+      customer_contact_id: customer.type === 'contact' ? customer.id : null,
+      status: 'draft',
+      currency: rows[0]?.currency ?? 'EUR',
+      subtotal_net: totalNet, vat_rate: vatRate, vat_amount: vatAmount, total: round2(totalNet + vatAmount),
+      document_type: customer.type === 'company' ? '1.1' : '11.1',
+      payment_terms_days: 30,
+      notes: 'Generated from billable trip expenses',
+      issued_at: null, due_at: null,
+    } as any).select().single();
+    if (insErr) throw insErr;
+
+    const itemsPayload = rows.map((r) => ({
+      invoice_id: (invoice as any).id,
+      description: [r.category, r.vendor, r.description].filter(Boolean).join(' · ') || 'Expense',
+      quantity: 1,
+      unit_price: Number(r.amount),
+      net_value: Number(r.amount),
+      line_total: Number(r.amount),
+    }));
+    const { error: itErr } = await supabase.from('invoice_items').insert(itemsPayload);
+    if (itErr) throw itErr;
+
+    const { error: stampErr } = await supabase.from('trip_expense_items')
+      .update({ billed_invoice_id: (invoice as any).id, billed_at: new Date().toISOString() })
+      .in('id', rows.map((r) => r.id));
+    if (stampErr) throw stampErr;
+
+    return (invoice as any).id as string;
   },
 
   // -------- Workflow (RPCs) --------

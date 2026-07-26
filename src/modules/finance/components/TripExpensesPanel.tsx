@@ -244,6 +244,49 @@ const TripCardDetail: React.FC<{
     catch (err: any) { toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' }); }
   };
 
+  // Approved, billable, not-yet-billed lines that can be on-charged to a client.
+  const billableEligible = useMemo(
+    () => items.filter((i) => i.billable && i.approval_status === 'approved' && !i.billed_invoice_id),
+    [items],
+  );
+
+  // Group the eligible lines by project → its client → one draft invoice per client (3.5).
+  const billToClient = async () => {
+    if (!report || billableEligible.length === 0) return;
+    setBusy(true);
+    try {
+      const byProject = new Map<string, TripExpenseItem[]>();
+      let skipped = 0;
+      for (const it of billableEligible) {
+        if (!it.project_id) { skipped++; continue; }
+        const arr = byProject.get(it.project_id) ?? []; arr.push(it); byProject.set(it.project_id, arr);
+      }
+      if (byProject.size === 0) {
+        toast({ title: 'Tag a project first', description: 'Billable expenses need a project (with a client) to be on-charged.', variant: 'destructive' });
+        return;
+      }
+      const { data: projs } = await supabase.from('projects').select('id, client_company_id, client_contact_id').in('id', [...byProject.keys()]);
+      const clientByProj = new Map((((projs as any[]) ?? [])).map((p) => [p.id, p]));
+      let invoices = 0;
+      for (const [pid, its] of byProject) {
+        const p = clientByProj.get(pid);
+        const cust = p?.client_company_id ? { type: 'company' as const, id: p.client_company_id }
+          : p?.client_contact_id ? { type: 'contact' as const, id: p.client_contact_id } : null;
+        if (!cust) { skipped += its.length; continue; }
+        await tripExpenseService.billToClient(report.workspace_id, cust, its.map((i) => i.id));
+        invoices++;
+      }
+      toast({
+        title: invoices ? `Created ${invoices} draft invoice${invoices > 1 ? 's' : ''}` : 'Nothing billed',
+        description: skipped ? `${skipped} expense(s) skipped — no project or the project has no client.` : 'Find them in Finance → drafts to review & issue.',
+        variant: invoices ? 'default' : 'destructive',
+      });
+      await refreshAll();
+    } catch (err: any) {
+      toast({ title: 'Billing failed', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
   const uploadReceipt = async (item: TripExpenseItem, file: File) => {
     try {
       setBusy(true);
@@ -302,6 +345,11 @@ const TripCardDetail: React.FC<{
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             {canEditItems && <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Expense</Button>}
+            {canReview && billableEligible.length > 0 && (
+              <Button size="sm" variant="outline" disabled={busy} onClick={billToClient} title="Create a draft customer invoice from the approved billable expenses">
+                <FileText className="h-3.5 w-3.5 mr-1" /> Bill to client ({billableEligible.length})
+              </Button>
+            )}
             {canEditItems && report.item_count > 0 && (
               <Button size="sm" disabled={busy} onClick={submit}><Send className="h-3.5 w-3.5 mr-1" /> Submit</Button>
             )}
@@ -394,6 +442,7 @@ const TripCardDetail: React.FC<{
 
       <AddExpenseDialog
         reportId={reportId}
+        workspaceId={report.workspace_id}
         currency={report.currency}
         open={addOpen}
         onOpenChange={setAddOpen}
@@ -580,11 +629,12 @@ const RequestCardDialog: React.FC<{
 
 const AddExpenseDialog: React.FC<{
   reportId: string;
+  workspaceId: string;
   currency: string;
   open: boolean;
   onOpenChange: (o: boolean) => void;
   onAdded: () => void;
-}> = ({ reportId, currency, open, onOpenChange, onAdded }) => {
+}> = ({ reportId, workspaceId, currency, open, onOpenChange, onAdded }) => {
   const { toast } = useToast();
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [category, setCategory] = useState<string>('transport');
@@ -592,7 +642,17 @@ const AddExpenseDialog: React.FC<{
   const [vendor, setVendor] = useState('');
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<ExpensePaymentMethod>('personal');
+  const [billable, setBillable] = useState(false);
+  const [projectId, setProjectId] = useState('');
+  const [projects, setProjects] = useState<Array<{ id: string; name: string | null }>>([]);
   const [saving, setSaving] = useState(false);
+
+  // Projects, so a billable expense can be tagged to the job it belongs to (→ rebill to its client).
+  useEffect(() => {
+    if (!open || !workspaceId) return;
+    void supabase.from('projects').select('id, name').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(200)
+      .then(({ data }) => setProjects((data as any[]) ?? []));
+  }, [open, workspaceId]);
 
   const save = async () => {
     const amt = parseDecimal(amount);
@@ -603,8 +663,9 @@ const AddExpenseDialog: React.FC<{
         report_id: reportId, expense_date: date, category,
         description: description.trim() || null, vendor: vendor.trim() || null,
         amount: amt, currency, payment_method: method,
+        billable, project_id: billable ? (projectId || null) : null,
       });
-      setDescription(''); setVendor(''); setAmount('');
+      setDescription(''); setVendor(''); setAmount(''); setBillable(false); setProjectId('');
       onOpenChange(false);
       onAdded();
     } catch (err: any) {
@@ -659,6 +720,23 @@ const AddExpenseDialog: React.FC<{
               </Select>
             </div>
           </div>
+          {/* Billable → rebill to a project's client later (Bill to client on the approved card). */}
+          <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 cursor-pointer">
+            <span className="text-xs">Billable to client <span className="text-muted-foreground">— on-charge this cost to a project's client</span></span>
+            <input type="checkbox" checked={billable} onChange={(e) => setBillable(e.target.checked)} className="h-4 w-4" />
+          </label>
+          {billable && (
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Project</label>
+              <Select value={projectId || '__none__'} onValueChange={(v) => setProjectId(v === '__none__' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="Pick the project to bill" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— No project —</SelectItem>
+                  {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name || p.id.slice(0, 8)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

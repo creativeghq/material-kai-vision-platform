@@ -122,9 +122,9 @@ export const MoodBoardDetailPage: React.FC = () => {
           const { data: quotes } = await supabase
             .from('quotes')
             .select('id, name, status, created_at')
-            .or(`name.ilike.%${boardData.title}%,notes.ilike.%${boardData.title}%`)
+            .eq('moodboard_id' as any, boardData.id)
             .order('created_at', { ascending: false })
-            .limit(5);
+            .limit(20);
           setRelatedQuotes(quotes || []);
         } catch {
           // non-fatal — quotes are optional
@@ -206,10 +206,31 @@ export const MoodBoardDetailPage: React.FC = () => {
     }
     setCreatingProposal(true);
     try {
+      // Carry the board's project + its client through, so the quote is billable and shows up in
+      // the project's Quotes/Billing/Finance tabs instead of being an orphaned, customer-less quote.
+      let projectId: string | null = null;
+      let customerCompanyId: string | null = null;
+      let customerContactId: string | null = null;
+      try {
+        const { data: mb } = await supabase.from('moodboards').select('project_id').eq('id', moodboard.id).single();
+        projectId = (mb as any)?.project_id ?? null;
+        if (projectId) {
+          const { data: proj } = await supabase.from('projects').select('client_company_id, client_contact_id').eq('id', projectId).single();
+          customerCompanyId = (proj as any)?.client_company_id ?? null;
+          customerContactId = (proj as any)?.client_contact_id ?? null;
+        }
+      } catch { /* non-fatal — quote still created, just without the links */ }
+
       const quote = await quotesService.createQuote({
         name: `Proposal from ${moodboard.title}`,
         notes: `Created from moodboard: ${moodboard.title}`,
+        project_id: projectId,
+        customer_company_id: customerCompanyId,
+        customer_contact_id: customerContactId,
+        moodboard_id: moodboard.id,
       });
+      // Add EVERY item — catalog products as product lines, non-catalog (pinned inspiration /
+      // Pinterest imports) as custom lines — so nothing is silently dropped.
       for (const item of items) {
         if (item.material_id) {
           await quotesService.addItem({
@@ -218,6 +239,14 @@ export const MoodBoardDetailPage: React.FC = () => {
             quantity: 1,
             notes: item.notes || '',
             added_from: 'manual',
+          });
+        } else {
+          await quotesService.addCustomItem({
+            quote_id: quote.id,
+            custom_product_name: (item as any).media_title || 'Inspiration item',
+            custom_image_url: (item as any).media_url || undefined,
+            quantity: 1,
+            notes: item.notes || '',
           });
         }
       }

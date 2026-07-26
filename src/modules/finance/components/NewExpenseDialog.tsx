@@ -82,6 +82,15 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [pickedOrderId, setPickedOrderId] = useState<string>('');
   const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
 
+  // A supplier passed in from the party page — used so the shared draft can't clobber the prefill.
+  const prefillParty: Party | null = prefill?.supplier?.companyId
+    ? { type: 'company', id: prefill.supplier.companyId, label: prefill.supplier.name || 'Supplier' }
+    : prefill?.supplier?.contactId
+      ? { type: 'contact', id: prefill.supplier.contactId, label: prefill.supplier.name || 'Supplier' }
+      : prefill?.supplier?.name
+        ? { type: 'adhoc', id: null, label: prefill.supplier.name }
+        : null;
+
   const expenseCats = useMemo(
     () => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'),
     [categories],
@@ -110,7 +119,8 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setBankAccountId(d?.bankAccountId ?? '');
       setMethod(d?.method ?? 'bank_transfer');
       setRepeat(d?.repeat ?? 'none');
-      setParty(d?.party ?? null);
+      // Prefilled supplier (party page) wins over any stale draft party.
+      setParty(prefillParty ?? d?.party ?? null);
       setPartySearch('');
     },
   );

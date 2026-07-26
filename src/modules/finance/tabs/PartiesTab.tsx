@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, FileText, Receipt, Printer, BookOpen, Coins, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { escapeHtml } from '@/utils/escapeHtml';
@@ -110,13 +110,17 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
   useEffect(() => { void load(); }, [workspaceId, role]);
 
   // Deep-link from another surface (e.g. the CRM Account tab → "View ledger in Finance")
-  // pre-opens that party's drill-down once the list has loaded.
+  // pre-opens that party's drill-down once the list has loaded. A brand-new party with no finance
+  // rows won't be in the list — tell the user rather than silently landing on the bare list.
+  const handledAutoOpen = useRef<string | null>(null);
   useEffect(() => {
-    if (!autoOpenParty || rows.length === 0) return;
+    if (!autoOpenParty || loading || handledAutoOpen.current === autoOpenParty) return;
     const [t, id] = autoOpenParty.split(':');
     const match = rows.find((r) => r.party_type === t && r.party_id === id);
+    handledAutoOpen.current = autoOpenParty;
     if (match) setSelected(match);
-  }, [autoOpenParty, rows]);
+    else toast({ title: 'Nothing to show yet', description: 'This party has no invoices, orders or payments in this workspace yet.' });
+  }, [autoOpenParty, rows, loading, toast]);
 
   const load = async () => {
     try {

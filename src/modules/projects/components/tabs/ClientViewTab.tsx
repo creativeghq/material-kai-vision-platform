@@ -28,7 +28,7 @@ interface ClientViewTabProps {
 }
 
 type AvailableSheet = Awaited<ReturnType<typeof projectsService.listProjectSheets>>[number];
-type ProjectQuote = { id: string; name: string | null; quote_number: string | null };
+type ProjectQuote = { id: string; name: string | null; quote_number: string | null; status: string | null; grand_total: number | null; currency: string | null };
 type VrWorld = { id: string; display_name: string | null; thumbnail_url: string | null };
 
 const STATUS_TONE: Record<string, string> = {
@@ -92,7 +92,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
       ]);
       setViews(v);
       setSheets(s);
-      setQuotes((q || []).map((x: any) => ({ id: x.id, name: x.name, quote_number: x.quote_number })));
+      setQuotes((q || []).map((x: any) => ({ id: x.id, name: x.name, quote_number: x.quote_number, status: x.status ?? null, grand_total: x.grand_total ?? null, currency: x.currency ?? null })));
       setVrWorlds(w);
     } catch {
       toast({ title: 'Failed to load client views', variant: 'destructive' });
@@ -396,10 +396,20 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                     <SelectContent>
                       <SelectItem value="__none__">— none —</SelectItem>
                       {quotes.map((q) => (
-                        <SelectItem key={q.id} value={q.id}>{q.name || q.quote_number || q.id.slice(0, 8)}</SelectItem>
+                        <SelectItem key={q.id} value={q.id}>
+                          {q.name || q.quote_number || q.id.slice(0, 8)}
+                          {q.status ? ` · ${q.status}` : ''}{q.grand_total != null ? ` · ${Number(q.grand_total).toFixed(2)} ${q.currency ?? ''}`.trimEnd() : ''}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {(() => {
+                    const sel = quotes.find((q) => q.id === form.quoteId);
+                    if (sel && sel.status && sel.status !== 'accepted') {
+                      return <p className="text-[11px] text-amber-500">This quote is <strong>{sel.status}</strong>, not accepted — its pricing will be shown to the client as-is.</p>;
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
               {form.embedVr && (

@@ -212,6 +212,8 @@ export class QuotesService {
     /** Optional customer link (used by the Sales portal #201 — rep builds a quote for a customer). */
     customer_contact_id?: string | null;
     customer_company_id?: string | null;
+    /** Source moodboard, when the quote was generated from one (real FK, not a name match). */
+    moodboard_id?: string | null;
   }): Promise<Quote> {
     // user_id is required by the RLS policy on quotes
     const { data: { user } } = await supabase.auth.getUser();
@@ -230,6 +232,7 @@ export class QuotesService {
         custom_request_text: data?.custom_request_text,
         customer_contact_id: data?.customer_contact_id ?? null,
         customer_company_id: data?.customer_company_id ?? null,
+        moodboard_id: data?.moodboard_id ?? null,
         status: 'draft',
       } as any)
       .select()
