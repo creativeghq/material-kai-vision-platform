@@ -13,6 +13,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { assertSafeUrl } from '../../_shared/ssrf-guard.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -67,7 +68,11 @@ async function extractPinData(pinUrl: string): Promise<PinData> {
  * Download image from URL and return as Uint8Array
  */
 async function downloadImage(imageUrl: string): Promise<Uint8Array> {
-  const res = await fetch(imageUrl);
+  // SSRF (invariant #7): thumbnail_url comes from the oEmbed response for a USER-supplied pin, so a
+  // crafted pin could point it at an internal host / 169.254.169.254. Validate + block redirects,
+  // exactly as the VR function does for its user-image fetch.
+  const safeUrl = await assertSafeUrl(imageUrl);
+  const res = await fetch(safeUrl, { redirect: 'error' });
   if (!res.ok) {
     throw new Error(`Failed to download image: ${res.status}`);
   }

@@ -915,6 +915,9 @@ export const createGenerateVRWorldTool = (
             },
             body: JSON.stringify({
               user_id: userId,
+              // Route the debit to the shared workspace pool (matches the frontend path). Omitting it
+              // made agent-initiated VR generations always bill personal credits.
+              workspace_id: workspaceId,
               source_image_url: resolvedImageUrl,
               prompt: resolvedPrompt,
               room_type: roomType,

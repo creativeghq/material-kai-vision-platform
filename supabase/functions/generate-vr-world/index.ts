@@ -27,10 +27,12 @@ const WORLDLABS_BASE_URL = 'https://api.worldlabs.ai/marble/v1';
 
 // Credit costs per model (raw cost × MARKUP_MULTIPLIER × 100 credits/$)
 // WorldLabs pricing: $1 = 1,250 WL credits
-// marble-1.0-draft: 230 WL cr = $0.184 raw × 1.50 = $0.276 → 28 credits
-// marble-1.1:      1580 WL cr = $1.264 raw × 1.50 = $1.896 → 190 credits
+// Charge the ADVERTISED price — the agent tool (VR_CREDIT_COSTS), the "N credits used" message it
+// returns, vrWorldService, and CLAUDE.md all quote 18 for draft / 190 for 1.1. The edge was silently
+// charging 28 for draft (a ~55% overcharge vs the quoted number). Honor the quote; a real price change
+// must update every surface together, not just this constant.
 const CREDIT_COSTS: Record<string, number> = {
-  'marble-1.0-draft': 28,
+  'marble-1.0-draft': 18,
   'marble-1.1': 190,
 };
 
@@ -146,6 +148,7 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       .from('vr_worlds')
       .insert({
         user_id: userId,
+        workspace_id: wsId,   // was never set → RLS INSERT/UPDATE (is_workspace_member) was inert + teammates couldn't see shared worlds
         source_image_url: body.source_image_url,
         source_prompt: body.prompt,
         display_name: displayName,
