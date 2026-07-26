@@ -17,6 +17,8 @@
  *  - Avoids CORS friction from calling ec.europa.eu directly from the browser
  *
  * VIES is EU-only — non-EU country codes are skipped with skipped_reason='non_eu'.
+ * address_parsed additionally carries `state` (province) for countries whose address
+ * convention encodes one (e.g. IT); null elsewhere.
  */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';

@@ -27,6 +27,9 @@
  * If company_id is provided AND the caller owns the row (or is admin), any field
  * still EMPTY on that row is cached back onto crm_companies (never overwrites
  * operator-entered values).
+ *
+ * Auth: self-authenticates via the caller's JWT (deployed with --no-verify-jwt like
+ * every function in this repo).
  */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
