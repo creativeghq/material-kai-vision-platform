@@ -13,6 +13,7 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
   const rid = runId();
   let svc: SupabaseClient;
   let A: TestUser;
+  let B: TestUser; // a user with NO access to `ws` — proves the edge gate rejects outsiders
   let ws = '', whId = '';
 
   // create a catalog product; returns its id
@@ -56,6 +57,7 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
   beforeAll(async () => {
     svc = serviceClient();
     A = await createUser(svc, 'stockA', rid);
+    B = await createUser(svc, 'stockB', rid);
     ws = await createWorkspace(svc, 'wsStock', rid, A.id);
     await addMember(svc, ws, A.id, 'owner');
     await grantModule(svc, ws, 'stock'); // record_stock_movement / import_opening_stock require the entitlement
@@ -71,8 +73,9 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     await svc.from('orders').delete().eq('workspace_id', ws).then(() => {}, () => {});
     await svc.from('warehouse_items').delete().eq('workspace_id', ws).then(() => {}, () => {});
     await svc.from('warehouses').delete().eq('workspace_id', ws).then(() => {}, () => {});
+    await svc.from('crm_companies').delete().eq('workspace_id', ws).then(() => {}, () => {});
     await svc.from('products').delete().eq('workspace_id', ws).then(() => {}, () => {});
-    await teardown(svc, { wsIds: [ws], userIds: [A.id] });
+    await teardown(svc, { wsIds: [ws], userIds: [A.id, B.id] });
   });
 
   it('auto-reserves free stock when a sales order is confirmed', async () => {
@@ -197,5 +200,101 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
       .eq('workspace_id', ws).eq('warehouse_id', whId).eq('product_id', pid).single();
     expect(Number(linked!.qty_on_hand)).toBe(7);
     expect(linked!.product_id).toBe(pid);
+  });
+
+  it('reserves a line added to an already-confirmed order (quote→order path)', async () => {
+    const p = await makeProduct('add-line');
+    const wi = await makeStock(p, 100);
+    // order is born 'confirmed' (as generate_order_from_quote makes it), then a line is inserted
+    const { data: o } = await svc.from('orders')
+      .insert({ workspace_id: ws, order_type: 'sales', status: 'confirmed', created_by: A.id }).select('id').single();
+    await svc.from('order_items').insert({ order_id: o!.id, workspace_id: ws, product_id: p, description: 'line', quantity: 8, unit_price: 0, net_value: 0, line_total: 0, sort_order: 0 });
+    expect((await qtys(wi)).reserved).toBe(8); // the order_items AFTER-INSERT trigger reserved it
+  });
+
+  it('partial delivery splits the hold: dispatched N + reserved remainder', async () => {
+    const p = await makeProduct('partial');
+    const wi = await makeStock(p, 50);
+    const { oId, oiId } = await makeConfirmedOrder(p, 10);
+
+    const { data: st } = await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 4 });
+    expect(st).toBe('partially_fulfilled');
+
+    const q = await qtys(wi);
+    expect(q.on_hand).toBe(46);   // 4 shipped
+    expect(q.reserved).toBe(6);   // 6 still held
+
+    const allocs = await allocStatuses(oiId);
+    const dispatched = allocs.filter((a) => a.status === 'dispatched').reduce((s, a) => s + a.quantity, 0);
+    const reserved = allocs.filter((a) => a.status === 'reserved').reduce((s, a) => s + a.quantity, 0);
+    expect(dispatched).toBe(4);
+    expect(reserved).toBe(6);
+  });
+
+  it('un-delivering re-holds the freed quantity', async () => {
+    const p = await makeProduct('undeliver');
+    const wi = await makeStock(p, 100);
+    const { oId, oiId } = await makeConfirmedOrder(p, 10);
+    await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 10 });
+    expect((await qtys(wi)).on_hand).toBe(90);
+
+    await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 6 }); // walk back to 6
+    const q = await qtys(wi);
+    expect(q.on_hand).toBe(94);   // 4 came back into stock
+    expect(q.reserved).toBe(4);   // and the 4 undelivered units are held again
+  });
+
+  it('free stock (the picker figure) reflects reservations', async () => {
+    const p = await makeProduct('free');
+    const wi = await makeStock(p, 30);
+    // the order product-picker shows (qty_on_hand − qty_reserved)
+    const free = async () => { const q = await qtys(wi); return q.on_hand - q.reserved; };
+    expect(await free()).toBe(30);
+    await makeConfirmedOrder(p, 12);
+    expect(await free()).toBe(18); // 12 now committed to a customer
+  });
+
+  it('reorder_warehouse_item drafts a replenishment PO (the engine behind bulk reorder)', async () => {
+    const { data: sup } = await svc.from('crm_companies').insert({ workspace_id: ws, name: `Supplier ${rid}` }).select('id').single();
+    const p = await makeProduct('reorder');
+    await svc.from('products').update({ supplier_company_id: sup!.id, cost: 5 }).eq('id', p);
+    const { data: wi } = await svc.from('warehouse_items')
+      .insert({ workspace_id: ws, warehouse_id: whId, product_id: p, name: `low ${rid}`, unit: 'pcs', qty_on_hand: 5, qty_reserved: 0, reorder_point: 20 })
+      .select('id').single();
+
+    const { data: res, error } = await A.client.rpc('reorder_warehouse_item', {
+      p_workspace_id: ws, p_warehouse_item_id: wi!.id, p_qty: null, p_supplier_product_id: null,
+    });
+    expect(error).toBeNull();
+    expect((res as any)?.ok).toBe(true);
+    expect(Number((res as any).quantity)).toBe(15); // tops back up to reorder_point (20 − 5)
+
+    const { data: po } = await svc.from('orders').select('order_type, status, supplier_company_id').eq('id', (res as any).order_id).single();
+    expect(po!.order_type).toBe('purchase');
+    expect(po!.status).toBe('draft');
+    expect(po!.supplier_company_id).toBe(sup!.id);
+    const { data: poItems } = await svc.from('order_items').select('quantity').eq('order_id', (res as any).order_id);
+    expect(Number(poItems![0].quantity)).toBe(15);
+  });
+
+  it('the stock-api import endpoint enforces its entitlement/access gate', async () => {
+    // Happy path: the workspace owner (entitled) can import through the edge function.
+    const { data: ok, error } = await A.client.functions.invoke('stock-api', {
+      body: { action: 'import-opening-stock', workspace_id: ws, warehouse_id: whId, lines: [{ sku: `EDGE-${rid}`, qty: 9 }] },
+    });
+    expect(error).toBeNull();
+    expect(ok?.result?.created + ok?.result?.updated).toBeGreaterThanOrEqual(1);
+    const { data: row } = await svc.from('warehouse_items').select('qty_on_hand')
+      .eq('workspace_id', ws).eq('warehouse_id', whId).eq('sku', `EDGE-${rid}`).single();
+    expect(Number(row!.qty_on_hand)).toBe(9);
+
+    // A non-member is rejected (404 no ws-id enumeration) and writes nothing.
+    const { error: denied } = await B.client.functions.invoke('stock-api', {
+      body: { action: 'import-opening-stock', workspace_id: ws, warehouse_id: whId, lines: [{ sku: `HACK-${rid}`, qty: 99 }] },
+    });
+    expect(denied).not.toBeNull();
+    const { data: leaked } = await svc.from('warehouse_items').select('id')
+      .eq('workspace_id', ws).eq('sku', `HACK-${rid}`).maybeSingle();
+    expect(leaked).toBeNull();
   });
 });
