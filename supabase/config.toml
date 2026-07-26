@@ -88,6 +88,11 @@ verify_jwt = false
 [functions.email-contacts-sync-cron]
 verify_jwt = false
 
+# gsc-api: cron-sync arrives with x-cron-secret (no JWT); every user action calls
+# authenticate() + userCanAccessWorkspace() itself. See supabase/functions/gsc-api/index.ts.
+[functions.gsc-api]
+verify_jwt = false
+
 [functions.email-webhooks]
 verify_jwt = false
 

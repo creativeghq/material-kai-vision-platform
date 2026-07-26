@@ -329,6 +329,85 @@ export const createSEOResearchKeywordTool = (
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Google Search Console — first-party performance (reads our own gsc_performance)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Resolve the connected website + guard that GSC is connected before a GSC read. */
+async function resolveGscWebsite(ctx: SeoWebsiteCtx | undefined, explicitWebsiteId?: string): Promise<{ ok: true; site: ResolvedWebsite } | { ok: false; error: string }> {
+  if (!ctx?.supabase || !ctx?.workspaceId) return { ok: false, error: 'No workspace context — Search Console reads need a signed-in workspace.' };
+  let site: ResolvedWebsite | null = ctx.defaultWebsite ?? null;
+  if (explicitWebsiteId) site = await resolveWebsite(ctx.supabase, { workspaceId: ctx.workspaceId, explicitWebsiteId });
+  if (!site) return { ok: false, error: 'No connected website. Ask the user to connect one under My Profile → Websites, then connect Google Search Console on it.' };
+  return { ok: true, site };
+}
+
+export const createSEOGscStrikingDistanceTool = (
+  _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
+) => {
+  return tool(
+    async ({ website_id, days }) => {
+      const r = await resolveGscWebsite(ctx, website_id);
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      onChunk?.({ type: 'tool_progress', status: `Finding striking-distance keywords for ${r.site.domain}…`, timestamp: Date.now() });
+      const { data, error } = await ctx!.supabase.rpc('get_gsc_striking_distance', { p_website_id: r.site.id, p_days: days ?? 28, p_limit: 25 });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      if (!data) return JSON.stringify({ success: false, error: 'Website not found.' });
+      const items = (data.items as any[]) || [];
+      if (items.length === 0) {
+        return JSON.stringify({ success: true, website: r.site.domain, count: 0, note: 'No striking-distance keywords yet — Search Console may not be connected/synced for this site, or there is not enough data.' });
+      }
+      onChunk?.({ type: 'seo_gsc_striking_distance_card', website: r.site.domain, days: data.days, items, timestamp: Date.now() });
+      return JSON.stringify({
+        success: true, website: r.site.domain, days: data.days, count: items.length,
+        top: items.slice(0, 12).map((i: any) => ({ query: i.query, position: i.position, impressions: i.impressions, ctr: i.ctr })),
+      });
+    },
+    {
+      name: 'seo_gsc_striking_distance',
+      description: 'Google Search Console: keywords this site ALREADY ranks for at average position 8–20 (just off page one) with real impression demand — the highest-leverage rewrite/optimize targets. Reads first-party GSC data (real impressions/clicks/position), not estimates. Requires the site to have Search Console connected. Defaults to the connected website when website_id is omitted.',
+      schema: z.object({
+        website_id: z.string().optional().describe('Connected website id. Omit to use the workspace default.'),
+        days: z.number().int().min(1).max(180).optional().describe('Look-back window in days, default 28.'),
+      }),
+    },
+  );
+};
+
+export const createSEOGscTopMoversTool = (
+  _userId: string, onChunk?: (chunk: any) => void, ctx?: SeoWebsiteCtx,
+) => {
+  return tool(
+    async ({ website_id, days }) => {
+      const r = await resolveGscWebsite(ctx, website_id);
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      onChunk?.({ type: 'tool_progress', status: `Computing top position movers for ${r.site.domain}…`, timestamp: Date.now() });
+      const { data, error } = await ctx!.supabase.rpc('get_gsc_movers', { p_website_id: r.site.id, p_days: days ?? 28, p_limit: 20 });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      if (!data) return JSON.stringify({ success: false, error: 'Website not found.' });
+      const items = (data.items as any[]) || [];
+      if (items.length === 0) {
+        return JSON.stringify({ success: true, website: r.site.domain, count: 0, note: 'No movers yet — Search Console may not be connected/synced, or there is not enough history (needs two comparable windows).' });
+      }
+      onChunk?.({ type: 'seo_gsc_movers_card', website: r.site.domain, days: data.days, items, timestamp: Date.now() });
+      const gainers = items.filter((i: any) => i.delta > 0), losers = items.filter((i: any) => i.delta < 0);
+      return JSON.stringify({
+        success: true, website: r.site.domain, days: data.days, count: items.length,
+        biggest_gains: gainers.slice(0, 6).map((i: any) => ({ query: i.query, delta: i.delta, position_now: i.position_now })),
+        biggest_drops: losers.slice(0, 6).map((i: any) => ({ query: i.query, delta: i.delta, position_now: i.position_now })),
+      });
+    },
+    {
+      name: 'seo_gsc_top_movers',
+      description: 'Google Search Console: the biggest average-position swings for this site — recent window vs the immediately-prior window. Positive delta = improved (rose toward #1); negative = slipped. Reads first-party GSC data. Use to answer "which of my pages/queries are gaining or losing rank?". Requires Search Console connected. Defaults to the connected website when website_id is omitted.',
+      schema: z.object({
+        website_id: z.string().optional().describe('Connected website id. Omit to use the workspace default.'),
+        days: z.number().int().min(1).max(90).optional().describe('Window size in days (compared against the prior equal window), default 28.'),
+      }),
+    },
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Wave 1B — Standalone Labs utilities (difficulty / suggestions / intent)
 // ─────────────────────────────────────────────────────────────────────────────
 

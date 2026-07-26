@@ -1859,6 +1859,28 @@
     "response": "{success, url, storage_path, page_count}"
   },
   {
+    "name": "gsc-api",
+    "tag": "SEO",
+    "summary": "Google Search Console for connected websites (OAuth + performance sync)",
+    "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. Self-brokered OAuth: the frontend opens Google's consent screen, Google redirects back with ?code&state (HMAC-signed, bound to a website_id), and the frontend POSTs action=callback. Tokens live in website_gsc_connections (service-role only). verify_jwt is disabled so the cron path (x-cron-secret, action=cron-sync) works; every user action calls authenticate()+userCanAccessWorkspace() and returns 404 on ownership mismatch (#250 invariant 1).",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      { "action": "authorize", "description": "Return the Google consent URL for a website (state binds the callback to it).", "params": [ { "name": "website_id", "type": "string", "required": true } ], "response": "{ ok, auth_url }" },
+      { "action": "callback", "description": "Exchange the OAuth code, store tokens, auto-match the GSC property to the site domain, and backfill 28 days.", "params": [ { "name": "website_id", "type": "string", "required": true }, { "name": "code", "type": "string", "required": true }, { "name": "state", "type": "string", "required": true } ], "response": "{ ok, connected, google_email, property, matched, initial_rows, available_properties? }" },
+      { "action": "list_properties", "description": "List the GSC properties the connected Google account can access.", "params": [ { "name": "website_id", "type": "string", "required": true } ], "response": "{ ok, properties: [{property, permission}] }" },
+      { "action": "set_property", "description": "Bind a specific GSC property to the website when auto-match didn't.", "params": [ { "name": "website_id", "type": "string", "required": true }, { "name": "property", "type": "string", "required": true } ], "response": "{ ok, property }" },
+      { "action": "sync", "description": "Pull the last N days of search-analytics now (default 28).", "params": [ { "name": "website_id", "type": "string", "required": true }, { "name": "days", "type": "number", "required": false } ], "response": "{ ok, rows, from, to }" },
+      { "action": "disconnect", "description": "Deactivate and clear the stored tokens (history is kept).", "params": [ { "name": "website_id", "type": "string", "required": true } ], "response": "{ ok, connected: false }" },
+      { "action": "cron-sync", "description": "x-cron-secret only — nightly refresh of every active connection + 180-day retention prune.", "params": [], "response": "{ ok, synced, failed, rows }" }
+    ]
+  },
+  {
     "name": "generate-quote-pdf",
     "tag": "Quotes",
     "summary": "Generate or return cached PDF for a quote",

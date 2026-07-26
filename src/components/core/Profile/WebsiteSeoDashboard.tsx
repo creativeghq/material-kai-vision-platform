@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
-  FlaskConical, Radar, AlertTriangle,
+  FlaskConical, Radar, AlertTriangle, LineChart,
 } from 'lucide-react';
+import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -51,8 +52,9 @@ function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () => void }> = ({ website, onBack }) => {
+export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () => void; initialTab?: string }> = ({ website, onBack, initialTab }) => {
   const { toast } = useToast();
+  const [tab, setTab] = useState(initialTab || 'articles');
   const [overview, setOverview] = useState<WebsiteSeoOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [recrawling, setRecrawling] = useState(false);
@@ -151,12 +153,13 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         <Stat label="Tracked domains" value={loading ? '—' : overview?.tracked_domains.total ?? 0} />
       </div>
 
-      <Tabs defaultValue="articles" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="bg-muted">
           <TabsTrigger value="articles" className="gap-1"><FileText className="w-3.5 h-3.5" /> Articles</TabsTrigger>
           <TabsTrigger value="research" className="gap-1"><Search className="w-3.5 h-3.5" /> Keyword Research</TabsTrigger>
           <TabsTrigger value="runs" className="gap-1"><FlaskConical className="w-3.5 h-3.5" /> Toolkit Runs</TabsTrigger>
           <TabsTrigger value="domains" className="gap-1"><Radar className="w-3.5 h-3.5" /> Domain Audits</TabsTrigger>
+          <TabsTrigger value="gsc" className="gap-1"><LineChart className="w-3.5 h-3.5" /> Search Performance</TabsTrigger>
         </TabsList>
 
         {/* Articles */}
@@ -323,6 +326,11 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Search Performance (Google Search Console) */}
+        <TabsContent value="gsc">
+          <WebsiteGscPanel website={website} />
         </TabsContent>
       </Tabs>
 

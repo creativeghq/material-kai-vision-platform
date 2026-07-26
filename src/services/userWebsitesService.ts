@@ -8,6 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { edgeErrorMessage } from '@/utils/edgeError';
 
 export interface UserWebsite {
   id: string;
@@ -122,6 +123,35 @@ export interface SeoTrackedDomainRow {
   current_domain_rank: number | null;
   current_organic_traffic: number | null;
   last_audited_at: string | null;
+}
+
+// ── Google Search Console ──────────────────────────────────────────────────
+export interface GscStatus {
+  connected: boolean;
+  google_email?: string | null;
+  property?: string | null;
+  is_active?: boolean;
+  connected_at?: string | null;
+  last_sync_at?: string | null;
+  last_sync_error?: string | null;
+}
+
+export interface GscRow {
+  query?: string;
+  page?: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;       // percentage
+  position: number;
+}
+
+export interface GscSummary {
+  days: number;
+  from: string;
+  to: string;
+  totals: { clicks: number; impressions: number; ctr: number; position: number };
+  top_queries: GscRow[];
+  top_pages: GscRow[];
 }
 
 function normalizeUrl(raw: string): string {
@@ -283,5 +313,65 @@ export const userWebsitesService = {
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data as SeoTrackedDomainRow[]) || [];
+  },
+
+  /** Read one website by id (RLS lets any workspace member read it). */
+  async get(websiteId: string): Promise<UserWebsite | null> {
+    const { data, error } = await supabase.from('user_websites').select('*').eq('id', websiteId).maybeSingle();
+    if (error) throw error;
+    return (data as UserWebsite) ?? null;
+  },
+
+  // ── Google Search Console ────────────────────────────────────────────────
+  async gscStatus(websiteId: string): Promise<GscStatus> {
+    const { data, error } = await supabase.rpc('get_gsc_connection_status', { p_website_id: websiteId });
+    if (error) throw error;
+    return (data as GscStatus) ?? { connected: false };
+  },
+
+  async gscSummary(websiteId: string, days = 28): Promise<GscSummary | null> {
+    const { data, error } = await supabase.rpc('get_gsc_summary', { p_website_id: websiteId, p_days: days });
+    if (error) throw error;
+    return (data as GscSummary) ?? null;
+  },
+
+  /** Returns the Google consent URL to redirect the browser to. */
+  async gscAuthorize(websiteId: string): Promise<string> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', { body: { action: 'authorize', website_id: websiteId } });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not start Google sign-in'));
+    if (!data?.auth_url) throw new Error(data?.error || 'No auth URL returned');
+    return data.auth_url as string;
+  },
+
+  async gscCallback(websiteId: string, code: string, state: string): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', { body: { action: 'callback', website_id: websiteId, code, state } });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Google connection failed'));
+    if (!data?.ok) throw new Error(data?.error || 'Google connection failed');
+    return data;
+  },
+
+  async gscListProperties(websiteId: string): Promise<{ property: string; permission?: string }[]> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', { body: { action: 'list_properties', website_id: websiteId } });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not list properties'));
+    return (data?.properties as any[]) || [];
+  },
+
+  async gscSetProperty(websiteId: string, property: string): Promise<void> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', { body: { action: 'set_property', website_id: websiteId, property } });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Could not set property'));
+    if (!data?.ok) throw new Error(data?.error || 'Could not set property');
+  },
+
+  async gscSync(websiteId: string, days = 28): Promise<{ rows: number }> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', { body: { action: 'sync', website_id: websiteId, days } });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Sync failed'));
+    if (!data?.ok) throw new Error(data?.error || 'Sync failed');
+    return { rows: data.rows ?? 0 };
+  },
+
+  async gscDisconnect(websiteId: string): Promise<void> {
+    const { data, error } = await supabase.functions.invoke('gsc-api', { body: { action: 'disconnect', website_id: websiteId } });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Disconnect failed'));
+    if (!data?.ok) throw new Error(data?.error || 'Disconnect failed');
   },
 };

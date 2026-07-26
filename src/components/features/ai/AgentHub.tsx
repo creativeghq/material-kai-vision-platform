@@ -300,6 +300,9 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Messaging / WhatsApp
   messaging_channels_list: 'WhatsApp channels',
   messaging_sent: 'WhatsApp sent',
+  // SEO — Google Search Console (first-party performance)
+  seo_gsc_striking_distance_card: 'Striking-distance keywords',
+  seo_gsc_movers_card: 'Search Console movers',
   // Contracts
   contracts_list: 'Contracts',
   contract_created: 'Contract drafted',

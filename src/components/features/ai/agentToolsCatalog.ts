@@ -1989,6 +1989,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions',
       'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume',
       'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps',
+      'seo_gsc_striking_distance', 'seo_gsc_top_movers',
     ],
     quick_starts: [
       {

@@ -850,6 +850,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
       // Composite audits
       'seo_site_review', 'seo_brand_search_audit',
+      // Google Search Console (first-party performance)
+      'seo_gsc_striking_distance', 'seo_gsc_top_movers',
       // Escape hatch — admin only
       'seo_dataforseo_call',
       // SEO article pipeline (admin/owner only)
@@ -1008,6 +1010,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_domain_whois', 'seo_llm_mentions_search', 'seo_youtube_search', 'seo_local_pack', 'seo_google_trends',
       'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
       'seo_site_review', 'seo_brand_search_audit', 'seo_dataforseo_call',
+      'seo_gsc_striking_distance', 'seo_gsc_top_movers',
       'create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer',
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
       'research_analysis', 'analytics_analysis',
@@ -1278,6 +1281,7 @@ async function executeAgent(
         'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions',
         'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume',
         'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps',
+        'seo_gsc_striking_distance', 'seo_gsc_top_movers',
       ],
     },
     'seo-domain': {
@@ -1520,6 +1524,7 @@ async function executeAgent(
     'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
     'seo_site_review', 'seo_brand_search_audit',
     'seo_dataforseo_call',
+    'seo_gsc_striking_distance', 'seo_gsc_top_movers',
   ];
   const needsSeoAgent = config.tools.some((t: string) => SEO_AGENT_TOOL_NAMES.includes(t));
   const needsBg = config.tools.includes('dispatch_background_task');
@@ -1648,6 +1653,8 @@ async function executeAgent(
   const createSEOGoogleTrendsTool = seoAgentMod?.createSEOGoogleTrendsTool;
   const createSEOSiteReviewTool = seoAgentMod?.createSEOSiteReviewTool;
   const createSEOBrandSearchAuditTool = seoAgentMod?.createSEOBrandSearchAuditTool;
+  const createSEOGscStrikingDistanceTool = seoAgentMod?.createSEOGscStrikingDistanceTool;
+  const createSEOGscTopMoversTool = seoAgentMod?.createSEOGscTopMoversTool;
   // Phase 12+ niche tools
   const createSEOAmazonAsinTool = seoAgentMod?.createSEOAmazonAsinTool;
   const createSEOAppKeywordsTool = seoAgentMod?.createSEOAppKeywordsTool;
@@ -1911,6 +1918,13 @@ async function executeAgent(
   }
   if (config.tools.includes('seo_brand_search_audit') && createSEOBrandSearchAuditTool) {
     tools.push(createSEOBrandSearchAuditTool(userId, onChunk));
+  }
+  // Google Search Console — reads first-party gsc_performance for the connected website.
+  if (config.tools.includes('seo_gsc_striking_distance') && createSEOGscStrikingDistanceTool) {
+    tools.push(createSEOGscStrikingDistanceTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
+  }
+  if (config.tools.includes('seo_gsc_top_movers') && createSEOGscTopMoversTool) {
+    tools.push(createSEOGscTopMoversTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
   }
   // Phase 12+ niche tools
   if (config.tools.includes('seo_amazon_asin') && createSEOAmazonAsinTool) {
