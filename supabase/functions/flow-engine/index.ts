@@ -529,6 +529,15 @@ async function executeAction(
       }
       const notifBody = String(resolved.body ?? '');
 
+      // N4: honor the notifications module toggle (was cosmetic — rows were written regardless, so
+      // disabling only hid the bell). Skip delivery when the module row exists AND is explicitly
+      // disabled; a missing row means default-on (never accidentally silence all notifications).
+      const { data: notifModule } = await supabase
+        .from('modules').select('enabled').eq('slug', 'notifications').maybeSingle();
+      if (notifModule && notifModule.enabled === false) {
+        return { output: { skipped: true, reason: 'module_disabled' } };
+      }
+
       const { error } = await supabase.from('user_notifications').insert({
         user_id: notifUserId,
         title: notifTitle,

@@ -9,7 +9,6 @@ import { Label } from '@/components/core/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { flowEventService } from '@/services/flows/flowEventService';
 import type { ProfileReview } from './ReviewsSection';
 
 const DIMENSIONS = [
@@ -102,20 +101,8 @@ export const ReviewModal: React.FC<{
 
     toast({ title: existingReview ? 'Review updated' : 'Review submitted' });
 
-    if (!existingReview) {
-      flowEventService.emit('review_submitted', {
-        user_id: toUserId, // recipient (the reviewed professional) — consumed by create_notification
-        to_user_id: toUserId,
-        from_user_id: user.id,
-        type: 'review_submitted',
-        title: 'You received a new review',
-        body: `Someone left you a ${overall}-star review.`,
-        action_url: '/profile',
-        overall_rating: overall,
-        service_name: payload.service_name,
-        submitted_at: new Date().toISOString(),
-      });
-    }
+    // The review_submitted Flow event is now emitted by the fn_notify_review DB trigger (covers every
+    // insert path — client, agent, API — and is admin-pausable). No client-side emit needed here.
 
     onSaved();
   };
