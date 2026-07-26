@@ -183,9 +183,11 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       .select('id')
       .single();
 
-    if (insertError) {
-      console.error('[seo-research] Failed to persist research:', insertError);
-      // Don't fail the request — research data is still valid
+    if (insertError || !researchRow?.id) {
+      // A persist failure leaves an empty research_id that the planner/pipeline can't dereference —
+      // so the 18-credit charge would buy an unusable result. Throw into the catch below, which refunds
+      // + returns 500 (the user retries) rather than silently charging for a broken result.
+      throw new Error(`Failed to persist research: ${insertError?.message ?? 'no row returned'}`);
     }
 
     console.log(`[seo-research] Complete. Research ID: ${researchRow?.id}`);
