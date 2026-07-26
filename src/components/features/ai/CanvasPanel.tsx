@@ -12,7 +12,7 @@
  */
 import React from 'react';
 import {
-  FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video, Sofa,
+  FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video,
   PanelRightClose, ArrowLeft, ArrowUpRight, LayoutPanelLeft, Sparkles, Radar, ClipboardList,
   Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
   Wand2, Calculator,
@@ -20,7 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 
 export type CanvasArtifactKind =
-  | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'design' | 'render'
+  | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'render'
   | 'inspiration' | 'radar' | 'result' | 'quote'
   | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog'
   | 'demo' | 'calc';
@@ -39,7 +39,6 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   board: LayoutGrid,
   image: ImageIcon,
   video: Video,
-  design: Sofa,
   render: LayoutGrid,
   inspiration: Sparkles,
   radar: Radar,
@@ -64,7 +63,6 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   board: 'Materials board',
   image: 'Generated image',
   video: 'Generated video',
-  design: 'Interior design',
   render: 'Room generation',
   inspiration: 'Inspiration board',
   radar: 'Tech radar',

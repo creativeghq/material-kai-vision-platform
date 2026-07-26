@@ -73,7 +73,6 @@ import {
   JobFindingsInspector, SourcingInspector, OrderInspector, MentionSummaryInspector, MentionFeedInspector,
   LlmVisibilityInspector, CatalogInspector, QuoteInspector,
 } from './ArtifactInspector';
-import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
 import { TechRadarFindingsCard, type TechRadarFindingsData } from './TechRadarFindingsCard';
@@ -397,30 +396,6 @@ interface Message {
     images?: Record<string, any[]>;
     title?: string;
   }; // Real material/product data from database
-  designData?: {
-    images?: string[];
-    modelResults?: Array<{
-      model_id: string;
-      model_name: string;
-      provider: 'replicate' | 'huggingface';
-      image_urls: string[];
-      processing_time_ms: number;
-      success: boolean;
-      error?: string;
-    }>;
-    totalModels?: number;
-    successfulModels?: number;
-    spatialAnalysis?: any;
-    matchedMaterials?: any[];
-    parsedRequest?: any;
-    qualityAssessment?: any;
-    processingTimeMs?: number;
-    costEstimate?: {
-      materials: any[];
-      total_cost: number;
-      currency: string;
-    };
-  }; // Interior design results (3D images, spatial analysis, materials, cost)
   generation_job?: {
     job_id: string;
     model_count: number;
@@ -928,7 +903,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const m = messages[i];
       if (m.geminiImageData?.image_url) return m.geminiImageData.image_url;
       if (m.virtualStagingData?.image_url) return m.virtualStagingData.image_url;
-      if (m.designData?.images?.[0]) return m.designData.images[0];
       if (m.images?.[0]) return m.images[0];
     }
     return null;
@@ -1008,7 +982,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // canvas in-place when an image is available (attached or just generated);
       // otherwise fall through to the prompt, which asks the user to attach one.
       const hasImage = attachedImages.length > 0
-        || messages.some((m) => m.geminiImageData?.image_url || m.virtualStagingData?.image_url || m.designData?.images?.[0] || m.images?.[0]);
+        || messages.some((m) => m.geminiImageData?.image_url || m.virtualStagingData?.image_url || m.images?.[0]);
       if (hasImage) {
         setGeminiEditRoomType(null);
         setGeminiEditStyle(null);
@@ -1026,7 +1000,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           const m = messages[i];
           if (m.geminiImageData?.image_url) { imageUrl = m.geminiImageData.image_url; break; }
           if (m.virtualStagingData?.image_url) { imageUrl = m.virtualStagingData.image_url; break; }
-          if (m.designData?.images?.[0]) { imageUrl = m.designData.images[0]; break; }
           if (m.images?.[0]) { imageUrl = m.images[0]; break; }
         }
       }
@@ -1669,7 +1642,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     (agent) => agent.comingSoon && roleHierarchy[userRole] >= roleHierarchy[agent.requiredRole],
   );
 
-  // Handle VR world generation from DesignCanvas
+  // Handle VR world generation from a generated room image (ProgressiveImageGrid actions).
   const handleGenerateVR = useCallback(async (
     imageUrl: string,
     context: { prompt?: string; roomType?: string; style?: string },
@@ -3327,7 +3300,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // Interior Designer: 3D generation is handled entirely by the agent-chat edge function
       // via the generate_3d tool → MIVAA /api/interior → async job → generation_job_created chunk.
       // The frontend receives data.generation_job when a job was created.
-      const designData: Message['designData'] = undefined;
 
       // Add assistant response to messages
       // If gemini generated an image during this turn, merge it into this single message
@@ -3341,7 +3313,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         model: data.model || selectedModel,
         demoData,
         materialData,
-        designData, // Include design data with spatial analysis
         generation_job: data.generation_job, // Async 3D generation job info
         geminiImageData: pendingGeminiData ?? undefined,
         searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec from material_search
@@ -3377,7 +3348,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             cachedResponse: false,
             demoData, // Save demo data for DemoAgent
             materialData, // Save material data for Search Agent
-            designData, // Save design data for Interior Designer Agent (includes spatial analysis)
             generation_job: data.generation_job, // Save generation job info for async 3D generation
             geminiImageData: pendingGeminiData ?? undefined, // Gemini single-image result merged into this message
             searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec
@@ -3628,7 +3598,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           images: msg.metadata?.attachedImages as string[] | undefined,
           demoData: msg.metadata?.demoData as any | undefined,
           materialData: msg.metadata?.materialData as any | undefined,
-          designData: msg.metadata?.designData as any | undefined,
           generation_job: msg.metadata?.generation_job as any | undefined,
           geminiImageData: msg.metadata?.geminiImageData as any | undefined,
           worldData: msg.metadata?.worldData as any | undefined,
@@ -3791,7 +3760,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       return { id: m.id, kind: 'products', title: m.materialData.title || `${m.materialData.products.length} products` };
     }
     if (m.generation_job) return { id: m.id, kind: 'render', title: m.generation_job.room_type ? `Room · ${m.generation_job.room_type}` : 'Room generation' };
-    if (m.designData) return { id: m.id, kind: 'design', title: m.designData.parsedRequest?.room_type ? `Interior · ${m.designData.parsedRequest.room_type}` : 'Interior design' };
     if (m.worldData) return { id: m.id, kind: 'world', title: m.worldData.caption || m.worldData.prompt || 'VR world' };
     if (m.materialsBoardData) return { id: m.id, kind: 'board', title: 'Materials board' };
     if (m.geminiImageData) return { id: m.id, kind: 'image', title: 'Generated image' };
@@ -3857,71 +3825,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const currentAgent = AGENTS.find((a) => a.id === selectedAgent);
   const AgentIcon = currentAgent?.icon || Bot;
   const currentConversationTitle = conversations.find((c) => c.id === currentConversationId)?.title;
-
-  // Full-size render of a canvas artifact — reuses the exact same self-contained
-  // card components as the chat, so there is one implementation, not two.
-  // Interior design results (DesignCanvas + cost estimate). Shared verbatim by
-  // the inline chat branch and the canvas so there is one implementation.
-  const renderDesignResults = (message: Message): React.ReactNode => (
-    <>
-      <DesignCanvas
-        images={message.designData.images}
-        modelResults={message.designData.modelResults}
-        totalModels={message.designData.totalModels}
-        successfulModels={message.designData.successfulModels}
-        spatialAnalysis={message.designData.spatialAnalysis}
-        matchedMaterials={message.designData.matchedMaterials}
-        parsedRequest={message.designData.parsedRequest}
-        qualityAssessment={message.designData.qualityAssessment}
-        processingTimeMs={message.designData.processingTimeMs}
-        onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
-        onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-        onMaterialClick={(materialId) => {
-          const all = message.designData.matchedMaterials || [];
-          const single = all.filter((m: any) => m?.id === materialId || m?.material_id === materialId);
-          setSelectedMaterialsData({
-            materials: single.length > 0 ? single : all,
-            spatialAnalysis: message.designData.spatialAnalysis,
-            roomType: message.designData.parsedRequest?.room_type,
-            style: message.designData.parsedRequest?.style,
-          });
-          setShowMaterialModal(true);
-        }}
-        onFindMaterials={async (imageUrl) => {
-          setInput(`Find materials and products that match this interior design image: ${imageUrl}`);
-          setTimeout(async () => { await handleSendMessage(); }, 100);
-        }}
-        onViewAllMaterials={() => {
-          setSelectedMaterialsData({
-            materials: message.designData.matchedMaterials || [],
-            spatialAnalysis: message.designData.spatialAnalysis,
-            roomType: message.designData.parsedRequest?.room_type,
-            style: message.designData.parsedRequest?.style,
-          });
-          setShowMaterialModal(true);
-        }}
-      />
-      {message.designData.costEstimate && (
-        <div className="rounded-lg bg-blue-50 p-4 text-gray-900">
-          <h4 className="mb-2 font-semibold">Cost Estimate</h4>
-          <div className="space-y-2">
-            {message.designData.costEstimate.materials.map((material: any) => (
-              <div key={material.name} className="flex justify-between text-sm">
-                <span>{material.name}</span>
-                <span className="font-medium">${material.subtotal.toFixed(2)}</span>
-              </div>
-            ))}
-            <div className="flex justify-between border-t border-gray-300 pt-2 font-bold">
-              <span>Total</span>
-              <span className="text-blue-600">
-                ${message.designData.costEstimate.total_cost.toFixed(2)} {message.designData.costEstimate.currency}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
 
   // Async multi-model room-generation grid (ProgressiveImageGrid, self-polling).
   // Shared verbatim by the inline chat branch and the canvas so the full grid +
@@ -4407,7 +4310,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   const renderCanvasArtifact = (message: Message): React.ReactNode => {
     if (message.generation_job) return renderGenerationGrid(message);
-    if (message.designData) return renderDesignResults(message);
     if (message.demoData) {
       return (
         <DemoAgentResults
@@ -5024,7 +4926,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[88%] sm:max-w-[75%]'} min-w-0 ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-3.5 sm:p-5 ${
+                    className={`${message.demoData || message.materialData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[88%] sm:max-w-[75%]'} min-w-0 ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-3.5 sm:p-5 ${
                       message.role === 'user'
                         ? 'bg-[#1f2937] text-white shadow-md'
                         : 'msg-assistant text-white shadow-sm'
@@ -5219,20 +5121,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               onUseIn3DScene={handleUseProductIn3DScene}
                             />
                           )
-                        )}
-                      </div>
-                    ) : message.designData ? (
-                      <div className="space-y-4">
-                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
-                        {canvasShown ? (
-                          <ArtifactChip
-                            kind="design"
-                            title="Interior design"
-                            active={activeCanvasId === message.id}
-                            onOpen={() => focusCanvas(message.id)}
-                          />
-                        ) : (
-                          renderDesignResults(message)
                         )}
                       </div>
                     ) : message.geminiImageData ? (
