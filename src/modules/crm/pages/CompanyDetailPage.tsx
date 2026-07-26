@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock } from 'lucide-react';
@@ -33,12 +33,12 @@ import { CategoryAssignmentPicker } from '@/components/business/catalogs/Categor
 import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
-import { CrmActivityTimeline, type TimelinePerson } from '@/components/business/crm/CrmActivityTimeline';
+import { type TimelinePerson } from '@/components/business/crm/CrmActivityTimeline';
+import { CrmRecordActivity, type CrmRecordActivityHandle } from '@/components/business/crm/CrmRecordActivity';
 import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
 import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
 import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
 import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
-import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import {
@@ -175,11 +175,12 @@ export const CompanyDetailPage: React.FC = () => {
   // Companies open on Activity — the unified feed (notes/calls/meetings/tracked actions),
   // aligned with the contact record.
   const [mainTab, setMainTab] = useState('activity');
-  // Bump to force the Activity timeline to reload after we log something (email sent, etc).
+  // Bump to force the Activity timeline to reload after the PAGE logs something
+  // (registry enrichment, etc). Email logging is owned by CrmRecordActivity itself.
   const [activityRefresh, setActivityRefresh] = useState(0);
-  // Recipient chosen from the Activity composer's Email picker (a specific contact or the
-  // company inbox). Drives the SendEmailDialog target.
-  const [emailTarget, setEmailTarget] = useState<{ email: string; name: string | null } | null>(null);
+  // Imperative handle to open the shared Activity email composer from the sidebar /
+  // Details quick-actions (works from any tab — the tab is force-mounted).
+  const activityRef = useRef<CrmRecordActivityHandle>(null);
   const [company, setCompany] = useState<Company | null>(isNew ? {
     id: '',
     name: '',
@@ -209,7 +210,6 @@ export const CompanyDetailPage: React.FC = () => {
     ...prefill,
   } : null);
   const [showAddContactDialog, setShowAddContactDialog] = useState(false);
-  const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string>('');
   const [contactRole, setContactRole] = useState<string>('');
   const [isPrimaryContact, setIsPrimaryContact] = useState(false);
@@ -422,7 +422,7 @@ export const CompanyDetailPage: React.FC = () => {
             title: 'Enriched from ΑΑΔΕ / ΓΕΜΗ',
             description: `Imported registry details${res.basic_rec.onomasia ? ` for ${res.basic_rec.onomasia}` : ''}.`,
             workspace_id: activeWorkspaceId ?? null,
-          });
+          }).then(bumpActivity);
         }
       }
     } finally {
@@ -502,13 +502,6 @@ export const CompanyDetailPage: React.FC = () => {
   };
 
   const bumpActivity = () => setActivityRefresh((n) => n + 1);
-  // Fire-and-forget CRM activity log for this company, then refresh the timeline.
-  const logActivity = (activity_type: string, title: string, description?: string, metadata?: Record<string, unknown>) => {
-    if (!id || isNew) return;
-    crmActivitiesService
-      .log({ kind: 'company', id }, { activity_type, title, description, metadata, workspace_id: activeWorkspaceId ?? null })
-      .then(bumpActivity);
-  };
 
   // Supplier↔factory pin. Persist the new pin list, then claim: re-point every matching
   // product's brand_company_id onto this company + fold in any duplicate auto-created brand
@@ -698,7 +691,7 @@ export const CompanyDetailPage: React.FC = () => {
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-1.5">
-                  <button type="button" onClick={() => setShowEmailDialog(true)} disabled={!company.email}
+                  <button type="button" onClick={() => activityRef.current?.composeEmail()} disabled={!timelinePeople.some((p) => p.email)}
                     className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-40 disabled:pointer-events-none">
                     <Send className="h-4 w-4" /> Email
                   </button>
@@ -738,7 +731,7 @@ export const CompanyDetailPage: React.FC = () => {
                     <div className="flex-1">
                       <InlineText alwaysEdit={isNew} type="email" label="Email" value={company.email} onSave={(v) => patchInline({ email: v })} placeholder="contact@company.com" />
                     </div>
-                    <Button type="button" size="icon" variant="ghost" onClick={() => setShowEmailDialog(true)} disabled={!company.email}
+                    <Button type="button" size="icon" variant="ghost" onClick={() => activityRef.current?.composeEmail(company.email ? { email: company.email, name: company.name || null } : undefined)} disabled={!company.email}
                       title={company.email ? `Send email to ${company.email}` : 'No email on file'} className="shrink-0 mb-0.5 text-muted-foreground hover:bg-transparent hover:text-foreground">
                       <Send className="h-4 w-4"/>
                     </Button>
@@ -1077,20 +1070,18 @@ export const CompanyDetailPage: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Activity Tab — unified feed (notes, calls, meetings + tracked actions),
-              aligned with the contact record. The composer's Email / Call / Meeting
-              actions let you pick which contact(s) they involve. */}
-          <TabsContent value="activity" className="space-y-4">
+          {/* Activity Tab — the shared record-activity element (identical to the
+              contact record). forceMount keeps it (and its portalled email dialog)
+              reachable from the sidebar / Details quick-actions on any tab. */}
+          <TabsContent value="activity" forceMount className="space-y-4 data-[state=inactive]:hidden">
             {company.id ? (
-              <CrmActivityTimeline
+              <CrmRecordActivity
+                ref={activityRef}
                 target={{ kind: 'company', id: company.id }}
-                refreshKey={activityRefresh}
+                workspaceId={activeWorkspaceId}
                 people={timelinePeople}
-                canEmail={timelinePeople.some((p) => p.email)}
-                onComposeEmail={(recipient) => {
-                  setEmailTarget(recipient ?? (company.email ? { email: company.email, name: company.name || null } : null));
-                  setShowEmailDialog(true);
-                }}
+                recordLabel={company.name}
+                refreshKey={activityRefresh}
               />
             ) : (
               <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Create this company to start logging activity.</CardContent></Card>
@@ -1132,22 +1123,6 @@ export const CompanyDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Send Email Dialog — targets the recipient picked in the Activity composer
-          (a specific contact or the company inbox); falls back to the company email
-          for the sidebar / Details quick-actions. */}
-      <SendEmailDialog
-        open={showEmailDialog}
-        onClose={() => { setShowEmailDialog(false); setEmailTarget(null); }}
-        toEmail={emailTarget?.email || company.email || ''}
-        toName={emailTarget?.name ?? company.name ?? null}
-        recipientLabel={emailTarget?.name || company.name || 'Company'}
-        workspaceId={activeWorkspaceId}
-        onSent={({ subject }) => {
-          const to = emailTarget?.email || company.email;
-          logActivity('email_sent', `Email sent${to ? ` to ${to}` : ''}`, subject);
-        }}
-      />
 
       {/* Add Contact Dialog */}
       <Dialog open={showAddContactDialog} onOpenChange={(o) => { if (!o) resetContactDialog(); else setShowAddContactDialog(true); }}>

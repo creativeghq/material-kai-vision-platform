@@ -7,16 +7,13 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Activity, FileText, Mail, Building2, Tag, ScrollText, Receipt, CreditCard, Loader2, Unlink, Trash2, Phone, CalendarDays, Users, ChevronDown,
+  Activity, FileText, Mail, Building2, Tag, ScrollText, Receipt, CreditCard, Loader2, Unlink, Trash2, Phone, CalendarDays, Users,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
 import { Checkbox } from '@/components/core/ui/checkbox';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/core/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { crmActivitiesService, type TimelineItem, type CrmActivityTarget } from '@/services/crmActivitiesService';
 import { crmMeetingsService } from '@/services/crmMeetingsService';
@@ -37,20 +34,21 @@ interface Props {
   target: CrmActivityTarget;
   /** Bump to force a reload (parent logged a new activity). */
   refreshKey?: number;
-  /**
-   * Opens the page's Send-email dialog (real send → auto-logs email_sent).
-   * When `people` is supplied (company record), the chosen recipient is passed
-   * so the parent can retarget the dialog; contact records call it with no arg.
-   */
-  onComposeEmail?: (recipient?: { email: string; name: string | null }) => void;
-  /** Whether the party has an email on file (gates the Email action, contact record). */
+  /** Opens the composer's Send-email dialog (recipient selection happens there). */
+  onComposeEmail?: () => void;
+  /** Whether the party has an email on file (gates the Email action when `people` is omitted). */
   canEmail?: boolean;
   /**
-   * People this record can email / meet with. Supplied on the COMPANY record so the
-   * Email button picks a recipient and Call/Meeting entries can name attendees.
-   * Omit on the contact record — the party itself is the single recipient.
+   * People this record can email / meet with. On a COMPANY these are the company
+   * inbox + attached contacts (so Email picks recipients and Call/Meeting entries
+   * name attendees). On a CONTACT it's just the contact. Omit to fall back to `canEmail`.
    */
   people?: TimelinePerson[];
+  /**
+   * Called after a meeting is logged, with how many calendar invites went out
+   * to attendees (0 when none were requested). Lets the parent surface a toast/refresh.
+   */
+  onMeetingLogged?: (info: { invitesSent: number; invitesFailed: number }) => void;
 }
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -88,7 +86,7 @@ const relativeTime = (iso: string): string => {
   return new Date(iso).toLocaleDateString();
 };
 
-export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, onComposeEmail, canEmail, people }) => {
+export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, onComposeEmail, canEmail, people, onMeetingLogged }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const [items, setItems] = useState<TimelineItem[]>([]);
@@ -100,13 +98,17 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
   const [remindWhatsapp, setRemindWhatsapp] = useState(false);
   const [reminderLead, setReminderLead] = useState(60); // minutes before meeting_at
   const [attendeeIds, setAttendeeIds] = useState<string[]>([]); // contacts a call/meeting is with
+  const [sendInvites, setSendInvites] = useState(true); // email a calendar invite to attendees
   const [saving, setSaving] = useState(false);
 
-  // Person picker (company record). Email can go to any person with an address; only
-  // real contacts (not the company inbox) are offered as meeting/call attendees.
+  // Person picker. Email can go to any person with an address; only real contacts
+  // (not the company inbox) are offered as meeting/call attendees.
   const emailRecipients = (people ?? []).filter((p) => (p.email ?? '').trim());
   const attendeeCandidates = (people ?? []).filter((p) => (p.kind ?? 'contact') !== 'company');
   const hasPeople = Array.isArray(people);
+  // Email action shows when there's someone to write to: an emailable person (company)
+  // or the party's own address (contact, via canEmail).
+  const canCompose = hasPeople ? emailRecipients.length > 0 : !!canEmail;
   const toggleAttendee = (id: string) =>
     setAttendeeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
@@ -138,19 +140,30 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
     const selectedAttendees = type === 'note' ? [] : attendeeCandidates.filter((p) => attendeeIds.includes(p.id));
     const withLine = selectedAttendees.length ? `With ${selectedAttendees.map((p) => p.name).join(', ')}` : '';
     const withBody = [withLine, body].filter(Boolean).join('\n');
+    // Only future meetings with emailable attendees can carry a calendar invite.
+    const invitableAttendees = selectedAttendees.filter((p) => (p.email ?? '').trim());
+    const willInvite = type === 'meeting' && sendInvites && isFutureMeeting && invitableAttendees.length > 0;
     setSaving(true);
     try {
       if (type === 'meeting') {
-        await crmMeetingsService.create({
+        const res = await crmMeetingsService.create({
           target,
           workspaceId: activeWorkspaceId,
           meetingAt: new Date(meetingAt).toISOString(),
           notes: withBody || null,
           attendeeContactIds: selectedAttendees.map((p) => p.id),
+          sendInvites: willInvite,
           remindEmail: isFutureMeeting && remindEmail,
           remindWhatsapp: isFutureMeeting && remindWhatsapp,
           reminderMinutesBefore: reminderLead,
         });
+        onMeetingLogged?.({ invitesSent: res.invitesSent, invitesFailed: res.invitesFailed });
+        if (res.invitesSent > 0) {
+          toast({ title: `Invite sent to ${res.invitesSent} attendee${res.invitesSent === 1 ? '' : 's'}` });
+        }
+        if (res.invitesFailed > 0) {
+          toast({ title: 'Some invites failed to send', description: res.inviteError || `${res.invitesFailed} attendee${res.invitesFailed === 1 ? '' : 's'} couldn’t be emailed.`, variant: 'destructive' });
+        }
       } else if (current.activity) {
         await crmActivitiesService.addActivity(
           target, current.activity.type, current.activity.title, withBody,
@@ -164,6 +177,7 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
       setRemindEmail(false);
       setRemindWhatsapp(false);
       setAttendeeIds([]);
+      setSendInvites(true);
       await load(); // instant refresh
     } catch (err) {
       toast({ title: 'Could not save', description: getErrorMessage(err), variant: 'destructive' });
@@ -205,45 +219,9 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
                   </button>
                 );
               })}
-              {/* Email action. On a company (people supplied) pick which person to
-                  write to; on a contact the party itself is the single recipient. */}
-              {onComposeEmail && hasPeople && emailRecipients.length > 0 && (
-                emailRecipients.length === 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => onComposeEmail({ email: emailRecipients[0].email!.trim(), name: emailRecipients[0].name })}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    title={`Email ${emailRecipients[0].name}`}
-                  >
-                    <Mail className="h-3.5 w-3.5" /> Email
-                  </button>
-                ) : (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        title="Compose and send an email — pick a recipient"
-                      >
-                        <Mail className="h-3.5 w-3.5" /> Email <ChevronDown className="h-3 w-3" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-60">
-                      <DropdownMenuLabel>Email who?</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {emailRecipients.map((p) => (
-                        <DropdownMenuItem key={p.id} onSelect={() => onComposeEmail({ email: p.email!.trim(), name: p.name })}>
-                          <div className="min-w-0">
-                            <div className="truncate">{p.name}{p.kind === 'company' ? ' (company)' : ''}</div>
-                            <div className="truncate text-[11px] text-muted-foreground">{p.email}</div>
-                          </div>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )
-              )}
-              {onComposeEmail && !hasPeople && canEmail && (
+              {/* Email action — opens the composer. Recipient selection (which
+                  contact / the company inbox, one or many) happens in the dialog. */}
+              {onComposeEmail && canCompose && (
                 <button
                   type="button"
                   onClick={() => onComposeEmail()}
@@ -290,6 +268,12 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
                     aria-label="Meeting date & time"
                   />
                 </div>
+                {isFutureMeeting && attendeeCandidates.some((p) => attendeeIds.includes(p.id) && (p.email ?? '').trim()) && (
+                  <label className="flex cursor-pointer items-center gap-1.5 pl-5 text-xs text-foreground">
+                    <Checkbox checked={sendInvites} onCheckedChange={(v) => setSendInvites(v === true)} />
+                    Email a calendar invite to the selected attendee(s)
+                  </label>
+                )}
                 {isFutureMeeting && (
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-5 text-xs text-muted-foreground">
                     <span>Remind me</span>

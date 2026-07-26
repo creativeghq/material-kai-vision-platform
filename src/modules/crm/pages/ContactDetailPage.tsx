@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Home, Sparkles } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
@@ -18,12 +18,12 @@ import { contactsAPI, usersAPI, companiesAPI } from '@/services/crm.service';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
 import { UserSearchDropdown } from '@/components/business/crm/UserSearchDropdown';
 import { CompanySearchDropdown } from '@/components/business/crm/CompanySearchDropdown';
-import { CrmActivityTimeline } from '@/components/business/crm/CrmActivityTimeline';
+import { type TimelinePerson } from '@/components/business/crm/CrmActivityTimeline';
+import { CrmRecordActivity, type CrmRecordActivityHandle } from '@/components/business/crm/CrmRecordActivity';
 import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
 import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
-import { SendEmailDialog } from '@/components/business/crm/SendEmailDialog';
 import { Switch } from '@/components/core/ui/switch';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import {
@@ -168,7 +168,6 @@ export const ContactDetailPage: React.FC = () => {
   const [primaryCompany, setPrimaryCompany] = useState<any>(null);
   const [linking, setLinking] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
-  const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteFullName, setInviteFullName] = useState('');
   const [inviting, setInviting] = useState(false);
@@ -179,6 +178,8 @@ export const ContactDetailPage: React.FC = () => {
   const [activityRefresh, setActivityRefresh] = useState(0);
   // Which top-level record tab is showing (activity-first record layout, 2026-07).
   const [mainTab, setMainTab] = useState('activity');
+  // Opens the shared Activity email composer from the sidebar / Details quick-actions.
+  const activityRef = useRef<CrmRecordActivityHandle>(null);
   const bumpActivity = () => setActivityRefresh((n) => n + 1);
   const logActivity = (activity_type: string, title: string, description?: string, metadata?: Record<string, unknown>) => {
     if (!id || isNew) return;
@@ -528,6 +529,10 @@ export const ContactDetailPage: React.FC = () => {
   // business owns pricing / VAT / tax, so those sections are hidden when attached.
   const hasCompany = !!primaryCompany;
   const initials = (contact.name || '?').trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
+  // The differentiator for the shared Activity element: a contact's only person is itself.
+  const timelinePeople: TimelinePerson[] = contact.id
+    ? [{ id: contact.id, name: contact.name || 'Contact', email: contact.email ?? null, kind: 'contact' }]
+    : [];
 
   return (
     <div className="min-h-screen">
@@ -573,7 +578,7 @@ export const ContactDetailPage: React.FC = () => {
                   </div>
                 )}
                 <div className="grid grid-cols-4 gap-1.5">
-                  <button type="button" onClick={() => setShowEmailDialog(true)} disabled={!contact.email}
+                  <button type="button" onClick={() => activityRef.current?.composeEmail(contact.email ? { email: contact.email, name: contact.name || null } : undefined)} disabled={!contact.email}
                     className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-40 disabled:pointer-events-none">
                     <Mail className="h-4 w-4" /> Email
                   </button>
@@ -623,7 +628,7 @@ export const ContactDetailPage: React.FC = () => {
                       <div className="flex-1">
                         <InlineText alwaysEdit={isNew} type="email" label="Email" value={contact.email} onSave={(v) => patchInline({ email: v })} placeholder="jane@example.com" />
                       </div>
-                      <Button type="button" size="icon" variant="ghost" onClick={() => setShowEmailDialog(true)} disabled={!contact.email}
+                      <Button type="button" size="icon" variant="ghost" onClick={() => activityRef.current?.composeEmail(contact.email ? { email: contact.email, name: contact.name || null } : undefined)} disabled={!contact.email}
                         title={contact.email ? `Send email to ${contact.email}` : 'No email on file'} className="shrink-0 mb-0.5 text-muted-foreground hover:bg-transparent hover:text-foreground">
                         <Send className="h-4 w-4" />
                       </Button>
@@ -660,10 +665,19 @@ export const ContactDetailPage: React.FC = () => {
                 )}
               </TabsList>
 
-              {/* Activity — the unified feed (notes live here). */}
-              <TabsContent value="activity" className="space-y-4">
+              {/* Activity — the shared record-activity element (identical to the company
+                  record). forceMount keeps its portalled email dialog reachable from the
+                  sidebar / Details quick-actions on any tab. */}
+              <TabsContent value="activity" forceMount className="space-y-4 data-[state=inactive]:hidden">
                 {contact.id ? (
-                  <CrmActivityTimeline target={{ kind: 'contact', id: contact.id }} refreshKey={activityRefresh} onComposeEmail={() => setShowEmailDialog(true)} canEmail={!!contact.email} />
+                  <CrmRecordActivity
+                    ref={activityRef}
+                    target={{ kind: 'contact', id: contact.id }}
+                    workspaceId={activeWorkspaceId}
+                    people={timelinePeople}
+                    recordLabel={contact.name}
+                    refreshKey={activityRefresh}
+                  />
                 ) : (
                   <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Create this contact to start logging activity.</CardContent></Card>
                 )}
@@ -925,17 +939,6 @@ export const ContactDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Send Email Dialog */}
-      <SendEmailDialog
-        open={showEmailDialog}
-        onClose={() => setShowEmailDialog(false)}
-        toEmail={contact.email || ''}
-        toName={contact.name || null}
-        recipientLabel={contact.name || 'Contact'}
-        workspaceId={activeWorkspaceId}
-        onSent={({ subject }) => logActivity('email_sent', `Email sent to ${contact.email}`, subject)}
-      />
 
       {/* Invite User Dialog */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>

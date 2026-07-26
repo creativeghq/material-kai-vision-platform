@@ -48,6 +48,8 @@ export interface SendEmailOptions {
   cc?: string[];
   bcc?: string[];
   replyTo?: string;
+  /** Resend attachments — base64 content (no data: prefix). */
+  attachments?: Array<{ filename: string; content: string }>;
   tags?: Record<string, string>;
   emailType?: 'transactional' | 'marketing' | 'notification';
   priority?: number;

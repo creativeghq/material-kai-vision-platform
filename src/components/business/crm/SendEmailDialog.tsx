@@ -21,11 +21,25 @@ import {
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/core/ui/tabs';
 
+export interface EmailRecipientOption {
+  email: string;
+  name?: string | null;
+  /** 'company' = the org's general inbox; 'contact' = a person. Cosmetic (a badge). */
+  kind?: 'contact' | 'company';
+}
+
 interface SendEmailDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Recipient email address. Required. */
-  toEmail: string;
+  /**
+   * Candidate recipients. When 2+, the dialog shows a To-picker so the user can
+   * send to one or several. Falls back to `toEmail`/`toName` for a single recipient.
+   */
+  recipients?: EmailRecipientOption[];
+  /** Emails pre-checked in the To-picker (subset of `recipients`). Defaults to all. */
+  initialSelected?: string[];
+  /** Single-recipient shorthand (used when `recipients` is omitted). */
+  toEmail?: string;
   /** Display name of the recipient, used for greeting prefilling. Optional. */
   toName?: string | null;
   /** Free-form context shown in the dialog header (e.g. "Granitifiandre Spa"). */
@@ -34,7 +48,7 @@ interface SendEmailDialogProps {
    *  never sends from the platform address — a missing sender surfaces the Connect-email modal. */
   workspaceId?: string | null;
   /** Called after a successful send (used to log a CRM activity). */
-  onSent?: (info: { subject: string }) => void;
+  onSent?: (info: { subject: string; recipients: string[] }) => void;
 }
 
 interface EmailTemplateRow {
@@ -56,10 +70,32 @@ interface EmailTemplateRow {
  *  - "Custom" — write subject + body once, send as a one-off transactional email.
  */
 export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
-  open, onClose, toEmail, toName, recipientLabel, workspaceId, onSent,
+  open, onClose, recipients, initialSelected, toEmail, toName, recipientLabel, workspaceId, onSent,
 }) => {
   const { toast } = useToast();
   const [showConnect, setShowConnect] = useState(false);
+
+  // Effective candidate list: explicit `recipients`, else the single toEmail shorthand.
+  const candidates: EmailRecipientOption[] = useMemo(() => {
+    const list = (recipients ?? []).filter((r) => (r.email ?? '').trim());
+    if (list.length > 0) return list;
+    return toEmail?.trim() ? [{ email: toEmail.trim(), name: toName ?? null }] : [];
+  }, [recipients, toEmail, toName]);
+  const multiRecipient = candidates.length > 1;
+
+  // Which candidates the email goes to (emails). Reset whenever the dialog (re)opens.
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    const all = candidates.map((c) => c.email);
+    const seed = (initialSelected ?? []).filter((e) => all.includes(e));
+    setSelectedEmails(seed.length > 0 ? seed : all);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  const toggleRecipient = (email: string) =>
+    setSelectedEmails((prev) => (prev.includes(email) ? prev.filter((e) => e !== email) : [...prev, email]));
+  // Name used to seed the greeting — the first selected recipient (or first candidate).
+  const primaryName = (candidates.find((c) => selectedEmails.includes(c.email)) ?? candidates[0])?.name ?? toName ?? null;
 
   // Tenant business mail must go from the workspace's own sender. When email-api 503s because no
   // BYOK is configured, surface the Connect-email modal + raise the admin bell instead of a raw error.
@@ -119,14 +155,16 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
     return () => { cancelled = true; };
   }, [open, toast, workspaceId]);
 
-  // Reset when dialog opens
+  // Reset when dialog opens. Greeting is seeded from the first candidate's name.
   useEffect(() => {
     if (!open) return;
+    const seedName = candidates[0]?.name ?? toName ?? null;
     setSelectedTemplateSlug('');
     setTemplateVars({});
     setCustomSubject('');
-    setCustomBody(toName ? `Hi ${toName.split(' ')[0]},\n\n` : '');
-  }, [open, toName]);
+    setCustomBody(seedName ? `Hi ${seedName.split(' ')[0]},\n\n` : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.slug === selectedTemplateSlug) ?? null,
@@ -141,22 +179,28 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
       next[v] = templateVars[v] ?? '';
     }
     // Seed obvious greeting variable if present
-    if ('name' in next && !next.name && toName) next.name = toName;
+    if ('name' in next && !next.name && primaryName) next.name = primaryName;
     setTemplateVars(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTemplate, toName]);
+  }, [selectedTemplate, primaryName]);
 
   const allVarsFilled = !selectedTemplate?.variables?.length ||
     selectedTemplate.variables.every((v) => (templateVars[v] ?? '').trim().length > 0);
-  const canSendTemplate = !!selectedTemplate && !sending && allVarsFilled;
-  const canSendCustom = customSubject.trim().length > 0 && customBody.trim().length > 0 && !sending;
+  const hasRecipient = selectedEmails.length > 0;
+  const canSendTemplate = !!selectedTemplate && !sending && allVarsFilled && hasRecipient;
+  const canSendCustom = customSubject.trim().length > 0 && customBody.trim().length > 0 && !sending && hasRecipient;
+
+  // A send goes to one address (string) or several (array). First goes on To, the rest CC.
+  const sendTo = selectedEmails.length === 1 ? selectedEmails[0] : selectedEmails;
+  const sentDescription = (messageId: string) =>
+    `${selectedEmails.length === 1 ? `Delivered to ${selectedEmails[0]}` : `Delivered to ${selectedEmails.length} recipients`} · message ${messageId.slice(0, 12)}…`;
 
   const handleSendTemplate = async () => {
-    if (!selectedTemplate || !toEmail) return;
+    if (!selectedTemplate || !hasRecipient) return;
     setSending(true);
     try {
       const result = await emailService.sendEmail({
-        to: toEmail,
+        to: sendTo,
         subject: selectedTemplate.subject_template || selectedTemplate.name,
         templateSlug: selectedTemplate.slug,
         variables: templateVars,
@@ -164,11 +208,8 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
         workspaceId: workspaceId ?? undefined,
         requireWorkspaceSender: true,
       });
-      toast({
-        title: 'Email sent',
-        description: `Delivered to ${toEmail} · message ${result.messageId.slice(0, 12)}…`,
-      });
-      onSent?.({ subject: selectedTemplate.subject_template || selectedTemplate.name });
+      toast({ title: 'Email sent', description: sentDescription(result.messageId) });
+      onSent?.({ subject: selectedTemplate.subject_template || selectedTemplate.name, recipients: selectedEmails });
       onClose();
     } catch (err: any) {
       if (isSenderNotConfigured(err)) { await handleSenderBlocked(); return; }
@@ -179,7 +220,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
   };
 
   const handleSendCustom = async () => {
-    if (!toEmail || !customSubject.trim() || !customBody.trim()) return;
+    if (!hasRecipient || !customSubject.trim() || !customBody.trim()) return;
     setSending(true);
     try {
       // The body comes in as plain text; convert newlines so it renders as
@@ -187,7 +228,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
       // is a follow-up — keeping v1 simple.
       const htmlBody = `<div style="font-family:'Open Sans',Arial,sans-serif;font-size:14px;line-height:1.6;color:#222;white-space:pre-wrap">${escapeHtml(customBody)}</div>`;
       const result = await emailService.sendEmail({
-        to: toEmail,
+        to: sendTo,
         subject: customSubject.trim(),
         html: htmlBody,
         text: customBody.trim(),
@@ -195,11 +236,8 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
         workspaceId: workspaceId ?? undefined,
         requireWorkspaceSender: true,
       });
-      toast({
-        title: 'Email sent',
-        description: `Delivered to ${toEmail} · message ${result.messageId.slice(0, 12)}…`,
-      });
-      onSent?.({ subject: customSubject.trim() });
+      toast({ title: 'Email sent', description: sentDescription(result.messageId) });
+      onSent?.({ subject: customSubject.trim(), recipients: selectedEmails });
       onClose();
     } catch (err: any) {
       if (isSenderNotConfigured(err)) { await handleSenderBlocked(); return; }
@@ -223,10 +261,38 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
             )}
           </DialogTitle>
           <DialogDescription>
-            To <span className="font-medium text-foreground">{toEmail}</span>
-            {toName ? ` (${toName})` : ''}
+            {multiRecipient
+              ? `Sending to ${selectedEmails.length} of ${candidates.length} recipients`
+              : (<>To <span className="font-medium text-foreground">{candidates[0]?.email ?? '—'}</span>{candidates[0]?.name ? ` (${candidates[0].name})` : ''}</>)}
           </DialogDescription>
         </DialogHeader>
+
+        {/* To-picker — only when there's more than one candidate (company record). */}
+        {multiRecipient && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">To</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {candidates.map((c) => {
+                const on = selectedEmails.includes(c.email);
+                return (
+                  <button
+                    key={c.email}
+                    type="button"
+                    onClick={() => toggleRecipient(c.email)}
+                    title={c.email}
+                    className={[
+                      'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                      on ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground hover:border-primary hover:text-foreground',
+                    ].join(' ')}
+                  >
+                    <span className="max-w-[14rem] truncate">{c.name || c.email}{c.kind === 'company' ? ' (company)' : ''}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {!hasRecipient && <p className="text-[11px] text-destructive">Pick at least one recipient.</p>}
+          </div>
+        )}
 
         <Tabs value={mode} onValueChange={(v) => setMode(v as 'template' | 'custom')}>
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
