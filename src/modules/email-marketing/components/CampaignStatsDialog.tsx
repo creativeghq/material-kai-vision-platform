@@ -49,7 +49,12 @@ export const CampaignStatsDialog: React.FC<Props> = ({ campaignId, campaignName,
     setSyncing(true);
     try {
       const res = await marketingService.syncStats(campaignId, workspaceId);
-      toast({ title: 'Stats refreshed', description: `Updated ${res.updated} of ${res.synced} polled.` });
+      toast({
+        title: 'Stats refreshed',
+        description: res.capped
+          ? `Updated ${res.updated} of ${res.synced} polled. More recipients remain${res.total_dispatched ? ` (${res.total_dispatched} total)` : ''} — click Sync again to continue.`
+          : `Updated ${res.updated} of ${res.synced} polled.`,
+      });
       await load();
     } catch (e: any) {
       toast({ title: 'Sync failed', description: e?.message || 'Could not reach Resend', variant: 'destructive' });

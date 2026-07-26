@@ -294,13 +294,13 @@ class MarketingService {
 
   /** Pull fresh delivery/open/click/bounce status from the workspace's OWN Resend account and
    *  update campaign_recipients. Returns how many rows were refreshed. */
-  async syncStats(campaignId: string, workspaceId: string): Promise<{ updated: number; synced: number; by_status: Record<string, number> }> {
+  async syncStats(campaignId: string, workspaceId: string): Promise<{ updated: number; synced: number; by_status: Record<string, number>; capped: boolean; total_dispatched: number | null }> {
     const { data, error } = await supabase.functions.invoke('email-api', {
       body: { action: 'sync-campaign-stats', campaign_id: campaignId, workspace_id: workspaceId },
     });
     if (error) throw await edgeError(error);
     if (!data?.success) throw new Error(data?.error || 'Failed to sync stats');
-    return { updated: data.updated ?? 0, synced: data.synced ?? 0, by_status: data.by_status ?? {} };
+    return { updated: data.updated ?? 0, synced: data.synced ?? 0, by_status: data.by_status ?? {}, capped: !!data.capped, total_dispatched: data.total_dispatched ?? null };
   }
 
   // ── Resend audience / contacts sync ──────────────────────────────────────────

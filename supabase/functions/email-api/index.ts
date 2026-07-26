@@ -24,6 +24,9 @@ interface SendEmailRequest {
   subject: string;
   html?: string;
   text?: string;
+  /** Inbox preview snippet (preheader) — injected as a hidden preheader at the top of the HTML so it
+   *  shows after the subject in the recipient's inbox list. Used by marketing campaigns. */
+  previewText?: string;
   templateSlug?: string;
   /** Overrides the template's subject_template when a templateSlug is used (variables still rendered).
    *  Marketing campaigns pass the campaign's own subject_line here so it wins over the template subject. */
@@ -441,6 +444,15 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           throw new Error('Either html or text body must be provided');
         }
 
+        // Inbox preview (preheader): a hidden span at the very top of the HTML becomes the grey
+        // preview line after the subject in most mail clients. Rendered through the same var pass so
+        // {{firstName}} etc. work in the preview too.
+        if (body.previewText && htmlBody) {
+          const pv = renderTemplateWithVariables(body.previewText, body.variables || {})
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          htmlBody = `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#ffffff;opacity:0">${pv}</div>` + htmlBody;
+        }
+
         // Sender comes from the resolved BYOK/platform config (see resolveWorkspaceEmailSender).
         // We deliberately do NOT fall back to a bogus `noreply@example.com` — that domain is
         // unverified, so Resend rejects it (and a silent fallback masks a real misconfiguration).
@@ -578,14 +590,25 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           );
         }
 
-        // Most-recent 150 recipients that were actually dispatched (have an email_log with a Resend id).
+        // Poll Resend once per dispatched recipient (GET /emails/{id}). That's rate-limited + costs
+        // edge time, so it's capped per call — but the cap must NOT be silent: we count the total
+        // dispatched and report whether coverage was partial so the UI can prompt another sync.
+        const STATS_POLL_CAP = 300;
+        const { count: totalDispatched } = await supabaseClient
+          .from('campaign_recipients')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', campaignId)
+          .not('email_log_id', 'is', null);
+        // Prioritize recipients whose outcome isn't terminal yet (no delivery/bounce/complaint), so
+        // repeated syncs sweep forward through a large list instead of re-polling the same recent 300.
         const { data: recips } = await supabaseClient
           .from('campaign_recipients')
           .select('id, email_log_id, delivered_at, opened_at, clicked_at, bounced_at, complained_at')
           .eq('campaign_id', campaignId)
           .not('email_log_id', 'is', null)
+          .is('delivered_at', null).is('bounced_at', null).is('complained_at', null)
           .order('sent_at', { ascending: false, nullsFirst: false })
-          .limit(150);
+          .limit(STATS_POLL_CAP);
         const logIds = [...new Set((recips ?? []).map((r: any) => r.email_log_id).filter(Boolean))];
         const { data: logs } = logIds.length
           ? await supabaseClient.from('email_logs').select('id, message_id').in('id', logIds)
@@ -621,8 +644,14 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           byStatus[ev] = (byStatus[ev] ?? 0) + 1;
         }
 
+        // `capped` = there were more unresolved recipients than one call polls; the UI should offer
+        // "Sync again" to continue. `synced === STATS_POLL_CAP` is the signal we hit the ceiling.
+        const capped = (recips ?? []).length >= STATS_POLL_CAP;
         return new Response(
-          JSON.stringify({ success: true, updated, synced: (recips ?? []).length, by_status: byStatus }),
+          JSON.stringify({
+            success: true, updated, synced: (recips ?? []).length, by_status: byStatus,
+            total_dispatched: totalDispatched ?? null, capped,
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }

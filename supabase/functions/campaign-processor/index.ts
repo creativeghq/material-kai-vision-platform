@@ -265,6 +265,7 @@ serve(withApiLogging('campaign-processor', async (req) => {
               to: recipient.email,
               templateSlug: template.slug,
               subjectOverride: campaign.subject_line || undefined,
+              previewText: campaign.preview_text || undefined,
               variables,
               emailType: 'marketing',
               workspace_id: campaign.workspace_id,
