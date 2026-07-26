@@ -56,6 +56,7 @@ const DocsPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [tags, setTags] = useState('');
+  const [category, setCategory] = useState('');
   const [status, setStatus] = useState('published');
 
   const isOwner = workspaceRole === 'owner' || isPlatformOperator;
@@ -88,11 +89,12 @@ const DocsPage: React.FC = () => {
     setTitle(d.title);
     setBody(d.content_markdown);
     setTags((d.tags ?? []).join(', '));
+    setCategory((d as any).category ?? '');
     setStatus(d.status);
   };
   const openNew = () => {
     setSelectedId(NEW);
-    setTitle(''); setBody(''); setTags(''); setStatus('published');
+    setTitle(''); setBody(''); setTags(''); setCategory(''); setStatus('published');
   };
 
   const save = async () => {
@@ -103,7 +105,7 @@ const DocsPage: React.FC = () => {
       title: title.trim(),
       content_markdown: body,
       tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-      category: null,
+      category: category.trim() || null,
       status,
     };
     try {
@@ -250,6 +252,7 @@ const DocsPage: React.FC = () => {
                 <CardContent className="p-4 space-y-3">
                   <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document title" className="text-lg font-medium" />
                   <div className="flex items-center gap-2">
+                    <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category (optional)" className="w-44" />
                     <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="tags, comma, separated" className="flex-1" />
                     <Select value={status} onValueChange={setStatus}>
                       <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>

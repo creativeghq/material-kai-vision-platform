@@ -47,11 +47,15 @@ export async function listDocs(workspaceId: string): Promise<WorkspaceDocWithAut
   return docs.map((d) => ({ ...d, author_name: d.created_by ? nameById.get(d.created_by) ?? null : null }));
 }
 
-/** Flows — a workspace doc reached the 'published' state (fire-and-forget). */
+/** Flows — a workspace doc reached the 'published' state (fire-and-forget). Fans out one event per
+ *  workspace owner/admin with a per-recipient `user_id`, so the seeded default create_notification flow
+ *  actually delivers (a bare event with no user_id is dropped by that action) — mirrors the correctly
+ *  wired doc_suggestion_submitted path. workspace_id is carried too so custom tenant flows match. */
 function emitDocumentPublished(doc: WorkspaceDoc, workspaceId: string) {
-  flowEventService.emit('document_published', {
+  flowEventService.emitToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'document_published', (uid) => ({
     type: 'document_published',
     workspace_id: workspaceId,
+    user_id: uid,
     doc_id: (doc as any).id,
     doc_title: (doc as any).title,
     category: (doc as any).category ?? null,
@@ -59,7 +63,7 @@ function emitDocumentPublished(doc: WorkspaceDoc, workspaceId: string) {
     title: `Document published: ${(doc as any).title}`,
     body: `"${(doc as any).title}" was published in your workspace docs.`,
     action_url: `/docs?doc=${(doc as any).id}`,
-  });
+  }));
 }
 
 export async function createDoc(workspaceId: string, userId: string, input: DocInput): Promise<WorkspaceDoc> {
