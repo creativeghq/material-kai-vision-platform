@@ -180,6 +180,25 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
       });
     }
 
+    // T2-1 — pre-flight the workspace sender BEFORE looping 200 recipients. The per-recipient send uses
+    // requireWorkspaceSender:true, so a workspace with no BYOK Resend would 403 EVERY recipient; but
+    // functions.invoke masks the 503 code, so the batch returned success:true with "0 sent / 200 failed"
+    // and the frontend's "connect your email" gate never opened. Short-circuit with an actionable code
+    // (root workspace is exempt — it sends via the platform sender).
+    if (ownerWsId) {
+      const [{ data: emailCfg }, { data: wsRow }] = await Promise.all([
+        supabase.from('workspace_email_config').select('resend_api_key, from_email, enabled').eq('workspace_id', ownerWsId).maybeSingle(),
+        supabase.from('workspaces').select('is_root').eq('id', ownerWsId).maybeSingle(),
+      ]);
+      const hasByok = !!(emailCfg && emailCfg.enabled !== false && String(emailCfg.resend_api_key ?? '').trim() && String(emailCfg.from_email ?? '').trim());
+      if (!hasByok && wsRow?.is_root !== true) {
+        return jsonResponse({
+          success: false, code: 'workspace_sender_required',
+          error: 'Connect your workspace email (Resend API key + verified sender) before sending catalogs to customers.',
+        }, 200);
+      }
+    }
+
     let sent = 0;
     let failed = 0;
 

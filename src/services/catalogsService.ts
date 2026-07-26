@@ -279,6 +279,23 @@ class CatalogsService {
     return data as PresentationCatalog;
   }
 
+  /** Publish with a GLOBALLY-unique slug. The slug unique index spans all workspaces, but RLS hides
+   *  other tenants' rows so a client-side pre-check can't detect a collision — retry on the unique
+   *  violation (23505) with a numeric suffix instead (mirrors the agent path's ensureUniqueSlug). */
+  async publish(catalogId: string, baseSlug: string): Promise<PresentationCatalog> {
+    const base = baseSlug || 'catalog';
+    let slug = base;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try {
+        return await this.update(catalogId, { slug, status: 'published', published_at: new Date().toISOString() } as any);
+      } catch (err: any) {
+        if (err?.code === '23505' && attempt < 5) { slug = `${base}-${Math.floor(1000 + Math.random() * 9000)}`; continue; }
+        throw err;
+      }
+    }
+    throw new Error('Could not find a free catalog URL — try a different title.');
+  }
+
   async remove(catalogId: string): Promise<void> {
     const cat = await this.get(catalogId);
     if (cat?.pdf_storage_path) {

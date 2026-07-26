@@ -132,13 +132,11 @@ export const CatalogBuilderPage: React.FC = () => {
     if (!catalog) return;
     setBusyAction('publish');
     try {
-      const slug = catalog.slug || (await proposeSlug(catalog.title));
-      await catalogsService.update(catalog.id, {
-        slug,
-        status: 'published',
-        published_at: new Date().toISOString(),
-      } as any);
-      toast({ title: 'Published', description: `/c/${slug}` });
+      // Use the collision-safe publish (retries on the global slug unique-violation) — the plain
+      // slugify used to hard-fail the second catalog with the same title.
+      const base = catalog.slug || (await proposeSlug(catalog.title));
+      const published = await catalogsService.publish(catalog.id, base);
+      toast({ title: 'Published', description: `/c/${published.slug}` });
       load();
     } catch (err) {
       toast({ title: 'Publish failed', description: getErrorMessage(err), variant: 'destructive' });
