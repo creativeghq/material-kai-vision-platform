@@ -9,7 +9,8 @@ export interface FinanceCategory {
   is_active: boolean;
   /** #207 — default sell margin % for products in this category; auto-prices received goods. */
   margin_pct: number | null;
-  /** Protected built-in (the "Order" category): can't be renamed/deleted; auto-attached to order costs. */
+  /** Protected built-in (the "Orders" category): every workspace has one; can't be renamed/deleted;
+   *  auto-attached to order costs. Enforced by the guard_system_finance_category DB trigger. */
   is_system: boolean;
 }
 
