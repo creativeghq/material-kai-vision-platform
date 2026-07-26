@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { FilterBar, useFilters } from '@/components/core/filters';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { listChatToolCalls, formatDuration } from '@/services/backgroundAgents';
 import type { ChatToolCall } from '@/services/backgroundAgents';
 import { useToast } from '@/hooks/use-toast';
@@ -122,21 +123,17 @@ export function ChatActivityTab() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <MessageSquare className="h-6 w-6 text-primary" />
-          <div>
-            <h2 className="text-xl font-semibold">Chat Agent Activity</h2>
-            <p className="text-sm text-muted-foreground">
-              Tool calls executed inline by KAI and Interior Designer chat agents
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
+      <SectionHeader
+        icon={MessageSquare}
+        title="Chat Agent Activity"
+        subtitle="Tool calls executed inline by KAI and Interior Designer chat agents"
+        actions={
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        }
+      />
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">

@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
 import type { AIUsageLog, InteriorDesignStats } from './OperationsDashboard/types';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface ModelUsageRow {
   model_name: string;
@@ -151,12 +152,10 @@ export const AIPerformanceTab: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Page Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
-        <p className="text-muted-foreground text-sm">
-          Monitoring all AI models — Claude Opus 4.8 (vision + classification), Claude Sonnet 4.6 (chunking), Claude Haiku 4.5, and embedding models (SigLIP, Voyage AI). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
-        </p>
-      </div>
+      <SectionHeader
+        title="AI Performance"
+        subtitle="Monitoring all AI models — Claude Opus 4.8 (vision + classification), Claude Sonnet 4.6 (chunking), Claude Haiku 4.5, and embedding models (SigLIP, Voyage AI). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure."
+      />
 
       {/* AI Models Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

@@ -26,6 +26,7 @@ import {
 import type { AgentRun, BackgroundAgent } from '@/services/backgroundAgents';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
   completed:  <CheckCircle className="h-4 w-4 text-green-500"                 />,
@@ -188,21 +189,17 @@ export function BackgroundAgentsPage() {
         <TabsContent value="background" className="space-y-4 sm:space-y-6 mt-0">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Bot className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-xl font-semibold">Background Tasks</h1>
-            <p className="text-sm text-muted-foreground">
-              Monitor AI tasks dispatched from JARVIS chat and other triggers
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
+      <SectionHeader
+        icon={Bot}
+        title="Background Tasks"
+        subtitle="Monitor AI tasks dispatched from JARVIS chat and other triggers"
+        actions={
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        }
+      />
 
 
       {/* Stats bar */}

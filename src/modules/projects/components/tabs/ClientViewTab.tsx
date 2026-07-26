@@ -21,6 +21,7 @@ import {
   type ClientViewFeedback,
 } from '@/services/clientViewsService';
 import { SHEET_TYPE_LABELS, type SheetType } from '@/services/moodboardSheetsService';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface ClientViewTabProps {
   projectId: string;
@@ -302,19 +303,15 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-base font-semibold">Client Views</h3>
-          <p className="text-sm text-muted-foreground">
-            Bundle sheets from any of this project's moodboards into one client-ready PDF + online presentation.
-          </p>
-        </div>
-        {!editorOpen && (
+      <SectionHeader
+        title="Client Views"
+        subtitle="Bundle sheets from any of this project's moodboards into one client-ready PDF + online presentation."
+        actions={!editorOpen && (
           <Button onClick={openCreate} className="rounded-full">
             <Plus className="h-4 w-4 mr-1" /> New Client View
           </Button>
         )}
-      </div>
+      />
 
       {/* Editor */}
       {editorOpen && (

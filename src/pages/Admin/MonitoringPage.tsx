@@ -6,6 +6,7 @@ import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { PriceMonitoringDashboard } from '@/components/business/price-monitoring/PriceMonitoringDashboard';
 import MentionMonitoringDashboard from '@/components/business/mention-monitoring/MentionMonitoringDashboard';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 /**
  * #244 B — one monitoring home. Three tabs (Price / Mention / Job Research)
@@ -32,10 +33,7 @@ export default function MonitoringPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div>
-        <h1 className="text-xl font-medium">Monitoring</h1>
-        <p className="text-sm text-muted-foreground">Price, mentions, and job-research tracking in one place.</p>
-      </div>
+      <SectionHeader title="Monitoring" subtitle="Price, mentions, and job-research tracking in one place." />
       <Tabs value={tab} onValueChange={(t) => setParams({ tab: t })}>
         <TabsList>
           <TabsTrigger value="price"><TrendingUp className="h-4 w-4 mr-1.5" /> Price</TabsTrigger>

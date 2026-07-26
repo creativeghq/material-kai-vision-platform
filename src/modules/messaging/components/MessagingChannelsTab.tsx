@@ -12,6 +12,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/core/ui/dialog';
 import { Switch } from '@/components/core/ui/switch';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingChannel } from '../services';
 
@@ -103,14 +104,10 @@ export const MessagingChannelsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="dashboard-card">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">WhatsApp Channels</h3>
-            <p className="text-sm text-muted-foreground">
-              Connect WhatsApp Business numbers via Zernio (Meta Cloud API)
-            </p>
-          </div>
+      <SectionHeader
+        title="WhatsApp Channels"
+        subtitle="Connect WhatsApp Business numbers via Zernio (Meta Cloud API)"
+        actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={loadChannels} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -125,8 +122,8 @@ export const MessagingChannelsTab: React.FC = () => {
               Connect WhatsApp
             </Button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Channels List */}
       {channels.length === 0 ? (

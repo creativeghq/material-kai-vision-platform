@@ -11,6 +11,7 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingOptout, MessagingChannelType } from '../services';
@@ -93,20 +94,16 @@ export const MessagingOptoutsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="dashboard-card">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Opt-out List</h3>
-            <p className="text-sm text-muted-foreground">
-              Manage phone numbers that have opted out of messaging
-            </p>
-          </div>
+      <SectionHeader
+        title="Opt-out List"
+        subtitle="Manage phone numbers that have opted out of messaging"
+        actions={
           <Button onClick={() => setShowAddModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Opt-out
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Filters */}
       <div className="dashboard-card">

@@ -22,6 +22,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface ChunkQualityMetrics {
   total_chunks: number;
@@ -165,23 +166,22 @@ export const ChunkQualityDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2"><CheckCircle className="h-6 w-6" />Chunk Quality Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Monitor chunk quality, deduplication, and validation metrics
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            fetchMetrics();
-            fetchFlaggedChunks(showReviewed);
-          }}
-        >
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
+      <SectionHeader
+        icon={CheckCircle}
+        title="Chunk Quality Dashboard"
+        subtitle="Monitor chunk quality, deduplication, and validation metrics"
+        actions={
+          <Button
+            onClick={() => {
+              fetchMetrics();
+              fetchFlaggedChunks(showReviewed);
+            }}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        }
+      />
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

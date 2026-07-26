@@ -9,6 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, useFilters } from '@/components/core/filters';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { emailService, EmailLog } from '../services/emailService';
 import { buildEmailLogFilters } from './emailFilters';
 import { useToast } from '@/hooks/use-toast';
@@ -98,27 +99,25 @@ export const EmailLogsTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Email Logs</h3>
-          <p className="text-sm text-muted-foreground">
-            View all sent emails and their delivery status
-          </p>
-        </div>
-        <FilterBar
-          groups={filterGroups}
-          values={filterValues}
-          onChange={setFilterValues}
-          previewCount={previewCount}
-          title="Filter email logs"
-          searchPlaceholder="Search recipient / subject…"
-        >
-          <Button variant="outline" onClick={exportLogs}>
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-        </FilterBar>
-      </div>
+      <SectionHeader
+        title="Email Logs"
+        subtitle="View all sent emails and their delivery status"
+        actions={
+          <FilterBar
+            groups={filterGroups}
+            values={filterValues}
+            onChange={setFilterValues}
+            previewCount={previewCount}
+            title="Filter email logs"
+            searchPlaceholder="Search recipient / subject…"
+          >
+            <Button variant="outline" onClick={exportLogs}>
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          </FilterBar>
+        }
+      />
 
       <div className="dashboard-card p-0">
         {loading ? (

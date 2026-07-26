@@ -20,6 +20,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import {
   Select,
   SelectContent,
@@ -276,31 +277,29 @@ export const SearchAnalyticsDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Search Analytics</h2>
-          <p className="text-muted-foreground">
-            Track user search behavior and material demand patterns
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={timeRange} onValueChange={(value: any) => setTimeRange(value)}>
-            <SelectTrigger className="w-32">
-              <Calendar className="h-4 w-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={refreshViews} disabled={refreshing} variant="outline">
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <SectionHeader
+        title="Search Analytics"
+        subtitle="Track user search behavior and material demand patterns"
+        actions={
+          <>
+            <Select value={timeRange} onValueChange={(value: any) => setTimeRange(value)}>
+              <SelectTrigger className="w-32">
+                <Calendar className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={refreshViews} disabled={refreshing} variant="outline">
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </>
+        }
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">

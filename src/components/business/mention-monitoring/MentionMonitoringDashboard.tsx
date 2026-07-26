@@ -16,6 +16,7 @@ import { FilterBar, useFilters } from '@/components/core/filters';
 import { TrackedMention } from '@/services/mentionMonitoringApi';
 import { statusTone } from '@/utils/statusTone';
 import { buildTrackedMentionFilters } from './mentionFilters';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 const MentionMonitoringDashboard: React.FC = () => {
   const { toast } = useToast();
@@ -67,19 +68,16 @@ const MentionMonitoringDashboard: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-medium flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" /> Mention Monitoring
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            All tracked subjects across the catalog: news, blogs, RSS, YouTube, and LLM visibility.
-          </p>
-        </div>
-        <Button onClick={load} disabled={loading} variant="outline" className="rounded-full">
-          <RefreshCw className={`h-3 w-3 mr-1 ${loading ? 'animate-spin' : ''}`} /> Reload
-        </Button>
-      </div>
+      <SectionHeader
+        icon={Sparkles}
+        title="Mention Monitoring"
+        subtitle="All tracked subjects across the catalog: news, blogs, RSS, YouTube, and LLM visibility."
+        actions={(
+          <Button onClick={load} disabled={loading} variant="outline" className="rounded-full">
+            <RefreshCw className={`h-3 w-3 mr-1 ${loading ? 'animate-spin' : ''}`} /> Reload
+          </Button>
+        )}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card className="dashboard-card"><CardContent className="p-4">

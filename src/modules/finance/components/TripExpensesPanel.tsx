@@ -20,6 +20,7 @@ import {
 import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface Props {
   workspaceId: string;
@@ -79,16 +80,12 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <h3 className="text-sm font-semibold">Expense cards</h3>
-          <p className="text-xs text-muted-foreground">
-            {canReview
-              ? 'Review the team’s expense cards (trips, monthly expenses, …). Approve or reject each line; approved totals can post a reimbursement payable.'
-              : 'Track your expenses by card — a sales trip, a month of expenses, anything — attach receipts, and submit to finance for approval.'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <SectionHeader
+        title="Expense cards"
+        subtitle={canReview
+          ? 'Review the team’s expense cards (trips, monthly expenses, …). Approve or reject each line; approved totals can post a reimbursement payable.'
+          : 'Track your expenses by card — a sales trip, a month of expenses, anything — attach receipts, and submit to finance for approval.'}
+        actions={<>
           {reports.length > 0 && (
             <FilterBar groups={filterGroups} values={filterValues} onChange={setFilterValues} previewCount={previewCount} title="Filter expense cards" />
           )}
@@ -96,8 +93,8 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
             <Button variant="outline" onClick={() => setRequestOpen(true)}><UserPlus className="h-4 w-4 mr-1" /> Request from teammate</Button>
           )}
           <Button onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New card</Button>
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         <Card>

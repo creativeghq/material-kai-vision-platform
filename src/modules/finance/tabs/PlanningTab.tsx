@@ -15,6 +15,7 @@ import {
   FilterBar, optionsFromRows, useFilters,
   type DateRangeValue, type FilterGroupDef,
 } from '@/components/core/filters';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface Props { workspaceId: string }
 
@@ -175,12 +176,10 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold">Planning</h3>
-          <p className="text-xs text-muted-foreground">Scheduled future payments and expected receipts. Marking Paid creates a real payment + allocation.</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <SectionHeader
+        title="Planning"
+        subtitle="Scheduled future payments and expected receipts. Marking Paid creates a real payment + allocation."
+        actions={<>
           <FilterBar
             groups={filterGroups}
             values={filterValues}
@@ -190,8 +189,8 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
             title="Filter planned payments"
           />
           <Button onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add planned payment</Button>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* Totals strip */}
       <div className="grid grid-cols-3 gap-3">

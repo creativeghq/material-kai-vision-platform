@@ -12,6 +12,7 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { marketingService, type MarketingCampaign } from '../services/marketingService';
 import { CreateMarketingCampaignModal } from './CreateMarketingCampaignModal';
 import { CampaignStatsDialog } from './CampaignStatsDialog';
@@ -58,13 +59,13 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
 
   return (
     <div className="space-y-4">
-      <div className="dashboard-card flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Campaigns</h3>
-          <p className="text-sm text-muted-foreground">Send bulk email to your CRM audiences from your own Resend domain.</p>
-        </div>
-        <Button onClick={() => setShowCreate(true)} className="rounded-full"><Plus className="h-4 w-4 mr-2" /> Create Campaign</Button>
-      </div>
+      <SectionHeader
+        title="Campaigns"
+        subtitle="Send bulk email to your CRM audiences from your own Resend domain."
+        actions={
+          <Button onClick={() => setShowCreate(true)} className="rounded-full"><Plus className="h-4 w-4 mr-2" /> Create Campaign</Button>
+        }
+      />
 
       {loading ? (
         <div className="dashboard-card py-8 text-center text-muted-foreground">Loading campaigns…</div>

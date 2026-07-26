@@ -11,6 +11,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
 import { supabase } from '@/integrations/supabase/client';
@@ -386,21 +387,23 @@ export const PushNotificationsTab: React.FC = () => {
       </div>
 
       {/* Actions */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Active Subscriptions</h3>
-        <div className="flex gap-2">
-          {analytics.inactiveSubscriptions > 0 && (
-            <Button variant="outline" onClick={handleCleanupInactive}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Cleanup Inactive ({analytics.inactiveSubscriptions})
+      <SectionHeader
+        title="Active Subscriptions"
+        actions={
+          <div className="flex gap-2">
+            {analytics.inactiveSubscriptions > 0 && (
+              <Button variant="outline" onClick={handleCleanupInactive}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Cleanup Inactive ({analytics.inactiveSubscriptions})
+              </Button>
+            )}
+            <Button onClick={() => setTestDialogOpen(true)} disabled={!vapidConfig.configured}>
+              <Send className="mr-2 h-4 w-4" />
+              Send Test Notification
             </Button>
-          )}
-          <Button onClick={() => setTestDialogOpen(true)} disabled={!vapidConfig.configured}>
-            <Send className="mr-2 h-4 w-4" />
-            Send Test Notification
-          </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Subscriptions Table */}
       <Card>

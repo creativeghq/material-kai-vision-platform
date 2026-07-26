@@ -42,6 +42,7 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag } from '../services/QuotesService';
 import { usersAPI } from '@/services/crm.service';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { TimelineStepsManagement } from './TimelineStepsManagementPage';
@@ -331,52 +332,52 @@ export const QuoteRequestsAdmin: React.FC = () => {
         </div>
 
         {/* Actions */}
-        <div className="flex justify-between items-center">
-          <div className="flex flex-wrap items-center gap-4">
-            <h2 className="text-2xl font-bold">All Quote Requests</h2>
-            <FilterBar
-              groups={filterGroups}
-              values={filterValues}
-              onChange={setFilterValues}
-              previewCount={previewCount}
-              title="Filter quote requests"
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowTimelinePanel(true)}
-            >
-              <ListChecks className="h-4 w-4 mr-2" />
-              Global Timeline Elements
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowUpsellsPanel(true)}
-            >
-              <Gift className="h-4 w-4 mr-2" />
-              Global Upsells Elements
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowSettingsPanel(true)}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Quote Settings
-            </Button>
-            <Button
-              onClick={() => setShowCreateModal(true)}
-              style={{
-                backgroundColor: 'hsl(var(--primary))',
-                color: 'white',
-              }}
-              className="hover:opacity-90"
-            >
-              <UserPlus className="h-4 w-4 mr-2" />
-              Create Quote for User
-            </Button>
-          </div>
-        </div>
+        <SectionHeader
+          title="All Quote Requests"
+          actions={
+            <>
+              <FilterBar
+                groups={filterGroups}
+                values={filterValues}
+                onChange={setFilterValues}
+                previewCount={previewCount}
+                title="Filter quote requests"
+              />
+              <Button
+                variant="outline"
+                onClick={() => setShowTimelinePanel(true)}
+              >
+                <ListChecks className="h-4 w-4 mr-2" />
+                Global Timeline Elements
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowUpsellsPanel(true)}
+              >
+                <Gift className="h-4 w-4 mr-2" />
+                Global Upsells Elements
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowSettingsPanel(true)}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Quote Settings
+              </Button>
+              <Button
+                onClick={() => setShowCreateModal(true)}
+                style={{
+                  backgroundColor: 'hsl(var(--primary))',
+                  color: 'white',
+                }}
+                className="hover:opacity-90"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Create Quote for User
+              </Button>
+            </>
+          }
+        />
 
         {/* Quote Requests Table */}
         <div className="dashboard-card overflow-x-auto">

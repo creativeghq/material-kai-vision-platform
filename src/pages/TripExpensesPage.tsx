@@ -1,6 +1,7 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import TripExpensesPanel from '@/modules/finance/components/TripExpensesPanel';
 
@@ -14,10 +15,10 @@ const TripExpensesPage: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-6xl p-4 sm:p-6 space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold">My expenses</h1>
-        <p className="text-sm text-muted-foreground">Track your expenses by card — a sales trip, a month of expenses, anything — attach receipts, and submit to finance for approval.</p>
-      </div>
+      <SectionHeader
+        title="My expenses"
+        subtitle="Track your expenses by card — a sales trip, a month of expenses, anything — attach receipts, and submit to finance for approval."
+      />
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : !activeWorkspaceId ? (

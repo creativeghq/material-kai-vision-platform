@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { SheetTypePreviewModal } from '@/components/features/sheets/SheetTypePreviewModal';
 import { SheetWizardModal, type SheetWizardResult } from '@/components/features/sheets/SheetWizardModal';
 import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface MoodboardSheetsTabProps {
   moodboardId: string;
@@ -265,14 +266,11 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
       </Dialog>
 
       {/* New Tool launcher */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h3 className="text-base font-semibold">Presentation Tools</h3>
-          <p className="text-xs text-muted-foreground">
-            Pick a tool to produce a client-ready deliverable from this moodboard. KAI walks you through the inputs.
-          </p>
-        </div>
-        <DropdownMenu>
+      <SectionHeader
+        title="Presentation Tools"
+        subtitle="Pick a tool to produce a client-ready deliverable from this moodboard. KAI walks you through the inputs."
+        actions={(
+          <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button className="rounded-full gap-2">
               <Plus className="h-4 w-4" />
@@ -313,8 +311,9 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
               </React.Fragment>
             ))}
           </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+          </DropdownMenu>
+        )}
+      />
 
       {/* Sheet list */}
       {loading ? (

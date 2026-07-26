@@ -34,6 +34,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, TimelineStep } from '../services/QuotesService';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface TimelineStepsManagementProps {
   embedded?: boolean;
@@ -438,20 +439,19 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
       />
 
       <div className="p-3 sm:p-6 space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Timeline Steps</h2>
-            <p className="text-gray-600 mt-1">Define the stages of your project timeline</p>
-          </div>
-          <Button
-            onClick={handleOpenCreate}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Step
-          </Button>
-        </div>
+        <SectionHeader
+          title="Timeline Steps"
+          subtitle="Define the stages of your project timeline"
+          actions={
+            <Button
+              onClick={handleOpenCreate}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Step
+            </Button>
+          }
+        />
 
         {/* Timeline Steps Table */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">

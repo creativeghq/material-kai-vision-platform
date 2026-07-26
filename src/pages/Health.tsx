@@ -17,6 +17,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import {
   healthCheck,
   readinessCheck,
@@ -103,26 +104,26 @@ const HealthPage: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Activity className="w-6 h-6" />
-          <h1 className="text-2xl font-bold">System Health Status</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-          {lastChecked && (
-            <span className="text-sm text-muted-foreground">
-              Last checked: {lastChecked.toLocaleTimeString()}
-            </span>
-          )}
-          <Button
-            onClick={runHealthCheck}
-            onKeyDown={(e) => e.key === 'Enter' && runHealthCheck()}
-            disabled={loading}
-          >
-            {loading ? 'Checking...' : 'Refresh'}
-          </Button>
-        </div>
-      </div>
+      <SectionHeader
+        icon={Activity}
+        title="System Health Status"
+        actions={
+          <>
+            {lastChecked && (
+              <span className="text-sm text-muted-foreground">
+                Last checked: {lastChecked.toLocaleTimeString()}
+              </span>
+            )}
+            <Button
+              onClick={runHealthCheck}
+              onKeyDown={(e) => e.key === 'Enter' && runHealthCheck()}
+              disabled={loading}
+            >
+              {loading ? 'Checking...' : 'Refresh'}
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Health Status */}

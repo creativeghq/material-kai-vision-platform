@@ -12,6 +12,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { Input } from '@/components/core/ui/input';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import {
   X,
@@ -193,59 +194,54 @@ export default function MaterialComparePage() {
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="rounded-full">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-light text-primary">Material Comparison</h1>
-            <p className="text-sm text-muted-foreground">
-              {products.length} of {MAX_COMPARE} materials selected
-            </p>
-          </div>
-        </div>
-
-        {products.length < MAX_COMPARE && (
-          <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="rounded-full gap-2">
-                <Plus className="h-4 w-4" />
-                Add Material
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="end">
-              <Command>
-                <CommandInput
-                  placeholder="Search materials..."
-                  value={searchQuery}
-                  onValueChange={setSearchQuery}
-                />
-                <CommandList>
-                  {searching ? (
-                    <div className="p-3 text-sm text-muted-foreground">Searching...</div>
-                  ) : searchResults.length === 0 ? (
-                    <CommandEmpty>No results found.</CommandEmpty>
-                  ) : (
-                    <CommandGroup>
-                      {searchResults.map((r) => (
-                        <CommandItem key={r.id} onSelect={() => addProduct(r.id)}>
-                          <div>
-                            <p className="font-medium text-sm">{r.name}</p>
-                            {r.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-1">{r.description}</p>
-                            )}
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        )}
+      <div>
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="rounded-full -ml-2 mb-3">
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
+        <SectionHeader
+          title="Material Comparison"
+          subtitle={`${products.length} of ${MAX_COMPARE} materials selected`}
+          actions={products.length < MAX_COMPARE ? (
+            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="rounded-full gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Material
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <Command>
+                  <CommandInput
+                    placeholder="Search materials..."
+                    value={searchQuery}
+                    onValueChange={setSearchQuery}
+                  />
+                  <CommandList>
+                    {searching ? (
+                      <div className="p-3 text-sm text-muted-foreground">Searching...</div>
+                    ) : searchResults.length === 0 ? (
+                      <CommandEmpty>No results found.</CommandEmpty>
+                    ) : (
+                      <CommandGroup>
+                        {searchResults.map((r) => (
+                          <CommandItem key={r.id} onSelect={() => addProduct(r.id)}>
+                            <div>
+                              <p className="font-medium text-sm">{r.name}</p>
+                              {r.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-1">{r.description}</p>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          ) : undefined}
+        />
       </div>
 
       {products.length === 0 && (

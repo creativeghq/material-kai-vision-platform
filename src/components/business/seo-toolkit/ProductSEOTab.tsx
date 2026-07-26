@@ -25,6 +25,7 @@ import { edgeErrorMessage } from '@/utils/edgeError';
 import { SEOResearchCard } from '@/components/features/ai/SEOResearchCard';
 import { SEOGenericCard } from '@/components/features/ai/SEOGenericCard';
 import { listResearchRuns, persistResearchRun, type SeoResearchRun } from '@/services/seoToolkitApi';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface Props {
   productId: string;
@@ -192,31 +193,32 @@ const ProductSEOTab: React.FC<Props> = ({ productId, productName, manufacturer, 
 
   return (
     <div className="space-y-4 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-medium flex items-center gap-2">
-            <Search className="h-4 w-4 text-primary" /> SEO snapshot
-          </h3>
-          <p className="text-xs text-muted-foreground mt-1">
+      <SectionHeader
+        icon={Search}
+        title="SEO snapshot"
+        subtitle={(
+          <>
             Auto-derived target keyword: <Badge variant="outline" className="text-[10px] ml-1">{targetKeyword}</Badge>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <a
-            href={`/agent-hub?agent=kai&q=${encodeURIComponent(`research the keyword "${targetKeyword}"`)}`}
-            className="text-xs text-primary hover:underline inline-flex items-center gap-1">
-            Open in chat <ExternalLink className="h-3 w-3" />
-          </a>
-          <Button
-            size="sm" variant="outline"
-            onClick={fireResearch}
-            disabled={refreshing}
-            className="rounded-full text-xs">
-            <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-            {research ? 'Refresh' : 'Run audit'}
-          </Button>
-        </div>
-      </div>
+          </>
+        )}
+        actions={(
+          <>
+            <a
+              href={`/agent-hub?agent=kai&q=${encodeURIComponent(`research the keyword "${targetKeyword}"`)}`}
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+              Open in chat <ExternalLink className="h-3 w-3" />
+            </a>
+            <Button
+              size="sm" variant="outline"
+              onClick={fireResearch}
+              disabled={refreshing}
+              className="rounded-full text-xs">
+              <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+              {research ? 'Refresh' : 'Run audit'}
+            </Button>
+          </>
+        )}
+      />
 
       {loading && !research && (
         <div className="text-sm text-muted-foreground p-4 text-center">Loading cached research...</div>

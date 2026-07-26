@@ -18,6 +18,7 @@ import { MonitoredProductsList } from './MonitoredProductsList';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { PriceAlertsPanel } from './PriceAlertsPanel';
 import { AddProductToMonitoring } from './AddProductToMonitoring';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 export const PriceMonitoringDashboard: React.FC = () => {
   const [monitoredProducts, setMonitoredProducts] = useState<TrackedQuery[]>([]);
@@ -102,21 +103,19 @@ export const PriceMonitoringDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Price Monitoring</h1>
-          <p className="text-muted-foreground mt-1">
-            Track competitor prices and get alerts on price changes
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <AddProductToMonitoring onProductAdded={loadDashboardData} />
-        </div>
-      </div>
+      <SectionHeader
+        title="Price Monitoring"
+        subtitle="Track competitor prices and get alerts on price changes"
+        actions={(
+          <>
+            <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <AddProductToMonitoring onProductAdded={loadDashboardData} />
+          </>
+        )}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>

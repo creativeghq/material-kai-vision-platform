@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Switch } from '@/components/core/ui/switch';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ActionStatisticsModal } from './ActionStatisticsModal';
@@ -113,12 +114,10 @@ export const EmailActionsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold">Email Actions</h3>
-        <p className="text-sm text-muted-foreground">
-          Manage trigger-based emails and assign templates to each action
-        </p>
-      </div>
+      <SectionHeader
+        title="Email Actions"
+        subtitle="Manage trigger-based emails and assign templates to each action"
+      />
 
       {/* Actions Table */}
       <div className="dashboard-card">

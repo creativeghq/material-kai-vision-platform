@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, ShieldCheck, Check, X, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { supplierClaimsService, type SupplierClaimRequest } from '@/services/supplierClaimsService';
 
@@ -43,15 +44,16 @@ export default function SupplierClaimsPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-medium flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> Supplier identity claims</h1>
-          <p className="text-sm text-muted-foreground">Approving grants the workspace cross-workspace order visibility — operator-only.</p>
-        </div>
-        <Button size="sm" variant="outline" onClick={load} disabled={loading}>
-          <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
-      </div>
+      <SectionHeader
+        icon={ShieldCheck}
+        title="Supplier identity claims"
+        subtitle="Approving grants the workspace cross-workspace order visibility — operator-only."
+        actions={
+          <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader className="pb-3"><CardTitle>Pending ({claims.length})</CardTitle></CardHeader>

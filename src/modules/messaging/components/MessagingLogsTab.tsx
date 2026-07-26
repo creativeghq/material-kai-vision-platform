@@ -7,6 +7,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { RefreshCw, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingLog, MessagingChannelType, MessageStatus } from '../services';
@@ -65,20 +66,16 @@ export const MessagingLogsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="dashboard-card">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Message Logs</h3>
-            <p className="text-sm text-muted-foreground">
-              View delivery status and details for all sent messages
-            </p>
-          </div>
+      <SectionHeader
+        title="Message Logs"
+        subtitle="View delivery status and details for all sent messages"
+        actions={
           <Button onClick={loadLogs} variant="outline" disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Filters */}
       <div className="dashboard-card">

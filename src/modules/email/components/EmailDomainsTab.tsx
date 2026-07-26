@@ -11,6 +11,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/core/ui/dialog';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { emailService, EmailDomain } from '../services/emailService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -102,10 +103,10 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Email Domains</h3>
-          <p className="text-sm text-muted-foreground">
+      <SectionHeader
+        title="Email Domains"
+        subtitle={
+          <>
             Manage sending domains via{' '}
             <a
               href="https://resend.com/domains"
@@ -115,53 +116,55 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
             >
               Resend <ExternalLink className="h-3 w-3" />
             </a>
-          </p>
-        </div>
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Domain
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Email Domain</DialogTitle>
-              <DialogDescription>
-                Add a domain you've already added to your{' '}
-                <a
-                  href="https://resend.com/domains"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-2"
-                >
-                  Resend dashboard
-                </a>
-                . After adding DNS records and verifying in Resend, mark it verified here.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="domain">Domain Name</Label>
-                <Input
-                  id="domain"
-                  placeholder="example.com"
-                  value={newDomain}
-                  onChange={(e) => setNewDomain(e.target.value)}
-                />
+          </>
+        }
+        actions={
+          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Domain
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Email Domain</DialogTitle>
+                <DialogDescription>
+                  Add a domain you've already added to your{' '}
+                  <a
+                    href="https://resend.com/domains"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2"
+                  >
+                    Resend dashboard
+                  </a>
+                  . After adding DNS records and verifying in Resend, mark it verified here.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="domain">Domain Name</Label>
+                  <Input
+                    id="domain"
+                    placeholder="example.com"
+                    value={newDomain}
+                    onChange={(e) => setNewDomain(e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddDomain} disabled={saving || !newDomain}>
-                {saving ? 'Adding...' : 'Add Domain'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddDomain} disabled={saving || !newDomain}>
+                  {saving ? 'Adding...' : 'Add Domain'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       {/* Resend dashboard link banner */}
       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">

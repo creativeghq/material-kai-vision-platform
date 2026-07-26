@@ -17,6 +17,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
@@ -214,33 +215,29 @@ export const ChatStartersTab: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header + actions */}
-      <div className="flex flex-wrap items-center gap-3 justify-between">
-        <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <ListChecks className="h-5 w-5 text-primary" />
-            Chat Starters
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Curated prompt templates that appear in the chat composer picker.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={filterAgent} onValueChange={setFilterAgent}>
-            <SelectTrigger className="w-[200px] rounded-full">
-              <SelectValue placeholder="All agents" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All agents</SelectItem>
-              {AGENT_OPTIONS.map(a => (
-                <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={() => setCreating(emptyStarter())} className="rounded-full">
-            <Plus className="h-4 w-4 mr-2" />New starter
-          </Button>
-        </div>
-      </div>
+      <SectionHeader
+        icon={ListChecks}
+        title="Chat Starters"
+        subtitle="Curated prompt templates that appear in the chat composer picker."
+        actions={
+          <>
+            <Select value={filterAgent} onValueChange={setFilterAgent}>
+              <SelectTrigger className="w-[200px] rounded-full">
+                <SelectValue placeholder="All agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All agents</SelectItem>
+                {AGENT_OPTIONS.map(a => (
+                  <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => setCreating(emptyStarter())} className="rounded-full">
+              <Plus className="h-4 w-4 mr-2" />New starter
+            </Button>
+          </>
+        }
+      />
 
       {/* List */}
       {loading ? (

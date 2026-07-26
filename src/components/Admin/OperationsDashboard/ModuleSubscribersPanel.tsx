@@ -12,6 +12,7 @@ import {
 } from '@/components/core/ui/table';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface SubscriberRow {
   workspace_id: string;
@@ -116,15 +117,16 @@ export const ModuleSubscribersPanel: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold flex items-center gap-2"><CreditCard className="h-5 w-5" /> Module add-ons</h3>
-          <p className="text-sm text-muted-foreground">Per-module activation, subscribers, and add-on MRR across all workspaces.</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading} className="gap-2">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
-      </div>
+      <SectionHeader
+        icon={CreditCard}
+        title="Module add-ons"
+        subtitle="Per-module activation, subscribers, and add-on MRR across all workspaces."
+        actions={
+          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading} className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+        }
+      />
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">

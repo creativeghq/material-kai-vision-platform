@@ -4,6 +4,7 @@ import { Eye, Download, Share2 } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { RecognitionResult } from '@/types/materials';
 
 interface RecognitionResultsProps {
@@ -55,13 +56,15 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
   return (
     <Card>
       <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Recognition Results</h3>
-          <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
-            {results.length} material{results.length !== 1 ? 's' : ''}{' '}
-            identified
-          </Badge>
-        </div>
+        <SectionHeader
+          title="Recognition Results"
+          actions={
+            <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80">
+              {results.length} material{results.length !== 1 ? 's' : ''}{' '}
+              identified
+            </Badge>
+          }
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {results.map((result, index) => (

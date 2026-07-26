@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/core/ui/button';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { statusTone } from '@/utils/statusTone';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CreateCampaignModal } from './CreateCampaignModal';
@@ -131,20 +132,16 @@ export const CampaignsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="dashboard-card">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Email Campaigns</h3>
-            <p className="text-sm text-muted-foreground">
-              Create and manage email marketing campaigns
-            </p>
-          </div>
+      <SectionHeader
+        title="Email Campaigns"
+        subtitle="Create and manage email marketing campaigns"
+        actions={
           <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Create Campaign
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Campaigns List */}
       {campaigns.length === 0 ? (

@@ -13,6 +13,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { marketingService, type MarketingTemplate } from '../services/marketingService';
 
 export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
@@ -78,15 +79,15 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
 
   return (
     <div className="space-y-4">
-      <div className="dashboard-card flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Templates</h3>
-          <p className="text-sm text-muted-foreground">Design reusable email templates for your campaigns.</p>
-        </div>
-        <Button onClick={() => { setName(''); setDescription(''); setShowCreate(true); }} className="rounded-full">
-          <Plus className="h-4 w-4 mr-2" /> New Template
-        </Button>
-      </div>
+      <SectionHeader
+        title="Templates"
+        subtitle="Design reusable email templates for your campaigns."
+        actions={
+          <Button onClick={() => { setName(''); setDescription(''); setShowCreate(true); }} className="rounded-full">
+            <Plus className="h-4 w-4 mr-2" /> New Template
+          </Button>
+        }
+      />
 
       {loading ? (
         <div className="dashboard-card py-8 text-center text-muted-foreground">Loading templates…</div>

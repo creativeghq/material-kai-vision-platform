@@ -10,6 +10,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { marketingService, type ResendContactsResult } from '../services/marketingService';
 
 export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
@@ -85,15 +86,17 @@ export const MarketingContactsTab: React.FC<{ workspaceId: string }> = ({ worksp
     <div className="space-y-4">
       {/* Sync controls */}
       <div className="dashboard-card space-y-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h3 className="text-lg font-semibold flex items-center gap-2"><Users className="h-5 w-5" /> Resend Audience</h3>
-            <p className="text-sm text-muted-foreground">Contacts synced into your Resend account for campaigns.</p>
-          </div>
-          <Button onClick={sync} disabled={syncing} className="rounded-full">
-            {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />} Sync now
-          </Button>
-        </div>
+        <SectionHeader
+          className="mb-0"
+          icon={Users}
+          title="Resend Audience"
+          subtitle="Contacts synced into your Resend account for campaigns."
+          actions={
+            <Button onClick={sync} disabled={syncing} className="rounded-full">
+              {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />} Sync now
+            </Button>
+          }
+        />
 
         <div className="flex items-center justify-between rounded-md border p-3">
           <div>

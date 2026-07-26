@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { RefreshCw, Send, CheckCircle, Eye, XCircle, DollarSign } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingAnalyticsResponse } from '../services';
 
@@ -93,14 +94,10 @@ export const MessagingAnalyticsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="dashboard-card">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Messaging Analytics</h3>
-            <p className="text-sm text-muted-foreground">
-              Track message delivery and engagement metrics
-            </p>
-          </div>
+      <SectionHeader
+        title="Messaging Analytics"
+        subtitle="Track message delivery and engagement metrics"
+        actions={
           <div className="flex items-center gap-4">
             <Select value={dateRange} onValueChange={setDateRange}>
               <SelectTrigger className="w-[150px]">
@@ -118,8 +115,8 @@ export const MessagingAnalyticsTab: React.FC = () => {
               Refresh
             </Button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {loading ? (
         <div className="dashboard-card">

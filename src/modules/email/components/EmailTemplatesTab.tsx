@@ -10,6 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { FilterBar, useFilters } from '@/components/core/filters';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { humanizeLabel } from '@/utils/humanize';
@@ -187,36 +188,38 @@ export const EmailTemplatesTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-        <div>
-          <h3 className="text-lg font-semibold">Email Templates</h3>
-          <p className="text-sm text-muted-foreground">
+      <SectionHeader
+        title="Email Templates"
+        subtitle={
+          <>
             Manage reusable email templates built with React Email
-          </p>
-          {(emailDefaults.fromEmail || emailDefaults.fromName) && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Default sender:{' '}
-              <span className="font-mono">
-                {emailDefaults.fromName ? `${emailDefaults.fromName} <${emailDefaults.fromEmail}>` : emailDefaults.fromEmail}
+            {(emailDefaults.fromEmail || emailDefaults.fromName) && (
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Default sender:{' '}
+                <span className="font-mono">
+                  {emailDefaults.fromName ? `${emailDefaults.fromName} <${emailDefaults.fromEmail}>` : emailDefaults.fromEmail}
+                </span>
+                {' '}— change in Email Settings.
               </span>
-              {' '}— change in Email Settings.
-            </p>
-          )}
-        </div>
-        <FilterBar
-          groups={filterGroups}
-          values={filterValues}
-          onChange={setFilterValues}
-          previewCount={previewCount}
-          title="Filter templates"
-          searchPlaceholder="Search name / slug…"
-        >
-          <Button onClick={() => setShowCreateModal(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Template
-          </Button>
-        </FilterBar>
-      </div>
+            )}
+          </>
+        }
+        actions={
+          <FilterBar
+            groups={filterGroups}
+            values={filterValues}
+            onChange={setFilterValues}
+            previewCount={previewCount}
+            title="Filter templates"
+            searchPlaceholder="Search name / slug…"
+          >
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Template
+            </Button>
+          </FilterBar>
+        }
+      />
 
       <div className="space-y-6">
         {loading ? (

@@ -43,6 +43,7 @@ import {
 } from 'recharts';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import {
@@ -1183,12 +1184,10 @@ const OperationsDashboardInner: React.FC = () => {
 
           {/* Services & Billing Tab — 3rd Party API Services */}
           <TabsContent value="services-billing" className="space-y-4">
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-2">3rd Party Services</h2>
-              <p className="text-muted-foreground text-sm">
-                Live usage and cost tracking for all external APIs: Resend (email), Apollo, Hunter.io, ZeroBounce, Firecrawl, and Zernio (WhatsApp + social media). For AI model costs (Anthropic, Google, OpenAI) see AI Configurations → Performance.
-              </p>
-            </div>
+            <SectionHeader
+              title="3rd Party Services"
+              subtitle="Live usage and cost tracking for all external APIs: Resend (email), Apollo, Hunter.io, ZeroBounce, Firecrawl, and Zernio (WhatsApp + social media). For AI model costs (Anthropic, Google, OpenAI) see AI Configurations → Performance."
+            />
 
             {/* API Catalogue — static reference */}
             <Card>
@@ -1623,12 +1622,10 @@ const OperationsDashboardInner: React.FC = () => {
           {/* Data Processing Tab - PDF, XML, Scraping */}
           <TabsContent value="data-processing" className="space-y-4">
             {/* Page Header */}
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-2">Data Processing Pipeline</h2>
-              <p className="text-muted-foreground text-sm">
-                Real-time monitoring of PDF processing, XML imports, and web scraping operations. Track job status, success rates, processing times, and data volumes across all import sources.
-              </p>
-            </div>
+            <SectionHeader
+              title="Data Processing Pipeline"
+              subtitle="Real-time monitoring of PDF processing, XML imports, and web scraping operations. Track job status, success rates, processing times, and data volumes across all import sources."
+            />
 
             {/* Summary Cards */}
             <div className="grid grid-cols-3 gap-4">
@@ -1909,12 +1906,10 @@ const OperationsDashboardInner: React.FC = () => {
               Module-specific keys live in each module's own Settings tab. Env vars always win;
               this table is the fallback admins can edit when env is unset. */}
           <TabsContent value="keys" className="space-y-4">
-            <div>
-              <h2 className="text-2xl font-bold text-foreground mb-2">Platform Keys</h2>
-              <p className="text-muted-foreground text-sm">
-                Centrally manage secrets that aren't tied to a single module — AI providers, payments, push notifications, and cron secrets. Environment variables take priority; the values stored here are only used when the corresponding env var is unset. Module-specific keys live in each module's own Settings tab.
-              </p>
-            </div>
+            <SectionHeader
+              title="Platform Keys"
+              subtitle="Centrally manage secrets that aren't tied to a single module — AI providers, payments, push notifications, and cron secrets. Environment variables take priority; the values stored here are only used when the corresponding env var is unset. Module-specific keys live in each module's own Settings tab."
+            />
             <SecretsManagerCard
               scope={{ mode: 'platform' }}
               title="Platform secret keys"

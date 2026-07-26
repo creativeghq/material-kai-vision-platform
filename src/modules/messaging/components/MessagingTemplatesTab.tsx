@@ -13,6 +13,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { Switch } from '@/components/core/ui/switch';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
@@ -119,22 +120,16 @@ export const MessagingTemplatesTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="dashboard-card">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Message Templates</h3>
-            <p className="text-sm text-muted-foreground">
-              Create reusable WhatsApp templates (must map to a Meta-approved template)
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Template
-            </Button>
-          </div>
-        </div>
-      </div>
+      <SectionHeader
+        title="Message Templates"
+        subtitle="Create reusable WhatsApp templates (must map to a Meta-approved template)"
+        actions={
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Template
+          </Button>
+        }
+      />
 
       {/* Templates List */}
       {filteredTemplates.length === 0 ? (

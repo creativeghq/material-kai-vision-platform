@@ -41,6 +41,7 @@ import { useToast } from '@/hooks/use-toast';
 import { parseDecimal } from '@/utils/decimal';
 import { quotesService, Upsell } from '../services/QuotesService';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface UpsellsManagementProps {
   embedded?: boolean;
@@ -422,20 +423,19 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
       />
 
       <div className="p-3 sm:p-6 space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Upsell Items</h2>
-            <p className="text-gray-600 mt-1">Create and manage upsell items to offer customers additional products or services</p>
-          </div>
-          <Button
-            onClick={handleOpenCreate}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Upsell
-          </Button>
-        </div>
+        <SectionHeader
+          title="Upsell Items"
+          subtitle="Create and manage upsell items to offer customers additional products or services"
+          actions={
+            <Button
+              onClick={handleOpenCreate}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Upsell
+            </Button>
+          }
+        />
 
         {/* Upsells Table */}
         <TooltipProvider>

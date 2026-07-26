@@ -20,6 +20,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import {
   Collapsible,
   CollapsibleContent,
@@ -409,28 +410,30 @@ export const EnhancedFunctionalMetadataCard: React.FC<
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h3 className="text-lg font-semibold">Functional Properties</h3>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="text-xs">
-            {availableCategories.length} categories
-          </Badge>
-          {extractionSummary?.overall_confidence && showConfidence && (
-            <Badge
-              variant="outline"
-              className={`text-xs ${getConfidenceColor(extractionSummary.overall_confidence)}`}
-            >
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Overall: {extractionSummary.overall_confidence}
+      <SectionHeader
+        title="Functional Properties"
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              {availableCategories.length} categories
             </Badge>
-          )}
-          {functionalMetadata.functionalMetadataSource && (
-            <Badge variant="secondary" className="text-xs">
-              Source: {functionalMetadata.functionalMetadataSource}
-            </Badge>
-          )}
-        </div>
-      </div>
+            {extractionSummary?.overall_confidence && showConfidence && (
+              <Badge
+                variant="outline"
+                className={`text-xs ${getConfidenceColor(extractionSummary.overall_confidence)}`}
+              >
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Overall: {extractionSummary.overall_confidence}
+              </Badge>
+            )}
+            {functionalMetadata.functionalMetadataSource && (
+              <Badge variant="secondary" className="text-xs">
+                Source: {functionalMetadata.functionalMetadataSource}
+              </Badge>
+            )}
+          </div>
+        }
+      />
 
       {/* Application Suggestions Section */}
       {extractionSummary?.suggested_applications &&

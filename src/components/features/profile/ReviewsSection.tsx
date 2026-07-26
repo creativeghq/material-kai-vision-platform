@@ -5,6 +5,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Avatar, AvatarFallback } from '@/components/core/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { ReviewModal } from './ReviewModal';
 
 export interface ProfileReview {
@@ -121,15 +122,15 @@ export const ReviewsSection: React.FC<{
 
   return (
     <section>
-      <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
-        <Star className="h-5 w-5 text-amber-400 fill-amber-400" />
-        Reviews
-        {stats && (
+      <SectionHeader
+        icon={Star}
+        title="Reviews"
+        actions={stats && (
           <Badge variant="secondary" className="text-xs font-normal">
             {stats.count} review{stats.count !== 1 ? 's' : ''}
           </Badge>
         )}
-      </h2>
+      />
 
       {/* Aggregate row */}
       {stats && (

@@ -22,6 +22,7 @@ import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierB
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
@@ -257,9 +258,9 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h3 className="text-sm font-semibold text-primary">Account overview</h3>
-        <div className="flex items-center gap-2 flex-wrap">
+      <SectionHeader
+        title="Account overview"
+        actions={<>
           {ledgerHref && (
             <Link to={ledgerHref}><Button size="sm" variant="ghost"><FileText className="h-3.5 w-3.5 mr-2" /> View ledger in Finance</Button></Link>
           )}
@@ -271,8 +272,8 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
               side={isSupplier && !account ? 'supplier' : 'customer'}
             />
           )}
-        </div>
-      </div>
+        </>}
+      />
 
       <PartyAccountSummary
         customer={account ? { invoiced: account.invoicedTotal, paid: account.paidTotal, outstanding: account.outstandingTotal } : null}

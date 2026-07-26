@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 /**
  * #237 A4 — Finance procurement board off the stock_allocations ledger.
@@ -100,12 +101,10 @@ export const SourcingBoardPanel: React.FC<{ workspaceId: string }> = ({ workspac
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-medium">Sourcing</h2>
-          <p className="text-xs text-muted-foreground">What needs ordering, what's on its way, and what's reserved for customers.</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <SectionHeader
+        title="Sourcing"
+        subtitle="What needs ordering, what's on its way, and what's reserved for customers."
+        actions={<>
           <div className="inline-flex rounded-full border border-border overflow-hidden text-xs">
             <button
               className={`px-3 py-1 ${!mine ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
@@ -119,8 +118,8 @@ export const SourcingBoardPanel: React.FC<{ workspaceId: string }> = ({ workspac
           <Button size="sm" variant="outline" onClick={load} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
-        </div>
-      </div>
+        </>}
+      />
       {loading && !data ? (
         <div className="flex items-center gap-2 justify-center py-16 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading…

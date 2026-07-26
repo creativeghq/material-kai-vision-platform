@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Send, Calendar, Users, Play, Pause, Trash2, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { messagingCampaignService, MessagingCampaign } from '../services/messagingCampaignService';
 import { humanizeLabel } from '@/utils/humanize';
@@ -131,20 +132,18 @@ export const MessagingCampaignsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="dashboard-card">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold">Messaging Campaigns</h3>
-            <p className="text-sm text-muted-foreground">
-              Create and manage WhatsApp campaigns
-            </p>
-          </div>
-          <Button disabled>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Campaign
-          </Button>
-        </div>
-        <p className="text-sm text-muted-foreground mt-2">
+      <div>
+        <SectionHeader
+          title="Messaging Campaigns"
+          subtitle="Create and manage WhatsApp campaigns"
+          actions={
+            <Button disabled>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Campaign
+            </Button>
+          }
+        />
+        <p className="-mt-4 text-sm text-muted-foreground">
           Note: Create messaging campaigns from the main Campaigns tab with channel type selection.
         </p>
       </div>
