@@ -105,6 +105,16 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       .select('id').eq('workspace_id', workspaceId).eq('system_key', 'myaade').maybeSingle();
     const myaadeCategoryId: string | null = myaadeCat?.id ?? null;
 
+    // Learned per-issuer defaults: when the operator has previously classified a supplier's
+    // docs into a real category, a new doc from that same ΑΦΜ defaults to it instead of the
+    // generic myAADE bucket. Maintained by the remember_inbound_issuer_category trigger.
+    const { data: issuerDefaults } = await supabase
+      .from('inbound_issuer_category_defaults')
+      .select('issuer_vat, category_id').eq('workspace_id', workspaceId);
+    const issuerCatMap = new Map<string, string>(
+      (issuerDefaults ?? []).map((r: any) => [r.issuer_vat, r.category_id]),
+    );
+
     let xml: string;
     try {
       const res = await fetch(`${baseUrl}/RequestDocs?mark=${encodeURIComponent(watermark)}`, {
@@ -151,10 +161,13 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         vat_amount: num(pickTag(lb, 'vatAmount')),
         item_description: pickTag(lb, 'itemDescr') ?? pickTag(lb, 'productDescription') ?? null,
       }));
+      const issuerVat = pickTag(issuerBlock, 'vatNumber');
+      // Learned supplier default wins over the generic myAADE fallback.
+      const defaultCategoryId = (issuerVat && issuerCatMap.get(issuerVat)) || myaadeCategoryId;
       const row = {
         workspace_id: workspaceId,
         mark,
-        issuer_vat: pickTag(issuerBlock, 'vatNumber'),
+        issuer_vat: issuerVat,
         issuer_name: pickTag(issuerBlock, 'name'),
         issue_date: pickTag(headerB, 'issueDate'),
         doc_type: pickTag(headerB, 'invoiceType'),
@@ -162,7 +175,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         total_vat: num(pickTag(summaryB, 'totalVatAmount')),
         total_gross: num(pickTag(summaryB, 'totalGrossValue')),
         lines,
-        category_id: myaadeCategoryId,
+        category_id: defaultCategoryId,
         raw: { xml: b.slice(0, 20000) },
       };
       const { error } = await supabase.from('inbound_documents').upsert(row, { onConflict: 'workspace_id,mark', ignoreDuplicates: true });

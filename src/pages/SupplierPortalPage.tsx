@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supplierClaimsService, type SupplierInboundOrder } from '@/services/supplierClaimsService';
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 /**
  * #247 / Workstream F — supplier portal. A claimed supplier sees the purchase
@@ -62,16 +63,24 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
     } finally { setBusyId(null); }
   };
 
+  const headerActions = (
+    <div className="flex items-center gap-2">
+      {orders.length > 0 && (
+        <FilterBar groups={filterGroups} values={filterValues} onChange={setFilterValues} previewCount={previewCount} title="Filter incoming orders" />
+      )}
+      <Button size="sm" variant="outline" onClick={load} disabled={loading} className="rounded-full">
+        <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
+      </Button>
+    </div>
+  );
+
   const body = (
     <div className="space-y-4">
-      {/* Standalone gets the page title; embedded relies on the Finance header above it. */}
-      <div className="flex items-center justify-between gap-3">
-        {embedded ? (
-          <div>
-            <h2 className="text-sm font-semibold text-primary">Incoming orders</h2>
-            <p className="text-xs text-muted-foreground">Purchase orders sent to you across every buyer.</p>
-          </div>
-        ) : (
+      {/* Standalone gets its own page hero; embedded (Profile / Finance tab) uses the shared SectionHeader. */}
+      {embedded ? (
+        <SectionHeader icon={Inbox} title="Incoming orders" subtitle="Purchase orders sent to you across every buyer." actions={headerActions} />
+      ) : (
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/12 border border-primary/20 flex items-center justify-center shrink-0">
               <Inbox className="h-5 w-5 text-primary" />
@@ -81,16 +90,9 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
               <p className="text-sm text-muted-foreground">Purchase orders sent to you across every buyer.</p>
             </div>
           </div>
-        )}
-        <div className="flex items-center gap-2">
-          {orders.length > 0 && (
-            <FilterBar groups={filterGroups} values={filterValues} onChange={setFilterValues} previewCount={previewCount} title="Filter incoming orders" />
-          )}
-          <Button size="sm" variant="outline" onClick={load} disabled={loading} className="rounded-full">
-            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </Button>
+          {headerActions}
         </div>
-      </div>
+      )}
 
       {loading ? (
         <Card className="dashboard-card border-0">
