@@ -46,7 +46,9 @@ suite('money paths · payments + credits', () => {
   afterAll(async () => {
     for (const ws of [wsA, wsB]) {
       await svc.from('payments').delete().eq('workspace_id', ws).then(() => {}, () => {});
+      await svc.from('invoices').delete().eq('workspace_id', ws).then(() => {}, () => {});
       await svc.from('orders').delete().eq('workspace_id', ws).then(() => {}, () => {});
+      await svc.from('crm_contacts').delete().eq('workspace_id', ws).then(() => {}, () => {});
       await svc.from('finance_bank_accounts').delete().eq('workspace_id', ws).then(() => {}, () => {});
     }
     for (const u of [A.id, B.id]) {
@@ -116,6 +118,47 @@ suite('money paths · payments + credits', () => {
       const { error } = await pay(A, { p_bank_account_id: bankB });
       expect(error, 'accepted a bank account belonging to another workspace').toBeTruthy();
     }
+  });
+
+  // ── order settlement round-trip (Tier 0.1 regression guard) ─────────────────
+  // The bug this locks down: paying an order's INVOICE in full created an invoice-targeted
+  // allocation (order_id NULL by the one-target constraint), and settlement only counted
+  // order-DIRECT allocations — so the order read as unpaid, with spurious "Record payment /
+  // Apply credit" prompts, while the money was in the bank. Static checks can't see this;
+  // only an end-to-end pay-then-assert can. get_order_settlements must count the invoice
+  // payment, and the trigger must flip orders.payment_status to 'paid'.
+  it('settles an order when its linked invoice is paid in full', async () => {
+    const ord = await svc.from('orders').insert({
+      workspace_id: wsA, created_by: A.id, order_type: 'sales', status: 'confirmed',
+      subtotal_net: 100, vat_amount: 0, total: 100, currency: 'EUR',
+    }).select('id').single();
+    const orderId = ord.data!.id as string;
+    const cust = await svc.from('crm_contacts').insert({ workspace_id: wsA, name: `E2E Cust ${rid}` }).select('id').single();
+    const num = await svc.rpc('next_invoice_number', { p_workspace_id: wsA });
+    const inv = await svc.from('invoices').insert({
+      workspace_id: wsA, order_id: orderId, customer_contact_id: cust.data!.id,
+      internal_number: num.data as string, status: 'issued', currency: 'EUR',
+      subtotal_net: 100, vat_rate: 0, vat_amount: 0, total: 100, document_type: '11.1',
+    }).select('id').single();
+    const invoiceId = inv.data!.id as string;
+
+    // Pay the invoice in full — an invoice-targeted allocation, tagged to the order.
+    const { error } = await pay(A, {
+      p_amount: 100, p_order_id: orderId,
+      p_allocations: [{ target_type: 'invoice', target_id: invoiceId, amount_doc: 100 }],
+    });
+    expect(error, 'paying the order invoice failed').toBeNull();
+
+    const { data: settle } = await A.client.rpc('get_order_settlements', { p_order_ids: [orderId] });
+    const row = (settle as Array<{ settled_in: number }>)?.[0];
+    expect(Number(row?.settled_in), 'invoice payment did not register as order settlement').toBe(100);
+
+    const { data: o } = await svc.from('orders').select('payment_status').eq('id', orderId).maybeSingle();
+    expect(o!.payment_status, 'order still unpaid after its invoice was fully paid').toBe('paid');
+
+    await svc.from('invoices').delete().eq('id', invoiceId).then(() => {}, () => {});
+    await svc.from('orders').delete().eq('id', orderId).then(() => {}, () => {});
+    await svc.from('crm_contacts').delete().eq('id', cust.data!.id).then(() => {}, () => {});
   });
 
   // ── credits ────────────────────────────────────────────────────────────────
