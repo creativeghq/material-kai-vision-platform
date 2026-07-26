@@ -7,8 +7,6 @@
  *
  * Money OUT to a SUPPLIER is NOT here — that's a cost, recorded via the expense flow (NewExpenseDialog),
  * so it lands in Payables + P&L. This modal is customer-side only.
- *
- * Pass `preset` to deep-link the dialog to a specific invoice (e.g. the Settle action on a row).
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
@@ -28,19 +26,11 @@ import { parseDecimal } from '@/utils/decimal';
 
 type Kind = 'received' | 'refund';
 
-/** Deep-link the dialog straight to one invoice (Settle / refund action on a row). */
-export interface RecordPaymentPreset {
-  direction: Kind;
-  targetType: 'invoice';
-  targetId: string;
-}
-
 export const RecordPaymentDialog: React.FC<{
   workspaceId: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onSaved: () => void;
-  preset?: RecordPaymentPreset | null;
   /** Tie the payment to a specific party when there's no allocation target
    *  (e.g. opened from a CRM party page → records as customer credit). */
   initialCounterparty?: { contactId?: string | null; companyId?: string | null } | null;
@@ -53,7 +43,7 @@ export const RecordPaymentDialog: React.FC<{
    *  receipt/invoice in the same step. `onIssueDoc` runs after the payment is recorded. */
   issueDocLabel?: string;
   onIssueDoc?: () => Promise<void>;
-}> = ({ workspaceId, open, onOpenChange, onSaved, preset, initialCounterparty, orderId, defaultAmount, presetInvoiceId, issueDocLabel, onIssueDoc }) => {
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, issueDocLabel, onIssueDoc }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -83,11 +73,11 @@ export const RecordPaymentDialog: React.FC<{
 
   useEffect(() => {
     if (!open) return;
-    setKind(preset?.direction ?? 'received');
+    setKind('received');
     setAmount(defaultAmount != null && defaultAmount > 0 ? String(defaultAmount) : ''); setMethod('cash'); setPaidAt(new Date().toISOString().slice(0, 10));
     setCategoryId(''); setReference(''); setNotes('');
-    setTargetInvoiceId(preset && preset.direction === 'received' ? preset.targetId : (presetInvoiceId ?? ''));
-    setInvoiceId(preset?.direction === 'refund' ? preset.targetId : '');
+    setTargetInvoiceId(presetInvoiceId ?? '');
+    setInvoiceId('');
     setIssueCreditNote(true);
     setSendReceipt(true);
     setIssueDoc(false);
@@ -100,7 +90,7 @@ export const RecordPaymentDialog: React.FC<{
         // Balances, so the picker shows what's in each account at the point of choosing.
         financeService.getBankAccountBalances(workspaceId).catch(() => [] as BankAccountBalance[]),
         // Open sales orders to attach the payment to — scoped to the party when opened from one.
-        (preset || orderId)
+        orderId
           ? Promise.resolve([] as OrderListRow[])
           : ordersService.list({ workspaceId, orderType: 'sales', companyId: initialCounterparty?.companyId ?? undefined, contactId: initialCounterparty?.contactId ?? undefined }).catch(() => [] as OrderListRow[]),
       ]);
@@ -112,7 +102,7 @@ export const RecordPaymentDialog: React.FC<{
       // Default to the workspace's default account so cash location is always captured.
       setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
     })();
-  }, [open, workspaceId, preset]);
+  }, [open, workspaceId]);
 
   // Received → open invoices. Refund → any issued invoice (usually paid).
   // When opened from a party page (initialCounterparty set) the picker is HARD-SCOPED to that
