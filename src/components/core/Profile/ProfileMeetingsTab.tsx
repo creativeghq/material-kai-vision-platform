@@ -6,13 +6,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays, Clock, Mail, MessageSquare, Loader2, Check, Trash2, Building2, User } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import { crmMeetingsService, type CrmMeeting } from '@/services/crmMeetingsService';
 import { getErrorMessage } from '@/core/errors/utils';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' });
 
@@ -98,12 +99,12 @@ export const ProfileMeetingsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <SectionHeader icon={CalendarDays} title="Meetings & calendar" subtitle="Meetings you've logged on CRM contacts & companies. Log a meeting from a contact's Activity tab." />
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-primary" /> Upcoming meetings
           </CardTitle>
-          <CardDescription>Meetings you've logged on CRM contacts &amp; companies. Log a meeting from a contact's Activity tab.</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (

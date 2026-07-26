@@ -19,6 +19,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { FilterBar, useFilters } from '@/components/core/filters';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { buildModuleFilters, type ModuleFilterRow } from './moduleFilters';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -390,10 +391,11 @@ export const ModulesActivationTab: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="mb-1 text-lg font-semibold">Modules</h2>
-          <p className="max-w-2xl text-sm text-muted-foreground">
+      <SectionHeader
+        icon={Sparkles}
+        title="Modules"
+        subtitle={
+          <>
             {isOwner ? (
               <>Everything you can run in this workspace, grouped the same way as your Hubs.
               You're on <span className="font-medium text-foreground">{planName}</span> — modules it
@@ -402,9 +404,9 @@ export const ModulesActivationTab: React.FC = () => {
               <>Everything this workspace can run. You can request a module — the workspace owner is
               notified and decides.</>
             )}
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {(loading || entLoading) ? (
         <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">

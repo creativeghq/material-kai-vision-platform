@@ -3,7 +3,7 @@ import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, CalendarDays, 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { ProfileTab } from '@/components/core/Profile/ProfileTab';
 import { SubscriptionTab } from '@/components/core/Profile/SubscriptionTab';
 import { CreditsTab } from '@/components/core/Profile/CreditsTab';
@@ -137,25 +137,8 @@ export const UserProfilePage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="reviews" className="space-y-6">
-          <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Star className="h-4 w-4 text-primary" />
-                Reviews from clients
-              </CardTitle>
-              <CardDescription>
-                Reviews left by people who have worked with you. You can reply to each one.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {user && (
-                <ReviewsSection
-                  profileUserId={user.id}
-                  currentUserId={user.id}
-                />
-              )}
-            </CardContent>
-          </Card>
+          <SectionHeader icon={Star} title="Reviews from clients" subtitle="Reviews left by people who have worked with you. You can reply to each one." />
+          {user && (<ReviewsSection profileUserId={user.id} currentUserId={user.id} />)}
         </TabsContent>
 
         <TabsContent value="subscription" className="space-y-6">

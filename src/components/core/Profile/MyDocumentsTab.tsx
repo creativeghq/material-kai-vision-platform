@@ -16,6 +16,7 @@ import {
   type CustomerOrderItem,
   type ReorderPreview,
 } from '@/services/customerDocumentsService';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 const money = (v: number, currency: string) =>
   new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(v || 0);
@@ -95,18 +96,23 @@ export const MyDocumentsTab: React.FC = () => {
   const isEmpty = summary.length === 0 && totals.orders === 0 && totals.invoices === 0 && totals.receipts === 0;
   if (isEmpty) {
     return (
-      <Card className="dashboard-card p-12 text-center space-y-3">
-        <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-        <p className="text-sm text-muted-foreground">Nothing here yet.</p>
-        <p className="text-xs text-muted-foreground">
-          Your orders, invoices and receipts will appear here as soon as a business issues them to you.
-        </p>
-      </Card>
+      <div className="space-y-6">
+        <SectionHeader icon={Receipt} title="My account" subtitle="Your orders, invoices and receipts." />
+        <Card className="dashboard-card p-12 text-center space-y-3">
+          <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+          <p className="text-sm text-muted-foreground">Nothing here yet.</p>
+          <p className="text-xs text-muted-foreground">
+            Your orders, invoices and receipts will appear here as soon as a business issues them to you.
+          </p>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      <SectionHeader icon={Receipt} title="My account" subtitle="Your orders, invoices and receipts." />
+
       {/* ── Account summary (per currency) ── */}
       {summary.map((s) => (
         <div key={s.currency} className="grid grid-cols-2 gap-3 lg:grid-cols-4">

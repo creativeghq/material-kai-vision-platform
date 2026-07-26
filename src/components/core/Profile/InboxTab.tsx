@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Mail, Inbox, Trash2, Loader2, Briefcase } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 interface ContactRequest {
   id: string;
@@ -78,16 +79,13 @@ export const InboxTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <SectionHeader
+        icon={Inbox}
+        title="Inbox"
+        subtitle="Messages people sent you from your public profile."
+        actions={messages.length > 0 ? <Badge variant="secondary">{messages.length}</Badge> : undefined}
+      />
       <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Inbox className="h-4 w-4 text-primary" />
-            Hire Me Inbox
-            {messages.length > 0 && (
-              <Badge variant="secondary">{messages.length}</Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
         <CardContent>
           {messages.length === 0 ? (
             <div className="py-10 text-center text-muted-foreground">

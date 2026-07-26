@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Receipt, ArrowUpDown } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { directionTone } from '@/utils/statusTone';
 import {
   Table,
@@ -72,15 +73,10 @@ export const BillingHistoryTab: React.FC = () => {
   };
 
   return (
-    <Card className="rounded-2xl">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Receipt className="h-4 w-4 text-primary" />
-          Billing History
-        </CardTitle>
-        <CardDescription>View all your credit transactions and purchases</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
+    <div className="space-y-6">
+      <SectionHeader icon={Receipt} title="Billing history" subtitle="All your credit transactions and purchases." />
+      <Card className="rounded-2xl">
+        <CardContent className="p-0">
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">Loading transactions...</div>
         ) : transactions.length === 0 ? (
@@ -137,8 +133,9 @@ export const BillingHistoryTab: React.FC = () => {
             />
           </div>
         )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

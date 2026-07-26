@@ -20,6 +20,7 @@ import {
   type PreviewResult,
 } from '@/services/userWebsitesService';
 import { Search, FileSearch, BarChart3, ChevronRight } from 'lucide-react';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 function timeAgo(iso: string | null): string {
   if (!iso) return 'never';
@@ -212,12 +213,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold mb-1">Connected Websites</h2>
-        <p className="text-sm text-muted-foreground">
-          Connect your website's sitemap to enable site-aware inter-linking suggestions when generating SEO articles.
-        </p>
-      </div>
+      <SectionHeader icon={Globe} title="Connected Websites" subtitle="Connect your website's sitemap to enable site-aware inter-linking suggestions when generating SEO articles." />
 
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-start justify-between gap-3">

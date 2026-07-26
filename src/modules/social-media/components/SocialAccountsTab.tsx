@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 const SUPABASE_FUNCTIONS_URL = `${supabaseConfig.projectUrl}/functions/v1`;
 
@@ -215,6 +216,8 @@ export const SocialAccountsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <SectionHeader icon={Share2} title="Social accounts" subtitle="Connect the accounts you publish to." />
+
       {/* Connected accounts */}
       {accounts.length > 0 && (
         <div className="space-y-3">

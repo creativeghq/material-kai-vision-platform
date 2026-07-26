@@ -10,6 +10,7 @@ import { CreditsService } from '@/services/credits.service';
 import { StripeService, calculateCreditsForAmount } from '@/services/stripe.service';
 import { CreditUsageHistory } from './CreditUsageHistory';
 import { CronPausedBanner } from './CronPausedBanner';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 const creditsService = new CreditsService();
 const stripeService = new StripeService();
@@ -70,6 +71,7 @@ export const CreditsTab: React.FC = () => {
     <div className="space-y-6">
       {/* Scheduled features paused for lack of credits (auto-resume on top-up) */}
       <CronPausedBanner />
+      <SectionHeader icon={Coins} title="Credits" subtitle="Buy credits and track your spend." />
 
       {/* Current Balance */}
       <Card className="rounded-2xl">

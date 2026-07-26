@@ -28,6 +28,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 import { AppearanceSection } from '@/components/core/Profile/AppearanceSection';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
@@ -879,6 +880,7 @@ export const ProfileTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <SectionHeader icon={User} title="Profile" subtitle="Your account details, visibility and public profile." />
 
       {/* Visibility */}
       <Card className={`rounded-2xl border-2 transition-colors ${isPublic ? 'border-primary/30' : ''}`}>

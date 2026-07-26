@@ -25,6 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
 import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
 import { VivaConfigCard } from '@/modules/payments-viva/components/VivaConfigCard';
@@ -248,10 +249,7 @@ export const WorkspaceKeysTab: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <KeyRound className="h-4 w-4 text-primary" />
-        <h1 className="text-lg font-semibold">Keys &amp; connections</h1>
-      </div>
+      <SectionHeader icon={KeyRound} title="Keys & connections" subtitle="API keys, integrations and per-workspace credentials." />
 
       <div className="flex flex-col gap-6 md:flex-row">
         {/* Sidebar — horizontal scroll on mobile, left column on desktop */}
