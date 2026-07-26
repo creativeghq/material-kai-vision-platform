@@ -195,9 +195,15 @@ export const createManageEmailCampaignTool = (
         // Confirmed → insert recipients (dedupe safety: only if none yet) + flip to sending (cron sends).
         const { count: existing } = await sb.from('campaign_recipients').select('id', { count: 'exact', head: true }).eq('campaign_id', campaign_id);
         if (!existing) {
+          const nameVars = (dn: string | null | undefined) => {
+            const full = (dn || '').trim();
+            if (!full) return {};
+            const parts = full.split(/\s+/);
+            return { fullName: full, firstName: parts[0], lastName: parts.length > 1 ? parts.slice(1).join(' ') : '' };
+          };
           const rows = recipients.map((r: any) => ({
             campaign_id, email: r.email, contact_id: r.crm_contact_id ?? null,
-            variables: r.display_name ? { fullName: r.display_name } : {}, status: 'pending',
+            variables: nameVars(r.display_name), status: 'pending',
           }));
           for (let i = 0; i < rows.length; i += 500) {
             const { error: recErr } = await sb.from('campaign_recipients').insert(rows.slice(i, i + 500));

@@ -232,7 +232,7 @@ serve(withApiLogging('campaign-processor', async (req) => {
               failed_count: failedCount ?? 0,
               title: `Campaign sent: ${campaign.name}`,
               body: `"${campaign.name}" finished sending — ${sentCount ?? 0} delivered${failedCount ? `, ${failedCount} failed` : ''}.`,
-              action_url: '/email-marketing?tab=campaigns',
+              action_url: '/marketing/email?tab=campaigns',
             });
           }
         } catch { /* best-effort */ }

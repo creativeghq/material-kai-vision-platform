@@ -208,7 +208,7 @@ class MarketingService {
         campaign_id: campaignId,
         email: r.email,
         contact_id: r.crm_contact_id ?? null,
-        variables: r.display_name ? { fullName: r.display_name } : {},
+        variables: this.nameVars(r.display_name),
         status: 'pending',
       }));
       // Chunk to keep the insert payload reasonable for large audiences.
@@ -230,9 +230,61 @@ class MarketingService {
     if (error) throw error;
   }
 
-  startCampaign(id: string) { return this.setStatus(id, 'sending', ['draft', 'paused']); }
+  /** Merge-vars for one recipient — fullName plus first/last split (templates use all three; the
+   *  send path only ever set fullName, so {{firstName}}/{{lastName}} rendered blank). */
+  private nameVars(displayName: string | null | undefined): Record<string, string> {
+    const full = (displayName || '').trim();
+    if (!full) return {};
+    const parts = full.split(/\s+/);
+    return { fullName: full, firstName: parts[0], lastName: parts.length > 1 ? parts.slice(1).join(' ') : '' };
+  }
+
+  /** Ensure a campaign has recipient rows before it sends. Agent-created drafts (and any campaign
+   *  whose recipients weren't materialized at create time) have none — the page's "send" was just a
+   *  status flip, so the processor found 0 pending and marked it `sent` with nobody emailed. Resolve
+   *  from the campaign's own audience_filter (category members + manual_emails, deduped) exactly like
+   *  the create modal + the agent tool, so the three paths agree. Returns the recipient count. */
+  async ensureRecipients(campaignId: string): Promise<number> {
+    const { count } = await supabase.from('campaign_recipients').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId);
+    if ((count ?? 0) > 0) return count ?? 0;
+    const { data: camp } = await supabase.from('campaigns').select('workspace_id, audience_filter').eq('id', campaignId).maybeSingle();
+    if (!camp) return 0;
+    const af = ((camp as any).audience_filter || {}) as { category_ids?: string[]; manual_emails?: string[] };
+    const categoryIds = Array.isArray(af.category_ids) ? af.category_ids : [];
+    const manualEmails = Array.isArray(af.manual_emails) ? af.manual_emails : [];
+    const byEmail = new Map<string, AudienceRecipient>();
+    if (categoryIds.length) {
+      const cats = await this.resolveAudience((camp as any).workspace_id, categoryIds);
+      for (const r of cats) { const e = String(r.email ?? '').trim().toLowerCase(); if (!e || byEmail.has(e)) continue; byEmail.set(e, r); }
+    }
+    for (const em of manualEmails) { const e = String(em ?? '').trim().toLowerCase(); if (!e || byEmail.has(e)) continue; byEmail.set(e, { email: em, member_kind: 'manual', crm_contact_id: null, crm_company_id: null, display_name: null }); }
+    const recipients = [...byEmail.values()];
+    if (recipients.length === 0) return 0;
+    const rows = recipients.map((r) => ({ campaign_id: campaignId, email: r.email, contact_id: r.crm_contact_id ?? null, variables: this.nameVars(r.display_name), status: 'pending' }));
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await supabase.from('campaign_recipients').insert(rows.slice(i, i + 500));
+      if (error) throw error;
+    }
+    await supabase.from('campaigns').update({ recipient_count: recipients.length }).eq('id', campaignId);
+    return recipients.length;
+  }
+
+  async startCampaign(id: string) {
+    const n = await this.ensureRecipients(id);
+    if (n === 0) throw new Error('This campaign resolves to 0 recipients — set an audience before sending.');
+    return this.setStatus(id, 'sending', ['draft', 'paused']);
+  }
   pauseCampaign(id: string) { return this.setStatus(id, 'paused', ['sending']); }
-  resumeCampaign(id: string) { return this.setStatus(id, 'sending', ['paused']); }
+  /** Resume a paused campaign — also clears the stale amber "blocked" banner (the processor only
+   *  cleared it on the credits path, so a manual resume left it lingering). */
+  async resumeCampaign(id: string) {
+    const { data } = await supabase.from('campaigns').select('metadata').eq('id', id).maybeSingle();
+    const md = { ...(((data as any)?.metadata) || {}) };
+    delete (md as Record<string, unknown>).blocked_reason;
+    delete (md as Record<string, unknown>).blocked_message;
+    const { error } = await supabase.from('campaigns').update({ status: 'sending', metadata: md }).eq('id', id).eq('status', 'paused');
+    if (error) throw error;
+  }
   cancelCampaign(id: string) { return this.setStatus(id, 'cancelled', ['draft', 'scheduled', 'sending', 'paused']); }
 
   async deleteCampaign(id: string): Promise<void> {
