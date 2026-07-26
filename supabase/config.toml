@@ -10,6 +10,11 @@ max_rows = 10000
 # ==================== EXISTING FUNCTIONS ====================
 # Only functions that actually exist in supabase/functions/
 
+# Public marketing opt-out (Email#1). No JWT — recipients aren't authenticated; the ?t= HMAC token
+# authorizes the action.
+[functions.email-unsubscribe]
+verify_jwt = false
+
 [functions.crm-meeting-reminders]
 verify_jwt = false
 

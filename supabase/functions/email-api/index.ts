@@ -56,6 +56,8 @@ async function sendViaResend(apiKey: string, payload: {
   reply_to?: string;
   tags?: Array<{ name: string; value: string }>;
   attachments?: Array<{ filename: string; content: string }>;
+  /** Custom SMTP headers (e.g. List-Unsubscribe for marketing compliance). */
+  headers?: Record<string, string>;
 }): Promise<string> {
   if (!apiKey) throw new Error('RESEND_API_KEY is not configured');
 
@@ -76,6 +78,37 @@ async function sendViaResend(apiKey: string, payload: {
   }
 
   return data.id as string;
+}
+
+// ── Email#1 marketing compliance: unsubscribe injection + suppression ─────────
+async function hmacHex(message: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Build the public one-click unsubscribe URL + List-Unsubscribe headers for a marketing send.
+ *  The token is an HMAC of `workspace:lower(email)` under CRON_SECRET (verified by email-unsubscribe).
+ *  Returns null when CRON_SECRET is unset (fail-open on the header, never block the send). */
+async function buildUnsubscribe(
+  workspaceId: string, email: string, fromEmail: string, campaignId?: string | null,
+): Promise<{ url: string; headers: Record<string, string> } | null> {
+  const secret = Deno.env.get('CRON_SECRET') || '';
+  if (!secret) return null;
+  const token = await hmacHex(`${workspaceId}:${email.toLowerCase()}`, secret);
+  const base = `${Deno.env.get('SUPABASE_URL')}/functions/v1/email-unsubscribe`;
+  const qs = `w=${encodeURIComponent(workspaceId)}&e=${encodeURIComponent(email)}&t=${token}` +
+    (campaignId ? `&c=${encodeURIComponent(campaignId)}` : '');
+  const url = `${base}?${qs}`;
+  return {
+    url,
+    headers: {
+      'List-Unsubscribe': `<mailto:${fromEmail}?subject=unsubscribe>, <${url}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
+  };
 }
 
 /**
@@ -315,6 +348,41 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           );
         }
 
+        // ── Email#1: marketing opt-out enforcement + compliance merge-vars ──────────
+        // Marketing sends MUST honor unsubscribes and carry a working opt-out. Transactional /
+        // notification sends are exempt (receipts, account notices).
+        let unsubHeaders: Record<string, string> | undefined;
+        const primaryTo = Array.isArray(body.to) ? body.to[0] : body.to;
+        if (body.emailType === 'marketing' && body.workspace_id && primaryTo) {
+          // Never re-email an address that opted out of THIS workspace's marketing.
+          const { data: supp } = await supabaseClient
+            .from('email_unsubscribes').select('id')
+            .eq('workspace_id', body.workspace_id)
+            .eq('email', String(primaryTo).toLowerCase())
+            .maybeSingle();
+          if (supp) {
+            return new Response(
+              JSON.stringify({ success: false, suppressed: true, code: 'recipient_unsubscribed' }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
+          const fromForUnsub = body.from || sender.fromEmail || '';
+          const built = fromForUnsub
+            ? await buildUnsubscribe(body.workspace_id, String(primaryTo), fromForUnsub, (body.tags?.campaign_id as string | undefined) ?? null)
+            : null;
+          const appBase = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
+          const sysVars: Record<string, string> = {
+            unsubscribeUrl: built?.url || `${appBase}/unsubscribe`,
+            companyName: sender.fromName || body.fromName || 'Materials Hub',
+            currentYear: String(new Date().getFullYear()),
+            platformUrl: appBase,
+          };
+          // System-computed compliance placeholders fill the template; caller-supplied variables
+          // still win (explicit override), but these are added when absent so the link is never dead.
+          body.variables = { ...sysVars, ...(body.variables || {}) };
+          unsubHeaders = built?.headers;
+        }
+
         let htmlBody = body.html;
         let textBody = body.text;
         let subject = body.subject;
@@ -454,6 +522,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           reply_to: replyTo,
           tags,
           attachments: body.attachments,
+          headers: unsubHeaders,
         });
 
         // Update log with Resend message ID

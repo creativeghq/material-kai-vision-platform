@@ -285,6 +285,13 @@ serve(withApiLogging('campaign-processor', async (req) => {
               .update({ status: 'sent', sent_at: new Date().toISOString(), email_log_id: result.logId ?? null })
               .eq('id', recipient.id);
             totalProcessed++;
+          } else if (result?.suppressed || result?.code === 'recipient_unsubscribed') {
+            // Recipient opted out of this workspace's marketing (Email#1). Terminal, not a failure —
+            // mark it so it drops out of the pending queue and the campaign completes cleanly.
+            await supabase
+              .from('campaign_recipients')
+              .update({ status: 'unsubscribed', error_message: 'Recipient unsubscribed' })
+              .eq('id', recipient.id);
           } else if (emailResponse.status === 503 && result?.code === 'workspace_sender_required') {
             // BYOK disappeared mid-run (key removed/disabled). Re-queue this recipient and block the
             // whole campaign rather than marking recipients failed.

@@ -235,6 +235,24 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
         .eq('id', emailLog.id);
     }
 
+    // Email#1 — a spam complaint or (permanent) bounce is a mandatory opt-out. Add the address to
+    // this workspace's suppression list so no future marketing send reaches it. Idempotent; never
+    // overwrites an earlier link-based opt-out timestamp. Best-effort (never fail the webhook on it).
+    if (event.type === 'email.complained' || event.type === 'email.bounced') {
+      try {
+        const wsId = (emailLog as any).workspace_id ?? null;
+        const toEmail = (emailLog as any).to_email ?? (event.data.to?.[0] ?? null);
+        if (wsId && toEmail) {
+          await supabaseClient.from('email_unsubscribes').upsert({
+            workspace_id: wsId,
+            email: String(toEmail).toLowerCase(),
+            source: event.type === 'email.complained' ? 'complaint' : 'bounce',
+            unsubscribed_at: new Date().toISOString(),
+          }, { onConflict: 'workspace_id,email', ignoreDuplicates: true });
+        }
+      } catch (e) { console.error('suppression upsert failed:', e); }
+    }
+
     // Flows — surface actionable reputation events (bounce / spam complaint) as workspace-scoped
     // triggers so an operator can auto-suppress the contact or alert. Opens/clicks are intentionally
     // NOT emitted (high-volume; the campaign dashboard already aggregates them). Best-effort.
