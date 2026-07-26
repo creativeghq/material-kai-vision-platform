@@ -7,27 +7,50 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Activity, FileText, Mail, Building2, Tag, ScrollText, Receipt, CreditCard, Loader2, Unlink, Trash2, Phone, CalendarDays,
+  Activity, FileText, Mail, Building2, Tag, ScrollText, Receipt, CreditCard, Loader2, Unlink, Trash2, Phone, CalendarDays, Users, ChevronDown,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
 import { Checkbox } from '@/components/core/ui/checkbox';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { crmActivitiesService, type TimelineItem, type CrmActivityTarget } from '@/services/crmActivitiesService';
 import { crmMeetingsService } from '@/services/crmMeetingsService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { getErrorMessage } from '@/core/errors/utils';
 
+/** A person the timeline can email or add as a meeting/call attendee. On a company
+ *  record these are the attached contacts (+ optionally the company's own inbox). */
+export interface TimelinePerson {
+  id: string;
+  name: string;
+  email?: string | null;
+  /** 'company' entries are emailable but never offered as meeting attendees. */
+  kind?: 'contact' | 'company';
+}
+
 interface Props {
   target: CrmActivityTarget;
   /** Bump to force a reload (parent logged a new activity). */
   refreshKey?: number;
-  /** Opens the page's Send-email dialog (real send → auto-logs email_sent). */
-  onComposeEmail?: () => void;
-  /** Whether the party has an email on file (gates the Email action). */
+  /**
+   * Opens the page's Send-email dialog (real send → auto-logs email_sent).
+   * When `people` is supplied (company record), the chosen recipient is passed
+   * so the parent can retarget the dialog; contact records call it with no arg.
+   */
+  onComposeEmail?: (recipient?: { email: string; name: string | null }) => void;
+  /** Whether the party has an email on file (gates the Email action, contact record). */
   canEmail?: boolean;
+  /**
+   * People this record can email / meet with. Supplied on the COMPANY record so the
+   * Email button picks a recipient and Call/Meeting entries can name attendees.
+   * Omit on the contact record — the party itself is the single recipient.
+   */
+  people?: TimelinePerson[];
 }
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -65,7 +88,7 @@ const relativeTime = (iso: string): string => {
   return new Date(iso).toLocaleDateString();
 };
 
-export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, onComposeEmail, canEmail }) => {
+export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, onComposeEmail, canEmail, people }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const [items, setItems] = useState<TimelineItem[]>([]);
@@ -76,7 +99,16 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
   const [remindEmail, setRemindEmail] = useState(false);
   const [remindWhatsapp, setRemindWhatsapp] = useState(false);
   const [reminderLead, setReminderLead] = useState(60); // minutes before meeting_at
+  const [attendeeIds, setAttendeeIds] = useState<string[]>([]); // contacts a call/meeting is with
   const [saving, setSaving] = useState(false);
+
+  // Person picker (company record). Email can go to any person with an address; only
+  // real contacts (not the company inbox) are offered as meeting/call attendees.
+  const emailRecipients = (people ?? []).filter((p) => (p.email ?? '').trim());
+  const attendeeCandidates = (people ?? []).filter((p) => (p.kind ?? 'contact') !== 'company');
+  const hasPeople = Array.isArray(people);
+  const toggleAttendee = (id: string) =>
+    setAttendeeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const load = useCallback(async () => {
     if (!target.id) { setItems([]); setLoading(false); return; }
@@ -101,6 +133,11 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
   const handleSubmit = async () => {
     if (!canSubmit) return;
     const body = draft.trim();
+    // Attendees only apply to call/meeting entries. Prepend a "With <names>" line so
+    // the timeline shows who was involved without an extra lookup (ids are the source of truth).
+    const selectedAttendees = type === 'note' ? [] : attendeeCandidates.filter((p) => attendeeIds.includes(p.id));
+    const withLine = selectedAttendees.length ? `With ${selectedAttendees.map((p) => p.name).join(', ')}` : '';
+    const withBody = [withLine, body].filter(Boolean).join('\n');
     setSaving(true);
     try {
       if (type === 'meeting') {
@@ -108,13 +145,17 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
           target,
           workspaceId: activeWorkspaceId,
           meetingAt: new Date(meetingAt).toISOString(),
-          notes: body || null,
+          notes: withBody || null,
+          attendeeContactIds: selectedAttendees.map((p) => p.id),
           remindEmail: isFutureMeeting && remindEmail,
           remindWhatsapp: isFutureMeeting && remindWhatsapp,
           reminderMinutesBefore: reminderLead,
         });
       } else if (current.activity) {
-        await crmActivitiesService.addActivity(target, current.activity.type, current.activity.title, body);
+        await crmActivitiesService.addActivity(
+          target, current.activity.type, current.activity.title, withBody,
+          selectedAttendees.length ? { attendee_contact_ids: selectedAttendees.map((p) => p.id) } : {},
+        );
       } else {
         await crmActivitiesService.addNote(target, body);
       }
@@ -122,6 +163,7 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
       setMeetingAt('');
       setRemindEmail(false);
       setRemindWhatsapp(false);
+      setAttendeeIds([]);
       await load(); // instant refresh
     } catch (err) {
       toast({ title: 'Could not save', description: getErrorMessage(err), variant: 'destructive' });
@@ -163,10 +205,48 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
                   </button>
                 );
               })}
-              {onComposeEmail && canEmail && (
+              {/* Email action. On a company (people supplied) pick which person to
+                  write to; on a contact the party itself is the single recipient. */}
+              {onComposeEmail && hasPeople && emailRecipients.length > 0 && (
+                emailRecipients.length === 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => onComposeEmail({ email: emailRecipients[0].email!.trim(), name: emailRecipients[0].name })}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    title={`Email ${emailRecipients[0].name}`}
+                  >
+                    <Mail className="h-3.5 w-3.5" /> Email
+                  </button>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        title="Compose and send an email — pick a recipient"
+                      >
+                        <Mail className="h-3.5 w-3.5" /> Email <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-60">
+                      <DropdownMenuLabel>Email who?</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {emailRecipients.map((p) => (
+                        <DropdownMenuItem key={p.id} onSelect={() => onComposeEmail({ email: p.email!.trim(), name: p.name })}>
+                          <div className="min-w-0">
+                            <div className="truncate">{p.name}{p.kind === 'company' ? ' (company)' : ''}</div>
+                            <div className="truncate text-[11px] text-muted-foreground">{p.email}</div>
+                          </div>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )
+              )}
+              {onComposeEmail && !hasPeople && canEmail && (
                 <button
                   type="button"
-                  onClick={onComposeEmail}
+                  onClick={() => onComposeEmail()}
                   className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   title="Compose and send an email — it's logged here automatically"
                 >
@@ -174,6 +254,30 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
                 </button>
               )}
             </div>
+            {/* Attendees — pick which contact(s) a call/meeting is with (company record). */}
+            {type !== 'note' && attendeeCandidates.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 px-2.5 pt-2">
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                  <Users className="h-3.5 w-3.5" /> With
+                </span>
+                {attendeeCandidates.map((p) => {
+                  const on = attendeeIds.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => toggleAttendee(p.id)}
+                      className={[
+                        'rounded-full border px-2.5 py-0.5 text-xs transition-colors',
+                        on ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground hover:border-primary hover:text-foreground',
+                      ].join(' ')}
+                    >
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {type === 'meeting' && (
               <div className="space-y-2 px-2.5 pt-2">
                 <div className="flex items-center gap-2">

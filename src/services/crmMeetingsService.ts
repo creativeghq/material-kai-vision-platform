@@ -12,6 +12,7 @@ export interface CrmMeeting {
   notes: string | null;
   meeting_at: string;
   location: string | null;
+  attendee_contact_ids: string[];
   remind_email: boolean;
   remind_whatsapp: boolean;
   reminder_minutes_before: number;
@@ -31,6 +32,8 @@ class CrmMeetingsService {
     meetingAt: string; // ISO
     subject?: string;
     notes?: string | null;
+    /** crm_contacts this appointment is with (used when logging on a company). */
+    attendeeContactIds?: string[];
     remindEmail?: boolean;
     remindWhatsapp?: boolean;
     reminderMinutesBefore?: number;
@@ -48,6 +51,7 @@ class CrmMeetingsService {
       target_id: input.target?.id ?? null,
       subject: input.subject?.trim() || 'Meeting',
       notes: input.notes?.trim() || null,
+      attendee_contact_ids: input.attendeeContactIds ?? [],
       meeting_at: input.meetingAt,
       remind_email: !!input.remindEmail,
       remind_whatsapp: !!input.remindWhatsapp,

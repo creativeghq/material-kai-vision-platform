@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
   CustomerAccountOverview,
@@ -33,7 +33,7 @@ import { CategoryAssignmentPicker } from '@/components/business/catalogs/Categor
 import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { SupplierProductsTab } from '@/components/business/crm/SupplierProductsTab';
-import { CrmNotesTimeline } from '@/components/business/crm/CrmNotesTimeline';
+import { CrmActivityTimeline, type TimelinePerson } from '@/components/business/crm/CrmActivityTimeline';
 import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
 import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
 import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
@@ -172,8 +172,14 @@ export const CompanyDetailPage: React.FC = () => {
   const [viesBusy, setViesBusy] = useState(false);
   const [aadeBusy, setAadeBusy] = useState(false);
   // Which top-level record tab is showing (activity-first record layout, 2026-07).
-  // Companies open on Contacts (always present; Account only renders for customers/suppliers).
-  const [mainTab, setMainTab] = useState('contacts');
+  // Companies open on Activity — the unified feed (notes/calls/meetings/tracked actions),
+  // aligned with the contact record.
+  const [mainTab, setMainTab] = useState('activity');
+  // Bump to force the Activity timeline to reload after we log something (email sent, etc).
+  const [activityRefresh, setActivityRefresh] = useState(0);
+  // Recipient chosen from the Activity composer's Email picker (a specific contact or the
+  // company inbox). Drives the SendEmailDialog target.
+  const [emailTarget, setEmailTarget] = useState<{ email: string; name: string | null } | null>(null);
   const [company, setCompany] = useState<Company | null>(isNew ? {
     id: '',
     name: '',
@@ -495,6 +501,15 @@ export const CompanyDetailPage: React.FC = () => {
     }
   };
 
+  const bumpActivity = () => setActivityRefresh((n) => n + 1);
+  // Fire-and-forget CRM activity log for this company, then refresh the timeline.
+  const logActivity = (activity_type: string, title: string, description?: string, metadata?: Record<string, unknown>) => {
+    if (!id || isNew) return;
+    crmActivitiesService
+      .log({ kind: 'company', id }, { activity_type, title, description, metadata, workspace_id: activeWorkspaceId ?? null })
+      .then(bumpActivity);
+  };
+
   // Supplier↔factory pin. Persist the new pin list, then claim: re-point every matching
   // product's brand_company_id onto this company + fold in any duplicate auto-created brand
   // node. This makes the pin authoritative immediately (not just for future ingests) and keeps
@@ -636,6 +651,12 @@ export const CompanyDetailPage: React.FC = () => {
   const showCommercial = !isPureSupplier;
   const showSupplierFeatures = !!company.is_supplier;
   const initials = (company.name || '?').trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
+  // People the Activity composer can email / add as meeting attendees: the company's own
+  // inbox (emailable only) + each attached contact.
+  const timelinePeople: TimelinePerson[] = [
+    ...(company.email ? [{ id: company.id || 'company', name: company.name || 'Company', email: company.email, kind: 'company' as const }] : []),
+    ...((company.contacts ?? []).map((c: any) => ({ id: c.contact_id, name: c.contact_name, email: c.contact_email, kind: 'contact' as const }))),
+  ];
 
   return (
     <div className="min-h-screen">
@@ -692,7 +713,7 @@ export const CompanyDetailPage: React.FC = () => {
                       <Phone className="h-4 w-4" /> Call
                     </button>
                   )}
-                  <button type="button" onClick={() => setMainTab('notes')}
+                  <button type="button" onClick={() => setMainTab('activity')}
                     className="flex flex-col items-center gap-1 rounded-lg border py-2 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary">
                     <MessageSquare className="h-4 w-4" /> Note
                   </button>
@@ -752,7 +773,7 @@ export const CompanyDetailPage: React.FC = () => {
           <div className="min-w-0">
             <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
               <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-                <TabsTrigger value="notes" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FileText className="h-4 w-4 mr-2"/>Notes</TabsTrigger>
+                <TabsTrigger value="activity" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Clock className="h-4 w-4 mr-2"/>Activity</TabsTrigger>
                 <TabsTrigger value="details" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Building2 className="h-4 w-4 mr-2"/>Details</TabsTrigger>
                 {(showCommercial || showSupplierFeatures) && (
                   <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wallet className="h-4 w-4 mr-2"/>Account</TabsTrigger>
@@ -1056,10 +1077,24 @@ export const CompanyDetailPage: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Notes Tab — timeline of separate note entries (replaced the
-              single-textarea blob in 2026-05-25). */}
-          <TabsContent value="notes" className="space-y-4">
-            <CrmNotesTimeline targetKind="company" targetId={company.id || null}/>
+          {/* Activity Tab — unified feed (notes, calls, meetings + tracked actions),
+              aligned with the contact record. The composer's Email / Call / Meeting
+              actions let you pick which contact(s) they involve. */}
+          <TabsContent value="activity" className="space-y-4">
+            {company.id ? (
+              <CrmActivityTimeline
+                target={{ kind: 'company', id: company.id }}
+                refreshKey={activityRefresh}
+                people={timelinePeople}
+                canEmail={timelinePeople.some((p) => p.email)}
+                onComposeEmail={(recipient) => {
+                  setEmailTarget(recipient ?? (company.email ? { email: company.email, name: company.name || null } : null));
+                  setShowEmailDialog(true);
+                }}
+              />
+            ) : (
+              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Create this company to start logging activity.</CardContent></Card>
+            )}
           </TabsContent>
 
           {/* Account = one flow: the money summary up top (orders, owed, paid, net + AR aging),
@@ -1098,14 +1133,20 @@ export const CompanyDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Send Email Dialog */}
+      {/* Send Email Dialog — targets the recipient picked in the Activity composer
+          (a specific contact or the company inbox); falls back to the company email
+          for the sidebar / Details quick-actions. */}
       <SendEmailDialog
         open={showEmailDialog}
-        onClose={() => setShowEmailDialog(false)}
-        toEmail={company.email || ''}
-        toName={company.name || null}
-        recipientLabel={company.name || 'Company'}
+        onClose={() => { setShowEmailDialog(false); setEmailTarget(null); }}
+        toEmail={emailTarget?.email || company.email || ''}
+        toName={emailTarget?.name ?? company.name ?? null}
+        recipientLabel={emailTarget?.name || company.name || 'Company'}
         workspaceId={activeWorkspaceId}
+        onSent={({ subject }) => {
+          const to = emailTarget?.email || company.email;
+          logActivity('email_sent', `Email sent${to ? ` to ${to}` : ''}`, subject);
+        }}
       />
 
       {/* Add Contact Dialog */}
