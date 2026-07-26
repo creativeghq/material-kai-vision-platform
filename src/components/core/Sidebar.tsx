@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, LogOut, Wrench, Eye, EyeOff, LayoutDashboard, Settings } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
 import { useShowPrices } from '@/hooks/useShowPrices';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,6 +49,23 @@ export const Sidebar: React.FC = () => {
   const { isModuleAvailable } = useEntitlements();
   const isMobile = useIsMobile();
 
+  // The account button is the most visible spot the user's avatar/name should appear — read the
+  // same user_profiles.avatar_url/full_name the Profile page writes (was a generic icon + email).
+  const [profile, setProfile] = useState<{ avatar_url: string | null; full_name: string | null }>({ avatar_url: null, full_name: null });
+  useEffect(() => {
+    if (!user) { setProfile({ avatar_url: null, full_name: null }); return; }
+    let cancelled = false;
+    void supabase.from('user_profiles').select('avatar_url, full_name').eq('id', user.id).maybeSingle()
+      .then(({ data }) => { if (!cancelled && data) setProfile({ avatar_url: (data as any).avatar_url ?? null, full_name: (data as any).full_name ?? null }); });
+    return () => { cancelled = true; };
+  }, [user]);
+  const accountAvatar = (cls: string) => (
+    <Avatar className={cls}>
+      {profile.avatar_url && <AvatarImage src={profile.avatar_url} alt="" />}
+      <AvatarFallback className="bg-transparent"><User className="w-4 h-4" /></AvatarFallback>
+    </Avatar>
+  );
+
   const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can });
   // #251 — items marked surface:'app' render in the App Launcher, not the top bar / drawer.
   const topNav = navigationItems.filter((item) => item.surface !== 'app');
@@ -70,14 +89,17 @@ export const Sidebar: React.FC = () => {
               : 'text-muted-foreground hover:bg-primary hover:text-primary-foreground'
           }`}
         >
-          <User className="w-4 h-4" />
-          <span className="font-light hidden md:inline">Profile</span>
+          {accountAvatar('h-5 w-5')}
+          <span className="font-light hidden md:inline">{profile.full_name || 'Profile'}</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 rounded-xl" align="end" forceMount>
         <DropdownMenuItem disabled className="py-3">
-          <User className="mr-3 h-4 w-4" />
-          <span className="text-sm">{user.email}</span>
+          {accountAvatar('mr-3 h-6 w-6')}
+          <span className="flex flex-col">
+            {profile.full_name && <span className="text-sm">{profile.full_name}</span>}
+            <span className={profile.full_name ? 'text-xs text-muted-foreground' : 'text-sm'}>{user.email}</span>
+          </span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate('/profile')} className="py-3">

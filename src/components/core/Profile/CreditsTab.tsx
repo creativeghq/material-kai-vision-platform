@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Coins, ShoppingCart, TrendingUp, Loader2, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Progress } from '@/components/core/ui/progress';
 import { Slider } from '@/components/core/ui/slider';
 import { Badge } from '@/components/core/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +24,6 @@ export const CreditsTab: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState(0);
-  const [monthlyAllowance, setMonthlyAllowance] = useState(100);
   const [amount, setAmount] = useState(25);
 
   const quote = useMemo(() => calculateCreditsForAmount(amount), [amount]);
@@ -68,8 +66,6 @@ export const CreditsTab: React.FC = () => {
     }
   };
 
-  const usagePercentage = (balance / monthlyAllowance) * 100;
-
   return (
     <div className="space-y-6">
       {/* Scheduled features paused for lack of credits (auto-resume on top-up) */}
@@ -89,18 +85,8 @@ export const CreditsTab: React.FC = () => {
             <span className="text-5xl font-bold text-primary">{balance.toFixed(2)}</span>
             <span className="text-xl text-muted-foreground">credits</span>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Monthly allowance</span>
-              <span className="font-semibold">{monthlyAllowance} credits</span>
-            </div>
-            <Progress value={Math.min(usagePercentage, 100)} className="h-2" />
-            <p className="text-xs text-muted-foreground">
-              {usagePercentage > 100
-                ? `${(usagePercentage - 100).toFixed(0)}% over monthly allowance`
-                : `${(100 - usagePercentage).toFixed(0)}% remaining this month`}
-            </p>
-          </div>
+          {/* The real spend breakdown lives in the Usage & spend history card below — no fabricated
+              "monthly allowance" meter (there is no per-plan monthly grant to measure against). */}
         </CardContent>
       </Card>
 

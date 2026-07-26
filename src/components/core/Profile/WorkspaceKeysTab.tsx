@@ -15,7 +15,7 @@
  * in Finance → Settings / the module pages — this is just the tidy home for them.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   KeyRound, CreditCard, Share2, MessageCircle, ArrowRight,
   FileImage, Landmark, Mail, Users, Truck,
@@ -80,7 +80,22 @@ export const WorkspaceKeysTab: React.FC = () => {
   const stockModule = useModule('stock');
   const hrModule = useModule('hr');
   const [conn, setConn] = useState<ConnState>({ stripe: 'none', social: 0 });
-  const [active, setActive] = useState<SectionId>('finance');
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Deep-linkable: `/profile?tab=keys&section=email` lands on the right card (cross-module
+  // "configure your key here" links target it). Falls back to finance.
+  const VALID_SECTIONS: SectionId[] = ['finance', 'email', 'documents', 'hr', 'shipping', 'social'];
+  const paramSection = searchParams.get('section') as SectionId | null;
+  const [active, setActive] = useState<SectionId>(
+    paramSection && VALID_SECTIONS.includes(paramSection) ? paramSection : 'finance',
+  );
+  // Reflect the current section in the URL so it stays shareable/back-navigable.
+  useEffect(() => {
+    if (searchParams.get('section') === active) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('section', active);
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   useEffect(() => {
     if (!activeWorkspaceId) return;

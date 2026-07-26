@@ -77,7 +77,7 @@ export const ProfileMeetingsTab: React.FC = () => {
             <Badge variant="outline" className="gap-1 text-[10px]"><Mail className="h-3 w-3" /> Email{m.reminder_sent_at ? ' · sent' : ''}</Badge>
           )}
           {isUpcoming(m) && m.remind_whatsapp && (
-            <Badge variant="outline" className="gap-1 text-[10px]"><MessageSquare className="h-3 w-3" /> WhatsApp{m.reminder_sent_at ? ' · sent' : ''}</Badge>
+            <Badge variant="outline" className="gap-1 text-[10px]" title="Delivered as an in-app notification for now — outbound WhatsApp isn't wired yet."><MessageSquare className="h-3 w-3" /> WhatsApp (in-app){m.reminder_sent_at ? ' · sent' : ''}</Badge>
           )}
         </div>
       </div>
