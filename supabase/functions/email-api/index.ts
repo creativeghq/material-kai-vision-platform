@@ -356,7 +356,20 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // notification sends are exempt (receipts, account notices).
         let unsubHeaders: Record<string, string> | undefined;
         const primaryTo = Array.isArray(body.to) ? body.to[0] : body.to;
-        if (body.emailType === 'marketing' && body.workspace_id && primaryTo) {
+        if (body.emailType === 'marketing') {
+          // Compliance is per-(workspace, recipient): the suppression list is workspace-scoped and the
+          // unsubscribe token is minted for ONE address. So a marketing send MUST carry a workspace_id
+          // and target exactly one recipient — otherwise the opt-out link would be minted for the wrong
+          // person and suppression couldn't be enforced for recipients after the first. Bulk marketing
+          // is fanned out one-recipient-per-send by campaign-processor, so this never blocks that path;
+          // it closes the freeform / multi-`to` bypass.
+          if (!body.workspace_id) {
+            throw new HttpError(400, 'A marketing email requires workspace_id (for suppression + a workspace-scoped unsubscribe link).');
+          }
+          if (Array.isArray(body.to) && body.to.length > 1) {
+            throw new HttpError(400, 'A marketing email must target a single recipient — use campaign_recipients for bulk sends.');
+          }
+          if (!primaryTo) throw new HttpError(400, 'No recipient for the marketing send.');
           // Never re-email an address that opted out of THIS workspace's marketing.
           const { data: supp } = await supabaseClient
             .from('email_unsubscribes').select('id')
@@ -380,9 +393,9 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             currentYear: String(new Date().getFullYear()),
             platformUrl: appBase,
           };
-          // System-computed compliance placeholders fill the template; caller-supplied variables
-          // still win (explicit override), but these are added when absent so the link is never dead.
-          body.variables = { ...sysVars, ...(body.variables || {}) };
+          // System-computed compliance placeholders WIN over caller-supplied variables — a stale/forged
+          // caller unsubscribeUrl must never replace the real HMAC opt-out link (which the header also uses).
+          body.variables = { ...(body.variables || {}), ...sysVars };
           unsubHeaders = built?.headers;
         }
 

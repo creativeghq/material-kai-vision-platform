@@ -235,10 +235,15 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
         .eq('id', emailLog.id);
     }
 
-    // Email#1 — a spam complaint or (permanent) bounce is a mandatory opt-out. Add the address to
-    // this workspace's suppression list so no future marketing send reaches it. Idempotent; never
-    // overwrites an earlier link-based opt-out timestamp. Best-effort (never fail the webhook on it).
-    if (event.type === 'email.complained' || event.type === 'email.bounced') {
+    // Email#1 — a spam complaint or a PERMANENT (hard) bounce is a mandatory opt-out. Add the address
+    // to this workspace's suppression list so no future marketing send reaches it. A transient/soft
+    // bounce (full mailbox, temporary MTA defer) must NOT permanently suppress — those recover, and
+    // over-suppressing silently deletes a valid address from all marketing with no path back. Resend's
+    // bounce payload carries `type` ∈ Permanent | Transient | Undetermined; only Permanent suppresses.
+    // Idempotent; never overwrites an earlier link-based opt-out. Best-effort.
+    const bounceType = String((event.data as any)?.bounce?.type ?? '').toLowerCase();
+    const isHardBounce = event.type === 'email.bounced' && bounceType === 'permanent';
+    if (event.type === 'email.complained' || isHardBounce) {
       try {
         const wsId = (emailLog as any).workspace_id ?? null;
         const toEmail = (emailLog as any).to_email ?? (event.data.to?.[0] ?? null);

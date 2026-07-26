@@ -7,7 +7,7 @@
  *
  * Usage (from edge functions):
  *   import { emitFlowEvent } from '../_shared/flow-events.ts';
- *   await emitFlowEvent('image_uploaded', { image_id: '...', category: 'material' });
+ *   await emitFlowEvent('invoice_issued', { invoice_id: '...', workspace_id: '...' });
  *
  * Usage (fire-and-forget, non-blocking):
  *   emitFlowEvent('vr_world_created', { world_id: '...' }); // no await

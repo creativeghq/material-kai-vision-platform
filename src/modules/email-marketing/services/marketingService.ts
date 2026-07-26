@@ -355,13 +355,14 @@ class MarketingService {
       bounced: rows.filter((r) => is(r, 'bounced') || r.bounced_at).length,
       complained: rows.filter((r) => is(r, 'complained') || r.complained_at).length,
       failed: rows.filter((r) => is(r, 'failed')).length,
+      unsubscribed: rows.filter((r) => is(r, 'unsubscribed')).length,
     };
   }
 }
 
 export interface CampaignStats {
   total: number; pending: number; sent: number; delivered: number;
-  opened: number; clicked: number; bounced: number; complained: number; failed: number;
+  opened: number; clicked: number; bounced: number; complained: number; failed: number; unsubscribed: number;
 }
 
 export interface ResendContact {

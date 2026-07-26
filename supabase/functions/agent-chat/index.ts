@@ -1378,15 +1378,18 @@ async function executeAgent(
   };
 
   const META_TOOLS = ['load_toolkit'];
+  // Core "always-available" tools that belong to no toolkit but survive the filter (see the
+  // CORE_ALWAYS_TOOLS re-add below). They are legitimately homed, so the orphan audit must know them.
+  const CORE_ALWAYS_TOOLS = ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison'];
 
   // PREVENTION (root cause of the real-estate/sourcing/trip/docs orphaning): every tool declared on
-  // an agent MUST live in some SERVER_TOOLKITS cluster (or be a meta-tool), otherwise the startup
-  // filter strips it for non-curated agents AND load_toolkit can't reach it — a silent capability
-  // loss with zero error. Surface any drift once per cold start so a new tool can't slip through.
+  // an agent MUST live in some SERVER_TOOLKITS cluster, be a meta-tool, or be a core-always tool,
+  // otherwise the startup filter strips it for non-curated agents AND load_toolkit can't reach it — a
+  // silent capability loss with zero error. Surface any drift once per cold start so nothing slips through.
   if (!(globalThis as any).__agentToolkitAuditLogged) {
     (globalThis as any).__agentToolkitAuditLogged = true;
     try {
-      const homed = new Set<string>(META_TOOLS);
+      const homed = new Set<string>([...META_TOOLS, ...CORE_ALWAYS_TOOLS]);
       for (const def of Object.values(SERVER_TOOLKITS)) for (const t of def.tool_ids) homed.add(t);
       const orphans = new Set<string>();
       for (const cfg of Object.values(AGENT_CONFIGS) as any[]) for (const t of (cfg?.tools ?? [])) if (!homed.has(t)) orphans.add(t);
@@ -1414,6 +1417,10 @@ async function executeAgent(
     ? [...config.tools]
     : config.tools.filter((t) => toolkitToolIds.has(t));
   for (const m of META_TOOLS) if (!baseTools.includes(m)) baseTools.push(m);
+  // Core "always-available" tools (deterministic, free, self-contained; belong to no toolkit) must
+  // survive the toolkit filter, or an agent that declares them (kai, interior-designer) would have
+  // them stripped and the registration guard at ~L1770 would never fire. (Set defined above.)
+  for (const c of CORE_ALWAYS_TOOLS) if (config.tools.includes(c) && !baseTools.includes(c)) baseTools.push(c);
   config = { ...config, tools: baseTools };
 
   // Extract previously generated image URLs from assistant messages (for edit mode).

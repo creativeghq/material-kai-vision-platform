@@ -93,6 +93,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   document_published: BookOpen,
   doc_suggestion_submitted: FilePlus2,
   campaign_sent: Megaphone,
+  email_sender_not_configured: MailWarning,
   email_bounced: MailX,
   email_complained: MailWarning,
   social_post_published: Share2,

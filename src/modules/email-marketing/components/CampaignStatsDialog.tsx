@@ -27,6 +27,7 @@ const CELLS: Array<{ key: keyof CampaignStats; label: string }> = [
   { key: 'bounced', label: 'Bounced' },
   { key: 'complained', label: 'Complaints' },
   { key: 'failed', label: 'Failed' },
+  { key: 'unsubscribed', label: 'Unsubscribed' },
   { key: 'pending', label: 'Pending' },
 ];
 

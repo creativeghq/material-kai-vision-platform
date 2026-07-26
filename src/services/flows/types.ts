@@ -104,6 +104,8 @@ export type TriggerType =
   | 'campaign_sent'
   | 'email_bounced'
   | 'email_complained'
+  // A feature tried to send email but the workspace has no email sender configured (notify owner/admins)
+  | 'email_sender_not_configured'
   // Social publishing (Zernio): a scheduled post went live or failed on all platforms
   | 'social_post_published'
   | 'social_post_failed'
@@ -146,6 +148,7 @@ export interface OrderStatusChangedTriggerConfig {}
 export interface DocumentPublishedTriggerConfig {}
 export interface DocSuggestionSubmittedTriggerConfig {}
 export interface CampaignSentTriggerConfig {}
+export interface EmailSenderNotConfiguredTriggerConfig {}
 export interface EmailBouncedTriggerConfig {}
 export interface EmailComplainedTriggerConfig {}
 export interface SocialPostPublishedTriggerConfig {}
@@ -364,6 +367,7 @@ export type TriggerConfigMap = {
   document_published: DocumentPublishedTriggerConfig;
   doc_suggestion_submitted: DocSuggestionSubmittedTriggerConfig;
   campaign_sent: CampaignSentTriggerConfig;
+  email_sender_not_configured: EmailSenderNotConfiguredTriggerConfig;
   email_bounced: EmailBouncedTriggerConfig;
   email_complained: EmailComplainedTriggerConfig;
   social_post_published: SocialPostPublishedTriggerConfig;

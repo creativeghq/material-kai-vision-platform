@@ -40,7 +40,6 @@ const TRIGGER_LABELS: Record<string, string> = {
   invoice_paid: 'Invoice paid',
   payment_received: 'Payment received',
   quote_approved: 'Quote approved',
-  product_added: 'Product added',
   'inbox.message_received': 'Inbox message',
   appointment_booked: 'Appointment booked',
 };
