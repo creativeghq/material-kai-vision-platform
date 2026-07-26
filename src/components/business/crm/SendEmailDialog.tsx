@@ -254,12 +254,12 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
+            <Mail className="h-4 w-4 shrink-0" />
             Send email
-            {recipientLabel && (
-              <span className="text-sm font-normal text-muted-foreground">· {recipientLabel}</span>
-            )}
           </DialogTitle>
+          {recipientLabel && (
+            <p className="text-sm font-medium text-foreground">{recipientLabel}</p>
+          )}
           <DialogDescription>
             {multiRecipient
               ? `Sending to ${selectedEmails.length} of ${candidates.length} recipients`

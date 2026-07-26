@@ -115,8 +115,8 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
             Products from this supplier
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            Linked by <code>brand_company_id</code> — the products claimed by this company (set at
-            ingestion, or via the “Linked factory / manufacturer” pin).
+            Products attributed to this company as their brand or manufacturer — matched when a
+            catalog is imported, or linked manually from a product’s “Factory / manufacturer” field.
           </p>
         </div>
         <div className="flex items-center gap-2">
