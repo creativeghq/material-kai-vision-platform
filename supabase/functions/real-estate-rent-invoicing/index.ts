@@ -23,7 +23,7 @@ serve(withApiLogging('real-estate-rent-invoicing', async (req) => {
 
   const { data: charges, error } = await supabase.from('property_rent_charges')
     .select('id, workspace_id, amount, currency, due_date, tenancy:property_tenancies!property_rent_charges_tenancy_id_fkey ( property_id, tenant_contact_id, status, property:properties!property_tenancies_property_id_fkey ( title ) )')
-    .eq('status', 'due').is('invoice_id', null).lte('due_date', horizon)
+    .in('status', ['due', 'overdue']).is('invoice_id', null).lte('due_date', horizon)
     .limit(500);
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
 

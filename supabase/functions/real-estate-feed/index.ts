@@ -31,8 +31,13 @@ Deno.serve(withApiLogging('real-estate-feed', async (req) => {
   if (!settings || !settings.feed_enabled) return err('feed not found or disabled', 404);
   format = format || settings.feed_format || 'kyero';
 
+  // Respect the per-listing external-distribution opt-in: the syndication feed is third-party
+  // portal export, so it must honor `in_discovery` exactly as the cross-workspace `discover` action
+  // does. A listing published only to the agency's own portal (in_discovery=false) must NOT leak into
+  // the Kyero/OpenImmo feed. (deactivate_listing also clears in_discovery, so pulled listings drop out.)
   const { data: rows } = await supabase.from('properties').select('*')
     .eq('workspace_id', settings.workspace_id).eq('is_public', true).eq('listing_status', 'active')
+    .eq('in_discovery', true)
     .order('published_at', { ascending: false }).limit(500);
   const listings = rows ?? [];
 

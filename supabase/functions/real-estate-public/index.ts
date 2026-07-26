@@ -19,6 +19,29 @@ function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
+/** RE T1-1 — per-IP throttle for the anonymous lead-capture writes. Returns a 429 Response when the
+ *  caller has exceeded the hourly budget (across all public lead actions), else records the attempt and
+ *  returns null. IP is hashed (never stored raw). Service-role table; no captcha dependency. */
+const PUBLIC_LEAD_HOURLY_LIMIT = 8;
+async function enforceLeadRateLimit(supabase: any, req: Request, action: string, workspaceId: string | null): Promise<Response | null> {
+  try {
+    const ipRaw = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('cf-connecting-ip') || 'unknown';
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ipRaw));
+    const ipHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 40);
+    const sinceIso = new Date(Date.now() - 3600_000).toISOString();
+    const { count } = await supabase.from('public_realestate_submissions')
+      .select('id', { count: 'exact', head: true }).eq('ip_hash', ipHash).gte('created_at', sinceIso);
+    if ((count ?? 0) >= PUBLIC_LEAD_HOURLY_LIMIT) {
+      return json({ error: 'Too many requests. Please try again later.' }, 429);
+    }
+    await supabase.from('public_realestate_submissions').insert({ ip_hash: ipHash, workspace_id: workspaceId, action });
+    return null;
+  } catch (_) {
+    // Never let a throttle-bookkeeping failure block a legitimate submission.
+    return null;
+  }
+}
+
 // #281 buyer portal — same criteria contract as real-estate-api.matchesCriteria.
 function matchesCriteria(c: any, p: any): boolean {
   if (!c) return false;
@@ -102,17 +125,19 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     return json({ ok: true, favorited: true });
   }
   if (action === 'buyer-request-viewing') {
-    const req = await loadRequirement(String(body?.token ?? ''));
+    const reqmt = await loadRequirement(String(body?.token ?? ''));
     const propertyId = String(body?.property_id ?? '');
     if (!propertyId) return json({ error: 'property_id is required' }, 400);
-    const { data: p } = await supabase.from('properties').select('id').eq('id', propertyId).eq('workspace_id', req.workspace_id).eq('is_public', true).maybeSingle();
+    const rl = await enforceLeadRateLimit(supabase, req, 'buyer-request-viewing', reqmt.workspace_id);
+    if (rl) return rl;
+    const { data: p } = await supabase.from('properties').select('id').eq('id', propertyId).eq('workspace_id', reqmt.workspace_id).eq('is_public', true).maybeSingle();
     if (!p) return json({ error: 'not found' }, 404);
-    const { data: contact } = await supabase.from('crm_contacts').select('name, email, phone').eq('id', req.crm_contact_id).maybeSingle();
+    const { data: contact } = await supabase.from('crm_contacts').select('name, email, phone').eq('id', reqmt.crm_contact_id).maybeSingle();
     const { error } = await supabase.from('property_inquiries').insert({
-      workspace_id: req.workspace_id, property_id: propertyId,
+      workspace_id: reqmt.workspace_id, property_id: propertyId,
       name: contact?.name ?? 'Buyer (portal)', email: contact?.email ?? null, phone: contact?.phone ?? null,
       message: String(body?.message ?? '').slice(0, 1000) || 'Viewing requested via buyer portal',
-      status: 'new', crm_contact_id: req.crm_contact_id, source: 'buyer_portal',
+      status: 'new', crm_contact_id: reqmt.crm_contact_id, source: 'buyer_portal',
     });
     if (error) throw new HttpError(400, error.message);
     return json({ ok: true });
@@ -169,6 +194,8 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     const email = String(body?.email ?? '').trim();
     if (!name || !email) return json({ error: 'name and email are required' }, 400);
     if (body?.gdpr_consent !== true) return json({ error: 'gdpr_consent is required' }, 400);
+    const rl = await enforceLeadRateLimit(supabase, req, 'request-valuation', workspaceId);
+    if (rl) return rl;
 
     const propertyType = String(body?.property_type ?? 'residential');
     const town = String(body?.town ?? '').trim();
@@ -234,6 +261,8 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     const name = String(body?.name ?? '').trim();
     if (!name || !email) return json({ error: 'name and email are required' }, 400);
     if (body?.gdpr_consent !== true) return json({ error: 'gdpr_consent is required' }, 400);
+    const rl = await enforceLeadRateLimit(supabase, req, 'inquire', property.workspace_id);
+    if (rl) return rl;
     // property_id + workspace_id come from the resolved token, NEVER the request body (anti-IDOR).
     const { error: insErr } = await supabase.from('property_inquiries').insert({
       workspace_id: property.workspace_id, property_id: property.id,

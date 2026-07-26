@@ -831,6 +831,9 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
       // ── Buyer requirements (saved searches; auto-match in P2) ───────────
       case 'list-buyer-requirements': {
+        // Buyer saved searches carry buyer PII (name/email) and are a lead surface → manager-only,
+        // like list-inquiries / list-viewings (a plain viewer must not read or write them).
+        requireManage();
         let q = supabase.from('property_buyer_requirements').select('*, contact:crm_contacts!property_buyer_requirements_crm_contact_id_fkey ( id, name, email )').eq('workspace_id', workspaceId).order('updated_at', { ascending: false });
         if (body.crm_contact_id) q = q.eq('crm_contact_id', String(body.crm_contact_id));
         const { data, error } = await q;
@@ -839,6 +842,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'upsert-buyer-requirement': {
+        requireManage();
         const contactId = String(body.crm_contact_id ?? '');
         if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
         const row: Record<string, unknown> = {
@@ -891,6 +895,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'delete-buyer-requirement': {
+        requireManage();
         const reqId = String(body.requirement_id ?? '');
         if (!reqId) return json({ error: 'requirement_id is required' }, 400);
         const { error } = await supabase.from('property_buyer_requirements').delete().eq('id', reqId).eq('workspace_id', workspaceId);

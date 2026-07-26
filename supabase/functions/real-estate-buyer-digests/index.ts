@@ -37,7 +37,7 @@ serve(withApiLogging('real-estate-buyer-digests', async (req) => {
 
   const { data: reqs, error } = await supabase
     .from('property_buyer_requirements')
-    .select('id, workspace_id, label, criteria, portal_token, last_digest_at, contact:crm_contacts!property_buyer_requirements_crm_contact_id_fkey ( name, email )')
+    .select('id, workspace_id, label, criteria, portal_token, last_digest_at, contact:crm_contacts!property_buyer_requirements_crm_contact_id_fkey ( name, email, marketing_consent )')
     .eq('is_active', true).eq('digest_enabled', true).not('portal_token', 'is', null)
     .limit(500);
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
@@ -47,7 +47,10 @@ serve(withApiLogging('real-estate-buyer-digests', async (req) => {
 
   for (const r of reqs ?? []) {
     const email = (r as any).contact?.email as string | undefined;
-    if (!email) { skipped++; continue; }
+    // GDPR: the digest is a marketing send — honor marketing_consent, exactly as the immediate
+    // new-listing alert does (real-estate-api gates on the same flag). Without this a buyer with
+    // consent=false still got the daily digest for listings the instant-alert path suppressed.
+    if (!email || (r as any).contact?.marketing_consent === false) { skipped++; continue; }
     const since = r.last_digest_at ?? '1970-01-01T00:00:00Z';
     // New public/active listings in this agency since the last digest.
     const { data: listings } = await supabase.from('properties')
