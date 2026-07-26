@@ -17,6 +17,7 @@ import { ordersService } from '@/modules/finance/services/ordersService';
 import { humanizeLabel } from '@/utils/humanize';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
@@ -296,11 +297,12 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
  * paid totals + the last-payment date; this card is the itemised history. Read-only — payments
  * are recorded per order (open an order to add one).
  */
-export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) => {
+export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId, customerName }) => {
   const { activeWorkspaceId } = useWorkspace();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PaymentWithAllocation[]>([]);
   const [payOpen, setPayOpen] = useState(false);
+  const [expenseOpen, setExpenseOpen] = useState(false);
   const [page, setPage] = useState(1);
 
   const reload = useCallback(async () => {
@@ -329,9 +331,15 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
           <Banknote className="h-4 w-4" /> Payments
         </CardTitle>
         {activeWorkspaceId && (
-          <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Record payment
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Money OUT to this party (pay a supplier) is a cost → the expense flow (bill + payment). */}
+            <Button size="sm" variant="outline" onClick={() => setExpenseOpen(true)}>
+              <ShoppingBag className="h-3.5 w-3.5 mr-1" /> Add expense
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Record payment
+            </Button>
+          </div>
         )}
       </CardHeader>
       <CardContent className="p-0">
@@ -392,6 +400,15 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId }) =>
           onOpenChange={setPayOpen}
           onSaved={reload}
           initialCounterparty={{ contactId: contactId ?? null, companyId: companyId ?? null }}
+        />
+      )}
+      {activeWorkspaceId && (
+        <NewExpenseDialog
+          workspaceId={activeWorkspaceId}
+          open={expenseOpen}
+          onOpenChange={setExpenseOpen}
+          prefill={{ supplier: { companyId: companyId ?? null, contactId: companyId ? null : (contactId ?? null), name: customerName ?? null } }}
+          onCreated={() => { setExpenseOpen(false); void reload(); }}
         />
       )}
     </Card>

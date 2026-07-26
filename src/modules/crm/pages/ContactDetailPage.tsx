@@ -892,7 +892,7 @@ export const ContactDetailPage: React.FC = () => {
                       <>
                         <CustomerAccountOverview contactId={contact.id} customerName={contact.name} isSupplier={!!contact.is_supplier} ledgerHref={`/finance?tab=parties&party=contact:${contact.id}`} />
                         <OrdersPanel workspaceId={activeWorkspaceId ?? ''} contactId={contact.id} partyRoles={{ customer: !!contact.is_client, supplier: !!contact.is_supplier }} />
-                        <PartyPaymentsCard contactId={contact.id} />
+                        <PartyPaymentsCard contactId={contact.id} customerName={contact.name} />
                         <CustomerTopItemsCard contactId={contact.id} />
                         <CustomerFinanceRulesCard contactId={contact.id} />
                       </>

@@ -1082,7 +1082,7 @@ export const CompanyDetailPage: React.FC = () => {
                   <OrdersPanel workspaceId={activeWorkspaceId ?? ''} companyId={company.id} partyRoles={{ customer: !!company.is_customer, supplier: !!company.is_supplier }} />
                   {/* 2b — Itemised cash movements across all their orders (money in & out), so the
                          payments made to / received from this party are visible at the party level. */}
-                  <PartyPaymentsCard companyId={company.id} />
+                  <PartyPaymentsCard companyId={company.id} customerName={company.name} />
                   {/* 3 + 4 — Customer-only: repeat-buy suggestions + finance/pricing rules. */}
                   {showCommercial && <CustomerTopItemsCard companyId={company.id} />}
                   {showCommercial && <CustomerFinanceRulesCard companyId={company.id} />}

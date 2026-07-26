@@ -10,7 +10,6 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -708,7 +707,7 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = (
         <tr key={cn.id} className="border-b border-border/30">
           <td className="px-4 py-2 font-mono text-xs">{cn.credit_note_number}</td>
           <td className="px-4 py-2">{cn.issued_at ? new Date(cn.issued_at).toLocaleDateString() : '—'}</td>
-          <td className="px-4 py-2"><Badge variant="outline" className="text-[10px]">{cn.document_type ?? '—'}</Badge></td>
+          <td className="px-4 py-2"><span className="text-xs text-muted-foreground">{cn.document_type ?? '—'}</span></td>
           <td className="px-4 py-2 text-muted-foreground truncate max-w-[220px]">{cn.reason ?? '—'}</td>
           <td className="px-4 py-2 text-right font-medium">{formatMoney(cn.total ?? cn.amount, cn.currency)}</td>
           <td className="px-4 py-2 text-center">{transmitted(cn.fiscal_status) ? <span className="text-emerald-500">✓</span> : <span className="text-muted-foreground">—</span>}</td>
@@ -847,7 +846,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
               <div className="font-medium">{d.issuer_name ?? '—'}</div>
               <div className="text-xs text-muted-foreground font-mono">{d.issuer_vat ?? ''}</div>
             </td>
-            <td className="px-4 py-2"><Badge variant="outline" className="text-[10px]">{d.doc_type ?? '—'}</Badge></td>
+            <td className="px-4 py-2"><span className="text-xs text-muted-foreground">{d.doc_type ?? '—'}</span></td>
             <td className="px-4 py-2">
               {readOnly
                 ? <span className="text-xs text-muted-foreground">{categoryName(cat)}</span>

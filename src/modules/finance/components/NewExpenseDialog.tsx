@@ -40,8 +40,8 @@ interface Props {
     amount?: number;
     description?: string;
     categoryId?: string;
-    /** Pre-select the payee: a CRM supplier (companyId + display name) or a one-off name. */
-    supplier?: { companyId?: string | null; name?: string | null };
+    /** Pre-select the payee: a CRM supplier company OR contact (+ display name), or a one-off name. */
+    supplier?: { companyId?: string | null; contactId?: string | null; name?: string | null };
   };
 }
 
@@ -146,6 +146,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setIssuedAt(new Date().toISOString().slice(0, 10));
       // Supplier: set from the line/order, or CLEAR (so a prior line's supplier never carries over).
       if (prefill?.supplier?.companyId) setParty({ type: 'company', id: prefill.supplier.companyId, label: prefill.supplier.name || 'Supplier' });
+      else if (prefill?.supplier?.contactId) setParty({ type: 'contact', id: prefill.supplier.contactId, label: prefill.supplier.name || 'Supplier' });
       else if (prefill?.supplier?.name) setParty({ type: 'adhoc', id: null, label: prefill.supplier.name });
       else setParty(null);
       setPartySearch('');
@@ -158,11 +159,13 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (prefill.categoryId) setCategoryId(prefill.categoryId);
     if (prefill.supplier?.companyId) {
       setParty({ type: 'company', id: prefill.supplier.companyId, label: prefill.supplier.name || 'Supplier' });
+    } else if (prefill.supplier?.contactId) {
+      setParty({ type: 'contact', id: prefill.supplier.contactId, label: prefill.supplier.name || 'Supplier' });
     } else if (prefill.supplier?.name) {
       setParty({ type: 'adhoc', id: null, label: prefill.supplier.name });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, orderId, prefill?.amount, prefill?.description, prefill?.categoryId, prefill?.supplier?.companyId, prefill?.supplier?.name]);
+  }, [open, orderId, prefill?.amount, prefill?.description, prefill?.categoryId, prefill?.supplier?.companyId, prefill?.supplier?.contactId, prefill?.supplier?.name]);
 
   // Load the picked payee's own bank accounts (for the Bank Payment "paid to their bank" selector).
   useEffect(() => {
