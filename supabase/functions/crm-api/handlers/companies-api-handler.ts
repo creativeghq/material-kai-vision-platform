@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
-import { getCrmScope, scopeAllows } from './_scope.ts';
+import { getCrmScope, scopeAllows, rowInScope, isUuid, type CrmScope } from './_scope.ts';
 import { pickContactFields, escapeLike, parseIdsParam } from './contacts-api-handler.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 
@@ -45,13 +45,6 @@ const COMPANY_WRITABLE_COLUMNS = [
   'kad_codes', 'kad_all',
 ] as const;
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** Guard a path/body id before it reaches Postgres so a malformed value returns a
- * clean 400 instead of a raw "invalid input syntax for type uuid" 22P02. */
-function isUuid(v: unknown): v is string {
-  return typeof v === 'string' && UUID_RE.test(v);
-}
-
 function pickCompanyFields(body: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const col of COMPANY_WRITABLE_COLUMNS) {
@@ -61,23 +54,7 @@ function pickCompanyFields(body: Record<string, unknown>): Record<string, unknow
 }
 
 /** Verify a company id is reachable by the caller's workspace scope. */
-async function companyInScope(
-  companyId: string,
-  scope: import('./_scope.ts').CrmScope,
-): Promise<boolean> {
-  if (scope.isGlobalOperator) {
-    const { data } = await supabase.from('crm_companies').select('id').eq('id', companyId).maybeSingle();
-    return !!data;
-  }
-  if (scope.workspaceIds.length === 0) return false;
-  const { data } = await supabase
-    .from('crm_companies')
-    .select('id')
-    .eq('id', companyId)
-    .in('workspace_id', scope.workspaceIds)
-    .maybeSingle();
-  return !!data;
-}
+const companyInScope = (companyId: string, scope: CrmScope) => rowInScope(supabase, 'crm_companies', companyId, scope);
 
 /** companyInScope + the company's workspace_id, for the create-and-attach path: a contact
  * created from a company page belongs in THAT company's workspace, not whichever workspace
@@ -99,23 +76,7 @@ async function companyWorkspaceInScope(
 // insert verified the company but NOT the contact, so a caller could attach another
 // tenant's contact_id to their own company and then read that contact's PII via the
 // nested crm_contacts join on GET /companies/{id}.
-async function contactInScope(
-  contactId: string,
-  scope: import('./_scope.ts').CrmScope,
-): Promise<boolean> {
-  if (scope.isGlobalOperator) {
-    const { data } = await supabase.from('crm_contacts').select('id').eq('id', contactId).maybeSingle();
-    return !!data;
-  }
-  if (scope.workspaceIds.length === 0) return false;
-  const { data } = await supabase
-    .from('crm_contacts')
-    .select('id')
-    .eq('id', contactId)
-    .in('workspace_id', scope.workspaceIds)
-    .maybeSingle();
-  return !!data;
-}
+const contactInScope = (contactId: string, scope: CrmScope) => rowInScope(supabase, 'crm_contacts', contactId, scope);
 
 /**
  * CRM Companies API

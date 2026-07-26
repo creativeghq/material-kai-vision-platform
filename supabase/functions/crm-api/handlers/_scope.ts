@@ -29,6 +29,28 @@ export interface CrmScope {
   callerUserId: string | null;
 }
 
+/** Is a crm_contacts / crm_companies row reachable by the caller's workspace scope? The SINGLE
+ *  implementation behind the per-handler contactInScope/companyInScope wrappers (was copy-pasted). */
+export async function rowInScope(
+  supabase: SupabaseClient,
+  table: 'crm_contacts' | 'crm_companies',
+  id: string,
+  scope: CrmScope,
+): Promise<boolean> {
+  if (scope.isGlobalOperator) {
+    const { data } = await supabase.from(table).select('id').eq('id', id).maybeSingle();
+    return !!data;
+  }
+  if (scope.workspaceIds.length === 0) return false;
+  const { data } = await supabase.from(table).select('id').eq('id', id).in('workspace_id', scope.workspaceIds).maybeSingle();
+  return !!data;
+}
+
+/** UUID guard shared by the handlers. */
+export function isUuid(v: unknown): v is string {
+  return typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+}
+
 export async function getCrmScope(
   adminClient: SupabaseClient,
   auth: AuthResult,

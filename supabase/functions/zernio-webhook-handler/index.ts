@@ -27,7 +27,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -143,6 +143,19 @@ async function matchOrCreateContact(
   const { data: created } = await supabase.from('crm_contacts').insert({
     workspace_id: workspaceId, name: name || phone, phone, created_by: owner, lead_source: 'whatsapp',
   }).select('id').single();
+  // T2-2: a WhatsApp reply from an unknown number is a genuine new lead written directly to crm_contacts
+  // (bypassing crm-api), so fire crm_contact_created here or the "new lead → notify/assign" flow never
+  // runs for it. Notify workspace owners/admins. Best-effort.
+  if (created?.id) {
+    try {
+      await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'crm_contact_created', (uid: string) => ({
+        type: 'crm_contact_created', workspace_id: workspaceId, user_id: uid,
+        contact_id: created.id, contact_name: name || phone, lead_source: 'whatsapp',
+        title: 'New WhatsApp lead', body: `${name || phone} messaged you on WhatsApp.`,
+        action_url: `/crm/contacts/${created.id}`,
+      }));
+    } catch { /* best-effort */ }
+  }
   return created?.id ?? null;
 }
 

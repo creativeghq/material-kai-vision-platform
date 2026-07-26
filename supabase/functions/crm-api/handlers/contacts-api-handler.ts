@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
-import { getCrmScope, scopeAllows, type CrmScope } from './_scope.ts';
+import { getCrmScope, scopeAllows, rowInScope, type CrmScope } from './_scope.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -42,20 +42,7 @@ export function parseIdsParam(url: URL): string[] | null {
 }
 
 /** Verify a contact id is reachable by the caller's workspace scope. */
-async function contactInScope(contactId: string, scope: CrmScope): Promise<boolean> {
-  if (scope.isGlobalOperator) {
-    const { data } = await supabase.from('crm_contacts').select('id').eq('id', contactId).maybeSingle();
-    return !!data;
-  }
-  if (scope.workspaceIds.length === 0) return false;
-  const { data } = await supabase
-    .from('crm_contacts')
-    .select('id')
-    .eq('id', contactId)
-    .in('workspace_id', scope.workspaceIds)
-    .maybeSingle();
-  return !!data;
-}
+const contactInScope = (contactId: string, scope: CrmScope) => rowInScope(supabase, 'crm_contacts', contactId, scope);
 
 /** Columns a client may write on a CRM contact. Used by BOTH create and update so
  * a field added on the frontend can never silently no-op (the bug that hid
@@ -369,12 +356,6 @@ export async function handleContacts(req: Request): Promise<Response> {
         .from('crm_contacts')
         .select(`
           *,
-          crm_contact_relationships(
-            id,
-            user_id,
-            relationship_type,
-            created_at
-          ),
           crm_company_contacts(
             id,
             company_id,
