@@ -343,7 +343,7 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
         </div>
         {/* Employment contracts for this employee (HR context — admin-only via RLS). */}
         <div className="border-t border-border/60 mt-4 pt-4">
-          <ContractsSection workspaceId={workspaceId} context="hr" subject={{ hr_employee_id: employee.id }} heading="Employment contracts" />
+          <ContractsSection workspaceId={workspaceId} context="hr" subject={{ hr_employee_id: employee.id }} heading="Employment contracts" defaultCounterparty={{ name: empName(employee), email: employee.contact?.email }} />
         </div>
         <DialogFooter>
           <Button variant="outline" className="rounded-full" onClick={onClose} disabled={saving}>Cancel</Button>

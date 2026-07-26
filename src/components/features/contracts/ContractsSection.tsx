@@ -44,13 +44,16 @@ export const ContractsSection: React.FC<{
   context: ContractContext | 'all';
   subject?: Subject;
   heading?: string;
+  /** Prefill the counterparty from the entity this panel is mounted under (employee / project client
+   *  / property buyer) so the signer isn't retyped — and the signing email actually has a recipient. */
+  defaultCounterparty?: { name?: string | null; email?: string | null };
   /**
    * Group definitions for the shared filter modal. Only the standalone Contracts page passes
    * these — the entity-scoped mounts (employee dialog, project tab) show a handful of rows and
    * would gain nothing from a filter bar.
    */
   filterGroups?: (rows: Contract[]) => FilterGroupDef[];
-}> = ({ workspaceId, context, subject, heading = 'Contracts', filterGroups: buildGroups }) => {
+}> = ({ workspaceId, context, subject, heading = 'Contracts', defaultCounterparty, filterGroups: buildGroups }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,9 +77,18 @@ export const ContractsSection: React.FC<{
   const changeCategory = (c: ContractContext) => { setCreateContext(c); setType(TYPE_OPTIONS[c][0]); };
   const [counterparty, setCounterparty] = useState('');
   const [counterpartyEmail, setCounterpartyEmail] = useState('');
+  const [value, setValue] = useState('');
+  const [currency, setCurrency] = useState('EUR');
   const [effective, setEffective] = useState('');
   const [expiry, setExpiry] = useState('');
   const [bodyText, setBodyText] = useState('');
+
+  /** Open the create dialog, prefilling the counterparty from the mounted entity when available. */
+  const openCreate = () => {
+    if (defaultCounterparty?.name) setCounterparty(defaultCounterparty.name);
+    if (defaultCounterparty?.email) setCounterpartyEmail(defaultCounterparty.email);
+    setOpen(true);
+  };
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
@@ -96,7 +108,7 @@ export const ContractsSection: React.FC<{
 
   const resetForm = () => {
     setTitle(''); setType(TYPE_OPTIONS[createContext][0]); setCounterparty(''); setCounterpartyEmail('');
-    setEffective(''); setExpiry(''); setBodyText('');
+    setValue(''); setCurrency('EUR'); setEffective(''); setExpiry(''); setBodyText('');
   };
 
   const create = async () => {
@@ -110,6 +122,8 @@ export const ContractsSection: React.FC<{
         context: createContext, title: title.trim(), contract_type: type,
         counterparty_name: counterparty.trim() || undefined,
         counterparty_email: counterpartyEmail.trim() || undefined,
+        value: value.trim() ? Number(value) : undefined,
+        currency: value.trim() ? currency : undefined,
         effective_date: effective || undefined,
         expiry_date: expiry || undefined,
         body_markdown: bodyText.trim() || undefined,
@@ -151,7 +165,7 @@ export const ContractsSection: React.FC<{
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2"><FileSignature className="h-4 w-4" /> {heading}</h3>
         {canCreate && (
-          <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New contract</Button>
+          <Button size="sm" variant="outline" className="rounded-full" onClick={openCreate}><Plus className="h-3.5 w-3.5 mr-1" /> New contract</Button>
         )}
       </div>
 
@@ -235,9 +249,13 @@ export const ContractsSection: React.FC<{
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Counterparty email</Label><Input type="email" value={counterpartyEmail} onChange={(e) => setCounterpartyEmail(e.target.value)} placeholder="signer@example.com" /></div>
               <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1"><Label>Effective</Label><Input type="date" value={effective} onChange={(e) => setEffective(e.target.value)} /></div>
-                <div className="space-y-1"><Label>Expires</Label><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></div>
+                <div className="space-y-1"><Label>Value</Label><Input type="number" min={0} value={value} onChange={(e) => setValue(e.target.value)} placeholder="0.00" /></div>
+                <div className="space-y-1"><Label>Currency</Label><Input value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="EUR" /></div>
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label>Effective</Label><Input type="date" value={effective} onChange={(e) => setEffective(e.target.value)} /></div>
+              <div className="space-y-1"><Label>Expires</Label><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></div>
             </div>
             <div className="space-y-1"><Label>Terms</Label><Textarea rows={6} value={bodyText} onChange={(e) => setBodyText(e.target.value)} placeholder="The agreement text the signer will read and sign…" /></div>
           </div>

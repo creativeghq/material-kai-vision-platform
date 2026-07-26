@@ -96,6 +96,9 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
       workspace_id: c.workspace_id,
       signer_name: signerName,
       signer_email: typeof body?.signer_email === 'string' ? body.signer_email.slice(0, 200) : null,
+      // Single-signer design: the person signing via the token IS the counterparty. Stamp it so the
+      // column carries meaning (was always NULL) and a future multi-party design has the field populated.
+      signer_role: 'counterparty',
       signature_image: typeof body?.signature_image === 'string' ? body.signature_image.slice(0, 200_000) : null,
       ip, user_agent: ua,
     });
