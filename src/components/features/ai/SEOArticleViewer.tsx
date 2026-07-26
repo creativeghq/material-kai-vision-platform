@@ -10,7 +10,7 @@
  * and defined in _shared/seo-types.ts (ArticleOutput).
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { supabase } from '@/integrations/supabase/client';
@@ -912,17 +912,25 @@ function parseLinksFromMarkdown(markdown: string | null): ParsedLink[] {
   return links;
 }
 
-function InterlinkingTab({ data, markdown }: { data: InterlinkingData; markdown: string | null }) {
+function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingData; markdown: string | null; onApplyLink?: (anchor: string, url: string) => Promise<'inserted' | 'exists' | 'notfound'> }) {
   const writtenLinks = useMemo(() => parseLinksFromMarkdown(markdown), [markdown]);
   const internalWritten = writtenLinks.filter((l) => l.kind !== 'external');
   const externalWritten = writtenLinks.filter((l) => l.kind === 'external');
   const siteMatches = data.siteArticles || [];
   const [copied, setCopied] = useState<string | null>(null);
+  const [applied, setApplied] = useState<Record<string, 'inserted' | 'exists' | 'notfound'>>({});
 
   const copyMarkdownLink = async (m: SiteMatch) => {
     await navigator.clipboard.writeText(`[${m.anchorSuggestion}](${m.url})`);
     setCopied(m.url);
     setTimeout(() => setCopied(null), 1500);
+  };
+
+  const insertLink = async (m: SiteMatch) => {
+    if (!onApplyLink) return;
+    const result = await onApplyLink(m.anchorSuggestion, m.url);
+    setApplied((prev) => ({ ...prev, [m.url]: result }));
+    setTimeout(() => setApplied((prev) => { const n = { ...prev }; delete n[m.url]; return n; }), 2500);
   };
 
   const hasAnything =
@@ -957,15 +965,32 @@ function InterlinkingTab({ data, markdown }: { data: InterlinkingData; markdown:
                   {m.alreadyLinked && (
                     <Badge variant="secondary" className="text-[10px]">already in draft</Badge>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ml-auto h-6 text-xs"
-                    onClick={() => copyMarkdownLink(m)}
-                  >
-                    {copied === m.url ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
-                    {copied === m.url ? 'Copied' : 'Copy MD link'}
-                  </Button>
+                  <div className="ml-auto flex items-center gap-1">
+                    {onApplyLink && !m.alreadyLinked && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-xs"
+                        onClick={() => insertLink(m)}
+                        title="Insert this link into the article draft"
+                      >
+                        {applied[m.url] === 'inserted' ? <Check className="w-3 h-3 mr-1" /> : null}
+                        {applied[m.url] === 'inserted' ? 'Inserted'
+                          : applied[m.url] === 'exists' ? 'Already linked'
+                          : applied[m.url] === 'notfound' ? 'Anchor not found'
+                          : 'Insert'}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={() => copyMarkdownLink(m)}
+                    >
+                      {copied === m.url ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+                      {copied === m.url ? 'Copied' : 'Copy MD link'}
+                    </Button>
+                  </div>
                 </div>
                 <div className="pl-5 space-y-0.5">
                   {m.title && <p className="text-xs text-foreground truncate">{m.title}</p>}
@@ -1826,6 +1851,23 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
     !initialArticle && !!isInProgress,
   );
 
+  // Insert an inter-link suggestion INTO the article (was copy-to-clipboard only). Replaces the first
+  // plain occurrence of the anchor text — not already inside a link — with a markdown link, then persists.
+  const applyInterlink = useCallback(async (anchor: string, url: string): Promise<'inserted' | 'exists' | 'notfound'> => {
+    if (!article?.id) return 'notfound';
+    const md = article.markdown_content ?? '';
+    if (md.includes(`](${url})`) || md.includes(`[${anchor}](`)) return 'exists';
+    const esc = anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let re: RegExp;
+    try { re = new RegExp(`(?<!\\[)\\b${esc}\\b(?!\\]|\\()`); } catch { re = new RegExp(esc); }
+    if (!re.test(md)) return 'notfound';
+    const next = md.replace(re, `[${anchor}](${url})`);
+    const { error } = await supabase.from('seo_articles').update({ markdown_content: next }).eq('id', article.id);
+    if (error) return 'notfound';
+    setArticle({ ...article, markdown_content: next });
+    return 'inserted';
+  }, [article]);
+
   if (loading) {
     return (
       <Card className="mt-3">
@@ -2055,7 +2097,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
 
                 {article.interlinking_data && (
                   <TabsContent value="interlink" className="mt-4">
-                    <InterlinkingTab data={article.interlinking_data} markdown={article.markdown_content} />
+                    <InterlinkingTab data={article.interlinking_data} markdown={article.markdown_content} onApplyLink={applyInterlink} />
                   </TabsContent>
                 )}
               </Tabs>
