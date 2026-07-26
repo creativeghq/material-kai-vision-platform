@@ -23,7 +23,7 @@ import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
-import { financeService, formatMoney, round2, extractNet } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, round2, extractNet, type BankAccountBalance } from '@/modules/finance/services/financeService';
 import { posSessionService, type PosSession, type PosReport } from '@/modules/finance/services/posSessionService';
 import { fiscalConnectorService, posTerminalService, type PosTerminal } from '@/services/fiscalConnectorService';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
@@ -89,6 +89,8 @@ const PosPage: React.FC = () => {
   // #185 EFT-POS terminals for the Law-5155 card/IRIS signature flow.
   const [terminals, setTerminals] = useState<PosTerminal[]>([]);
   const [terminalId, setTerminalId] = useState<string>('');
+  // Treasury accounts, so a POS sale is attributed to the cash drawer (cash) / acquirer (card).
+  const [bankAccounts, setBankAccounts] = useState<BankAccountBalance[]>([]);
   const [awaiting, setAwaiting] = useState<{
     posSignatureId: string; invoiceId: string; number: string; total: number; currency: string;
     net: number; vat: number; method: 'card' | 'iris'; vatRate: number; docType: DocType; customerName: string | null;
@@ -134,7 +136,7 @@ const PosPage: React.FC = () => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const [{ data: prices }, { data: fs }, br] = await Promise.all([
+      const [{ data: prices }, { data: fs }, br, banks] = await Promise.all([
         supabase
           .from('product_prices')
           .select('list_price, currency, unit, product:products(id, name, item_type, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category)')
@@ -143,9 +145,11 @@ const PosPage: React.FC = () => {
           'default_vat_rate, business_name, business_vat, business_tax_office, business_profession, business_address, business_street_number, business_postal_code, business_city, business_country, business_phone, business_email, business_gemi, business_company_type',
         ).eq('workspace_id', activeWorkspaceId).maybeSingle(),
         invoicingSetupService.listBranches(activeWorkspaceId).catch(() => [] as FinanceBranch[]),
+        financeService.getBankAccountBalances(activeWorkspaceId).catch(() => [] as BankAccountBalance[]),
       ]);
       if (cancelled) return;
       setBranches(br);
+      setBankAccounts(banks);
       setIssuer(fs ? {
         name: [fs.business_name, fs.business_company_type].filter(Boolean).join(' ') || (fs.business_name ?? ''),
         vat: fs.business_vat ?? '', tax_office: fs.business_tax_office ?? '', profession: fs.business_profession ?? '',
@@ -427,9 +431,16 @@ const PosPage: React.FC = () => {
   ) => {
     if (!activeWorkspaceId) return;
     try {
+      // Attribute the takings to the register's cash drawer (cash) / card acquirer account (card),
+      // so end-of-day bank reconciliation can tie POS revenue to an account. Fall back to default.
+      const wantKind = paidMethod === 'cash' ? 'cash' : 'card';
+      const acct = bankAccounts.find((b) => b.is_active && b.kind === wantKind)
+        ?? bankAccounts.find((b) => b.is_default)
+        ?? null;
       await financeService.recordPayment({
         workspaceId: activeWorkspaceId, direction: 'in', amount: snapshot.total, currency: snapshot.currency,
         method: paidMethod === 'cash' ? 'cash' : 'card',
+        bankAccountId: acct?.bank_account_id ?? null,
         allocations: [{ target_id: invoiceId, target_type: 'invoice', amount: snapshot.total }],
       });
     } catch { /* non-fatal */ }

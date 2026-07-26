@@ -21,6 +21,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { financeService, type Invoice, type PaymentMethod, type BankAccountBalance } from '@/modules/finance/services/financeService';
+import { ordersService, type OrderListRow } from '@/modules/finance/services/ordersService';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { parseDecimal } from '@/utils/decimal';
@@ -71,7 +72,14 @@ export const RecordPaymentDialog: React.FC<{
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccountBalance[]>([]);
   const [bankAccountId, setBankAccountId] = useState<string>('');
+  // Order to attach the payment to (drives orders.payment_status). Only shown when the caller
+  // didn't already fix an order (OrdersPanel passes `orderId`); lets a payment be tied to an order
+  // from the party page / Documents → Payments, which previously had no way to do it.
+  const [orders, setOrders] = useState<OrderListRow[]>([]);
+  const [pickedOrderId, setPickedOrderId] = useState<string>('');
   const [busy, setBusy] = useState(false);
+  const showOrderPicker = kind === 'received' && !orderId;
+  const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
 
   useEffect(() => {
     if (!open) return;
@@ -83,17 +91,24 @@ export const RecordPaymentDialog: React.FC<{
     setIssueCreditNote(true);
     setSendReceipt(true);
     setIssueDoc(false);
+    setPickedOrderId('');
     (async () => {
-      const [cats, invs, banks] = await Promise.all([
+      const [cats, invs, banks, ords] = await Promise.all([
         financeCategoriesService.list(workspaceId).catch(() => []),
         // Include paid invoices too — a refund is usually against an already-settled invoice.
         financeService.listInvoices({ workspaceId, status: ['issued', 'partially_paid', 'overdue', 'paid'], limit: 200 }).catch(() => []),
         // Balances, so the picker shows what's in each account at the point of choosing.
         financeService.getBankAccountBalances(workspaceId).catch(() => [] as BankAccountBalance[]),
+        // Open sales orders to attach the payment to — scoped to the party when opened from one.
+        (preset || orderId)
+          ? Promise.resolve([] as OrderListRow[])
+          : ordersService.list({ workspaceId, orderType: 'sales', companyId: initialCounterparty?.companyId ?? undefined, contactId: initialCounterparty?.contactId ?? undefined }).catch(() => [] as OrderListRow[]),
       ]);
       setCategories(cats);
       setInvoices(invs);
       setBankAccounts(banks);
+      // Attachable = not cancelled and not already fully paid.
+      setOrders(ords.filter((o) => o.status !== 'cancelled' && o.payment_status !== 'paid'));
       // Default to the workspace's default account so cash location is always captured.
       setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
     })();
@@ -118,6 +133,13 @@ export const RecordPaymentDialog: React.FC<{
     if (amount) return;
     const inv = invoices.find((i) => i.id === id);
     if (inv) setAmount(String(inv.amount_due));
+  };
+
+  const pickOrder = (id: string) => {
+    setPickedOrderId(id);
+    if (amount) return;
+    const o = orders.find((x) => x.id === id);
+    if (o) setAmount(String(Number(o.total)));
   };
 
   const pickRefundInvoice = (id: string) => {
@@ -186,7 +208,7 @@ export const RecordPaymentDialog: React.FC<{
         counterpartyContactId,
         allocations,
         bankAccountId: bankAccountId || null,
-        orderId: orderId ?? null,
+        orderId: effectiveOrderId ?? null,
         sendReceipt: kind === 'received' ? sendReceipt : false,
       });
       // Order-attached: also create the order's receipt/invoice when asked (best-effort — the
@@ -233,6 +255,23 @@ export const RecordPaymentDialog: React.FC<{
               <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
           </div>
+
+          {showOrderPicker && orders.length > 0 && (
+            <div className="space-y-1">
+              <Label>On order (optional)</Label>
+              <Select value={pickedOrderId} onValueChange={pickOrder}>
+                <SelectTrigger><SelectValue placeholder="None — not tied to an order" /></SelectTrigger>
+                <SelectContent>
+                  {orders.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.order_number ?? o.id.slice(0, 8)}{o.party_name ? ` · ${o.party_name}` : ''} — {Number(o.total).toFixed(2)}{o.payment_status === 'partial' ? ' · part-paid' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">Attaches the payment to this order and updates its paid status. Use this for a deposit or a payment on an order not yet invoiced.</p>
+            </div>
+          )}
 
           {kind === 'received' && (
             <div className="space-y-1">

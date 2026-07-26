@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   financeService, type PaymentMethod, type BankAccountBalance, type RecurringCadence,
 } from '@/modules/finance/services/financeService';
+import { ordersService } from '@/modules/finance/services/ordersService';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service';
@@ -75,6 +76,11 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // you paid to (managed on their CRM record → Tax & VAT → Bank Accounts).
   const [payeeBanks, setPayeeBanks] = useState<CrmBankAccount[]>([]);
   const [counterpartyBankId, setCounterpartyBankId] = useState<string>('');
+  // Optional purchase-order link when NOT opened from an order — lets a cost booked from the
+  // supplier page / Finance page be attached to one of that supplier's POs (2.7).
+  const [poOptions, setPoOptions] = useState<Array<{ id: string; order_number: string | null; total: number }>>([]);
+  const [pickedOrderId, setPickedOrderId] = useState<string>('');
+  const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
 
   const expenseCats = useMemo(
     () => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'),
@@ -182,6 +188,36 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (counterpartyBankId && !payeeBanks.some((b) => b.id === counterpartyBankId)) setCounterpartyBankId('');
   }, [payeeBanks, counterpartyBankId]);
 
+  // 2.5 — a Bank Payment defaults to the payee's PRIMARY bank so reconciliation doesn't need a
+  // manual pick every time (the point of storing per-party banks).
+  useEffect(() => {
+    if (method === 'bank_transfer' && !counterpartyBankId && payeeBanks.length) {
+      const primary = payeeBanks.find((b) => b.is_primary);
+      if (primary) setCounterpartyBankId(primary.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payeeBanks, method]);
+
+  // 2.7 — load the chosen supplier's purchase orders so a general expense can be attached to one.
+  // Skipped in order mode (the order is already fixed) and for one-off payees (no CRM record).
+  useEffect(() => {
+    setPickedOrderId('');
+    setPoOptions([]);
+    if (!open || orderId || !party || !party.id) return;
+    let cancelled = false;
+    (async () => {
+      const companyId = party.type === 'company'
+        ? party.id
+        : await financeService.resolvePrimaryCompanyId(party.id!).catch(() => null);
+      if (!companyId || cancelled) return;
+      try {
+        const pos = await ordersService.listPurchaseOrdersForSupplier(workspaceId, companyId);
+        if (!cancelled) setPoOptions(pos.map((p) => ({ id: p.id, order_number: p.order_number, total: p.total })));
+      } catch { /* non-fatal — matching stays optional */ }
+    })();
+    return () => { cancelled = true; };
+  }, [open, orderId, party, workspaceId]);
+
   // Optional supplier/payee search (suppliers only).
   useEffect(() => {
     if (!open) return;
@@ -260,7 +296,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         supplierCompanyId: cpCompanyId,
         supplierContactId: cpContactId,
         supplierName: adhocSupplierName,
-        orderId,
+        orderId: effectiveOrderId,
         currency,
         subtotalNet: parseDecimalOr(subtotalNet, 0),
         vatAmount: parseDecimalOr(vatAmount, 0),
@@ -382,6 +418,21 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </div>
             )}
           </div>
+
+          {!orderId && poOptions.length > 0 && (
+            <div className="space-y-1">
+              <Label>On purchase order <span className="text-muted-foreground font-normal">(optional — attaches the cost to a PO)</span></Label>
+              <Select value={pickedOrderId || '__none__'} onValueChange={(v) => setPickedOrderId(v === '__none__' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="— No purchase order —" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— No purchase order —</SelectItem>
+                  {poOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.order_number || p.id.slice(0, 8)} · {p.total.toFixed(2)} {currency}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">

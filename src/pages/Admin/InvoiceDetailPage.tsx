@@ -29,9 +29,12 @@ import {
   paymentMethodLabel,
   type InvoiceWithItems,
   type PaymentMethod,
+  type BankAccountBalance,
 } from '@/modules/finance/services/financeService';
+import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
+import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 
 const PAYMENT_METHODS: PaymentMethod[] = ['bank_transfer', 'cash', 'card', 'check', 'other'];
@@ -571,6 +574,13 @@ const RecordPaymentDialog: React.FC<{
   const [reference, setReference] = useState('');
   const [paidAt, setPaidAt] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
+  // Capture cash location + P&L category + receipt, matching every other money-in path (these were
+  // silently dropped by this bespoke dialog).
+  const [bankAccounts, setBankAccounts] = useState<BankAccountBalance[]>([]);
+  const [bankAccountId, setBankAccountId] = useState<string>('');
+  const [categories, setCategories] = useState<FinanceCategory[]>([]);
+  const [categoryId, setCategoryId] = useState<string>('');
+  const [sendReceipt, setSendReceipt] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const foreign = currency !== (invoice.currency || 'EUR');
@@ -585,8 +595,19 @@ const RecordPaymentDialog: React.FC<{
       setReference('');
       setPaidAt(new Date().toISOString().slice(0, 10));
       setNotes('');
+      setCategoryId('');
+      setSendReceipt(true);
+      void (async () => {
+        const [banks, cats] = await Promise.all([
+          financeService.getBankAccountBalances(invoice.workspace_id).catch(() => [] as BankAccountBalance[]),
+          financeCategoriesService.list(invoice.workspace_id).catch(() => [] as FinanceCategory[]),
+        ]);
+        setBankAccounts(banks);
+        setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
+        setCategories(cats);
+      })();
     }
-  }, [open, invoice.amount_due, invoice.currency]);
+  }, [open, invoice.amount_due, invoice.currency, invoice.workspace_id]);
 
   const handleSave = async () => {
     const num = parseFloat(amount);
@@ -616,6 +637,9 @@ const RecordPaymentDialog: React.FC<{
         counterpartyCompanyId: invoice.customer_company_id ?? null,
         reference: reference || null,
         notes: notes || null,
+        categoryId: categoryId || null,
+        bankAccountId: bankAccountId || null,
+        sendReceipt,
         allocations: [{ target_id: invoice.id, target_type: 'invoice', amount: appliedToInvoice, amount_doc: num, fx_rate: rate }],
       });
       toast({ title: 'Payment recorded' });
@@ -664,19 +688,30 @@ const RecordPaymentDialog: React.FC<{
               </div>
             </div>
           )}
+          <PaidFromSelect
+            workspaceId={invoice.workspace_id}
+            label="Deposit to account"
+            value={bankAccountId}
+            onChange={setBankAccountId}
+            method={method}
+            onMethodChange={setMethod}
+            accounts={bankAccounts}
+            allowUnassigned
+          />
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Method</Label>
-              <Select value={method} onValueChange={(v: PaymentMethod) => setMethod(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="space-y-1">
               <Label>Paid on</Label>
               <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Category</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  {categories.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Add categories in Settings</div>
+                    : categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="space-y-1">
@@ -687,6 +722,10 @@ const RecordPaymentDialog: React.FC<{
             <Label>Notes</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
+          <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 cursor-pointer">
+            <span className="text-xs">Send receipt to customer <span className="text-muted-foreground">— emails the payment receipt. Off = record it silently.</span></span>
+            <Switch checked={sendReceipt} onCheckedChange={setSendReceipt} />
+          </label>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

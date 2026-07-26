@@ -18,6 +18,7 @@ import { humanizeLabel } from '@/utils/humanize';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
+import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
@@ -297,13 +298,18 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
  * paid totals + the last-payment date; this card is the itemised history. Read-only — payments
  * are recorded per order (open an order to add one).
  */
-export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId, customerName }) => {
+export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean; supplier?: boolean } }> = ({ contactId, companyId, customerName, roles }) => {
   const { activeWorkspaceId } = useWorkspace();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PaymentWithAllocation[]>([]);
   const [payOpen, setPayOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [billOpen, setBillOpen] = useState(false);
   const [page, setPage] = useState(1);
+  // Money IN from a customer only makes sense for a customer; money OUT (expense / bill) for a
+  // supplier. With no role info (unknown) show both, preserving prior behavior.
+  const showCustomerActions = !roles || roles.customer !== false;
+  const showSupplierActions = !roles || roles.supplier === true;
 
   const reload = useCallback(async () => {
     if (!activeWorkspaceId || (!contactId && !companyId)) { setRows([]); setLoading(false); return; }
@@ -333,12 +339,22 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId, cust
         {activeWorkspaceId && (
           <div className="flex items-center gap-2">
             {/* Money OUT to this party (pay a supplier) is a cost → the expense flow (bill + payment). */}
-            <Button size="sm" variant="outline" onClick={() => setExpenseOpen(true)}>
-              <ShoppingBag className="h-3.5 w-3.5 mr-1" /> Add expense
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Record payment
-            </Button>
+            {showSupplierActions && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setBillOpen(true)}>
+                  <FileText className="h-3.5 w-3.5 mr-1" /> Record bill
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setExpenseOpen(true)}>
+                  <ShoppingBag className="h-3.5 w-3.5 mr-1" /> Add expense
+                </Button>
+              </>
+            )}
+            {/* Money IN from a customer — hidden on a pure supplier where it doesn't apply. */}
+            {showCustomerActions && (
+              <Button size="sm" variant="outline" onClick={() => setPayOpen(true)}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Record payment
+              </Button>
+            )}
           </div>
         )}
       </CardHeader>
@@ -409,6 +425,15 @@ export const PartyPaymentsCard: React.FC<Target> = ({ contactId, companyId, cust
           onOpenChange={setExpenseOpen}
           prefill={{ supplier: { companyId: companyId ?? null, contactId: companyId ? null : (contactId ?? null), name: customerName ?? null } }}
           onCreated={() => { setExpenseOpen(false); void reload(); }}
+        />
+      )}
+      {activeWorkspaceId && (
+        <NewSupplierBillDialog
+          workspaceId={activeWorkspaceId}
+          open={billOpen}
+          onOpenChange={setBillOpen}
+          prefill={{ supplier: { companyId: companyId ?? null, contactId: companyId ? null : (contactId ?? null), name: customerName ?? null } }}
+          onCreated={() => { setBillOpen(false); void reload(); }}
         />
       )}
     </Card>

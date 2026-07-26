@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService } from '@/modules/finance/services/financeService';
+import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { ordersService } from '@/modules/finance/services/ordersService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimalOr } from '@/utils/decimal';
@@ -33,11 +34,19 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
+  /** Pre-select the supplier when opened from a supplier's CRM page. */
+  prefill?: { supplier?: { companyId?: string | null; contactId?: string | null; name?: string | null } } | null;
 }
 
-export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated }) => {
+export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, prefill }) => {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
+
+  const prefillSupplier: Supplier | null = prefill?.supplier?.companyId
+    ? { type: 'company', id: prefill.supplier.companyId, label: prefill.supplier.name ?? 'Supplier' }
+    : prefill?.supplier?.contactId
+      ? { type: 'contact', id: prefill.supplier.contactId, label: prefill.supplier.name ?? 'Supplier' }
+      : null;
 
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -50,6 +59,8 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
   const [issuedAt, setIssuedAt] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [dueAt, setDueAt] = useState<string>('');
   const [notes, setNotes] = useState('');
+  const [categoryId, setCategoryId] = useState<string>('');
+  const [categories, setCategories] = useState<FinanceCategory[]>([]);
 
   // Optional 3-way match: link this bill to one of the supplier's purchase orders.
   const [poOptions, setPoOptions] = useState<Array<{ id: string; order_number: string | null; total: number }>>([]);
@@ -61,7 +72,8 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
     open,
     { supplier, supplierBillNumber, currency, subtotalNet, vatAmount, issuedAt, dueAt, notes },
     (d) => {
-      setSupplier(d?.supplier ?? null);
+      // A supplier passed in from the party page wins over any stale draft supplier.
+      setSupplier(prefillSupplier ?? d?.supplier ?? null);
       setSupplierSearch('');
       setSupplierBillNumber(d?.supplierBillNumber ?? '');
       setCurrency(d?.currency ?? 'EUR');
@@ -108,6 +120,15 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
     }, 200);
     return () => clearTimeout(t);
   }, [supplierSearch, open]);
+
+  // Load P&L categories (so a bill lands in per-category reporting) + apply the party-page prefill.
+  useEffect(() => {
+    if (!open) return;
+    setCategoryId('');
+    if (prefillSupplier) setSupplier(prefillSupplier);
+    financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, workspaceId]);
 
   // Load the chosen supplier's purchase orders so the bill can be matched (3-way match).
   useEffect(() => {
@@ -162,6 +183,7 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
         dueAt: dueAt || undefined,
         notes: notes || undefined,
         orderId: matchedOrderId || undefined,
+        categoryId: categoryId || null,
       });
       toast({ title: 'Supplier bill recorded' });
       clearDraft();
@@ -285,6 +307,18 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
               </Select>
             </div>
           )}
+
+          <div className="space-y-1">
+            <Label>Category <span className="text-muted-foreground font-normal">(P&amp;L bucket)</span></Label>
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+              <SelectContent>
+                {categories.length === 0
+                  ? <div className="px-2 py-1 text-xs text-muted-foreground">Add categories in Settings</div>
+                  : categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="space-y-1">
             <Label>Notes</Label>
