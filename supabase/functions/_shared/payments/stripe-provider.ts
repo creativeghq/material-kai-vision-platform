@@ -43,11 +43,15 @@ export const stripeProvider: PaymentProvider = {
       console.error('[payments/stripe] get_workspace_payout_account failed:', error.message || error);
       return null;
     }
-    if (!destination) return null;
 
     return {
       workspaceId,
-      credentials: { destination: String(destination) },
+      // Connect destination when the workspace completed onboarding → funds route to the tenant's own
+      // connected account (destination charge). Otherwise fall back to a PLATFORM-account charge (no
+      // transfer_data — createCharge omits it), matching the emailed admin pay-link. This makes Stripe
+      // offerable on the customer pay page for EVERY workspace, not only Connect-onboarded ones, so the
+      // pay page and the admin link no longer disagree on whether Stripe is usable.
+      credentials: destination ? { destination: String(destination) } : {},
       isSandbox: false,
     };
   },
