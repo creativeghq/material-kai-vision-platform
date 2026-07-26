@@ -84,7 +84,8 @@ function money(amount: number | null | undefined, currency: string | null | unde
   } catch { return `${amount} ${currency || ''}`.trim(); }
 }
 
-/** Per-source presentation for a thread's channel (the "internal / WhatsApp / email" tag). */
+/** Per-source presentation for a thread's channel (the "Team / Customer / WhatsApp" tag). Email is
+ *  not an inbound channel — inbox threads are internal (in-app chats) or WhatsApp (via Zernio). */
 function channelMeta(t: InboxThread): { label: string; Icon: typeof MessageCircle; className: string } {
   if (t.channel === 'whatsapp') {
     return { label: 'WhatsApp', Icon: MessageCircle, className: 'bg-green-500/15 text-green-400 border-green-500/30' };
@@ -1369,36 +1370,38 @@ const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ workspace
 };
 
 /** Sidebar label management (owner/admin): create, recolor, delete workspace labels. */
+/** Shared workspace-label CRUD (create / recolor / delete) with busy state + toast-on-error, used by
+ *  both the manage popover and the per-thread assign popover. Mutators return true on success so the
+ *  caller can clear its input only when the write actually landed. */
+function useLabelCrud(workspaceId: string, onChanged: () => void) {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  const run = useCallback(async (fn: () => Promise<unknown>, failTitle: string): Promise<boolean> => {
+    setBusy(true);
+    try { await fn(); onChanged(); return true; }
+    catch (e) { toast({ title: failTitle, description: (e as Error).message, variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
+  }, [onChanged, toast]);
+  const create = useCallback((name: string, color: string) => run(() => inboxApi.createLabel(workspaceId, name, color), 'Could not create label'), [run, workspaceId]);
+  const recolor = useCallback((id: string, color: string) => run(() => inboxApi.updateLabel(id, { color }), 'Failed'), [run]);
+  const remove = useCallback((id: string) => run(() => inboxApi.deleteLabel(id), 'Could not delete label'), [run]);
+  return { busy, run, create, recolor, remove };
+}
+
 const LabelManagerPopover: React.FC<{
   workspaceId: string;
   labels: InboxLabel[];
   onChanged: () => void;
 }> = ({ workspaceId, labels, onChanged }) => {
-  const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState(LABEL_COLORS[0].key);
+  const { busy, create: createLabel, recolor, remove } = useLabelCrud(workspaceId, onChanged);
 
   const create = async () => {
     const name = newName.trim();
     if (!name) return;
-    setBusy(true);
-    try { await inboxApi.createLabel(workspaceId, name, newColor); setNewName(''); onChanged(); }
-    catch (e) { toast({ title: 'Could not create label', description: (e as Error).message, variant: 'destructive' }); }
-    finally { setBusy(false); }
-  };
-  const recolor = async (id: string, color: string) => {
-    setBusy(true);
-    try { await inboxApi.updateLabel(id, { color }); onChanged(); }
-    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
-    finally { setBusy(false); }
-  };
-  const remove = async (id: string) => {
-    setBusy(true);
-    try { await inboxApi.deleteLabel(id); onChanged(); }
-    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
-    finally { setBusy(false); }
+    if (await createLabel(name, newColor)) setNewName('');
   };
 
   return (
@@ -1480,46 +1483,22 @@ const LabelAssignButton: React.FC<{
   canManage: boolean;
   onChanged: () => void;
 }> = ({ workspaceId, threadId, labels, assigned, canManage, onChanged }) => {
-  const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState(LABEL_COLORS[0].key);
   const assignedIds = useMemo(() => new Set(assigned.map((l) => l.id)), [assigned]);
+  const { busy, run, create: createLabel, remove } = useLabelCrud(workspaceId, onChanged);
 
-  const toggle = async (labelId: string) => {
+  const toggle = (labelId: string) => {
     const next = new Set(assignedIds);
     if (next.has(labelId)) next.delete(labelId); else next.add(labelId);
-    setBusy(true);
-    try {
-      await inboxApi.setThreadLabels(threadId, [...next]);
-      onChanged();
-    } catch (e) {
-      toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' });
-    } finally { setBusy(false); }
+    return run(() => inboxApi.setThreadLabels(threadId, [...next]), 'Failed');
   };
 
   const create = async () => {
     const name = newName.trim();
     if (!name) return;
-    setBusy(true);
-    try {
-      await inboxApi.createLabel(workspaceId, name, newColor);
-      setNewName('');
-      onChanged();
-    } catch (e) {
-      toast({ title: 'Could not create label', description: (e as Error).message, variant: 'destructive' });
-    } finally { setBusy(false); }
-  };
-
-  const remove = async (labelId: string) => {
-    setBusy(true);
-    try {
-      await inboxApi.deleteLabel(labelId);
-      onChanged();
-    } catch (e) {
-      toast({ title: 'Could not delete label', description: (e as Error).message, variant: 'destructive' });
-    } finally { setBusy(false); }
+    if (await createLabel(name, newColor)) setNewName('');
   };
 
   return (
