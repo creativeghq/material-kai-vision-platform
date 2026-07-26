@@ -78,7 +78,7 @@ export const createManageCompanyAssetsTool = (userId: string, workspaceId: strin
 
       if (args.action === 'list') {
         let q = sb.from('company_assets')
-          .select('id, name, category, identifier, status, acquisition_type, acquisition_cost, currency, assignments:asset_assignments(returned_at, employee:hr_employees(contact:crm_contacts(name, first_name, last_name)), contact:crm_contacts(name, first_name, last_name))')
+          .select('id, name, category, identifier, status, acquisition_type, acquisition_cost, currency, assignments:asset_assignments(returned_at, employee:hr_employees(contact:crm_contacts!hr_employees_crm_contact_id_fkey(name, first_name, last_name)), contact:crm_contacts(name, first_name, last_name))')
           .eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(50);
         if (args.category) q = q.eq('category', args.category);
         const { data, error } = await q;

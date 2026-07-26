@@ -145,7 +145,7 @@ class AssetsService {
         recurring:finance_recurring_expenses(id, description, cadence, subtotal_net, currency),
         assignments:asset_assignments(
           id, assigned_at, returned_at, note,
-          employee:hr_employees(id, contact:crm_contacts(id, name, first_name, last_name, billing_name)),
+          employee:hr_employees(id, contact:crm_contacts!hr_employees_crm_contact_id_fkey(id, name, first_name, last_name, billing_name)),
           contact:crm_contacts(id, name, first_name, last_name, billing_name)
         )
       `)
@@ -275,7 +275,9 @@ class AssetsService {
   async listEmployees(workspaceId: string): Promise<EmployeeOption[]> {
     const { data, error } = await sb
       .from('hr_employees')
-      .select('id, contact:crm_contacts(name, first_name, last_name, billing_name)')
+      // hr_employees has TWO FKs to crm_contacts (crm_contact_id + manager_contact_id), so the embed
+      // must name the constraint or PostgREST can't disambiguate ("more than one relationship").
+      .select('id, contact:crm_contacts!hr_employees_crm_contact_id_fkey(name, first_name, last_name, billing_name)')
       .eq('workspace_id', workspaceId);
     if (error) throw error;
     return (data || [])
