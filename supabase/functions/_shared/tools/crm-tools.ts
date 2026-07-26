@@ -184,6 +184,81 @@ export const createCompanyFromVatTool = (
 };
 
 /**
+ * manage_crm — agent parity for the core CRM spine (#275 / audit T2-3): create a contact and log an
+ * activity/note from chat, the things the page does but the agent previously could not. create_contact
+ * routes through crm-api (validation + dedupe + the crm_contact_created event); log_activity writes
+ * crm_activities with the caller as actor. workspaceId is SERVER-DERIVED; userId is the caller.
+ */
+export const createManageCrmTool = (
+  userId: string,
+  workspaceId: string,
+  jwt: string | undefined,
+  onChunk?: (chunk: AnyRow) => void,
+) => {
+  return tool(
+    async ({ action, name, email, phone, company_name, contact_id, contact_query, kind, title, note }: AnyRow) => {
+      if (action === 'create_contact') {
+        if (!name) return JSON.stringify({ success: false, error: 'create_contact needs a name.' });
+        const created = await callEdge('crm-api/contacts', {
+          workspace_id: workspaceId, name, email: email || undefined, phone: phone || undefined,
+          company_name: company_name || undefined,
+        }, jwt);
+        if (!created.ok) return JSON.stringify({ success: false, error: created.error || `crm-api ${created.status}` });
+        const row = Array.isArray(created.data) ? created.data[0] : (created.data?.data ?? created.data);
+        onChunk?.({ type: 'crm_contact_created', data: { company: null, contact: row, source: 'agent' }, timestamp: Date.now() });
+        return JSON.stringify({ success: true, contact: row, message: `Created contact "${name}".` });
+      }
+
+      if (action === 'log_activity') {
+        // Resolve the target contact (by id or fuzzy name), workspace-scoped.
+        let target: AnyRow | null = null;
+        if (contact_id) {
+          const { data } = await supabase.from('crm_contacts').select('id, name').eq('workspace_id', workspaceId).eq('id', contact_id).maybeSingle();
+          target = data;
+        } else if (contact_query) {
+          const { data } = await supabase.from('crm_contacts').select('id, name').eq('workspace_id', workspaceId).ilike('name', `%${contact_query}%`).limit(5);
+          if (data && data.length > 1) return JSON.stringify({ success: false, error: `Multiple contacts match "${contact_query}". Ask which one.`, candidates: data });
+          target = data?.[0] ?? null;
+        }
+        if (!target) return JSON.stringify({ success: false, error: 'No matching contact — give contact_id or a more specific contact_query.' });
+        const activityType = ['note', 'call', 'email', 'meeting'].includes(String(kind)) ? `${kind}_logged` : 'note_added';
+        const { error } = await supabase.from('crm_activities').insert({
+          workspace_id: workspaceId, target_kind: 'contact', target_id: target.id,
+          activity_type: activityType, title: String(title || `${kind || 'Note'} on ${target.name}`),
+          description: note ? String(note) : null, actor_user_id: userId,
+        });
+        if (error) return JSON.stringify({ success: false, error: error.message });
+        onChunk?.({ type: 'crm_activity_logged', data: { contact: target.name, kind: activityType }, timestamp: Date.now() });
+        return JSON.stringify({ success: true, message: `Logged ${activityType.replace('_', ' ')} on ${target.name}.` });
+      }
+
+      return JSON.stringify({ success: false, error: `unknown action: ${action}` });
+    },
+    {
+      name: 'manage_crm',
+      description:
+        'Core CRM actions from chat: create_contact (add a person to the CRM — name required, optional '
+        + 'email/phone/company_name) and log_activity (record a note/call/email/meeting against a contact — '
+        + 'give contact_id or contact_query + kind + optional title/note). Use for "add John Smith as a '
+        + 'contact" / "log that I called Maria about the quote". For adding a COMPANY from a VAT number use '
+        + 'create_company_from_vat instead.',
+      schema: z.object({
+        action: z.enum(['create_contact', 'log_activity']),
+        name: z.string().optional().describe('create_contact: the person\'s full name (required).'),
+        email: z.string().optional().describe('create_contact: email.'),
+        phone: z.string().optional().describe('create_contact: phone.'),
+        company_name: z.string().optional().describe('create_contact: their company (optional).'),
+        contact_id: z.string().optional().describe('log_activity: the contact UUID.'),
+        contact_query: z.string().optional().describe('log_activity: fuzzy contact name to resolve.'),
+        kind: z.enum(['note', 'call', 'email', 'meeting']).optional().describe('log_activity: activity kind (default note).'),
+        title: z.string().optional().describe('log_activity: short title.'),
+        note: z.string().optional().describe('log_activity: the detail/body.'),
+      }),
+    },
+  );
+};
+
+/**
  * Enrich an EXISTING CRM company from ΑΑΔΕ (the agent equivalent of the company page's
  * "Fetch from ΑΑΔΕ" button — #275 parity). Resolves the company by id or fuzzy name, then calls
  * myaade-rgwspublic2 with the company_id so the edge does the authoritative write-back (structured

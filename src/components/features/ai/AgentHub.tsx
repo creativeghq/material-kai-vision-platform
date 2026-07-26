@@ -294,6 +294,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   email_campaign_sent: 'Campaign sending',
   // CRM
   crm_company_created: 'Company added to CRM',
+  crm_contact_created: 'Contact added to CRM',
+  crm_activity_logged: 'Activity logged',
   crm_kad_results: 'Business activity codes (KAD)',
   // Messaging / WhatsApp
   messaging_channels_list: 'WhatsApp channels',

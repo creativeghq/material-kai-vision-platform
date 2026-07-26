@@ -1429,10 +1429,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'Add companies from a VAT/ΑΦΜ (ΑΑΔΕ/VIES) and refresh existing companies from ΑΑΔΕ.',
     icon: 'Building2',
     moduleSlug: 'crm',
-    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade'],
+    tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm'],
     quick_starts: [
       { label: 'Company from VAT', description: 'Look up a VAT/ΑΦΜ and add the company', prompt: 'Add a company to the CRM from a VAT or ΑΦΜ number — ask me for it.', icon: 'Plus' },
       { label: 'Refresh from ΑΑΔΕ', description: 'Update an existing company from ΑΑΔΕ', prompt: 'Refresh a company\'s details from ΑΑΔΕ — I\'ll tell you which one.', icon: 'RefreshCw' },
+      { label: 'Add a contact', description: 'Add a person to the CRM', prompt: 'Add a new contact to the CRM — I\'ll give you their details.', icon: 'UserPlus' },
+      { label: 'Log an activity', description: 'Record a note/call on a contact', prompt: 'Log an activity on a contact — e.g. that I called them.', icon: 'Pencil' },
     ],
   },
   {

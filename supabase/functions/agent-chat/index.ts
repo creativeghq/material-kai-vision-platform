@@ -873,7 +873,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
       // CRM roster query — "which businesses have ΚΑΔ X?" + create-from-VAT (all users; workspace-scoped)
-      'search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade',
+      'search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
       // B2B Research (admin/owner only)
@@ -1045,7 +1045,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites',
       'price_lookup', 'product_analysis', 'business_analysis', 'dispatch_background_task',
       // Price monitoring + CRM-from-VAT (Pepper is the product/business agent)
-      'track_product_prices', 'get_price_summary', 'create_company_from_vat', 'enrich_company_from_aade',
+      'track_product_prices', 'get_price_summary', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm',
     ],
   },
   marketing: {
@@ -1246,7 +1246,7 @@ async function executeAgent(
       tool_ids: ['manage_finance'],
     },
     'crm': {
-      tool_ids: ['create_company_from_vat', 'enrich_company_from_aade'],
+      tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm'],
     },
     'messaging': {
       tool_ids: ['manage_messaging'],
@@ -1594,7 +1594,7 @@ async function executeAgent(
   const needsMyHr = config.tools.includes('manage_my_hr');
   const needsStock = config.tools.includes('manage_stock');
   const needsRealEstate = config.tools.includes('manage_real_estate');
-  const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade'].includes(t));
+  const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm'].includes(t));
   const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes'].includes(t));
   const needsSocial = config.tools.includes('manage_social');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
@@ -1824,6 +1824,9 @@ async function executeAgent(
   }
   if (config.tools.includes('enrich_company_from_aade') && crmToolsMod?.createEnrichCompanyFromAadeTool) {
     tools.push(crmToolsMod.createEnrichCompanyFromAadeTool(userId, workspaceId, userJwt, onChunk));
+  }
+  if (config.tools.includes('manage_crm') && crmToolsMod?.createManageCrmTool) {
+    tools.push(crmToolsMod.createManageCrmTool(userId, workspaceId, userJwt, onChunk));
   }
 
   // Material search (text-based 7-vector fusion) — now with search_spec support
