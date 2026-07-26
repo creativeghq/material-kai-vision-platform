@@ -91,7 +91,12 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
     .select('id')
     .eq('user_id', auth.userId);
   const contactIds = (contacts ?? []).map((c: any) => c.id);
-  if (contactIds.length === 0) {
+  // A caller with no linked CRM contacts owns nothing. For the READ overview that's an
+  // empty (linked:false) payload — but the action-gated handlers below (order_detail,
+  // reorder) MUST still reach their own 404 ownership gate. Short-circuiting here with a
+  // 200 let an unrelated user probe / reorder someone else's order (BOLA). Only the
+  // overview may take the early exit.
+  if (contactIds.length === 0 && action !== 'order_detail' && action !== 'reorder') {
     return json({ ok: true, invoices: [], receipts: [], linked: false });
   }
 
