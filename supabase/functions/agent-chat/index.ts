@@ -34,7 +34,6 @@ let z: any;
 let StateGraph: any, Annotation: any, END: any, START: any;
 let BaseMessage: any, HumanMessage: any, AIMessage: any, SystemMessage: any;
 let createClient: any;
-let debitExternalServiceCredits: any, checkCreditBalance: any;
 let debitAgentChatTurn: any, refundAgentChatTurn: any, getAgentTurnCost: any;
 let isPartnerApiKeyAccess: any, isEndpointAllowed: any;
 let getToolPrompt: any;
@@ -72,8 +71,6 @@ async function initRuntime() {
     import('../_shared/ai-logger.ts'),
   ]);
 
-  debitExternalServiceCredits = creditMod.debitExternalServiceCredits;
-  checkCreditBalance = creditMod.checkCreditBalance;
   debitAgentChatTurn = creditMod.debitAgentChatTurn;
   refundAgentChatTurn = creditMod.refundAgentChatTurn;
   getAgentTurnCost = creditMod.getAgentTurnCost;
@@ -105,7 +102,6 @@ async function initRuntime() {
   aiCallLogger = new aiLoggerMod.AICallLogger(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   // Initialize singletons that depend on loaded modules
-  checkpointer = new SupabaseCheckpointer();
   longTermMemory = new LongTermMemory();
   buildAgentStateAnnotation();
 
@@ -123,57 +119,6 @@ async function initRuntime() {
   });
 
   _initialized = true;
-}
-
-/**
- * Supabase-based Checkpointer for LangGraph
- * Persists agent state for resumable conversations
- */
-class SupabaseCheckpointer {
-  private tableName = 'agent_checkpoints';
-
-  async get(threadId: string): Promise<any | null> {
-    try {
-      const { data, error } = await supabase
-        .from(this.tableName)
-        .select('checkpoint_data, created_at')
-        .eq('thread_id', threadId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error || !data) return null;
-      return data.checkpoint_data;
-    } catch (error) {
-      console.error('Checkpointer get error:', error);
-      return null;
-    }
-  }
-
-  async put(threadId: string, checkpoint: any): Promise<void> {
-    try {
-      await supabase
-        .from(this.tableName)
-        .upsert({
-          thread_id: threadId,
-          checkpoint_data: checkpoint,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'thread_id' });
-    } catch (error) {
-      console.error('Checkpointer put error:', error);
-    }
-  }
-
-  async delete(threadId: string): Promise<void> {
-    try {
-      await supabase
-        .from(this.tableName)
-        .delete()
-        .eq('thread_id', threadId);
-    } catch (error) {
-      console.error('Checkpointer delete error:', error);
-    }
-  }
 }
 
 /**
@@ -285,7 +230,6 @@ class LongTermMemory {
 }
 
 // Singletons — initialized in initRuntime()
-let checkpointer: SupabaseCheckpointer;
 let longTermMemory: LongTermMemory;
 
 /**
@@ -1115,18 +1059,22 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [],
   },
+  // insights/seo resolve to the OPEN `kai` agent (id:'kai'), so their allowedRoles must mirror
+  // kai's — a narrower ['admin','owner'] gate here enforced nothing (a member simply sent
+  // agentId:'kai' for the identical capability set) while spuriously 403-ing a legacy member-role
+  // frontend that still sends 'insights'/'seo'. Kept honest = same open roles as kai.
   insights: {
     id: 'kai',
     name: 'KAI Agent',
     description: 'Legacy alias → KAI',
-    allowedRoles: ['admin', 'owner'],
+    allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [],
   },
   seo: {
     id: 'kai',
     name: 'KAI Agent',
     description: 'Legacy alias → KAI',
-    allowedRoles: ['admin', 'owner'],
+    allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [],
   },
 };
@@ -1847,13 +1795,53 @@ async function executeAgent(
     tools.push(createPresentationSheetTool(userId, onChunk));
   }
 
+  // ── Connected-website context for the SEO toolkit ──────────────────────────
+  // Resolve the workspace's connected websites once so every SEO tool defaults to
+  // (and files its output under) the primary site, and the agent can ask which
+  // site to use when there are several. "Ask, default to primary."
+  let seoDefaultWebsite:
+    | { id: string; url: string; domain: string; display_name: string | null; is_default: boolean }
+    | null = null;
+  const needsSeoWebsiteCtx = isAdmin && !!workspaceId && config.tools.some((t: string) => t.startsWith('seo_') || t === 'create_seo_article');
+  if (needsSeoWebsiteCtx) {
+    try {
+      const { data: wsRows } = await supabase
+        .from('user_websites')
+        .select('id, url, display_name, is_default')
+        .eq('workspace_id', workspaceId)
+        .eq('is_active', true)
+        .order('is_default', { ascending: false })
+        .order('created_at', { ascending: false });
+      const seoWebsites = (wsRows || []).map((r: any) => {
+        let domain = '';
+        try { domain = new URL(/^https?:\/\//i.test(r.url) ? r.url : `https://${r.url}`).hostname.replace(/^www\./i, ''); }
+        catch { domain = String(r.url || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || ''; }
+        return { id: r.id, url: r.url, domain, display_name: r.display_name ?? null, is_default: !!r.is_default };
+      });
+      seoDefaultWebsite = seoWebsites[0] ?? null;
+      if (seoWebsites.length > 0) {
+        const list = seoWebsites.map((w: any) =>
+          `- ${w.display_name || w.domain} (${w.domain})${w.is_default ? ' [default]' : ''} — website_id: ${w.id}`).join('\n');
+        systemPrompt += `\n\n[CONNECTED WEBSITES]\nThe workspace has these connected websites for SEO work:\n${list}\n\n`
+          + `When the user runs any SEO tool or asks to research/audit/write content for "their site":\n`
+          + `- If a website is marked [default], use it automatically and say which site you used (pass its website_id + domain to the SEO tool).\n`
+          + `- If there are multiple sites and none is [default], ask the user which one to use before running.\n`
+          + `- Only omit the website when the user is clearly researching a competitor or an unrelated keyword.`;
+      } else {
+        systemPrompt += `\n\n[CONNECTED WEBSITES]\nThe workspace has NO connected website yet. When the user asks to research/audit/write for "their site", run the SEO tool generically, then suggest they connect a website under My Profile → Websites so results are saved to a per-site dashboard and inter-linking can use their own pages.`;
+      }
+    } catch (e) {
+      console.warn('[agent-chat] connected websites resolve failed:', e instanceof Error ? e.message : e);
+    }
+  }
+
   // SEO toolkit (admin-only — each call spends real DataForSEO credits on the platform's tab).
   // 25 tools across keyword research, SERP audit, URL audit, domain intel,
   // backlinks, OnPage crawl, content + domain analytics, LLM-mention native
   // search, multi-engine SERP, Google Trends, composite audits, escape hatch.
   if (isAdmin) {
   if (config.tools.includes('seo_research_keyword') && createSEOResearchKeywordTool) {
-    tools.push(createSEOResearchKeywordTool(userId, onChunk));
+    tools.push(createSEOResearchKeywordTool(userId, onChunk, { supabase, workspaceId, defaultWebsite: seoDefaultWebsite }));
   }
   if (config.tools.includes('seo_keyword_difficulty') && createSEOKeywordDifficultyTool) {
     tools.push(createSEOKeywordDifficultyTool(userId, onChunk));
@@ -2445,12 +2433,7 @@ async function executeAgent(
   const selectedModel = getModelForAgent(agentId, messages, images, hasDocuments);
   const modelName = getModelNameForAgent(agentId, messages, images, hasDocuments);
 
-  // 🔷 LangGraph StateGraph-based execution with checkpointing
-
-  // Use conversation_id for stable thread ID (falls back to user+agent if none provided)
-  const threadId = conversation_id
-    ? `${userId}-${agentId}-${conversation_id}`
-    : `${userId}-${agentId}-${Date.now()}`;
+  // 🔷 LangGraph StateGraph-based execution
 
   // Create the agent graph — force tool use for interior-designer (prevents JARVIS text-first responses)
   const forceToolCall = agentId === 'interior-designer' && tools.length > 0;
@@ -2595,13 +2578,6 @@ async function executeAgent(
   try {
     // Execute the graph
     const result = await agentGraph.invoke(initialState);
-
-    // Save checkpoint for future resume (fire-and-forget — don't block response)
-    checkpointer.put(threadId, {
-      messages: result.messages,
-      toolResults: result.toolResults,
-      timestamp: new Date().toISOString(),
-    }).catch(e => console.warn('⚠️ Checkpoint save failed:', e));
 
     // Log final usage stats
 
@@ -2880,6 +2856,32 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
         );
       }
     }
+
+    // Cost guard (#3): images/documents are turned into native Anthropic vision/document content
+    // blocks with no per-item or aggregate cap, while the per-turn fee is flat (partner) or
+    // metered only post-hoc (internal). An unbounded multimodal payload could drive tens of
+    // dollars of vision/document tokens per turn for a fixed/near-zero charge. Bound count + bytes
+    // BEFORE any model call — reject oversized attachments with 413.
+    const MAX_IMAGES = 12;
+    const MAX_DOCUMENTS = 6;
+    const MAX_MULTIMODAL_CHARS = 32 * 1024 * 1024; // base64 chars ≈ ~24MB raw across all attachments
+    const reject413 = (msg: string) => new Response(
+      JSON.stringify({ error: msg }),
+      { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+    if (Array.isArray(images) && images.length > MAX_IMAGES) {
+      return reject413(`Too many images attached: ${images.length} (max ${MAX_IMAGES} per turn).`);
+    }
+    if (Array.isArray(documents) && documents.length > MAX_DOCUMENTS) {
+      return reject413(`Too many documents attached: ${documents.length} (max ${MAX_DOCUMENTS} per turn).`);
+    }
+    const multimodalChars = [
+      ...(Array.isArray(images) ? images : []),
+      ...(Array.isArray(documents) ? documents : []),
+    ].reduce((n: number, s: unknown) => n + (typeof s === 'string' ? s.length : 0), 0);
+    if (multimodalChars > MAX_MULTIMODAL_CHARS) {
+      return reject413(`Attached media too large (~${Math.round(multimodalChars / 1024 / 1024)}MB, max ${Math.round(MAX_MULTIMODAL_CHARS / 1024 / 1024)}MB per turn).`);
+    }
     // user_id: string | null — only honored when the caller authenticates with
     // the platform sb_secret_* admin key (server-to-server "act on behalf of"
     // pattern, same as generate-interior-gemini / generate-region-edit /
@@ -3021,6 +3023,34 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
       throw new Error('No workspace found for user');
     }
 
+    // ── Internal-user credit floor gate (#1) ─────────────────────────────
+    // Partners are gated above against a fixed per-turn cost. Internal (session-JWT and
+    // admin-on-behalf) turns are billed POST-HOC by log_agent_usage — it computes a token-based
+    // credit charge and routes it through debit_credits (workspace pool if funded, else personal).
+    // Without a pre-turn gate a user at zero/negative balance could keep sending Opus turns
+    // indefinitely: each turn burns real Anthropic $ and is never blocked. Reject when the effective
+    // balance (pool-if-member-else-personal, cap-aware — same decision debit_credits makes) can't
+    // cover even a nominal credit. One final turn of overage is bounded and acceptable (mirrors the
+    // partner path, which also can't refund the last turn); indefinite free Opus is not.
+    if (!isPartner) {
+      try {
+        const { data: pf, error: pfErr } = await auth.supabase.rpc('preflight_credits', {
+          p_user_id: userId!, p_amount: 1, p_workspace_id: workspaceId,
+        });
+        const row = Array.isArray(pf) ? pf[0] : pf;
+        if (!pfErr && row && row.sufficient === false) {
+          return new Response(
+            JSON.stringify({ error: 'insufficient_credits', current_balance: Number(row.balance ?? 0) }),
+            { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+      } catch (e) {
+        // Fail-open on a transient preflight error — the post-hoc debit still runs; a preflight
+        // blip must not take chat down for everyone.
+        console.warn('[agent-chat] internal balance preflight failed (allowing turn):', e);
+      }
+    }
+
     // ── Partner per-turn debit (charges BEFORE invoking the agent) ────────
     // Refund on hard pre-stream crash. Once streaming starts, no refund:
     // Anthropic + tool spend has already happened on our side.
@@ -3062,6 +3092,9 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // tool_call / text_chunk / final_result, the underlying Anthropic + tool spend
     // hasn't started yet, so we can safely return the per-turn credit.
     let hasStreamedRealContent = false;
+    // Chunk types that stream BEFORE any upstream (Anthropic/tool) spend — pure orchestration
+    // noise. Keeping partner-refund eligibility alive across these lets a pre-spend crash refund.
+    const NON_SPEND_CHUNK_TYPES = new Set(['status', 'heartbeat', 'iteration', 'agent_routed']);
     const refundIfNotConsumed = async (reason: string) => {
       if (!isPartner || hasStreamedRealContent || partnerTurnDebitedCredits <= 0) return;
       try {
@@ -3089,9 +3122,14 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           try {
             const chunk = encoder.encode(JSON.stringify(data) + '\n');
             controller.enqueue(chunk);
-            // Mark partner-refund eligibility off once the agent has produced
-            // anything spendworthy. status/heartbeat are pre-execution noise.
-            if (data?.type && data.type !== 'status' && data.type !== 'heartbeat') {
+            // Mark partner-refund eligibility off once the agent has produced anything
+            // spendworthy. NON_SPEND_CHUNK_TYPES are orchestration noise emitted BEFORE the
+            // first upstream call — status/heartbeat (keepalive), `iteration` (emitted at the
+            // top of each agent loop, before model.invoke) and `agent_routed` (emitted by the
+            // two-tier router before the specialist runs). Counting them as "real content"
+            // (bug #2) meant a crash on the very first Anthropic call — which cost us nothing —
+            // skipped the partner refund, charging the partner the full per-turn fee for zero work.
+            if (data?.type && !NON_SPEND_CHUNK_TYPES.has(data.type)) {
               hasStreamedRealContent = true;
             }
             return true;

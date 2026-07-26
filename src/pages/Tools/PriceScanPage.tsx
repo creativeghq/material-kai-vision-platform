@@ -29,7 +29,7 @@ export default function PriceScanPage() {
   const { user, session } = useAuth();
   const accessToken = session?.access_token ?? null;
   const isAuthenticated = !!user;
-  const { quota, setQuota, quotaError } = useToolsQuota(accessToken);
+  const { quota, setQuota, quotaError } = useToolsQuota(accessToken, 'price');
 
   const [productName, setProductName] = useState('');
   const [manufacturer, setManufacturer] = useState('');

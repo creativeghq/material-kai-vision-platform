@@ -113,6 +113,15 @@ export interface CreateListingInput {
   imageUrls?: string[];
 }
 
+/**
+ * Remove characters that carry meaning in the PostgREST filter grammar (`,` `(` `)` `\`) plus the
+ * ilike wildcards (`%` `*`) from a free-text search term, so it can be safely interpolated into an
+ * `.or(...)` / `.ilike(...)` expression. RLS is the security boundary; this keeps the query grammar intact.
+ */
+function sanitizeIlike(raw: string): string {
+  return raw.replace(/[,()\\%*]/g, ' ').trim();
+}
+
 function extractPriceAnchor(meta: Record<string, any>): number | null {
   const candidates = [
     meta?.retail_price, meta?.price,
@@ -202,16 +211,27 @@ export const marketplaceService = {
     return map;
   },
 
-  /** Cross-tenant browse of active surplus (server-side filtered — RLS gates to business users). */
+  /**
+   * Cross-tenant browse of active surplus. Reads the `marketplace_public_listings` definer view,
+   * which exposes only the safe projection and self-gates on `status='active' AND is_business_user()`
+   * — the base table's RLS no longer has a cross-tenant read branch (T1-1), so this is the only
+   * cross-workspace read surface and it can never return created_by / warehouse_item_id.
+   */
   async browse(filters: BrowseFilters = {}): Promise<MarketplaceListing[]> {
-    let q = sb.from('marketplace_listings').select(LISTING_COLUMNS).eq('status', 'active');
+    let q = sb.from('marketplace_public_listings').select(LISTING_COLUMNS).eq('status', 'active');
     if (filters.materialCategory) q = q.eq('material_category', filters.materialCategory);
     if (filters.minPrice != null) q = q.gte('price', filters.minPrice);
     if (filters.maxPrice != null) q = q.lte('price', filters.maxPrice);
-    if (filters.city) q = q.ilike('location_city', `%${filters.city}%`);
+    if (filters.city) q = q.ilike('location_city', `%${sanitizeIlike(filters.city)}%`);
     if (filters.conditions?.length) q = q.in('condition', filters.conditions);
     if (filters.deliveries?.length) q = q.in('delivery_option', filters.deliveries);
-    if (filters.q) q = q.or(`title.ilike.%${filters.q}%,seller_name.ilike.%${filters.q}%`);
+    if (filters.q) {
+      // Strip PostgREST filter-grammar metacharacters — a raw `,` / `(` / `)` in `q` would
+      // otherwise split or break the .or() expression. RLS still gates rows, but keep the
+      // query well-formed and injection-proof.
+      const term = sanitizeIlike(filters.q);
+      if (term) q = q.or(`title.ilike.%${term}%,seller_name.ilike.%${term}%`);
+    }
     q = q.order('created_at', { ascending: false })
          .range(filters.offset ?? 0, (filters.offset ?? 0) + (filters.limit ?? 40) - 1);
     const { data, error } = await q;
@@ -222,7 +242,7 @@ export const marketplaceService = {
   /** product_id → cheapest active surplus listing, for the "also available as surplus" badge. */
   async surplusByProduct(): Promise<Record<string, { price: number; currency: string }>> {
     const { data, error } = await sb
-      .from('marketplace_listings')
+      .from('marketplace_public_listings')
       .select('product_id, price, currency')
       .eq('status', 'active')
       .not('product_id', 'is', null);
@@ -237,7 +257,8 @@ export const marketplaceService = {
   },
 
   async getListing(id: string): Promise<MarketplaceListing | null> {
-    const { data, error } = await sb.from('marketplace_listings').select(LISTING_COLUMNS).eq('id', id).maybeSingle();
+    // Cross-tenant detail read → the safe-projection view (active listings only).
+    const { data, error } = await sb.from('marketplace_public_listings').select(LISTING_COLUMNS).eq('id', id).maybeSingle();
     if (error) throw error;
     return (data ?? null) as MarketplaceListing | null;
   },

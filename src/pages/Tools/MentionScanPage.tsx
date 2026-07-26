@@ -28,7 +28,7 @@ export default function MentionScanPage() {
   const { user, session } = useAuth();
   const accessToken = session?.access_token ?? null;
   const isAuthenticated = !!user;
-  const { quota, setQuota, quotaError } = useToolsQuota(accessToken);
+  const { quota, setQuota, quotaError } = useToolsQuota(accessToken, 'mention');
 
   const [subjectLabel, setSubjectLabel] = useState('');
   const [country, setCountry] = useState('');
