@@ -534,27 +534,23 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
 
     await logLookup('aade', result.valid_afm);
 
-    // Cache + mirror into structured columns. Only when caller is the company owner OR admin.
+    // Cache + mirror into structured columns. The write-back gate MUST match the LOOKUP gate: the
+    // caller is already a verified finance-manager of body.workspace_id (isLookupMgr, else we 403'd
+    // above), and they just spent the TAXISnet quota + triggered the ΑΦΜ's audit notification. The old
+    // gate (created_by === user OR GLOBAL role admin/super_admin/owner) was STRICTER than the lookup, so
+    // a finance-role user or a workspace-admin member who didn't create the company passed the lookup but
+    // the cache never persisted → the 90-day short-circuit could never fire → every repeat re-burned the
+    // quota and re-notified the third party. Now: persist whenever the company belongs to the authorized
+    // workspace.
     if (body.company_id) {
       const { data: company } = await admin
         .from('crm_companies')
-        .select('id, created_by, kad_all')
+        .select('id, created_by, kad_all, workspace_id')
         .eq('id', body.company_id)
         .maybeSingle();
 
       if (company) {
-        let canWrite = company.created_by === user.id;
-        if (!canWrite) {
-          const { data: profile } = await admin
-            .from('user_profiles')
-            .select('roles!user_profiles_role_id_fkey(name)')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          // deno-lint-ignore no-explicit-any
-          const rn = (profile as any)?.roles?.name;
-          canWrite = rn === 'admin' || rn === 'super_admin' || rn === 'owner';
-        }
-
+        const canWrite = company.workspace_id === body.workspace_id;
         if (canWrite) {
           const primaryAct = activities.find((a) => a.kind === 1) ?? activities[0] ?? null;
           const secondaryActs = activities.filter((a) => a.kind !== 1);
