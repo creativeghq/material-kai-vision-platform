@@ -54,7 +54,7 @@ export const BranchesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm flex items-center gap-2"><Building2 className="h-4 w-4" /> Establishments</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Establishments</CardTitle>
         <Button size="sm" variant="outline" className="rounded-full" onClick={() => setAdding((v) => !v)}>
           <Plus className="h-3.5 w-3.5 mr-1" /> Add establishment
         </Button>

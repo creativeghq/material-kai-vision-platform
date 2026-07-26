@@ -150,7 +150,7 @@ const ModulesPage: React.FC = () => {
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
                 <div>
-                  <CardTitle className="text-base">Unregistered modules in database</CardTitle>
+                  <CardTitle>Unregistered modules in database</CardTitle>
                   <CardDescription>
                     {orphanedRows.length} module row{orphanedRows.length === 1 ? '' : 's'} in the database
                     {' '}have no matching folder under <code>src/modules/</code>:
@@ -190,7 +190,7 @@ const ModulesPage: React.FC = () => {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4 text-primary" />
-                      <CardTitle className="text-base">{manifest.name}</CardTitle>
+                      <CardTitle>{manifest.name}</CardTitle>
                     </div>
                     <div className="flex items-center gap-1">
                       {bill?.is_addon && (

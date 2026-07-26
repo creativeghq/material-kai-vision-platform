@@ -177,7 +177,7 @@ export const ImageEmbeddingsInspector: React.FC<ImageEmbeddingsInspectorProps> =
       {/* Vision Analysis status */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
             Vision Analysis
             {va.present ? (
@@ -240,7 +240,7 @@ export const ImageEmbeddingsInspector: React.FC<ImageEmbeddingsInspectorProps> =
       {/* Non-aspect embeddings — visual SLIG + understanding */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Primary embeddings</CardTitle>
+          <CardTitle>Primary embeddings</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <NonAspectRow
@@ -257,7 +257,7 @@ export const ImageEmbeddingsInspector: React.FC<ImageEmbeddingsInspectorProps> =
       {/* Aspect embeddings — color/texture/style/material */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm">
+          <CardTitle>
             Aspect embeddings
             {status.stale_aspects.length > 0 && (
               <Badge variant="outline" className="ml-2 text-amber-700 border-amber-500 text-xs">

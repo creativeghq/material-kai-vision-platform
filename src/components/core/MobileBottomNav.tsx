@@ -167,7 +167,7 @@ export const MobileBottomNav: React.FC = () => {
           className="max-h-[80vh] overflow-y-auto rounded-t-2xl bg-sidebar border-t border-white/8 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
         >
           <SheetHeader className="text-left">
-            <SheetTitle className="text-base font-light">Menu</SheetTitle>
+            <SheetTitle className="font-light">Menu</SheetTitle>
           </SheetHeader>
           <div className="grid grid-cols-3 gap-1.5 pt-2 sm:grid-cols-4">
             {overflowItems.map((item) => {

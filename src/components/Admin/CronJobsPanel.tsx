@@ -161,7 +161,7 @@ export const CronJobsPanel: React.FC = () => {
         <div className="flex items-start justify-between gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+              <Calendar className="h-4 w-4" />
               Cron Jobs
               {totalFailures24h > 0 && (
                 <Badge variant="destructive">

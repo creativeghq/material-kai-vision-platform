@@ -81,7 +81,7 @@ export const PricingRulesCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><Tag className="h-4 w-4" /> Category Markup Rules</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4" /> Category Markup Rules</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">

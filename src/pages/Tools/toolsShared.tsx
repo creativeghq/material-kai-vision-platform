@@ -184,7 +184,7 @@ export function ScanningPanel({ kind }: { kind: 'price' | 'mention' | 'product' 
             </div>
           </div>
           <div>
-            <CardTitle className="text-lg">{title}</CardTitle>
+            <CardTitle>{title}</CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
               This usually takes 5–20 seconds. We're calling several sources in parallel.
             </p>
@@ -245,7 +245,7 @@ export function PriceResultsCard({ data }: { data: PublicPriceScanResponse }) {
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Store className="h-4 w-4 text-primary" />
               {data.stats.count} retailer{data.stats.count === 1 ? '' : 's'} found
             </CardTitle>
@@ -427,7 +427,7 @@ export function ProductResultsCard({ data, isAuthenticated }: { data: PublicProd
     <Card className="mt-6 dashboard-card overflow-hidden">
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between flex-wrap gap-3">
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <PackageSearch className="h-4 w-4 text-primary" />
             {data.total_results} material{data.total_results === 1 ? '' : 's'} found
           </CardTitle>
@@ -512,7 +512,7 @@ export function MentionResultsCard({ data }: { data: PublicMentionScanResponse }
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Newspaper className="h-4 w-4 text-primary" />
               {data.total_results} mention{data.total_results === 1 ? '' : 's'} in the last 30 days
             </CardTitle>

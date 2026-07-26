@@ -140,7 +140,7 @@ export const ModuleSubscribersPanel: React.FC = () => {
             <Card key={m.module_slug}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <CardTitle className="text-base flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
                     {m.module_name}
                     {m.is_addon && m.addon_price_cents != null && (
                       <Badge variant="outline">{money(m.addon_price_cents, m.addon_currency)}/mo</Badge>

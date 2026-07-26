@@ -98,7 +98,7 @@ const MentionMonitoringDashboard: React.FC = () => {
 
       <Card className="dashboard-card">
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-sm">Subjects</CardTitle>
+          <CardTitle>Subjects</CardTitle>
           <FilterBar
             groups={filterGroups}
             values={filterValues}

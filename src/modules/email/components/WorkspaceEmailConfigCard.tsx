@@ -104,7 +104,7 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><Mail className="h-4 w-4" /> Email Sender (Bring Your Own Resend)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Mail className="h-4 w-4" /> Email Sender (Bring Your Own Resend)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         {/* The platform default sender only applies to TRANSACTIONAL email (invoices/statements/

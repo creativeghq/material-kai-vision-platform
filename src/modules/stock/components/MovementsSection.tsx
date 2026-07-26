@@ -53,7 +53,7 @@ export const MovementsSection: React.FC<{ workspaceId: string }> = ({ workspaceI
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-sm">Stock movements</CardTitle>
+        <CardTitle>Stock movements</CardTitle>
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Item, reason, source…" className="h-8 w-52 pl-7 text-xs" />

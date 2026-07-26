@@ -226,7 +226,7 @@ export const BusinessIdentityCard: React.FC<{ workspaceId: string }> = ({ worksp
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-sm flex items-center gap-2"><Building2 className="h-4 w-4" /> Business Profile (Invoicing &amp; myDATA)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4" /> Business Profile (Invoicing &amp; myDATA)</CardTitle>
         <div className="flex items-center gap-2">
           <LangToggle lang={lang} onChange={setLang} />
           <Button size="sm" onClick={save} disabled={saving} className="rounded-full">

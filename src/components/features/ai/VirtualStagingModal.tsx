@@ -161,7 +161,7 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
               </button>
             )}
             <div className="flex-1">
-              <DialogTitle className="text-base font-semibold">{isDesign ? 'New Interior Design' : 'Virtual Staging'}</DialogTitle>
+              <DialogTitle className="font-semibold">{isDesign ? 'New Interior Design' : 'Virtual Staging'}</DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">{stepLabel}</p>
             </div>
             {/* Step indicators */}

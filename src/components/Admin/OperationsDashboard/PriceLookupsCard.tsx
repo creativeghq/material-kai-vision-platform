@@ -84,7 +84,7 @@ export const PriceLookupsCard: React.FC = () => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <DollarSign className="h-5 w-5" />
+          <DollarSign className="h-4 w-4" />
           Price Lookups <span className="text-xs font-normal text-muted-foreground">(AI mode)</span>
         </CardTitle>
         <p className="text-xs text-muted-foreground">

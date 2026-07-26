@@ -419,7 +419,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">
+              <CardTitle className="font-medium">
                 Total Models
               </CardTitle>
             </CardHeader>
@@ -431,7 +431,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <CardTitle className="font-medium flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 Working
               </CardTitle>
@@ -448,7 +448,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <CardTitle className="font-medium flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 Failing
               </CardTitle>
@@ -465,7 +465,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <CardTitle className="font-medium flex items-center gap-2">
                 <Clock className="h-4 w-4 text-yellow-600" />
                 Untested
               </CardTitle>

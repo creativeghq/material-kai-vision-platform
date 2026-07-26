@@ -65,7 +65,7 @@ export const PaymentProvidersCard: React.FC<{ workspaceId: string }> = ({ worksp
     <>
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="flex items-center gap-2 text-sm"><CreditCard className="h-4 w-4 text-primary" /> Payment providers</CardTitle>
+          <CardTitle className="flex items-center gap-2"><CreditCard className="h-4 w-4 text-primary" /> Payment providers</CardTitle>
           <CardDescription className="text-xs">Accept card &amp; bank payments from your customers on invoices. Each provider is a separate add-on — enable the ones you want and connect your own merchant account.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">

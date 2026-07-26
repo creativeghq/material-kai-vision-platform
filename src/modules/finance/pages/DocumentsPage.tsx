@@ -281,7 +281,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             ) : (
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
-                <CardTitle className="text-sm flex items-center gap-2 capitalize"><FileText className="h-4 w-4" /> {DOC_LABEL[type]}</CardTitle>
+                <CardTitle className="flex items-center gap-2 capitalize"><FileText className="h-4 w-4" /> {DOC_LABEL[type]}</CardTitle>
                 {docActions}
               </CardHeader>
               <CardContent className="p-0">

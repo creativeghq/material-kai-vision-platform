@@ -84,7 +84,7 @@ export const AdminRoleUpgradeRequestsPanel: React.FC<Props> = ({ userId, onUpdat
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
             Role Upgrade Requests
             {pending.length > 0 && (

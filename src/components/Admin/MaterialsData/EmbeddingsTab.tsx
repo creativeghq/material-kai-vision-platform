@@ -161,7 +161,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
+                <Database className="h-4 w-4" />
                 All Embeddings
               </CardTitle>
               <CardDescription>

@@ -177,7 +177,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
       {/* Log form */}
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="text-sm flex items-center gap-2"><Clock className="h-4 w-4" /> Log time</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" /> Log time</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 p-5 md:grid-cols-6">
           <div className="space-y-1 md:col-span-2">
@@ -228,7 +228,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
       {/* Unbilled + bill action */}
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
-          <CardTitle className="text-sm">Unbilled time</CardTitle>
+          <CardTitle>Unbilled time</CardTitle>
           <div className="flex items-center gap-3 text-xs">
             {selectedRows.length > 0 && (
               <>
@@ -275,7 +275,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
       {/* Time reports — per user / per contact */}
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0 flex-wrap gap-2">
-          <CardTitle className="text-sm flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Time reports</CardTitle>
+          <CardTitle className="flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Time reports</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-md border border-border/60 p-0.5">
               <button type="button" onClick={() => setRepView('user')} className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${repView === 'user' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}><Users className="h-3.5 w-3.5" /> By user</button>
@@ -354,7 +354,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
       {/* Billed history */}
       {billed.length > 0 && (
         <Card>
-          <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Billed</CardTitle></CardHeader>
+          <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Billed</CardTitle></CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border/40">
               {paginate(billed, billedPage).map((e) => (

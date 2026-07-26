@@ -640,7 +640,7 @@ export const MetadataManagement: React.FC = () => {
             {/* Controls */}
             <Card className="dashboard-card">
               <CardHeader>
-                <CardTitle className="text-base font-normal">Run Configuration</CardTitle>
+                <CardTitle className="font-normal">Run Configuration</CardTitle>
                 <CardDescription>Configure and trigger a batch categorization run using Claude Haiku</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
@@ -692,7 +692,7 @@ export const MetadataManagement: React.FC = () => {
             {lastRun && (
               <Card className="dashboard-card">
                 <CardHeader>
-                  <CardTitle className="text-base font-normal">Results</CardTitle>
+                  <CardTitle className="font-normal">Results</CardTitle>
                   <CardDescription>{lastRun.message}</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">

@@ -115,7 +115,7 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
       ) : ordersView.map((o) => (
         <Card key={o.order_id} className="dashboard-card border-0">
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-3">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="font-medium">
               PO {o.order_number} <span className="text-muted-foreground font-normal">· {o.buyer_name}</span>
             </CardTitle>
             <span className="flex items-center gap-2 shrink-0">

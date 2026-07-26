@@ -382,7 +382,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-primary" />Business
+            <Building2 className="h-4 w-4 text-primary" />Business
           </CardTitle>
           {!editing ? (
             <div className="flex gap-2">

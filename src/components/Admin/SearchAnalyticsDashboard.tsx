@@ -370,7 +370,7 @@ export const SearchAnalyticsDashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
+                <TrendingUp className="h-4 w-4" />
                 Popular Search Queries
               </CardTitle>
               <CardDescription>Most frequently searched terms by users</CardDescription>
@@ -432,7 +432,7 @@ export const SearchAnalyticsDashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
+                <Package className="h-4 w-4" />
                 Material Demand Analytics
               </CardTitle>
               <CardDescription>
@@ -518,7 +518,7 @@ export const SearchAnalyticsDashboard = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
+            <Filter className="h-4 w-4" />
             Procurement Insights
           </CardTitle>
           <CardDescription>
@@ -629,7 +629,7 @@ export const SearchAnalyticsDashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
+                  <Clock className="h-4 w-4" />
                   Per-Stage Average Timings
                 </CardTitle>
                 <CardDescription>
@@ -683,7 +683,7 @@ export const SearchAnalyticsDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" />
+              <Zap className="h-4 w-4" />
               Slowest Queries
             </CardTitle>
             <CardDescription>
@@ -729,7 +729,7 @@ export const SearchAnalyticsDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5" />
+              <AlertCircle className="h-4 w-4" />
               Zero-Result Queries
             </CardTitle>
             <CardDescription>
@@ -820,7 +820,7 @@ export const SearchAnalyticsDashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+              <TrendingUp className="h-4 w-4" />
               Top Cached Queries
             </CardTitle>
             <CardDescription>

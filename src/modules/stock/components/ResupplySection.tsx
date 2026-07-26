@@ -85,7 +85,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
         <div className="min-w-0">
-          <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Resupply forecast</CardTitle>
+          <CardTitle className="flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Resupply forecast</CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">Consumption velocity → days of cover vs supplier lead time. Items that will run out before a reorder lands are flagged.</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">

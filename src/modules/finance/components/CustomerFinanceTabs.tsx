@@ -333,7 +333,7 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Banknote className="h-4 w-4" /> Payments
         </CardTitle>
         {activeWorkspaceId && (
@@ -467,7 +467,7 @@ export const CustomerTopItemsCard: React.FC<Target> = ({ contactId, companyId })
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Top items to push <span className="text-[10px] font-normal text-muted-foreground">· in stock</span></CardTitle>
+        <CardTitle className="flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Top items to push <span className="text-[10px] font-normal text-muted-foreground">· in stock</span></CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full text-sm">

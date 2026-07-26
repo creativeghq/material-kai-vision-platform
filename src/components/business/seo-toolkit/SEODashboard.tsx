@@ -210,7 +210,7 @@ const KeywordResearchTab: React.FC = () => {
   return (
     <Card className="dashboard-card">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <CardTitle className="text-sm">Research history</CardTitle>
+        <CardTitle>Research history</CardTitle>
         <div className="flex items-center gap-2">
           <Button
             size="sm" variant={filter === 'all' ? 'default' : 'outline'}
@@ -346,7 +346,7 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
     <>
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm">Tracked domains</CardTitle>
+          <CardTitle>Tracked domains</CardTitle>
           <Button onClick={() => setShowAdd(true)} size="sm" className="rounded-full">
             <Plus className="h-3 w-3 mr-1" /> Track domain
           </Button>
@@ -553,7 +553,7 @@ const BacklinksTab: React.FC = () => {
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle className="text-sm">Backlink overview across tracked domains</CardTitle>
+        <CardTitle>Backlink overview across tracked domains</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         {domains.length === 0 ? (
@@ -604,7 +604,7 @@ const CompetitiveIntelTab: React.FC = () => {
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle className="text-sm">Competitive intel</CardTitle>
+        <CardTitle>Competitive intel</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3 text-sm">

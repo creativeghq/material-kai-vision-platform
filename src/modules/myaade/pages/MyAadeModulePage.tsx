@@ -79,7 +79,7 @@ const MyAadeModulePage: React.FC = () => {
         {/* Registration hint */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Don't have credentials yet?</CardTitle>
+            <CardTitle>Don't have credentials yet?</CardTitle>
             <CardDescription>
               AADE requires a separate <strong>Special Access Codes</strong> credential pair — distinct from your regular TAXISnet login — created specifically for software to use on your behalf.
             </CardDescription>
@@ -116,7 +116,7 @@ const MyAadeModulePage: React.FC = () => {
         {/* Connection test */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2"><Search className="h-4 w-4" />Test lookup</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Search className="h-4 w-4" />Test lookup</CardTitle>
             <CardDescription>
               Live call to AADE. Confirms the credentials work and shows you the data shape. Counts against your monthly TAXISnet quota.
             </CardDescription>

@@ -246,7 +246,7 @@ const Section: React.FC<{
 }> = ({ title, rows, onMarkPaid, onCancel, markingId, accent }) => (
   <Card className={accent === 'destructive' ? 'border-destructive/40' : ''}>
     <CardHeader className="border-b border-border/60 px-5 py-2">
-      <CardTitle className={`text-xs font-semibold ${accent === 'destructive' ? 'text-destructive' : ''}`}>{title} · {rows.length}</CardTitle>
+      <CardTitle className={`font-semibold ${accent === 'destructive' ? 'text-destructive' : ''}`}>{title} · {rows.length}</CardTitle>
     </CardHeader>
     <CardContent className="p-0">
       <FlatTable rows={rows} onMarkPaid={onMarkPaid} onCancel={onCancel} markingId={markingId} />

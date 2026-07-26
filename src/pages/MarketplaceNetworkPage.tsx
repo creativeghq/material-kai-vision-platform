@@ -124,7 +124,7 @@ const MarketplaceNetworkPage: React.FC = () => {
       />
       <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-6">
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Sub-workspaces</CardTitle></CardHeader>
+        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Sub-workspaces</CardTitle></CardHeader>
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>

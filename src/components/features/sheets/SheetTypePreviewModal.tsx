@@ -167,7 +167,7 @@ export function SheetTypePreviewModal({ open, sheetType, onCancel, onContinue }:
     <Dialog open={open} onOpenChange={(next) => { if (!next) onCancel(); }}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
+          <DialogTitle className="flex items-center gap-2">
             <Icon className="h-5 w-5 text-primary" />
             {SHEET_TYPE_LABELS[sheetType]}
             {credits > 0 && (

@@ -333,7 +333,7 @@ const TripCardDetail: React.FC<{
       <CardHeader className="border-b border-border/60 px-5 py-3 space-y-2">
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <div>
-            <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
+            <CardTitle className="flex items-center gap-2 flex-wrap">
               <Badge variant="secondary" className="text-[10px]">{EXPENSE_CARD_TYPE_LABEL[report.card_type] ?? 'Trip'}</Badge>
               {report.title}
               <Badge variant={STATUS_VARIANT[report.status]} className="text-[10px]">{TRIP_STATUS_LABEL[report.status]}</Badge>

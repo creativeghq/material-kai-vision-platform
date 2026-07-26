@@ -78,7 +78,7 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm flex items-center gap-2"><Wrench className="h-4 w-4" /> Services</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Wrench className="h-4 w-4" /> Services</CardTitle>
         {editing === null && <Button size="sm" variant="outline" onClick={startNew}><Plus className="h-3.5 w-3.5 mr-1" /> New service</Button>}
       </CardHeader>
       <CardContent className="space-y-3 p-5">

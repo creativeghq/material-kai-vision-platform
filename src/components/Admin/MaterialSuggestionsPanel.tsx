@@ -202,7 +202,7 @@ export const MaterialSuggestionsPanel: React.FC<{ embedded?: boolean }> = ({ emb
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
+              <Sparkles className="h-4 w-4" />
               3D Material Suggestions Configuration
             </CardTitle>
           </CardHeader>

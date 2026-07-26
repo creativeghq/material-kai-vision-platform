@@ -336,7 +336,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           }}
         >
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">
+            <DialogTitle className="font-bold">
               {documentId ? 'Edit Document' : 'Create New Document'}
             </DialogTitle>
           </DialogHeader>

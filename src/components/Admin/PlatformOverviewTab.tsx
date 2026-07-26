@@ -909,7 +909,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Quote Pipeline by Status</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Quote Pipeline by Status</CardTitle></CardHeader>
           <CardContent>
             {quoteFunnel.length === 0 ? <EmptyState /> : (
               <ResponsiveContainer width="100%" height={240}>
@@ -923,7 +923,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Weekly Quotes Submitted (12w)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Weekly Quotes Submitted (12w)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={weeklyQuotes} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -937,7 +937,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">User Mix by Professional Type</CardTitle></CardHeader>
+          <CardHeader><CardTitle>User Mix by Professional Type</CardTitle></CardHeader>
           <CardContent>
             {userTypes.length === 0 ? <EmptyState /> : (
               <ResponsiveContainer width="100%" height={240}>
@@ -947,7 +947,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">New User Signups per Week (12w)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>New User Signups per Week (12w)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={weeklyGrowth} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -961,7 +961,7 @@ export function PlatformOverviewTab() {
       </div>
       {topQuotedProducts.length > 0 && (
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Top 10 Quoted Products</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Top 10 Quoted Products</CardTitle></CardHeader>
           <CardContent>
             <div className="overflow-auto max-h-[280px]">
               <table className="w-full text-sm"><thead className="sticky top-0 bg-muted/50 border-b border-border/50"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">Product</th><th className="text-right py-2 font-medium">Inclusions</th></tr></thead>
@@ -981,7 +981,7 @@ export function PlatformOverviewTab() {
       </div>
       {topFactories.length > 0 && (
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Top Brands by Buyer Engagement (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">Ranked by combined moodboard saves + quote inclusions</p></CardHeader>
+          <CardHeader><CardTitle>Top Brands by Buyer Engagement (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">Ranked by combined moodboard saves + quote inclusions</p></CardHeader>
           <CardContent>
             <div className="overflow-auto max-h-[340px]">
               <table className="w-full text-sm"><thead className="sticky top-0 bg-muted/50 border-b border-border/50"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">Brand</th><th className="text-right py-2 pr-4 font-medium">Catalog</th><th className="text-right py-2 pr-4 font-medium">Saves</th><th className="text-right py-2 pr-4 font-medium">Quotes</th><th className="text-right py-2 font-medium">Conv.</th></tr></thead>
@@ -992,7 +992,7 @@ export function PlatformOverviewTab() {
         </Card>
       )}
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-sm">Catalog Growth — New Products Added per Week (12w)</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Catalog Growth — New Products Added per Week (12w)</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={catalogGrowth} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1014,7 +1014,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Weekly Credit Activity by Transaction Type</CardTitle><p className="text-xs text-muted-foreground mt-1">Debits, purchases, refunds, bonuses and grants over time</p></CardHeader>
+          <CardHeader><CardTitle>Weekly Credit Activity by Transaction Type</CardTitle><p className="text-xs text-muted-foreground mt-1">Debits, purchases, refunds, bonuses and grants over time</p></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={weeklyCredits} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1031,7 +1031,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">AI Model Cost Breakdown</CardTitle><p className="text-xs text-muted-foreground mt-1">Credits consumed per AI model over the last 12 weeks</p></CardHeader>
+          <CardHeader><CardTitle>AI Model Cost Breakdown</CardTitle><p className="text-xs text-muted-foreground mt-1">Credits consumed per AI model over the last 12 weeks</p></CardHeader>
           <CardContent>
             {aiModelCosts.length === 0 ? <EmptyState message="No AI usage logs found" /> : (
               <ResponsiveContainer width="100%" height={260}>
@@ -1048,7 +1048,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">AI Operation Type — Credit Spend</CardTitle><p className="text-xs text-muted-foreground mt-1">Which operation types consume the most credits</p></CardHeader>
+          <CardHeader><CardTitle>AI Operation Type — Credit Spend</CardTitle><p className="text-xs text-muted-foreground mt-1">Which operation types consume the most credits</p></CardHeader>
           <CardContent>
             {aiOperationCosts.length === 0 ? <EmptyState message="No AI usage data" /> : (
               <ResponsiveContainer width="100%" height={240}>
@@ -1062,7 +1062,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Weekly AI Cost Trend (USD)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Weekly AI Cost Trend (USD)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={aiCostTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
@@ -1077,7 +1077,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">User Credit Balance Distribution</CardTitle><p className="text-xs text-muted-foreground mt-1">How many users fall in each balance tier</p></CardHeader>
+          <CardHeader><CardTitle>User Credit Balance Distribution</CardTitle><p className="text-xs text-muted-foreground mt-1">How many users fall in each balance tier</p></CardHeader>
           <CardContent>
             {creditBalanceDist.length === 0 ? <EmptyState message="No balance data" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1091,7 +1091,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Top 10 Credit Consumers (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">Heaviest AI usage — anonymous user IDs</p></CardHeader>
+          <CardHeader><CardTitle>Top 10 Credit Consumers (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">Heaviest AI usage — anonymous user IDs</p></CardHeader>
           <CardContent>
             {topCreditConsumers.length === 0 ? <EmptyState message="No usage data yet" /> : (
               <div className="overflow-auto max-h-[220px]">
@@ -1116,7 +1116,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">VR World Quality Split (draft vs 1.1)</CardTitle><p className="text-xs text-muted-foreground mt-1">draft = 18 credits (~30s), 1.1 = 190 credits (~5min)</p></CardHeader>
+          <CardHeader><CardTitle>VR World Quality Split (draft vs 1.1)</CardTitle><p className="text-xs text-muted-foreground mt-1">draft = 18 credits (~30s), 1.1 = 190 credits (~5min)</p></CardHeader>
           <CardContent>
             {vrQualitySplit.length === 0 ? <EmptyState message="No VR worlds generated yet" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1126,7 +1126,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">VR Generation — Success vs Failure (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>VR Generation — Success vs Failure (weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={vrStatusTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1142,7 +1142,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">3D Generation Room Types</CardTitle><p className="text-xs text-muted-foreground mt-1">Which room types users generate most</p></CardHeader>
+          <CardHeader><CardTitle>3D Generation Room Types</CardTitle><p className="text-xs text-muted-foreground mt-1">Which room types users generate most</p></CardHeader>
           <CardContent>
             {gen3dRoomTypes.length === 0 ? <EmptyState message="No 3D jobs yet" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1156,7 +1156,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">3D Generation — Status by Week</CardTitle></CardHeader>
+          <CardHeader><CardTitle>3D Generation — Status by Week</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={gen3dStatusTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1173,7 +1173,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">3D Jobs & Segments Generated (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>3D Jobs & Segments Generated (weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={gen3dTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1187,7 +1187,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">SVBRDF Extractions (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>SVBRDF Extractions (weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={svbrdfTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1201,7 +1201,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Detected Zone Types in 3D Segments</CardTitle><p className="text-xs text-muted-foreground mt-1">Which room zones the AI identifies most</p></CardHeader>
+          <CardHeader><CardTitle>Detected Zone Types in 3D Segments</CardTitle><p className="text-xs text-muted-foreground mt-1">Which room zones the AI identifies most</p></CardHeader>
           <CardContent>
             {segmentZones.length === 0 ? <EmptyState message="No segment data yet" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1215,7 +1215,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Top Detected Materials in Segments</CardTitle><p className="text-xs text-muted-foreground mt-1">What the AI identifies as the material in each zone</p></CardHeader>
+          <CardHeader><CardTitle>Top Detected Materials in Segments</CardTitle><p className="text-xs text-muted-foreground mt-1">What the AI identifies as the material in each zone</p></CardHeader>
           <CardContent>
             {topDetectedMaterials.length === 0 ? <EmptyState message="No material detection data" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1230,7 +1230,7 @@ export function PlatformOverviewTab() {
         </Card>
       </div>
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-sm">Avg Segment Confidence Score (weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Higher = AI is more certain about detected materials in each zone</p></CardHeader>
+        <CardHeader><CardTitle>Avg Segment Confidence Score (weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Higher = AI is more certain about detected materials in each zone</p></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={avgConfidenceTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
@@ -1253,7 +1253,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Agent Run Outcomes</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Agent Run Outcomes</CardTitle></CardHeader>
           <CardContent>
             {agentOutcomePie.length === 0 ? <EmptyState message="No agent runs yet" /> : (
               <ResponsiveContainer width="100%" height={240}>
@@ -1263,7 +1263,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Agent Success vs Failure (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Agent Success vs Failure (weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={agentSuccessTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1279,7 +1279,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Avg Execution Time by Agent Type</CardTitle><p className="text-xs text-muted-foreground mt-1">Milliseconds — longer times may indicate delegation to Python backend</p></CardHeader>
+          <CardHeader><CardTitle>Avg Execution Time by Agent Type</CardTitle><p className="text-xs text-muted-foreground mt-1">Milliseconds — longer times may indicate delegation to Python backend</p></CardHeader>
           <CardContent>
             {agentAvgTime.length === 0 ? <EmptyState message="No timing data yet" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1295,7 +1295,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Credits Consumed by Agent Type (12w)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Credits Consumed by Agent Type (12w)</CardTitle></CardHeader>
           <CardContent>
             {agentCreditsByType.length === 0 ? <EmptyState message="No credit data yet" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1310,7 +1310,7 @@ export function PlatformOverviewTab() {
         </Card>
       </div>
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-sm">AI Agent Runs by Type (weekly stacked)</CardTitle></CardHeader>
+        <CardHeader><CardTitle>AI Agent Runs by Type (weekly stacked)</CardTitle></CardHeader>
         <CardContent>
           {agentsByType.length === 0 || topAgentTypes.length === 0 ? <EmptyState message="No agent runs recorded" /> : (
             <ResponsiveContainer width="100%" height={260}>
@@ -1342,7 +1342,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">New Follows per Week (12w)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>New Follows per Week (12w)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={followsGrowth} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1354,7 +1354,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Review Rating Distribution</CardTitle><p className="text-xs text-muted-foreground mt-1">Star ratings left on materials</p></CardHeader>
+          <CardHeader><CardTitle>Review Rating Distribution</CardTitle><p className="text-xs text-muted-foreground mt-1">Star ratings left on materials</p></CardHeader>
           <CardContent>
             {reviewRatingDist.length === 0 ? <EmptyState message="No reviews yet" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1370,7 +1370,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Hire Me — Services Requested</CardTitle><p className="text-xs text-muted-foreground mt-1">What buyers are hiring designers for</p></CardHeader>
+          <CardHeader><CardTitle>Hire Me — Services Requested</CardTitle><p className="text-xs text-muted-foreground mt-1">What buyers are hiring designers for</p></CardHeader>
           <CardContent>
             {hireMeServices.length === 0 ? <EmptyState message="No hire requests yet" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1384,7 +1384,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Hire Me — Request Status Funnel</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Hire Me — Request Status Funnel</CardTitle></CardHeader>
           <CardContent>
             {hireMeFunnel.length === 0 ? <EmptyState message="No hire requests yet" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1400,7 +1400,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Review Velocity & Avg Rating (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Review Velocity & Avg Rating (weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={reviewVelocity} margin={{ top: 5, right: 30, left: -20, bottom: 5 }}>
@@ -1416,7 +1416,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Moodboard Activity (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Moodboard Activity (weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={moodboardActivity} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1431,7 +1431,7 @@ export function PlatformOverviewTab() {
         </Card>
       </div>
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-sm">Creator Community Growth by Professional Type (weekly signups)</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Creator Community Growth by Professional Type (weekly signups)</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={creatorGrowth} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1455,7 +1455,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Search Strategy Distribution</CardTitle><p className="text-xs text-muted-foreground mt-1">Which AI search pipeline users trigger</p></CardHeader>
+          <CardHeader><CardTitle>Search Strategy Distribution</CardTitle><p className="text-xs text-muted-foreground mt-1">Which AI search pipeline users trigger</p></CardHeader>
           <CardContent>
             {searchStrategyDist.length === 0 ? <EmptyState message="No strategy data" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1465,7 +1465,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Agent Used in Search</CardTitle><p className="text-xs text-muted-foreground mt-1">Which agent handled each search session</p></CardHeader>
+          <CardHeader><CardTitle>Agent Used in Search</CardTitle><p className="text-xs text-muted-foreground mt-1">Which agent handled each search session</p></CardHeader>
           <CardContent>
             {searchAgentDist.length === 0 ? <EmptyState message="No agent routing data" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1477,7 +1477,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Search Latency (avg ms per week)</CardTitle><p className="text-xs text-muted-foreground mt-1">Lower = faster search pipeline</p></CardHeader>
+          <CardHeader><CardTitle>Search Latency (avg ms per week)</CardTitle><p className="text-xs text-muted-foreground mt-1">Lower = faster search pipeline</p></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={searchLatencyTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
@@ -1490,7 +1490,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Click-Through Rate (weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Clicks per search — higher = more relevant results</p></CardHeader>
+          <CardHeader><CardTitle>Click-Through Rate (weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Clicks per search — higher = more relevant results</p></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={searchCTRTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
@@ -1505,7 +1505,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Weekly Search Volume (12w)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Weekly Search Volume (12w)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={searchVolume} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1517,7 +1517,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Search → Save → Quote Funnel</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Search → Save → Quote Funnel</CardTitle></CardHeader>
           <CardContent>
             {searchFunnel.length === 0 ? <EmptyState /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1533,7 +1533,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Top Search Terms (12w)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Top Search Terms (12w)</CardTitle></CardHeader>
           <CardContent>
             {topSearches.length === 0 ? <EmptyState message="No searches recorded" /> : (
               <div className="overflow-auto max-h-[240px]">
@@ -1545,7 +1545,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Zero-Result Searches — Catalog Gaps</CardTitle><p className="text-xs text-muted-foreground mt-1">What buyers searched for but found nothing</p></CardHeader>
+          <CardHeader><CardTitle>Zero-Result Searches — Catalog Gaps</CardTitle><p className="text-xs text-muted-foreground mt-1">What buyers searched for but found nothing</p></CardHeader>
           <CardContent>
             {zeroResultTerms.length === 0 ? <EmptyState message="No zero-result searches" /> : (
               <div className="space-y-2 pt-1">
@@ -1566,7 +1566,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Docs by Status</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Docs by Status</CardTitle></CardHeader>
           <CardContent>
             {kbStatusBreakdown.length === 0 ? <EmptyState message="No KB docs" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1576,7 +1576,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Embedding Health</CardTitle><p className="text-xs text-muted-foreground mt-1">success / pending / failed</p></CardHeader>
+          <CardHeader><CardTitle>Embedding Health</CardTitle><p className="text-xs text-muted-foreground mt-1">success / pending / failed</p></CardHeader>
           <CardContent>
             {kbEmbeddingHealth.length === 0 ? <EmptyState message="No embedding data" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1586,7 +1586,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Docs by Category</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Docs by Category</CardTitle></CardHeader>
           <CardContent>
             {kbDocsByCategory.length === 0 ? <EmptyState message="No KB docs found" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1598,7 +1598,7 @@ export function PlatformOverviewTab() {
       </div>
       {kbTopViewed.length > 0 && (
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Top Viewed Articles</CardTitle><p className="text-xs text-muted-foreground mt-1">Most read KB documents</p></CardHeader>
+          <CardHeader><CardTitle>Top Viewed Articles</CardTitle><p className="text-xs text-muted-foreground mt-1">Most read KB documents</p></CardHeader>
           <CardContent>
             <div className="space-y-2">
               {kbTopViewed.map((doc, i) => (
@@ -1618,7 +1618,7 @@ export function PlatformOverviewTab() {
         </Card>
       )}
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle className="text-sm">Document Chunks Indexed per Week (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">New text chunks added to the RAG knowledge base</p></CardHeader>
+        <CardHeader><CardTitle>Document Chunks Indexed per Week (12w)</CardTitle><p className="text-xs text-muted-foreground mt-1">New text chunks added to the RAG knowledge base</p></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chunkGrowth} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1639,7 +1639,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">PDF Batch Jobs — Success vs Failed (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>PDF Batch Jobs — Success vs Failed (weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={pdfJobTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1653,7 +1653,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">XML / Data Import Throughput (weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Records imported per week via XML/batch jobs</p></CardHeader>
+          <CardHeader><CardTitle>XML / Data Import Throughput (weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Records imported per week via XML/batch jobs</p></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={importThroughput} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1667,7 +1667,7 @@ export function PlatformOverviewTab() {
       </div>
       {enrichmentStatus.length > 0 && (
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Product Enrichment Status</CardTitle><p className="text-xs text-muted-foreground mt-1">How many products have been fully enriched with embeddings and metadata</p></CardHeader>
+          <CardHeader><CardTitle>Product Enrichment Status</CardTitle><p className="text-xs text-muted-foreground mt-1">How many products have been fully enriched with embeddings and metadata</p></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart><Pie data={enrichmentStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, value }) => `${name}: ${value}`}>{enrichmentStatus.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /></PieChart>
@@ -1693,7 +1693,7 @@ export function PlatformOverviewTab() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
             <Card className="rounded-2xl">
-              <CardHeader><CardTitle className="text-sm">Weekly Price Refresh Activity (12w)</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Weekly Price Refresh Activity (12w)</CardTitle></CardHeader>
               <CardContent>
                 {pricingWeekly.some(w => w.refreshes + w.marketplace > 0) ? (
                   <ResponsiveContainer width="100%" height={220}>
@@ -1714,7 +1714,7 @@ export function PlatformOverviewTab() {
             </Card>
 
             <Card className="rounded-2xl">
-              <CardHeader><CardTitle className="text-sm">Hits by Marketplace Source (12w)</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Hits by Marketplace Source (12w)</CardTitle></CardHeader>
               <CardContent>
                 {marketplaceBySource.some(s => s.count > 0) ? (
                   <ResponsiveContainer width="100%" height={220}>
@@ -1736,7 +1736,7 @@ export function PlatformOverviewTab() {
           {pricingSourceDist.length > 0 && (
             <Card className="rounded-2xl mt-4">
               <CardHeader>
-                <CardTitle className="text-sm">All Competitor Sources Distribution (12w)</CardTitle>
+                <CardTitle>All Competitor Sources Distribution (12w)</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={240}>
@@ -1772,7 +1772,7 @@ export function PlatformOverviewTab() {
       </div>
       {notifTrend.some(w => w.email + w.sms + w.web + w.inapp > 0) ? (
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle className="text-sm">Weekly Notification Sends by Channel (12w)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Weekly Notification Sends by Channel (12w)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={notifTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1802,7 +1802,7 @@ export function PlatformOverviewTab() {
       {/* ─── 11. Factory Registration Pipeline ──────────────────── */}
       {factoryPipeline.length > 0 && (
         <Card className="mt-8">
-          <CardHeader><CardTitle className="text-sm font-semibold flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Brand Registration Pipeline</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="font-semibold flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Brand Registration Pipeline</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-3 mb-4">
               {factoryPipeline.map((p) => (

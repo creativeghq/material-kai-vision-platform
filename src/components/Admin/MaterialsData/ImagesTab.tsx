@@ -305,7 +305,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <ImageIcon className="h-5 w-5" />
+                <ImageIcon className="h-4 w-4" />
                 All Images
               </CardTitle>
               <CardDescription>
@@ -449,7 +449,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {/* Classification Section */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Classification</CardTitle>
+                    <CardTitle>Classification</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
 
@@ -510,7 +510,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {selectedImage.vision_analysis && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Vision Analysis</CardTitle>
+                      <CardTitle>Vision Analysis</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {/* Material Type */}
@@ -645,7 +645,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {selectedImage.material_properties && Object.keys(selectedImage.material_properties).length > 0 && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Material Properties (Extracted)</CardTitle>
+                      <CardTitle>Material Properties (Extracted)</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {Object.entries(selectedImage.material_properties).map(([key, value]: [string, any]) => {
@@ -676,7 +676,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {(selectedImage.caption || selectedImage.alt_text) && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Image Text</CardTitle>
+                      <CardTitle>Image Text</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {selectedImage.caption && (
@@ -699,7 +699,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {(selectedImage.vision_analysis?.description || selectedImage.claude_validation?.description) && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">AI Analysis</CardTitle>
+                      <CardTitle>AI Analysis</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {selectedImage.vision_analysis?.description && (
@@ -722,7 +722,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {(selectedImage.quality_score || selectedImage.quality_metrics) && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Quality Metrics</CardTitle>
+                      <CardTitle>Quality Metrics</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {selectedImage.quality_score && (
@@ -745,7 +745,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {(selectedImage.ocr_extracted_text || selectedImage.ocr_confidence_score) && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">OCR Data</CardTitle>
+                      <CardTitle>OCR Data</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {selectedImage.ocr_confidence_score && (
@@ -768,7 +768,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {(selectedImage.contextual_name || selectedImage.nearest_heading) && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Context</CardTitle>
+                      <CardTitle>Context</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {selectedImage.contextual_name && (
@@ -794,7 +794,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {selectedImage.visual_features && Object.keys(selectedImage.visual_features).length > 0 && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Visual Features</CardTitle>
+                      <CardTitle>Visual Features</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {Object.entries(selectedImage.visual_features).map(([key, value]: [string, any]) => (
@@ -811,7 +811,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {selectedImage.image_analysis_results && Object.keys(selectedImage.image_analysis_results).length > 0 && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Image Analysis</CardTitle>
+                      <CardTitle>Image Analysis</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {Object.entries(selectedImage.image_analysis_results).map(([key, value]: [string, any]) => (
@@ -828,7 +828,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {selectedImage.metadata && Object.keys(selectedImage.metadata).length > 0 && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Metadata</CardTitle>
+                      <CardTitle>Metadata</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {selectedImage.metadata.filename && (
@@ -863,7 +863,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {selectedImage.visual_metadata && Object.keys(selectedImage.visual_metadata).length > 0 && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Visual Metadata</CardTitle>
+                      <CardTitle>Visual Metadata</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {Object.entries(selectedImage.visual_metadata).map(([key, value]: [string, any]) => (
@@ -880,7 +880,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {selectedImage.multimodal_metadata && Object.keys(selectedImage.multimodal_metadata).length > 0 && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Multimodal Metadata</CardTitle>
+                      <CardTitle>Multimodal Metadata</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {Object.entries(selectedImage.multimodal_metadata).map(([key, value]: [string, any]) => (
@@ -897,7 +897,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {selectedImage.extracted_metadata && Object.keys(selectedImage.extracted_metadata).length > 0 && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Extracted Metadata</CardTitle>
+                      <CardTitle>Extracted Metadata</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {Object.entries(selectedImage.extracted_metadata).map(([key, value]: [string, any]) => (
@@ -915,7 +915,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                   (selectedImage.product_relationships && selectedImage.product_relationships.length > 0)) && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Relationships</CardTitle>
+                      <CardTitle>Relationships</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {/* Related Chunks */}
@@ -993,7 +993,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {selectedImage.bbox && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Bounding Box</CardTitle>
+                      <CardTitle>Bounding Box</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <div className="text-xs bg-muted p-2 rounded font-mono">
@@ -1006,7 +1006,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 {/* Embeddings Section */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Embeddings</CardTitle>
+                    <CardTitle>Embeddings</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {imageEmbeddings.length === 0 ? (

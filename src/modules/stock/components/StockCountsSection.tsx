@@ -59,7 +59,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row flex-wrap items-center justify-between gap-2">
-        <CardTitle className="text-sm flex items-center gap-2"><ClipboardList className="h-4 w-4" /> Stock counts (stocktake)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><ClipboardList className="h-4 w-4" /> Stock counts (stocktake)</CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           {counts.length > 0 && (
             <FilterBar

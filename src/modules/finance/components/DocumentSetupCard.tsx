@@ -108,7 +108,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
   return (
     <Card className="lg:col-span-2">
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm">Document Types &amp; Series</CardTitle>
+        <CardTitle>Document Types &amp; Series</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full text-sm">

@@ -30,7 +30,7 @@ export const CollapsibleCard: React.FC<CollapsibleCardProps> = ({
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
           <CardHeader className="flex-row items-center justify-between space-y-0 py-4 cursor-pointer select-none">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               {Icon && <Icon className="h-4 w-4" />} {title}
             </CardTitle>
             <span className="flex items-center gap-2">

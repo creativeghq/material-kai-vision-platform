@@ -168,7 +168,7 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl">Add to Moodboard</DialogTitle>
+          <DialogTitle>Add to Moodboard</DialogTitle>
           <DialogDescription>
             {productName || 'Select a moodboard or create a new one'}
           </DialogDescription>

@@ -860,7 +860,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <DialogTitle className="text-base font-semibold text-foreground truncate">
+                <DialogTitle className="font-semibold text-foreground truncate">
                   Interior Design Render
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground mt-0.5">
@@ -1592,7 +1592,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       <Dialog open={showMaskReview && !!activeMask && !!selectedImage} onOpenChange={(open) => { if (!open) setShowMaskReview(false); }}>
         <DialogContent className="max-w-2xl w-full p-5 gap-4">
           <DialogHeader className="p-0">
-            <DialogTitle className="text-sm font-semibold">
+            <DialogTitle className="font-semibold">
               {activeZone ? `Replacing: ${activeZone.label}` : 'Drawn mask'}
             </DialogTitle>
             <DialogDescription className="text-xs">

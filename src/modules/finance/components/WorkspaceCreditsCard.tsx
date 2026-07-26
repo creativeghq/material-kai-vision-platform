@@ -82,7 +82,7 @@ export const WorkspaceCreditsCard: React.FC<{ workspaceId: string }> = ({ worksp
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><Coins className="h-4 w-4" /> Workspace Credit Pool</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Coins className="h-4 w-4" /> Workspace Credit Pool</CardTitle>
         <CardDescription className="text-xs">
           Fund one shared balance the whole team spends from. Members draw from the pool when it has credits; otherwise they use their own personal balance.
         </CardDescription>

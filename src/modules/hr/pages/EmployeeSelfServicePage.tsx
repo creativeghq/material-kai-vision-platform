@@ -111,7 +111,7 @@ export default function EmployeeSelfServicePage() {
               </CardContent>
             </Card>
             <Card>
-              <CardHeader><CardTitle className="text-base">Recent punches</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Recent punches</CardTitle></CardHeader>
               <CardContent className="p-0">
                 {punches.length === 0 ? <EmptyState icon={Clock} title="No punches yet" hint="Clock in above to start." /> : (
                   <div className="divide-y divide-border/40">
@@ -143,7 +143,7 @@ export default function EmployeeSelfServicePage() {
                   <HrStat label="Status" value={<span className="capitalize">{profile.status.replace('_', ' ')}</span>} />
                 </div>
                 <Card>
-                  <CardHeader><CardTitle className="text-base">{name}</CardTitle></CardHeader>
+                  <CardHeader><CardTitle>{name}</CardTitle></CardHeader>
                   <CardContent className="grid sm:grid-cols-2 gap-y-2 gap-x-6 text-sm">
                     <Field label="Position" value={profile.contact?.position} />
                     <Field label="Department" value={profile.department?.name} />
@@ -159,7 +159,7 @@ export default function EmployeeSelfServicePage() {
 
           <TabsContent value="onboarding" className="space-y-4">
             <Card>
-              <CardHeader><CardTitle className="text-base">Onboarding {tasks.length > 0 && <span className="text-xs text-muted-foreground font-normal">· {done}/{tasks.length} done</span>}</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Onboarding {tasks.length > 0 && <span className="text-xs text-muted-foreground font-normal">· {done}/{tasks.length} done</span>}</CardTitle></CardHeader>
               <CardContent>
                 {tasks.length === 0 ? <EmptyState icon={ClipboardCheck} title="Nothing to onboard" /> : (
                   <div className="space-y-1">

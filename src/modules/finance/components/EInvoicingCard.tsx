@@ -128,7 +128,7 @@ export const EInvoicingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity })
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><FileSignature className="h-4 w-4" /> e-Invoicing (Novus → myDATA)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><FileSignature className="h-4 w-4" /> e-Invoicing (Novus → myDATA)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
         {/* 1. Master connection status */}

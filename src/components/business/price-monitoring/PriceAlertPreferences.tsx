@@ -134,7 +134,7 @@ export const PriceAlertPreferences: React.FC<PriceAlertPreferencesProps> = ({ pr
     return (
       <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <Lock className="h-4 w-4 text-muted-foreground" />
             Price Monitoring Notifications
           </CardTitle>
@@ -155,7 +155,7 @@ export const PriceAlertPreferences: React.FC<PriceAlertPreferencesProps> = ({ pr
     <Card className="rounded-2xl">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <BellRing className="h-4 w-4 text-primary" />
             Notifications
           </CardTitle>

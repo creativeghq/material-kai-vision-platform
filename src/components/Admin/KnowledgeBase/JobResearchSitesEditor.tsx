@@ -235,7 +235,7 @@ export function JobResearchSitesEditor() {
 
           <Card className="dashboard-card">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
-              <CardTitle className="text-base font-normal">{config.label}</CardTitle>
+              <CardTitle className="font-normal">{config.label}</CardTitle>
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" className="rounded-full" onClick={() => setBulkOpen(true)}>
                   <ListPlus className="h-3 w-3 mr-1" />Bulk paste

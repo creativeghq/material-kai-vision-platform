@@ -178,7 +178,7 @@ export const PipelineStrategyMetricsPanel: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
+            <BarChart3 className="h-4 w-4" />
             Pipeline Strategy Metrics
           </CardTitle>
           <CardDescription>Chunking strategy distribution and Stage 1.5 failure rate over the last 30 days</CardDescription>
@@ -198,7 +198,7 @@ export const PipelineStrategyMetricsPanel: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
+            <BarChart3 className="h-4 w-4" />
             Chunking Strategy Distribution
           </CardTitle>
           <CardDescription>
@@ -255,7 +255,7 @@ export const PipelineStrategyMetricsPanel: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-400" />
+            <AlertTriangle className="h-4 w-4 text-amber-400" />
             Stage 1.5 Failure Surface
           </CardTitle>
           <CardDescription>

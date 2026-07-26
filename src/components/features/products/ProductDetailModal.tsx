@@ -2801,7 +2801,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     {groups[groupKey].map(doc => (
                       <Card key={doc.id} className="dashboard-card rounded-2xl border-0 shadow-sm">
                         <CardHeader className="pb-3">
-                          <CardTitle className="text-base flex items-center gap-2">
+                          <CardTitle className="flex items-center gap-2">
                             <BookOpen className="h-4 w-4" />
                             {doc.title}
                           </CardTitle>

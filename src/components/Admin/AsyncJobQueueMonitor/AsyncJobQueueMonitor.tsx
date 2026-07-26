@@ -1614,7 +1614,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-primary" />
+                    <Activity className="h-4 w-4 text-primary" />
                     All Background Jobs
                   </CardTitle>
                   <CardDescription>
@@ -1877,7 +1877,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-primary" />
+                    <Activity className="h-4 w-4 text-primary" />
                     PDF Processing Jobs
                   </CardTitle>
                   <CardDescription>
@@ -2088,7 +2088,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-primary" />
+                    <Activity className="h-4 w-4 text-primary" />
                     Web Scraping Jobs
                   </CardTitle>
                   <CardDescription>
@@ -2299,7 +2299,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-primary" />
+                    <Activity className="h-4 w-4 text-primary" />
                     XML Import Jobs
                   </CardTitle>
                   <CardDescription>
@@ -2509,7 +2509,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         <Card className="border-red-500/30 bg-red-500/10 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-red-400 flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
+              <AlertTriangle className="h-4 w-4" />
               Failed Jobs
             </CardTitle>
             <CardDescription className="text-red-400/70">
@@ -3295,20 +3295,20 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     <Card className={`border-2 ${isJobCompleted ? 'border-green-500/30 bg-green-500/5' : isJobFailed ? 'border-red-500/30 bg-red-500/5' : 'border-primary/20 bg-primary/5'}`}>
                       <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-base flex items-center gap-2">
+                          <CardTitle className="flex items-center gap-2">
                             {isJobCompleted ? (
                               <>
-                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <CheckCircle className="h-4 w-4 text-green-600" />
                                 Pipeline Complete
                               </>
                             ) : isJobFailed ? (
                               <>
-                                <XCircle className="h-5 w-5 text-red-600" />
+                                <XCircle className="h-4 w-4 text-red-600" />
                                 Pipeline Failed
                               </>
                             ) : (
                               <>
-                                <RefreshCw className="h-5 w-5 text-primary animate-spin" />
+                                <RefreshCw className="h-4 w-4 text-primary animate-spin" />
                                 Processing Pipeline
                               </>
                             )}
@@ -3444,8 +3444,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 <Card>
                   <CardHeader className="pb-3 border-b bg-white/5">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Package className="h-5 w-5 text-primary" />
+                      <CardTitle className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-primary" />
                         Product Processing Pipeline
                       </CardTitle>
                       <div className="text-xs text-muted-foreground font-medium">

@@ -70,7 +70,7 @@ export const InboundSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
         <div className="min-w-0">
-          <CardTitle className="text-sm flex items-center gap-2"><Ship className="h-4 w-4" /> Inbound shipments</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Ship className="h-4 w-4" /> Inbound shipments</CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">Track containers/BLs in transit and receive them into stock on arrival.</p>
         </div>
         <Button size="sm" className="rounded-full shrink-0" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" /> Track shipment</Button>

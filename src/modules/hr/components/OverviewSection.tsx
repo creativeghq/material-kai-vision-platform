@@ -41,7 +41,7 @@ export function OverviewSection({ workspaceId }: { workspaceId: string | null; c
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /> Headcount by department</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /> Headcount by department</CardTitle></CardHeader>
           <CardContent>
             {byDept.length === 0 ? (
               // Distinguish "no staff at all" from "staff exist but none are assigned to a department"
@@ -64,7 +64,7 @@ export function OverviewSection({ workspaceId }: { workspaceId: string | null; c
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Briefcase className="h-4 w-4 text-primary" /> Recruitment funnel</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase className="h-4 w-4 text-primary" /> Recruitment funnel</CardTitle></CardHeader>
           <CardContent>
             {funnel.length === 0 ? <EmptyState title="No applications yet" hint="Post a job to start tracking candidates" /> : (
               <div className="flex flex-wrap gap-2">

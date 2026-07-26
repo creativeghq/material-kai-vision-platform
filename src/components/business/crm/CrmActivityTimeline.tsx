@@ -194,7 +194,7 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Activity className="h-4 w-4" /> Activity
         </CardTitle>
       </CardHeader>

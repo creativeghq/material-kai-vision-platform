@@ -137,7 +137,7 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
 
       {recon && (
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2">{recon.ready_to_pay ? <CheckCircle2 className="h-4 w-4 text-success" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />} Reconciliation — {period}</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2">{recon.ready_to_pay ? <CheckCircle2 className="h-4 w-4 text-success" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />} Reconciliation — {period}</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm">{recon.summary}</p>
             {recon.matches?.length > 0 && (

@@ -174,7 +174,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
       <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <CardTitle className="text-sm shrink-0">Warehouse stock</CardTitle>
+          <CardTitle className="shrink-0">Warehouse stock</CardTitle>
           {warehouses.length > 0 && (
             <Select value={selectedWh} onValueChange={(v) => load(v)}>
               <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>

@@ -351,7 +351,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
               </button>
             )}
             <div className="flex-1">
-              <DialogTitle className="text-base font-semibold">
+              <DialogTitle className="font-semibold">
                 {step === 1
                   ? 'Edit Image'
                   : step === 2

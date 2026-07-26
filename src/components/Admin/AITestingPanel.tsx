@@ -558,7 +558,7 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Brain className="h-5 w-5" />
+                    <Brain className="h-4 w-4" />
                     Material Analysis Test
                   </CardTitle>
                 </CardHeader>
@@ -709,7 +709,7 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
+                    <FileText className="h-4 w-4" />
                     Text Analysis
                   </CardTitle>
                 </CardHeader>
@@ -752,7 +752,7 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Image className="h-5 w-5" />
+                    <Image className="h-4 w-4" />
                     Image Analysis
                   </CardTitle>
                 </CardHeader>
@@ -817,7 +817,7 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Layers className="h-5 w-5" />
+                    <Layers className="h-4 w-4" />
                     Combined Analysis
                   </CardTitle>
                 </CardHeader>
@@ -1005,7 +1005,7 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Search className="h-5 w-5" />
+                  <Search className="h-4 w-4" />
                   Vector Similarity Search Test
                 </CardTitle>
               </CardHeader>

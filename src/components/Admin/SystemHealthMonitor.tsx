@@ -347,7 +347,7 @@ export const SystemHealthMonitor: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
+            <Activity className="h-4 w-4" />
             System Health
           </CardTitle>
         </CardHeader>
@@ -365,7 +365,7 @@ export const SystemHealthMonitor: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
-            <AlertTriangle className="h-5 w-5" />
+            <AlertTriangle className="h-4 w-4" />
             Health Check Error
           </CardTitle>
         </CardHeader>
@@ -390,7 +390,7 @@ export const SystemHealthMonitor: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
+                <Activity className="h-4 w-4" />
                 System Health Status
               </CardTitle>
               <CardDescription>Real-time monitoring of critical services</CardDescription>
@@ -410,7 +410,7 @@ export const SystemHealthMonitor: React.FC = () => {
         {/* Database Health */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
+            <CardTitle className="flex items-center gap-2">
               <Database className="h-4 w-4" />
               Database Connection
             </CardTitle>
@@ -479,7 +479,7 @@ export const SystemHealthMonitor: React.FC = () => {
         {/* Job Monitor */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
+            <CardTitle className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
               Job Monitor
             </CardTitle>
@@ -509,7 +509,7 @@ export const SystemHealthMonitor: React.FC = () => {
         {/* Query Performance */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
+            <CardTitle className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               Query Performance
             </CardTitle>
@@ -542,7 +542,7 @@ export const SystemHealthMonitor: React.FC = () => {
         {/* Circuit Breaker */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm">
+            <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Circuit Breaker
             </CardTitle>
@@ -571,7 +571,7 @@ export const SystemHealthMonitor: React.FC = () => {
       {health.ai_services && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
               AI Services Status
             </CardTitle>
@@ -770,7 +770,7 @@ export const SystemHealthMonitor: React.FC = () => {
       {providers.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Third-Party Provider Uptime
             </CardTitle>
@@ -818,7 +818,7 @@ export const SystemHealthMonitor: React.FC = () => {
       {externalServices.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               External Services Status
             </CardTitle>
@@ -867,7 +867,7 @@ export const SystemHealthMonitor: React.FC = () => {
       {/* Database Performance Details */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Database Performance Metrics</CardTitle>
+          <CardTitle>Database Performance Metrics</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -862,7 +862,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                 <Paintbrush className="w-4 h-4 text-white" />
               </div>
               <div>
-                <DialogTitle className="text-base font-semibold">
+                <DialogTitle className="font-semibold">
                   Replace Material{zone ? `: ${zone.label}` : ''}
                 </DialogTitle>
                 {zone && (

@@ -147,7 +147,7 @@ export const CreditUsageHistory: React.FC = () => {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <TrendingDown className="h-5 w-5 text-primary" />
+                <TrendingDown className="h-4 w-4 text-primary" />
                 Spend Summary
               </CardTitle>
               <CardDescription>Where your credits went over the selected period</CardDescription>
@@ -240,7 +240,7 @@ export const CreditUsageHistory: React.FC = () => {
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <History className="h-5 w-5 text-primary" />
+            <History className="h-4 w-4 text-primary" />
             Recent Activity
           </CardTitle>
           <CardDescription>Every credit charge, refund, and top-up, newest first</CardDescription>

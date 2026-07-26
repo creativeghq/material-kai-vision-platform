@@ -188,7 +188,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
-          <CardTitle className="text-sm flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Users className="h-4 w-4" /> Customers &amp; Suppliers
           </CardTitle>
           <FilterBar
@@ -519,7 +519,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                 {/* Running ledger (καρτέλα) — printable */}
                 <Card>
                   <CardHeader className="border-b border-border/60 px-4 py-2 flex-row items-center justify-between space-y-0 flex-wrap gap-2">
-                    <CardTitle className="text-xs flex items-center gap-2"><BookOpen className="h-4 w-4" /> Ledger</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4" /> Ledger</CardTitle>
                     <div className="flex items-center gap-2 flex-wrap">
                       <input type="date" value={fromDate} max={toDate} onChange={(e) => setFromDate(e.target.value)}
                         className="h-7 rounded-md border border-border/60 bg-background px-2 text-xs" />
@@ -614,7 +614,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
 
 const Section: React.FC<{ title: React.ReactNode; empty: string; children: React.ReactNode }> = ({ title, empty, children }) => (
   <Card>
-    <CardHeader className="border-b border-border/60 px-4 py-2"><CardTitle className="text-xs flex items-center gap-2">{title}</CardTitle></CardHeader>
+    <CardHeader className="border-b border-border/60 px-4 py-2"><CardTitle className="flex items-center gap-2">{title}</CardTitle></CardHeader>
     <CardContent className="p-0">{React.Children.count(children) > 0 ? children : <div className="p-4 text-xs text-muted-foreground">{empty}</div>}</CardContent>
   </Card>
 );

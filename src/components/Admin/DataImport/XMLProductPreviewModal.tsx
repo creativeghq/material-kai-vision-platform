@@ -107,7 +107,7 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2">
             <Package className="h-6 w-6 text-primary" />
             Product Preview
           </DialogTitle>
@@ -268,7 +268,7 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
           {product.metadata && Object.keys(product.metadata).length > 0 && (
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Additional Fields
                 </CardTitle>

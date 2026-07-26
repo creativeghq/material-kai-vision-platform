@@ -167,7 +167,7 @@ export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className, b
   return (
     <Card className={className}>
       <CardHeader className="flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Tags className="h-4 w-4" /> CRM Categories
         </CardTitle>
         {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}

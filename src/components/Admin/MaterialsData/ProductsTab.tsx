@@ -214,7 +214,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
+                <Package className="h-4 w-4" />
                 All Products
               </CardTitle>
               <CardDescription>

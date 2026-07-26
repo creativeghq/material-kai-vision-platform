@@ -209,7 +209,7 @@ export const SubscriptionTab: React.FC = () => {
         <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Crown className="h-5 w-5 text-primary" />
+              <Crown className="h-4 w-4 text-primary" />
               Current Subscription
             </CardTitle>
           </CardHeader>
@@ -328,7 +328,7 @@ export const SubscriptionTab: React.FC = () => {
       <Card className="rounded-2xl">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5 text-primary" />API Keys</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Key className="h-4 w-4 text-primary" />API Keys</CardTitle>
             {hasSubscription && (
               <Button size="sm" variant="outline" onClick={() => setShowNewKeyForm((v) => !v)}>
                 <Plus className="h-3.5 w-3.5 mr-1.5" />Generate Key

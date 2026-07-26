@@ -195,7 +195,7 @@ export const WebhooksPanel: React.FC = () => {
         <div className="flex items-start justify-between gap-4">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Webhook className="h-5 w-5" />
+              <Webhook className="h-4 w-4" />
               Webhooks
               {(inboundFailures24h + outboundFailures24h) > 0 && (
                 <Badge variant="destructive">

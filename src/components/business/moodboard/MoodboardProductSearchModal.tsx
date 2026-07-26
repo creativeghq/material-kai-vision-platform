@@ -133,7 +133,7 @@ export const MoodboardProductSearchModal: React.FC<MoodboardProductSearchModalPr
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-xl">Add Products</DialogTitle>
+          <DialogTitle>Add Products</DialogTitle>
           <DialogDescription>
             Search the catalog and add materials to "{moodboardTitle}"
           </DialogDescription>

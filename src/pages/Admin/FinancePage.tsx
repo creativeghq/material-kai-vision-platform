@@ -620,7 +620,7 @@ const FinancePage: React.FC = () => {
             {deposits.total > 0 && (
               <Card>
                 <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm flex items-center gap-2"><BanknoteIcon className="h-4 w-4" /> Received, not yet invoiced — deposits / on-account</CardTitle>
+                  <CardTitle className="flex items-center gap-2"><BanknoteIcon className="h-4 w-4" /> Received, not yet invoiced — deposits / on-account</CardTitle>
                   <span className="text-sm font-semibold text-amber-600">{formatMoney(deposits.total, deposits.currency)}</span>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -661,7 +661,7 @@ const FinancePage: React.FC = () => {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm flex items-center gap-2"><Bell className="h-4 w-4" /> Next follow-ups</CardTitle>
+                  <CardTitle className="flex items-center gap-2"><Bell className="h-4 w-4" /> Next follow-ups</CardTitle>
                   {followUps.length > 5 && <Button size="sm" variant="ghost" onClick={() => document.querySelector<HTMLButtonElement>('[data-value=followups]')?.click()}>View all</Button>}
                 </CardHeader>
                 <CardContent className="p-0">
@@ -694,7 +694,7 @@ const FinancePage: React.FC = () => {
 
               <Card>
                 <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm flex items-center gap-2"><Receipt className="h-4 w-4" /> Recent invoices</CardTitle>
+                  <CardTitle className="flex items-center gap-2"><Receipt className="h-4 w-4" /> Recent invoices</CardTitle>
                   {!isAccountant && <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-3 w-3 mr-1" /> New</Button>}
                 </CardHeader>
                 <CardContent className="p-0">
@@ -774,7 +774,7 @@ const FinancePage: React.FC = () => {
 
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <FileText className="h-4 w-4" /> Receivables
                   <span className="text-[10px] font-normal text-muted-foreground">· money customers owe us</span>
                 </CardTitle>
@@ -900,7 +900,7 @@ const FinancePage: React.FC = () => {
 
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
-                <CardTitle className="text-sm flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                   <Banknote className="h-4 w-4" /> Payables
                   <span className="text-[10px] font-normal text-muted-foreground">· money we owe</span>
                 </CardTitle>
@@ -1078,7 +1078,7 @@ const FinancePage: React.FC = () => {
           <TabsContent value="followups" className="space-y-4">
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
-                <CardTitle className="text-sm">Quotes needing a nudge</CardTitle>
+                <CardTitle>Quotes needing a nudge</CardTitle>
                 {followUps.length > 0 && (
                   <FilterBar groups={followUpGroups} values={fuValues} onChange={setFuValues} previewCount={fuPreview} title="Filter follow-ups" />
                 )}
@@ -1246,7 +1246,7 @@ const BucketSummary: React.FC<{
   return (
   <Card>
     <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
-      <CardTitle className="text-sm">{title}</CardTitle>
+      <CardTitle>{title}</CardTitle>
       <Button size="sm" variant="ghost" onClick={() => document.querySelector<HTMLButtonElement>(`[data-value=${viewLink}]`)?.click()}>View all</Button>
     </CardHeader>
     <CardContent className="p-0">
@@ -1301,7 +1301,7 @@ const CashFlowCard: React.FC<{ rows: CashFlowRow[] }> = ({ rows }) => {
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><LineChart className="h-4 w-4" /> Cash flow (next 90 days)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><LineChart className="h-4 w-4" /> Cash flow (next 90 days)</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full text-sm">
@@ -1335,7 +1335,7 @@ const CashFlowCard: React.FC<{ rows: CashFlowRow[] }> = ({ rows }) => {
 const PnlCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => (
   <Card>
     <CardHeader className="border-b border-border/60 px-5 py-3">
-      <CardTitle className="text-sm flex items-center gap-2"><Activity className="h-4 w-4" /> Monthly P&amp;L (last 12 months)</CardTitle>
+      <CardTitle className="flex items-center gap-2"><Activity className="h-4 w-4" /> Monthly P&amp;L (last 12 months)</CardTitle>
     </CardHeader>
     <CardContent className="p-0">
       <table className="w-full text-sm">
@@ -1378,7 +1378,7 @@ const BankBalancesCard: React.FC<{ rows: BankAccountBalance[]; onManage?: () => 
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm flex items-center gap-2"><BanknoteIcon className="h-4 w-4" /> Cash by account</CardTitle>
+        <CardTitle className="flex items-center gap-2"><BanknoteIcon className="h-4 w-4" /> Cash by account</CardTitle>
         <Button size="sm" variant="ghost" onClick={onManage}>{active.length === 0 ? 'Add accounts' : 'Manage'}</Button>
       </CardHeader>
       <CardContent className="p-0">
@@ -1446,7 +1446,7 @@ const RevenueTrendCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => {
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Revenue trend</CardTitle>
+        <CardTitle className="flex items-center gap-2"><TrendingUp className="h-4 w-4" /> Revenue trend</CardTitle>
         {stats && (
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">{formatMoney(stats.lastRev)}</span>
@@ -1490,7 +1490,7 @@ const InsightCard: React.FC<{
 }> = ({ title, icon: Icon, onViewAll, empty, isEmpty, children }) => (
   <Card>
     <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
-      <CardTitle className="text-sm flex items-center gap-2"><Icon className="h-4 w-4" /> {title}</CardTitle>
+      <CardTitle className="flex items-center gap-2"><Icon className="h-4 w-4" /> {title}</CardTitle>
       {onViewAll && <Button size="sm" variant="ghost" onClick={onViewAll}>View all</Button>}
     </CardHeader>
     <CardContent className="p-0">

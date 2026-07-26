@@ -158,7 +158,7 @@ export const ConversationManagerModal: React.FC<ConversationManagerModalProps> =
       >
         <DialogHeader className="flex flex-row items-center gap-4 space-y-0 border-b border-border/60 px-5 py-4">
           <div className="min-w-0">
-            <DialogTitle className="font-display text-lg tracking-tight">Conversations</DialogTitle>
+            <DialogTitle className="font-display tracking-tight">Conversations</DialogTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {agentName ? `${agentName} · ` : ''}
               {total} {total === 1 ? 'conversation' : 'conversations'}

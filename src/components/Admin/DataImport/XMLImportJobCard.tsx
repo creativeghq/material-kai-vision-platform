@@ -95,8 +95,8 @@ export const XMLImportJobCard: React.FC<XMLImportJobCardProps> = ({
     <Card className="dashboard-card">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-foreground text-lg flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
+          <CardTitle className="text-foreground flex items-center gap-2">
+            <FileText className="h-4 w-4 text-primary" />
             {job.source_name || 'Unnamed Import'}
           </CardTitle>
           {getStatusBadge(job.status)}

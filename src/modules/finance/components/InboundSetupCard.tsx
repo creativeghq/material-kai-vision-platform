@@ -57,7 +57,7 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><Inbox className="h-4 w-4" /> myDATA Inbox (Received Documents)</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Inbox className="h-4 w-4" /> myDATA Inbox (Received Documents)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">

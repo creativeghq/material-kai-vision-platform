@@ -115,7 +115,7 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, 
               <DialogHeader className="p-6 pb-4 border-b border-gray-200">
                 <div className="flex items-start justify-between">
                   <div>
-                    <DialogTitle className="text-2xl font-bold text-gray-900 mb-2">
+                    <DialogTitle className="font-bold text-gray-900 mb-2">
                       {design.title}
                     </DialogTitle>
                     <p className="text-gray-600 text-sm">{design.description}</p>

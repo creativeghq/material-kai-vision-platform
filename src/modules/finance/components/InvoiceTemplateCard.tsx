@@ -103,7 +103,7 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><FileText className="h-4 w-4" /> Invoice design template</CardTitle>
+        <CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> Invoice design template</CardTitle>
       </CardHeader>
       <CardContent className="p-5 space-y-5">
         <div className="space-y-1.5 max-w-md">

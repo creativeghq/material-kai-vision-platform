@@ -269,7 +269,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="general" className="mt-0">
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Module Settings</CardTitle></CardHeader>
+        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Module Settings</CardTitle></CardHeader>
         <CardContent className="space-y-4 p-5">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -376,7 +376,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="digest" className="mt-0 space-y-4">
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Account statements</CardTitle></CardHeader>
+        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Account statements</CardTitle></CardHeader>
         <CardContent className="space-y-4 p-5">
           <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
             <div>
@@ -501,7 +501,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="text-sm flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Statement PDF design</CardTitle>
+          <CardTitle className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Statement PDF design</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 p-5">
           <p className="text-xs text-muted-foreground">
@@ -538,7 +538,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="text-sm flex items-center gap-2"><Mail className="h-4 w-4" /> Finance Digest</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Mail className="h-4 w-4" /> Finance Digest</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 p-5">
           <DigestPanel

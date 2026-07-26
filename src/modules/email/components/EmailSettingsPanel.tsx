@@ -18,7 +18,7 @@ export const EmailSettingsPanel: React.FC<Props> = (_props) => {
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle className="text-base font-light">Default sender</CardTitle>
+        <CardTitle className="font-light">Default sender</CardTitle>
         <CardDescription>
           The email address + name shown to recipients of every outgoing email — alerts, digests,
           invitations, transactional confirmations.

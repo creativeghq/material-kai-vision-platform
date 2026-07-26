@@ -130,7 +130,7 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between px-5 py-3 border-b border-border/60">
-          <CardTitle className="text-sm">Submission history</CardTitle>
+          <CardTitle>Submission history</CardTitle>
           <Button size="sm" variant="ghost" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
         </CardHeader>
         <CardContent className="p-0">

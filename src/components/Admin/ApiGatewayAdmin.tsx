@@ -391,7 +391,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Total API Calls</CardTitle>
+                  <CardTitle className="font-medium">Total API Calls</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{analyticsData.totalRequests.toLocaleString()}</div>
@@ -400,7 +400,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Active API Keys</CardTitle>
+                  <CardTitle className="font-medium">Active API Keys</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{apiKeys.filter((k) => k.is_active).length}</div>
@@ -409,7 +409,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Rate Limit Hits</CardTitle>
+                  <CardTitle className="font-medium">Rate Limit Hits</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{analyticsData.rateLimitedRequests}</div>
@@ -418,7 +418,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Avg Response Time</CardTitle>
+                  <CardTitle className="font-medium">Avg Response Time</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{analyticsData.avgResponseTime > 0 ? `${Math.round(analyticsData.avgResponseTime)}ms` : '—'}</div>

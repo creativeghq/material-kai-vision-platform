@@ -190,7 +190,7 @@ const IdealoPage: React.FC = () => {
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <div>
-              <CardTitle className="text-base">Usage · last 7 days</CardTitle>
+              <CardTitle>Usage · last 7 days</CardTitle>
               <CardDescription>From <code>ai_usage_logs</code> tagged with this module.</CardDescription>
             </div>
             <Button variant="ghost" size="sm" onClick={loadStatus} disabled={statusLoading} className="gap-2">
@@ -235,7 +235,7 @@ const IdealoPage: React.FC = () => {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <Store className="h-4 w-4 text-muted-foreground" />
-                    <CardTitle className="text-base">{source.name}</CardTitle>
+                    <CardTitle>{source.name}</CardTitle>
                   </div>
                   {source.configured ? (
                     <Badge className="bg-green-500/20 text-green-600 border-green-500/30">
@@ -258,7 +258,7 @@ const IdealoPage: React.FC = () => {
         {/* Test search */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Test search</CardTitle>
+            <CardTitle>Test search</CardTitle>
             <CardDescription>
               Run a one-off query against the chosen locale. Does not write to{' '}
               <code>tracked_queries</code> or <code>tracked_query_price_history</code>. Firecrawl credits debit normally.

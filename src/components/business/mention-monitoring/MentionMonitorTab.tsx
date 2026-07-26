@@ -258,7 +258,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
           {/* Alert preferences */}
           <Card className="dashboard-card">
             <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Bell className="h-4 w-4" /> Alert preferences
               </CardTitle>
             </CardHeader>

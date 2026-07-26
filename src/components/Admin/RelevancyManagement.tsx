@@ -410,7 +410,7 @@ export const RelevancyManagement: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <CardTitle className="font-medium text-gray-600 flex items-center gap-2">
                 <Link2 className="h-4 w-4" />
                 Chunk → Product
               </CardTitle>
@@ -425,7 +425,7 @@ export const RelevancyManagement: React.FC = () => {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <CardTitle className="font-medium text-gray-600 flex items-center gap-2">
                 <ImageIcon className="h-4 w-4" />
                 Product → Image
               </CardTitle>
@@ -440,7 +440,7 @@ export const RelevancyManagement: React.FC = () => {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <CardTitle className="font-medium text-gray-600 flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Chunk → Image
               </CardTitle>

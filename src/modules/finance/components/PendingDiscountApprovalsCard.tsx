@@ -66,7 +66,7 @@ export const PendingDiscountApprovalsCard: React.FC<{ workspaceId: string }> = (
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Inbox className="h-4 w-4" /> Pending discount approvals
           <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] text-primary">{reqs.length}</span>
         </CardTitle>

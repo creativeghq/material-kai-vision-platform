@@ -127,7 +127,7 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Grid3X3 className="h-5 w-5" />
+                <Grid3X3 className="h-4 w-4" />
                 All Chunks
               </CardTitle>
               <CardDescription>

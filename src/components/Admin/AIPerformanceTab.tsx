@@ -289,7 +289,7 @@ export const AIPerformanceTab: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Bot className="h-5 w-5" />
+            <Bot className="h-4 w-4" />
             AI Model Usage & Costs
           </CardTitle>
           <CardDescription className="text-muted-foreground">

@@ -315,7 +315,7 @@ const InvoiceDetailPage: React.FC = () => {
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="text-sm">Line items</CardTitle>
+          <CardTitle>Line items</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
@@ -355,7 +355,7 @@ const InvoiceDetailPage: React.FC = () => {
       {(invoice as any).has_shipping && (
         <Card>
           <CardHeader className="border-b border-border/60 px-5 py-3">
-            <CardTitle className="text-sm flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Truck className="h-4 w-4" /> Shipping &amp; transport
             </CardTitle>
           </CardHeader>
@@ -392,7 +392,7 @@ const InvoiceDetailPage: React.FC = () => {
         ].filter((r) => r[1]) as [string, any][];
         return rows.length > 0 ? (
           <Card>
-            <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Payment &amp; document details</CardTitle></CardHeader>
+            <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Payment &amp; document details</CardTitle></CardHeader>
             <CardContent className="grid gap-x-8 gap-y-3 p-5 text-sm sm:grid-cols-2">
               {rows.map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-3">
@@ -407,7 +407,7 @@ const InvoiceDetailPage: React.FC = () => {
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle className="text-sm">Payments</CardTitle>
+          <CardTitle>Payments</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
@@ -446,7 +446,7 @@ const InvoiceDetailPage: React.FC = () => {
       {(invoice.credit_notes ?? []).length > 0 && (
         <Card>
           <CardHeader className="border-b border-border/60 px-5 py-3">
-            <CardTitle className="text-sm">Credit notes</CardTitle>
+            <CardTitle>Credit notes</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <table className="w-full text-sm">
@@ -491,7 +491,7 @@ const InvoiceDetailPage: React.FC = () => {
         return (
           <Card>
             <CardHeader className="border-b border-border/60 px-5 py-3">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4" /> myDATA / e-Invoicing
               </CardTitle>
             </CardHeader>

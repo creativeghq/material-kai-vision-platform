@@ -95,7 +95,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
       {val && (val.by_warehouse.length > 1 || val.items_missing_cost > 0) && (
         <Card>
           <CardHeader className="border-b border-border/60 px-5 py-3">
-            <CardTitle className="text-sm flex items-center gap-2"><Coins className="h-4 w-4 text-primary" /> Stock valuation</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Coins className="h-4 w-4 text-primary" /> Stock valuation</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <table className="w-full text-sm">
@@ -126,7 +126,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between">
-          <CardTitle className="text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" /> Low stock</CardTitle>
+          <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" /> Low stock</CardTitle>
           {low.length > 0 && onNavigate && (
             <button className="text-xs text-primary hover:underline" onClick={() => onNavigate('inventory')}>Manage in inventory →</button>
           )}

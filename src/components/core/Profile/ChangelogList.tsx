@@ -85,7 +85,7 @@ export const ChangelogList: React.FC<ChangelogListProps> = ({ highlightSlug }) =
     <Card className="rounded-2xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Megaphone className="h-5 w-5 text-primary" />
+          <Megaphone className="h-4 w-4 text-primary" />
           Changes Log
         </CardTitle>
       </CardHeader>

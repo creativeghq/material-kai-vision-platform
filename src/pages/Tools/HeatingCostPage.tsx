@@ -87,7 +87,7 @@ export default function HeatingCostPage() {
         {/* Inputs */}
         <Card className="dashboard-card lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">Inputs</CardTitle>
+            <CardTitle>Inputs</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

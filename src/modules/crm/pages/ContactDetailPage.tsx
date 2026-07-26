@@ -837,7 +837,7 @@ export const ContactDetailPage: React.FC = () => {
                         </CardContent></Card>
 
                         <Card>
-                          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Percent className="h-4 w-4" />Pricing</CardTitle></CardHeader>
+                          <CardHeader><CardTitle className="flex items-center gap-2"><Percent className="h-4 w-4" />Pricing</CardTitle></CardHeader>
                           <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                               <InlineSelect alwaysEdit={isNew} label="Pricing level" value={contact.user_level_key ?? undefined} unsetValue="__default__" placeholder="Standard" options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))} onSave={(v) => savePricing({ user_level_key: v })} hint="Tier this customer buys at — discount applies off retail on quotes." />
@@ -851,7 +851,7 @@ export const ContactDetailPage: React.FC = () => {
                         </Card>
 
                         <Card>
-                          <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Receipt className="h-4 w-4" />Invoicing &amp; VAT</CardTitle></CardHeader>
+                          <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-4 w-4" />Invoicing &amp; VAT</CardTitle></CardHeader>
                           <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                               <InlineSelect alwaysEdit={isNew} label="Segment" value={contact.contact_group ?? undefined} unsetValue="none" placeholder="Unsegmented" options={[{ value: 'b2b', label: 'B2B' }, { value: 'retail', label: 'Retail' }, { value: 'wholesale', label: 'Wholesale' }, { value: 'public_sector', label: 'Public sector' }]} onSave={(v) => patchInline({ contact_group: v })} hint="Groups this party for filtering and statement batches." />

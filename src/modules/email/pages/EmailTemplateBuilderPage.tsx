@@ -911,7 +911,7 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
           >
             <DialogHeader className="px-4 py-3 border-b shrink-0">
               <div className="flex items-center justify-between">
-                <DialogTitle className="text-sm font-medium capitalize">
+                <DialogTitle className="font-medium capitalize">
                   {previewDevice} preview — {DEVICE_WIDTHS[previewDevice]}px
                 </DialogTitle>
                 <div className="flex items-center border rounded-full overflow-hidden divide-x">

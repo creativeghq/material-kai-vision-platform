@@ -237,7 +237,7 @@ const ProductSEOTab: React.FC<Props> = ({ productId, productName, manufacturer, 
       {research && researchCardData && (
         <Card className="dashboard-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs text-muted-foreground">
+            <CardTitle className="text-muted-foreground">
               Last refreshed {new Date(research.created_at).toLocaleString()} · ${research.cost_usd.toFixed(4)}
             </CardTitle>
           </CardHeader>
@@ -250,7 +250,7 @@ const ProductSEOTab: React.FC<Props> = ({ productId, productName, manufacturer, 
       {homepageDomain && domainSnap?.response && (
         <Card className="dashboard-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Manufacturer domain — {homepageDomain}</CardTitle>
+            <CardTitle>Manufacturer domain — {homepageDomain}</CardTitle>
           </CardHeader>
           <CardContent>
             <SEOGenericCard data={{
@@ -266,7 +266,7 @@ const ProductSEOTab: React.FC<Props> = ({ productId, productName, manufacturer, 
       {homepageDomain && rankedKws?.response && (
         <Card className="dashboard-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Top ranking keywords for {homepageDomain}</CardTitle>
+            <CardTitle>Top ranking keywords for {homepageDomain}</CardTitle>
           </CardHeader>
           <CardContent>
             <SEOGenericCard data={{

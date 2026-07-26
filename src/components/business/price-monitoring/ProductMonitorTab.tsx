@@ -590,7 +590,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         <Card className="dashboard-card">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" />
                 Discovered retailers
                 {discovered.length > 0 && (
@@ -628,7 +628,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         <Card className="dashboard-card">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <ShoppingBag className="h-4 w-4 text-primary" />
                 Merchants
                 <Badge variant="outline" className="text-[10px]">
@@ -649,7 +649,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         <Card className="dashboard-card">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <ShoppingCart className="h-4 w-4 text-emerald-500" />
                 Marketplaces
                 <Badge variant="outline" className="text-[10px]">
@@ -672,7 +672,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         <Card className="dashboard-card">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Globe className="h-4 w-4 text-muted-foreground" />
                 Custom Monitoring
               </CardTitle>
@@ -715,7 +715,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             >
               <div className="flex items-center gap-2">
                 <Ban className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-sm font-medium">
+                <CardTitle className="font-medium">
                   Excluded Results
                 </CardTitle>
                 <Badge variant="outline" className="text-[10px]">
@@ -849,7 +849,7 @@ const SimilarProductsSection: React.FC<{
           onClick={() => setExpanded((v) => !v)}
           className="w-full flex items-center justify-between text-left"
         >
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-yellow-500" />
             Similar Products in this series
             <Badge variant="outline" className="text-[10px]">

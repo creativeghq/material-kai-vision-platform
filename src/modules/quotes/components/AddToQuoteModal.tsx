@@ -143,7 +143,7 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl">Add to Quote</DialogTitle>
+          <DialogTitle>Add to Quote</DialogTitle>
           <DialogDescription>
             {productName || 'Select a quote to add this product'}
           </DialogDescription>

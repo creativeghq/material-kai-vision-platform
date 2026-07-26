@@ -187,7 +187,7 @@ export const ChunkQualityDashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground">
               Total Chunks
             </CardTitle>
           </CardHeader>
@@ -203,7 +203,7 @@ export const ChunkQualityDashboard: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground">
               Average Quality
             </CardTitle>
           </CardHeader>
@@ -224,7 +224,7 @@ export const ChunkQualityDashboard: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground">
               Duplicates Prevented
             </CardTitle>
           </CardHeader>
@@ -240,7 +240,7 @@ export const ChunkQualityDashboard: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground">
               Flagged for Review
             </CardTitle>
           </CardHeader>
@@ -278,7 +278,7 @@ export const ChunkQualityDashboard: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-blue-500" />
+                <TrendingUp className="h-4 w-4 text-blue-500" />
                 AI-Powered Chunk Quality Recommendations
               </CardTitle>
               <CardDescription>
@@ -496,7 +496,7 @@ export const ChunkQualityDashboard: React.FC = () => {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
-                        <CardTitle className="text-base">
+                        <CardTitle>
                           {chunk.flag_type.replace(/_/g, ' ').toUpperCase()}
                         </CardTitle>
                         <CardDescription>{chunk.flag_reason}</CardDescription>

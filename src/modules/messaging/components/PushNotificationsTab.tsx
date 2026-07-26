@@ -329,7 +329,7 @@ export const PushNotificationsTab: React.FC = () => {
         {/* Total Subscriptions */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground">
               Total Subscriptions
             </CardTitle>
           </CardHeader>
@@ -342,7 +342,7 @@ export const PushNotificationsTab: React.FC = () => {
         {/* Active Subscriptions */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground">
               Active Subscriptions
             </CardTitle>
           </CardHeader>
@@ -355,7 +355,7 @@ export const PushNotificationsTab: React.FC = () => {
         {/* Recent Activity */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground">
               Recent Activity
             </CardTitle>
           </CardHeader>
@@ -368,7 +368,7 @@ export const PushNotificationsTab: React.FC = () => {
         {/* Browser Breakdown */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="font-medium text-muted-foreground">
               Browser Breakdown
             </CardTitle>
           </CardHeader>

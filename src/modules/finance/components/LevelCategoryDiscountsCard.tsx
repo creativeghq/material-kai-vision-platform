@@ -73,7 +73,7 @@ export const LevelCategoryDiscountsCard: React.FC<{ workspaceId: string }> = ({ 
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2"><Layers className="h-4 w-4" /> Level Discounts by Category</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Layers className="h-4 w-4" /> Level Discounts by Category</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 p-5">
         <p className="text-xs text-muted-foreground">

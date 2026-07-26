@@ -23,18 +23,24 @@ const Card = React.forwardRef<
 ));
 Card.displayName = 'Card';
 
+// Canonical card header: a bordered header bar with tight vertical padding. Horizontal padding
+// stays px-6 so the header's left edge aligns with CardContent's p-6. Cards that want a
+// borderless header (e.g. mini KPI tiles) can override with `border-0`.
 const CardHeader = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('flex flex-col space-y-1.5 p-6', className)}
+    className={cn('flex flex-col space-y-1 px-6 py-4 border-b border-border/60', className)}
     {...props}
   />
 ));
 CardHeader.displayName = 'CardHeader';
 
+// Canonical card title: 16px. This is THE single card-header size across the platform — do not
+// pass ad-hoc text-* overrides. Page-level gradient headers (PageHeader, 24px) and the compact
+// glass analytics headers (h3 text-sm) are separate, deliberately-distinct tiers.
 const CardTitle = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLHeadingElement>
@@ -42,7 +48,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'text-2xl font-light leading-none tracking-tight',
+      'text-base font-semibold leading-none tracking-tight',
       className,
     )}
     {...props}
@@ -62,11 +68,13 @@ const CardDescription = React.forwardRef<
 ));
 CardDescription.displayName = 'CardDescription';
 
+// Content sits below the bordered header, so it carries its own top padding (p-6, not pt-0).
+// Tables still override to p-0 for edge-to-edge rows.
 const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('p-6 pt-0', className)} {...props} />
+  <div ref={ref} className={cn('p-6', className)} {...props} />
 ));
 CardContent.displayName = 'CardContent';
 

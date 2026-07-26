@@ -468,7 +468,7 @@ export const AgentConfigsPage: React.FC = () => {
                                   <TypeIcon className="h-4 w-4" />
                                 </div>
                                 <div className="min-w-0">
-                                  <CardTitle className="text-base font-semibold truncate">{prompt.name}</CardTitle>
+                                  <CardTitle className="font-semibold truncate">{prompt.name}</CardTitle>
                                   <div className="flex items-center gap-2 mt-1">
                                     <Badge variant="outline" className="text-xs">{prompt.category}</Badge>
                                     <Badge variant="outline" className="text-xs">v{prompt.version}</Badge>
@@ -673,7 +673,7 @@ export const AgentConfigsPage: React.FC = () => {
                   <Card key={entry.id} className="border-l-4 border-l-blue-500">
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2">
                           <Badge variant="outline">#{historyData.length - index}</Badge>
                           {entry.change_reason || 'No reason provided'}
                         </CardTitle>

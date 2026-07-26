@@ -51,7 +51,7 @@ export const AppearanceSection: React.FC = () => {
     <Card className="rounded-2xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Palette className="h-5 w-5 text-primary" />
+          <Palette className="h-4 w-4 text-primary" />
           Appearance
         </CardTitle>
       </CardHeader>

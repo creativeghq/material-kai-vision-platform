@@ -96,7 +96,7 @@ export const ShippingCredentialsCard: React.FC<{ workspaceId: string }> = ({ wor
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Ship className="h-4 w-4" /> Shipment tracking (ShipsGo)
           {hasKey && <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">{enabled ? 'Active' : 'Disabled'}</Badge>}
         </CardTitle>

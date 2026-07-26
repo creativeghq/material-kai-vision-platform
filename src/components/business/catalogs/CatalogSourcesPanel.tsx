@@ -156,7 +156,7 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
       {/* Upload + attach */}
       <Card className="dashboard-card">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2"><Upload className="h-4 w-4" /> Add source PDFs</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Upload className="h-4 w-4" /> Add source PDFs</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
@@ -212,7 +212,7 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
       {/* Attached PDFs */}
       <Card className="dashboard-card">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2"><FileText className="h-4 w-4" /> Attached PDFs ({attached.length})</CardTitle>
+          <CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> Attached PDFs ({attached.length})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {attached.length === 0 ? (
@@ -244,7 +244,7 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
       {attached.length > 0 && (
         <Card className="dashboard-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2"><Sparkles className="h-4 w-4" /> Extract specific products</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4" /> Extract specific products</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex gap-2">

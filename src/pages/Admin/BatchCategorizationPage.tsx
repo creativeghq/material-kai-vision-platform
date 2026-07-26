@@ -177,7 +177,7 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
       {/* Controls */}
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle className="text-base font-normal">Run Configuration</CardTitle>
+          <CardTitle className="font-normal">Run Configuration</CardTitle>
           <CardDescription>Configure and trigger a batch categorization run</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -233,7 +233,7 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
       {lastRun && (
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base font-normal">Results</CardTitle>
+            <CardTitle className="font-normal">Results</CardTitle>
             <CardDescription>{lastRun.message}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">

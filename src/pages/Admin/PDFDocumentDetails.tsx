@@ -268,7 +268,7 @@ export const PDFDocumentDetails: React.FC = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="font-medium flex items-center gap-2">
               <Package className="h-4 w-4" />
               Products
             </CardTitle>
@@ -280,7 +280,7 @@ export const PDFDocumentDetails: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="font-medium flex items-center gap-2">
               <Grid3X3 className="h-4 w-4" />
               Chunks
             </CardTitle>
@@ -292,7 +292,7 @@ export const PDFDocumentDetails: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="font-medium flex items-center gap-2">
               <ImageIcon className="h-4 w-4" />
               Images
             </CardTitle>
@@ -304,7 +304,7 @@ export const PDFDocumentDetails: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="font-medium flex items-center gap-2">
               <FileCheck className="h-4 w-4" />
               Entities
             </CardTitle>
@@ -318,7 +318,7 @@ export const PDFDocumentDetails: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="font-medium flex items-center gap-2">
               <Sparkles className="h-4 w-4" />
               Embeddings
             </CardTitle>
@@ -332,7 +332,7 @@ export const PDFDocumentDetails: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="font-medium flex items-center gap-2">
               <Database className="h-4 w-4" />
               Metadata
             </CardTitle>

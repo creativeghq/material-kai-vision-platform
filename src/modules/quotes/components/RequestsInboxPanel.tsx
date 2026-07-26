@@ -154,7 +154,7 @@ export const RequestsInboxPanel: React.FC = () => {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm flex items-center gap-2"><Inbox className="h-4 w-4" /> Incoming ({incoming.filter((r) => r.status === 'new' || r.status === 'in_review').length})</CardTitle></CardHeader>
+        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="flex items-center gap-2"><Inbox className="h-4 w-4" /> Incoming ({incoming.filter((r) => r.status === 'new' || r.status === 'in_review').length})</CardTitle></CardHeader>
         <CardContent className="p-0">
           {incoming.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">No requests from your network yet.</div>
@@ -249,7 +249,7 @@ export const RequestsInboxPanel: React.FC = () => {
       </Card>
 
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm flex items-center gap-2"><Send className="h-4 w-4" /> Sent upward</CardTitle></CardHeader>
+        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="flex items-center gap-2"><Send className="h-4 w-4" /> Sent upward</CardTitle></CardHeader>
         <CardContent className="p-0">
           {mine.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">You haven’t submitted any procurement requests.</div>

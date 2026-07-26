@@ -146,7 +146,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div>
-              <DialogTitle className="text-2xl">{quote.name || 'Quote Request'}</DialogTitle>
+              <DialogTitle>{quote.name || 'Quote Request'}</DialogTitle>
               <DialogDescription className="mt-1 flex items-center gap-4">
                 <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> Created {formatDate(quote.created_at)}</span>
                 {quote.expires_at && (

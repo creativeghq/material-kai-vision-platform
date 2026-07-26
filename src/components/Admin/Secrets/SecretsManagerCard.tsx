@@ -88,7 +88,7 @@ export const SecretsManagerCard: React.FC<Props> = ({ scope, title, description,
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <KeyRound className="h-4 w-4" /> {title ?? 'Secret keys'}
             </CardTitle>
             {description && <CardDescription>{description}</CardDescription>}

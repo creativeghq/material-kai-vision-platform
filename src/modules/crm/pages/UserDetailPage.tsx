@@ -175,7 +175,7 @@ const AIUsageTab: React.FC<{ userId: string }> = ({ userId }) => {
       {byModel.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Usage by Model</CardTitle>
+            <CardTitle>Usage by Model</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -199,7 +199,7 @@ const AIUsageTab: React.FC<{ userId: string }> = ({ userId }) => {
       {/* Recent Usage Logs */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent AI Operations</CardTitle>
+          <CardTitle>Recent AI Operations</CardTitle>
         </CardHeader>
         <CardContent>
           {usage.length === 0 ? (
@@ -720,7 +720,7 @@ export const UserDetailPage: React.FC = () => {
               {/* Subscription Card */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
+                  <CardTitle className="flex items-center gap-2">
                     <CreditCard className="h-4 w-4" />
                     Subscription
                   </CardTitle>
@@ -753,7 +753,7 @@ export const UserDetailPage: React.FC = () => {
               {/* Credits Card */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
+                  <CardTitle className="flex items-center gap-2">
                     <CreditCard className="h-4 w-4" />
                     Credits Balance
                   </CardTitle>

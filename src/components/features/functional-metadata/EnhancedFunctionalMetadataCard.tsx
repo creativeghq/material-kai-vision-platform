@@ -259,7 +259,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<
                 variant="ghost"
                 className="w-full justify-between p-0 h-auto"
               >
-                <CardTitle className="flex items-center gap-2 text-sm">
+                <CardTitle className="flex items-center gap-2">
                   <Icon className={`h-4 w-4 ${config.color}`} />
                   {config.displayName}
                   <div className="flex items-center gap-2 ml-2">

@@ -115,7 +115,7 @@ export const BusinessDetailsPanel: React.FC<Props> = (_props) => {
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle className="text-base font-light flex items-center gap-2">
+        <CardTitle className="font-light flex items-center gap-2">
           <Building2 className="h-4 w-4 text-primary" />
           Business details
         </CardTitle>

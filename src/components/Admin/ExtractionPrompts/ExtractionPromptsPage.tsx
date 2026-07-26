@@ -510,7 +510,7 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
                   <Card key={history.id}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm">
+                        <CardTitle>
                           Version {history.version}
                         </CardTitle>
                         <span className="text-xs text-muted-foreground">

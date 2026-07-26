@@ -186,7 +186,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <AlertTriangle
-              className={`w-5 h-5 ${isCritical ? 'text-destructive' : 'text-yellow-500'}`}
+              className={`w-4 h-4 ${isCritical ? 'text-destructive' : 'text-yellow-500'}`}
             />
             <span>
               {isCritical

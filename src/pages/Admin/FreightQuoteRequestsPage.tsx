@@ -51,7 +51,7 @@ export default function FreightQuoteRequestsPage() {
       <PageHeader icon={Ship} title="Freight quote requests" subtitle="Tenant requests without their own SeaRates key — fulfil and send back" />
       <div className="p-3 sm:p-6">
         <Card>
-          <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle className="text-sm">Pending requests</CardTitle></CardHeader>
+          <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Pending requests</CardTitle></CardHeader>
           <CardContent className="p-0">
             {loading ? (
               <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>

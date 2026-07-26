@@ -121,7 +121,7 @@ export const PriceMonitoringDashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Monitored</CardTitle>
+            <CardTitle className="font-medium">Total Monitored</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -132,7 +132,7 @@ export const PriceMonitoringDashboard: React.FC = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Price Drops Today</CardTitle>
+            <CardTitle className="font-medium">Price Drops Today</CardTitle>
             <TrendingDown className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
@@ -143,7 +143,7 @@ export const PriceMonitoringDashboard: React.FC = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Credits Used Today</CardTitle>
+            <CardTitle className="font-medium">Credits Used Today</CardTitle>
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>

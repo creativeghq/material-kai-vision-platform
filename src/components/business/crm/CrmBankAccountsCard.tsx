@@ -119,7 +119,7 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="flex items-center gap-2 text-base"><Landmark className="h-4 w-4" />Bank Accounts</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Landmark className="h-4 w-4" />Bank Accounts</CardTitle>
         {editingId === null && <Button size="sm" variant="outline" onClick={startAdd}><Plus className="h-3.5 w-3.5 mr-1" />Add bank</Button>}
       </CardHeader>
       <CardContent className="space-y-3">

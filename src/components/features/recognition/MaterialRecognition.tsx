@@ -134,7 +134,7 @@ export const MaterialRecognition: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileImage className="w-5 h-5" />
+            <FileImage className="w-4 h-4" />
             Material Recognition
             <Badge className="flex items-center gap-1 bg-secondary text-secondary-foreground hover:bg-secondary/80">
               <Brain className="w-3 h-3" />

@@ -90,7 +90,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       {/* Client */}
       <Card className="dashboard-card lg:col-span-1">
         <CardHeader>
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <CardTitle className="font-medium flex items-center gap-2">
             {project.client_company ? <Building2 className="h-4 w-4 text-primary" /> : <UserIcon className="h-4 w-4 text-primary" />}
             Client
           </CardTitle>
@@ -142,7 +142,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       {isOwner && (
         <Card className="dashboard-card lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="font-medium flex items-center gap-2">
               <Wallet className="h-4 w-4 text-primary" />
               Budget
             </CardTitle>
@@ -170,7 +170,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       {/* Deadline */}
       <Card className="dashboard-card lg:col-span-1">
         <CardHeader>
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
+          <CardTitle className="font-medium flex items-center gap-2">
             <Calendar className="h-4 w-4 text-primary" />
             Deadline
           </CardTitle>
@@ -196,7 +196,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       {rooms.length > 0 && !hasMeaningfulRoomBudget && (
         <Card className="dashboard-card lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="font-medium flex items-center gap-2">
               <Home className="h-4 w-4 text-primary" />
               Rooms ({rooms.length})
             </CardTitle>
@@ -217,7 +217,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       {hasMeaningfulRoomBudget && isOwner && (
         <Card className="dashboard-card lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardTitle className="font-medium flex items-center gap-2">
               <Home className="h-4 w-4 text-primary" />
               Budget by Room
             </CardTitle>
@@ -256,7 +256,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       {taskStats.total > 0 && (
         <Card className={`dashboard-card ${rooms.length > 0 ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Tasks</CardTitle>
+            <CardTitle className="font-medium">Tasks</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
@@ -291,7 +291,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
       {project.description && (
         <Card className="dashboard-card lg:col-span-3">
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Description</CardTitle>
+            <CardTitle className="font-medium">Description</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm whitespace-pre-wrap">{project.description}</p>

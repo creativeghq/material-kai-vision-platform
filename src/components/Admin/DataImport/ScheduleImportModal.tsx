@@ -183,7 +183,7 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl bg-card text-card-foreground border-border">
         <DialogHeader>
-          <DialogTitle className="text-2xl flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-6 w-6 text-purple-400" />
             Schedule Recurring Import
           </DialogTitle>

@@ -75,12 +75,12 @@ export const BillingHistoryTab: React.FC = () => {
     <Card className="rounded-2xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Receipt className="h-5 w-5 text-primary" />
+          <Receipt className="h-4 w-4 text-primary" />
           Billing History
         </CardTitle>
         <CardDescription>View all your credit transactions and purchases</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">Loading transactions...</div>
         ) : transactions.length === 0 ? (
@@ -88,7 +88,7 @@ export const BillingHistoryTab: React.FC = () => {
             No transactions yet. Purchase credits or subscribe to get started!
           </div>
         ) : (
-          <div className="rounded-lg border">
+          <div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -115,11 +115,9 @@ export const BillingHistoryTab: React.FC = () => {
                       {transaction.description}
                     </TableCell>
                     <TableCell
-                      className={`text-right font-semibold ${
-                        Number(transaction.amount ?? 0) >= 0
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                      }`}
+                      className={`text-right font-semibold ${directionTone(
+                        Number(transaction.amount ?? 0) >= 0 ? 'in' : 'out',
+                      )}`}
                     >
                       {Number(transaction.amount ?? 0) >= 0 ? '+' : ''}
                       {Number(transaction.amount ?? 0).toFixed(2)}

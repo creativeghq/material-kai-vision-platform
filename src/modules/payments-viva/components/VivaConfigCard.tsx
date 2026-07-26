@@ -128,7 +128,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle className="text-base font-light flex items-center gap-2">
+        <CardTitle className="font-light flex items-center gap-2">
           <CreditCard className="h-4 w-4 text-primary" />
           Viva.com
           {fullyConnected ? (

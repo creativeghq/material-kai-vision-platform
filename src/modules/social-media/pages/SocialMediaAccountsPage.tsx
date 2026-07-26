@@ -137,7 +137,7 @@ export const SocialMediaAccountsPage: React.FC = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
-              <CardTitle className="text-base">Connected Accounts</CardTitle>
+              <CardTitle>Connected Accounts</CardTitle>
               <CardDescription>
                 {activeAccounts.length} active account{activeAccounts.length !== 1 ? 's' : ''} across the workspace
               </CardDescription>

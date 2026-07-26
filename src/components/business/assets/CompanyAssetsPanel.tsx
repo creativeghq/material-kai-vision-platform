@@ -187,7 +187,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
         <div>
-          <CardTitle className="text-sm">Company assets</CardTitle>
+          <CardTitle>Company assets</CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
             {context === 'hr'
               ? 'Equipment, phones, cards and vehicles issued to staff — who holds what.'

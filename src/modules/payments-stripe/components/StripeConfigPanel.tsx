@@ -39,7 +39,7 @@ export const StripeConfigPanel: React.FC<Props> = (_props) => {
     <div className="space-y-4">
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle className="text-base font-light flex items-center gap-2">
+          <CardTitle className="font-light flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-primary" />
             Webhook
           </CardTitle>
@@ -67,7 +67,7 @@ export const StripeConfigPanel: React.FC<Props> = (_props) => {
 
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle className="text-base font-light">Quick links</CardTitle>
+          <CardTitle className="font-light">Quick links</CardTitle>
           <CardDescription>
             Stripe Dashboard surfaces for the bits you can't configure inside the platform.
           </CardDescription>
@@ -98,7 +98,7 @@ export const StripeConfigPanel: React.FC<Props> = (_props) => {
 
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle className="text-base font-light">Product / Price IDs</CardTitle>
+          <CardTitle className="font-light">Product / Price IDs</CardTitle>
           <CardDescription>
             Stripe product + price IDs are stored as platform secrets so they can be rotated
             without a redeploy. Edit them on the <strong>Keys</strong> tab:

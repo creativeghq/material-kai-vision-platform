@@ -191,7 +191,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           {models.map((model: any, index: number) => (
             <Card key={index} className="bg-muted/40 border border-border hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-foreground">{model.model}</CardTitle>
+                <CardTitle className="font-bold text-foreground">{model.model}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {/* Capacity */}
@@ -257,7 +257,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
         {/* Common Specifications */}
         <Card className="bg-muted/40 border-border mt-6">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-bold text-foreground">Common Specifications</CardTitle>
+            <CardTitle className="font-bold text-foreground">Common Specifications</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

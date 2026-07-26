@@ -81,7 +81,7 @@ export const InboxTab: React.FC = () => {
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Inbox className="h-5 w-5 text-primary" />
+            <Inbox className="h-4 w-4 text-primary" />
             Hire Me Inbox
             {messages.length > 0 && (
               <Badge variant="secondary">{messages.length}</Badge>

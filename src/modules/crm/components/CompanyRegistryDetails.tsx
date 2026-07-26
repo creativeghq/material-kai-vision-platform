@@ -80,7 +80,7 @@ export const CompanyRegistryDetails: React.FC<{
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle className="text-sm">Activity codes (ΚΑΔ)</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Activity codes (ΚΑΔ)</DialogTitle></DialogHeader>
             <div className="max-h-[60vh] overflow-y-auto space-y-1.5">
               {codes.map((k, i) => (
                 <div key={`${k.code}-${i}`} className="flex items-start gap-2 rounded-md border border-border/50 px-2.5 py-1.5 text-xs">
@@ -103,7 +103,7 @@ export const CompanyRegistryDetails: React.FC<{
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle className="text-sm">People from ΓΕΜΗ registry</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>People from ΓΕΜΗ registry</DialogTitle></DialogHeader>
             <p className="text-[11px] text-muted-foreground -mt-1">Add any as a contact under this company.</p>
             <div className="max-h-[60vh] overflow-y-auto space-y-1.5">
               {persons.map((p, i) => {

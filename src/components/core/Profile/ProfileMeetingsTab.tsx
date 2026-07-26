@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays, Clock, Mail, MessageSquare, Loader2, Check, Trash2, Building2, User } from 'lucide-react';
-import { Card, CardContent } from '@/components/core/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
@@ -98,29 +98,33 @@ export const ProfileMeetingsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-        <div className="mb-4">
-          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-            <CalendarDays className="h-4 w-4" /> Upcoming meetings
-          </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Meetings you've logged on CRM contacts &amp; companies. Log a meeting from a contact's Activity tab.</p>
-        </div>
-        {loading ? (
-          <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
-        ) : upcoming.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">No upcoming meetings.</p>
-        ) : (
-          <div className="space-y-2">{upcoming.map((m) => <Row key={m.id} m={m} />)}</div>
-        )}
-      </div>
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-primary" /> Upcoming meetings
+          </CardTitle>
+          <CardDescription>Meetings you've logged on CRM contacts &amp; companies. Log a meeting from a contact's Activity tab.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+          ) : upcoming.length === 0 ? (
+            <p className="py-4 text-sm text-muted-foreground">No upcoming meetings.</p>
+          ) : (
+            <div className="space-y-2">{upcoming.map((m) => <Row key={m.id} m={m} />)}</div>
+          )}
+        </CardContent>
+      </Card>
 
       {past.length > 0 && (
-        <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-primary flex items-center gap-2"><Clock className="h-4 w-4" /> Past &amp; done</h3>
-          </div>
-          <div className="space-y-2">{past.map((m) => <Row key={m.id} m={m} done />)}</div>
-        </div>
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" /> Past &amp; done</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">{past.map((m) => <Row key={m.id} m={m} done />)}</div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

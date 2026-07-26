@@ -197,7 +197,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5" />
               <div className="flex-1">
-                <CardTitle className="text-base font-medium">
+                <CardTitle className="font-medium">
                   Invoice issuance is handled by {provider.name}
                 </CardTitle>
                 <CardDescription className="mt-1 space-y-2">
@@ -228,7 +228,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
 
       <Card className={`dashboard-card ${erpActive ? 'opacity-50 pointer-events-none' : ''}`}>
         <CardHeader>
-          <CardTitle className="text-base font-light flex items-center gap-2">
+          <CardTitle className="font-light flex items-center gap-2">
             <Hash className="h-4 w-4 text-primary" />
             Invoice numbering
           </CardTitle>
@@ -315,7 +315,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
       {/* Invoice design — inline cover + footer uploads (stored in quote-templates bucket) */}
       <Card className={`dashboard-card ${erpActive ? 'opacity-50 pointer-events-none' : ''}`}>
         <CardHeader>
-          <CardTitle className="text-base font-light flex items-center gap-2">
+          <CardTitle className="font-light flex items-center gap-2">
             <ImageIcon className="h-4 w-4 text-primary" />
             Invoice design
           </CardTitle>

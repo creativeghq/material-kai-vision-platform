@@ -94,7 +94,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
     <Card className="border-amber-500/40">
       <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center gap-2 space-y-0">
         <PackagePlus className="h-4 w-4 text-amber-500" />
-        <CardTitle className="text-sm">Pending products from expenses</CardTitle>
+        <CardTitle>Pending products from expenses</CardTitle>
         <Badge variant="outline" className="text-[10px]">{items.length}</Badge>
         <span className="text-xs text-muted-foreground">AI-extracted from your myDATA supplier invoices — review and add or dismiss.</span>
       </CardHeader>

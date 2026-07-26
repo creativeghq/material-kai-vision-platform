@@ -74,7 +74,7 @@ export const FactoryLinkCard: React.FC<{
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
+        <CardTitle className="flex items-center gap-2">
           <Factory className="h-4 w-4" />
           Linked brand
         </CardTitle>

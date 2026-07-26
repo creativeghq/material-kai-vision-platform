@@ -54,7 +54,7 @@ export default function SupplierClaimsPage() {
       </div>
 
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Pending ({claims.length})</CardTitle></CardHeader>
+        <CardHeader className="pb-3"><CardTitle>Pending ({claims.length})</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           {loading ? (
             <div className="flex items-center gap-2 justify-center py-12 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>

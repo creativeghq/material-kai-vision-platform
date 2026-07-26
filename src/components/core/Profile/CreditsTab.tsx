@@ -75,7 +75,7 @@ export const CreditsTab: React.FC = () => {
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Coins className="h-5 w-5 text-primary" />
+            <Coins className="h-4 w-4 text-primary" />
             Credit Balance
           </CardTitle>
           <CardDescription>Your available credits for AI operations</CardDescription>
@@ -97,7 +97,7 @@ export const CreditsTab: React.FC = () => {
       <Card className="rounded-2xl" id="buy-credits-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" />
+            <ShoppingCart className="h-4 w-4" />
             Buy Credits
           </CardTitle>
           <CardDescription>Pick a pack or set your own amount — bigger amounts get better rates</CardDescription>

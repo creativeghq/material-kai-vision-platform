@@ -197,7 +197,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="font-semibold flex items-center gap-2">
               <FileText className="h-4 w-4 text-blue-600" />
               Layer 1 — Catalog Layout
             </CardTitle>
@@ -241,7 +241,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="font-semibold flex items-center gap-2">
               <Award className="h-4 w-4 text-purple-600" />
               Layer 2 — Catalog Legends
             </CardTitle>
@@ -306,7 +306,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
       {/* Coverage bucket chart */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <CardTitle className="font-semibold flex items-center gap-2">
             <Package className="h-4 w-4 text-blue-600" />
             Products by coverage bucket
           </CardTitle>
@@ -345,7 +345,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
       {data.products_sample.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <CardTitle className="font-semibold flex items-center gap-2">
               <Eye className="h-4 w-4 text-blue-600" />
               Per-product extraction detail
               <Badge variant="outline" className="ml-2 text-[10px]">

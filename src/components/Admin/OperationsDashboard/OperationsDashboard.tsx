@@ -810,7 +810,7 @@ const OperationsDashboardInner: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5" />
+                  <Bot className="h-4 w-4" />
                   Agent Chat Analytics
                 </CardTitle>
                 <CardDescription>
@@ -1038,7 +1038,7 @@ const OperationsDashboardInner: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
+                  <Zap className="h-4 w-4" />
                   Tool Call Analytics
                 </CardTitle>
                 <CardDescription>
@@ -1114,7 +1114,7 @@ const OperationsDashboardInner: React.FC = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Zap className="h-5 w-5" />
+                    <Zap className="h-4 w-4" />
                     API Request Logs
                   </CardTitle>
                   <CardDescription>Raw API endpoint requests and response codes, newest first</CardDescription>
@@ -1193,7 +1193,7 @@ const OperationsDashboardInner: React.FC = () => {
             {/* API Catalogue — static reference */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2">
                   <Globe className="h-4 w-4" />
                   Configured API Services
                 </CardTitle>
@@ -1274,7 +1274,7 @@ const OperationsDashboardInner: React.FC = () => {
             {/* Resend Email Delivery Section */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2">
                   <Mail className="h-4 w-4" />
                   Email Delivery — Resend
                 </CardTitle>
@@ -1327,7 +1327,7 @@ const OperationsDashboardInner: React.FC = () => {
             {/* Notification Channels Section */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2">
                   <Send className="h-4 w-4" />
                   Notification Channels
                 </CardTitle>
@@ -1509,7 +1509,7 @@ const OperationsDashboardInner: React.FC = () => {
                 <div className="grid gap-6 md:grid-cols-2">
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
+                      <CardTitle className="flex items-center gap-2">
                         <DollarSign className="h-4 w-4" />
                         Cost Breakdown by Service
                       </CardTitle>
@@ -1542,7 +1542,7 @@ const OperationsDashboardInner: React.FC = () => {
 
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
+                      <CardTitle className="flex items-center gap-2">
                         <BarChart3 className="h-4 w-4" />
                         Daily Usage Timeline
                       </CardTitle>
@@ -1573,7 +1573,7 @@ const OperationsDashboardInner: React.FC = () => {
                 {/* Per-Service Table */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
+                    <CardTitle className="flex items-center gap-2">
                       <Globe className="h-4 w-4" />
                       Per-Service Breakdown
                     </CardTitle>
@@ -1684,7 +1684,7 @@ const OperationsDashboardInner: React.FC = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
+                    <Activity className="h-4 w-4" />
                     Processing Jobs Monitor
                   </CardTitle>
                   <CardDescription>Real-time monitoring of all processing pipelines (PDF, XML, Web Scraping)</CardDescription>
@@ -1705,7 +1705,7 @@ const OperationsDashboardInner: React.FC = () => {
             <Card className="hidden">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
+                  <Database className="h-4 w-4" />
                   XML Import Jobs (Old Stats)
                 </CardTitle>
                 <CardDescription>Legacy XML import statistics</CardDescription>
@@ -1758,7 +1758,7 @@ const OperationsDashboardInner: React.FC = () => {
             <Card className="hidden">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
+                  <Activity className="h-4 w-4" />
                   Web Scraping Sessions (Old Stats)
                 </CardTitle>
                 <CardDescription>Legacy web scraping statistics</CardDescription>
@@ -1811,7 +1811,7 @@ const OperationsDashboardInner: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Success Rates</CardTitle>
+                  <CardTitle className="font-medium">Success Rates</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div>
@@ -1867,7 +1867,7 @@ const OperationsDashboardInner: React.FC = () => {
 
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Processing Metrics</CardTitle>
+                  <CardTitle className="font-medium">Processing Metrics</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex justify-between items-center">
