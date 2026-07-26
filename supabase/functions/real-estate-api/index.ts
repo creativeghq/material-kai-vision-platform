@@ -18,7 +18,7 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
-import { checkPublishRequirements, matchesCriteria } from '../_shared/real-estate.ts';
+import { checkPublishRequirements, matchesCriteria, createRentInvoiceForCharge, estimateFromMedianPerSqm } from '../_shared/real-estate.ts';
 import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
 import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -104,6 +104,7 @@ async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property:
     if (property.is_public && property.public_listing_token) {
       const pubUrl = `/p/${property.public_listing_token}`;
       const priceStr = property.price != null ? ` — ${new Intl.NumberFormat('en-GB', { style: 'currency', currency: property.currency || 'EUR', maximumFractionDigits: 0 }).format(Number(property.price))}` : '';
+      const alertedReqIds: string[] = [];
       for (const m of matches) {
         const c = m.contact;
         if (!c?.marketing_consent || !c.email) continue;
@@ -115,6 +116,13 @@ async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property:
           body: `${lead} matching your saved search: ${label}${priceStr}.`,
           action_url: pubUrl, property_id: property.id,
         }).catch(() => {});
+        if (m.id) alertedReqIds.push(m.id);
+      }
+      // T3-2 — advance the digest window for buyers we just alerted immediately, so tonight's digest
+      // doesn't email them the SAME listing again (double-notify). Only for new_listing (the digest is
+      // about new listings; a price_drop alert doesn't overlap it).
+      if (reason === 'new_listing' && alertedReqIds.length > 0) {
+        await supabase.from('property_buyer_requirements').update({ last_digest_at: new Date().toISOString() }).in('id', alertedReqIds).catch(() => {});
       }
     }
   } catch (_) { /* non-fatal — alerting must never block the listing op */ }
@@ -1152,25 +1160,18 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         await loadEditable(tenancy.property_id);
         if (!tenancy.tenant_contact_id) return json({ error: 'Set a tenant on the tenancy before invoicing rent.' }, 400);
         const property = await loadProperty(tenancy.property_id);
-        const amount = Number(charge.amount);
-        const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: workspaceId });
-        if (numErr) throw new HttpError(500, `numbering failed: ${numErr.message}`);
-        // Draft, VAT-0 (operator sets the correct rent VAT/doc-type on issue — residential rent is
-        // usually exempt, commercial is not). Not transmitted until issued in Finance.
-        const { data: inv, error: invErr } = await supabase.from('invoices').insert({
-          workspace_id: workspaceId, customer_contact_id: tenancy.tenant_contact_id,
-          internal_number: draftNumber as string, status: 'draft', document_type: '1.1',
-          currency: charge.currency ?? 'EUR', subtotal_net: amount, vat_rate: 0, vat_amount: 0, total: amount,
-          notes: `Rent — ${property.title ?? 'property'} — due ${charge.due_date}`, issued_at: null, due_at: charge.due_date,
-        }).select('id').single();
-        if (invErr) throw new HttpError(400, invErr.message);
-        const { error: itErr } = await supabase.from('invoice_items').insert({
-          invoice_id: (inv as any).id, description: `Rent — ${property.title ?? 'property'} (${charge.due_date})`,
-          quantity: 1, unit_price: amount, net_value: amount, vat_amount: 0, line_total: amount,
-        });
-        if (itErr) throw new HttpError(400, itErr.message);
-        await supabase.from('property_rent_charges').update({ invoice_id: (inv as any).id }).eq('id', chargeId).eq('workspace_id', workspaceId);
-        return json({ invoice_id: (inv as any).id });
+        // Shared with the rent-invoicing cron (single source — no VAT/doc-type/numbering drift).
+        let invoiceId: string;
+        try {
+          invoiceId = await createRentInvoiceForCharge(supabase, {
+            workspaceId, chargeId, tenantContactId: tenancy.tenant_contact_id,
+            amount: Number(charge.amount), currency: charge.currency ?? 'EUR',
+            dueDate: charge.due_date, propertyTitle: property.title ?? 'property',
+          });
+        } catch (e) {
+          throw new HttpError(400, e instanceof Error ? e.message : 'Could not create the rent invoice.');
+        }
+        return json({ invoice_id: invoiceId });
       }
 
       case 'renew-tenancy': {
@@ -1227,11 +1228,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           max_per_sqm: pps[pps.length - 1] ?? null,
           avg_days_on_market: domVals.length ? Math.round(domVals.reduce((a: number, b: number) => a + b, 0) / domVals.length) : null,
         };
-        const suggestion = (median && area > 0) ? {
-          estimate: Math.round(median * area / 1000) * 1000,
-          low: Math.round(median * area * 0.9 / 1000) * 1000,
-          high: Math.round(median * area * 1.1 / 1000) * 1000,
-        } : null;
+        const suggestion = estimateFromMedianPerSqm(median, area, 0.1);
         return json({
           subject: { property_id: propertyId || null, title: subject?.title ?? null, property_type: propertyType, town, area: area || null, price: subject?.price ?? null, currency: subject?.currency ?? 'EUR' },
           comps, stats, suggestion, generated_at: new Date().toISOString(),

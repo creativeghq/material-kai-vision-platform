@@ -13,7 +13,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { toPublic, matchesCriteria } from '../_shared/real-estate.ts';
+import { toPublic, matchesCriteria, estimateFromMedianPerSqm } from '../_shared/real-estate.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 function json(body: any, status = 200): Response {
@@ -203,9 +203,8 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     let estimate: number | null = null, low: number | null = null, high: number | null = null, medianPerSqm: number | null = null;
     if (perSqm.length >= 3 && area > 0) {
       medianPerSqm = perSqm[Math.floor(perSqm.length / 2)];
-      estimate = Math.round((medianPerSqm * area) / 1000) * 1000;
-      low = Math.round((estimate * 0.85) / 1000) * 1000;
-      high = Math.round((estimate * 1.15) / 1000) * 1000;
+      const est = estimateFromMedianPerSqm(medianPerSqm, area, 0.15); // shared formula, ±15% band
+      if (est) { estimate = est.estimate; low = est.low; high = est.high; }
     }
 
     // Capture the seller lead (crm_contact + real-estate extension). property_id/workspace are server-set.

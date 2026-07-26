@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
+import { createRentInvoiceForCharge } from '../_shared/real-estate.ts';
 
 const WINDOW_DAYS = 7; // draft the invoice up to a week before the due date
 
@@ -32,22 +33,12 @@ serve(withApiLogging('real-estate-rent-invoicing', async (req) => {
     const t = (c as any).tenancy;
     if (!t || t.status !== 'active' || !t.tenant_contact_id) { skipped++; continue; }
     try {
-      const amount = Number(c.amount);
-      const title = t.property?.title ?? 'property';
-      const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: c.workspace_id });
-      if (numErr) { failed++; continue; }
-      const { data: inv, error: invErr } = await supabase.from('invoices').insert({
-        workspace_id: c.workspace_id, customer_contact_id: t.tenant_contact_id,
-        internal_number: draftNumber as string, status: 'draft', document_type: '1.1',
-        currency: c.currency ?? 'EUR', subtotal_net: amount, vat_rate: 0, vat_amount: 0, total: amount,
-        notes: `Rent — ${title} — due ${c.due_date}`, issued_at: null, due_at: c.due_date,
-      }).select('id').single();
-      if (invErr) { failed++; continue; }
-      await supabase.from('invoice_items').insert({
-        invoice_id: (inv as any).id, description: `Rent — ${title} (${c.due_date})`,
-        quantity: 1, unit_price: amount, net_value: amount, vat_amount: 0, line_total: amount,
+      // Shared with the invoice-rent-charge API action (single source — no VAT/doc-type/numbering drift).
+      await createRentInvoiceForCharge(supabase, {
+        workspaceId: c.workspace_id, chargeId: c.id, tenantContactId: t.tenant_contact_id,
+        amount: Number(c.amount), currency: c.currency ?? 'EUR', dueDate: c.due_date,
+        propertyTitle: t.property?.title ?? 'property',
       });
-      await supabase.from('property_rent_charges').update({ invoice_id: (inv as any).id }).eq('id', c.id);
       created++;
     } catch { failed++; }
   }

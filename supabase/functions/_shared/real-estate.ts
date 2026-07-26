@@ -23,6 +23,46 @@ export function matchesCriteria(c: any, p: any): boolean {
 }
 
 /**
+ * Create the draft rent invoice (+ line item) for a rent charge and link it back. SINGLE source used
+ * by BOTH the rent-invoicing cron and the invoice-rent-charge API action (was duplicated → drift risk
+ * on VAT/doc-type/numbering). Draft, VAT-0, doc_type 1.1 — the operator sets the correct rent VAT on
+ * issue in Finance (residential rent is usually exempt, commercial isn't); nothing is transmitted here.
+ * Throws on any step; returns the new invoice id.
+ */
+/** Median-price-per-sqm × area, ±band, rounded to the nearest 1,000. SINGLE source for the CMA report
+ *  (±10%) and the public instant valuation (±15%) — same formula, band passed in (was 2 copies). */
+export function estimateFromMedianPerSqm(median: number | null, area: number, bandPct: number): { estimate: number; low: number; high: number } | null {
+  if (!median || !(area > 0)) return null;
+  const round1k = (n: number) => Math.round(n / 1000) * 1000;
+  const base = median * area;
+  return { estimate: round1k(base), low: round1k(base * (1 - bandPct)), high: round1k(base * (1 + bandPct)) };
+}
+
+export async function createRentInvoiceForCharge(supabase: any, args: {
+  workspaceId: string; chargeId: string; tenantContactId: string;
+  amount: number; currency: string; dueDate: string; propertyTitle: string;
+}): Promise<string> {
+  const title = args.propertyTitle || 'property';
+  const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: args.workspaceId });
+  if (numErr) throw new Error(`numbering failed: ${numErr.message}`);
+  const { data: inv, error: invErr } = await supabase.from('invoices').insert({
+    workspace_id: args.workspaceId, customer_contact_id: args.tenantContactId,
+    internal_number: draftNumber as string, status: 'draft', document_type: '1.1',
+    currency: args.currency || 'EUR', subtotal_net: args.amount, vat_rate: 0, vat_amount: 0, total: args.amount,
+    notes: `Rent — ${title} — due ${args.dueDate}`, issued_at: null, due_at: args.dueDate,
+  }).select('id').single();
+  if (invErr) throw new Error(invErr.message);
+  const invoiceId = (inv as any).id as string;
+  const { error: itErr } = await supabase.from('invoice_items').insert({
+    invoice_id: invoiceId, description: `Rent — ${title} (${args.dueDate})`,
+    quantity: 1, unit_price: args.amount, net_value: args.amount, vat_amount: 0, line_total: args.amount,
+  });
+  if (itErr) throw new Error(itErr.message);
+  await supabase.from('property_rent_charges').update({ invoice_id: invoiceId }).eq('id', args.chargeId).eq('workspace_id', args.workspaceId);
+  return invoiceId;
+}
+
+/**
  * Publish compliance gate (revised §3 per-category required-field policy + the GR hard-block).
  * Greece: buildings need energy_class + electronic_building_id (ΠΕΑ + Ηλεκτρονική Ταυτότητα);
  * short-let needs the ΑΜΑ license; land needs land_use/zoning. Non-GR: same list, warn-only.
