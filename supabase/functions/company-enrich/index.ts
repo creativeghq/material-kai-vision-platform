@@ -42,6 +42,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') || '';
 const APOLLO_API_KEY = Deno.env.get('APOLLO_API_KEY') || '';
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') || '';
 
 // Ceiling reserved up front for affordability (web search ~2cr + Apollo ~7.5cr worst case).
 const ENRICH_CREDIT_CEILING = 12;
@@ -310,7 +311,7 @@ interface CompetitorOrg {
   employee_count: string | null;
   linkedin: string | null;
   description: string | null;
-  source: 'apollo' | 'web_search';
+  source: 'apollo' | 'gemini' | 'web_search';
 }
 
 interface CompetitorSeed {
@@ -416,18 +417,7 @@ async function findCompetitorsViaWebSearch(
 ): Promise<CompetitorOrg[] | null> {
   if (!ANTHROPIC_API_KEY) return null;
   try {
-    const scopeBits = [
-      seed.industry ? `in the ${seed.industry} sector` : '',
-      seed.kadCodes.length ? `(activity codes ${seed.kadCodes.slice(0, 5).join(', ')})` : '',
-      seed.country ? `operating in ${seed.country}` : '',
-      seed.city ? `around ${seed.city}` : '',
-    ].filter(Boolean).join(' ');
-    const target = seed.name ? `the business "${seed.name}"` : `a business ${scopeBits}`;
-    const researchQuery =
-      `Find up to ${seed.limit} real companies that compete with or are closely similar to ${target} ${scopeBits}. ` +
-      `For each competitor give the company name, official website, head-office city/country, and a one-sentence ` +
-      `description of what it does. Prefer direct competitors in the same market. ${seed.name ? `Exclude "${seed.name}" itself. ` : ''}` +
-      `Only list companies you can actually find — do not invent names.`;
+    const researchQuery = competitorResearchQuery(seed);
 
     let inTok = 0, outTok = 0;
     const research = await anthropic({
@@ -519,6 +509,165 @@ async function findCompetitorsViaWebSearch(
   }
 }
 
+/** Build the free-text competitor research prompt shared by the web/grounded providers. */
+function competitorResearchQuery(seed: CompetitorSeed): string {
+  const scopeBits = [
+    seed.industry ? `in the ${seed.industry} sector` : '',
+    seed.kadCodes.length ? `(activity codes ${seed.kadCodes.slice(0, 5).join(', ')})` : '',
+    seed.country ? `operating in ${seed.country}` : '',
+    seed.city ? `around ${seed.city}` : '',
+  ].filter(Boolean).join(' ');
+  const target = seed.name ? `the business "${seed.name}"` : `a business ${scopeBits}`;
+  return (
+    `Find up to ${seed.limit} real companies that compete with or are closely similar to ${target} ${scopeBits}. ` +
+    `For each competitor give the company name, official website, head-office city/country, and a one-sentence ` +
+    `description of what it does. Prefer direct competitors in the same market. ${seed.name ? `Exclude "${seed.name}" itself. ` : ''}` +
+    `Only list companies you can actually find — do not invent names.`
+  );
+}
+
+/**
+ * Gemini + Google Search grounding — the broadest live web index for freeform competitor
+ * research. Two Flash calls: (1) grounded research (text, google_search tool), (2) JSON-mode
+ * structured extraction. Only when GEMINI_API_KEY is set. Debits its own cost.
+ */
+async function findCompetitorsViaGemini(
+  admin: any, userId: string, workspaceId: string | null, seed: CompetitorSeed,
+): Promise<CompetitorOrg[] | null> {
+  if (!GEMINI_API_KEY) return null;
+  const base = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  try {
+    // Step 1 — grounded research (Google Search).
+    const rc = new AbortController();
+    const rt = setTimeout(() => rc.abort(), 30_000);
+    const researchRes = await fetch(`${base}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: competitorResearchQuery(seed) }] }],
+        tools: [{ google_search: {} }],
+      }),
+      signal: rc.signal,
+    });
+    clearTimeout(rt);
+    if (!researchRes.ok) return null;
+    const research = await researchRes.json();
+    const researchText = (research?.candidates?.[0]?.content?.parts ?? [])
+      .map((p: any) => p?.text).filter(Boolean).join('\n') || '';
+    let inTok = research?.usageMetadata?.promptTokenCount ?? 0;
+    let outTok = research?.usageMetadata?.candidatesTokenCount ?? 0;
+    if (!researchText) return [];
+
+    // Step 2 — structured extraction (JSON mode, no grounding).
+    let list: any[] = [];
+    try {
+      const ec = new AbortController();
+      const et = setTimeout(() => ec.abort(), 20_000);
+      const extractRes = await fetch(`${base}?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [{ text: `From the research below, extract the distinct real companies found. Use null for any field not clearly stated.\n\n<research>\n${researchText.slice(0, 14000)}\n</research>` }],
+          }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'OBJECT',
+              properties: {
+                competitors: {
+                  type: 'ARRAY',
+                  items: {
+                    type: 'OBJECT',
+                    properties: {
+                      name: { type: 'STRING' },
+                      website: { type: 'STRING', nullable: true },
+                      industry: { type: 'STRING', nullable: true },
+                      city: { type: 'STRING', nullable: true },
+                      country: { type: 'STRING', nullable: true },
+                      description: { type: 'STRING', nullable: true },
+                    },
+                    required: ['name'],
+                  },
+                },
+              },
+              required: ['competitors'],
+            },
+          },
+        }),
+        signal: ec.signal,
+      });
+      clearTimeout(et);
+      if (extractRes.ok) {
+        const extract = await extractRes.json();
+        inTok += extract?.usageMetadata?.promptTokenCount ?? 0;
+        outTok += extract?.usageMetadata?.candidatesTokenCount ?? 0;
+        const raw = (extract?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text).filter(Boolean).join('');
+        const parsed = raw ? JSON.parse(raw) : null;
+        list = Array.isArray(parsed?.competitors) ? parsed.competitors : [];
+      }
+    } catch {
+      list = [];
+    }
+
+    // Cost log + debit (Gemini Flash tokens + Google-Search grounding surcharge).
+    try {
+      const inputCost = (inTok / 1_000_000) * 0.10;
+      const outputCost = (outTok / 1_000_000) * 0.40;
+      const rawCost = inputCost + outputCost + 0.035; // grounded-query surcharge
+      const billedCost = rawCost * 1.5;
+      const credits = Math.round(billedCost * 100 * 100) / 100;
+      await admin.rpc('debit_credits', {
+        p_user_id: userId,
+        p_amount: credits,
+        p_operation_type: 'find_competitors_gemini',
+        p_description: `Competitor discovery via Gemini (${seed.name ?? seed.industry ?? 'company'})`,
+        p_metadata: { name: seed.name, industry: seed.industry, country: seed.country },
+        p_workspace_id: workspaceId,
+      });
+      await admin.from('ai_usage_logs').insert({
+        user_id: userId,
+        workspace_id: workspaceId,
+        operation_type: 'find_competitors_gemini',
+        model_name: 'gemini-2.0-flash',
+        input_tokens: inTok,
+        output_tokens: outTok,
+        input_cost_usd: inputCost,
+        output_cost_usd: outputCost,
+        raw_cost_usd: rawCost,
+        markup_multiplier: 1.5,
+        billed_cost_usd: billedCost,
+        credits_debited: credits,
+        module_slug: 'crm',
+        metadata: { feature: 'find_competitors', provider: 'gemini', grounded: true, name: seed.name },
+        created_at: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.warn('[company-enrich] gemini competitor cost log failed:', (e as Error)?.message);
+    }
+
+    const selfName = (seed.name ?? '').toLowerCase();
+    return list
+      .map((c): CompetitorOrg => ({
+        name: cleanStr(c?.name) ?? '',
+        website: normalizeUrl(c?.website),
+        domain: toDomain(c?.website),
+        industry: cleanStr(c?.industry),
+        city: cleanStr(c?.city),
+        country: cleanStr(c?.country),
+        employee_count: null,
+        linkedin: null,
+        description: cleanStr(c?.description),
+        source: 'gemini',
+      }))
+      .filter((c) => c.name && c.name.toLowerCase() !== selfName);
+  } catch (e) {
+    console.warn('[company-enrich] gemini competitors failed:', (e as Error)?.message);
+    return null;
+  }
+}
+
 /** Handle the `find-competitors` action: seed → Apollo/web-search → de-duped competitor list. */
 async function handleFindCompetitors(userId: string, body: any): Promise<Response> {
   const admin = createClient(supabaseUrl, supabaseServiceKey);
@@ -547,13 +696,20 @@ async function handleFindCompetitors(userId: string, body: any): Promise<Respons
 
   const skipped: string[] = [];
   let competitors: CompetitorOrg[] = [];
-  let source: 'apollo' | 'web_search' | 'none' = 'none';
+  let source: 'apollo' | 'gemini' | 'web_search' | 'none' = 'none';
 
+  // Chain: Apollo (structured firmographics) → Gemini + Google-Search grounding (broadest live
+  // web index) → Anthropic web_search. First provider that returns results wins.
   const viaApollo = await findCompetitorsViaApollo(admin, userId, seed.workspaceId ?? null, seed);
   if (viaApollo && viaApollo.length) { competitors = viaApollo; source = 'apollo'; }
   else skipped.push(APOLLO_API_KEY ? 'apollo' : 'apollo (no APOLLO_API_KEY)');
 
-  // Web-search fallback when Apollo is unavailable or returned nothing.
+  if (competitors.length === 0) {
+    const viaGemini = await findCompetitorsViaGemini(admin, userId, seed.workspaceId ?? null, seed);
+    if (viaGemini && viaGemini.length) { competitors = viaGemini; source = 'gemini'; }
+    else skipped.push(GEMINI_API_KEY ? 'gemini' : 'gemini (no GEMINI_API_KEY)');
+  }
+
   if (competitors.length === 0) {
     const viaWeb = await findCompetitorsViaWebSearch(admin, userId, seed.workspaceId ?? null, seed);
     if (viaWeb && viaWeb.length) { competitors = viaWeb; source = 'web_search'; }

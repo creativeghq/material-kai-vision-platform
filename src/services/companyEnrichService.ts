@@ -80,12 +80,12 @@ export interface CompetitorOrg {
   employee_count: string | null;
   linkedin: string | null;
   description: string | null;
-  source: 'apollo' | 'web_search';
+  source: 'apollo' | 'gemini' | 'web_search';
 }
 
 export interface FindCompetitorsResult {
   ok: boolean;
-  source: 'apollo' | 'web_search' | 'none';
+  source: 'apollo' | 'gemini' | 'web_search' | 'none';
   competitors: CompetitorOrg[];
   skipped: string[];
   error?: string;

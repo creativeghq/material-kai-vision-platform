@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Users, Sparkles, Loader2, ExternalLink, Wallet, Inbox, ArrowRight, Building2, Search,
+  Package, BarChart3, MapPin, Gauge, LineChart, Bell, BellOff,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -9,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/modules/finance/services/financeService';
 import { findCompetitors, type CompetitorOrg } from '@/services/companyEnrichService';
+import { marketCheck, trackProduct, untrackProduct, type MarketStats } from '@/services/priceMonitoringApi';
 
 /** The seed identity the Market tab reads off the company row. */
 export interface CompanyMarketSeed {
@@ -45,6 +47,8 @@ export const CompanyMarketTab: React.FC<CompanyMarketTabProps> = ({ workspaceId,
   return (
     <div className="space-y-4">
       <CompetitorsCard workspaceId={workspaceId} companyId={companyId} company={company} />
+      <MarketPositionCard workspaceId={workspaceId} companyId={companyId} company={company} />
+      <ProductPriceIntelCard workspaceId={workspaceId} companyId={companyId} company={company} />
       <FinancialSnapshotCard workspaceId={workspaceId} companyId={companyId} company={company} />
     </div>
   );
@@ -184,7 +188,7 @@ const CompetitorsCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, company
             <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
               <Search className="h-3.5 w-3.5" />Discovered
               {discoverSource && discoverSource !== 'none' && (
-                <span className="text-muted-foreground/70">· via {discoverSource === 'apollo' ? 'Apollo' : 'web search'}</span>
+                <span className="text-muted-foreground/70">· via {discoverSource === 'apollo' ? 'Apollo' : discoverSource === 'gemini' ? 'Gemini (Google Search)' : 'web search'}</span>
               )}
             </p>
             {discovered.length === 0 ? (
@@ -328,6 +332,262 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
               </p>
             )}
           </>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Market position analytics (re-scoped Factory Analytics via brand_company_id)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface MarketAnalytics {
+  product_count: number;
+  totals: Record<string, number>;
+  geo: Array<{ country: string | null; city: string | null; count: number }>;
+  top_products: Array<{ product_id: string; name: string | null; count: number }>;
+}
+
+const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<MarketAnalytics | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      // RPC added 2026-07-26; not yet in generated types → cast the call.
+      const { data, error } = await (supabase.rpc as any)('company_market_analytics', { p_company_id: companyId, p_days: 90 });
+      if (cancelled) return;
+      setData(error ? null : (data as unknown as MarketAnalytics));
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [companyId]);
+
+  const t = data?.totals ?? {};
+  const views = t.product_view ?? 0;
+  const saves = t.product_save ?? 0;
+  const quotes = t.product_quote ?? 0;
+  const hasSignal = data && (data.product_count > 0) && (views || saves || quotes || data.geo.length);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" />Market position</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            How our users engage with this supplier's catalog products — demand and geography over the last 90 days.
+          </p>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+        ) : !hasSignal ? (
+          <p className="text-sm text-muted-foreground italic">
+            {(!data || data.product_count === 0)
+              ? 'No catalog products are linked to this company yet (via the Factory link on the Details tab), so there is no engagement to report.'
+              : 'No user engagement recorded for this company’s products in the last 90 days.'}
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatCell label="Products" value={String(data!.product_count)} />
+              <StatCell label="Views" value={views.toLocaleString()} />
+              <StatCell label="Saves" value={saves.toLocaleString()} />
+              <StatCell label="Quote adds" value={quotes.toLocaleString()} />
+            </div>
+
+            {data!.geo.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />Where demand comes from</p>
+                <div className="divide-y divide-border rounded-lg border border-border">
+                  {data!.geo.map((g, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-1.5 text-sm">
+                      <span>{[g.city, g.country].filter(Boolean).join(', ') || 'Unknown'}</span>
+                      <span className="text-muted-foreground">{g.count.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {data!.top_products.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><LineChart className="h-3.5 w-3.5" />Most-engaged products</p>
+                <div className="divide-y divide-border rounded-lg border border-border">
+                  {data!.top_products.map((p) => (
+                    <div key={p.product_id} className="flex items-center justify-between px-3 py-1.5 text-sm">
+                      <span className="truncate">{p.name || p.product_id}</span>
+                      <span className="text-muted-foreground shrink-0">{p.count.toLocaleString()} saves/quotes</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="text-[11px] text-muted-foreground">
+              Follower, hire-request and profile-view metrics are not shown — those belong to a platform supplier account, which a CRM company record doesn't have.
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product price intelligence — our cost vs live market spread + monitor toggle
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ProductRow {
+  id: string;
+  name: string;
+  cost: number | null;
+  cost_currency: string | null;
+}
+
+const money = (n: number | null | undefined, currency?: string | null) =>
+  n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR', maximumFractionDigits: 2 }).format(n);
+
+const ProductPriceIntelCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<ProductRow[]>([]);
+  const [enrolled, setEnrolled] = useState<Set<string>>(new Set());
+  const [market, setMarket] = useState<Record<string, { loading?: boolean; stats?: MarketStats | null }>>({});
+  const [busyMonitor, setBusyMonitor] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, cost, cost_currency')
+        .eq('brand_company_id', companyId)
+        .order('name')
+        .limit(60);
+      const rows = (data as ProductRow[]) ?? [];
+      if (cancelled) return;
+      setProducts(rows);
+      if (rows.length) {
+        const { data: tq } = await supabase
+          .from('tracked_queries')
+          .select('product_id')
+          .in('product_id', rows.map((r) => r.id))
+          .is('api_key_id', null)
+          .eq('mode', 'discovery');
+        if (!cancelled) setEnrolled(new Set((tq ?? []).map((r: any) => r.product_id).filter(Boolean)));
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [companyId]);
+
+  const checkMarket = async (p: ProductRow) => {
+    setMarket((m) => ({ ...m, [p.id]: { loading: true } }));
+    try {
+      const res = await marketCheck({ productId: p.id, productName: p.name });
+      setMarket((m) => ({ ...m, [p.id]: { stats: res.stats } }));
+    } catch (e: any) {
+      setMarket((m) => { const n = { ...m }; delete n[p.id]; return n; });
+      toast({ title: 'Market check failed', description: e?.message || 'Could not scan the market.', variant: 'destructive' });
+    }
+  };
+
+  const toggleMonitor = async (p: ProductRow) => {
+    setBusyMonitor((s) => new Set(s).add(p.id));
+    try {
+      if (enrolled.has(p.id)) {
+        await untrackProduct(p.id);
+        setEnrolled((s) => { const n = new Set(s); n.delete(p.id); return n; });
+        toast({ title: 'Monitoring stopped', description: p.name });
+      } else {
+        await trackProduct(p.id);
+        setEnrolled((s) => new Set(s).add(p.id));
+        toast({ title: 'Monitoring started', description: `${p.name} — retailer prices will refresh on the daily cadence.` });
+      }
+    } catch (e: any) {
+      toast({ title: 'Could not update monitoring', description: e?.message, variant: 'destructive' });
+    } finally {
+      setBusyMonitor((s) => { const n = new Set(s); n.delete(p.id); return n; });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle className="flex items-center gap-2"><Package className="h-4 w-4 text-primary" />Product price intelligence</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            This supplier's catalog products — our cost vs the live market spread. Run a market scan (debits credits) or start daily price monitoring per product.
+          </p>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground p-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+        ) : products.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic p-4">
+            No catalog products are linked to this company. Pin the supplier to its ingested brand via the Factory link on the Details tab.
+          </p>
+        ) : (
+          <div className="divide-y divide-border">
+            {products.map((p) => {
+              const mk = market[p.id];
+              const stats = mk?.stats;
+              const headroom = stats?.median != null && p.cost != null ? stats.median - p.cost : null;
+              const isMonitored = enrolled.has(p.id);
+              return (
+                <div key={p.id} className="px-4 py-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">Our cost: {money(p.cost, p.cost_currency)}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button size="sm" variant="outline" onClick={() => checkMarket(p)} disabled={mk?.loading}>
+                        {mk?.loading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Gauge className="h-3.5 w-3.5 mr-1.5" />}
+                        Check market
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={isMonitored ? 'secondary' : 'outline'}
+                        onClick={() => toggleMonitor(p)}
+                        disabled={busyMonitor.has(p.id)}
+                      >
+                        {busyMonitor.has(p.id)
+                          ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          : isMonitored ? <BellOff className="h-3.5 w-3.5 mr-1.5" /> : <Bell className="h-3.5 w-3.5 mr-1.5" />}
+                        {isMonitored ? 'Monitoring' : 'Monitor'}
+                      </Button>
+                    </div>
+                  </div>
+                  {stats && (
+                    <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 pl-0.5">
+                      {stats.count > 0 ? (
+                        <>
+                          <span>Market: <span className="text-foreground">{money(stats.min, stats.currency)}</span> – <span className="text-foreground">{money(stats.max, stats.currency)}</span></span>
+                          <span>Median: <span className="text-foreground">{money(stats.median, stats.currency)}</span></span>
+                          <span className="text-muted-foreground/70">{stats.count} retailer{stats.count === 1 ? '' : 's'}</span>
+                          {headroom != null && (
+                            <span className={headroom >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>
+                              {headroom >= 0 ? 'Headroom' : 'Underwater'} {money(Math.abs(headroom), stats.currency)}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="italic">No market prices found.</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </CardContent>
     </Card>
