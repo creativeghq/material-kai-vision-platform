@@ -62,11 +62,14 @@ export class SocialAnalyticsSyncAgent implements AgentRunner {
 
     const { data: posts, error: fetchErr } = await supabase
       .from('social_posts')
-      .select('id, zernio_post_id, workspace_id, platform')
+      .select('id, zernio_post_id, workspace_id, platform, metadata')
       .eq('status', 'published')
       .not('zernio_post_id', 'is', null)
       .lte('published_at', minPublishedAt) // at least N hours old
-      .or(`metadata->>'last_analytics_sync'.is.null,metadata->>'last_analytics_sync'.lte.${staleThreshold}`)
+      // NB: the JSON key must NOT be single-quoted here — `metadata->>'last_analytics_sync'` makes
+      // PostgREST treat the quoted token as a literal key that never exists, so `.is.null` matched
+      // EVERY published post and the stale-after gate was inert (re-pulling the whole set each tick).
+      .or(`metadata->>last_analytics_sync.is.null,metadata->>last_analytics_sync.lte.${staleThreshold}`)
       .order('published_at', { ascending: true })
       .limit(batchSize);
 
@@ -122,10 +125,11 @@ export class SocialAnalyticsSyncAgent implements AgentRunner {
         continue;
       }
 
-      // Update last_analytics_sync in metadata
+      // MERGE last_analytics_sync into metadata — a bare `{ last_analytics_sync }` replaces the whole
+      // jsonb and would destroy the partial/failed diagnostic state the webhook + publish handler write.
       await supabase
         .from('social_posts')
-        .update({ metadata: { last_analytics_sync: new Date().toISOString() } })
+        .update({ metadata: { ...((post as any).metadata ?? {}), last_analytics_sync: new Date().toISOString() } })
         .eq('id', post.id);
 
       synced++;
