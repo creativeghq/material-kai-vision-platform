@@ -57,7 +57,7 @@ export const ProfileMeetingsTab: React.FC = () => {
   const Row: React.FC<{ m: CrmMeeting; done?: boolean }> = ({ m, done }) => (
     <div className={`flex flex-wrap items-start gap-3 rounded-lg border p-3 ${done ? 'opacity-70' : ''}`}>
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <CalendarDays className="h-4.5 w-4.5" />
+        <CalendarDays className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium">{m.subject || 'Meeting'}</div>
