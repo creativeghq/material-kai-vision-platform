@@ -62,22 +62,17 @@ const INTERNAL_TOOLS = new Set([
 // only by typing in chat, invisible in the toolkit picker. Tracked tech-debt: SHRINK by
 // giving each a cluster; never grow it (a new orphan should fail the build instead).
 const KNOWN_UNCLUSTERED = new Set([
-  // Purchasing / sourcing
-  'create_purchase_order', 'send_purchase_order', 'source_product',
-  // Trip expenses (submit_trip_card is user-facing: "submit a DRAFT card to finance")
-  'add_trip_expense', 'create_trip_card', 'list_trip_cards', 'submit_trip_card',
-  // Business expenses (added by the concurrent finance-expenses work, commit 7db30144) — not yet
-  // clustered by that change; tracked here so main stays green until it gets a Finance-Hub cluster.
-  'record_expense', 'list_recent_expenses',
-  // Real Estate module (#249) — the manage_real_estate agent tool has no toolkit cluster yet;
-  // tracked here until a Real-Estate cluster (+ picker entry) is added to agentToolsCatalog.ts.
-  'manage_real_estate',
   // Generation extras (belong in the Interior Design cluster)
   'generate_gemini', 'generate_video', 'virtual_staging',
   // HVAC / energy calculators
   'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
   // Docs / misc
-  'search_workspace_docs', 'estimate_cost', 'web_search',
+  'estimate_cost', 'web_search',
+  // ─── Cleared 2026-07-26 ──────────────────────────────────────────────
+  // Pruned once these got clusters in BOTH mirrors: sourcing (create_purchase_order,
+  // send_purchase_order, source_product), trip-expenses (add_trip_expense, create_trip_card,
+  // list_trip_cards, submit_trip_card), expenses (record_expense, list_recent_expenses),
+  // real-estate (manage_real_estate), docs (search_workspace_docs).
   // ─── Cleared 2026-07-16 (#266) ───────────────────────────────────────
   // 18 entries were removed here, not by 18 separate judgement calls but by
   // adding the 4 ToolkitDefinitions the SERVER already defined + the 2 tools
