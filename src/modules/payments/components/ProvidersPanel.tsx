@@ -18,12 +18,10 @@ import {
   ExternalLink,
   Sliders,
   AlertCircle,
-  CheckCircle2,
   Package,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { statusTone } from '@/utils/statusTone';
 import { useActivePaymentProviders } from '../services/invoiceProviderService';
 
 interface Props { embedded?: boolean }
@@ -71,9 +69,11 @@ export const ProvidersPanel: React.FC<Props> = (_props) => {
                     <p className="font-medium truncate">{p.name}</p>
                     <p className="text-xs text-muted-foreground font-mono">{p.slug}</p>
                   </div>
-                  <span className={`inline-flex items-center text-xs capitalize ${statusTone('active')}`}>
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Active
+                  {/* This panel only knows the provider is published + entitled — NOT whether its
+                      credentials/webhook are set up. Say "Available" (not "Active") so an operator
+                      doesn't believe it's collecting money before Configure is completed. */}
+                  <span className="inline-flex items-center text-xs text-muted-foreground">
+                    Available — configure to go live
                   </span>
                   <Button asChild variant="outline" size="sm">
                     <Link to={`/admin/modules/${p.slug}/settings`}>
