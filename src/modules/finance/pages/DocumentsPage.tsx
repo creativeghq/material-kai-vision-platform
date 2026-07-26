@@ -31,7 +31,7 @@ import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog'
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Input } from '@/components/core/ui/input';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
@@ -977,7 +977,7 @@ const ReceiveToWarehouseDialog: React.FC<{
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Receive into warehouse — {doc.issuer_name ?? doc.issuer_vat ?? doc.mark}</DialogTitle>
+          <DialogTitle>Receive into warehouse — {doc.issuer_name ?? doc.issuer_vat ?? doc.mark}</DialogTitle><DialogDescription className="sr-only">Receive this document's lines into the warehouse.</DialogDescription>
         </DialogHeader>
         {loading ? (
           <div className="py-8 text-center"><Loader2 className="h-5 w-5 animate-spin inline" /></div>

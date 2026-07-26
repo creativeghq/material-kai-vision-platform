@@ -5,7 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -412,7 +412,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Add stock item</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add stock item</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
 
           {!selected ? (
             <div className="space-y-3">
@@ -513,7 +513,7 @@ const AddWarehouseDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) =
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Add warehouse</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Add warehouse</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1"><Label>Name *</Label><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Athens depot" /></div>
           <div className="grid grid-cols-2 gap-3">
@@ -569,7 +569,7 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Codes &amp; classification — {item.name}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Codes &amp; classification — {item.name}</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1"><Label className="text-xs">Barcode</Label><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></div>
           <div className="space-y-1"><Label className="text-xs">Serial number (S/N)</Label><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
@@ -708,7 +708,7 @@ const ListToMarketplaceDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>List “{item.name}” to Marketplace</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>List “{item.name}” to Marketplace</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           {imageUrls.length > 0 && (
             <div className="flex gap-2 overflow-x-auto">

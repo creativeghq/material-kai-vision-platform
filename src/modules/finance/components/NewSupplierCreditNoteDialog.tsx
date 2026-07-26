@@ -6,7 +6,7 @@
  * issues + transmits to myDATA; on our side we RECORD it so AP is reduced.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -161,7 +161,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Supplier credit note</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Supplier credit note</DialogTitle><DialogDescription className="sr-only">Record a credit note received from a supplier.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           {/* Bill link OR standalone supplier */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

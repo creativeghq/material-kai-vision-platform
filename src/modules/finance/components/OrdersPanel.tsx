@@ -7,7 +7,7 @@ import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from '@/components/core/ui/dropdown-menu';
@@ -595,7 +595,7 @@ const NewOrderModal: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{preset.draft ? 'New pre-order' : isSales ? 'New sales order' : 'New purchase order'}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{preset.draft ? 'New pre-order' : isSales ? 'New sales order' : 'New purchase order'}</DialogTitle><DialogDescription className="sr-only">Order form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>{isSales ? 'Customer *' : 'Supplier *'}</Label>
@@ -1125,7 +1125,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-[1400px] w-[95vw] max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Order {order?.order_number ?? order?.id.slice(0, 8)}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Order {order?.order_number ?? order?.id.slice(0, 8)}</DialogTitle><DialogDescription className="sr-only">Order form.</DialogDescription></DialogHeader>
         {loading || !order ? (
           <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : (
@@ -1698,7 +1698,7 @@ const SupplierPickerDialog: React.FC<{
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Supplier for “{label}”</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Supplier for “{label}”</DialogTitle><DialogDescription className="sr-only">Order form.</DialogDescription></DialogHeader>
         <div className="space-y-2">
           {currentName && (
             <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">

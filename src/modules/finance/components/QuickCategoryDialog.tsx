@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Plus, Trash2, Pencil, Check, X, Tags } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
@@ -76,7 +76,7 @@ export const QuickCategoryDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 capitalize"><Tags className="h-4 w-4" /> {label} categories</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 capitalize"><Tags className="h-4 w-4" /> {label} categories</DialogTitle><DialogDescription className="sr-only">Add or manage finance categories.</DialogDescription>
         </DialogHeader>
 
         <p className="text-xs text-muted-foreground">

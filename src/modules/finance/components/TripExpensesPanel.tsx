@@ -7,7 +7,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter , DialogDescription } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatMoney } from '@/modules/finance/services/financeService';
@@ -448,7 +448,7 @@ const NewTripCardDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>New expense card</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New expense card</DialogTitle><DialogDescription className="sr-only">Expense card form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Type</label>
@@ -537,7 +537,7 @@ const RequestCardDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Request an expense card</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Request an expense card</DialogTitle><DialogDescription className="sr-only">Expense card form.</DialogDescription></DialogHeader>
         <p className="text-xs text-muted-foreground">Create a card for a team member to fill in — they’ll get a notification with a link to add their expenses and submit.</p>
         <div className="space-y-3">
           <div className="space-y-1">
@@ -615,7 +615,7 @@ const AddExpenseDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Add expense</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Add expense</DialogTitle><DialogDescription className="sr-only">Expense card form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">

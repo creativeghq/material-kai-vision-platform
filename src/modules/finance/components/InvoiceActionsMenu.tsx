@@ -15,7 +15,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter , DialogDescription } from '@/components/core/ui/dialog';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -241,7 +241,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     {/* Change description */}
     <Dialog open={descOpen} onOpenChange={setDescOpen}>
       <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
-        <DialogHeader><DialogTitle>Change description</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Change description</DialogTitle><DialogDescription className="sr-only">Confirm this invoice action.</DialogDescription></DialogHeader>
         <Textarea value={descValue} onChange={(e) => setDescValue(e.target.value)} rows={4} placeholder="Internal note / Description for this document…" />
         <DialogFooter>
           <Button variant="outline" onClick={() => setDescOpen(false)}>Cancel</Button>
@@ -253,7 +253,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     {/* Change category */}
     <Dialog open={catOpen} onOpenChange={setCatOpen}>
       <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
-        <DialogHeader><DialogTitle>Change category</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Change category</DialogTitle><DialogDescription className="sr-only">Confirm this invoice action.</DialogDescription></DialogHeader>
         <div className="space-y-2">
           <Label>Category</Label>
           <Select value={catValue} onValueChange={setCatValue}>
@@ -274,7 +274,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     {/* myDATA details + characterizations */}
     <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
       <DialogContent className="sm:max-w-lg" onClick={(e) => e.stopPropagation()}>
-        <DialogHeader><DialogTitle>myDATA details</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>myDATA details</DialogTitle><DialogDescription className="sr-only">Confirm this invoice action.</DialogDescription></DialogHeader>
         {detailBusy && !detail ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : detail ? (
@@ -324,7 +324,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     {/* History — derived timeline from the document's own lifecycle + payments + credit notes */}
     <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
       <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
-        <DialogHeader><DialogTitle>History</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>History</DialogTitle><DialogDescription className="sr-only">Confirm this invoice action.</DialogDescription></DialogHeader>
         {detailBusy && !detail ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : detail ? (

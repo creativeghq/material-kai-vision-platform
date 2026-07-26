@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, ChevronLeft, Search, Package, MapPin, Eye } from 'lucide-react';
 import { ToastAction } from '@/components/core/ui/toast';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -881,7 +881,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[98vw] max-w-[1500px] h-[96vh] max-h-[96vh] overflow-hidden p-0 flex flex-col">
         <DialogHeader className="border-b border-border/60 px-5 py-3 shrink-0">
-          <DialogTitle>New invoice</DialogTitle>
+          <DialogTitle>New invoice</DialogTitle><DialogDescription className="sr-only">Create a sales invoice or receipt and add its line items.</DialogDescription>
         </DialogHeader>
 
         {/* ───────── Editable form (left) + live styled-template preview (right) ───────── */}

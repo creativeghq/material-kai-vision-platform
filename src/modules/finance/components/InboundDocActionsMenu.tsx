@@ -14,7 +14,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter , DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -181,7 +181,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
       {/* Add issuer → CRM supplier */}
       <Dialog open={crmOpen} onOpenChange={setCrmOpen}>
         <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
-          <DialogHeader><DialogTitle>Add issuer as CRM supplier</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add issuer as CRM supplier</DialogTitle><DialogDescription className="sr-only">Process this received (myDATA) document.</DialogDescription></DialogHeader>
           {existing ? (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
               <div className="flex items-center justify-between gap-2">

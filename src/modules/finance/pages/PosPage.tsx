@@ -15,7 +15,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -676,7 +676,7 @@ const PosPage: React.FC = () => {
       {/* ── Doc-type modal (retail / service receipt) ── */}
       <Dialog open={docTypeOpen} onOpenChange={setDocTypeOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Select document type</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Select document type</DialogTitle><DialogDescription className="sr-only">Point-of-sale action.</DialogDescription></DialogHeader>
           <div className="space-y-2">
             {(Object.keys(DOC_TYPES) as DocType[]).map((k) => (
               <button key={k} type="button" onClick={() => { setDocType(k); setDocTypeOpen(false); }}
@@ -692,7 +692,7 @@ const PosPage: React.FC = () => {
       {/* ── Customer attach modal ── */}
       <Dialog open={custOpen} onOpenChange={setCustOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Customer (optional)</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Customer (optional)</DialogTitle><DialogDescription className="sr-only">Point-of-sale action.</DialogDescription></DialogHeader>
           {customer && (
             <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
               <span>{customer.name}</span>
@@ -714,7 +714,7 @@ const PosPage: React.FC = () => {
       {/* ── Issue (payment + options) dialog ── */}
       <Dialog open={issueOpen} onOpenChange={(o) => !o && setIssueOpen(false)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{dt.labelEn} · {formatMoney(totals.total, currency)}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{dt.labelEn} · {formatMoney(totals.total, currency)}</DialogTitle><DialogDescription className="sr-only">Point-of-sale action.</DialogDescription></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground"><span>Net</span><span>{formatMoney(totals.net, currency)}</span></div>
@@ -788,7 +788,7 @@ const PosPage: React.FC = () => {
             <DialogTitle className="flex items-center gap-2">
               {awaiting?.method === 'iris' ? <Smartphone className="h-5 w-5 text-primary" /> : <CreditCard className="h-5 w-5 text-primary" />}
               {awaiting?.method === 'iris' ? 'IRIS payment' : 'Card payment'}
-            </DialogTitle>
+            </DialogTitle><DialogDescription className="sr-only">Point-of-sale action.</DialogDescription>
           </DialogHeader>
           {awaiting && (
             <div className="space-y-4">
@@ -860,7 +860,7 @@ const PosPage: React.FC = () => {
       {zReport && (
         <Dialog open onOpenChange={() => setZReport(null)}>
           <DialogContent className="max-w-sm">
-            <DialogHeader><DialogTitle>{zReport.status === 'closed' ? `Z report #${zReport.z_number}` : 'X report (live)'}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{zReport.status === 'closed' ? `Z report #${zReport.z_number}` : 'X report (live)'}</DialogTitle><DialogDescription className="sr-only">Point-of-sale action.</DialogDescription></DialogHeader>
             <div className="space-y-1 text-sm">
               <Row label="Receipts" value={String(zReport.receipt_count)} />
               <Row label="Total sales" value={formatMoney(zReport.total_sales, currency)} />

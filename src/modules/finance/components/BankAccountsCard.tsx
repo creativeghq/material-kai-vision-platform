@@ -16,7 +16,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/core/ui/dialog';
 import { Loader2, Plus, Trash2, Landmark, Star, Wallet, CreditCard, Globe, Banknote, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -211,7 +211,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       <Dialog open={editing !== null} onOpenChange={(o) => { if (!o) setEditing(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing?.id ? 'Edit account' : 'New account'}</DialogTitle>
+            <DialogTitle>{editing?.id ? 'Edit account' : 'New account'}</DialogTitle><DialogDescription className="sr-only">Add or edit a bank or cash account.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">

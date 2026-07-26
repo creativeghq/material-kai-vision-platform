@@ -6,7 +6,7 @@
  * for legacy invoices that have no stored line items.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -123,7 +123,7 @@ export const NewCreditNoteDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>New credit note</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New credit note</DialogTitle><DialogDescription className="sr-only">Issue a credit note against an existing invoice.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Against invoice *</Label>
