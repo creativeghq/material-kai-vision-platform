@@ -4,6 +4,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { quotesService } from '@/modules/quotes/services/QuotesService';
 import { getProductName } from '@/utils/productMetadata';
 import { moodboardPath, generationPathFromUrl } from '@/utils/storagePaths';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 
 export interface CreateMoodBoardData {
   title: string;
@@ -201,6 +202,9 @@ class MoodBoardAPI {
       moodboard_id: result.id,
       title: result.title,
       user_id: user.id,
+      // Moodboards are user-scoped (no workspace_id column), so resolve the user's active workspace
+      // — without it flow-engine matches only is_global flows and a tenant's own automation never fires.
+      workspace_id: getActiveWorkspaceId(user.id),
     });
 
     return {
@@ -236,6 +240,7 @@ class MoodBoardAPI {
         moodboard_id: result.id,
         title: result.title,
         shared_by: result.user_id,
+        workspace_id: getActiveWorkspaceId(result.user_id),
       });
     }
 
