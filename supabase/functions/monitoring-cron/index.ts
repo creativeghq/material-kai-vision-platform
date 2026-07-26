@@ -1,5 +1,6 @@
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { isCronAuthorized } from '../_shared/auth.ts';
 import { isModuleEnabled, moduleSupabaseClient } from '../_shared/modules/registry.ts';
 
 /**
@@ -52,8 +53,10 @@ Deno.serve(withApiLogging('monitoring-cron', async (req) => {
   await bootstrapForFunction();
   const task = new URL(req.url).searchParams.get('task') ?? '';
 
-  const expectedSecret = Deno.env.get('CRON_SECRET') || '';
-  if (!expectedSecret || req.headers.get('x-cron-secret') !== expectedSecret) {
+  // Monitoring T1-2: use the shared cron gate (service-role bearer OR x-cron-secret) instead of a
+  // bespoke env-only x-cron-secret check. Still fails CLOSED, but a vault/env secret-name drift no
+  // longer 401s all five monitoring tasks at once as long as the scheduler sends the service-role bearer.
+  if (!isCronAuthorized(req)) {
     return json({ error: 'Unauthorized' }, 401);
   }
 
