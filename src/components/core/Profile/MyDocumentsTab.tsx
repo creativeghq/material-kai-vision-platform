@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Download, FileText, FileCheck, Receipt, Package, Wallet, ChevronDown, ChevronRight } from 'lucide-react';
+import { Loader2, Download, FileText, FileCheck, Receipt, Package, Wallet, ChevronDown, ChevronRight, Repeat } from 'lucide-react';
 import { Card } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
@@ -197,6 +197,22 @@ const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<CustomerOrderItem[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [reordering, setReordering] = useState(false);
+
+  const orderAgain = async () => {
+    setReordering(true);
+    try {
+      const res = await customerDocumentsService.reorder(order.id);
+      toast({
+        title: 'Reorder sent',
+        description: `We sent your request to the business${res.order_number ? ` (draft order ${res.order_number})` : ''}. They'll confirm the price and availability.`,
+      });
+    } catch (err) {
+      toast({ title: 'Could not reorder', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setReordering(false);
+    }
+  };
 
   const toggle = async () => {
     const next = !open;
@@ -260,6 +276,12 @@ const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
               </tbody>
             </table>
           )}
+          <div className="mt-2 flex justify-end">
+            <Button size="sm" variant="outline" className="rounded-full" disabled={reordering} onClick={orderAgain}>
+              {reordering ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Repeat className="h-3.5 w-3.5 mr-1" />}
+              Order again
+            </Button>
+          </div>
         </div>
       )}
     </Card>

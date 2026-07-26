@@ -482,6 +482,61 @@ export const ordersService = {
     return orderId;
   },
 
+  /**
+   * Duplicate an order into a NEW DRAFT — same party / project / currency / lines — so the operator
+   * can repeat business without re-entering everything. Delivered/paid state is NOT carried (a fresh
+   * order starts undelivered, unpaid); reservation re-pins on confirm. Returns the new order id.
+   */
+  async duplicate(orderId: string): Promise<string> {
+    const { data: o, error } = await supabase.from('orders')
+      .select('workspace_id, order_type, customer_company_id, customer_contact_id, supplier_company_id, supplier_contact_id, project_id, currency, subtotal_net, vat_amount, total, discount_type, discount_value, notes, category_id')
+      .eq('id', orderId).single();
+    if (error) throw error;
+    const { data: items, error: iErr } = await supabase.from('order_items')
+      .select('product_id, description, quantity, unit_price, unit_cost, supplier_company_id, measurement_unit_code, vat_percent, vat_category, net_value, vat_amount, line_total, discount_pct, update_warehouse, sort_order')
+      .eq('order_id', orderId).order('sort_order', { ascending: true });
+    if (iErr) throw iErr;
+
+    const { data: created, error: cErr } = await supabase.from('orders').insert({
+      workspace_id: o.workspace_id, order_type: o.order_type, status: 'draft',
+      customer_company_id: o.customer_company_id, customer_contact_id: o.customer_contact_id,
+      supplier_company_id: o.supplier_company_id, supplier_contact_id: o.supplier_contact_id,
+      project_id: o.project_id, currency: o.currency,
+      subtotal_net: o.subtotal_net, vat_amount: o.vat_amount, total: o.total,
+      discount_type: o.discount_type, discount_value: o.discount_value,
+      notes: o.notes, category_id: o.category_id,
+    }).select('id, order_number').single();
+    if (cErr) throw cErr;
+    const newId = created.id as string;
+
+    if (items?.length) {
+      const rows = (items as any[]).map((it, i) => ({
+        order_id: newId, workspace_id: o.workspace_id,
+        product_id: it.product_id ?? null, description: it.description,
+        quantity: it.quantity, unit_price: it.unit_price, unit_cost: it.unit_cost ?? null,
+        supplier_company_id: it.supplier_company_id ?? null,
+        measurement_unit_code: it.measurement_unit_code ?? null,
+        vat_percent: it.vat_percent ?? null, vat_category: it.vat_category ?? null,
+        net_value: it.net_value ?? 0, vat_amount: it.vat_amount ?? 0, line_total: it.line_total ?? 0,
+        discount_pct: it.discount_pct ?? 0, update_warehouse: it.update_warehouse ?? true, sort_order: it.sort_order ?? i,
+      }));
+      const { error: insErr } = await supabase.from('order_items').insert(rows);
+      if (insErr) throw insErr;
+    }
+
+    flowEventService.emitToWorkspaceRoles(o.workspace_id, ['owner', 'admin'], 'order_created',
+      (recipientUserId) => ({
+        user_id: recipientUserId, type: 'order_created', workspace_id: o.workspace_id,
+        order_id: newId, order_number: (created as any).order_number ?? null, order_type: o.order_type, status: 'draft',
+        total: o.total, currency: o.currency,
+        customer_company_id: o.customer_company_id, supplier_company_id: o.supplier_company_id, project_id: o.project_id,
+        title: `${o.order_type === 'purchase' ? 'Purchase' : 'Sales'} order duplicated${(created as any).order_number ? ` #${(created as any).order_number}` : ''}`,
+        body: `A draft copy was created (${Number(o.total).toFixed(2)} ${o.currency}).`,
+        action_url: '/finance?tab=orders',
+      }));
+    return newId;
+  },
+
   async getOrderFinance(orderId: string): Promise<{
     invoices: Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>;
     supplierBills: Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>;

@@ -129,4 +129,16 @@ export const customerDocumentsService = {
     if (data?.ok === false || !data?.order) throw new Error(data?.error ?? 'Order not found');
     return { order: data.order as CustomerOrderDetail['order'], items: (data.items ?? []) as CustomerOrderItem[] };
   },
+
+  /**
+   * "Order again" — clone one of the caller's own orders into a NEW DRAFT order in the issuing
+   * business's workspace (ownership enforced server-side). It's a request: the business reviews /
+   * re-prices / confirms it. Returns the new order's id + number.
+   */
+  async reorder(orderId: string): Promise<{ order_id: string; order_number: string | null }> {
+    const { data, error } = await supabase.functions.invoke('finance-customer-documents', { body: { action: 'reorder', order_id: orderId } });
+    if (error) throw new Error(await edgeErrorMessage(error));
+    if (data?.ok === false || !data?.order_id) throw new Error(data?.error ?? 'Reorder failed');
+    return { order_id: data.order_id as string, order_number: (data.order_number ?? null) as string | null };
+  },
 };

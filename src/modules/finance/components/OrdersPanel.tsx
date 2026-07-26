@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Copy } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -368,7 +368,7 @@ export const OrdersPanel: React.FC<{
         onOpenChange={setCreateOpen}
         onCreated={() => { setCreateOpen(false); void load(); }}
       />
-      <OrderDetailDialog orderId={openId} categories={categories} open={openId !== null} onClose={() => setOpenId(null)} onChanged={() => void load()} />
+      <OrderDetailDialog orderId={openId} categories={categories} open={openId !== null} onClose={() => setOpenId(null)} onChanged={() => void load()} onOpenOrder={(id) => setOpenId(id)} />
     </div>
   );
 };
@@ -825,7 +825,7 @@ const MATCH_META: Record<ThreeWayMatchStatus, { label: string; cls: string }> = 
   variance:         { label: 'Variance',         cls: 'text-destructive border-destructive/40' },
 };
 
-const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceCategory[]; open: boolean; onClose: () => void; onChanged: () => void }> = ({ orderId, categories, open, onClose, onChanged }) => {
+const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceCategory[]; open: boolean; onClose: () => void; onChanged: () => void; onOpenOrder?: (id: string) => void }> = ({ orderId, categories, open, onClose, onChanged, onOpenOrder }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
@@ -1089,6 +1089,18 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     finally { setSaving(false); }
   };
 
+  const duplicate = async () => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      const newId = await ordersService.duplicate(order.id);
+      onChanged();
+      toast({ title: 'Order duplicated', description: 'A draft copy was created — edit and confirm it.' });
+      if (onOpenOrder) onOpenOrder(newId); else onClose();
+    } catch (err: any) { toast({ title: 'Could not duplicate', description: err?.message, variant: 'destructive' }); }
+    finally { setSaving(false); }
+  };
+
   // #237 A3 — email the purchase order to the supplier (PDF), mark it placed.
   const sendToSupplier = async () => {
     if (!order) return;
@@ -1212,6 +1224,9 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                         <Pencil className="h-3.5 w-3.5 mr-2" /> Edit items
                       </DropdownMenuItem>
                     )}
+                    <DropdownMenuItem onClick={duplicate}>
+                      <Copy className="h-3.5 w-3.5 mr-2" /> Duplicate order
+                    </DropdownMenuItem>
                     {order.order_type === 'sales' && (
                       <DropdownMenuItem onClick={() => navigate('/finance?tab=doc_dispatch')}>
                         <Truck className="h-3.5 w-3.5 mr-2" /> Dispatch board

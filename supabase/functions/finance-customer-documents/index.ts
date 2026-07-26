@@ -13,6 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -122,6 +123,75 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
       .eq('order_id', orderId)
       .order('sort_order', { ascending: true });
     return json({ ok: true, order, items: items ?? [] });
+  }
+
+  // ── action: reorder — "Order again": clone an owned order into a NEW DRAFT the business reviews ──
+  if (action === 'reorder') {
+    if (!orderId) return json({ error: 'order_id required' }, 400);
+    const { data: src } = await supabase
+      .from('orders')
+      .select('id, order_number, workspace_id, order_type, currency, project_id, customer_contact_id, customer_company_id')
+      .eq('id', orderId)
+      .maybeSingle();
+    const owns = src
+      && src.order_type === 'sales'
+      && ((src.customer_contact_id && contactIds.includes(src.customer_contact_id))
+        || (src.customer_company_id && companyIds.includes(src.customer_company_id)));
+    if (!owns) return json({ error: 'Not found' }, 404); // 404 (not 403) — no order-id enumeration
+
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('product_id, description, quantity, unit_price, unit_cost, supplier_company_id, measurement_unit_code, vat_percent, vat_category, net_value, vat_amount, line_total, discount_pct, update_warehouse, sort_order')
+      .eq('order_id', orderId)
+      .order('sort_order', { ascending: true });
+    if (!items || items.length === 0) return json({ ok: false, error: 'This order has no items to reorder.' }, 400);
+
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const subtotal = r2(items.reduce((a: number, it: any) => a + Number(it.net_value || 0), 0));
+    const vat = r2(items.reduce((a: number, it: any) => a + Number(it.vat_amount || 0), 0));
+    const total = r2(subtotal + vat);
+
+    // Born as a DRAFT (= Pre-order) so the business confirms/re-prices before it becomes live. The
+    // customer never writes a live order into someone else's workspace; identity fields are copied
+    // from the SOURCE order (server-side), never taken from the request body.
+    const { data: created, error: cErr } = await supabase
+      .from('orders')
+      .insert({
+        workspace_id: src.workspace_id, order_type: 'sales', status: 'draft',
+        customer_contact_id: src.customer_contact_id, customer_company_id: src.customer_company_id,
+        project_id: src.project_id, currency: src.currency,
+        subtotal_net: subtotal, vat_amount: vat, total,
+        notes: `Reorder requested by customer${src.order_number ? ` (from order ${src.order_number})` : ''}.`,
+      })
+      .select('id, order_number')
+      .single();
+    if (cErr || !created) return json({ ok: false, error: cErr?.message ?? 'Could not create the reorder.' }, 400);
+
+    const rows = items.map((it: any, i: number) => ({
+      order_id: created.id, workspace_id: src.workspace_id,
+      product_id: it.product_id ?? null, description: it.description,
+      quantity: it.quantity, unit_price: it.unit_price, unit_cost: it.unit_cost ?? null,
+      supplier_company_id: it.supplier_company_id ?? null,
+      measurement_unit_code: it.measurement_unit_code ?? null,
+      vat_percent: it.vat_percent ?? null, vat_category: it.vat_category ?? null,
+      net_value: it.net_value ?? 0, vat_amount: it.vat_amount ?? 0, line_total: it.line_total ?? 0,
+      discount_pct: it.discount_pct ?? 0, update_warehouse: it.update_warehouse ?? true, sort_order: it.sort_order ?? i,
+    }));
+    const { error: iErr } = await supabase.from('order_items').insert(rows);
+    if (iErr) return json({ ok: false, error: iErr.message }, 400);
+
+    // Tell the business (owners/admins) a customer wants to order again — a draft awaits review.
+    await emitFlowEventToWorkspaceRoles(src.workspace_id, ['owner', 'admin'], 'order_created', (uid) => ({
+      user_id: uid, type: 'order_created', workspace_id: src.workspace_id,
+      order_id: created.id, order_number: created.order_number ?? null, order_type: 'sales', status: 'draft',
+      total, currency: src.currency,
+      customer_company_id: src.customer_company_id, customer_contact_id: src.customer_contact_id,
+      title: `Customer reorder request${created.order_number ? ` #${created.order_number}` : ''}`,
+      body: `A customer asked to order again (${total.toFixed(2)} ${src.currency}). A draft order is ready to review.`,
+      action_url: '/finance?tab=orders',
+    }));
+
+    return json({ ok: true, order_id: created.id, order_number: created.order_number ?? null });
   }
 
   const sign = async (path: string | null): Promise<string | null> => {
