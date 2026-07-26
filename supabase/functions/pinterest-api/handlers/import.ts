@@ -195,7 +195,10 @@ async function importSinglePin(
             'Content-Type': 'application/json',
             ...(mivaaKey ? { Authorization: `Bearer ${mivaaKey}` } : {}),
           },
-          body: JSON.stringify({ query: pinData.title, top_k: 5 }),
+          // VISUAL match on the pinned IMAGE (the value-prop) — not the pin title, which is usually
+          // "Untitled Pin". MIVAA /api/rag/search does a visual/CLIP search when given image_url
+          // (mivaa-gateway recognizes image_url → visual_search). publicUrl is the stored image.
+          body: JSON.stringify({ image_url: publicUrl, query: pinData.title, top_k: 5 }),
         });
 
         if (searchRes.ok) {

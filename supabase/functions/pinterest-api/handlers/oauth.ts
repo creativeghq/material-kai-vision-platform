@@ -103,10 +103,23 @@ async function getValidAccessToken(
   const now = Date.now();
 
   if (now >= expiresAt - 5 * 60 * 1000) {
+    // Recovery: when we can't refresh (no refresh token, or Pinterest rejects it — rotated/revoked),
+    // mark the account inactive so the UI surfaces a "reconnect" prompt instead of showing it as connected
+    // while every operation silently 400s.
+    const markNeedsReconnect = async () => {
+      await supabase.from('social_accounts').update({ is_active: false })
+        .eq('user_id', userId).eq('platform', 'pinterest');
+    };
     if (!account.refresh_token) {
+      await markNeedsReconnect();
       throw new Error('Pinterest token expired and no refresh token available. Please reconnect.');
     }
-    return await refreshAccessToken(supabase, userId, account.refresh_token);
+    try {
+      return await refreshAccessToken(supabase, userId, account.refresh_token);
+    } catch (e) {
+      await markNeedsReconnect();
+      throw e;
+    }
   }
 
   return account.access_token;
