@@ -367,7 +367,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Misc
   price_lookup_matches: 'Price lookup matches',
   project_created: 'Project created',
-  video_generated: 'Video generated',
+  // video_generated is intentionally NOT here — it has a dedicated handler that maps it into the
+  // rich <video> player card (videoData). Registering it would make the generic card shadow that.
 };
 
 interface Message {
@@ -2407,6 +2408,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   agentId: selectedAgent,
                   model: selectedModel,
                 };
+              // Handle video_generated — agent-produced video → the rich player card (was falling
+              // through to the generic JSON card because video_generated was in AGENT_RESULT_TITLES).
+              } else if (chunk.type === 'video_generated' && chunk.video_url) {
+                const videoMsg: Message = {
+                  id: `msg-video-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Your video is ready!${chunk.credits_used ? ` ${chunk.credits_used} credits used.` : ''}`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  videoData: { video_url: chunk.video_url, job_id: chunk.job_id, status: 'completed' as const },
+                };
+                setMessages(prev => [...prev, videoMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: videoMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, videoData: videoMsg.videoData },
+                  });
+                }
+                finalResult = { type: 'final_result', text: videoMsg.content, agentId: selectedAgent, model: selectedModel };
               // Handle virtual_staging_ready — virtual staging result
               } else if (chunk.type === 'virtual_staging_ready') {
                 const stagingMsg: Message = {
