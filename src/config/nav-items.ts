@@ -227,12 +227,47 @@ export function filterNavItems(
 }
 
 /**
- * Priority order for the mobile bottom tab bar. The first N visible entries
- * (after gating) fill the bar; everything else is reachable via the "More" sheet.
- * Dashboard and Agent Hub lead because they're the most-used surfaces.
+ * Importance ranking that drives the ENTIRE mobile nav order (bottom bar + "More" sheet).
+ * MobileBottomNav sorts every gated item by this list: the first BAR_SLOTS (4) entitled entries
+ * fill the visible bottom bar, and the remainder flow into the "More" sheet in this same order.
+ * IDs not listed here fall back after these, in raw SIDEBAR_NAV_ITEMS order — so keep this complete.
+ * This is the ONE place to re-rank mobile importance; it does NOT affect the desktop nav/launcher.
+ * Grouped by how central each surface is to running the business day-to-day.
  */
 export const BOTTOM_NAV_PRIORITY: readonly string[] = [
+  // Everyday drivers — these fill the visible bottom bar (top 4 entitled)
   'dashboard',
   'agent-hub',
   'discover',
+  'quotes',
+  // Customers & revenue
+  'crm',
+  'inbox',
+  'finance',
+  'sales',
+  // Scheduling & operations
+  'appointments',
+  'projects',
+  'stock',
+  // Design studio
+  'moodboard',
+  'interior',
+  'catalogs',
+  'image-studio',
+  // Vertical modules
+  'real-estate',
+  // Comms
+  'messaging',
+  'reviews',
+  // Documents & people
+  'contracts',
+  'hr',
+  'my-hr',
+  // Marketing
+  'email-marketing',
+  'social',
+  'seo',
+  'automations',
+  // Niche / role-specific
+  'factory-analytics',
 ];
