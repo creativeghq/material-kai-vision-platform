@@ -4162,45 +4162,40 @@
     "response": "{success: boolean, data: object}"
   },
   {
-    "name": "ses-webhook",
+    "name": "email-unsubscribe",
     "tag": "Email",
-    "summary": "Processes SNS notifications from Amazon SES for bounces, complaints, and deliveries.",
-    "description": "Accepts POST from Amazon SNS; auto-confirms subscription on `SubscriptionConfirmation` messages. For `Notification` messages, parses SES bounce/complaint/delivery payloads and updates `email_logs` and `campaign_recipients` accordingly. No HMAC signature verification is performed — relies on SNS IP filtering.",
+    "summary": "Public one-click marketing email opt-out (RFC 8058 List-Unsubscribe).",
+    "description": "Public compliance endpoint linked from every marketing send. GET renders a human confirmation page with a POST button (so mail-client link prefetch can't opt someone out by accident); POST is the RFC 8058 one-click path (mail client posts List-Unsubscribe=One-Click) or the form button — it verifies the token, records the opt-out, and renders a success page. No JWT (verify_jwt=false). The link carries ?w=<workspace>&e=<email>&t=<token>, where token is an HMAC-SHA256 of `workspace:lower(email)` under CRON_SECRET (no token table).",
     "security": [
-      "snsSignature"
+      "queryToken"
     ],
     "docs": null,
     "methods": [
+      "GET",
       "POST"
     ],
     "actions": [],
     "request": [
       {
-        "name": "Type",
+        "name": "w",
         "type": "string",
         "required": true,
-        "desc": "SNS message type: SubscriptionConfirmation or Notification"
+        "desc": "Workspace id (query param)"
       },
       {
-        "name": "Message",
+        "name": "e",
         "type": "string",
         "required": true,
-        "desc": "JSON-encoded SES notification payload (Bounce, Complaint, or Delivery)"
+        "desc": "Recipient email address (query param)"
       },
       {
-        "name": "TopicArn",
+        "name": "t",
         "type": "string",
         "required": true,
-        "desc": "SNS topic ARN"
-      },
-      {
-        "name": "SubscribeURL",
-        "type": "string",
-        "required": false,
-        "desc": "Confirmation URL (only on SubscriptionConfirmation)"
+        "desc": "HMAC-SHA256 token of `workspace:lower(email)` under CRON_SECRET (query param)"
       }
     ],
-    "response": "{message:string}"
+    "response": "text/html (confirmation page on GET, success page on POST)"
   },
   {
     "name": "storage-orphan-cleanup-cron",
