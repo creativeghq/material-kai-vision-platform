@@ -47,8 +47,8 @@ function SectionHeader({ title, desc, icon: Icon }: { title: string; desc?: stri
   return (
     <div className="mt-14 mb-6">
       <div className="flex items-center gap-2.5 mb-2">
-        <Icon className="h-4 w-4 text-primary shrink-0" />
-        <h3 className="text-base font-semibold tracking-tight">{title}</h3>
+        <Icon className="h-5 w-5 text-primary shrink-0" />
+        <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
       </div>
       {desc && <p className="text-sm text-muted-foreground leading-snug">{desc}</p>}
       <div className="mt-4 border-b border-border/50" />

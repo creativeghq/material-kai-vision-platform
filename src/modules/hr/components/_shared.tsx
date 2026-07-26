@@ -1,6 +1,7 @@
 // Shared, design-system-compliant building blocks for the HR sections.
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
+import { SectionHeader as SharedSectionHeader } from '@/components/shared/SectionHeader';
 
 /** Currency formatter for the HR sections. `minDecimals` defaults to 2 (accounting-style); pass 0 for
  *  payroll totals that read cleaner as whole numbers. `nullDash` shows "—" for null instead of 0. */
@@ -28,17 +29,13 @@ export function HrStat({ icon: Icon, label, value, hint }: { icon?: LucideIcon; 
   );
 }
 
-/** Section header row: title (+ optional subtitle) on the left, actions on the right. */
+/**
+ * Section header row — delegates to the platform-canonical SectionHeader so HR sections
+ * match every other tab/page (18px title). Kept as a local re-export so the ~10 HR call
+ * sites don't need to change their import.
+ */
 export function SectionHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2 flex-wrap">
-      <div>
-        <h2 className="text-base font-display font-semibold">{title}</h2>
-        {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
-      </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
-    </div>
-  );
+  return <SharedSectionHeader title={title} subtitle={subtitle} actions={actions} />;
 }
 
 /** Read a File as base64 (no data: prefix) — HR uploads go through hr-api (service role), since the
