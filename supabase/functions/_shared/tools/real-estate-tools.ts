@@ -112,17 +112,19 @@ export const createManageRealEstateTool = (
           if (!tRes.ok) return JSON.stringify({ success: false, error: tRes.error });
           const tenancies = tRes.data?.tenancies ?? [];
           const openWork = mRes.ok ? (mRes.data?.work_orders ?? []) : [];
-          return JSON.stringify({
-            success: true,
+          const lettingsPayload = {
             tenancy_count: tenancies.length,
             tenancies: tenancies.slice(0, 25).map((t: any) => ({ id: t.id, property: t.property?.title, tenant: t.tenant?.name, rent: t.rent_amount, currency: t.currency, frequency: t.rent_frequency, status: t.status })),
             open_work_orders: openWork.slice(0, 25).map((w: any) => ({ id: w.id, property: w.property?.title, title: w.title, priority: w.priority, status: w.status })),
-          });
+          };
+          onChunk?.({ type: 'real_estate_lettings', ...lettingsPayload, timestamp: Date.now() });
+          return JSON.stringify({ success: true, ...lettingsPayload });
         }
         case 'log_maintenance': {
           if (!property_id || !work_order_title) return JSON.stringify({ success: false, error: 'property_id and work_order_title are required' });
           const res = await callApi(jwt, workspaceId, 'upsert-maintenance', { property_id, title: work_order_title, description: work_order_description });
           if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+          onChunk?.({ type: 'real_estate_work_order', work_order: res.data?.work_order, timestamp: Date.now() });
           return JSON.stringify({ success: true, work_order: res.data?.work_order, note: 'Work order logged. Assign a contractor and track it in the listing Lettings tab.' });
         }
         case 'complete_sale': {
@@ -130,6 +132,7 @@ export const createManageRealEstateTool = (
           const res = await callApi(jwt, workspaceId, 'complete-sale', { property_id, sale_price, ...(commission_pct !== undefined ? { commission_pct } : {}) });
           if (!res.ok) return JSON.stringify({ success: false, error: res.error });
           const s = res.data?.sale;
+          onChunk?.({ type: 'real_estate_sale', sale: s, commission_net: s?.commission_base, currency: s?.currency, timestamp: Date.now() });
           return JSON.stringify({ success: true, sale: s, commission_net: s?.commission_base, currency: s?.currency, note: 'Listing marked sold and commission calculated. Issue the commission invoice from the listing Offers tab in Finance when ready.' });
         }
         case 'list_deals': {
@@ -138,6 +141,7 @@ export const createManageRealEstateTool = (
           const deals = (res.data?.deals ?? []).filter((d: any) => d.status !== 'lost');
           const byStage: Record<string, any[]> = {};
           for (const d of deals) (byStage[d.stage] ??= []).push({ id: d.id, property: d.property?.title, buyer: d.buyer?.name, value: d.value, tasks: `${d.task_done}/${d.task_total}` });
+          onChunk?.({ type: 'real_estate_deals', open_count: deals.length, by_stage: byStage, timestamp: Date.now() });
           return JSON.stringify({ success: true, open_count: deals.length, by_stage: byStage });
         }
         case 'manage_deal': {
@@ -151,6 +155,7 @@ export const createManageRealEstateTool = (
           if (status === 'won' || status === 'lost' || status === 'open') fields.status = status;
           const res = await callApi(jwt, workspaceId, 'upsert-deal', fields);
           if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+          onChunk?.({ type: 'real_estate_deal', deal: res.data?.deal, timestamp: Date.now() });
           return JSON.stringify({ success: true, deal: res.data?.deal });
         }
         case 'cma_report': {
@@ -158,19 +163,24 @@ export const createManageRealEstateTool = (
           const res = await callApi(jwt, workspaceId, 'cma-report', { property_id, property_type, town, area });
           if (!res.ok) return JSON.stringify({ success: false, error: res.error });
           const r = res.data;
-          return JSON.stringify({ success: true, suggested_price: r?.suggestion?.estimate ?? null, price_range: r?.suggestion ? [r.suggestion.low, r.suggestion.high] : null, median_per_sqm: r?.stats?.median_per_sqm, comparables: r?.stats?.count, avg_days_on_market: r?.stats?.avg_days_on_market, currency: r?.subject?.currency, note: 'Comps-based CMA. Open the CMA button on the listing to save a client PDF.' });
+          const cma = { suggested_price: r?.suggestion?.estimate ?? null, price_range: r?.suggestion ? [r.suggestion.low, r.suggestion.high] : null, median_per_sqm: r?.stats?.median_per_sqm, comparables: r?.stats?.count, avg_days_on_market: r?.stats?.avg_days_on_market, currency: r?.subject?.currency };
+          onChunk?.({ type: 'real_estate_cma', ...cma, timestamp: Date.now() });
+          return JSON.stringify({ success: true, ...cma, note: 'Comps-based CMA. Open the CMA button on the listing to save a client PDF.' });
         }
         case 'list_investments': {
           const res = await callApi(jwt, workspaceId, 'list-investments');
           if (!res.ok) return JSON.stringify({ success: false, error: res.error });
           const r = res.data;
-          return JSON.stringify({ success: true, portfolio: r?.portfolio, investments: (r?.investments ?? []).slice(0, 25).map((iv: any) => ({ property_id: iv.property_id, property: iv.property?.title, net_yield_pct: iv.metrics?.net_yield_pct, cap_rate_pct: iv.metrics?.cap_rate_pct, monthly_cash_flow: iv.metrics?.monthly_cash_flow })) });
+          const invPayload = { portfolio: r?.portfolio, investments: (r?.investments ?? []).slice(0, 25).map((iv: any) => ({ property_id: iv.property_id, property: iv.property?.title, net_yield_pct: iv.metrics?.net_yield_pct, cap_rate_pct: iv.metrics?.cap_rate_pct, monthly_cash_flow: iv.metrics?.monthly_cash_flow })) };
+          onChunk?.({ type: 'real_estate_investments', ...invPayload, timestamp: Date.now() });
+          return JSON.stringify({ success: true, ...invPayload });
         }
         case 'buyer_portal_link': {
           const res = await callApi(jwt, workspaceId, 'list-buyer-requirements', crm_contact_id ? { crm_contact_id } : {});
           if (!res.ok) return JSON.stringify({ success: false, error: res.error });
           const base = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/$/, '');
           const portals = (res.data?.requirements ?? []).filter((r: any) => r.portal_token).map((r: any) => ({ buyer: r.contact?.name, label: r.label, url: `${base}/buyer/${r.portal_token}` }));
+          onChunk?.({ type: 'real_estate_portals', count: portals.length, portals, timestamp: Date.now() });
           return JSON.stringify({ success: true, count: portals.length, portals, note: 'Share a portal URL with the buyer — it shows their live matches and lets them favourite + request viewings.' });
         }
         default:

@@ -4,11 +4,12 @@
  * ONE tool, actions:
  *   - list           — recent email campaigns in the workspace
  *   - list_templates — the workspace's marketing templates (needed to compose)
- *   - create_draft   — create a DRAFT campaign the user reviews + sends on the page
+ *   - create_draft   — create a DRAFT campaign (name + template + audience filter)
+ *   - send           — send a draft/paused campaign (mass-comms → human-in-the-loop confirm gate)
  *
- * Deliberately DRAFT-ONLY: sending is a paid, mass-comms action with BYOK + quota rules, so the
- * agent never sends. It composes the draft (name + template + audience filter); the user opens it
- * in Marketing → Email and hits send. The draft is workspace-scoped and shows on the page (2-way).
+ * Sending is a paid, mass-comms action with BYOK + quota rules, so `send` is gated behind an
+ * explicit confirmation chunk (invariant #9). It resolves the audience the SAME way the Email page
+ * does — category members PLUS any manual_emails on the campaign — then enqueues + flips to sending.
  *
  * Gated on module `email-marketing` enabled + workspace entitlement (paid add-on). Service-role
  * client, but EVERY read/write is scoped to the server-derived workspaceId and the template is
@@ -151,14 +152,27 @@ export const createManageEmailCampaignTool = (
           return JSON.stringify({ success: false, error: `only draft/paused campaigns can be sent (this one is "${camp.status}")` });
         }
 
-        // Resolve the audience now (membership-guarded RPC → needs the user client).
+        // Resolve the audience now (membership-guarded RPC → needs the user client). Include BOTH
+        // the category members AND any manual_emails on the campaign (the Email page sends both;
+        // dropping manual_emails here silently under-sent the campaign). Dedupe by email.
         const categoryIds: string[] = Array.isArray(camp.audience_filter?.category_ids) ? camp.audience_filter.category_ids : [];
+        const manualEmails: string[] = Array.isArray(camp.audience_filter?.manual_emails) ? camp.audience_filter.manual_emails : [];
         const usb = userClient(jwt);
-        let recipients: any[] = [];
+        const byEmail = new Map<string, { email: string; crm_contact_id: string | null; display_name: string | null }>();
         if (categoryIds.length) {
           const { data } = await usb.rpc('crm_categories_resolve_recipients_ws', { p_workspace_id: workspaceId, p_category_ids: categoryIds });
-          recipients = Array.isArray(data) ? data : [];
+          for (const r of (Array.isArray(data) ? data : []) as any[]) {
+            const e = String(r?.email ?? '').trim().toLowerCase();
+            if (!e || byEmail.has(e)) continue;
+            byEmail.set(e, { email: r.email, crm_contact_id: r.crm_contact_id ?? null, display_name: r.display_name ?? null });
+          }
         }
+        for (const em of manualEmails) {
+          const e = String(em ?? '').trim().toLowerCase();
+          if (!e || byEmail.has(e)) continue;
+          byEmail.set(e, { email: em, crm_contact_id: null, display_name: null });
+        }
+        const recipients = [...byEmail.values()];
         if (recipients.length === 0) {
           return JSON.stringify({ success: false, error: 'This campaign resolves to 0 recipients — set an audience on the Email page before sending.' });
         }

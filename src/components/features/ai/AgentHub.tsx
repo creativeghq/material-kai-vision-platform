@@ -315,6 +315,14 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   real_estate_listing_published: 'Listing published',
   real_estate_viewing_scheduled: 'Viewing scheduled',
   real_estate_description_draft: 'AI listing copy',
+  real_estate_lettings: 'Lettings',
+  real_estate_work_order: 'Maintenance logged',
+  real_estate_sale: 'Sale completed',
+  real_estate_deals: 'Deal pipeline',
+  real_estate_deal: 'Deal',
+  real_estate_cma: 'CMA valuation',
+  real_estate_investments: 'Investment portfolio',
+  real_estate_portals: 'Buyer portals',
   // Appointments
   appointments_list: 'Upcoming appointments',
   appointment_scheduled: 'Appointment scheduled',
@@ -350,7 +358,6 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   job_search_created: 'Job search created',
   job_search_updated: 'Job search updated',
   job_searches_list: 'Job searches',
-  job_listings_feed: 'Job listings',
   job_digest_preview: 'Job digest preview',
   // Stock management
   stock_overview: 'Stock overview',
@@ -2414,6 +2421,33 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   });
                 }
                 finalResult = { type: 'final_result', text: videoMsg.content, agentId: selectedAgent, model: selectedModel };
+              // Handle job_listings_feed (find_jobs) — render the rich JobFindings card interactively,
+              // the same card the daily digest cron uses (was falling through to the generic card).
+              } else if (chunk.type === 'job_listings_feed') {
+                const jobsMsg: Message = {
+                  id: `msg-jobs-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Found ${(chunk.listings || []).length} matching role${(chunk.listings || []).length === 1 ? '' : 's'}.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  jobFindingsData: {
+                    tracked_job_id: chunk.tracked_job_id,
+                    tracked_job_label: chunk.tracked_job_label ?? '',
+                    discovered_at_window: `last ${chunk.days ?? 30}d`,
+                    listings: chunk.listings || [],
+                  },
+                };
+                setMessages(prev => [...prev, jobsMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: jobsMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, jobFindingsData: jobsMsg.jobFindingsData },
+                  });
+                }
+                finalResult = { type: 'final_result', text: jobsMsg.content, agentId: selectedAgent, model: selectedModel };
               // Handle virtual_staging_ready — virtual staging result
               } else if (chunk.type === 'virtual_staging_ready') {
                 const stagingMsg: Message = {
@@ -3885,8 +3919,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         <div className="bg-card text-card-foreground rounded-lg p-4 border border-border">
           <div className="flex items-center justify-between mb-1">
             <div>
-              <div className="text-xs text-muted-foreground">Daily job digest · {message.jobFindingsData.discovered_at_window === 'last_24h' ? 'last 24 hours' : message.jobFindingsData.discovered_at_window}</div>
-              <div className="text-sm font-medium mt-0.5">{message.jobFindingsData.tracked_job_label}</div>
+              <div className="text-xs text-muted-foreground">{message.jobFindingsData.discovered_at_window === 'last_24h' ? 'Daily job digest · last 24 hours' : `Recent matches · ${message.jobFindingsData.discovered_at_window}`}</div>
+              <div className="text-sm font-medium mt-0.5">{message.jobFindingsData.tracked_job_label || 'Job findings'}</div>
             </div>
             <div className="text-2xl font-light text-foreground">
               {message.jobFindingsData.listings.length}

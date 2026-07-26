@@ -1177,6 +1177,11 @@ async function executeAgent(
     if (routed && AGENT_CONFIGS[routed.slug]) {
       onChunk?.({ type: 'agent_routed', to: routed.slug, name: routed.name, timestamp: Date.now() });
       agentId = routed.slug;
+    } else if (images.length > 0 && userInput.trim().length < 20 && AGENT_CONFIGS['interior-designer']) {
+      // Image-first turn with thin/empty text: the classifier only sees text, so a dropped room
+      // photo would fall to the generalist. Bias to Vision (interior-designer), the image specialist.
+      onChunk?.({ type: 'agent_routed', to: 'interior-designer', name: 'Vision', timestamp: Date.now() });
+      agentId = 'interior-designer';
     } else {
       // Generalist fallback — behaves exactly like the pre-orchestrator default.
       agentId = 'kai';
