@@ -13,6 +13,7 @@ const sb = supabase as any;
 export type AssetCategory = 'vehicle' | 'phone' | 'laptop' | 'payment_card' | 'equipment' | 'other';
 export type AssetStatus = 'active' | 'in_repair' | 'retired' | 'returned';
 export type AcquisitionType = 'owned' | 'leased' | 'financed';
+export type DepreciationMethod = 'none' | 'straight_line';
 
 export const ASSET_CATEGORY_LABEL: Record<AssetCategory, string> = {
   vehicle: 'Vehicle',
@@ -62,6 +63,13 @@ export interface CompanyAsset {
   recurring_expense_label: string | null;
   finance_category_id: string | null;
   notes: string | null;
+  // Depreciation (owned assets only). Straight-line; book value computed on read.
+  depreciation_method: DepreciationMethod;
+  useful_life_months: number | null;
+  salvage_value: number;
+  depreciation_start: string | null;
+  book_value: number | null;          // computed: cost − accumulated depreciation
+  monthly_depreciation: number | null; // computed: per-month straight-line amount
   created_at: string;
   updated_at: string;
   // Current holder (active assignment, returned_at IS NULL), resolved for display.
@@ -81,6 +89,10 @@ export interface AssetInput {
   recurring_expense_id?: string | null;
   finance_category_id?: string | null;
   notes?: string | null;
+  depreciation_method?: DepreciationMethod;
+  useful_life_months?: number | null;
+  salvage_value?: number | null;
+  depreciation_start?: string | null;
 }
 
 export interface EmployeeOption { id: string; name: string; }
@@ -91,6 +103,35 @@ export interface CompanyOption { id: string; name: string; }
 function contactName(c: any): string | null {
   if (!c) return null;
   return c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.billing_name || null;
+}
+
+/** Whole months elapsed between a start date and today (never negative). */
+function monthsElapsed(startISO: string): number {
+  const start = new Date(startISO);
+  const now = new Date();
+  if (isNaN(start.getTime()) || now < start) return 0;
+  let m = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  if (now.getDate() < start.getDate()) m -= 1; // not a full month yet
+  return Math.max(0, m);
+}
+
+/**
+ * Straight-line book value for an owned asset.
+ * monthly = (cost − salvage) / life; accumulated caps at (cost − salvage); book = cost − accumulated.
+ * Returns nulls when depreciation doesn't apply / can't be computed.
+ */
+function computeDepreciation(row: any): { book: number | null; monthly: number | null } {
+  if (row.depreciation_method !== 'straight_line') return { book: null, monthly: null };
+  const cost = row.acquisition_cost;
+  const life = row.useful_life_months;
+  if (cost == null || !life || life <= 0) return { book: null, monthly: null };
+  const salvage = row.salvage_value ?? 0;
+  const depreciable = Math.max(0, cost - salvage);
+  const monthly = depreciable / life;
+  const start = row.depreciation_start || row.acquired_at;
+  const elapsed = start ? monthsElapsed(start) : 0;
+  const accumulated = Math.min(depreciable, elapsed * monthly);
+  return { book: Math.round((cost - accumulated) * 100) / 100, monthly: Math.round(monthly * 100) / 100 };
 }
 
 class AssetsService {
@@ -132,6 +173,7 @@ class AssetsService {
         ? [rec.description, rec.subtotal_net != null ? `${rec.subtotal_net} ${rec.currency || ''}`.trim() : null, rec.cadence]
             .filter(Boolean).join(' · ')
         : null;
+      const dep = computeDepreciation(row);
       return {
         id: row.id,
         workspace_id: row.workspace_id,
@@ -149,6 +191,12 @@ class AssetsService {
         recurring_expense_label: recLabel,
         finance_category_id: row.finance_category_id ?? null,
         notes: row.notes ?? null,
+        depreciation_method: row.depreciation_method ?? 'none',
+        useful_life_months: row.useful_life_months ?? null,
+        salvage_value: row.salvage_value ?? 0,
+        depreciation_start: row.depreciation_start ?? null,
+        book_value: dep.book,
+        monthly_depreciation: dep.monthly,
         created_at: row.created_at,
         updated_at: row.updated_at,
         current_holder: holder,
@@ -172,6 +220,10 @@ class AssetsService {
       recurring_expense_id: input.recurring_expense_id || null,
       finance_category_id: input.finance_category_id || null,
       notes: input.notes || null,
+      depreciation_method: input.depreciation_method || 'none',
+      useful_life_months: input.useful_life_months ?? null,
+      salvage_value: input.salvage_value ?? 0,
+      depreciation_start: input.depreciation_start || null,
       created_by: auth?.user?.id ?? null,
     };
     const { data, error } = await sb.from('company_assets').insert(payload).select('id').single();

@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { parseDecimal } from '@/utils/decimal';
 import {
   assetsService, ASSET_CATEGORY_LABEL, ASSET_STATUS_LABEL, ACQUISITION_LABEL,
-  type CompanyAsset, type AssetCategory, type AssetStatus, type AcquisitionType,
+  type CompanyAsset, type AssetCategory, type AssetStatus, type AcquisitionType, type DepreciationMethod,
   type AssetInput, type EmployeeOption, type ContactOption, type RecurringExpenseOption, type CompanyOption,
 } from '@/services/assetsService';
 
@@ -44,6 +44,7 @@ const EMPTY_FORM: AssetInput = {
   category: 'vehicle', name: '', identifier: '', status: 'active',
   acquisition_type: 'owned', acquisition_cost: null, currency: 'EUR', acquired_at: '',
   supplier_company_id: null, recurring_expense_id: null, finance_category_id: null, notes: '',
+  depreciation_method: 'none', useful_life_months: null, salvage_value: null, depreciation_start: '',
 };
 
 export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = true, context = 'finance' }) => {
@@ -64,6 +65,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
   const [editing, setEditing] = useState<CompanyAsset | null>(null);
   const [form, setForm] = useState<AssetInput>(EMPTY_FORM);
   const [costText, setCostText] = useState('');
+  const [salvageText, setSalvageText] = useState('');
   const [busy, setBusy] = useState(false);
 
   // Assign dialog state
@@ -105,7 +107,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
   const pageRows = useMemo(() => paginate(filtered, page, 15), [filtered, page]);
   useEffect(() => { setPage((p) => clampPage(p, filtered.length, 15)); }, [filtered.length]);
 
-  const openAdd = () => { setEditing(null); setForm(EMPTY_FORM); setCostText(''); setFormOpen(true); };
+  const openAdd = () => { setEditing(null); setForm(EMPTY_FORM); setCostText(''); setSalvageText(''); setFormOpen(true); };
   const openEdit = (a: CompanyAsset) => {
     setEditing(a);
     setForm({
@@ -113,8 +115,11 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
       acquisition_type: a.acquisition_type, acquisition_cost: a.acquisition_cost, currency: a.currency,
       acquired_at: a.acquired_at || '', supplier_company_id: a.supplier_company_id,
       recurring_expense_id: a.recurring_expense_id, finance_category_id: a.finance_category_id, notes: a.notes || '',
+      depreciation_method: a.depreciation_method, useful_life_months: a.useful_life_months,
+      salvage_value: a.salvage_value, depreciation_start: a.depreciation_start || '',
     });
     setCostText(a.acquisition_cost != null ? String(a.acquisition_cost) : '');
+    setSalvageText(a.salvage_value ? String(a.salvage_value) : '');
     setFormOpen(true);
   };
 
@@ -123,7 +128,16 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
     if (!form.name.trim()) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
     setBusy(true);
     try {
-      const payload: AssetInput = { ...form, acquisition_cost: costText.trim() ? parseDecimal(costText) : null };
+      // Depreciation only applies to owned assets; leased/financed are pure expenses.
+      const owned = form.acquisition_type === 'owned';
+      const payload: AssetInput = {
+        ...form,
+        acquisition_cost: costText.trim() ? parseDecimal(costText) : null,
+        depreciation_method: owned ? (form.depreciation_method || 'none') : 'none',
+        useful_life_months: owned && form.depreciation_method === 'straight_line' ? (form.useful_life_months || null) : null,
+        salvage_value: owned && form.depreciation_method === 'straight_line' && salvageText.trim() ? parseDecimal(salvageText) : (owned ? 0 : 0),
+        depreciation_start: owned && form.depreciation_method === 'straight_line' ? (form.depreciation_start || null) : null,
+      };
       if (editing) { await assetsService.updateAsset(editing.id, payload); toast({ title: 'Asset updated' }); }
       else { await assetsService.createAsset(workspaceId, payload); toast({ title: 'Asset added' }); }
       setFormOpen(false); await load();
@@ -237,6 +251,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                       <td className="px-3 py-2">
                         <div>{ACQUISITION_LABEL[a.acquisition_type]}</div>
                         <div className="text-xs text-muted-foreground">{money(a.acquisition_cost, a.currency)}</div>
+                        {a.book_value != null && <div className="text-xs text-muted-foreground">Book: {money(a.book_value, a.currency)}</div>}
                       </td>
                       <td className="px-3 py-2">
                         {a.current_holder?.assignee_name
@@ -333,6 +348,37 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                 </Select>
                 {recurring.length === 0 && (
                   <p className="text-xs text-muted-foreground">No recurring expenses yet — create one under Finance → Expenses to link the lease cost.</p>
+                )}
+              </div>
+            )}
+            {form.acquisition_type === 'owned' && (
+              <div className="col-span-2 rounded-md border border-border/60 p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Depreciation</Label>
+                  <Select value={form.depreciation_method || 'none'} onValueChange={(v) => setForm((f) => ({ ...f, depreciation_method: v as DepreciationMethod }))}>
+                    <SelectTrigger className="h-8 w-40"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="straight_line">Straight-line</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {form.depreciation_method === 'straight_line' && (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label>Useful life (months)</Label>
+                      <Input type="number" min="1" value={form.useful_life_months ?? ''} onChange={(e) => setForm((f) => ({ ...f, useful_life_months: e.target.value ? parseInt(e.target.value, 10) : null }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Salvage value</Label>
+                      <Input value={salvageText} onChange={(e) => setSalvageText(e.target.value)} placeholder="0,00" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Start</Label>
+                      <Input type="date" value={form.depreciation_start || ''} onChange={(e) => setForm((f) => ({ ...f, depreciation_start: e.target.value }))} />
+                    </div>
+                    <p className="col-span-3 text-xs text-muted-foreground">Book value = cost − straight-line depreciation since start (defaults to the acquired date).</p>
+                  </div>
                 )}
               </div>
             )}

@@ -1390,6 +1390,17 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'company-assets',
+    name: 'Company Assets',
+    description: 'Track company vehicles, phones, cards, laptops & equipment and who holds each (shared with Finance + HR).',
+    icon: 'Package',
+    tool_ids: ['manage_company_assets'],
+    quick_starts: [
+      { label: 'List assets', description: 'Company assets & holders', prompt: 'List our company assets and who holds each one.', icon: 'ListChecks' },
+      { label: 'Add an asset', description: 'Register a company asset', prompt: 'Add a company asset — I\'ll give you the details.', icon: 'Plus' },
+    ],
+  },
+  {
     id: 'docs',
     name: 'Workspace Docs',
     description: 'Search your workspace\'s internal documents.',

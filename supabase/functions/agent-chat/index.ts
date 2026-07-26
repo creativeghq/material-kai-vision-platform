@@ -965,6 +965,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L); 0 cr
       'record_expense', 'list_recent_expenses',
+      // Company assets register (vehicles/phones/cards/laptops) shared with Finance + HR; 0 cr — DB-only
+      'manage_company_assets',
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
       // Knowledge-graph traversal (all users; 0 cr — DB-only RPC reads over existing relational edges).
@@ -1292,6 +1294,9 @@ async function executeAgent(
     },
     'expenses': {
       tool_ids: ['record_expense', 'list_recent_expenses'],
+    },
+    'company-assets': {
+      tool_ids: ['manage_company_assets'],
     },
     'docs': {
       tool_ids: ['search_workspace_docs'],
@@ -2128,6 +2133,16 @@ async function executeAgent(
       if (config.tools.includes('list_recent_expenses')) tools.push(expMod.createListExpensesTool(userId, workspaceId, onChunk));
     } catch (expErr) {
       console.warn('⚠️ Could not register expense tools:', expErr);
+    }
+  }
+
+  // Company assets register (vehicles/phones/cards/laptops) — shared with the Finance + HR panels. 0 cr, DB-only.
+  if (config.tools.includes('manage_company_assets')) {
+    try {
+      const assetMod = await import('../_shared/tools/company-assets-tools.ts');
+      tools.push(assetMod.createManageCompanyAssetsTool(userId, workspaceId, onChunk));
+    } catch (assetErr) {
+      console.warn('⚠️ Could not register company-assets tool:', assetErr);
     }
   }
 

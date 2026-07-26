@@ -335,6 +335,11 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Finance expenses
   expense_recorded: 'Expense recorded',
   expenses_list: 'Recent expenses',
+  // Company assets (shared Finance + HR register)
+  company_assets_list: 'Company assets',
+  company_asset_added: 'Asset added',
+  company_asset_assigned: 'Asset assigned',
+  company_asset_returned: 'Asset returned',
   // Knowledge-graph tools
   customer_overview_result: 'Customer overview',
   supplier_overview_result: 'Supplier overview',
