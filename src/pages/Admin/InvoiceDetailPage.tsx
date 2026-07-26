@@ -19,7 +19,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
@@ -631,7 +631,7 @@ const RecordPaymentDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Record payment</DialogTitle>
+          <DialogTitle>Record payment</DialogTitle><DialogDescription className="sr-only">Record a payment against this invoice (supports foreign-currency settlement).</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
@@ -756,7 +756,7 @@ const CreditNoteDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Issue credit note</DialogTitle>
+          <DialogTitle>Issue credit note</DialogTitle><DialogDescription className="sr-only">Issue a credit note against this invoice.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
