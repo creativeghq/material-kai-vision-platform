@@ -26,7 +26,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
-import { ConnectedWebsitesTab } from '@/components/core/Profile/ConnectedWebsitesTab';
 import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 import { AppearanceSection } from '@/components/core/Profile/AppearanceSection';
 
@@ -965,7 +964,7 @@ export const ProfileTab: React.FC = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5 text-primary" />Personal Information
+              <User className="h-4 w-4 text-primary" />Personal Information
             </CardTitle>
             {!editingPersonal ? (
               <Button size="sm" onClick={() => { setPersonalForm({ ...personal }); setEditingPersonal(true); }}>
@@ -1041,7 +1040,7 @@ export const ProfileTab: React.FC = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-primary" />Services
+              <Briefcase className="h-4 w-4 text-primary" />Services
             </CardTitle>
             <Button size="sm" variant="outline" onClick={() => { setAddingService(true); setEditingServiceId(null); }}>
               <Plus className="h-3.5 w-3.5 mr-1.5" />Add Service
@@ -1083,7 +1082,7 @@ export const ProfileTab: React.FC = () => {
       <Card className="rounded-2xl">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2"><Tag className="h-5 w-5 text-primary" />Skills & Expertise</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary" />Skills & Expertise</CardTitle>
             <Button size="sm" variant="outline" onClick={() => setAddingSkill((v) => !v)}>
               <Plus className="h-3.5 w-3.5 mr-1.5" />Add Skill
             </Button>
@@ -1115,7 +1114,7 @@ export const ProfileTab: React.FC = () => {
       <Card className="rounded-2xl">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" />Preferred Brands</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Preferred Brands</CardTitle>
             <Button size="sm" variant="outline" onClick={() => setAddingFactory((v) => !v)}>
               <Plus className="h-3.5 w-3.5 mr-1.5" />Add Brand
             </Button>
@@ -1175,7 +1174,7 @@ export const ProfileTab: React.FC = () => {
         <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />Supplier Verification
+              <Building2 className="h-4 w-4 text-primary" />Supplier Verification
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -1292,7 +1291,7 @@ export const ProfileTab: React.FC = () => {
         <Card className="rounded-2xl h-full">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-primary" />Featured Moodboard</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Star className="h-4 w-4 text-primary" />Featured Moodboard</CardTitle>
               <Button size="sm" variant="outline" onClick={() => setEditingFeatured((v) => !v)}>
                 <Pencil className="h-3.5 w-3.5 mr-1.5" />{featuredMoodboardId ? 'Change' : 'Set'}
               </Button>
@@ -1326,7 +1325,7 @@ export const ProfileTab: React.FC = () => {
         {isPublic && (
         <Card className="rounded-2xl h-full">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><BarChart2 className="h-5 w-5 text-primary" />Profile Analytics</CardTitle>
+            <CardTitle className="flex items-center gap-2"><BarChart2 className="h-4 w-4 text-primary" />Profile Analytics</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {analyticsLoading ? (
@@ -1395,9 +1394,6 @@ export const ProfileTab: React.FC = () => {
           </CardContent>
         </Card>
         )}
-
-        {/* Connected websites — used by SEO Inter-linking module */}
-        <ConnectedWebsitesTab />
 
       </div>
     </div>
@@ -1505,7 +1501,7 @@ function AvailabilitySettings() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-primary" />Appointment Availability
+            <CalendarDays className="h-4 w-4 text-primary" />Appointment Availability
           </CardTitle>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Accept bookings</span>

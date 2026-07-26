@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { generateStandardEmbedding } from '../../_shared/embedding-utils.ts';
+import { resolveWebsite } from '../../_shared/seo-website.ts';
 import type {
   SEOPipelineRequest,
   SEOPipelineResponse,
@@ -116,13 +117,21 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       .select('workspace_id')
       .eq('user_id', userId)
       .single();
+    const workspaceId = memberData?.workspace_id || null;
+
+    // Resolve the connected website this article belongs to — explicit body.website_id
+    // when the agent picked one, else the workspace's default site. Also feeds the
+    // interlink page-matcher below so suggestions come from the same site.
+    const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
+    const websiteId = website?.id ?? null;
 
     // Create article record immediately (for frontend polling)
     const { data: articleRow, error: insertError } = await supabase
       .from('seo_articles')
       .insert({
         user_id: userId,
-        workspace_id: memberData?.workspace_id || null,
+        workspace_id: workspaceId,
+        website_id: websiteId,
         target_keyword: body.target_keyword,
         content_type: body.content_brief?.contentType || 'guide',
         content_brief: body.content_brief || null,
@@ -169,6 +178,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         language_code: body.language_code || 'en',
         location_code: body.location_code || 2840,
         user_id: userId,
+        website_id: websiteId,
       }, 90_000);
 
       research = researchResult.data.research;
@@ -372,7 +382,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
 
     // Site-aware inter-linking: match this article's plan against the user's
     // indexed website pages (if they've connected one in profile settings).
-    const siteArticles = await buildSiteMatches(supabase, userId, plan, finalMarkdown);
+    const siteArticles = await buildSiteMatches(supabase, userId, plan, finalMarkdown, websiteId);
 
     // ── Phase 5 — auto-interlink from Google's "related searches" block ──
     // Each term in serpSignals.relatedSearches is a query Google clusters
@@ -767,6 +777,7 @@ async function buildSiteMatches(
   userId: string,
   plan: ArticlePlan,
   finalMarkdown: string,
+  preferredWebsiteId?: string | null,
 ): Promise<{
   url: string;
   title: string | null;
@@ -776,18 +787,21 @@ async function buildSiteMatches(
   alreadyLinked: boolean;
 }[]> {
   try {
-    // Pick the user's default (or any active) website
-    const { data: sites } = await supabase
-      .from('user_websites')
-      .select('id, url')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .order('is_default', { ascending: false })
-      .order('last_crawled_at', { ascending: false })
-      .limit(1);
-
-    if (!sites || sites.length === 0) return [];
-    const websiteId = sites[0].id as string;
+    // Prefer the website the article was filed under (workspace-resolved upstream);
+    // otherwise fall back to any active site owned by this user (legacy path).
+    let websiteId = preferredWebsiteId || null;
+    if (!websiteId) {
+      const { data: sites } = await supabase
+        .from('user_websites')
+        .select('id, url')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('is_default', { ascending: false })
+        .order('last_crawled_at', { ascending: false })
+        .limit(1);
+      if (!sites || sites.length === 0) return [];
+      websiteId = sites[0].id as string;
+    }
 
     // Build a compact summary of the planned article for embedding
     const sectionHeadings = collectHeadings(plan.sections).slice(0, 30).join(' | ');

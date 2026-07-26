@@ -13,12 +13,13 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   userWebsitesService,
   type UserWebsite,
   type PreviewResult,
 } from '@/services/userWebsitesService';
-import { Search, FileSearch } from 'lucide-react';
+import { Search, FileSearch, BarChart3, ChevronRight } from 'lucide-react';
 
 function timeAgo(iso: string | null): string {
   if (!iso) return 'never';
@@ -44,8 +45,9 @@ function statusOf(w: UserWebsite): { label: string; variant: 'default' | 'second
   return { label: 'Not crawled yet', variant: 'outline', icon: <Globe className="w-3 h-3" /> };
 }
 
-export const ConnectedWebsitesTab: React.FC = () => {
+export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void }> = ({ onOpen }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [sites, setSites] = useState<UserWebsite[]>([]);
   const [loading, setLoading] = useState(true);
   const [crawling, setCrawling] = useState<Record<string, boolean>>({});
@@ -67,7 +69,7 @@ export const ConnectedWebsitesTab: React.FC = () => {
   const reload = async () => {
     try {
       setLoading(true);
-      const rows = await userWebsitesService.list();
+      const rows = await userWebsitesService.list(activeWorkspaceId);
       setSites(rows);
     } catch (e: any) {
       toast({ title: 'Failed to load websites', description: e.message, variant: 'destructive' });
@@ -78,7 +80,8 @@ export const ConnectedWebsitesTab: React.FC = () => {
 
   useEffect(() => {
     reload();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspaceId]);
 
   const openAdd = () => {
     setForm({ url: '', sitemap_url: '', display_name: '', is_default: sites.length === 0, max_pages: 50 });
@@ -115,8 +118,14 @@ export const ConnectedWebsitesTab: React.FC = () => {
         });
         toast({ title: 'Website updated' });
       } else {
+        if (!activeWorkspaceId) {
+          toast({ title: 'No active workspace', description: 'Select a workspace before connecting a website.', variant: 'destructive' });
+          setSaving(false);
+          return;
+        }
         const created = await userWebsitesService.create({
           url: form.url,
+          workspace_id: activeWorkspaceId,
           sitemap_url: form.sitemap_url || null,
           display_name: form.display_name || null,
           is_default: form.is_default,
@@ -213,7 +222,7 @@ export const ConnectedWebsitesTab: React.FC = () => {
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Globe className="w-4 h-4" />
               Your Websites
             </CardTitle>
@@ -250,9 +259,21 @@ export const ConnectedWebsitesTab: React.FC = () => {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium truncate">
-                          {w.display_name || w.url.replace(/^https?:\/\//, '')}
-                        </span>
+                        {onOpen ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpen(w)}
+                            className="text-sm font-medium truncate inline-flex items-center gap-1 hover:text-primary text-left"
+                            title="Open SEO dashboard"
+                          >
+                            {w.display_name || w.url.replace(/^https?:\/\//, '')}
+                            <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+                          </button>
+                        ) : (
+                          <span className="text-sm font-medium truncate">
+                            {w.display_name || w.url.replace(/^https?:\/\//, '')}
+                          </span>
+                        )}
                         {w.is_default && (
                           <Badge variant="secondary" className="text-[10px] gap-1">
                             <Star className="w-2.5 h-2.5" />
@@ -295,6 +316,16 @@ export const ConnectedWebsitesTab: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1 flex-shrink-0">
+                      {onOpen && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Open SEO dashboard"
+                          onClick={() => onOpen(w)}
+                        >
+                          <BarChart3 className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

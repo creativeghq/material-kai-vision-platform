@@ -65,7 +65,7 @@ export async function callSEOFunction(functionName: string, body: any, timeoutMs
  */
 export const createSEOKeywordResearchTool = (userId: string, onProgress?: (status: string) => void, onChunk?: ChunkSink) => {
   return tool(
-    async ({ topic, target_keyword, language_code, location_code, _workflow_run_id }) => {
+    async ({ topic, target_keyword, language_code, location_code, website_id, _workflow_run_id }) => {
       // Workflow run_id strategy: prefer agent-passed _workflow_run_id (extracted
       // from `[workflow:seo-article/research:<run_id>]` prefix). Fall back to a
       // generated UUID — the frontend's run_id migration handler will reattach
@@ -83,6 +83,7 @@ export const createSEOKeywordResearchTool = (userId: string, onProgress?: (statu
           language_code: language_code || 'en',
           location_code: location_code || 2840,
           user_id: userId,
+          website_id: website_id || undefined,
         }, 60_000);
 
         if (!result.success) {
@@ -137,6 +138,7 @@ export const createSEOKeywordResearchTool = (userId: string, onProgress?: (statu
         target_keyword: z.string().describe('The primary keyword to target (e.g. "recycled concrete aggregates")'),
         language_code: z.string().optional().describe('Language code, defaults to "en"'),
         location_code: z.number().optional().describe('DataForSEO location code, defaults to 2840 (US)'),
+        website_id: z.string().optional().describe('Connected website id to file this research under. Omit to use the workspace default connected website.'),
         _workflow_run_id: z.string().optional().describe('Workflow run_id passed by the wizard. Extract from `[workflow:seo-article/research:<run_id>]` prefix.'),
       }),
     }
@@ -334,7 +336,7 @@ export const createSEOContentAnalyzerTool = (userId: string, onProgress?: (statu
  */
 export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => void) => {
   return tool(
-    async ({ topic, target_keyword, content_brief, auto_fix, max_fix_iterations, content_type }) => {
+    async ({ topic, target_keyword, content_brief, auto_fix, max_fix_iterations, content_type, website_id }) => {
       try {
 
         const result = await callSEOFunction('seo-pipeline', {
@@ -345,6 +347,7 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
           max_fix_iterations: max_fix_iterations ?? 2,
           content_type: content_type || 'guide',
           user_id: userId,
+          website_id: website_id || undefined,
         }, 300_000); // 5 min timeout for full pipeline
 
         if (!result.success) {
@@ -386,6 +389,7 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
         auto_fix: z.boolean().optional().describe('Auto-fix content if quality score is below 70 (default: true)'),
         max_fix_iterations: z.number().optional().describe('Max auto-fix iterations (default: 2)'),
         content_type: z.string().optional().describe('Article type: guide, listicle, comparison, how-to, case-study (default: guide)'),
+        website_id: z.string().optional().describe('Connected website id to file this article under (drives inter-linking from that site). Omit to use the workspace default connected website.'),
       }),
     }
   );

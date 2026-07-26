@@ -13,6 +13,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { chargeCronUser } from '../_shared/cron-billing.ts';
+import { userCanAccessWorkspace } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -367,12 +368,17 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
 
   const { data: website, error } = await supabase
     .from('user_websites')
-    .select('id, user_id, url, sitemap_url, max_pages, is_active')
+    .select('id, user_id, workspace_id, url, sitemap_url, max_pages, is_active')
     .eq('id', body.website_id)
     .maybeSingle();
 
   if (error || !website) return jsonResponse({ success: false, error: 'Website not found' }, 404);
-  if (!isCron && website.user_id !== userId) return jsonResponse({ success: false, error: 'Forbidden' }, 403);
+  // #250 invariant #1 (BOLA): user_websites is workspace-shared. The service-role client
+  // above bypasses RLS, so reconcile the caller against the row's workspace by MEMBERSHIP,
+  // not the body-supplied id. Return 404 (not 403) on mismatch to avoid id enumeration.
+  if (!isCron && !(await userCanAccessWorkspace(supabase, userId, website.workspace_id))) {
+    return jsonResponse({ success: false, error: 'Website not found' }, 404);
+  }
   if (!website.is_active) return jsonResponse({ success: false, error: 'Website is inactive' }, 400);
 
   const mode = body.mode === 'preview' ? 'preview' : 'full';

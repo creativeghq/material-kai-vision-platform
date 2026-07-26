@@ -155,7 +155,7 @@ export const SeoInterlinkingPanel: React.FC = () => {
 
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">Connected Websites</CardTitle>
+            <CardTitle>Connected Websites</CardTitle>
             <CardDescription>
               Per-user connected sites. The SEO pipeline reads from <code>user_websites</code> + <code>user_website_pages</code> when generating inter-linking suggestions for that user's articles.
             </CardDescription>
@@ -167,7 +167,7 @@ export const SeoInterlinkingPanel: React.FC = () => {
               </div>
             ) : rows.length === 0 ? (
               <div className="text-center py-12 text-sm text-muted-foreground">
-                No websites have been connected yet. Users add sites from <Link to="/profile" className="text-primary hover:underline">their profile page</Link>.
+                No websites have been connected yet. Users add sites from <Link to="/profile?tab=websites" className="text-primary hover:underline">Profile → Websites</Link>.
               </div>
             ) : (
               <>
@@ -269,7 +269,7 @@ export const SeoInterlinkingPanel: React.FC = () => {
         {counters.errored > 0 && (
           <Card className="dashboard-card border-red-500/30">
             <CardHeader>
-              <CardTitle className="text-base text-red-500 flex items-center gap-2">
+              <CardTitle className="text-red-500 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
                 Sites with errors
               </CardTitle>

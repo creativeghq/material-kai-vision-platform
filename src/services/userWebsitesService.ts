@@ -61,6 +61,69 @@ export interface PreviewResult {
   error?: string;
 }
 
+/** Per-website aggregate counts from the get_website_seo_overview RPC. */
+export interface WebsiteSeoOverview {
+  website: {
+    id: string;
+    url: string;
+    display_name: string | null;
+    is_default: boolean;
+    is_active: boolean;
+    page_count: number;
+    max_pages: number;
+    last_crawled_at: string | null;
+    last_crawl_error: string | null;
+  };
+  articles: { total: number; by_status: Record<string, number> };
+  keyword_research: { total: number };
+  toolkit_runs: { total: number; starred: number };
+  tracked_domains: { total: number; active: number; last_audited_at: string | null };
+}
+
+export interface SeoArticleRow {
+  id: string;
+  title: string | null;
+  target_keyword: string;
+  status: string;
+  seo_score: number | null;
+  readability_score: number | null;
+  word_count: number | null;
+  slug: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface SeoKeywordResearchRow {
+  id: string;
+  topic: string;
+  target_keyword: string;
+  total_keywords_found: number | null;
+  total_addressable_volume: number | null;
+  created_at: string;
+}
+
+export interface SeoResearchRunRow {
+  id: string;
+  kind: string;
+  subject: string;
+  success: boolean;
+  starred: boolean;
+  label: string | null;
+  country_code: string | null;
+  created_at: string;
+}
+
+export interface SeoTrackedDomainRow {
+  id: string;
+  domain: string;
+  display_label: string | null;
+  country_code: string | null;
+  is_active: boolean;
+  current_domain_rank: number | null;
+  current_organic_traffic: number | null;
+  last_audited_at: string | null;
+}
+
 function normalizeUrl(raw: string): string {
   let s = raw.trim();
   if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
@@ -68,18 +131,23 @@ function normalizeUrl(raw: string): string {
 }
 
 export const userWebsitesService = {
-  async list(): Promise<UserWebsite[]> {
-    const { data, error } = await supabase
+  /** List connected websites for a workspace (default first). Pass the active
+   *  workspace id so multi-workspace users only see the current tenant's sites. */
+  async list(workspaceId?: string | null): Promise<UserWebsite[]> {
+    let q = supabase
       .from('user_websites')
       .select('*')
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false });
+    if (workspaceId) q = q.eq('workspace_id', workspaceId);
+    const { data, error } = await q;
     if (error) throw error;
     return (data as UserWebsite[]) || [];
   },
 
   async create(input: {
     url: string;
+    workspace_id: string;
     sitemap_url?: string | null;
     display_name?: string | null;
     is_default?: boolean;
@@ -87,9 +155,11 @@ export const userWebsitesService = {
   }): Promise<UserWebsite> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
+    if (!input.workspace_id) throw new Error('workspace_id is required');
 
     const payload = {
       user_id: user.id,
+      workspace_id: input.workspace_id,
       url: normalizeUrl(input.url),
       sitemap_url: input.sitemap_url ? input.sitemap_url.trim() : null,
       display_name: input.display_name?.trim() || null,
@@ -161,5 +231,57 @@ export const userWebsitesService = {
     if (error) throw error;
     if (!data?.success) throw new Error(data?.error || 'Preview failed');
     return data.data as PreviewResult;
+  },
+
+  // ── Per-website SEO dashboard ─────────────────────────────────────────────
+  /** Aggregate counts for one website (workspace-guarded RPC). Null when the
+   *  website is unknown / not accessible. */
+  async overview(websiteId: string): Promise<WebsiteSeoOverview | null> {
+    const { data, error } = await supabase.rpc('get_website_seo_overview', { p_website_id: websiteId });
+    if (error) throw error;
+    return (data as WebsiteSeoOverview | null) ?? null;
+  },
+
+  async articles(websiteId: string, limit = 50): Promise<SeoArticleRow[]> {
+    const { data, error } = await supabase
+      .from('seo_articles')
+      .select('id, title, target_keyword, status, seo_score, readability_score, word_count, slug, created_at, completed_at')
+      .eq('website_id', websiteId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data as SeoArticleRow[]) || [];
+  },
+
+  async keywordResearch(websiteId: string, limit = 50): Promise<SeoKeywordResearchRow[]> {
+    const { data, error } = await supabase
+      .from('seo_keyword_research')
+      .select('id, topic, target_keyword, total_keywords_found, total_addressable_volume, created_at')
+      .eq('website_id', websiteId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data as SeoKeywordResearchRow[]) || [];
+  },
+
+  async toolkitRuns(websiteId: string, limit = 50): Promise<SeoResearchRunRow[]> {
+    const { data, error } = await supabase
+      .from('seo_research_runs')
+      .select('id, kind, subject, success, starred, label, country_code, created_at')
+      .eq('website_id', websiteId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data as SeoResearchRunRow[]) || [];
+  },
+
+  async trackedDomains(websiteId: string): Promise<SeoTrackedDomainRow[]> {
+    const { data, error } = await supabase
+      .from('seo_tracked_domains')
+      .select('id, domain, display_label, country_code, is_active, current_domain_rank, current_organic_traffic, last_audited_at')
+      .eq('website_id', websiteId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data as SeoTrackedDomainRow[]) || [];
   },
 };

@@ -22,11 +22,25 @@
  * the conversation moving without re-emitting the full payload.
  */
 
+import { resolveWebsite, type ResolvedWebsite } from '../seo-website.ts';
+
 const { tool } = await import('npm:@langchain/core@1.1.15/tools');
 const { z } = await import('npm:zod@3.24.0');
 
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
+
+/**
+ * Connected-website context threaded into the SEO agent tools so a research pass
+ * defaults to (and is filed under) the workspace's primary connected website.
+ * `supabase` is the service-role client; `defaultWebsite` is pre-resolved in
+ * agent-chat so the common path costs no extra DB round-trip.
+ */
+export interface SeoWebsiteCtx {
+  supabase?: any;
+  workspaceId?: string | null;
+  defaultWebsite?: ResolvedWebsite | null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -180,14 +194,24 @@ function condenseForLLM(data: any): Record<string, any> {
 export const createSEOResearchKeywordTool = (
   _userId: string,
   onChunk?: (chunk: any) => void,
+  ctx?: SeoWebsiteCtx,
 ) => {
   return tool(
-    async ({ keyword, brand_name, aliases, country_code, language_code, homepage_domain, types, limit_per_type }) => {
+    async ({ keyword, brand_name, aliases, country_code, language_code, homepage_domain, website_id, types, limit_per_type }) => {
       onChunk?.({
         type: 'tool_progress',
         status: `Researching "${keyword}" — fetching live SERP, AI Overview, PAA, related searches, competitors...`,
         timestamp: Date.now(),
       });
+
+      // Resolve the connected website this research is filed under: an explicit
+      // website_id (agent picked one), else the workspace default. A lookup only
+      // happens when website_id is passed — the default is pre-resolved in ctx.
+      let site: ResolvedWebsite | null = ctx?.defaultWebsite ?? null;
+      if (website_id && ctx?.supabase && ctx?.workspaceId) {
+        site = await resolveWebsite(ctx.supabase, { workspaceId: ctx.workspaceId, explicitWebsiteId: website_id });
+      }
+      const effectiveDomain = homepage_domain || site?.domain || undefined;
 
       const country = (country_code || 'US').toUpperCase();
       const lang = (language_code || 'en').toLowerCase();
@@ -197,7 +221,7 @@ export const createSEOResearchKeywordTool = (
         aliases: aliases && aliases.length ? aliases : undefined,
         language_codes: [lang],
         country_codes: [country],
-        homepage_domain: homepage_domain || undefined,
+        homepage_domain: effectiveDomain,
         // Subject-driven only — mention-derived types auto-skip in stateless mode
         // anyway, but being explicit keeps the LLM-facing schema honest.
         types: types || [
@@ -205,7 +229,7 @@ export const createSEOResearchKeywordTool = (
           'featured_snippet', 'related_search', 'competitor_ranking',
           'video_carousel', 'news_carousel', 'knowledge_graph',
           'paid_competitor', 'shopping_listing',
-          ...(homepage_domain ? ['domain_snapshot'] : []),
+          ...(effectiveDomain ? ['domain_snapshot'] : []),
         ],
         limit_per_type: limit_per_type ?? 5,
       });
@@ -218,6 +242,32 @@ export const createSEOResearchKeywordTool = (
 
       const summary = condenseForLLM(r.data);
 
+      // Persist to seo_research_runs so this agent research shows up in the
+      // connected-website's SEO dashboard (filed under the resolved site).
+      // Best-effort — a persist failure never blocks the chat response.
+      if (ctx?.supabase && ctx?.workspaceId) {
+        try {
+          await ctx.supabase.from('seo_research_runs').insert({
+            user_id: _userId,
+            workspace_id: ctx.workspaceId,
+            website_id: site?.id ?? null,
+            kind: 'keyword_research',
+            subject: keyword.slice(0, 200),
+            request_params: { keyword, country_code: country, language_code: lang, homepage_domain: effectiveDomain ?? null },
+            response: r.data ?? null,
+            country_code: country,
+            language_code: lang,
+            cost_usd: 0,
+            latency_ms: r.data?.latency_ms ?? null,
+            success: true,
+            error_message: null,
+            label: null,
+          });
+        } catch (e) {
+          console.warn('[seo_research_keyword] seo_research_runs persist failed:', e instanceof Error ? e.message : e);
+        }
+      }
+
       // Card payload — full opportunities array goes to the frontend so the
       // user can drill into every signal without round-tripping.
       onChunk?.({
@@ -225,6 +275,8 @@ export const createSEOResearchKeywordTool = (
         keyword,
         country,
         language: lang,
+        website_id: site?.id ?? null,
+        website_domain: site?.domain ?? null,
         opportunity_count: r.data?.opportunities?.length || 0,
         summary,
         opportunities: r.data?.opportunities || [],
@@ -235,7 +287,7 @@ export const createSEOResearchKeywordTool = (
 
       onChunk?.({
         type: 'tool_progress',
-        status: `Done — ${summary.opportunity_count} signals across ${Object.keys(summary.types).length} types.`,
+        status: `Done — ${summary.opportunity_count} signals across ${Object.keys(summary.types).length} types${site ? ` · filed under ${site.domain}` : ''}.`,
         timestamp: Date.now(),
       });
 
@@ -244,6 +296,7 @@ export const createSEOResearchKeywordTool = (
         keyword,
         country,
         language: lang,
+        website: site ? { id: site.id, domain: site.domain } : null,
         ...summary,
       });
     },
@@ -266,8 +319,9 @@ export const createSEOResearchKeywordTool = (
         aliases: z.array(z.string()).optional().describe('Alternate strings to try if the primary keyword returns empty — e.g. SKU variants, abbreviations, multi-language spellings.'),
         country_code: z.string().length(2).optional().describe('ISO-3166 alpha-2 country code (US, GB, DE, FR, IT, ES, GR, NL, BE, AT, CH, PT, IE, CA, AU, PL, SE, DK, NO, FI, TR, BG, RO, CY). Default: US.'),
         language_code: z.string().min(2).max(5).optional().describe('ISO 639-1 language code, default "en".'),
-        homepage_domain: z.string().optional().describe('Brand homepage domain (e.g. "flobali.gr"). When set, also returns a domain_snapshot card with Domain Rank, organic traffic, ranking-keywords count, referring domains, backlinks.'),
-        types: z.array(z.string()).optional().describe('Subset of opportunity types to return. Default = all subject-driven (11 types + domain_snapshot when homepage_domain is set).'),
+        homepage_domain: z.string().optional().describe('Brand homepage domain (e.g. "flobali.gr"). Defaults to the connected website\'s domain when omitted. When set, also returns a domain_snapshot card with Domain Rank, organic traffic, ranking-keywords count, referring domains, backlinks.'),
+        website_id: z.string().optional().describe('Connected website id to file this research under and derive the homepage_domain from. Omit to use the workspace\'s default connected website.'),
+        types: z.array(z.string()).optional().describe('Subset of opportunity types to return. Default = all subject-driven (11 types + domain_snapshot when a homepage domain is set/derived).'),
         limit_per_type: z.number().int().min(1).max(20).optional().describe('Max items per opportunity type, default 5.'),
       }),
     },

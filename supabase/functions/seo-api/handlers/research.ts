@@ -14,6 +14,7 @@ import { authenticate } from '../../_shared/auth.ts';
 import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
 import type { SEOResearchRequest, SEOResearchResponse } from '../../_shared/seo-types.ts';
 import { fetchOpportunitiesStateless } from '../../_shared/mention-opportunities-client.ts';
+import { resolveWebsite } from '../../_shared/seo-website.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -158,13 +159,19 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       .select('workspace_id')
       .eq('user_id', userId)
       .single();
+    const workspaceId = memberData?.workspace_id || null;
+
+    // File this research under a connected website — explicit body.website_id when the
+    // agent picked one, else the workspace's default site (null when none connected).
+    const website = await resolveWebsite(supabase, { workspaceId, explicitWebsiteId: body.website_id });
 
     // Persist to database
     const { data: researchRow, error: insertError } = await supabase
       .from('seo_keyword_research')
       .insert({
         user_id: userId,
-        workspace_id: memberData?.workspace_id || null,
+        workspace_id: workspaceId,
+        website_id: website?.id ?? null,
         topic: body.topic,
         target_keyword: body.target_keyword,
         location_code: locationCode,

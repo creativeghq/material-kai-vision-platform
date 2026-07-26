@@ -18,6 +18,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
+import { resolveWebsite } from '../../_shared/seo-website.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -82,10 +83,23 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
     // Persist via service-role (so insert works regardless of RLS, but with
     // explicit user_id from the verified JWT)
     const sbAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // File the run under the workspace + connected website so it surfaces in the
+    // website's SEO dashboard. website_id: explicit body.website_id → default site.
+    const { data: memberData } = await sbAdmin
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const workspaceId = memberData?.workspace_id || null;
+    const website = await resolveWebsite(sbAdmin, { workspaceId, explicitWebsiteId: body.website_id });
+
     const { data: row, error: insertErr } = await sbAdmin
       .from('seo_research_runs')
       .insert({
         user_id: userId,
+        workspace_id: workspaceId,
+        website_id: website?.id ?? null,
         kind: body.kind,
         subject: body.subject.slice(0, 200),
         request_params: body.params,

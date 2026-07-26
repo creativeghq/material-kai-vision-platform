@@ -4,7 +4,9 @@
 // The admin page is now mounted inside Operations Dashboard → SEO Toolkit as
 // the `interlinking` sub-tab. The legacy /admin/modules/seo-interlinking route
 // is kept as a redirect so old links / bookmarks still resolve.
-// Per-user management still lives in Profile → Websites tab (ConnectedWebsitesTab).
+// Workspace-shared management lives in Profile → Websites tab (WebsitesTab), where
+// each connected website opens a per-site SEO dashboard (articles, keyword research,
+// toolkit runs, domain audits).
 
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import manifest from './manifest.json';
