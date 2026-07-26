@@ -4447,6 +4447,53 @@
     "response": "{valid:boolean|null, name, legal_name, trade_name, address, address_parsed:{street,street_number,postal_code,city}, country_code, vat_number, checked_at, source:'vies', skipped_reason?}"
   },
   {
+    "name": "company-enrich",
+    "tag": "Business Profile",
+    "summary": "Auto-fill soft business identity (website, socials, phone, email, description, industry, employee band, city/state) via web search + Apollo, after a VAT lookup.",
+    "description": "JWT-authenticated POST. Runs Anthropic web_search (always) merged with Apollo.io (only when APOLLO_API_KEY is set) to fill fields a VAT registry never carries. Credit-metered per invariant #10 (reserve ceiling then per-provider debit). If company_id is supplied and the caller owns the row (or is admin), only currently-empty columns are cached back onto crm_companies.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "desc": "Business/company name to research"
+      },
+      {
+        "name": "country_name",
+        "type": "string",
+        "required": false,
+        "desc": "Country display name (e.g. Greece) to improve match quality"
+      },
+      {
+        "name": "vat_number",
+        "type": "string",
+        "required": false,
+        "desc": "VAT/registration number, used as a research hint"
+      },
+      {
+        "name": "workspace_id",
+        "type": "string",
+        "required": false,
+        "desc": "Routes credit debit to the workspace pool when provided"
+      },
+      {
+        "name": "company_id",
+        "type": "string",
+        "required": false,
+        "desc": "crm_companies.id - if provided and authorized, caches empty-only columns onto the row"
+      }
+    ],
+    "response": "{ok:boolean, fields:{website,email,phone,linkedin,facebook,twitter,description,industry,employee_count,city,state,country}, sources:string[], skipped:string[]}"
+  },
+  {
     "name": "xml-import-orchestrator",
     "tag": "Data Import",
     "summary": "Parse and import supplier XML feeds; supports field detection, preview, and full import modes.",
