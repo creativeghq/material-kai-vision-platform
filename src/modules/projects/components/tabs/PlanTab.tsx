@@ -221,7 +221,7 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
     try {
       const quoteId = await projectPlansService.createQuote(plan.id);
       toast({ title: 'Quote created from plan' });
-      navigate(`/quotes/${quoteId}`);
+      navigate(`/admin/quotes/${quoteId}`);
     } catch (e) {
       toast({ title: 'Quote creation failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
     } finally { setBusy(false); }
@@ -244,7 +244,7 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
     try {
       const quoteId = await projectPlansService.createChangeOrder(plan.id);
       toast({ title: 'Change order created' });
-      navigate(`/quotes/${quoteId}`);
+      navigate(`/admin/quotes/${quoteId}`);
     } catch (e) {
       toast({ title: 'Change order failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
     } finally { setBusy(false); }

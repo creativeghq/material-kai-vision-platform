@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Palette, Loader2, ArrowRight } from 'lucide-react';
+import { Palette, Loader2, ArrowRight, Plus } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { projectsService } from '../../services/projectsService';
+import { moodboardAPI } from '@/services/moodboardAPI';
 
 interface MoodboardsTabProps {
   projectId: string;
@@ -25,6 +26,21 @@ export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId }) => {
   const navigate = useNavigate();
   const [moodboards, setMoodboards] = useState<MoodboardRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  // Create a moodboard already linked to THIS project (+ open it) — the project page is the one
+  // place project context is known, so it shouldn't send the user to /moodboard to re-pick it.
+  const handleCreate = async () => {
+    const title = window.prompt('Name this moodboard')?.trim();
+    if (!title) return;
+    setCreating(true);
+    try {
+      const mb = await moodboardAPI.createMoodBoard({ title, project_id: projectId });
+      navigate(`/moodboard/${mb.id}`);
+    } catch {
+      toast({ title: 'Could not create moodboard', variant: 'destructive' });
+    } finally { setCreating(false); }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -54,19 +70,25 @@ export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId }) => {
         <CardContent className="py-12 text-center">
           <Palette className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
           <p className="text-sm text-muted-foreground mb-3">No moodboards attached to this project yet.</p>
-          <p className="text-xs text-muted-foreground mb-4">
-            When you create a new moodboard, pick this project in the "Add to Moodboard" modal.
-          </p>
-          <Button variant="outline" onClick={() => navigate('/moodboard')}>
-            Go to Moodboards
-          </Button>
+          <div className="flex items-center justify-center gap-2">
+            <Button onClick={handleCreate} disabled={creating}>
+              {creating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} New moodboard
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/moodboard')}>Go to Moodboards</Button>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <Button size="sm" onClick={handleCreate} disabled={creating}>
+          {creating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} New moodboard
+        </Button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {moodboards.map(mb => (
         <Card
           key={mb.id}
@@ -88,6 +110,7 @@ export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId }) => {
           </CardContent>
         </Card>
       ))}
+      </div>
     </div>
   );
 };

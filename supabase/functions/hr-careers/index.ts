@@ -9,6 +9,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
+import { emitApplicantStage } from '../_shared/hr/applicant-events.ts';
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -274,14 +275,17 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
         .eq('id', candidateId).eq('workspace_id', ws.id);
     }
 
-    const { error: aErr } = await supabase.from('hr_applications').insert({
+    const { data: appRow, error: aErr } = await supabase.from('hr_applications').insert({
       workspace_id: ws.id, job_posting_id: (job as any).id, candidate_id: candidateId, stage: 'applied',
       notes: String(body?.cover_letter ?? '').trim().slice(0, 5000) || null,
-    });
+    }).select('id').single();
     if (aErr) {
       if ((aErr as any).code === '23505') return json({ ok: true, already: true, message: "You've already applied to this role." });
       return json({ error: 'Could not submit application.' }, 400);
     }
+    // Notify owner/admins of the new inbound application (same Flow event the admin-create path
+    // emits) so a real public application isn't silently piling up in the Recruitment tab.
+    if (appRow?.id) await emitApplicantStage(supabase, ws.id, appRow.id, null, 'applied');
     return json({ ok: true, message: 'Application submitted — thank you!' });
   }
 

@@ -243,6 +243,17 @@ async function loadPlan(supabase: SupabaseClient, planId: string) {
   return data;
 }
 
+/** Resolve the project's client so a plan-generated quote carries the customer (pricing / email /
+ *  invoicing) — CreateQuoteModal does this from the project too, so the paths agree. */
+async function projectCustomer(supabase: SupabaseClient, projectId: string | null): Promise<{ customer_company_id: string | null; customer_contact_id: string | null }> {
+  if (!projectId) return { customer_company_id: null, customer_contact_id: null };
+  const { data } = await supabase.from('projects').select('client_company_id, client_contact_id').eq('id', projectId).maybeSingle();
+  return {
+    customer_company_id: (data as any)?.client_company_id ?? null,
+    customer_contact_id: (data as any)?.client_contact_id ?? null,
+  };
+}
+
 async function loadPlanItems(supabase: SupabaseClient, planId: string): Promise<ItemRow[]> {
   const { data, error } = await supabase.from('project_plan_items').select('*').eq('plan_id', planId).order('sort_order');
   if (error) throw new HttpError(400, error.message);
@@ -397,10 +408,12 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
         }
       }
       if (!quote) {
+        const cust = await projectCustomer(supabase, plan.project_id);
         const { data: created, error: qErr } = await supabase.from('quotes').insert({
           user_id: plan.user_id,
           workspace_id: plan.workspace_id,
           project_id: plan.project_id,
+          ...cust,
           name: plan.title,
           status: 'draft',
           currency: plan.source_currency || 'EUR',
@@ -503,10 +516,12 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       const { data: prevQuote } = await supabase.from('quotes').select('revision_number').eq('id', plan.quote_id).maybeSingle();
       const items = await loadPlanItems(supabase, plan_id);
 
+      const coCust = await projectCustomer(supabase, plan.project_id);
       const { data: quote, error: qErr } = await supabase.from('quotes').insert({
         user_id: plan.user_id,
         workspace_id: plan.workspace_id,
         project_id: plan.project_id,
+        ...coCust,
         name: `${plan.title} (revised)`,
         status: 'draft',
         currency: plan.source_currency || 'EUR',

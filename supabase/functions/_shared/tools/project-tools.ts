@@ -88,16 +88,36 @@ export const createCreateProjectTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ name, description, deadline, budget_amount, budget_currency, rooms }: {
+    async ({ name, description, deadline, budget_amount, budget_currency, rooms, client_company_id, client_contact_id, client_name }: {
       name: string;
       description?: string;
       deadline?: string;
       budget_amount?: number;
       budget_currency?: string;
       rooms?: string[];
+      client_company_id?: string;
+      client_contact_id?: string;
+      client_name?: string;
     }) => {
       if (!await isModuleEnabled()) return moduleDisabledError();
       const sb = svcClient();
+
+      // Resolve the project's client — everything downstream (quotes, invoices, client views,
+      // finance attach) depends on it, so the agent must set it just like the create page does.
+      // Company XOR contact.
+      let companyId = client_company_id ?? null;
+      let contactId = client_contact_id ?? null;
+      if (companyId && contactId) return JSON.stringify({ success: false, error: 'Provide a client company OR contact, not both.' });
+      if (!companyId && !contactId && client_name) {
+        const { data: co } = await sb.from('crm_companies').select('id')
+          .eq('workspace_id', workspaceId).ilike('name', client_name).limit(1).maybeSingle();
+        if (co) companyId = (co as any).id;
+        else {
+          const { data: ct } = await sb.from('crm_contacts').select('id')
+            .eq('workspace_id', workspaceId).ilike('name', client_name).limit(1).maybeSingle();
+          if (ct) contactId = (ct as any).id;
+        }
+      }
 
       onChunk?.({ type: 'tool_progress', status: `Creating project "${name}"...`, timestamp: Date.now() });
 
@@ -111,6 +131,8 @@ export const createCreateProjectTool = (
           deadline: deadline || null,
           budget_amount: budget_amount || null,
           budget_currency: budget_currency || 'EUR',
+          client_company_id: companyId,
+          client_contact_id: contactId,
         } as any)
         .select()
         .single();
@@ -157,6 +179,9 @@ export const createCreateProjectTool = (
         budget_amount: z.number().optional().describe('Total budget'),
         budget_currency: z.string().optional().describe('ISO currency code, default EUR'),
         rooms: z.array(z.string()).optional().describe('Room names like ["Master Bath", "Kitchen", "Living"]'),
+        client_company_id: z.string().optional().describe('CRM company id of the client (drives quotes/invoices/finance). Company XOR contact.'),
+        client_contact_id: z.string().optional().describe('CRM contact id of the client, if the client is a person not a company.'),
+        client_name: z.string().optional().describe('Client name to resolve to an existing CRM company/contact when you don\'t have the id.'),
       }),
     },
   );
@@ -454,6 +479,7 @@ export const createAddPurchaseItemTool = (
           unit_cost: input.unit_cost ?? null,
           currency: input.currency || 'EUR',
           details,
+          notes: input.notes ?? null,   // was advertised in the schema but silently dropped
           created_by: userId,
         } as any)
         .select('id')
@@ -515,7 +541,7 @@ export const createGeneratePurchaseSheetTool = (
     async ({ project_id, project_name, mode }: {
       project_id?: string;
       project_name?: string;
-      mode?: 'schedule' | 'per_item' | 'both';
+      mode?: 'schedule' | 'per_item' | 'both' | 'order';
     }) => {
       if (!await isModuleEnabled()) return moduleDisabledError();
       const sb = svcClient();
@@ -572,7 +598,7 @@ export const createGeneratePurchaseSheetTool = (
       schema: z.object({
         project_id: z.string().optional().describe('UUID of the project'),
         project_name: z.string().optional().describe('Project name fragment (fuzzy match)'),
-        mode: z.enum(['schedule', 'per_item', 'both']).optional().describe('Default both'),
+        mode: z.enum(['schedule', 'per_item', 'both', 'order']).optional().describe("Default both; 'order' produces the per-item supplier order sheet"),
       }),
     },
   );

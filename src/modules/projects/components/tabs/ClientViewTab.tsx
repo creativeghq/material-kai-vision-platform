@@ -12,6 +12,7 @@ import { Input } from '@/components/core/ui/input';
 import { Switch } from '@/components/core/ui/switch';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 import { projectsService } from '../../services/projectsService';
 import {
@@ -80,6 +81,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [feedbackByView, setFeedbackByView] = useState<Record<string, ClientViewFeedback[]>>({});
+  const [clientDisplayName, setClientDisplayName] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -94,6 +96,17 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
       setSheets(s);
       setQuotes((q || []).map((x: any) => ({ id: x.id, name: x.name, quote_number: x.quote_number, status: x.status ?? null, grand_total: x.grand_total ?? null, currency: x.currency ?? null })));
       setVrWorlds(w);
+      // Resolve the project's client name so the deck cover's "Prepared for" is prefilled.
+      const { data: proj } = await supabase.from('projects').select('client_company_id, client_contact_id').eq('id', projectId).maybeSingle();
+      const companyId = (proj as any)?.client_company_id as string | null;
+      const contactId = (proj as any)?.client_contact_id as string | null;
+      if (companyId) {
+        const { data: c } = await supabase.from('crm_companies').select('name').eq('id', companyId).maybeSingle();
+        setClientDisplayName((c as any)?.name ?? '');
+      } else if (contactId) {
+        const { data: c } = await supabase.from('crm_contacts').select('name').eq('id', contactId).maybeSingle();
+        setClientDisplayName((c as any)?.name ?? '');
+      } else setClientDisplayName('');
     } catch {
       toast({ title: 'Failed to load client views', variant: 'destructive' });
     } finally {
@@ -106,7 +119,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const sheetById = useMemo(() => new Map(sheets.map((s) => [s.id, s])), [sheets]);
 
   const openCreate = () => {
-    setForm({ ...emptyForm(), title: `${projectName} — Client Presentation`, clientName: '' });
+    setForm({ ...emptyForm(), title: `${projectName} — Client Presentation`, clientName: clientDisplayName });
     setEditorOpen(true);
   };
 
