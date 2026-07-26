@@ -7,23 +7,13 @@
  * last_digest_at so the same listings never re-send. Runs daily via pg_cron (x-cron-secret).
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { matchesCriteria } from '../_shared/real-estate.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
 import { escapeHtml } from '../_shared/html.ts';
 
-function matchesCriteria(c: any, p: any): boolean {
-  if (!c) return false;
-  if (c.type && c.type !== p.property_type) return false;
-  if (c.transaction_type && c.transaction_type !== p.transaction_type) return false;
-  if (c.price_min != null && p.price != null && Number(p.price) < Number(c.price_min)) return false;
-  if (c.price_max != null && p.price != null && Number(p.price) > Number(c.price_max)) return false;
-  if (c.beds != null && p.bedrooms != null && Number(p.bedrooms) < Number(c.beds)) return false;
-  if (c.baths != null && p.bathrooms != null && Number(p.bathrooms) < Number(c.baths)) return false;
-  if (c.location) { const loc = `${p.town ?? ''} ${p.region ?? ''}`.toLowerCase(); if (!loc.includes(String(c.location).toLowerCase())) return false; }
-  return true;
-}
 const money = (n: number | null, ccy = 'EUR') => (n == null ? 'Price on request' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
 
 serve(withApiLogging('real-estate-buyer-digests', async (req) => {

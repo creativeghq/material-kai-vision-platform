@@ -54,6 +54,12 @@ serve(withApiLogging('crm-meeting-reminders', async (req) => {
       const whenLong = new Date(m.meeting_at).toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' });
       const whenShort = new Date(m.meeting_at).toLocaleDateString('en-GB');
 
+      // Track outcome so we only stamp reminder_sent_at when a channel actually delivered OR the failure
+      // is permanent (retrying won't help). A transient failure with nothing delivered is left unstamped
+      // so the next tick retries — previously it stamped unconditionally and the reminder was lost.
+      let deliveredAny = false;
+      let transientFailure = false;
+
       if (m.remind_email && owner?.email) {
         const html = `<div style="font-family:Arial,sans-serif;color:#222;line-height:1.5">
           <h2 style="margin:0 0 10px">Meeting reminder</h2>
@@ -74,7 +80,7 @@ serve(withApiLogging('crm-meeting-reminders', async (req) => {
             workspace_id: m.workspace_id,
           }),
         });
-        if (res.ok) emailed++; else failed++;
+        if (res.ok) { emailed++; deliveredAny = true; } else { failed++; transientFailure = true; }
       }
 
       // WhatsApp reminder: direct WhatsApp send needs a connected per-workspace channel +
@@ -90,10 +96,15 @@ serve(withApiLogging('crm-meeting-reminders', async (req) => {
           is_read: false,
           metadata: { feature: 'crm_meeting_reminder', meeting_id: m.id, channel: 'whatsapp_bell_fallback' },
         });
-        if (notifErr) failed++; else whatsappPending++;
+        if (notifErr) { failed++; transientFailure = true; } else { whatsappPending++; deliveredAny = true; }
       }
 
-      await supabase.from('crm_meetings').update({ reminder_sent_at: new Date().toISOString() }).eq('id', m.id);
+      // Stamp when something delivered, or when nothing delivered but the failure was permanent (e.g. an
+      // email-only reminder with no owner email — retrying can't fix it). Leave unstamped on a transient
+      // failure with nothing delivered so the next run retries.
+      if (deliveredAny || !transientFailure) {
+        await supabase.from('crm_meetings').update({ reminder_sent_at: new Date().toISOString() }).eq('id', m.id);
+      }
     } catch (_) {
       failed++;
     }

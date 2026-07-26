@@ -13,7 +13,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { toPublic } from '../_shared/real-estate.ts';
+import { toPublic, matchesCriteria } from '../_shared/real-estate.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 function json(body: any, status = 200): Response {
@@ -43,18 +43,6 @@ async function enforceLeadRateLimit(supabase: any, req: Request, action: string,
   }
 }
 
-// #281 buyer portal — same criteria contract as real-estate-api.matchesCriteria.
-function matchesCriteria(c: any, p: any): boolean {
-  if (!c) return false;
-  if (c.type && c.type !== p.property_type) return false;
-  if (c.transaction_type && c.transaction_type !== p.transaction_type) return false;
-  if (c.price_min != null && p.price != null && Number(p.price) < Number(c.price_min)) return false;
-  if (c.price_max != null && p.price != null && Number(p.price) > Number(c.price_max)) return false;
-  if (c.beds != null && p.bedrooms != null && Number(p.bedrooms) < Number(c.beds)) return false;
-  if (c.baths != null && p.bathrooms != null && Number(p.bathrooms) < Number(c.baths)) return false;
-  if (c.location) { const loc = `${p.town ?? ''} ${p.region ?? ''}`.toLowerCase(); if (!loc.includes(String(c.location).toLowerCase())) return false; }
-  return true;
-}
 
 Deno.serve(withApiLogging('real-estate-public', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });

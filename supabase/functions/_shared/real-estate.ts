@@ -6,6 +6,23 @@
 const GR = new Set(['EL', 'GR', 'GRC']); // ΑΑΔΕ uses 'EL'; ISO alpha-2 'GR'
 
 /**
+ * Does a listing `p` satisfy a saved-buyer-search `criteria` `c`? The SINGLE source used by the buyer
+ * portal, the cross-workspace discover, the "buyers for this property" inverse, and the daily digest —
+ * so a criteria tweak can't make those surfaces silently disagree (was copy-pasted in 3 files).
+ */
+export function matchesCriteria(c: any, p: any): boolean {
+  if (!c) return false;
+  if (c.type && c.type !== p.property_type) return false;
+  if (c.transaction_type && c.transaction_type !== p.transaction_type) return false;
+  if (c.price_min != null && p.price != null && Number(p.price) < Number(c.price_min)) return false;
+  if (c.price_max != null && p.price != null && Number(p.price) > Number(c.price_max)) return false;
+  if (c.beds != null && p.bedrooms != null && Number(p.bedrooms) < Number(c.beds)) return false;
+  if (c.baths != null && p.bathrooms != null && Number(p.bathrooms) < Number(c.baths)) return false;
+  if (c.location) { const loc = `${p.town ?? ''} ${p.region ?? ''}`.toLowerCase(); if (!loc.includes(String(c.location).toLowerCase())) return false; }
+  return true;
+}
+
+/**
  * Publish compliance gate (revised §3 per-category required-field policy + the GR hard-block).
  * Greece: buildings need energy_class + electronic_building_id (ΠΕΑ + Ηλεκτρονική Ταυτότητα);
  * short-let needs the ΑΜΑ license; land needs land_use/zoning. Non-GR: same list, warn-only.

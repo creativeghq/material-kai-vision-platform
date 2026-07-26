@@ -18,23 +18,12 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
-import { checkPublishRequirements } from '../_shared/real-estate.ts';
+import { checkPublishRequirements, matchesCriteria } from '../_shared/real-estate.ts';
 import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
 import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 /** Does a buyer requirement's saved-search criteria match a listing? (deterministic facets) */
-function matchesCriteria(c: any, p: any): boolean {
-  if (!c) return false;
-  if (c.type && c.type !== p.property_type) return false;
-  if (c.transaction_type && c.transaction_type !== p.transaction_type) return false;
-  if (c.price_min != null && p.price != null && Number(p.price) < Number(c.price_min)) return false;
-  if (c.price_max != null && p.price != null && Number(p.price) > Number(c.price_max)) return false;
-  if (c.beds != null && p.bedrooms != null && Number(p.bedrooms) < Number(c.beds)) return false;
-  if (c.baths != null && p.bathrooms != null && Number(p.bathrooms) < Number(c.baths)) return false;
-  if (c.location) { const loc = `${p.town ?? ''} ${p.region ?? ''}`.toLowerCase(); if (!loc.includes(String(c.location).toLowerCase())) return false; }
-  return true;
-}
 
 /** #281 Investments: derive yield/cap-rate/cash-flow metrics from the stored inputs. */
 function computeInvestmentMetrics(r: any) {
