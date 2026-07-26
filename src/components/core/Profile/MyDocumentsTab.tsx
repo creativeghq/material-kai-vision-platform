@@ -14,6 +14,7 @@ import {
   type CustomerOrder,
   type CustomerAccountSummary,
   type CustomerOrderItem,
+  type ReorderPreview,
 } from '@/services/customerDocumentsService';
 
 const money = (v: number, currency: string) =>
@@ -198,8 +199,9 @@ const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
   const [items, setItems] = useState<CustomerOrderItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [preview, setPreview] = useState<ReorderPreview | null>(null);
 
-  const orderAgain = async () => {
+  const submitReorder = async () => {
     setReordering(true);
     try {
       const res = await customerDocumentsService.reorder(order.id);
@@ -207,9 +209,23 @@ const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
         title: 'Reorder sent',
         description: `We sent your request to the business${res.order_number ? ` (draft order ${res.order_number})` : ''}. They'll confirm the price and availability.`,
       });
+      setPreview(null);
     } catch (err) {
       toast({ title: 'Could not reorder', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
     } finally {
+      setReordering(false);
+    }
+  };
+
+  const orderAgain = async () => {
+    setReordering(true);
+    try {
+      // Check current prices first — if anything changed, let the customer review before committing.
+      const pv = await customerDocumentsService.reorderPreview(order.id);
+      if (pv.changed > 0) { setPreview(pv); setReordering(false); }
+      else { await submitReorder(); }
+    } catch (err) {
+      toast({ title: 'Could not reorder', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
       setReordering(false);
     }
   };
@@ -276,12 +292,36 @@ const OrderRow: React.FC<{ order: CustomerOrder }> = ({ order }) => {
               </tbody>
             </table>
           )}
-          <div className="mt-2 flex justify-end">
-            <Button size="sm" variant="outline" className="rounded-full" disabled={reordering} onClick={orderAgain}>
-              {reordering ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Repeat className="h-3.5 w-3.5 mr-1" />}
-              Order again
-            </Button>
-          </div>
+          {preview ? (
+            <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs space-y-1">
+              <div className="font-medium">Some prices changed since your last order:</div>
+              {preview.lines.filter((l) => l.changed).map((l, idx) => (
+                <div key={idx} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{l.description || 'Item'}</span>
+                  <span className="shrink-0 tabular-nums">
+                    <span className="line-through text-muted-foreground">{money(l.old_unit_price, order.currency)}</span>
+                    {' → '}<span className="font-medium">{money(l.new_unit_price, order.currency)}</span>
+                  </span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-2 pt-1.5">
+                <span className="text-muted-foreground">New total {money(preview.total, order.currency)}</span>
+                <span className="flex items-center gap-2">
+                  <Button size="sm" variant="ghost" className="rounded-full h-7" disabled={reordering} onClick={() => setPreview(null)}>Cancel</Button>
+                  <Button size="sm" className="rounded-full h-7" disabled={reordering} onClick={submitReorder}>
+                    {reordering ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}Confirm reorder
+                  </Button>
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 flex justify-end">
+              <Button size="sm" variant="outline" className="rounded-full" disabled={reordering} onClick={orderAgain}>
+                {reordering ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Repeat className="h-3.5 w-3.5 mr-1" />}
+                Order again
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </Card>

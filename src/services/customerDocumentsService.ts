@@ -131,14 +131,51 @@ export const customerDocumentsService = {
   },
 
   /**
-   * "Order again" — clone one of the caller's own orders into a NEW DRAFT order in the issuing
-   * business's workspace (ownership enforced server-side). It's a request: the business reviews /
-   * re-prices / confirms it. Returns the new order's id + number.
+   * Preview a reorder at TODAY's prices without creating anything — lets the customer check price
+   * changes before committing. Returns the per-line old→new comparison + the new total.
    */
-  async reorder(orderId: string): Promise<{ order_id: string; order_number: string | null }> {
+  async reorderPreview(orderId: string): Promise<ReorderPreview> {
+    const { data, error } = await supabase.functions.invoke('finance-customer-documents', { body: { action: 'reorder', order_id: orderId, preview: true } });
+    if (error) throw new Error(await edgeErrorMessage(error));
+    if (data?.ok === false) throw new Error(data?.error ?? 'Reorder preview failed');
+    return {
+      total: Number(data?.total ?? 0),
+      currency: (data?.currency ?? 'EUR') as string,
+      sourceOrderNumber: (data?.source_order_number ?? null) as string | null,
+      changed: Number(data?.reprice?.changed ?? 0),
+      lines: (data?.reprice?.lines ?? []) as ReorderLine[],
+    };
+  },
+
+  /**
+   * "Order again" — clone one of the caller's own orders into a NEW DRAFT order in the issuing
+   * business's workspace (ownership enforced server-side). Lines are re-priced at current
+   * customer-aware prices by default. It's a request the business reviews / confirms.
+   */
+  async reorder(orderId: string): Promise<{ order_id: string; order_number: string | null; changed: number }> {
     const { data, error } = await supabase.functions.invoke('finance-customer-documents', { body: { action: 'reorder', order_id: orderId } });
     if (error) throw new Error(await edgeErrorMessage(error));
     if (data?.ok === false || !data?.order_id) throw new Error(data?.error ?? 'Reorder failed');
-    return { order_id: data.order_id as string, order_number: (data.order_number ?? null) as string | null };
+    return {
+      order_id: data.order_id as string,
+      order_number: (data.order_number ?? null) as string | null,
+      changed: Number(data?.reprice?.changed ?? 0),
+    };
   },
 };
+
+/** One line's price comparison in a reorder preview. */
+export interface ReorderLine {
+  description: string;
+  old_unit_price: number;
+  new_unit_price: number;
+  changed: boolean;
+}
+
+export interface ReorderPreview {
+  total: number;
+  currency: string;
+  sourceOrderNumber: string | null;
+  changed: number;
+  lines: ReorderLine[];
+}

@@ -147,9 +147,53 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
     if (!items || items.length === 0) return json({ ok: false, error: 'This order has no items to reorder.' }, 400);
 
     const r2 = (n: number) => Math.round(n * 100) / 100;
-    const subtotal = r2(items.reduce((a: number, it: any) => a + Number(it.net_value || 0), 0));
-    const vat = r2(items.reduce((a: number, it: any) => a + Number(it.vat_amount || 0), 0));
+
+    // Re-price at TODAY's customer-aware prices (fair to both sides) — default on; opt out with
+    // reprice:false to repeat the exact historical prices. Only catalog lines (product_id) can be
+    // re-priced; ad-hoc lines keep their price. The customer's discount level/override is applied via
+    // the source order's party ids. An unpriced product falls back to the old price (never blocks).
+    const reprice = body?.reprice !== false;
+    const repriced: Array<{ description: string; old_unit_price: number; new_unit_price: number; changed: boolean }> = [];
+    const priced = await Promise.all((items as any[]).map(async (it) => {
+      const oldPrice = Number(it.unit_price || 0);
+      let unitPrice = oldPrice;
+      let discountPct = Number(it.discount_pct || 0);
+      let net = Number(it.net_value || 0);
+      let vatAmt = Number(it.vat_amount || 0);
+      let lineTotal = Number(it.line_total || 0);
+      let changed = false;
+      if (reprice && it.product_id) {
+        const { data: pr } = await supabase.rpc('get_product_price_for_workspace', {
+          p_workspace_id: src.workspace_id, p_product_id: it.product_id,
+          p_company_id: src.customer_company_id, p_contact_id: src.customer_contact_id, p_audience: 'seller',
+        });
+        const finalSell = pr && (pr as any).final_sell != null ? Number((pr as any).final_sell) : null;
+        if (finalSell != null) {
+          changed = Math.abs(finalSell - oldPrice) > 0.005;
+          unitPrice = finalSell;
+          discountPct = 0; // the current price is already the discounted (final_sell) figure
+          net = r2(Number(it.quantity || 0) * finalSell);
+          vatAmt = r2(net * Number(it.vat_percent || 0) / 100);
+          lineTotal = net;
+        }
+      }
+      repriced.push({ description: it.description, old_unit_price: oldPrice, new_unit_price: unitPrice, changed });
+      return { ...it, unit_price: unitPrice, discount_pct: discountPct, net_value: net, vat_amount: vatAmt, line_total: lineTotal };
+    }));
+    const changedCount = repriced.filter((r) => r.changed).length;
+
+    const subtotal = r2(priced.reduce((a: number, it: any) => a + Number(it.net_value || 0), 0));
+    const vat = r2(priced.reduce((a: number, it: any) => a + Number(it.vat_amount || 0), 0));
     const total = r2(subtotal + vat);
+
+    // Preview: return what the reorder WOULD cost at today's prices without creating anything, so the
+    // customer can review price changes before committing (nothing is written).
+    if (body?.preview === true) {
+      return json({
+        ok: true, preview: true, total, currency: src.currency, source_order_number: src.order_number ?? null,
+        reprice: { applied: reprice, changed: changedCount, lines: repriced },
+      });
+    }
 
     // Born as a DRAFT (= Pre-order) so the business confirms/re-prices before it becomes live. The
     // customer never writes a live order into someone else's workspace; identity fields are copied
@@ -161,13 +205,14 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
         customer_contact_id: src.customer_contact_id, customer_company_id: src.customer_company_id,
         project_id: src.project_id, currency: src.currency,
         subtotal_net: subtotal, vat_amount: vat, total,
-        notes: `Reorder requested by customer${src.order_number ? ` (from order ${src.order_number})` : ''}.`,
+        notes: `Reorder requested by customer${src.order_number ? ` (from order ${src.order_number})` : ''}.`
+          + (changedCount > 0 ? ` Prices updated to current for ${changedCount} line(s).` : ''),
       })
       .select('id, order_number')
       .single();
     if (cErr || !created) return json({ ok: false, error: cErr?.message ?? 'Could not create the reorder.' }, 400);
 
-    const rows = items.map((it: any, i: number) => ({
+    const rows = priced.map((it: any, i: number) => ({
       order_id: created.id, workspace_id: src.workspace_id,
       product_id: it.product_id ?? null, description: it.description,
       quantity: it.quantity, unit_price: it.unit_price, unit_cost: it.unit_cost ?? null,
@@ -191,7 +236,11 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
       action_url: '/finance?tab=orders',
     }));
 
-    return json({ ok: true, order_id: created.id, order_number: created.order_number ?? null });
+    return json({
+      ok: true, order_id: created.id, order_number: created.order_number ?? null,
+      total, currency: src.currency,
+      reprice: { applied: reprice, changed: changedCount, lines: repriced },
+    });
   }
 
   const sign = async (path: string | null): Promise<string | null> => {
