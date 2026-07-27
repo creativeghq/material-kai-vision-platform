@@ -35,7 +35,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [props, setProps] = useState<{ property: string; permission?: string }[] | null>(null);
-  const [view, setView] = useState<'queries' | 'pages'>('queries');
+  const [view, setView] = useState<'queries' | 'pages' | 'countries' | 'appearance'>('queries');
 
   const load = async () => {
     setLoading(true);
@@ -178,7 +178,16 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
 
   // ── Connected + property ──
   const t = summary?.totals;
-  const rows = (view === 'queries' ? summary?.top_queries : summary?.top_pages) || [];
+  const VIEW_ROWS: Record<typeof view, () => any[]> = {
+    queries: () => summary?.top_queries || [],
+    pages: () => summary?.top_pages || [],
+    countries: () => summary?.countries || [],
+    appearance: () => summary?.appearances || [],
+  };
+  const rows = VIEW_ROWS[view]();
+  const firstColLabel = view === 'queries' ? 'Query' : view === 'pages' ? 'Page' : view === 'countries' ? 'Country' : 'Appearance';
+  const devices = summary?.devices || [];
+  const trend = summary?.trend || [];
   return (
     <div className="space-y-4">
       <Card className="dashboard-card">
@@ -207,15 +216,49 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
             <Metric label="Avg CTR" value={`${(t?.ctr ?? 0).toFixed(1)}%`} />
             <Metric label="Avg position" value={(t?.position ?? 0).toFixed(1)} />
           </div>
+          {trend.length > 1 && (
+            <div className="mt-4">
+              <p className="text-xs text-muted-foreground mb-1">Clicks · last {summary?.days} days</p>
+              <Sparkline points={trend.map((p) => p.clicks)} />
+            </div>
+          )}
         </CardContent>
       </Card>
 
+      {/* Devices */}
+      {devices.length > 0 && (
+        <Card className="dashboard-card">
+          <CardHeader><CardTitle className="text-base">Devices</CardTitle></CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {devices.map((d) => {
+                const total = devices.reduce((s, x) => s + x.clicks, 0) || 1;
+                const pct = Math.round((d.clicks / total) * 100);
+                return (
+                  <div key={d.value} className="flex items-center gap-3">
+                    <span className="text-xs w-20 capitalize text-muted-foreground">{(d.value || '').toLowerCase()}</span>
+                    <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs tabular-nums w-24 text-right">{fmt(d.clicks)} clicks</span>
+                    <span className="text-xs tabular-nums w-10 text-right text-muted-foreground">{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Queries / Pages / Countries / Appearance */}
       <Card className="dashboard-card">
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle className="text-base">Top {view === 'queries' ? 'queries' : 'pages'}</CardTitle>
-          <div className="inline-flex rounded-full bg-muted p-0.5 text-xs">
-            <button onClick={() => setView('queries')} className={`px-3 py-1 rounded-full ${view === 'queries' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Queries</button>
-            <button onClick={() => setView('pages')} className={`px-3 py-1 rounded-full ${view === 'pages' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Pages</button>
+        <CardHeader className="flex flex-row items-center justify-between gap-3 flex-wrap">
+          <CardTitle className="text-base">Breakdown</CardTitle>
+          <div className="inline-flex rounded-full bg-muted p-0.5 text-xs flex-wrap">
+            {(['queries', 'pages', 'countries', 'appearance'] as const).map((v) => (
+              <button key={v} onClick={() => setView(v)}
+                className={`px-3 py-1 rounded-full capitalize ${view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{v}</button>
+            ))}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -226,7 +269,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{view === 'queries' ? 'Query' : 'Page'}</TableHead>
+                    <TableHead>{firstColLabel}</TableHead>
                     <TableHead className="text-right">Clicks</TableHead>
                     <TableHead className="text-right">Impr.</TableHead>
                     <TableHead className="text-right">CTR</TableHead>
@@ -241,7 +284,9 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
                           <a href={r.page} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-primary">
                             <span className="truncate">{r.page.replace(/^https?:\/\/[^/]+/, '') || r.page}</span><ExternalLink className="w-3 h-3 shrink-0" />
                           </a>
-                        ) : (r.query || '—')}
+                        ) : view === 'queries' ? (r.query || '—')
+                          : view === 'countries' ? <span className="uppercase">{r.value || '—'}</span>
+                          : (r.value || '—')}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{fmt(r.clicks)}</TableCell>
                       <TableCell className="text-right tabular-nums">{fmt(r.impressions)}</TableCell>
@@ -258,6 +303,21 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
     </div>
   );
 };
+
+/** Minimal inline SVG sparkline — no chart dependency. */
+function Sparkline({ points }: { points: number[] }) {
+  if (points.length < 2) return null;
+  const w = 600, h = 44, max = Math.max(...points, 1);
+  const step = w / (points.length - 1);
+  const d = points.map((v, i) => `${i === 0 ? 'M' : 'L'} ${(i * step).toFixed(1)} ${(h - (v / max) * (h - 4) - 2).toFixed(1)}`).join(' ');
+  const area = `${d} L ${w} ${h} L 0 ${h} Z`;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full h-11" role="img" aria-label="Clicks trend">
+      <path d={area} fill="hsl(var(--primary) / 0.12)" />
+      <path d={d} fill="none" stroke="hsl(var(--primary))" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
 
 function Metric({ label, value }: { label: string; value: React.ReactNode }) {
   return (

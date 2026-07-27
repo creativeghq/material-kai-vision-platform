@@ -135,32 +135,78 @@ async function listSites(accessToken: string): Promise<any[]> {
 }
 function ymd(d: Date): string { return d.toISOString().slice(0, 10); }
 
-/** Pull search-analytics rows for [startDate,endDate] and upsert into gsc_performance. */
-async function syncConnection(supabase: any, conn: any, startDate: string, endDate: string): Promise<number> {
-  const token = await validAccessToken(supabase, conn);
-  const url = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(conn.property)}/searchAnalytics/query`;
-  const r = await fetch(url, {
-    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ startDate, endDate, dimensions: ['date', 'query', 'page'], rowLimit: 25000, dataState: 'all' }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error?.message || `searchAnalytics ${r.status}`);
-  const rows: any[] = j.rows || [];
-  if (rows.length === 0) return 0;
-  const payload = rows.map((row) => {
-    const [date, query, page] = row.keys || [];
-    return {
-      website_id: conn.website_id, workspace_id: conn.workspace_id,
-      date, query: query ?? '', page: page ?? '',
-      clicks: Math.round(row.clicks || 0), impressions: Math.round(row.impressions || 0),
-      ctr: row.ctr || 0, position: row.position || 0,
-    };
-  });
-  for (let i = 0; i < payload.length; i += 500) {
-    const { error } = await supabase.from('gsc_performance').upsert(payload.slice(i, i + 500), { onConflict: 'website_id,date,query,page' });
+const GSC_ROW_LIMIT = 25000;
+
+/** Run a Search Analytics query for one property, paginating past the 25k row cap. */
+async function gscQuery(token: string, property: string, body: Record<string, unknown>): Promise<any[]> {
+  const url = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(property)}/searchAnalytics/query`;
+  const all: any[] = [];
+  for (let startRow = 0, page = 0; page < 40; page++, startRow += GSC_ROW_LIMIT) { // hard cap 1M rows
+    const r = await fetch(url, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, rowLimit: GSC_ROW_LIMIT, startRow, dataState: 'all' }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error?.message || `searchAnalytics ${r.status}`);
+    const rows: any[] = j.rows || [];
+    all.push(...rows);
+    if (rows.length < GSC_ROW_LIMIT) break;
+  }
+  return all;
+}
+
+async function upsertChunked(supabase: any, table: string, rows: any[], onConflict: string): Promise<void> {
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await supabase.from(table).upsert(rows.slice(i, i + 500), { onConflict });
     if (error) throw new Error(error.message);
   }
-  return payload.length;
+}
+
+// Extra Performance-report dimensions (mirrors what the GSC UI shows): accurate daily
+// totals + device / country / search-appearance splits. Each is its own query because
+// stacking every dimension into one explodes rows and hits the API cap.
+const GSC_BREAKDOWNS: { dim: string; gscDims: string[] }[] = [
+  { dim: 'total', gscDims: ['date'] },
+  { dim: 'device', gscDims: ['date', 'device'] },
+  { dim: 'country', gscDims: ['date', 'country'] },
+  { dim: 'searchAppearance', gscDims: ['date', 'searchAppearance'] },
+];
+
+/**
+ * Pull all of a property's search-analytics for [startDate,endDate] and upsert it:
+ *   - query×page×date   → gsc_performance (paginated past 25k)
+ *   - date/device/country/searchAppearance → gsc_breakdown
+ * Returns the number of query×page rows persisted. Breakdown failures are non-fatal
+ * (a property with no rich-result data, say, just yields an empty searchAppearance).
+ */
+async function syncConnection(supabase: any, conn: any, startDate: string, endDate: string): Promise<number> {
+  const token = await validAccessToken(supabase, conn);
+  const base = { website_id: conn.website_id, workspace_id: conn.workspace_id };
+
+  // 1. Core query × page grain
+  const core = await gscQuery(token, conn.property, { startDate, endDate, dimensions: ['date', 'query', 'page'] });
+  const corePayload = core.map((row) => {
+    const [date, query, page] = row.keys || [];
+    return { ...base, date, query: query ?? '', page: page ?? '',
+      clicks: Math.round(row.clicks || 0), impressions: Math.round(row.impressions || 0), ctr: row.ctr || 0, position: row.position || 0 };
+  });
+  if (corePayload.length) await upsertChunked(supabase, 'gsc_performance', corePayload, 'website_id,date,query,page');
+
+  // 2. Dimension breakdowns
+  for (const { dim, gscDims } of GSC_BREAKDOWNS) {
+    try {
+      const rows = await gscQuery(token, conn.property, { startDate, endDate, dimensions: gscDims });
+      const payload = rows.map((row) => {
+        const keys = row.keys || [];
+        return { ...base, date: keys[0], dimension: dim, value: gscDims.length > 1 ? (keys[1] ?? '') : '',
+          clicks: Math.round(row.clicks || 0), impressions: Math.round(row.impressions || 0), ctr: row.ctr || 0, position: row.position || 0 };
+      });
+      if (payload.length) await upsertChunked(supabase, 'gsc_breakdown', payload, 'website_id,date,dimension,value');
+    } catch (e) {
+      console.warn(`[gsc-api] breakdown '${dim}' failed for ${conn.property}:`, e instanceof Error ? e.message : e);
+    }
+  }
+  return corePayload.length;
 }
 
 /** Exchange the code, store the connection, auto-match the property, and backfill 28 days.
@@ -259,7 +305,9 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         await supabase.from('website_gsc_connections').update({ last_sync_error: String(e instanceof Error ? e.message : e).slice(0, 500) }).eq('website_id', c.website_id);
       }
     }
-    await supabase.from('gsc_performance').delete().lt('date', ymd(new Date(Date.now() - 180 * 86400000)));
+    const cutoff = ymd(new Date(Date.now() - 180 * 86400000));
+    await supabase.from('gsc_performance').delete().lt('date', cutoff);
+    await supabase.from('gsc_breakdown').delete().lt('date', cutoff);
     return json({ ok: true, synced: ok, failed, rows });
   }
 

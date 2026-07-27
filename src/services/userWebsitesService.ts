@@ -139,19 +139,26 @@ export interface GscStatus {
 export interface GscRow {
   query?: string;
   page?: string;
+  value?: string;    // breakdown value (device / country / appearance)
   clicks: number;
   impressions: number;
   ctr: number;       // percentage
   position: number;
 }
 
+export interface GscTrendPoint { date: string; clicks: number; impressions: number }
+
 export interface GscSummary {
   days: number;
   from: string;
   to: string;
   totals: { clicks: number; impressions: number; ctr: number; position: number };
+  trend: GscTrendPoint[];
   top_queries: GscRow[];
   top_pages: GscRow[];
+  devices: GscRow[];
+  countries: GscRow[];
+  appearances: GscRow[];
 }
 
 function normalizeUrl(raw: string): string {
