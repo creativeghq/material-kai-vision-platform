@@ -71,6 +71,7 @@ import { SystemPerformance } from '../SystemPerformance';
 // Relocated here (2026-06-09) from the misnamed /admin/training-models grab-bag.
 import { FactoryRegistrationsTab } from '../FactoryRegistrationsTab';
 import { ResellerApplicationsTab } from '../ResellerApplicationsTab';
+import { MarketplaceApprovalsTab } from '../MarketplaceApprovalsTab';
 import { FactoryAccessRequestsTab } from '../FactoryAccessRequestsTab';
 import { PlatformOverviewTab } from '../PlatformOverviewTab';
 import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
@@ -767,10 +768,12 @@ const OperationsDashboardInner: React.FC = () => {
                 <TabsTrigger value="registrations">Brand Registrations</TabsTrigger>
                 <TabsTrigger value="access">Access Requests</TabsTrigger>
                 <TabsTrigger value="resellers">Resellers</TabsTrigger>
+                <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
               </TabsList>
               <TabsContent value="registrations"><FactoryRegistrationsTab /></TabsContent>
               <TabsContent value="access"><FactoryAccessRequestsTab /></TabsContent>
               <TabsContent value="resellers"><ResellerApplicationsTab /></TabsContent>
+              <TabsContent value="marketplace"><MarketplaceApprovalsTab /></TabsContent>
             </Tabs>
           </TabsContent>
 

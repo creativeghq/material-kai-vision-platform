@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { validateVatViaVies, type ViesValidationResult } from '@/services/viesService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
+import { MarketplaceParticipationCard } from './MarketplaceParticipationCard';
 
 export type EntityType = 'solo' | 'business';
 
@@ -378,6 +379,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
   ].filter((s) => s && s.length > 0).join(', ');
 
   return (
+    <div className="space-y-6">
     <Card className="rounded-2xl">
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -617,6 +619,8 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
         )}
       </CardContent>
     </Card>
+    <MarketplaceParticipationCard />
+    </div>
   );
 };
 

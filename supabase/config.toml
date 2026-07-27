@@ -148,6 +148,11 @@ verify_jwt = false
 [functions.real-estate-feed]
 verify_jwt = false
 
+# #219 — Surplus marketplace price check. Resolves market price (via MIVAA market-check) + tells the
+# seller if a listing price is within the Operator cap. authenticate() handles auth internally.
+[functions.marketplace-price-check]
+verify_jwt = false
+
 # Contracts & e-signature API. verify_jwt off so the public /sign token path works; management
 # actions call authenticate + isModuleEnabled('contracts') + assertEntitled('contracts') and write
 # through a user-JWT client so the context-branched RLS (hr/finance/project) enforces access.

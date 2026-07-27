@@ -69,6 +69,39 @@ export interface BrowseFilters {
   offset?: number;
 }
 
+export type MarketplaceParticipationStatus = 'pending' | 'approved' | 'rejected';
+
+/** A workspace's surplus-marketplace participation (owner-enabled + operator-approved). */
+export interface MarketplaceParticipation {
+  workspace_id: string;
+  enabled: boolean;
+  status: MarketplaceParticipationStatus;
+  applied_at: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+}
+
+/** Operator view of a participation row + the applicant workspace name. */
+export interface MarketplaceApplication extends MarketplaceParticipation {
+  workspace_name: string | null;
+}
+
+/** Result of the market price-cap check for a proposed listing price. */
+export interface MarketPriceCheck {
+  success: boolean;
+  market_median: number | null;
+  market_min: number | null;
+  market_max: number | null;
+  currency: string;
+  cap_pct: number;
+  /** market_median × (1 + cap%); the highest price a listing may carry. Null when unverified. */
+  max_allowed: number | null;
+  allowed: boolean;
+  /** True when no market price could be resolved — the cap can't be enforced client-side. */
+  unverified: boolean;
+  from_cache: boolean;
+}
+
 /** A buyer's saved surplus alert (#225). A matching new listing emails + bells them. */
 export interface WantList {
   id: string;
@@ -365,5 +398,84 @@ export const marketplaceService = {
       specs,
       price_anchor: extractPriceAnchor(meta),
     };
+  },
+
+  // ── Participation (owner-enabled + operator-approved) ─────────────────────
+  /** This workspace's marketplace participation row (null if never applied). */
+  async getParticipation(workspaceId: string): Promise<MarketplaceParticipation | null> {
+    const { data, error } = await sb
+      .from('marketplace_participation')
+      .select('workspace_id, enabled, status, applied_at, reviewed_at, review_notes')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (error) throw error;
+    return (data ?? null) as MarketplaceParticipation | null;
+  },
+
+  /** Owner enables participation → raises an application for operator approval. */
+  async applyParticipation(workspaceId: string): Promise<MarketplaceParticipation> {
+    const { data, error } = await sb.rpc('marketplace_apply', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return data as MarketplaceParticipation;
+  },
+
+  /** Owner toggles participation on/off (does not change approval status). */
+  async setParticipationEnabled(workspaceId: string, enabled: boolean): Promise<MarketplaceParticipation> {
+    const { data, error } = await sb.rpc('marketplace_set_enabled', { p_workspace_id: workspaceId, p_enabled: enabled });
+    if (error) throw error;
+    return data as MarketplaceParticipation;
+  },
+
+  /** The Operator-set markup cap (% over market price). */
+  async getMarkupCap(): Promise<number> {
+    const { data, error } = await sb.from('marketplace_config').select('markup_cap_pct').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    return Number(data?.markup_cap_pct ?? 20);
+  },
+
+  // ── Operator approvals ────────────────────────────────────────────────────
+  /** All participation rows (operator-only via RLS), with the applicant workspace name. */
+  async listApplications(): Promise<MarketplaceApplication[]> {
+    const { data, error } = await sb
+      .from('marketplace_participation')
+      .select('workspace_id, enabled, status, applied_at, reviewed_at, review_notes, workspace:workspaces(name, slug)')
+      .order('applied_at', { ascending: false, nullsFirst: false });
+    if (error) throw error;
+    return ((data ?? []) as any[]).map((r) => ({
+      workspace_id: r.workspace_id, enabled: r.enabled, status: r.status,
+      applied_at: r.applied_at, reviewed_at: r.reviewed_at, review_notes: r.review_notes,
+      workspace_name: r.workspace?.name ?? null,
+    }));
+  },
+
+  /** Operator approve/reject a workspace's marketplace application. */
+  async review(workspaceId: string, approve: boolean, notes?: string): Promise<void> {
+    const { error } = await sb.rpc('marketplace_review', { p_workspace_id: workspaceId, p_approve: approve, p_notes: notes ?? null });
+    if (error) throw error;
+  },
+
+  // ── Price check (market cap) ───────────────────────────────────────────────
+  /**
+   * Resolve the market price of an item + whether a proposed listing price is within the
+   * Operator cap. Runs the price monitor (cached 24h server-side) and also populates the
+   * server-authoritative reference that create_marketplace_listing enforces against.
+   */
+  async priceCheck(input: {
+    workspaceId: string; productId?: string | null; productName?: string;
+    price?: number | null; currency?: string; manufacturer?: string; dimensions?: string;
+  }): Promise<MarketPriceCheck> {
+    const { data, error } = await supabase.functions.invoke('marketplace-price-check', {
+      body: {
+        workspace_id: input.workspaceId,
+        product_id: input.productId ?? null,
+        product_name: input.productName,
+        price: input.price ?? null,
+        currency: input.currency,
+        manufacturer: input.manufacturer,
+        dimensions: input.dimensions,
+      },
+    });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Price check failed'));
+    return data as MarketPriceCheck;
   },
 };

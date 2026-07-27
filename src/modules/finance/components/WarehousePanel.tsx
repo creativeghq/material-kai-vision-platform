@@ -13,6 +13,7 @@ import { warehouseService, type WarehouseItem, type Warehouse } from '@/services
 import { stockService, type OpeningStockLine } from '@/modules/stock/services/stockService';
 import {
   marketplaceService, type ActiveListingSummary, type ListingCondition, type DeliveryOption,
+  type MarketPriceCheck,
 } from '@/services/marketplaceService';
 import { AddDealerProductDialog } from '@/components/business/marketplace/AddDealerProductDialog';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
@@ -721,6 +722,9 @@ const ListToMarketplaceDialog: React.FC<{
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [specs, setSpecs] = useState<Record<string, unknown>>({});
   const [comps, setComps] = useState<{ n: number; min: number | null; median: number | null; max: number | null } | null>(null);
+  // Marketplace price cap (market_median × (1 + cap%)) — resolved by the price monitor.
+  const [pc, setPc] = useState<MarketPriceCheck | null>(null);
+  const [pcLoading, setPcLoading] = useState(false);
 
   const [price, setPrice] = useState('');
   const [priceTouched, setPriceTouched] = useState(false);
@@ -778,12 +782,43 @@ const ListToMarketplaceDialog: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comps]);
 
+  // Market price-cap check (debounced) — runs the price monitor whenever the seller sets a price and
+  // tells them if it's within the Operator cap (market_median × (1 + cap%)). Advisory here; the
+  // create_marketplace_listing RPC enforces the same ceiling server-side.
+  useEffect(() => {
+    if (!item) { setPc(null); return; }
+    const p = parseDecimal(price);
+    if (p == null || p <= 0) { setPc(null); return; }
+    let cancelled = false;
+    setPcLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await marketplaceService.priceCheck({
+          workspaceId, productId: item.product_id, productName: title || item.name, price: p,
+        });
+        if (!cancelled) setPc(res);
+      } catch {
+        if (!cancelled) setPc(null); // advisory only — the RPC still enforces on submit
+      } finally {
+        if (!cancelled) setPcLoading(false);
+      }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [price, item?.id]);
+
+  const overCap = !!pc && !pc.allowed && !pc.unverified;
+
   const submit = async () => {
     if (!item) return;
     const p = parseDecimal(price); const q = parseDecimal(qty);
     if (p == null || p <= 0) { toast({ title: 'Set a price', variant: 'destructive' }); return; }
     if (q == null || q <= 0) { toast({ title: 'Set a quantity', variant: 'destructive' }); return; }
     if (q > available) { toast({ title: `Only ${available} ${item.unit} available to list`, variant: 'destructive' }); return; }
+    if (overCap) {
+      toast({ title: 'Price exceeds the marketplace cap', description: `Max €${pc!.max_allowed} (${pc!.cap_pct}% over the market median €${Math.round(pc!.market_median ?? 0)}). Lower the price to list.`, variant: 'destructive' });
+      return;
+    }
     try {
       setBusy(true);
       await marketplaceService.createListing({
@@ -848,6 +883,21 @@ const ListToMarketplaceDialog: React.FC<{
             </div>
           </div>
 
+          {/* Market price-cap feedback (surplus may not exceed market_median × (1 + cap%)). */}
+          {(pcLoading || pc) && (
+            <div className={`rounded-md border px-3 py-2 text-xs ${pcLoading || !pc || pc.unverified ? 'border-border/60 text-muted-foreground' : pc.allowed ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400' : 'border-destructive/50 text-destructive'}`}>
+              {pcLoading ? (
+                <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Checking market price…</span>
+              ) : pc!.unverified ? (
+                <>No market price found for this item — it will be listed without a cap check.</>
+              ) : pc!.allowed ? (
+                <>✓ Within cap · market median €{Math.round(pc!.market_median ?? 0)} · max €{pc!.max_allowed} ({pc!.cap_pct}% over market)</>
+              ) : (
+                <>✗ Over the {pc!.cap_pct}% cap · market median €{Math.round(pc!.market_median ?? 0)} · max allowed €{pc!.max_allowed}. Lower the price to list.</>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Batch / Lot</Label><Input value={batchLot} onChange={(e) => setBatchLot(e.target.value)} placeholder="optional" /></div>
             <div className="space-y-1"><Label>Location</Label><Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Athens" /></div>
@@ -868,7 +918,7 @@ const ListToMarketplaceDialog: React.FC<{
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={busy || available <= 0}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'List it'}</Button>
+          <Button onClick={submit} disabled={busy || available <= 0 || overCap}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'List it'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
