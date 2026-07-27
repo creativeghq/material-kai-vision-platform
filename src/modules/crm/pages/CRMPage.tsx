@@ -689,10 +689,11 @@ export const CRMManagement: React.FC = () => {
                           <TableCell>
                             <Checkbox checked={selContacts.has(contact.id)} onCheckedChange={() => setSelContacts((s) => toggle(s, contact.id))} aria-label="Select row" />
                           </TableCell>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <button onClick={() => navigate(`/crm/contacts/${contact.id}`)} className="text-primary hover:underline flex items-center gap-1">
-                                {contact.name}<ExternalLink className="h-3 w-3" />
+                          <TableCell className="font-medium max-w-[24rem]">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <button onClick={() => navigate(`/crm/contacts/${contact.id}`)} title={contact.name} className="text-primary hover:underline inline-flex items-center gap-1 max-w-full text-left">
+                                <span className="truncate min-w-0">{contact.name}</span>
+                                <ExternalLink className="h-3 w-3 shrink-0" />
                               </button>
                               {(contact as any).lead_score != null && (
                                 <Badge className={`${leadScoreTint((contact as any).lead_score)} rounded-full border-0 text-[10px]`} title="Lead score">{(contact as any).lead_score}</Badge>
@@ -769,9 +770,10 @@ export const CRMManagement: React.FC = () => {
                           <TableCell>
                             <Checkbox checked={selCompanies.has(company.id)} onCheckedChange={() => setSelCompanies((s) => toggle(s, company.id))} aria-label="Select row" />
                           </TableCell>
-                          <TableCell className="font-medium">
-                            <button onClick={() => navigate(`/crm/companies/${company.id}`)} className="text-primary hover:underline flex items-center gap-1">
-                              {company.name}<ExternalLink className="h-3 w-3" />
+                          <TableCell className="font-medium max-w-[24rem]">
+                            <button onClick={() => navigate(`/crm/companies/${company.id}`)} title={company.name} className="text-primary hover:underline inline-flex items-center gap-1 max-w-full text-left">
+                              <span className="truncate min-w-0">{company.name}</span>
+                              <ExternalLink className="h-3 w-3 shrink-0" />
                             </button>
                           </TableCell>
                           <TableCell>{company.email ? <a href={`mailto:${company.email}`} className="text-primary hover:underline">{company.email}</a> : '-'}</TableCell>
