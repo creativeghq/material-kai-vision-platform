@@ -125,6 +125,10 @@
       { file: "stock.html", title: "Stock Management", icon: "📦" },
       { file: "contracts.html", title: "Contracts & e-Signature", icon: "✍️" },
       { file: "email-marketing.html", title: "Email Marketing (BYOK)", icon: "📣" },
+      { file: "seo.html", title: "SEO & Content", icon: "📈", children: [
+        { file: "seo-websites.html", title: "Connected Websites & GSC" },
+        { file: "seo-toolkit.html", title: "The SEO Toolkit (Edith)" },
+      ]},
       { file: "flows.html", title: "Flows (Automations)", icon: "🔀" },
       { file: "team-docs.html", title: "Team Docs", icon: "📓" },
     ]},

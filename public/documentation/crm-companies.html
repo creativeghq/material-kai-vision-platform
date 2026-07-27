@@ -27,7 +27,7 @@
   <p><strong>What it is —</strong> the tab for <strong>managing company accounts and business relationships</strong>. <strong>Why it matters —</strong> a company is your billing counter-party. The legal name, address and VAT number you confirm here are exactly what appears on an invoice, so this is the record that makes your documents legally correct. It's also where the Greek registry lookup and the EU VIES validation live, so getting a company on file properly means no re-typing, no mismatched names, and no rejected myDATA submissions because a VAT number was wrong.</p>
 
   <h2>The company detail page — the Account tab</h2>
-  <p><strong>What it is —</strong> clicking a company opens its detail page, where a company is treated as an <strong>Account</strong> you trade with over time. Its tabs are <strong>Overview</strong>, <strong>Contacts</strong>, <strong>Social</strong>, <strong>Notes</strong> and — the financial one — <strong>Account</strong>. Orders <em>drive</em> the Account, so everything money-related lives together on the one <strong>Account</strong> tab:</p>
+  <p><strong>What it is —</strong> clicking a company opens its detail page, where a company is treated as an <strong>Account</strong> you trade with over time. Its tabs are <strong>Activity</strong>, <strong>Details</strong>, <strong>Account</strong>, <strong>Contacts</strong>, <strong>Products</strong>, <strong>Social &amp; Web</strong> and — for suppliers — <strong>Market</strong> (documented below). Orders <em>drive</em> the Account, so everything money-related lives together on the one <strong>Account</strong> tab:</p>
   <div class="table-wrap"><table>
     <thead><tr><th>On the Account tab</th><th>What it shows</th></tr></thead>
     <tbody>
@@ -39,6 +39,35 @@
   </table></div>
   <p>The detail page uses a <strong>two-column layout</strong> with <strong>collapsible sidebar sections</strong>, and a unified <strong>Activity</strong>/Notes view records what's happened.</p>
   <div class="callout"><p><strong>Business vs solopreneur.</strong> A contact who runs a business can be promoted to (or linked with) a <strong>business</strong> Account; when that happens, the financials (orders, invoices, balance) <strong>roll up to the business</strong> rather than the individual, and the individual contact's financial tabs are hidden in favour of a “Check Company” link to the Account. This keeps one customer's money in one place instead of split across a person and their company.</p></div>
+
+  <h2>The Market tab — competitive &amp; market intelligence <span class="badge gated">suppliers only</span></h2>
+  <p><strong>What it is —</strong> a market-intelligence view that appears as an extra tab on a company's detail page <strong>only when the company is flagged as a supplier</strong>. <strong>Why it matters —</strong> for the brands you buy from, it answers four questions in one place: who competes with them, how your own catalogue built on their products is performing, where your buying prices sit against the live market, and what the money side of the relationship looks like. It stacks four cards:</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/company-market.png" alt="The Market tab on a supplier company">
+    <figcaption>The Market tab (suppliers only) — Competitors, Market position, Product price intelligence and Financial relationship, stacked top to bottom.</figcaption>
+  </figure>
+
+  <h3>Competitors</h3>
+  <p><strong>What it shows —</strong> who competes with this supplier, in two parts:</p>
+  <ul class="feat">
+    <li><strong>In your CRM</strong> — automatically finds other companies in your own CRM whose <strong>ΚΑΔ activity codes overlap</strong> this one's, so you instantly see the rivals you already know. Each is a clickable link tagged Supplier / Customer. (If the company has no ΚΑΔ codes yet, it prompts you to run the ΑΑΔΕ/ΓΕΜΗ import first.)</li>
+    <li><strong>Discover competitors</strong> — a button that goes out and finds competitors on the open web. It tries, in order, <strong>Apollo</strong> (a business database), then <strong>Gemini grounded on Google Search</strong>, then a general <strong>web search</strong> — the first source with results wins, and the card labels which one answered. Each result shows the name, industry/location and an outbound website link.</li>
+  </ul>
+  <div class="callout warn"><p><strong>Discover competitors debits credits.</strong> The web discovery runs paid look-ups (Apollo / Gemini / web search), so it draws on your workspace <a href="account-credits.html">credit pool</a>; if you're out of credits it stops rather than charging you. The “In your CRM” list is a free database query. Discovered competitors are shown for reference only — there's no one-click “add to CRM”.</p></div>
+
+  <h3>Market position</h3>
+  <p><strong>What it shows —</strong> how <em>MaterialsHub users engage with this supplier's products in your catalogue</em> over the last 90 days: the number of products, and their <strong>views, saves and quote-adds</strong>, plus a <em>“where demand comes from”</em> geographic breakdown and your most-engaged products. It's a read-only analytics roll-up (no credit cost), and it only has data once the supplier's products are linked to the company (via the Factory/brand link on the Details tab).</p>
+
+  <h3>Product price intelligence</h3>
+  <p><strong>What it shows —</strong> the products you carry from this supplier (matched on the brand link), each with <strong>“Our cost”</strong>. Two actions per product:</p>
+  <ul class="feat">
+    <li><strong>Check market</strong> — runs a one-shot live price scan and returns the market <strong>min–max range</strong>, <strong>median</strong> and <strong>retailer count</strong>, then shows your <strong>Headroom / Underwater</strong> figure (median minus your cost) so you can see at a glance whether you're buying below or above the going rate. <em>This debits credits</em> (it calls out to live pricing sources).</li>
+    <li><strong>Monitor</strong> — a toggle that enrols the product into ongoing <a href="finance-op-marketplace.html">price monitoring</a> so its market price is tracked over time (turn it off to stop tracking).</li>
+  </ul>
+
+  <h3>Financial relationship</h3>
+  <p><strong>What it shows —</strong> the money side of the supplier relationship, drawn entirely from <em>your own</em> finance data (not the registry): <strong>Billed to us</strong>, <strong>Paid to them</strong> and <strong>We owe (outstanding)</strong> from your accounts-payable ledger. It also flags <strong>unbooked myDATA documents</strong> — received documents matched to this supplier's VAT that you haven't turned into a bill yet — with a link straight to <a href="finance-doc-expenses.html">Finance → Expenses</a>, plus an <strong>Open ledger</strong> button to the supplier's full account.</p>
 
   <h2>The Companies list</h2>
   <p>Each row carries the company's headline details, with per-row <strong>Actions</strong> to manage it. The columns are:</p>
@@ -82,6 +111,16 @@
   <div class="callout tip"><p><strong>Lookups are cached for about 90 days.</strong> Once you've fetched a company's details, repeating the lookup within that window is instant and doesn't re-contact the registry — so there's no penalty for re-opening a record.</p></div>
 
   <div class="callout warn"><p><strong>Each fresh lookup writes a notification to the looked-up company's TaxisNet inbox.</strong> This is required by tax-authority policy and can't be turned off. For that reason the lookup is meant for verifying your <em>own</em> business or a legitimate customer/supplier you actually trade with — not for researching arbitrary companies.</p></div>
+
+  <h3>ΓΕΜΗ chained after ΑΑΔΕ</h3>
+  <p><strong>What it is —</strong> when you look up a Greek ΑΦΜ in the <strong>Add Company</strong> flow, the platform now runs the <strong>ΓΕΜΗ</strong> (General Commercial Registry) open-data lookup <em>immediately after</em> the ΑΑΔΕ one, in the same click. <strong>Why it matters —</strong> ΑΑΔΕ gives you the tax profile (legal name, address, ΔΟΥ, ΚΑΔ, active/inactive), but ΓΕΜΗ adds the <strong>commercial-registry identity</strong> that ΑΑΔΕ never returns. You get a fuller record from one action.</p>
+  <p>The chained ΓΕΜΗ pass adds:</p>
+  <ul class="feat">
+    <li><strong>Γ.Ε.ΜΗ. number</strong> — the company's commercial-registry number, shown as a verified badge and on the Details → Tax tab.</li>
+    <li><strong>Legal form</strong> and <strong>registry status</strong> — the ΓΕΜΗ legal form and standing.</li>
+    <li><strong>Extra activity codes</strong> — any ΚΑΔ activities ΓΕΜΗ lists are merged in <em>alongside</em> the ΑΑΔΕ ones (nothing is overwritten).</li>
+  </ul>
+  <div class="callout"><p><strong>Best-effort, never blocking.</strong> If ΓΕΜΗ has no record or is briefly unavailable, the ΑΑΔΕ result still stands — the status line shows <em>“Checking ΓΕΜΗ registry…”</em> during the pass and simply moves on if there's nothing to add. For non-Greek EU companies the flow uses <strong>VIES</strong> instead, then fills soft profile fields from a web-search enrichment.</p></div>
 
   <h2>Company fields in detail</h2>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/company-form.png" alt="The New Company form"><figcaption>The New Company form — grouped sections.</figcaption></figure>

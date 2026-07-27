@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEO & Content | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / SEO &amp; Content</div>
+  <h1>SEO &amp; Content <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/agent-hub?capability=seo-research</span> <span class="badge route">/profile?tab=websites</span></div>
+  <p class="lead">SEO &amp; Content is the platform's <strong>search-marketing workbench</strong>. It has two halves that work together: you <strong>connect your website</strong> once (the platform crawls your sitemap and, optionally, pulls your real <strong>Google Search Console</strong> performance), and then you drive the <strong>SEO assistant</strong> — <strong>Edith</strong> — to research keywords, audit pages and competitors, and <strong>write full SEO articles</strong> that automatically suggest and insert internal links back to <em>your own</em> pages. This page explains how the two halves fit, where each lives, and how it's gated and metered; the sub-pages go deep on each.</p>
+
+  <div class="callout"><p><strong>Where:</strong> the <strong>SEO &amp; Content</strong> tile is in the <a href="apps.html">App Launcher</a>'s Marketing hub (Pro add-on). Clicking it opens the AI studio with the SEO toolkit primed at <span class="badge route">/agent-hub?capability=seo-research</span>. The <strong>Connected Websites</strong> half lives in your <a href="account-profile.html">Profile</a> at <span class="badge route">/profile?tab=websites</span> and is available to any signed-in user.</p></div>
+
+  <h2>The two halves</h2>
+  <div class="cards">
+    <a class="card" href="seo-websites.html"><div class="ico">🌐</div><h3>Connected Websites &amp; Search Console</h3><p>Add your site, crawl its sitemap into a semantic index, and see a per-site dashboard — Articles, Keyword research, Toolkit runs, Domain audits, and full <strong>Google Search Console</strong> performance.</p></a>
+    <a class="card" href="seo-toolkit.html"><div class="ico">📈</div><h3>The SEO Toolkit (Edith)</h3><p>The AI studio for keyword research, SERP &amp; competitor audits, backlink and traffic analysis, and <strong>writing SEO articles</strong> with automatic internal-link suggestions inserted into the copy.</p></a>
+  </div>
+
+  <h2>How the halves connect</h2>
+  <p>The point of connecting a website is that it makes the toolkit <strong>website-aware</strong>. Once you have a connected (crawled) site:</p>
+  <ul class="feat">
+    <li><strong>Everything files under your site.</strong> Keyword research, toolkit runs and articles are stamped with the website, so the per-site dashboard becomes the running record of your SEO work.</li>
+    <li><strong>Articles link back to you.</strong> When Edith writes an article, it semantically matches your <em>own</em> indexed pages and suggests internal links — which you can <strong>insert straight into the draft</strong>. That's the site-aware inter-linking the crawl exists for.</li>
+    <li><strong>First-party search data feeds the tools.</strong> If you connect Google Search Console, tools like <em>striking-distance</em> and <em>top-movers</em> read your real clicks/impressions/position, not just third-party estimates.</li>
+  </ul>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/edith-studio.png" alt="The SEO assistant Edith in the AI studio">
+    <figcaption>Opening <strong>SEO &amp; Content</strong> loads <strong>Edith</strong> in the AI studio with the SEO Research toolkit primed — starter actions for keyword research, URL audits and keyword suggestions, with the connected website used as context.</figcaption>
+  </figure>
+
+  <h2>Gating — what's free and what's a Pro add-on</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Surface</th><th>Access</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Connected Websites</strong> (Profile → Websites)</td><td><strong>Open to any signed-in user</strong> — you can always add a site and crawl it. (Crawling spends credits, see below.)</td></tr>
+      <tr><td><strong>SEO Toolkit / Edith</strong> (research, audits, articles)</td><td><strong>Pro add-on.</strong> The tile requires the <code>seo-toolkit</code> module to be enabled on the workspace, plus the everyday <code>agent.use</code> capability. If it isn't enabled, the launcher shows it as an <em>“available to add”</em> upsell.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Enable the add-on from the <a href="apps.html">App Launcher</a> (or <a href="account-modules.html">Profile → Modules</a>); a member without owner rights can <strong>request</strong> it and the owner is notified to approve.</p>
+
+  <h2>Metering — what costs credits</h2>
+  <p>Reading your dashboards is free; the work that calls paid data providers or the LLM is <strong>metered against your workspace <a href="account-credits.html">credit pool</a></strong>:</p>
+  <ul class="feat">
+    <li><strong>Crawling a site</strong> — the crawler fetches each page through Firecrawl and embeds it, so it's charged per page. That's why adding a site runs a <strong>5-page preview first</strong> (see <a href="seo-websites.html">Connected Websites</a>) before you commit to the full crawl.</li>
+    <li><strong>Research &amp; audits</strong> — the DataForSEO-backed tools (SERP, keywords, backlinks, traffic, audits) each debit credits per run.</li>
+    <li><strong>Writing an article</strong> — the article pipeline runs on Claude Opus and debits accordingly.</li>
+    <li><strong>Google Search Console</strong> — connecting and reading GSC is <strong>free</strong> (it's your own data from Google); only the platform-side sync runs, no per-call charge.</li>
+  </ul>
+  <div class="callout tip"><p><strong>Recommended path:</strong> connect your website (<a href="seo-websites.html">Profile → Websites</a>) and let the preview run → optionally connect <strong>Google Search Console</strong> for real performance data → open <strong>SEO &amp; Content</strong> and ask Edith to research a keyword or write an article → use the <strong>Inter-linking</strong> tab to drop internal links to your own pages into the draft.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

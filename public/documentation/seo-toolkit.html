@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The SEO Toolkit (Edith) | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="seo.html">SEO &amp; Content</a> / The SEO Toolkit</div>
+  <h1>The SEO Toolkit — Edith <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/agent-hub?capability=seo-research</span> <span class="badge route">/agent-hub?capability=seo-article</span></div>
+  <p class="lead">The SEO Toolkit is an <strong>AI studio</strong>, not a form-driven screen. You work through <strong>Edith</strong>, the SEO assistant, in plain language — “research <em>porcelain floor tiles</em>”, “audit this URL”, “write me an article on underfloor heating”. Behind Edith sits a large set of search-marketing tools (SERP and keyword research, competitor and backlink analysis, site audits, traffic estimates) plus a full <strong>article-writing pipeline</strong> that drafts, scores and <strong>inserts internal links to your own pages</strong>. Every tool is <strong>website-aware</strong>: it defaults to your connected site and files its results under it.</p>
+
+  <div class="callout"><p><strong>Where:</strong> the <strong>SEO &amp; Content</strong> tile in the <a href="apps.html">App Launcher</a> (Marketing hub) opens the studio at <span class="badge route">/agent-hub?capability=seo-research</span>. The launcher also offers a direct <strong>“Write an article”</strong> entry (<span class="badge route">/agent-hub?capability=seo-article</span>). It's a <strong>Pro add-on</strong> — the workspace needs the <code>seo-toolkit</code> module enabled.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/edith-studio.png" alt="Edith, the SEO assistant, in the AI studio">
+    <figcaption>Edith in the AI studio — starter actions (<em>Research a keyword</em>, <em>Audit a URL</em>, <em>Suggest keywords</em>) with the SEO Research toolkit loaded. Type a request or click a starter; results render as inline cards on the canvas.</figcaption>
+  </figure>
+
+  <h2>Website-aware by default</h2>
+  <p>The single most important thing about the toolkit is that it works <em>against your connected website</em>. When you've set a <a href="seo-websites.html">default connected site</a>, every research run, audit and article automatically uses it as context and files the result under it (so it appears on that site's dashboard). The first-party tools that read <strong>Google Search Console</strong> require a connected, GSC-linked site and will point you to <em>Profile → Websites</em> if none exists.</p>
+
+  <h2>What Edith can do — the tool families</h2>
+  <p>You don't call these by name; you ask for the outcome and Edith picks the tool. Broadly, the toolkit covers:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Family</th><th>What you can ask for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Keyword research</strong></td><td>Full SERP snapshots (with AI-Overview and People-Also-Ask), keyword suggestions and difficulty, search-intent classification, and related-keyword expansion with volumes.</td></tr>
+      <tr><td><strong>First-party (GSC)</strong></td><td><strong>Striking-distance</strong> (queries just off page one) and <strong>top-movers</strong> (biggest week-on-week changes) — read straight from your connected Search Console data.</td></tr>
+      <tr><td><strong>Page &amp; site audits</strong></td><td>Audit a URL (technical + on-page issues, with a Lighthouse pass), start a full-site crawl and check its status, and a plain-language site review.</td></tr>
+      <tr><td><strong>Competitor &amp; domain analysis</strong></td><td>Domain snapshots, ranked keywords, domain competitors, keyword gaps between you and a rival, and traffic estimates.</td></tr>
+      <tr><td><strong>Backlinks</strong></td><td>Backlink summaries, anchor-text profiles and referring domains.</td></tr>
+      <tr><td><strong>Visibility &amp; extras</strong></td><td>Google Trends, local-pack checks, brand-search audits, LLM-mention searches, YouTube search, content sentiment and a site's detected technologies.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Each run renders as an <strong>inline card</strong> on the canvas and (where relevant) is saved to the site's <strong>Toolkit Runs</strong> / <strong>Keyword Research</strong> / <strong>Domain Audits</strong> tabs so you can come back to it.</p>
+  <div class="callout warn"><p><strong>These tools debit credits.</strong> The research and audit tools call paid data providers, so each run draws on your workspace <a href="account-credits.html">credit pool</a>. Reading the saved results later is free.</p></div>
+
+  <h2>Writing an SEO article</h2>
+  <p>The headline capability is the <strong>article pipeline</strong>. Ask Edith to write an article (from the studio, or the launcher's <em>“Write an article”</em> entry) and it runs an end-to-end job:</p>
+  <ol>
+    <li><strong>Research</strong> — pulls the SERP, related searches and competitor angles for your target keyword.</li>
+    <li><strong>Plan</strong> — builds an outline / brief from that research.</li>
+    <li><strong>Write</strong> — drafts the full article (on Claude Opus).</li>
+    <li><strong>Analyze</strong> — scores the draft for SEO and readability, and can auto-fix weak spots.</li>
+  </ol>
+  <p>The article is <strong>filed under your connected website</strong> and appears on the site dashboard's <strong>Articles</strong> tab. Opening it launches the article viewer, organised into tabs — <strong>Optimize</strong>, <strong>Brief</strong>, <strong>Gaps/Gains</strong>, <strong>Research</strong> and <strong>Inter-linking</strong>.</p>
+
+  <h3>Inter-linking — internal links inserted into the draft</h3>
+  <p><strong>What it is —</strong> the reason connecting your site matters. On the <strong>Inter-linking</strong> tab, the article viewer shows <em>“Suggested Internal Links from Your Site”</em> — pages from your <a href="seo-websites.html">connected site's index</a> that semantically match the article, each with a <strong>% match</strong> and a suggested anchor phrase. <strong>Why it matters —</strong> internal links are core SEO, and here they're <em>real</em> links to <em>your</em> pages, not invented ones.</p>
+  <ul class="feat">
+    <li><strong>Insert</strong> — finds the first unlinked occurrence of the anchor phrase in the draft and turns it into a Markdown link to your page, saving it into the article. The button then reflects whether it was <em>inserted</em>, <em>already there</em>, or the anchor wasn't <em>found</em>.</li>
+    <li><strong>Copy MD link</strong> — grabs the Markdown link to paste wherever you like.</li>
+    <li>If you haven't connected a site, the tab shows a prompt to <em>“Connect your website's sitemap”</em> first — no connected pages means no suggestions.</li>
+  </ul>
+  <div class="callout tip"><p><strong>Worked example:</strong> connect your site in <a href="seo-websites.html">Profile → Websites</a> and let it crawl → open <strong>SEO &amp; Content</strong> and ask Edith to <em>“write an article targeting ‘bathroom tile ideas'”</em> → when it's ready, open it from the site's <strong>Articles</strong> tab → on the <strong>Inter-linking</strong> tab, click <strong>Insert</strong> on the strongest matches to weave links to your own tile pages into the copy → export or publish the finished Markdown.</p></div>
+
+  <h2>Gating &amp; cost recap</h2>
+  <ul class="feat">
+    <li><strong>Pro add-on.</strong> The toolkit needs the <code>seo-toolkit</code> module enabled on the workspace (plus everyday <code>agent.use</code>). Without it, the launcher shows an upsell card.</li>
+    <li><strong>Metered.</strong> Research/audit tools debit credits per run; the article pipeline debits for the Claude Opus write. Reading saved dashboards and re-opening articles is free.</li>
+    <li><strong>Better with a connected site.</strong> Connecting a website (free to do; crawling spends credits) unlocks internal-link suggestions and first-party Search Console tools — see <a href="seo-websites.html">Connected Websites</a>.</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

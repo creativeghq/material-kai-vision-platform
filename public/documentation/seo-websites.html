@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connected Websites & Search Console | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="seo.html">SEO &amp; Content</a> / Connected Websites</div>
+  <h1>Connected Websites &amp; Search Console</h1>
+  <div class="routes"><span class="badge route">/profile?tab=websites</span></div>
+  <p class="lead">Connecting a website is the foundation of the whole SEO feature. You point the platform at your site, it reads your <strong>sitemap</strong>, fetches each page and builds a <strong>semantic index</strong> of your content — without ever publishing or changing anything on your site. That index is what lets the <a href="seo-toolkit.html">SEO assistant</a> suggest internal links back to your own pages when it writes articles, and it gives you a <strong>per-site dashboard</strong> that gathers all your SEO work in one place, including your real <strong>Google Search Console</strong> performance. This page covers adding a site, the preview-then-crawl safety step, the dashboard's tabs, and connecting Search Console.</p>
+
+  <div class="callout"><p><strong>Where:</strong> your <a href="account-profile.html">Profile</a> → the <strong>Websites</strong> tab (<span class="badge route">/profile?tab=websites</span>), between <em>Social Accounts</em> and <em>Keys</em>. Unlike the SEO Toolkit, this tab is <strong>open to any signed-in user</strong> — you don't need the Pro add-on to connect a site (though crawling spends credits).</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/connected-websites.png" alt="The Connected Websites tab">
+    <figcaption>Connected Websites — each site shows a <strong>Default</strong> badge, an index status (<em>“44 pages indexed”</em>), the last crawl time and sitemap, plus per-row actions: open dashboard, preview, recrawl, edit, remove.</figcaption>
+  </figure>
+
+  <h2>What the crawler does (and doesn't do)</h2>
+  <p><strong>What it is —</strong> a read-only crawler that reads your sitemap, fetches each listed page, and builds a semantic index of the content. <strong>Why it matters —</strong> that index is how the assistant knows what pages you already have, so it can suggest genuinely relevant internal links. <strong>It never publishes or modifies anything on your site</strong> — it only reads. The crawl re-runs on a schedule (roughly daily) to keep the index fresh, and you can force a fresh crawl any time with <strong>Recrawl</strong>.</p>
+
+  <h2>Adding a website</h2>
+  <p>Click <strong>Add Website</strong> and fill in:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Website URL *</strong></td><td>Your domain, e.g. <code>https://yourdomain.com</code>.</td></tr>
+      <tr><td><strong>Sitemap URL</strong></td><td>Optional — leave blank and the platform auto-detects it (it tries <code>/sitemap.xml</code>, <code>/sitemap_index.xml</code>, then <code>robots.txt</code>).</td></tr>
+      <tr><td><strong>Display Name</strong></td><td>Optional friendly name for the site.</td></tr>
+      <tr><td><strong>Max pages to index</strong></td><td>How many pages to crawl (default <strong>50</strong>, minimum 10, hard cap 1000). This bounds the cost of the crawl.</td></tr>
+      <tr><td><strong>Use as default</strong></td><td>Make this the site that inter-linking suggestions pull from when you write a new article. One site is your default.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Preview before the full crawl</h3>
+  <p>Because the crawler is charged per page (it fetches each one through Firecrawl), adding a site doesn't immediately crawl everything. Saving runs <strong>Add &amp; Preview</strong> — a <strong>Sitemap Preview</strong> that reads your sitemap, reports the <strong>total URLs</strong> found and how many it <em>will</em> crawl, and fetches a <strong>sample of 5 pages</strong> so you can confirm titles and descriptions come through cleanly. If it looks right, click <strong>Proceed with Full Crawl</strong>. This preview-then-commit step means you never spend credits on a full crawl of a site whose sitemap was wrong.</p>
+  <div class="callout tip"><p>You can re-run the 5-page <strong>Preview</strong> any time from the row's action icons, and <strong>Recrawl now (full)</strong> forces a complete fresh index. <strong>Remove</strong> deletes the site and all its indexed pages.</p></div>
+
+  <h2>The per-site SEO dashboard</h2>
+  <p>Click a site (or its <strong>Open SEO dashboard</strong> icon) to open its dashboard. The header shows the domain, page count and last-crawl time with a <strong>Recrawl</strong> button, then <strong>four headline counters</strong> — <strong>Articles</strong>, <strong>Keyword research</strong>, <strong>Toolkit runs</strong> and <strong>Tracked domains</strong> — over five tabs.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/website-dashboard.png" alt="The per-site SEO dashboard">
+    <figcaption>The per-site dashboard — headline counters plus the five tabs: Articles, Keyword Research, Toolkit Runs, Domain Audits and Search Performance.</figcaption>
+  </figure>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Tab</th><th>What it lists</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Articles</strong></td><td>Every SEO article written for this site — title, target keyword, SEO score, word count, status. Click a row to open the full article viewer. (Empty until you ask the assistant to write one.)</td></tr>
+      <tr><td><strong>Keyword Research</strong></td><td>Saved keyword-research runs — target keyword, topic, number of keywords, volume.</td></tr>
+      <tr><td><strong>Toolkit Runs</strong></td><td>A log of the assistant's research/audit tool runs against this site — subject, kind, country, result.</td></tr>
+      <tr><td><strong>Domain Audits</strong></td><td>Tracked domains — domain, rank, organic traffic, last audit — from the domain-snapshot tools.</td></tr>
+      <tr><td><strong>Search Performance</strong></td><td>Your real <strong>Google Search Console</strong> data (see below).</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Google Search Console — real search performance</h2>
+  <p><strong>What it is —</strong> a direct connection to your property in Google Search Console, so the <strong>Search Performance</strong> tab shows the numbers Google actually reports for your site rather than third-party estimates. <strong>Why it matters —</strong> it's the ground truth for how you're doing in search, and it powers the assistant's <em>striking-distance</em> and <em>top-movers</em> tools.</p>
+
+  <h3>How to connect Search Console</h3>
+  <ol>
+    <li>Open the site's dashboard → <strong>Search Performance</strong> tab → <strong>Connect Search Console</strong>.</li>
+    <li>You're sent to Google to grant read-only access (the <em>webmasters.readonly</em> scope). The sign-in and callback happen <strong>server-side</strong> — Google returns to the platform, not into the app — so the connection is handled securely and you land back on the Websites tab.</li>
+    <li>If your Google account has more than one property, <strong>pick the Search Console property</strong> that matches this site. The platform also tries to auto-match it to your domain.</li>
+    <li>It backfills the last 28 days immediately, then refreshes nightly. Use <strong>Sync</strong> to pull more history on demand, or <strong>Disconnect</strong> to stop (your historical rows are kept).</li>
+  </ol>
+  <div class="callout warn"><p><strong>Operator setup required.</strong> Search Console uses Google OAuth, so a platform operator must have configured the Google client credentials (under <em>Operations → Keys</em>). If they haven't, the <em>Connect</em> action tells you so instead of failing silently.</p></div>
+
+  <h3>What the Search Performance tab shows</h3>
+  <p>Once connected, the tab presents your last-28-day performance:</p>
+  <ul class="feat">
+    <li><strong>Four headline tiles</strong> — <strong>Clicks</strong>, <strong>Impressions</strong>, <strong>Average CTR</strong> and <strong>Average position</strong>.</li>
+    <li><strong>Clicks trend</strong> — a sparkline of daily clicks across the window.</li>
+    <li><strong>Devices</strong> — clicks split by device (mobile / desktop / tablet), each with its share.</li>
+    <li><strong>Breakdown</strong> — a table you can switch between <strong>Queries</strong>, <strong>Pages</strong>, <strong>Countries</strong> and <strong>Appearance</strong>, each row showing Clicks, Impressions, CTR and Position. Page rows link out to the live page.</li>
+  </ul>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/gsc.png" alt="The Search Performance (Google Search Console) tab">
+    <figcaption>Search Performance — Clicks / Impressions / Avg CTR / Avg position tiles and a clicks trend, with a Devices breakdown and a switchable Queries / Pages / Countries / Appearance table below. (Search Console reports with a 2–3 day lag.)</figcaption>
+  </figure>
+
+  <div class="callout"><p><strong>Reporting lag.</strong> Google Search Console data lands a couple of days behind, so the most recent 2–3 days may look sparse — that's Google's lag, not a sync problem.</p></div>
+
+  <h2>What it affects elsewhere</h2>
+  <ul class="feat">
+    <li>Your <strong>default</strong> connected site is what the <a href="seo-toolkit.html">SEO Toolkit</a> uses for internal-link suggestions when writing articles.</li>
+    <li>Articles, keyword research and tool runs the assistant produces are <strong>filed under the site</strong>, so they show up on this dashboard.</li>
+    <li>Connected <strong>Search Console</strong> data feeds the assistant's first-party GSC tools (striking-distance, top-movers).</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
