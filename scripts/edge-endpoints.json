@@ -1859,10 +1859,10 @@
     "response": "{success, url, storage_path, page_count}"
   },
   {
-    "name": "gsc-api",
-    "tag": "SEO",
-    "summary": "Google Search Console for connected websites (OAuth + performance sync)",
-    "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. Self-brokered OAuth: the frontend opens Google's consent screen, Google redirects back with ?code&state (HMAC-signed, bound to a website_id), and the frontend POSTs action=callback. Tokens live in website_gsc_connections (service-role only). verify_jwt is disabled so the cron path (x-cron-secret, action=cron-sync) works; every user action calls authenticate()+userCanAccessWorkspace() and returns 404 on ownership mismatch (#250 invariant 1).",
+    "name": "marketplace-price-check",
+    "tag": "Marketplace",
+    "summary": "Check a surplus-listing price against the Operator's market cap",
+    "description": "Resolves the market price for a product (via MIVAA's market-check engine — Perplexity/DataForSEO/Firecrawl) and returns whether a proposed surplus listing price is within the Operator cap (market_median × (1 + cap%), default 20%). Same guard create_marketplace_listing enforces server-side so the client can't forge it. authenticate() + userCanAccessWorkspace(); workspace must be an approved marketplace participant.",
     "security": [
       "supabaseJwt"
     ],
@@ -1870,9 +1870,31 @@
     "methods": [
       "POST"
     ],
+    "request": [
+      { "name": "workspace_id", "type": "string", "required": true },
+      { "name": "product_id", "type": "string", "required": false, "desc": "product_id OR product_name is required" },
+      { "name": "product_name", "type": "string", "required": false },
+      { "name": "price", "type": "number", "required": false, "desc": "Proposed listing price to test against the cap" }
+    ],
+    "response": "{ success, market_median, market_min, market_max, currency, cap_pct, max_allowed, allowed, unverified, from_cache }"
+  },
+  {
+    "name": "gsc-api",
+    "tag": "SEO",
+    "summary": "Google Search Console for connected websites (OAuth + performance sync)",
+    "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. OAuth is SERVER-SIDE: Google's redirect_uri points at THIS function (GET ?code&state); it exchanges the code and 302s back to /profile?tab=websites&gsc=<connected|pick_property|error>. This avoids the SPA's supabase-js (detectSessionInUrl+PKCE) intercepting Google's ?code= as a login code. `state` is an HMAC-signed {website_id,user_id,ts} minted at authorize-time after authenticate()+userCanAccessWorkspace(). Tokens live in website_gsc_connections (service-role only). verify_jwt disabled so the GET callback + cron (x-cron-secret, action=cron-sync) work.",
+    "security": [
+      "supabaseJwt",
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST",
+      "GET"
+    ],
     "actions": [
-      { "action": "authorize", "description": "Return the Google consent URL for a website (state binds the callback to it).", "params": [ { "name": "website_id", "type": "string", "required": true } ], "response": "{ ok, auth_url }" },
-      { "action": "callback", "description": "Exchange the OAuth code, store tokens, auto-match the GSC property to the site domain, and backfill 28 days.", "params": [ { "name": "website_id", "type": "string", "required": true }, { "name": "code", "type": "string", "required": true }, { "name": "state", "type": "string", "required": true } ], "response": "{ ok, connected, google_email, property, matched, initial_rows, available_properties? }" },
+      { "action": "GET ?code&state", "description": "Google's server-side redirect target. Verifies the signed state, exchanges the code, stores the connection, auto-matches the property + backfills 28 days, then 302s to the app. No JSON body.", "params": [], "response": "302 → /profile?tab=websites&gsc=connected|pick_property|error&website=<id>" },
+      { "action": "authorize", "description": "Return the Google consent URL for a website (signed state binds the server-side callback to this website + user).", "params": [ { "name": "website_id", "type": "string", "required": true } ], "response": "{ ok, auth_url }" },
       { "action": "list_properties", "description": "List the GSC properties the connected Google account can access.", "params": [ { "name": "website_id", "type": "string", "required": true } ], "response": "{ ok, properties: [{property, permission}] }" },
       { "action": "set_property", "description": "Bind a specific GSC property to the website when auto-match didn't.", "params": [ { "name": "website_id", "type": "string", "required": true }, { "name": "property", "type": "string", "required": true } ], "response": "{ ok, property }" },
       { "action": "sync", "description": "Pull the last N days of search-analytics now (default 28).", "params": [ { "name": "website_id", "type": "string", "required": true }, { "name": "days", "type": "number", "required": false } ], "response": "{ ok, rows, from, to }" },

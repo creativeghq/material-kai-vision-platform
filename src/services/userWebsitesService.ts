@@ -343,13 +343,6 @@ export const userWebsitesService = {
     return data.auth_url as string;
   },
 
-  async gscCallback(websiteId: string, code: string, state: string): Promise<any> {
-    const { data, error } = await supabase.functions.invoke('gsc-api', { body: { action: 'callback', website_id: websiteId, code, state } });
-    if (error) throw new Error(await edgeErrorMessage(error, 'Google connection failed'));
-    if (!data?.ok) throw new Error(data?.error || 'Google connection failed');
-    return data;
-  },
-
   async gscListProperties(websiteId: string): Promise<{ property: string; permission?: string }[]> {
     const { data, error } = await supabase.functions.invoke('gsc-api', { body: { action: 'list_properties', website_id: websiteId } });
     if (error) throw new Error(await edgeErrorMessage(error, 'Could not list properties'));

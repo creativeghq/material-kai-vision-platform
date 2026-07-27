@@ -5,17 +5,21 @@
  * public.website_gsc_connections (service-role only — never exposed to the browser);
  * daily search-analytics rows land in public.gsc_performance.
  *
- * Self-brokered OAuth (mirrors pinterest-api/handlers/oauth.ts): the frontend opens
- * Google's consent screen, Google redirects back to the app with ?code&state, and the
- * frontend POSTs {action:'callback', code, state} with the user's JWT. `state` is an
- * HMAC-signed {website_id, ts} so a callback is bound to a specific website and can't
- * be replayed — no server-side state row needed.
+ * OAuth is SERVER-SIDE by design. Google's redirect_uri points at THIS function
+ * (a GET), not the SPA — because the app's supabase-js client has
+ * `detectSessionInUrl` + PKCE on, and would otherwise intercept Google's `?code=`
+ * as a login code, fail, and bounce the user to the login screen. The function
+ * exchanges the code, stores the connection, then 302-redirects to the app with a
+ * clean `?gsc=connected` (no code param ever touches the SPA).
  *
- * Actions (user JWT): authorize · callback · list_properties · set_property · sync · disconnect
- * Action (x-cron-secret): cron-sync — nightly refresh of every active connection.
+ * Auth model: `state` is an HMAC-signed `{website_id, user_id, ts}` minted at
+ * authorize-time — AFTER authenticate()+userCanAccessWorkspace() proved the caller
+ * owns the website. The GET callback carries no JWT (it's a browser redirect from
+ * Google), so it trusts that signed, short-lived state; forgery needs the service key.
  *
- * verify_jwt is disabled at the gateway (see config.toml) so the cron path works; every
- * user action calls authenticate() + userCanAccessWorkspace() itself (invariant #1).
+ * Actions (user JWT, POST): authorize · list_properties · set_property · sync · disconnect
+ * Action (x-cron-secret, POST): cron-sync — nightly refresh of every active connection.
+ * GET ?code&state — Google's redirect target (server-side callback).
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -28,9 +32,10 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 // Lazy getters so the platform_secrets bootstrap (run at handler entry) is honored.
 const GOOGLE_CLIENT_ID = () => Deno.env.get('GOOGLE_CLIENT_ID') || '';
 const GOOGLE_CLIENT_SECRET = () => Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
-const GOOGLE_REDIRECT_URI = () =>
-  Deno.env.get('GOOGLE_OAUTH_REDIRECT_URI') ||
-  `${Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr'}/profile?tab=websites`;
+const APP_URL = () => (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
+// The redirect_uri sent to Google (and echoed at token-exchange) — this function itself.
+// Register THIS exact URL in the Google client. Override via GOOGLE_OAUTH_REDIRECT_URI only if needed.
+const GOOGLE_REDIRECT_URI = () => Deno.env.get('GOOGLE_OAUTH_REDIRECT_URI') || `${SUPABASE_URL}/functions/v1/gsc-api`;
 
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly openid email';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -43,52 +48,55 @@ const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
+/** 302 back to the app's Websites tab with a status flag (no OAuth code in the URL). */
+function redirectToApp(params: Record<string, string>): Response {
+  const u = new URL(`${APP_URL()}/profile`);
+  u.searchParams.set('tab', 'websites');
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+  return new Response(null, { status: 302, headers: { Location: u.toString() } });
+}
 
-// ── state signing (HMAC-SHA256 over "website_id.ts" with the service key) ──────────
+// ── state signing: HMAC-SHA256 over "website_id.user_id.ts" with the service key ──
 async function hmac(data: string): Promise<string> {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(SERVICE_KEY),
     { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
-async function signState(websiteId: string): Promise<string> {
-  const ts = String(Date.now());
-  const payload = `${websiteId}.${ts}`;
+async function signState(websiteId: string, userId: string): Promise<string> {
+  const payload = `${websiteId}.${userId}.${Date.now()}`;
   return `${payload}.${await hmac(payload)}`;
 }
-async function verifyState(state: string): Promise<string | null> {
+async function verifyState(state: string): Promise<{ websiteId: string; userId: string } | null> {
   const parts = (state || '').split('.');
-  if (parts.length !== 3) return null;
-  const [websiteId, ts, sig] = parts;
+  if (parts.length !== 4) return null;
+  const [websiteId, userId, ts, sig] = parts;
+  if (!websiteId || !userId || !ts) return null;
   if (Date.now() - Number(ts) > STATE_TTL_MS) return null;
-  const expected = await hmac(`${websiteId}.${ts}`);
-  // constant-time-ish compare
+  const expected = await hmac(`${websiteId}.${userId}.${ts}`);
   if (sig.length !== expected.length) return null;
   let diff = 0;
   for (let i = 0; i < sig.length; i++) diff |= sig.charCodeAt(i) ^ expected.charCodeAt(i);
-  return diff === 0 ? websiteId : null;
+  return diff === 0 ? { websiteId, userId } : null;
 }
 
 function domainOf(url: string): string {
   try { return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./i, ''); }
   catch { return String(url || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0] || ''; }
 }
-
-// Pick the GSC property that best matches a website domain.
 function matchProperty(sites: any[], domain: string): string | null {
   const urls: string[] = (sites || []).map((s) => s.siteUrl).filter(Boolean);
   const scDomain = `sc-domain:${domain}`;
   if (urls.includes(scDomain)) return scDomain;
-  const prefix = urls.find((u) => { try { return domainOf(u) === domain; } catch { return false; } });
-  return prefix || null;
+  return urls.find((u) => { try { return domainOf(u) === domain; } catch { return false; } }) || null;
 }
 
-// ── Google token helpers ───────────────────────────────────────────────────────────
+// ── Google token helpers ─────────────────────────────────────────────────────────
 async function exchangeCode(code: string): Promise<any> {
   const body = new URLSearchParams({
     code, client_id: GOOGLE_CLIENT_ID(), client_secret: GOOGLE_CLIENT_SECRET(),
@@ -97,19 +105,17 @@ async function exchangeCode(code: string): Promise<any> {
   const r = await fetch(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error_description || j.error || `token exchange ${r.status}`);
-  return j; // { access_token, refresh_token, expires_in, scope, token_type, id_token }
+  return j;
 }
 async function refreshToken(refresh: string): Promise<any> {
   const body = new URLSearchParams({
-    refresh_token: refresh, client_id: GOOGLE_CLIENT_ID(), client_secret: GOOGLE_CLIENT_SECRET(),
-    grant_type: 'refresh_token',
+    refresh_token: refresh, client_id: GOOGLE_CLIENT_ID(), client_secret: GOOGLE_CLIENT_SECRET(), grant_type: 'refresh_token',
   });
   const r = await fetch(TOKEN_URL, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error_description || j.error || `token refresh ${r.status}`);
-  return j; // { access_token, expires_in, scope }
+  return j;
 }
-/** Return a valid access token for a connection, refreshing (and persisting) if near expiry. */
 async function validAccessToken(supabase: any, conn: any): Promise<string> {
   const exp = conn.token_expires_at ? new Date(conn.token_expires_at).getTime() : 0;
   if (conn.access_token && exp - Date.now() > REFRESH_BUFFER_MS) return conn.access_token;
@@ -121,13 +127,13 @@ async function validAccessToken(supabase: any, conn: any): Promise<string> {
     .eq('website_id', conn.website_id);
   return t.access_token;
 }
-
 async function listSites(accessToken: string): Promise<any[]> {
   const r = await fetch(SITES_URL, { headers: { Authorization: `Bearer ${accessToken}` } });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error?.message || `sites list ${r.status}`);
   return j.siteEntry || [];
 }
+function ymd(d: Date): string { return d.toISOString().slice(0, 10); }
 
 /** Pull search-analytics rows for [startDate,endDate] and upsert into gsc_performance. */
 async function syncConnection(supabase: any, conn: any, startDate: string, endDate: string): Promise<number> {
@@ -150,24 +156,86 @@ async function syncConnection(supabase: any, conn: any, startDate: string, endDa
       ctr: row.ctr || 0, position: row.position || 0,
     };
   });
-  // Upsert in chunks (idempotent on the unique key).
   for (let i = 0; i < payload.length; i += 500) {
-    const chunk = payload.slice(i, i + 500);
-    const { error } = await supabase.from('gsc_performance').upsert(chunk, { onConflict: 'website_id,date,query,page' });
+    const { error } = await supabase.from('gsc_performance').upsert(payload.slice(i, i + 500), { onConflict: 'website_id,date,query,page' });
     if (error) throw new Error(error.message);
   }
   return payload.length;
 }
 
-function ymd(d: Date): string { return d.toISOString().slice(0, 10); }
+/** Exchange the code, store the connection, auto-match the property, and backfill 28 days.
+ *  Shared by the GET callback. Tenancy comes from the (already-verified) website row. */
+async function finishConnect(
+  supabase: any,
+  args: { websiteId: string; userId: string; workspaceId: string; websiteUrl: string; code: string },
+): Promise<{ property: string | null }> {
+  const tok = await exchangeCode(args.code);
+  if (!tok.refresh_token) {
+    throw new Error('Google did not return a refresh token. Remove the app under your Google Account → Security → Third-party access, then reconnect.');
+  }
+  let email = '';
+  try {
+    const ui = await fetch(USERINFO_URL, { headers: { Authorization: `Bearer ${tok.access_token}` } });
+    if (ui.ok) email = (await ui.json())?.email || '';
+  } catch { /* non-fatal */ }
+  const sites = await listSites(tok.access_token);
+  const property = matchProperty(sites, domainOf(args.websiteUrl));
+  const expiresAt = new Date(Date.now() + (Number(tok.expires_in || 3600) * 1000)).toISOString();
+
+  const { error: upErr } = await supabase.from('website_gsc_connections').upsert({
+    website_id: args.websiteId, workspace_id: args.workspaceId,
+    google_email: email || null, property,
+    access_token: tok.access_token, refresh_token: tok.refresh_token,
+    token_expires_at: expiresAt, scope: tok.scope || GOOGLE_SCOPE,
+    connected_by: args.userId, connected_at: new Date().toISOString(),
+    is_active: true, last_sync_error: null, updated_at: new Date().toISOString(),
+  }, { onConflict: 'website_id' });
+  if (upErr) throw new Error(upErr.message);
+
+  if (property) {
+    try {
+      const { data: fresh } = await supabase.from('website_gsc_connections')
+        .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at').eq('website_id', args.websiteId).single();
+      const end = ymd(new Date(Date.now() - 1 * 86400000));
+      const start = ymd(new Date(Date.now() - 28 * 86400000));
+      await syncConnection(supabase, fresh, start, end);
+      await supabase.from('website_gsc_connections').update({ last_sync_at: new Date().toISOString() }).eq('website_id', args.websiteId);
+    } catch (e) {
+      await supabase.from('website_gsc_connections').update({ last_sync_error: String(e instanceof Error ? e.message : e).slice(0, 500) }).eq('website_id', args.websiteId);
+    }
+  }
+  return { property };
+}
 
 // ── handler ──────────────────────────────────────────────────────────────────────
 Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   await bootstrapForFunction();
-
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+  // ── GET: Google's server-side OAuth redirect target ──
+  if (req.method === 'GET') {
+    const q = new URL(req.url).searchParams;
+    const err = q.get('error');
+    if (err) return redirectToApp({ gsc: 'error', msg: err.slice(0, 120) });
+    const code = q.get('code'); const state = q.get('state') || '';
+    if (!code) return redirectToApp({ gsc: 'error', msg: 'missing_code' });
+    const st = await verifyState(state);
+    if (!st) return redirectToApp({ gsc: 'error', msg: 'invalid_state' });
+    const { data: website } = await supabase.from('user_websites')
+      .select('id, workspace_id, url').eq('id', st.websiteId).maybeSingle();
+    if (!website) return redirectToApp({ gsc: 'error', msg: 'website_not_found' });
+    try {
+      const { property } = await finishConnect(supabase, {
+        websiteId: website.id, userId: st.userId, workspaceId: website.workspace_id, websiteUrl: website.url, code,
+      });
+      return redirectToApp({ gsc: property ? 'connected' : 'pick_property', website: website.id });
+    } catch (e) {
+      return redirectToApp({ gsc: 'error', website: website.id, msg: String(e instanceof Error ? e.message : e).slice(0, 160) });
+    }
+  }
+
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   let body: any = {};
   try { body = await req.json(); } catch { /* empty */ }
   const action = String(body?.action || '');
@@ -178,37 +246,31 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
     const { data: conns } = await supabase.from('website_gsc_connections')
       .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at')
       .eq('is_active', true).not('property', 'is', null).not('refresh_token', 'is', null);
-    const today = new Date();
-    const end = ymd(new Date(today.getTime() - 1 * 86400000));   // GSC finalizes with ~2d lag
-    const start = ymd(new Date(today.getTime() - 5 * 86400000)); // re-pull last 5d (idempotent)
+    const end = ymd(new Date(Date.now() - 1 * 86400000));
+    const start = ymd(new Date(Date.now() - 5 * 86400000));
     let ok = 0, failed = 0, rows = 0;
     for (const c of conns || []) {
       try {
         rows += await syncConnection(supabase, c, start, end);
-        await supabase.from('website_gsc_connections')
-          .update({ last_sync_at: new Date().toISOString(), last_sync_error: null }).eq('website_id', c.website_id);
+        await supabase.from('website_gsc_connections').update({ last_sync_at: new Date().toISOString(), last_sync_error: null }).eq('website_id', c.website_id);
         ok++;
       } catch (e) {
         failed++;
-        await supabase.from('website_gsc_connections')
-          .update({ last_sync_error: String(e instanceof Error ? e.message : e).slice(0, 500) }).eq('website_id', c.website_id);
+        await supabase.from('website_gsc_connections').update({ last_sync_error: String(e instanceof Error ? e.message : e).slice(0, 500) }).eq('website_id', c.website_id);
       }
     }
-    // Retention: GSC keeps ~16 months; we keep 180 days.
     await supabase.from('gsc_performance').delete().lt('date', ymd(new Date(Date.now() - 180 * 86400000)));
     return json({ ok: true, synced: ok, failed, rows });
   }
 
-  // ── All other actions require a user JWT ──
+  // ── User actions require a JWT ──
   const auth = await authenticate(req, { requireUser: true });
   if (!auth.success || !auth.userId) return json({ error: auth.error || 'Unauthorized' }, 401);
   const userId = auth.userId;
 
-  // Resolve website + reconcile workspace membership (service-role client bypasses RLS → manual check).
   const websiteId = String(body?.website_id || '');
   if (!websiteId) return json({ error: 'website_id required' }, 400);
-  const { data: website } = await supabase.from('user_websites')
-    .select('id, workspace_id, url').eq('id', websiteId).maybeSingle();
+  const { data: website } = await supabase.from('user_websites').select('id, workspace_id, url').eq('id', websiteId).maybeSingle();
   if (!website) return json({ error: 'Website not found' }, 404);
   if (!(await userCanAccessWorkspace(supabase, userId, website.workspace_id))) {
     return json({ error: 'Website not found' }, 404); // 404, not 403 — no id enumeration
@@ -218,7 +280,7 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
     switch (action) {
       case 'authorize': {
         if (!GOOGLE_CLIENT_ID()) return json({ error: 'Google OAuth is not configured. Add GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET under Operations → Keys.' }, 400);
-        const state = await signState(websiteId);
+        const state = await signState(websiteId, userId);
         const u = new URL(AUTH_URL);
         u.searchParams.set('client_id', GOOGLE_CLIENT_ID());
         u.searchParams.set('redirect_uri', GOOGLE_REDIRECT_URI());
@@ -226,61 +288,9 @@ Deno.serve(withApiLogging('gsc-api', async (req: Request) => {
         u.searchParams.set('scope', GOOGLE_SCOPE);
         u.searchParams.set('access_type', 'offline');
         u.searchParams.set('include_granted_scopes', 'true');
-        u.searchParams.set('prompt', 'consent'); // force refresh_token every time
+        u.searchParams.set('prompt', 'consent');
         u.searchParams.set('state', state);
         return json({ ok: true, auth_url: u.toString() });
-      }
-
-      case 'callback': {
-        const code = String(body?.code || '');
-        const state = String(body?.state || '');
-        if (!code) return json({ error: 'code required' }, 400);
-        const stateWebsite = await verifyState(state);
-        if (!stateWebsite || stateWebsite !== websiteId) return json({ error: 'Invalid or expired state' }, 400);
-
-        const tok = await exchangeCode(code);
-        if (!tok.refresh_token) {
-          return json({ error: 'Google did not return a refresh token. Remove the app under your Google Account → Security → Third-party access, then reconnect.' }, 400);
-        }
-        // Who authorized + which properties they have.
-        let email = '';
-        try {
-          const ui = await fetch(USERINFO_URL, { headers: { Authorization: `Bearer ${tok.access_token}` } });
-          if (ui.ok) email = (await ui.json())?.email || '';
-        } catch { /* non-fatal */ }
-        const sites = await listSites(tok.access_token);
-        const property = matchProperty(sites, domainOf(website.url));
-
-        const expiresAt = new Date(Date.now() + (Number(tok.expires_in || 3600) * 1000)).toISOString();
-        const { error: upErr } = await supabase.from('website_gsc_connections').upsert({
-          website_id: websiteId, workspace_id: website.workspace_id,
-          google_email: email || null, property,
-          access_token: tok.access_token, refresh_token: tok.refresh_token,
-          token_expires_at: expiresAt, scope: tok.scope || GOOGLE_SCOPE,
-          connected_by: userId, connected_at: new Date().toISOString(),
-          is_active: true, last_sync_error: null, updated_at: new Date().toISOString(),
-        }, { onConflict: 'website_id' });
-        if (upErr) return json({ error: upErr.message }, 400);
-
-        // If we matched a property, do an initial 28-day backfill right away.
-        let initialRows = 0;
-        if (property) {
-          try {
-            const { data: fresh } = await supabase.from('website_gsc_connections')
-              .select('website_id, workspace_id, property, access_token, refresh_token, token_expires_at').eq('website_id', websiteId).single();
-            const end = ymd(new Date(Date.now() - 1 * 86400000));
-            const start = ymd(new Date(Date.now() - 28 * 86400000));
-            initialRows = await syncConnection(supabase, fresh, start, end);
-            await supabase.from('website_gsc_connections').update({ last_sync_at: new Date().toISOString() }).eq('website_id', websiteId);
-          } catch (e) {
-            await supabase.from('website_gsc_connections').update({ last_sync_error: String(e instanceof Error ? e.message : e).slice(0, 500) }).eq('website_id', websiteId);
-          }
-        }
-        return json({
-          ok: true, connected: true, google_email: email, property,
-          matched: !!property, initial_rows: initialRows,
-          available_properties: property ? undefined : (sites || []).map((s) => s.siteUrl),
-        });
       }
 
       case 'list_properties': {
