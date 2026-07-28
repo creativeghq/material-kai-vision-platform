@@ -16,6 +16,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { warehouseService, type OperatorCatalogMatch } from '@/services/warehouseService';
 import {
   dealerProductsService, COMMON_FACET_KEYS, type CategoryField, type ManualImageRef,
 } from '@/services/dealerProductsService';
@@ -51,11 +52,29 @@ export const AddDealerProductDialog: React.FC<{
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
 
+  // "We already carry this" — the operator catalog is invisible to a dealer workspace (RLS
+  // is workspace-scoped), so without this check a dealer re-creates a product we already
+  // stock, with none of our identity, images or embeddings behind it.
+  const [dupes, setDupes] = useState<OperatorCatalogMatch[]>([]);
+  const [dupeDismissed, setDupeDismissed] = useState(false);
+  useEffect(() => {
+    if (!open || !activeWorkspaceId || dupeDismissed) { setDupes([]); return; }
+    const q = name.trim();
+    if (q.length < 3 && !sku.trim()) { setDupes([]); return; }
+    let live = true;
+    const t = setTimeout(async () => {
+      const res = await warehouseService.findOperatorCatalogMatches(activeWorkspaceId, q, { sku: sku.trim() || null });
+      if (live) setDupes(res);
+    }, 400);
+    return () => { live = false; clearTimeout(t); };
+  }, [open, activeWorkspaceId, name, sku, dupeDismissed]);
+
   useEffect(() => {
     if (open) {
       setName(''); setDescription(''); setCategory(''); setSupplyMode('platform_sold');
       setPrice(''); setCurrency('EUR'); setUnit(''); setDimensions(''); setSku('');
       setAttrs({}); setCategoryFields([]); setFacetOptions({}); setCustomKey(''); setFiles([]);
+      setDupes([]); setDupeDismissed(false);
     }
   }, [open]);
 
@@ -158,6 +177,35 @@ export const AddDealerProductDialog: React.FC<{
             <div className="space-y-1 col-span-2">
               <Label>Name *</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Calacatta Lux" />
+              {dupes.length > 0 && (
+                <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-medium">
+                      {dupes[0].hasCatalogAccess
+                        ? 'This is already in the catalog you sell from — add it from there instead of creating a copy.'
+                        : 'The operator already carries this product. Ask them for catalog access rather than creating a duplicate.'}
+                    </p>
+                    <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground"
+                      onClick={() => { setDupeDismissed(true); setDupes([]); }}>
+                      It&apos;s different
+                    </button>
+                  </div>
+                  {dupes.slice(0, 3).map((d) => (
+                    <div key={d.id} className="flex items-center gap-2">
+                      {d.image_url
+                        ? <img src={d.image_url} alt="" className="h-8 w-8 rounded object-cover" />
+                        : <span className="h-8 w-8 rounded bg-muted" />}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs">{d.name}</span>
+                        <span className="block truncate text-[10px] text-muted-foreground">
+                          {[d.sku, d.factoryName].filter(Boolean).join(' · ') || 'no SKU'}
+                          {d.score != null && ` · ${Math.round(d.score * 100)}% match`}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Category</Label>

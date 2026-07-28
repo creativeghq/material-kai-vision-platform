@@ -13,6 +13,15 @@ export interface CatalogMatch {
   score?: number | null;
 }
 
+/** A product the OPERATOR already carries that looks like the one being added. */
+export interface OperatorCatalogMatch extends CatalogMatch {
+  factoryName: string | null;
+  /** False when the caller's workspace is `own_products_only` — they can see the duplicate
+   *  but must be granted catalog access before they can sell ours. */
+  hasCatalogAccess: boolean;
+  operatorWorkspaceId: string | null;
+}
+
 export interface Warehouse {
   id: string;
   workspace_id: string;
@@ -366,6 +375,44 @@ export const warehouseService = {
     if (Object.keys(patch).length === 0) return;
     const { error } = await supabase.from('products').update(patch).eq('id', productId);
     if (error) throw error;
+  },
+
+  /**
+   * "We already carry this" — does the OPERATOR catalog already contain this product?
+   *
+   * A dealer workspace cannot read the operator's products (RLS is workspace-scoped), so
+   * without this a dealer adding an item we already stock silently creates a duplicate that
+   * shares none of our identity, images or embeddings. The RPC verifies membership before
+   * returning anything and reports whether the caller may actually sell the match.
+   *
+   * Returns [] for the operator itself (nothing above it) and on any failure — this is an
+   * advisory check, never a gate on creating a product.
+   */
+  async findOperatorCatalogMatches(
+    workspaceId: string,
+    query: string,
+    opts: { sku?: string | null; brand?: string | null; limit?: number } = {},
+  ): Promise<OperatorCatalogMatch[]> {
+    if (!workspaceId || (!query?.trim() && !opts.sku)) return [];
+    try {
+      const { data, error } = await supabase.rpc('find_operator_catalog_matches', {
+        p_workspace_id: workspaceId,
+        p_query: query ?? '',
+        p_sku: opts.sku ?? null,
+        p_brand: opts.brand ?? null,
+        p_limit: opts.limit ?? 8,
+      });
+      if (error) throw error;
+      return ((data ?? []) as any[]).map((r) => ({
+        id: r.product_id, name: r.name, sku: r.sku ?? null,
+        image_url: r.image_url ?? null, score: r.score != null ? Number(r.score) : null,
+        factoryName: r.factory_name ?? null,
+        hasCatalogAccess: !!r.has_catalog_access,
+        operatorWorkspaceId: r.operator_workspace ?? null,
+      }));
+    } catch {
+      return [];
+    }
   },
 
   /** Catalog candidates for matching a supplier line to an existing product. Searches name,
