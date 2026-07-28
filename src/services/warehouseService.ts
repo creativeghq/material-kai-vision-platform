@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { PRODUCT_IMAGE_SELECT, getProductImageUrl } from '@/utils/productMetadata';
+import { PRODUCT_IMAGE_SELECT, getProductImageUrl, getProductName } from '@/utils/productMetadata';
 import { mivaaApi } from '@/services/mivaaApiClient';
 
 /** A catalog product offered as the match for a supplier line. */
@@ -277,20 +277,24 @@ export const warehouseService = {
       });
       const results = (res?.success && (res.data as any)?.results) as any[] | undefined;
       if (!Array.isArray(results)) return [];
+      // Same result shape the material picker consumes: `id` is the product, images come as
+      // an `images[]` array (primary first), and the name may live in metadata.
       const seen = new Set<string>();
       const out: CatalogMatch[] = [];
       for (const r of results) {
-        // The multi-vector index is image-first: a hit may be an image that belongs to a
-        // product, or the product itself. Only image hits carrying a product are usable here.
-        const id = r.product_id ?? r.id;
+        const id = r?.id;
         if (!id || seen.has(id)) continue;
         seen.add(id);
+        const primary = Array.isArray(r.images)
+          ? (r.images.find((im: any) => im?.isPrimary) ?? r.images[0])
+          : null;
         out.push({
           id,
-          name: r.product_name ?? r.name ?? r.title ?? 'Untitled product',
+          name: getProductName(r),
           sku: r.sku ?? r.external_sku ?? null,
-          image_url: r.image_url ?? r.thumbnail_url ?? null,
-          score: typeof r.score === 'number' ? r.score : (typeof r.similarity === 'number' ? r.similarity : null),
+          image_url: primary?.url ?? getProductImageUrl(r) ?? null,
+          score: typeof r.similarity_score === 'number' ? r.similarity_score
+            : (typeof r.score === 'number' ? r.score : null),
         });
       }
       return out;
