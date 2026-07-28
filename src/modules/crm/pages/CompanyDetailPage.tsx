@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
   CustomerAccountOverview,
@@ -25,8 +25,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { financeService } from '@/modules/finance/services/financeService';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { validateVatViaVies } from '@/services/viesService';
-import { aadeService, type AadeLookupResult } from '@/modules/myaade';
-import { gemiService } from '@/services/gemiService';
+import { researchCompany, summarizeResearch } from '@/modules/crm/services/companyResearch';
 import { CompanyRegistryDetails, type KadEntry } from '@/modules/crm/components/CompanyRegistryDetails';
 import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
@@ -60,24 +59,6 @@ import {
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
-
-/** Merge one source's ΚΑΔ into an existing kad_all, preserving the other source (mirrors the
- *  server-side mergeKad in the enrich functions). Used for instant display on the client. */
-function mergeKadClient(
-  existing: any,
-  source: 'aade' | 'gemi',
-  items: Array<{ code: string | null; description: string | null; primary: boolean }>,
-): { kad_all: KadEntry[]; kad_codes: string[] } {
-  const kept: KadEntry[] = Array.isArray(existing) ? existing.filter((x: KadEntry) => x && x.source && x.source !== source) : [];
-  const fresh: KadEntry[] = items
-    .filter((a) => a.code && String(a.code).trim())
-    .map((a) => ({ code: String(a.code).trim(), description: a.description ?? null, source, primary: !!a.primary }));
-  const kad_all = [...kept, ...fresh];
-  const seen = new Set<string>();
-  const kad_codes: string[] = [];
-  for (const e of kad_all) { const k = e.code.toLowerCase(); if (!seen.has(k)) { seen.add(k); kad_codes.push(e.code); } }
-  return { kad_all, kad_codes };
-}
 
 interface Company {
   id: string;
@@ -172,6 +153,8 @@ export const CompanyDetailPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [viesBusy, setViesBusy] = useState(false);
   const [aadeBusy, setAadeBusy] = useState(false);
+  // Sub-phase label while the research chain runs ("Checking ΓΕΜΗ registry…").
+  const [researchStatus, setResearchStatus] = useState<string | null>(null);
   // Which top-level record tab is showing (activity-first record layout, 2026-07).
   // Companies open on Activity — the unified feed (notes/calls/meetings/tracked actions),
   // aligned with the contact record.
@@ -349,133 +332,74 @@ export const CompanyDetailPage: React.FC = () => {
   };
 
   /**
-   * Greek-only enrichment via ΑΑΔΕ RgWsPublic2. Manual button (operator controls when the
-   * TAXISnet notification fires). Prefills the form — including the structured myDATA-grade
-   * address (street + number) + ΚΑΔ + legal form — which then persists on Save. For an existing
-   * company we also pass companyId so the edge function caches the structured columns server-side.
+   * Full research pass for this company — ΑΑΔΕ (Greek registry) → ΓΕΜΗ (Γ.Ε.ΜΗ. number, legal
+   * form, status) → web/Apollo business research (website, phone, socials, industry). One shared
+   * routine ([[researchCompany]]) drives every surface that researches a party, so the Tax-tab
+   * buttons, the header refresh, Add Company and the Expenses inbox all produce the same result.
    *
-   * Counterparty lookup is legitimate here: we only enrich businesses we have a real relationship
-   * with (a CRM customer/supplier we will invoice or be invoiced by). reason='crm_enrichment'.
+   * Manual by design: the operator controls when the ΑΑΔΕ TAXISnet notification fires. Passing
+   * companyId lets the edge functions cache their raw payloads server-side; we mirror the patch
+   * into local state through patchInline so the form updates instantly.
+   *
+   * Counterparty lookup is legitimate here: we only research businesses we have a real
+   * relationship with (a CRM customer/supplier we invoice or are invoiced by).
+   *
+   * @param opts.silentSkip suppress the "needs a VAT number" error — used by the header refresh,
+   *   which falls back to name-only web research when there is no Greek ΑΦΜ.
    */
-  const lookupAade = async () => {
+  const runResearch = async (opts?: { silentSkip?: boolean }) => {
     if (!company) return;
     const rawAfm = (company.vat_number || '').replace(/[^0-9]/g, '');
-    if (rawAfm.length !== 9) {
+    const hasAfm = rawAfm.length === 9;
+    if (!hasAfm && !opts?.silentSkip) {
       toast({ title: 'Need a 9-digit VAT number', description: 'Type the Greek VAT number (9 digits) in the VAT field first.', variant: 'destructive' });
+      return;
+    }
+    if (!hasAfm && !company.name?.trim()) {
+      toast({ title: 'Nothing to research', description: 'Add a VAT number or a company name first.', variant: 'destructive' });
       return;
     }
     setAadeBusy(true);
     try {
-      const res = await aadeService.lookup({
-        afm: rawAfm,
+      const res = await researchCompany({
+        vatNumber: company.vat_number,
+        countryCode: company.country_code,
+        name: company.name,
+        countryName: company.country,
         companyId: isNew ? undefined : id,
-        reason: 'crm_enrichment',
         workspaceId: activeWorkspaceId ?? undefined,
+        reason: 'crm_enrichment',
+        existing: company as unknown as Record<string, unknown>,
+        onProgress: setResearchStatus,
       });
-      if ('error' in res && res.error) {
-        toast({ title: 'AADE lookup failed', description: (res.message || res.error), variant: 'destructive' });
-        return;
+      if (Object.keys(res.fields).length > 0) {
+        await patchInline(res.fields as Partial<Company>);
       }
-      if ('ok' in res && res.ok) {
-        adoptAadeAll(res);
-        toast({
-          title: res.source === 'cache' ? 'AADE data (cached)' : 'AADE data fetched',
-          description: res.basic_rec.onomasia ? `Imported ${res.basic_rec.onomasia} from ΑΑΔΕ.` : 'Business details imported from ΑΑΔΕ.',
-        });
+      const failed = res.steps.filter((s) => s.status === 'failed');
+      toast({
+        title: res.ok ? 'Company refreshed' : 'Nothing new found',
+        description: summarizeResearch(res.steps),
+        variant: res.ok ? undefined : (failed.length ? 'destructive' : undefined),
+      });
 
-        // ΓΕΜΗ enrichment: the GEMI number (ΑΑΔΕ doesn't return it) + legal form + status. The
-        // edge function caches gemi_* onto crm_companies server-side; here we mirror to local
-        // state for instant display. Best-effort — a ΓΕΜΗ miss never blocks the ΑΑΔΕ import.
-        try {
-          const g = await gemiService.lookup({
-            afm: rawAfm,
-            companyId: isNew ? undefined : id,
-            reason: 'crm_enrichment',
-            workspaceId: activeWorkspaceId ?? undefined,
-          });
-          if ('ok' in g && g.ok && g.gemi.ar_gemi) {
-            // Merge ΓΕΜΗ activities into the normalized ΚΑΔ list (preserving the ΑΑΔΕ entries
-            // adopted moments ago). Read from the freshest state via the functional setter.
-            setCompany((prev) => {
-              if (!prev) return prev;
-              const { kad_all, kad_codes } = mergeKadClient(
-                prev.kad_all,
-                'gemi',
-                (g.gemi.activities || []).map((a) => ({ code: a.code, description: a.description, primary: /κ[υύ]ρι/i.test(a.type ?? '') })),
-              );
-              return { ...prev, kad_all, kad_codes };
-            });
-            patchInline({
-              gemi_number: g.gemi.ar_gemi,
-              gemi_legal_form: g.gemi.legal_form,
-              gemi_status: g.gemi.status,
-              gemi_data: g.raw ?? null,
-              gemi_data_at: g.checked_at,
-            } as Partial<Company>);
-            toast({ title: 'ΓΕΜΗ number added', description: `Γ.Ε.ΜΗ.: ${g.gemi.ar_gemi}` });
-          }
-        } catch { /* GEMI is a best-effort add-on; ignore failures */ }
-
-        // Log a CRM activity so the enrichment shows up in the company timeline (fire-and-forget).
-        if (!isNew && id) {
-          crmActivitiesService.log({ kind: 'company', id }, {
-            activity_type: 'registry_enrichment',
-            title: 'Enriched from ΑΑΔΕ / ΓΕΜΗ',
-            description: `Imported registry details${res.basic_rec.onomasia ? ` for ${res.basic_rec.onomasia}` : ''}.`,
-            workspace_id: activeWorkspaceId ?? null,
-          }).then(bumpActivity);
-        }
+      // Log a CRM activity so the enrichment shows up in the company timeline (fire-and-forget).
+      if (res.ok && !isNew && id) {
+        const sources = res.steps.filter((s) => s.status === 'ok').map((s) => ({ aade: 'ΑΑΔΕ', gemi: 'ΓΕΜΗ', enrich: 'business research' } as const)[s.step]);
+        crmActivitiesService.log({ kind: 'company', id }, {
+          activity_type: 'registry_enrichment',
+          title: `Refreshed from ${sources.join(' + ')}`,
+          description: `Updated ${Object.keys(res.fields).length} field${Object.keys(res.fields).length === 1 ? '' : 's'}${res.resolvedName ? ` for ${res.resolvedName}` : ''}.`,
+          workspace_id: activeWorkspaceId ?? null,
+        }).then(bumpActivity);
       }
     } finally {
       setAadeBusy(false);
+      setResearchStatus(null);
     }
   };
 
-  /** Adopt every ΑΑΔΕ field. Self-saves via patchInline (persists for existing, local for new). */
-  const adoptAadeAll = (res: AadeLookupResult) => {
-    if (!company) return;
-    const r = res.basic_rec;
-    const primaryAct = res.activities.find((a) => a.kind === 1) ?? res.activities[0] ?? null;
-    const secondaryActs = res.activities.filter((a) => a.kind !== 1);
-    const combinedAddress = r.postal_address
-      ? `${r.postal_address} ${r.postal_address_no ?? ''}`.replace(/\s+/g, ' ').trim()
-      : null;
-    // Merge ΑΑΔΕ activities into the normalized ΚΑΔ list (preserving any ΓΕΜΗ entries).
-    const { kad_all, kad_codes } = mergeKadClient(
-      company.kad_all,
-      'aade',
-      res.activities.map((a) => ({ code: a.code, description: a.description, primary: a.kind === 1 })),
-    );
-    patchInline({
-      kad_all,
-      kad_codes,
-      name: r.onomasia ?? company.name,
-      street: r.postal_address ?? company.street,
-      street_number: r.postal_address_no ?? company.street_number,
-      address: combinedAddress ?? company.address,
-      postal_code: r.postal_zip_code ?? company.postal_code,
-      city: r.postal_area_description ?? company.city,
-      country: r.postal_area_description ? (company.country || 'Greece') : company.country,
-      country_code: company.country_code || 'EL',
-      tax_office: r.doy_descr ?? company.tax_office,
-      profession: primaryAct?.description ?? company.profession,
-      commercial_title: r.commer_title,
-      legal_status: r.legal_status_descr,
-      kad_primary: primaryAct?.code ?? null,
-      kad_primary_description: primaryAct?.description ?? null,
-      kad_secondary: secondaryActs.length > 0 ? secondaryActs : null,
-      business_start_date: r.regist_date ? (r.regist_date.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null,
-      aade_data: { basic_rec: r, activities: res.activities },
-      aade_data_at: res.checked_at,
-      vat_validated: r.deactivation_flag === '1' ? true : (r.deactivation_flag === '2' ? false : null),
-      vat_validated_at: res.checked_at,
-      vat_validated_name: r.onomasia,
-      vat_validated_address: combinedAddress
-        ? `${combinedAddress} ${r.postal_zip_code ?? ''} ${r.postal_area_description ?? ''}`.replace(/\s+/g, ' ').trim()
-        : company.vat_validated_address,
-      vat_validation_source: 'aade',
-    } as Partial<Company>);
-  };
+  /** Tax-tab buttons keep their old name / behaviour (VAT is required there). */
+  const lookupAade = () => runResearch();
 
   /**
    * Inline patch for fields that should save on change without entering the
@@ -662,12 +586,28 @@ export const CompanyDetailPage: React.FC = () => {
             Back to CRM
           </Button>
           {/* View-first: existing companies save per field inline. Only create needs Create/Cancel. */}
-          {isNew && (
+          {isNew ? (
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => navigate('/admin/crm')}>Cancel</Button>
               <Button onClick={handleSave} disabled={saving}>
                 <Save className="h-4 w-4 mr-2"/>
                 {saving ? 'Saving...' : 'Create Company'}
+              </Button>
+            </div>
+          ) : (
+            /* Refresh = re-run the whole research chain (ΑΑΔΕ → ΓΕΜΗ → business research) and
+               write what it finds straight onto this record. Registry data overwrites; web
+               research only fills blanks. */
+            <div className="flex items-center gap-2">
+              {researchStatus && <span className="text-xs text-muted-foreground">{researchStatus}</span>}
+              <Button
+                variant="outline"
+                onClick={() => runResearch({ silentSkip: true })}
+                disabled={aadeBusy}
+                title="Refresh from ΑΑΔΕ + ΓΕΜΗ registries and re-run business research (website, phone, socials)"
+              >
+                {aadeBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <RefreshCw className="h-4 w-4 mr-2"/>}
+                {aadeBusy ? 'Researching…' : 'Refresh research'}
               </Button>
             </div>
           )}

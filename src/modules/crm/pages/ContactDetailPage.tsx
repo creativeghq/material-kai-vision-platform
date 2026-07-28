@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Home, Sparkles } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Home, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { CustomerAccountOverview, CustomerTopItemsCard, PartyPaymentsCard } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -50,6 +50,7 @@ import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { PropertyBuyerPanel } from '@/modules/real-estate/components/PropertyBuyerPanel';
 import { scoreLead, leadScoreTint } from '@/modules/crm/services/leadScoring';
 import { financeService } from '@/modules/finance/services/financeService';
+import { researchCompany, summarizeResearch, greekAfm } from '@/modules/crm/services/companyResearch';
 import { flowEventService } from '@/services/flows/flowEventService';
 
 interface Contact {
@@ -174,6 +175,9 @@ export const ContactDetailPage: React.FC = () => {
   // item 5 — company chosen while creating a brand-new contact, attached right after create.
   const [pendingCompanyId, setPendingCompanyId] = useState<string>('');
   const [creatingBusiness, setCreatingBusiness] = useState(false);
+  // Business-research pass (ΑΑΔΕ → ΓΕΜΗ → web) driven from the header refresh button.
+  const [researchBusy, setResearchBusy] = useState(false);
+  const [researchStatus, setResearchStatus] = useState<string | null>(null);
   // Bump to force the Activity timeline to reload after we log a new activity.
   const [activityRefresh, setActivityRefresh] = useState(0);
   // Which top-level record tab is showing (activity-first record layout, 2026-07).
@@ -317,6 +321,92 @@ export const ContactDetailPage: React.FC = () => {
       toast({ title: `Lead scored ${s.lead_score}/100`, description: `${s.rationale ?? ''} · ${s.credits} credit(s)` });
     } catch (e) { toast({ title: 'Scoring failed', description: e instanceof Error ? e.message : 'Try again', variant: 'destructive' }); }
     finally { setScoringLead(false); }
+  };
+
+  /**
+   * Refresh this person's business data — the same ΑΑΔΕ → ΓΕΜΗ → web-research chain the company
+   * record uses ([[researchCompany]]), routed to whichever identity actually carries a business:
+   *
+   *   1. the contact's OWN Greek ΑΦΜ (sole trader / freelancer) → registries + web research,
+   *      written onto the contact (only the columns crm_contacts has — no ΚΑΔ/ΓΕΜΗ JSON);
+   *   2. otherwise the linked company → full research on the company record (that is where a
+   *      business's registry data belongs), then both records are reloaded;
+   *   3. otherwise the typed employer name → web research only, onto the contact.
+   *
+   * NOTE: a contact id is NEVER passed as companyId — the registry edge functions cache onto
+   * `crm_companies`, so handing them a contact id would write to the wrong table.
+   */
+  const runResearch = async () => {
+    if (!contact || isNew || !id) return;
+    const ownAfm = greekAfm(contact.vat_number, contact.country_code);
+    const linkedCompanyId: string | undefined = primaryCompany?.id;
+
+    if (!ownAfm && !linkedCompanyId && !(contact.company || '').trim()) {
+      toast({
+        title: 'Nothing to research',
+        description: 'Add a VAT number, attach a company, or type the employer name first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setResearchBusy(true);
+    try {
+      if (!ownAfm && linkedCompanyId) {
+        // The business identity lives on the company — research there, not here.
+        const res = await researchCompany({
+          vatNumber: primaryCompany?.vat_number,
+          countryCode: primaryCompany?.country_code,
+          name: primaryCompany?.name,
+          countryName: primaryCompany?.country,
+          companyId: linkedCompanyId,
+          workspaceId: activeWorkspaceId ?? undefined,
+          reason: 'crm_enrichment',
+          existing: primaryCompany as Record<string, unknown>,
+          onProgress: setResearchStatus,
+        });
+        if (Object.keys(res.fields).length > 0) {
+          await companiesAPI.updateCompany(linkedCompanyId, res.fields);
+          const fresh = await companiesAPI.getCompany(linkedCompanyId).catch(() => null);
+          if (fresh) setPrimaryCompany((fresh as any)?.data ?? fresh);
+        }
+        toast({
+          title: res.ok ? `Refreshed ${primaryCompany?.name ?? 'company'}` : 'Nothing new found',
+          description: summarizeResearch(res.steps),
+        });
+        if (res.ok) {
+          logActivity('registry_enrichment', 'Refreshed company research', `Updated ${primaryCompany?.name ?? 'the linked company'} from ΑΑΔΕ / ΓΕΜΗ / business research.`);
+        }
+        return;
+      }
+
+      // Own identity (sole trader with an ΑΦΜ, or a name-only web lookup).
+      const res = await researchCompany({
+        vatNumber: contact.vat_number,
+        countryCode: contact.country_code,
+        name: (contact.company || '').trim() || contact.name,
+        countryName: contact.country,
+        workspaceId: activeWorkspaceId ?? undefined,
+        reason: 'crm_enrichment',
+        target: 'contact',
+        existing: contact as unknown as Record<string, unknown>,
+        onProgress: setResearchStatus,
+      });
+      if (Object.keys(res.fields).length > 0) {
+        await patchInline(res.fields as Partial<Contact>);
+      }
+      toast({
+        title: res.ok ? 'Contact refreshed' : 'Nothing new found',
+        description: summarizeResearch(res.steps),
+      });
+      if (res.ok) {
+        const sources = res.steps.filter((s) => s.status === 'ok').map((s) => ({ aade: 'ΑΑΔΕ', gemi: 'ΓΕΜΗ', enrich: 'business research' } as const)[s.step]);
+        logActivity('registry_enrichment', `Refreshed from ${sources.join(' + ')}`, `Updated ${Object.keys(res.fields).length} field${Object.keys(res.fields).length === 1 ? '' : 's'}.`);
+      }
+    } finally {
+      setResearchBusy(false);
+      setResearchStatus(null);
+    }
   };
 
   const patchInline = async (updates: Partial<Contact>) => {
@@ -545,12 +635,29 @@ export const ContactDetailPage: React.FC = () => {
           </Button>
           {/* View-first: existing contacts save per field inline. Only the create
               flow needs an explicit Create/Cancel. */}
-          {isNew && (
+          {isNew ? (
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => navigate('/admin/crm')}>Cancel</Button>
               <Button onClick={handleSave} disabled={saving}>
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? 'Saving...' : 'Create Contact'}
+              </Button>
+            </div>
+          ) : (
+            /* Refresh = re-run the research chain. Own ΑΦΜ → registries onto this contact;
+               otherwise the linked company is refreshed (that is where a business identity lives). */
+            <div className="flex items-center gap-2">
+              {researchStatus && <span className="text-xs text-muted-foreground">{researchStatus}</span>}
+              <Button
+                variant="outline"
+                onClick={runResearch}
+                disabled={researchBusy}
+                title={primaryCompany?.id && !greekAfm(contact.vat_number, contact.country_code)
+                  ? `Refresh ${primaryCompany.name} from ΑΑΔΕ + ΓΕΜΗ and re-run business research`
+                  : 'Refresh from ΑΑΔΕ + ΓΕΜΗ registries and re-run business research (website, phone, socials)'}
+              >
+                {researchBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                {researchBusy ? 'Researching…' : 'Refresh research'}
               </Button>
             </div>
           )}

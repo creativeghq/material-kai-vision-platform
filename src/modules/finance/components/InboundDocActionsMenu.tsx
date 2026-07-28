@@ -2,10 +2,15 @@
  * #206/#207 — per-row 3-dots action menu for the Expenses (myDATA inbound) inbox. Folds the
  * loose row buttons (Create bill / Receive stock / Dismiss) into one menu and adds two
  * "turn this received document into platform data" actions:
- *   • Add issuer → CRM supplier (with optional ΑΑΔΕ enrichment when the issuer is Greek and
- *     myDATA returned only a VAT number / no name), deduped by VAT within the workspace.
+ *   • Add issuer → CRM supplier (with optional registry + business research when the issuer is
+ *     Greek and myDATA returned only a VAT number / no name), deduped by VAT within the workspace.
  *   • Add products → warehouse (reuses the existing ReceiveToWarehouseDialog via callback).
  * Mirrors the InvoiceActionsMenu pattern so it drops into the InboundTable row.
+ *
+ * The research chain (ΑΑΔΕ → ΓΕΜΗ → web/Apollo enrichment) is the shared
+ * [[researchCompany]] routine, so an issuer added here lands with the exact same data an
+ * operator would get from Add Company or the refresh button on the company record. It used
+ * to run ΑΑΔΕ only, which is why inbox-created issuers had no Γ.Ε.ΜΗ. number or website.
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +26,7 @@ import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { companiesAPI } from '@/services/crm.service';
-import { aadeService, type AadeLookupResult } from '@/modules/myaade';
+import { researchCompany, greekAfm, summarizeResearch } from '@/modules/crm/services/companyResearch';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
 import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
 
@@ -35,45 +40,8 @@ interface Props {
   onChanged?: () => void;
 }
 
-/** A bare 9-digit number is a Greek ΑΦΜ — only those are resolvable via the ΑΑΔΕ registry. */
-const isGreekVat = (vat: string | null | undefined) => !!vat && /^\d{9}$/.test(vat.trim());
-
-/** Map an ΑΑΔΕ lookup onto crm_companies columns (mirrors CompanyDetailPage.adoptAadeAll) so
- *  a brand-new supplier persists every registry field in a single insert. */
-function aadeToCompanyFields(res: AadeLookupResult): Record<string, unknown> {
-  const r = res.basic_rec;
-  const primary = res.activities.find((a) => a.kind === 1) ?? res.activities[0] ?? null;
-  const secondary = res.activities.filter((a) => a.kind !== 1);
-  const combinedAddress = r.postal_address
-    ? `${r.postal_address} ${r.postal_address_no ?? ''}`.replace(/\s+/g, ' ').trim()
-    : null;
-  const out: Record<string, unknown> = {
-    street: r.postal_address ?? undefined,
-    street_number: r.postal_address_no ?? undefined,
-    address: combinedAddress ?? undefined,
-    postal_code: r.postal_zip_code ?? undefined,
-    city: r.postal_area_description ?? undefined,
-    country: r.postal_area_description ? 'Greece' : undefined,
-    country_code: 'EL',
-    tax_office: r.doy_descr ?? undefined,
-    profession: primary?.description ?? undefined,
-    commercial_title: r.commer_title ?? undefined,
-    legal_status: r.legal_status_descr ?? undefined,
-    kad_primary: primary?.code ?? undefined,
-    kad_primary_description: primary?.description ?? undefined,
-    kad_secondary: secondary.length > 0 ? secondary : undefined,
-    business_start_date: r.regist_date ? (r.regist_date.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? undefined) : undefined,
-    aade_data: { basic_rec: r, activities: res.activities },
-    aade_data_at: res.checked_at,
-    vat_validated: true,
-    vat_validated_at: res.checked_at,
-    vat_validated_name: r.onomasia ?? undefined,
-    vat_validated_address: combinedAddress ?? undefined,
-    vat_validation_source: 'aade',
-  };
-  // Drop undefined so we never overwrite a typed value with a blank.
-  return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined));
-}
+/** A bare 9-digit number is a Greek ΑΦΜ — only those are resolvable via the ΑΑΔΕ / ΓΕΜΗ registries. */
+const isGreekVat = (vat: string | null | undefined) => !!greekAfm(vat);
 
 export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, onCreateBill, onReceiveStock, onDismiss, onChanged }) => {
   const { toast } = useToast();
@@ -90,14 +58,18 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   // ---- Add issuer → CRM supplier dialog ----
   const [crmOpen, setCrmOpen] = useState(false);
   const [name, setName] = useState(doc.issuer_name ?? '');
-  const [enrich, setEnrich] = useState(isGreekVat(doc.issuer_vat));
+  // Research is on by default whenever there is something to research — a Greek ΑΦΜ (registries)
+  // or at least a name (web research).
+  const [enrich, setEnrich] = useState(isGreekVat(doc.issuer_vat) || !!doc.issuer_name?.trim());
   const [saving, setSaving] = useState(false);
   const [existing, setExisting] = useState<{ id: string; name: string | null } | null>(null);
   const [checking, setChecking] = useState(false);
+  // Sub-phase label while the research chain runs ("Checking ΓΕΜΗ registry…").
+  const [statusLine, setStatusLine] = useState<string | null>(null);
 
   const openCrm = async () => {
     setName(doc.issuer_name ?? '');
-    setEnrich(isGreekVat(doc.issuer_vat));
+    setEnrich(isGreekVat(doc.issuer_vat) || !!doc.issuer_name?.trim());
     setExisting(null);
     setCrmOpen(true);
     // Dedupe: is a supplier with this VAT already in the workspace? RLS scopes the read.
@@ -121,9 +93,10 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   const saveCrm = async () => {
     const vat = doc.issuer_vat?.trim() || undefined;
     const typedName = name.trim();
-    const doEnrich = enrich && isGreekVat(vat);
-    if (!typedName && !doEnrich) {
-      toast({ title: 'Name required', description: 'Enter a supplier name, or enable ΑΑΔΕ enrichment to fetch it.', variant: 'destructive' });
+    // Research needs *something* to work from: a Greek ΑΦΜ (registries) or a name (web research).
+    const doResearch = enrich && !!(isGreekVat(vat) || typedName);
+    if (!typedName && !isGreekVat(vat)) {
+      toast({ title: 'Name required', description: 'Enter a supplier name — this issuer has no Greek ΑΦΜ to look up.', variant: 'destructive' });
       return;
     }
     setSaving(true);
@@ -134,24 +107,35 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
         is_supplier: true,
         workspace_id: workspaceId,
       };
-      if (doEnrich) {
-        const res = await aadeService.lookup({ afm: vat!, reason: 'invoice_counterparty', workspaceId });
-        if ('ok' in res && res.ok) {
-          payload = { ...payload, ...aadeToCompanyFields(res), name: typedName || res.basic_rec.onomasia || vat };
-        } else {
-          // Enrichment failed — still create the bare supplier rather than losing the action.
-          toast({ title: 'ΑΑΔΕ lookup failed — added without enrichment', description: (res as any).message ?? (res as any).error, variant: 'destructive' });
+      if (doResearch) {
+        // Full chain: ΑΑΔΕ → ΓΕΜΗ → web/Apollo. No companyId yet (the row doesn't exist), so
+        // everything comes back as fields and lands in the single insert below.
+        const res = await researchCompany({
+          vatNumber: vat,
+          name: typedName || undefined,
+          workspaceId,
+          reason: 'invoice_counterparty',
+          existing: { name: typedName || undefined },
+          onProgress: setStatusLine,
+        });
+        payload = { ...payload, ...res.fields, name: typedName || res.resolvedName || vat };
+        if (!res.ok) {
+          // Research came back empty — still create the bare supplier rather than losing the action.
+          toast({ title: 'Research found nothing — added without enrichment', description: summarizeResearch(res.steps) });
         }
       }
       if (!payload.name) { toast({ title: 'Name required', variant: 'destructive' }); setSaving(false); return; }
       const { data } = await companiesAPI.createCompany(payload);
-      toast({ title: 'Supplier added to CRM', description: doEnrich ? 'Enriched from the ΑΑΔΕ registry.' : undefined });
+      toast({
+        title: 'Supplier added to CRM',
+        description: doResearch ? 'Enriched from ΑΑΔΕ / ΓΕΜΗ + business research.' : undefined,
+      });
       setCrmOpen(false);
       onChanged?.();
       if (data?.id) navigate(`/crm/companies/${data.id}`);
     } catch (err: any) {
       toast({ title: 'Failed to add supplier', description: err?.message, variant: 'destructive' });
-    } finally { setSaving(false); }
+    } finally { setSaving(false); setStatusLine(null); }
   };
 
   return (
@@ -212,14 +196,22 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
                 <Label className="text-xs">VAT number</Label>
                 <Input value={doc.issuer_vat ?? ''} disabled className="font-mono text-xs" />
               </div>
-              {isGreekVat(doc.issuer_vat) && (
-                <label className="flex items-start gap-2 cursor-pointer rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
-                  <input type="checkbox" className="mt-0.5 h-3.5 w-3.5 rounded" checked={enrich} onChange={(e) => setEnrich(e.target.checked)} />
-                  <span>
-                    <span className="flex items-center gap-1 font-medium"><Sparkles className="h-3 w-3" /> Enrich from ΑΑΔΕ registry</span>
-                    <span className="text-muted-foreground">Fills name, address, tax office &amp; ΚΑΔ from the issuer's ΑΦΜ. Writes an audit entry to their TAXISnet inbox (ΑΑΔΕ policy).</span>
+              <label className="flex items-start gap-2 cursor-pointer rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
+                <input type="checkbox" className="mt-0.5 h-3.5 w-3.5 rounded" checked={enrich} onChange={(e) => setEnrich(e.target.checked)} />
+                <span>
+                  <span className="flex items-center gap-1 font-medium">
+                    <Sparkles className="h-3 w-3" />
+                    {isGreekVat(doc.issuer_vat) ? 'Research: ΑΑΔΕ + ΓΕΜΗ + business info' : 'Research business info'}
                   </span>
-                </label>
+                  <span className="text-muted-foreground">
+                    {isGreekVat(doc.issuer_vat)
+                      ? "Fills name, address, tax office & ΚΑΔ from ΑΑΔΕ, the Γ.Ε.ΜΗ. number from ΓΕΜΗ, and website / phone / socials from the web. The ΑΑΔΕ call writes an audit entry to the issuer's TAXISnet inbox (ΑΑΔΕ policy)."
+                      : 'Looks up website, phone, socials and industry from the web. No Greek ΑΦΜ, so the ΑΑΔΕ / ΓΕΜΗ registries are skipped.'}
+                  </span>
+                </span>
+              </label>
+              {statusLine && (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />{statusLine}</p>
               )}
             </div>
           )}

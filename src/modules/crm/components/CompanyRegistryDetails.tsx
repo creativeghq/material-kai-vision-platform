@@ -16,7 +16,9 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { companiesAPI } from '@/services/crm.service';
 
-export interface KadEntry { code: string; description?: string | null; source?: 'aade' | 'gemi'; primary?: boolean }
+// Canonical shape lives with the research routine that produces it.
+export type { KadEntry } from '@/modules/crm/services/companyResearch';
+import type { KadEntry } from '@/modules/crm/services/companyResearch';
 interface GemiPerson { personName?: string | null; businessName?: string | null; role?: string | null; percentage?: string | null; category?: string | null }
 
 const SourceBadge: React.FC<{ source?: string }> = ({ source }) =>
