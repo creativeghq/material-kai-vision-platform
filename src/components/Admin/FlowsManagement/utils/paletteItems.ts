@@ -334,6 +334,15 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'job_alert_triggered', group: 'Monitoring',
     label: 'Job Alert', description: 'The job-research dispatcher fired a digest/burst alert', icon: 'Briefcase', color: 'blue',
     defaultData: { label: 'Job Alert', category: 'trigger', triggerType: 'job_alert_triggered', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'seo.ranking_movement', group: 'Monitoring',
+    label: 'SEO Rankings Moved', description: 'A connected website\'s ranking keywords / organic traffic moved materially week-over-week', icon: 'Search', color: 'blue',
+    defaultData: { label: 'SEO Rankings Moved', category: 'trigger', triggerType: 'seo.ranking_movement', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'seo.backlink_movement', group: 'Monitoring',
+    label: 'SEO Backlinks Moved', description: 'A connected website\'s referring domains / backlinks moved materially week-over-week', icon: 'Search', color: 'blue',
+    defaultData: { label: 'SEO Backlinks Moved', category: 'trigger', triggerType: 'seo.backlink_movement', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'seo.site_health_changed', group: 'Monitoring',
+    label: 'SEO Site Health Changed', description: 'A connected website\'s on-page health score regressed (or recovered) week-over-week', icon: 'Search', color: 'blue',
+    defaultData: { label: 'SEO Site Health Changed', category: 'trigger', triggerType: 'seo.site_health_changed', config: {} } as TriggerNodeData },
 
   // #237 Phase 4.4 — upstream line-level RFQ between networked workspaces
   { type: 'triggerNode', category: 'trigger', subType: 'rfq_lines_requested', group: 'Quotes',

@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -94,8 +95,35 @@ async function auditWebsite(supabase: any, website: { id: string; workspace_id: 
       onpage: { onpage_score: ip.onpage_score ?? null, meta: ip.meta ?? null, page_timing: ip.page_timing ?? null, checks },
       issues, error: null,
     };
+    // Previous on-page score (for the week-over-week change alert) — read BEFORE insert.
+    const { data: prevRows } = await supabase.from('website_health_audits')
+      .select('seo_score, created_at').eq('website_id', website.id).eq('status', 'ok')
+      .order('created_at', { ascending: false }).limit(1);
+    const prevScore: number | null = prevRows?.[0]?.seo_score ?? null;
+
     const { error } = await supabase.from('website_health_audits').insert(row);
     if (error) throw new Error(error.message);
+
+    // Alert on a material on-page score change (regressed ≥10 pts, or recovered ≥15 pts).
+    try {
+      const cur = row.seo_score;
+      if (prevScore != null && cur != null) {
+        const delta = cur - prevScore;
+        const regressed = delta <= -10, recovered = delta >= 15;
+        if (regressed || recovered) {
+          const domain = homepage.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+          await emitFlowEventToWorkspaceRoles(website.workspace_id, ['owner', 'admin'], 'seo.site_health_changed', (uid) => ({
+            user_id: uid, workspace_id: website.workspace_id,
+            title: `Site health ${regressed ? 'dropped' : 'recovered'} for ${domain}`,
+            body: `On-page SEO score ${regressed ? 'fell' : 'rose'} from ${prevScore} to ${cur} since the last audit.`,
+            action_url: '/profile?tab=websites', type: regressed ? 'warning' : 'success',
+            website_id: website.id, domain, direction: regressed ? 'regressed' : 'recovered',
+            previous_score: prevScore, current_score: cur,
+          }));
+        }
+      }
+    } catch (e) { console.warn('[seo-site-audit] health alert failed:', e instanceof Error ? e.message : e); }
+
     return { ok: true, ...row, lighthouse: undefined, onpage: undefined };
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e).slice(0, 500);

@@ -113,6 +113,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   upstream_order_created: ShoppingCart,
   'realestate.buyer_matches_found': Home,
   'realestate.new_listing_for_buyer': Home,
+  'seo.ranking_movement': Search,
+  'seo.backlink_movement': Search,
+  'seo.site_health_changed': Search,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

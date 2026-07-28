@@ -266,6 +266,31 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'sales_order_id', label: 'Sales order ID', note: 'The mirrored sales order created in the supplier workspace.' },
     { key: 'purchase_order_id', label: 'Purchase order ID', note: 'The reseller-side purchase order paired to the sales order.' },
   ]),
+  'seo.ranking_movement': withStandard([
+    { key: 'website_id', label: 'Website ID', note: 'The connected website whose rankings moved.' },
+    { key: 'domain', label: 'Domain', note: 'The website domain.', example: 'flobali.gr' },
+    { key: 'metric', label: 'Metric', note: 'Which metric moved.', example: 'ranking_keywords' },
+    { key: 'direction', label: 'Direction', note: 'up or down.', example: 'down' },
+    { key: 'previous', label: 'Previous value', note: 'Value at the prior snapshot.' },
+    { key: 'current', label: 'Current value', note: 'Value at this snapshot.' },
+    { key: 'delta_pct', label: 'Change %', note: 'Percentage change week-over-week.' },
+  ]),
+  'seo.backlink_movement': withStandard([
+    { key: 'website_id', label: 'Website ID', note: 'The connected website whose backlinks moved.' },
+    { key: 'domain', label: 'Domain', note: 'The website domain.', example: 'flobali.gr' },
+    { key: 'metric', label: 'Metric', note: 'referring_domains or backlinks.', example: 'referring_domains' },
+    { key: 'direction', label: 'Direction', note: 'up or down.' },
+    { key: 'previous', label: 'Previous value', note: 'Value at the prior snapshot.' },
+    { key: 'current', label: 'Current value', note: 'Value at this snapshot.' },
+    { key: 'delta_pct', label: 'Change %', note: 'Percentage change week-over-week.' },
+  ]),
+  'seo.site_health_changed': withStandard([
+    { key: 'website_id', label: 'Website ID', note: 'The connected website audited.' },
+    { key: 'domain', label: 'Domain', note: 'The website domain.', example: 'flobali.gr' },
+    { key: 'direction', label: 'Direction', note: 'regressed or recovered.', example: 'regressed' },
+    { key: 'previous_score', label: 'Previous score', note: 'On-page score at the prior audit.' },
+    { key: 'current_score', label: 'Current score', note: 'On-page score at this audit.' },
+  ]),
 };
 
 /** The standard envelope every notification/email event carries. */
@@ -323,6 +348,9 @@ export const TRIGGER_TITLES: Record<string, string> = {
   project_invitation_resent: 'Project invite resent',
   webhook: 'Webhook (external)',
   scheduled: 'Scheduled (cron)',
+  'seo.ranking_movement': 'SEO Rankings Moved',
+  'seo.backlink_movement': 'SEO Backlinks Moved',
+  'seo.site_health_changed': 'SEO Site Health Changed',
 };
 
 /**

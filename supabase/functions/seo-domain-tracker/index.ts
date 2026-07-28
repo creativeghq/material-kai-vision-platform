@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -88,6 +89,41 @@ async function dfs(kind: string, params: Record<string, unknown>): Promise<any[]
 const n = (v: any): number | null => (typeof v === 'number' ? v : null);
 const sum = (...v: any[]) => v.reduce((s, x) => s + (typeof x === 'number' ? x : 0), 0);
 
+/**
+ * Emit a workspace-scoped movement alert if a metric moved materially week-over-week.
+ * "Material" = abs change ≥ floor AND ≥ pctThreshold of the previous value (both, so
+ * tiny sites don't spam and % noise on small bases is ignored). Fans out to the site's
+ * workspace owners/admins via the Flows engine (one event per member, each with user_id).
+ */
+async function maybeAlert(
+  website: { id: string; workspace_id: string },
+  domain: string,
+  eventType: string,
+  metric: string,
+  metricLabel: string,
+  prev: number | null,
+  cur: number | null,
+  floor: number,
+  pctThreshold: number,
+): Promise<void> {
+  if (prev == null || cur == null) return;
+  const delta = cur - prev;
+  const absDelta = Math.abs(delta);
+  if (absDelta < floor || absDelta < Math.abs(prev) * pctThreshold) return;
+  const direction = delta < 0 ? 'down' : 'up';
+  const deltaPct = prev ? Math.round((delta / prev) * 100) : null;
+  const verb = direction === 'down' ? 'dropped' : 'rose';
+  const Cap = metricLabel.charAt(0).toUpperCase() + metricLabel.slice(1);
+  await emitFlowEventToWorkspaceRoles(website.workspace_id, ['owner', 'admin'], eventType, (uid) => ({
+    user_id: uid, workspace_id: website.workspace_id,
+    title: `${Cap} ${verb} for ${domain}`,
+    body: `${Cap} ${verb} ${Math.abs(deltaPct ?? 0)}% (${prev.toLocaleString()} → ${cur.toLocaleString()}) week-over-week.`,
+    action_url: '/profile?tab=websites',
+    type: direction === 'down' ? 'warning' : 'success',
+    website_id: website.id, domain, metric, direction, previous: prev, current: cur, delta_pct: deltaPct,
+  }));
+}
+
 async function trackWebsite(supabase: any, website: { id: string; workspace_id: string; url: string }): Promise<{ ok: boolean; error?: string }> {
   const domain = domainOf(website.url);
   const { country, language } = await resolveMarket(supabase, website.id, domain);
@@ -127,6 +163,21 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
     }).filter((k: any) => k.keyword);
     await supabase.from('seo_domain_keywords').delete().eq('website_id', website.id);
     if (kws.length) await supabase.from('seo_domain_keywords').insert(kws);
+
+    // Week-over-week movement alerts (Flows, workspace-scoped). Best-effort.
+    try {
+      const { data: prevRows } = await supabase.from('seo_domain_snapshots')
+        .select('ranking_keywords, referring_domains, captured_at')
+        .eq('website_id', website.id).lt('captured_at', snapshot.captured_at)
+        .order('captured_at', { ascending: false }).limit(1);
+      const prev = prevRows?.[0];
+      if (prev) {
+        await maybeAlert(website, domain, 'seo.ranking_movement', 'ranking_keywords', 'ranking keywords',
+          prev.ranking_keywords, snapshot.ranking_keywords, 10, 0.20);
+        await maybeAlert(website, domain, 'seo.backlink_movement', 'referring_domains', 'referring domains',
+          prev.referring_domains, snapshot.referring_domains, 5, 0.15);
+      }
+    } catch (e) { console.warn('[seo-domain-tracker] alert check failed:', e instanceof Error ? e.message : e); }
 
     return { ok: true };
   } catch (e) {

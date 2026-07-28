@@ -132,13 +132,21 @@ export type TriggerType =
   // SALES order + draft invoice in the supplier/operator workspace (notify the supplier admins)
   | 'upstream_order_created'
   | 'realestate.buyer_matches_found'
-  | 'realestate.new_listing_for_buyer';
+  | 'realestate.new_listing_for_buyer'
+  // SEO movement alerts — detected week-over-week by the seo-domain-tracker / seo-site-audit
+  // crons and fanned out to the site's workspace members (payload-only, server-only events)
+  | 'seo.ranking_movement'
+  | 'seo.backlink_movement'
+  | 'seo.site_health_changed';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
 export interface HrLateCheckinTriggerConfig {}
 export interface RealestateBuyerMatchesFoundTriggerConfig {}
 export interface RealestateNewListingForBuyerTriggerConfig {}
+export interface SeoRankingMovementTriggerConfig {}
+export interface SeoBacklinkMovementTriggerConfig {}
+export interface SeoSiteHealthChangedTriggerConfig {}
 export interface HrApplicantStageChangedTriggerConfig {}
 export interface HrEmployeeAddedTriggerConfig {}
 export interface HrAbsenceRequestedTriggerConfig {}
@@ -387,6 +395,9 @@ export type TriggerConfigMap = {
   upstream_order_created: UpstreamOrderCreatedTriggerConfig;
   'realestate.buyer_matches_found': RealestateBuyerMatchesFoundTriggerConfig;
   'realestate.new_listing_for_buyer': RealestateNewListingForBuyerTriggerConfig;
+  'seo.ranking_movement': SeoRankingMovementTriggerConfig;
+  'seo.backlink_movement': SeoBacklinkMovementTriggerConfig;
+  'seo.site_health_changed': SeoSiteHealthChangedTriggerConfig;
 };
 
 // =====================================================

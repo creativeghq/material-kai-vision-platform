@@ -184,6 +184,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   upstream_order_created: ShoppingCart,
   'realestate.buyer_matches_found': Home,
   'realestate.new_listing_for_buyer': Home,
+  'seo.ranking_movement': Search,
+  'seo.backlink_movement': Search,
+  'seo.site_health_changed': Search,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -285,6 +288,9 @@ const triggerLabels: Record<TriggerType, string> = {
   upstream_order_created: 'Reseller Order Created (supplier)',
   'realestate.buyer_matches_found': 'Buyer Matches Found',
   'realestate.new_listing_for_buyer': 'New Listing for Buyer',
+  'seo.ranking_movement': 'SEO Rankings Moved',
+  'seo.backlink_movement': 'SEO Backlinks Moved',
+  'seo.site_health_changed': 'SEO Site Health Changed',
 };
 
 const statusColors: Record<FlowStatus, string> = {
