@@ -92,7 +92,3 @@ export function unitSuffix(raw: string | null | undefined): string {
   const k = normalizeUnit(raw);
   return k === 'm2' ? 'm²' : k === 'm3' ? 'm³' : k;
 }
-
-export function isAreaUnit(raw: string | null | undefined): boolean {
-  return !!unitDef(raw)?.isArea;
-}

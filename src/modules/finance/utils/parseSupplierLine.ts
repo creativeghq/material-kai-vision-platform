@@ -13,9 +13,9 @@
  * `confidence` drives whether it is applied silently or flagged for a look.
  */
 
-export type LengthUnit = 'mm' | 'cm';
+type LengthUnit = 'mm' | 'cm';
 
-export interface ParsedDimensions {
+interface ParsedDimensions {
   width_mm: number | null;
   length_mm: number | null;
   thickness_mm: number | null;
@@ -139,7 +139,7 @@ function inferLengthUnit(values: number[], explicit: string | undefined): Length
 const toMm = (v: number | null, unit: LengthUnit): number | null =>
   v == null ? null : Math.round((unit === 'cm' ? v * 10 : v) * 100) / 100;
 
-export function parseDimensions(text: string): ParsedDimensions {
+function parseDimensions(text: string): ParsedDimensions {
   const empty: ParsedDimensions = {
     width_mm: null, length_mm: null, thickness_mm: null, source_unit: 'cm', label: null, matched: null,
   };

@@ -52,7 +52,6 @@ export interface WarehouseItem {
   manufacturer: string | null;
   supplier_product_code: string | null;
   image_urls: string[];
-  notes: string | null;
   is_active: boolean;
 }
 
@@ -69,7 +68,6 @@ export interface WarehouseItemPhysicalFields {
   manufacturer?: string | null;
   supplier_product_code?: string | null;
   image_urls?: string[];
-  notes?: string | null;
   is_active?: boolean;
 }
 
@@ -104,8 +102,6 @@ export interface ProductFiscalFields {
   measurement_unit_code?: number | null;
   /** Sale-side AADE VAT category (1 = 24%, 2 = 13%, 3 = 6%, …). */
   mydata_vat_category?: number | null;
-  /** Purchase-side VAT category — differs on imports / reverse charge. */
-  mydata_purchase_vat_category?: number | null;
   /** Wholesale income classification (χονδρική). */
   mydata_income_classification_category?: string | null;
   mydata_income_classification_type?: string | null;
@@ -125,7 +121,7 @@ export interface ProductFiscalFields {
 /** The one place the fiscal column list is written down, shared by create and update. */
 const FISCAL_KEYS = [
   'barcode', 'cpv_code', 'taric_code', 'measurement_unit_code',
-  'mydata_vat_category', 'mydata_purchase_vat_category',
+  'mydata_vat_category',
   'mydata_income_classification_category', 'mydata_income_classification_type',
   'mydata_income_classification_category_retail', 'mydata_income_classification_type_retail',
   'prices_include_vat', 'markup_percent',
@@ -211,25 +207,9 @@ export const warehouseService = {
       manufacturer: input.manufacturer ?? null,
       supplier_product_code: input.supplier_product_code ?? null,
       image_urls: input.image_urls ?? [],
-      notes: input.notes ?? null,
     }).select('id').single();
     if (error) throw error;
     return (data as any).id as string;
-  },
-
-  /** Patch a stock item's physical/identity metadata. Same patch-only semantics as
-   *  `updateItemCatalog` — an omitted key is left alone, never nulled. */
-  async updateItemPhysical(id: string, fields: WarehouseItemPhysicalFields): Promise<void> {
-    const patch: Record<string, unknown> = {};
-    for (const k of [
-      'width_mm', 'length_mm', 'thickness_mm', 'weight_kg',
-      'manufacturer', 'supplier_product_code', 'image_urls', 'notes', 'is_active',
-    ] as const) {
-      if (fields[k] !== undefined) patch[k] = fields[k];
-    }
-    if (Object.keys(patch).length === 0) return;
-    const { error } = await supabase.from('warehouse_items').update(patch).eq('id', id);
-    if (error) throw error;
   },
 
   /** Update a stock item's operational fields (serial, reorder point, location, warehouse

@@ -81,7 +81,6 @@ interface LineRow {
   taric: string;
   /** Sale-side AADE VAT category; seeded from the supplier line's own vatCategory. */
   vatCategory: string;
-  purchaseVatCategory: string;
   incomeCatWholesale: string;
   incomeTypeWholesale: string;
   incomeCatRetail: string;
@@ -301,7 +300,6 @@ export const ReceiveToWarehouseDialog: React.FC<{
             // BOTH sides: we bought it at that rate, and absent other information we resell
             // at the same rate. Editable per line.
             vatCategory: ln.vat_category != null ? String(ln.vat_category) : '',
-            purchaseVatCategory: ln.vat_category != null ? String(ln.vat_category) : '',
             incomeCatWholesale: defaults.incomeCatWholesale,
             incomeTypeWholesale: defaults.incomeTypeWholesale,
             incomeCatRetail: defaults.incomeCatRetail,
@@ -456,7 +454,6 @@ export const ReceiveToWarehouseDialog: React.FC<{
           taric_code: r.taric.trim() || null,
           measurement_unit_code: unitDef(r.unit)?.mydataCode ?? null,
           mydata_vat_category: num(r.vatCategory),
-          mydata_purchase_vat_category: num(r.purchaseVatCategory),
           mydata_income_classification_category: r.incomeCatWholesale || null,
           mydata_income_classification_type: r.incomeTypeWholesale || null,
           mydata_income_classification_category_retail: r.incomeCatRetail || null,
@@ -652,7 +649,7 @@ function blankRow(mode: LineMode): LineRow {
     markup: '', salePrice: '', match: null,
     images: [], visualMatches: [], matching: false, unitReason: '', uploading: false,
     itemType: 'good', categoryId: '', barcode: '', cpv: '', taric: '',
-    vatCategory: '', purchaseVatCategory: '',
+    vatCategory: '',
     incomeCatWholesale: '', incomeTypeWholesale: '', incomeCatRetail: '', incomeTypeRetail: '',
     defaultDiscount: '', pricesIncludeVat: false, warranty: '', productUrl: '', notes: '',
     location: '', reorderPoint: '', serialNumber: '',
@@ -882,9 +879,6 @@ const LineCard: React.FC<{
                 <div className="h-8 flex items-center rounded-md border border-border/60 bg-muted/40 px-2 text-xs">
                   {cost != null ? formatMoney(cost, currency) : '—'}
                 </div>
-              </Field>
-              <Field label="Purchase VAT">
-                <VatSelect value={row.purchaseVatCategory} options={vatCats} onChange={(v) => onChange({ purchaseVatCategory: v })} />
               </Field>
               <Field label="Markup %">
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.markup} onChange={(e) => onMarkup(e.target.value)} placeholder="25" />
