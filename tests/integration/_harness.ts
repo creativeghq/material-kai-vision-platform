@@ -76,8 +76,32 @@ export async function grantModule(svc: SupabaseClient, wsId: string, moduleSlug:
   if (error) throw new Error(`grantModule(${moduleSlug}): ${error.message}`);
 }
 
+/** Swallow the failure but REMEMBER it, so a broken teardown can be reported instead of hidden. */
+async function step(
+  problems: string[],
+  label: string,
+  run: () => PromiseLike<{ error?: { message?: string } | null } | unknown>,
+): Promise<void> {
+  try {
+    const res = (await run()) as { error?: { message?: string } | null } | null;
+    if (res && typeof res === 'object' && 'error' in res && res.error) {
+      problems.push(`${label}: ${res.error.message ?? String(res.error)}`);
+    }
+  } catch (e) {
+    problems.push(`${label}: ${(e as Error).message}`);
+  }
+}
+
 // Best-effort teardown. Data first (FK), then memberships, workspaces, users. Never throws —
 // the email-prefix cron is the backstop if anything here fails.
+//
+// It must never throw, but it MUST NOT be silent. Every delete here used to be
+// `.then(() => {}, () => {})`, which discarded the error object as well as the exception — so
+// when a BEFORE DELETE guard on a cascaded child (finance_categories' system-category trigger)
+// started aborting `delete from workspaces`, teardown reported nothing and kept "passing" while
+// 3,057 fixture workspaces piled up in production. The name-prefix reaper that was supposed to
+// catch the leak was independently broken, so two silent failures stacked and nothing surfaced.
+// Now: collect every failure, VERIFY the workspaces actually went, and warn loudly with the count.
 export async function teardown(svc: SupabaseClient, opts: { wsIds?: string[]; userIds?: string[] }): Promise<void> {
   const explicitWs = (opts.wsIds || []).filter(Boolean);
   const userIds = (opts.userIds || []).filter(Boolean);
@@ -98,13 +122,36 @@ export async function teardown(svc: SupabaseClient, opts: { wsIds?: string[]; us
   // The reseller mirror lives in the PARENT workspace, not the child, so `delete where
   // workspace_id = child` never touches it. Deleting the child fires the cleanup trigger, but
   // delete the mirror explicitly too so teardown never depends on the trigger being enabled.
+  const problems: string[] = [];
+
   for (const ws of wsIds) {
     const { data } = await svc.from('workspaces').select('parent_crm_company_id').eq('id', ws).maybeSingle()
       .then((r) => r, () => ({ data: null as { parent_crm_company_id: string | null } | null }));
-    if (data?.parent_crm_company_id) await svc.from('crm_companies').delete().eq('id', data.parent_crm_company_id).then(() => {}, () => {});
+    if (data?.parent_crm_company_id) {
+      await step(problems, `crm mirror ${data.parent_crm_company_id}`,
+        () => svc.from('crm_companies').delete().eq('id', data.parent_crm_company_id!));
+    }
   }
-  for (const ws of wsIds) await svc.from('crm_companies').delete().eq('workspace_id', ws).then(() => {}, () => {});
-  for (const ws of wsIds) await svc.from('workspace_members').delete().eq('workspace_id', ws).then(() => {}, () => {});
-  for (const ws of wsIds) await svc.from('workspaces').delete().eq('id', ws).then(() => {}, () => {});
-  for (const u of userIds) await svc.auth.admin.deleteUser(u).then(() => {}, () => {});
+  for (const ws of wsIds) await step(problems, `crm_companies of ${ws}`, () => svc.from('crm_companies').delete().eq('workspace_id', ws));
+  for (const ws of wsIds) await step(problems, `members of ${ws}`, () => svc.from('workspace_members').delete().eq('workspace_id', ws));
+  for (const ws of wsIds) await step(problems, `workspace ${ws}`, () => svc.from('workspaces').delete().eq('id', ws));
+  for (const u of userIds) await step(problems, `auth user ${u}`, () => svc.auth.admin.deleteUser(u));
+
+  // Check the WORLD, not the return value: a delete can report no error and still leave the row
+  // (that is exactly what happened here). This is the assertion that would have caught the leak
+  // on run #1 instead of after 3,057 of them.
+  if (wsIds.size > 0) {
+    const { data: left } = await svc.from('workspaces').select('id, name').in('id', [...wsIds])
+      .then((r) => r, () => ({ data: [] as Array<{ id: string; name: string }> }));
+    for (const w of left ?? []) problems.push(`workspace ${w.id} (${w.name}) SURVIVED deletion`);
+  }
+
+  if (problems.length > 0) {
+    // Deliberately a warning, not a throw: teardown must never turn a green suite red. But it is
+    // now impossible for a silently-failing teardown to look identical to a working one.
+    console.warn(
+      `[teardown] ${problems.length} step(s) failed — fixtures leaked into the live database:\n  ` +
+      problems.join('\n  '),
+    );
+  }
 }
