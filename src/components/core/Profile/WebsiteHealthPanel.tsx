@@ -100,19 +100,16 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
               <span className="break-all">{health.error || 'Audit failed'}</span>
             </div>
           ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 justify-items-center">
-                <Gauge100 label="On-page SEO" score={health.seo_score} />
-                <Gauge100 label="Performance" score={health.perf_score} />
-                <Gauge100 label="Accessibility" score={health.a11y_score} />
-                <Gauge100 label="Best practices" score={health.bp_score} />
-              </div>
-              {health.perf_score == null && (
-                <p className="text-xs text-muted-foreground text-center mt-3">
-                  Performance / Accessibility / Best-practices come from Google Lighthouse, which finishes a few minutes after the first check — re-check shortly to fill them in. The On-page SEO score is live.
-                </p>
-              )}
-            </>
+            <div className="flex flex-wrap items-center gap-6 justify-center sm:justify-start">
+              <Gauge100 label="On-page SEO" score={health.seo_score} />
+              {/* Lighthouse (Core Web Vitals) — only when present (DataForSEO Lighthouse is async). */}
+              {health.perf_score != null && <Gauge100 label="Performance" score={health.perf_score} />}
+              {health.a11y_score != null && <Gauge100 label="Accessibility" score={health.a11y_score} />}
+              {health.bp_score != null && <Gauge100 label="Best practices" score={health.bp_score} />}
+              <p className="text-xs text-muted-foreground max-w-[24ch]">
+                On-page score + issues are live. For full Core Web Vitals, ask the agent to run a site crawl.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
