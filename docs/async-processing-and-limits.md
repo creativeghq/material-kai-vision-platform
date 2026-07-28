@@ -71,7 +71,7 @@ All methods update the `background_jobs` table in real-time with the current job
 - **SLIG (20)**: Modal endpoint (scale-to-zero) → high concurrency
 - **PaddleOCR-VL (8)**: Modal-hosted endpoint (GPU L4, scale-to-zero, `max_containers=4`); concurrency bounded so warm containers aren't oversubscribed (post-2026-06-13: replaced the Surya-2 backbone, which had replaced YOLO + Chandra + merge_layout)
 - **Batch (15)**: Prevents OOM on large PDFs with 500+ images
-- **Qwen retired**: pre-2026-05-01 had a "5 Qwen concurrent" gate; the HF Qwen endpoint had been 404-ing for months, falling through to Claude. Gate deleted along with `endpoint_controller.qwen` AdaptiveConcurrency.
+; Gate deleted along with `endpoint_controller.
 
 ---
 
@@ -219,7 +219,7 @@ The per-page timeout is calculated dynamically: `max(300, file_size_mb * 10 + nu
 **Services**: `slig_client`, `paddleocr_endpoint_manager`
 
 > **Note (2026-06-13)**: The layout+OCR backbone is **PaddleOCR-VL** (`PaddlePaddle/PaddleOCR-VL-1.6`, two-stage: PP-DocLayoutV2 RT-DETR detector + 0.9B VLM), hosted on **Modal** (app `paddleocr-vl`, GPU L4, scale-to-zero). It replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). Both SLIG and PaddleOCR-VL run on **Modal**; HuggingFace hosts nothing.
-> **Note (2026-05-01)**: The `QwenEndpointService` and `Settings.qwen_*` are gone. Vision moved to Anthropic Claude Opus 4.7 via tool use.
+> **Note (2026. Vision moved to Anthropic Claude Opus 4.7 via tool use.
 
 | Limit | Value | Purpose |
 |-------|-------|---------|
@@ -272,7 +272,7 @@ Generates 6 embedding types written directly to VECS:
 - `image_color_embeddings`, `image_texture_embeddings`, `image_style_embeddings`, `image_material_embeddings` (aspect embeddings, **1024D** Voyage AI from deterministic per-image `VisionAnalysis` field serializations — post-2026-05-04; pre-v2 these were 768D SLIG-blend vectors)
 - `image_understanding_embeddings` (**1024D** Voyage AI from Claude Opus 4.7 `VisionAnalysis` JSON via `serialize_vision_analysis_to_text`)
 
-Updated 2026-04: legacy `google/siglip-so400m-patch14-384` (1152D) and CLIP 512D collections were dropped. Updated 2026-05-01: vision pass migrated from Qwen to Claude Opus 4.7 tool use (Qwen had been silently 404-ing for months).
+Updated 2026-04: legacy `google/siglip-so400m-patch14-384` (1152D) and CLIP 512D collections were dropped. Updated 2026.7 tool use.
 
 ---
 

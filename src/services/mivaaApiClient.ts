@@ -358,8 +358,7 @@ export class MivaaApiClient {
    * schema-locked output via the `emit_vision_analysis` tool defined in
    * mivaa-pdf-extractor/app/models/vision_analysis.py).
    *
-   * Was Qwen Vision until 2026-05-01; the Qwen endpoint was retired and
-   * the entire vision pipeline migrated to Anthropic-only.
+   * The vision pipeline is Anthropic-only.
    */
   async analyzeVision(payload: {
     image_url?: string;

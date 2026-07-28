@@ -81,7 +81,7 @@ Common issues and solutions for Material Kai Vision Platform.
 3. **Stage 6 (Image Analysis)**
    - Check image count
    - Verify image quality
-   - Check Anthropic API quota / rate limits (Claude Opus 4.7 vision_analysis is the sole vision pass post-2026-05-01; the HuggingFace Qwen3-VL endpoint was retired in the migration — it had been 404-ing for months)
+   - Check Anthropic API quota / rate limits
 
 4. **Resume from checkpoint**
 
@@ -162,7 +162,7 @@ Common issues and solutions for Material Kai Vision Platform.
    - Verify `ANTHROPIC_API_KEY` is set
    - Check rate-limit headers on the failing call
    - Confirm the response was tool_use (not text) — `VisionAnalysis` schema is hard-enforced by `VISION_ANALYSIS_TOOL`; if the model returned plain text instead of `tool_use`, the call should be retried (this is rare with the schema-locked path)
-   - Pre-2026-05-01 troubleshooting referenced `QWEN_ENDPOINT_TOKEN` and the HuggingFace Qwen3-VL endpoint — both are retired. The Qwen HF endpoint had been 404-ing for months and silently falling through to Claude; the migration removed the dead path entirely.
+— both are retired. the migration removed the dead path entirely.
 
 3. Retry with different image
 

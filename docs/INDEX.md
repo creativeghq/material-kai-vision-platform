@@ -72,7 +72,7 @@ Complete documentation for Material Kai Vision Platform.
 
 **[async-processing-and-limits.md](async-processing-and-limits.md)** - Async processing & concurrency limits ✨ NEW
 - Fully async architecture across all methods (PDF, Web, XML)
-- Unified concurrency limits (2 Claude, 10 uploads, 20 SLIG, PaddleOCR-VL on Modal with scale-to-zero — Chandra/Qwen gates retired)
+- Unified concurrency limits
 - Timeout configuration (300s discovery, 120s AI, 30s downloads)
 - Rate limiting (circuit breaker on Claude; PaddleOCR-VL inference retry in the Modal endpoint manager)
 - Shared services (ImageProcessingService, RealEmbeddingsService, AsyncQueueService)
@@ -359,7 +359,7 @@ Complete documentation for Material Kai Vision Platform.
 - Modal: SLIG SigLIP2 (5 visual embedding types, 768D each — `siglip2-base-patch16-512`, native 768D; migrated off HuggingFace 2026-06-14, so HuggingFace now hosts nothing)
 - OpenAI: GPT-4o, GPT-5 (optional alternatives — NOT vision)
 - WorldLabs Marble: 3D Gaussian Splat generation
-- PaddleOCR-VL replaced Surya-2 (2026-06-13), which had replaced YOLO + Chandra; Qwen vision retired 2026-05-01
+- PaddleOCR-VL replaced Surya-2 (2026-06-13), which had replaced YOLO + Chandra;
 - 7 embedding types (text, visual, understanding, color, texture, style, material) — halfvec float16
 - Model usage by pipeline stage
 - Cost optimization

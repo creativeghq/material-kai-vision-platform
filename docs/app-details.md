@@ -97,7 +97,6 @@ The platform's core differentiator is not a single AI model — it is the orches
 | OpenAI | GPT-4o | Alternative product discovery, multimodal tasks | $2.50 input / $10 output per 1M tokens |
 | OpenAI | GPT-4o-mini | Query intent parsing, lightweight operations | $0.15 input / $0.60 output per 1M tokens |
 | Voyage AI | voyage-4 (1024D) | Primary text embeddings + understanding embeddings | $0.06 per 1M tokens |
-| Anthropic | Claude Sonnet 4.6 | Semantic chunking (PRIMARY chunker; was Qwen pre-2026-05-01, but Qwen had been silently 404-ing for months — migration made architecture honest) | Anthropic API |
 | Anthropic | Claude Opus 4.7 (vision_analysis) | Image analysis, material recognition — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` | Anthropic API |
 | Modal | PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) | Layout + OCR backbone (sole engine post-2026-06-13) — two-stage parser (PP-DocLayoutV2 RT-DETR detector + 0.9B VLM), run as Stage 1 before discovery. Per-attempt metrics in `paddleocr_metrics`. Failure marker: `OCRResult.method='paddleocr_failed'`; `ocr_engine='paddleocr'`. Replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). | Modal endpoint (GPU L4, scale-to-zero) |
 | Modal | SLIG SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Modal endpoint (scale-to-zero; moved off HuggingFace 2026-06-14) |
@@ -119,7 +118,6 @@ Every product in the catalog is represented by **7 distinct AI embedding vectors
 |----------------|-----------|-------|----------------|
 | Text | 1024D | Voyage AI voyage-4 | Natural language + keyword search |
 | Visual | 768D | SigLIP2 | "Find materials that look like this photo" |
-| Understanding | 1024D | Voyage AI (from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage). Pre-2026-05-01 used Qwen3-VL JSON; migration retired Qwen vision entirely. | Spec-based search (dimensions, finishes, surface properties) |
 | Color | 768D | SigLIP2 | Color palette matching |
 | Texture | 768D | SigLIP2 | Surface texture similarity |
 | Style | 768D | SigLIP2 | Design aesthetic matching |
@@ -142,7 +140,7 @@ The primary ingest path. A supplier uploads a product catalog PDF. The platform 
 3. Semantic chunking via Anthropic API (800 token max, 100 overlap)
 4. Generates text + understanding embeddings via Voyage AI
 5. Extracts all images from product pages
-6. Runs Claude Opus 4.7 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) on every image — identifies material type, surface properties, finishes, dimensions visible, color palette. Pre-2026-05-01 ran Qwen3-VL with Claude fallback; the Qwen HF endpoint had been 404-ing for months (Stage 3 was effectively 100% Claude already), so the migration retired Qwen and went Anthropic-only.
+6. Runs Claude Opus 4.7 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) on every image — identifies material type, surface properties, finishes, dimensions visible, color palette. Pre;
 7. Generates all 5 SigLIP2 visual embedding types per image
 8. Extracts 200+ metadata fields per product (dimensions, material composition, certifications, weight, finish, slip resistance, etc.)
 9. PaddleOCR-VL layout detection + OCR (Modal-hosted, structure-first Stage 1) localizes regions, labels them, predicts reading order, and reads text/tables→markdown/formulas→LaTeX inside each region
@@ -626,7 +624,6 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 | Claude Haiku (1K tokens) | ~$0.0008–0.004 | 1–5 credits | 50–80%+ |
 | GPT-4o-mini (query parsing) | ~$0.0002 | 1 credit | 50x+ |
 | Voyage AI text embedding (1K tokens) | ~$0.00006 | Bundled into search | High |
-| Claude Opus 4.7 vision_analysis per image (post-2026-05-01 — sole vision pass; Qwen retired) | ~$0.02–0.05 | 2–5 credits | Variable |
 | VR World — draft (marble-1.0-draft) | WorldLabs | 18 credits | Pass-through + platform overhead |
 | VR World — quality (marble-1.1) | WorldLabs | 190 credits | Pass-through + platform overhead |
 | Interior design (Replicate) | Replicate variable | Credits per image | Variable |
@@ -646,7 +643,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 - Vercel: Included in Vercel plan at current scale (global CDN, zero egress cost)
 - Supabase: Managed PostgreSQL, storage, edge function invocations — scales with usage
 - DigitalOcean: Dedicated server for MIVAA FastAPI backend — predictable fixed monthly cost
-- Modal (SLIG): Scale-to-zero endpoint for SigLIP2 (768D visual embeddings); SLIG moved off HuggingFace to Modal 2026-06-14, so HuggingFace hosts nothing. Qwen3-VL vision retired 2026-05-01; vision is now Anthropic-only via Claude Opus 4.7 tool use.
+- Modal (SLIG): Scale-to-zero endpoint for SigLIP2 (768D visual embeddings); SLIG moved off HuggingFace to Modal 2026-06-14, so HuggingFace hosts nothing. vision is now Anthropic-only via Claude Opus 4.7 tool use.
 - Modal (PaddleOCR-VL): layout + OCR backbone (GPU L4, scale-to-zero → $0 idle, `max_containers=4`). Replaced the Surya-2 backbone 2026-06-13. Sole required runtime secret: `PADDLEOCR_MODAL_API_KEY`.
 - Variable: Anthropic, OpenAI, Voyage AI, WorldLabs, Replicate — fully usage-based
 
@@ -708,7 +705,7 @@ This analytics layer is a significant standalone upsell — providing market int
 Most platforms use one or two embedding types. Fusing 7 specialized vectors with dynamic per-query weight profiles requires custom ML infrastructure, tuned weight profiles per query intent, and deep integration between the vision analysis pipeline and the search layer. This compound in value as more products are added.
 
 **2. Understanding Embeddings (Novel Architecture)**
-Claude Opus 4.7 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) generates structured JSON analysis of every product image — material properties, surface characteristics, visible dimensions, finish type. The JSON is run through `serialize_vision_analysis_to_text` and embedded via Voyage AI into a 1024D "understanding" vector. This enables queries like *"find matte surfaces with slight veining, suitable for wet external areas"* — which no traditional image or keyword search can handle. (Pre-2026-05-01 used Qwen3-VL JSON for the analysis step; the Qwen HF endpoint had been 404-ing for months, falling through to Claude — the 2026-05-01 migration just retired the dead Qwen path and made the architecture honest.) This is a proprietary architecture not seen replicated elsewhere.
+Claude Opus 4.7 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) generates structured JSON analysis of every product image — material properties, surface characteristics, visible dimensions, finish type. The JSON is run through `serialize_vision_analysis_to_text` and embedded via Voyage AI into a 1024D "understanding" vector. This enables queries like *"find matte surfaces with slight veining, suitable for wet external areas"* — which no traditional image or keyword search can handle. This is a proprietary architecture not seen replicated elsewhere.
 
 **3. Full Vertical Integration**
 Ingestion + enrichment + search + design generation + VR visualization + quote management + marketplace in one product. Each layer creates switching costs. A user with their catalog ingested, moodboards saved, and project quotes tracked is not going to migrate to a competitor easily.
@@ -750,7 +747,7 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 
 ### Live in Production (March 2026)
 - 7-vector fusion search with query-adaptive weight profiles
-- Understanding embeddings (spec-based search via Claude Opus 4.7 vision_analysis tool use → Voyage AI; pre-2026-05-01 used Qwen3-VL, retired in the migration)
+- Understanding embeddings
 - AI search re-ranking (Claude post-retrieval re-ordering with explanations)
 - PDF ingestion pipeline (14 stages, 9 checkpoints, PaddleOCR-VL structure-first layout + OCR backbone on Modal)
 - Web scraping ingestion (Firecrawl)

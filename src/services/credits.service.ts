@@ -232,8 +232,6 @@ export const creditsAPI = {
 
       // Voyage AI Embeddings
       'voyage-4':   { input: 0.06, output: 0.00 },
-
-      // Qwen vision pricing removed 2026-05-01 — vision moved to Claude.
     };
 
     // Flat-rate pricing for non-token-based services (in credits, includes 1.50x markup)

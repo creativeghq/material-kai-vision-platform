@@ -2667,7 +2667,7 @@ These functions are callable but intended for internal/admin use. Not part of th
 ### POST /functions/v1/ai-pricing-updater
 
 **Auth**: None (internal cron or manual trigger)
-**Description**: Updates AI model pricing table (`ai_model_pricing`) from hardcoded reference prices for Anthropic, OpenAI, Voyage, Google, and Firecrawl. (Qwen pricing entries retired 2026-05-01 alongside the Qwen-removal migration; vision is now Anthropic-only and chunking moved to Claude Sonnet 4.6.)
+**Description**: Updates AI model pricing table (`ai_model_pricing`) from hardcoded reference prices for Anthropic, OpenAI, Voyage, Google, and Firecrawl.
 
 ```json
 { "force_update": false, "provider": "anthropic" }

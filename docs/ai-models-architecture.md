@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision is **Anthropic-only** (post-2026-05-01 migration); Qwen has been retired from every vision call site.
+MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision is **Anthropic-only** (post-2026-05-01 migration);
 
 | Provider | Models Used | Primary Purpose |
 |----------|-------------|-----------------|
@@ -46,10 +46,10 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ CHUNKING (text)                                                         │
-│ Model: Claude Sonnet 4.6 (default; was Qwen pre-2026-05-01)             │
+│ Model: Claude Sonnet 4.6             │
 │ Setting: Settings.chunking_primary_model = 'claude-sonnet-4-6'          │
 │ Why Sonnet: chunking is a text task at the quality ceiling — Sonnet     │
-│             matches Opus output quality at lower cost; Qwen had been    │
+│             matches Opus output quality at lower cost;
 │             silently 404-ing for months                                 │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
@@ -170,9 +170,9 @@ The vision pipeline calls `claude-opus-4-7` via Anthropic tool use. The tool sch
 
 ### 2. **Claude Sonnet 4.6 — Chunking** ✂️
 
-**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-4-6'` (was `Qwen/Qwen3.6-35B-A3B-FP8` pre-2026-05-01)
+**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-4-6'`
 
-Chunking is a text task at the quality ceiling — Sonnet matches Opus output quality on chunking work, so the extra Opus spend buys nothing. Qwen had been silently down for months.
+Chunking is a text task at the quality ceiling — Sonnet matches Opus output quality on chunking work, so the extra Opus spend buys nothing.
 
 **Cost**: $3.00 per 1M input tokens, $15.00 per 1M output tokens
 **Speed**: 2-4 seconds per chunk batch
@@ -280,11 +280,10 @@ GPT models are available as alternatives to Claude for product discovery and age
 
 ---
 
-### 8. **VisionProvider.QWEN enum (legacy)** 🪦
+### 8. **VisionProvider.
 
-The `VisionProvider.QWEN` enum value is retained **only** so historical pre-2026-05-01 rows in `document_images.vision_provider` still validate. No code path produces new rows with this value. The `qwen_endpoint_manager.py` file, all `Settings.qwen_*` fields, the qwen warmup task, the qwen pricing entries (backend + frontend + edge), the qwen Operations dashboard widgets, and the `endpoint_controller.qwen` AdaptiveConcurrency gate were all deleted on 2026-05-01.
+The `VisionProvider.vision_provider` still validate. No code path produces new rows with this value.py` file, all `Settings.
 
-The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at the next deploy.
 
 ---
 
@@ -327,7 +326,7 @@ These numbers are the source of truth; Doc #4's profile cost lines reference thi
 | **Voyage AI** | Understanding (50) + text chunks (500) | ~$0.05 |
 | **TOTAL** | Per PDF | **~$0.36** |
 
-The pre-migration documented estimate (~$0.23) assumed Qwen vision at $0.18/1M tokens, but every Qwen call had been silently 404-ing and falling through to Claude anyway — the actual bill was already Anthropic-priced. Today's number reflects honest accounting at Opus 4.7's current $5/$25 pricing.
+The pre-migration documented estimate (~$0. Today's number reflects honest accounting at Opus 4.7's current $5/$25 pricing.
 
 ### Per Search Query
 
@@ -346,7 +345,7 @@ The pre-migration documented estimate (~$0.23) assumed Qwen vision at $0.18/1M t
 Anthropic tool use guarantees the `VisionAnalysis` payload matches the Pydantic schema, so Voyage doesn't embed garbage. Provenance fields (`embedding_model`, `schema_version`) persist on every row so drift is detectable.
 
 ### 2. **Honest pricing**
-Pre-2026-05-01 the documented architecture said "Qwen for cheap bulk vision, Claude for validation" — but Qwen had been 404-ing for months. The platform was 100% Claude vision and the bill reflected it. The migration aligned the docs with reality.
+Pre. The platform was 100% Claude vision and the bill reflected it. The migration aligned the docs with reality.
 
 ### 3. **Structure-first layout + OCR**
 PaddleOCR-VL's dedicated RT-DETR detector produces tighter region boxes than the prior merge-based pipelines (→ cleaner product crops → better SLIG visual embeddings), and reading order comes from a dedicated pointer network rather than a heuristic merge. Running it as Stage 1 before discovery means every downstream consumer reads reading-order text from one cache. (Earlier OCR stacks — pytesseract + EasyOCR, then YOLO + Chandra, then Surya-2 — were all retired.)
@@ -361,7 +360,6 @@ No more dual-store. All vectors live in `vecs.image_*_embeddings` collections, a
 | Metric | Pre-2026-05-01 | Post-Migration |
 |--------|----------------|----------------|
 | **Vision schema integrity** | JSON regex recovery (best effort) | Tool-use schema guarantee |
-| **Vision actual cost** | "Qwen $0.18/1M" (false — 404→Claude fallback) | Claude Opus 4.7 $5/$25 per 1M (honest) |
 | **Layout + OCR engine** | ~60% (pytesseract broken in prod) | PaddleOCR-VL 1.6 structural pass on Modal (RT-DETR boxes + 0.9B VLM, ~1-3s/page warm) |
 | **Voyage drift detection** | None | `embedding_model` + `schema_version` on every row |
 

@@ -75,7 +75,6 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `PADDLEOCR_MODAL_API_KEY` | **Secret** | Server ENV | Bearer for the **PaddleOCR-VL** structural-pass endpoint on **Modal** (the layout+OCR backbone — replaced Surya-2 on 2026-06-13). **The only required runtime secret for the backbone** — must equal the `PADDLEOCR_API_KEY` value inside the `paddleocr-api-key` Modal secret. | `<openssl rand -hex 32>` |
 | `PADDLEOCR_MODAL_URL` | Public | Server ENV | Override for the Modal endpoint URL. Optional — the deployed app URL is baked as the `config.py` default. | `https://basilakis--paddleocr-vl-paddleservice-web.modal.run` |
 | `PADDLEOCR_ENABLED` | Public | Server ENV | Enable the PaddleOCR-VL structural pass. Empty → code default (enabled). | `true` |
-| ~~`QWEN_*` / `YOLO_*` / `CHANDRA_*`~~ | — | **REMOVED** | The Qwen (retired 2026-05-01), YOLO + Chandra (replaced by Surya-2, then PaddleOCR-VL on 2026-06-13) HF endpoints have **no consumer in the code**. Delete these GitHub Secrets and their systemd `Environment=` lines. | — |
 | `SLIG_MODAL_URL` | Public | Server ENV | SLIG Modal endpoint URL (both GPU endpoints are on Modal; HuggingFace hosts nothing) | `https://basilakis--slig-sligservice-web.modal.run` |
 | `SLIG_MODAL_API_KEY` | **Secret** | Server ENV | SLIG Modal bearer (shared `paddleocr-api-key` Modal secret value) | `<openssl rand -hex 32>` |
 | `HUGGING_FACE_ACCESS_TOKEN` | **Secret** | Server ENV | No longer required for SLIG — SLIG moved to Modal 2026-06-14. HuggingFace hosts nothing in this platform now; this token can be removed. | `hf_xxxxxxxxxxxxxxxx` |
@@ -145,7 +144,7 @@ The platform uses **no** HuggingFace Inference Endpoints. Both SLIG (visual embe
 - **Model**: `basiliskan/slig` — a duplicate of stock `google/siglip2-base-patch16-512` (SigLIP2 base, native 768D, no projection head)
 - **Scale-to-zero**: Enabled ($0 idle; Modal owns autoscaling)
 
-> **Retired**: the **Qwen** (2026-05-01, vision moved to Anthropic Claude Opus 4.7 via tool use), **YOLO** + **Chandra** (2026-06-13, replaced by Surya-2 then PaddleOCR-VL on Modal) HF endpoints are gone. Their `qwen_endpoint_manager.py` / `surya_*` / YOLO / Chandra code is deleted and has no consumer. Delete the `QWEN_*` / `YOLO_*` / `CHANDRA_*` / `SURYA_*` GitHub Secrets and their systemd `Environment=` lines, plus any `/etc/systemd/system/mivaa-pdf-extractor.service.d/{qwen,chandra,yolo}-*.conf` drop-ins.
+7 via tool use), **YOLO** + **Chandra** (2026-06-13, replaced by Surya-2 then PaddleOCR-VL on Modal) HF endpoints are gone.py` / `surya_*` / YOLO / Chandra code is deleted and has no consumer.service.conf` drop-ins.
 
 **Required GitHub Secrets** (the deploy workflow writes them as systemd `Environment=` lines into `mivaa-pdf-extractor.service` — see `.github/workflows/deploy.yml`):
 
@@ -592,7 +591,7 @@ All MIVAA service endpoints are available at:
 
 **Service File**: `/etc/systemd/system/mivaa-pdf-extractor.service`
 
-The service is a `simple` type running as `root` with `WorkingDirectory=/var/www/mivaa-pdf-extractor`. It sets all environment variables inline (Supabase URL and keys, JWT secret, Anthropic API key, Voyage AI key, the SLIG Modal endpoint URL/bearer (`SLIG_MODAL_URL` / `SLIG_MODAL_API_KEY`), and `PADDLEOCR_MODAL_API_KEY` for the Modal structural pass; OpenAI key optional). The `ExecStart` command launches uvicorn from the virtual environment at `.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`. The service uses `Restart=always` with a 3-second restart delay, and logs to the systemd journal. **Note**: the legacy `QWEN_*` / `YOLO_*` / `CHANDRA_*` / `SURYA_*` env lines have no consumer and can be deleted from the unit.
+The service is a `simple` type running as `root` with `WorkingDirectory=/var/www/mivaa-pdf-extractor`. It sets all environment variables inline (Supabase URL and keys, JWT secret, Anthropic API key, Voyage AI key, the SLIG Modal endpoint URL/bearer (`SLIG_MODAL_URL` / `SLIG_MODAL_API_KEY`), and `PADDLEOCR_MODAL_API_KEY` for the Modal structural pass; OpenAI key optional). The `ExecStart` command launches uvicorn from the virtual environment at `.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`. The service uses `Restart=always` with a 3-second restart delay, and logs to the systemd journal.
 
 ### 🚀 Deployment Process
 
@@ -718,7 +717,7 @@ All deployment results are displayed on the main GitHub Action page with:
 - **Database**: Supabase PostgreSQL with vector extensions
 - **AI Integration**: OpenAI, Anthropic, Voyage AI, Modal GPU Endpoints (SLIG + PaddleOCR-VL)
 - **Visual Embeddings**: SLIG (SigLIP2) via Modal Endpoint (768D, 5 specialized types)
-- **Vision Models**: Claude Opus 4.7 via Anthropic tool use (`VisionAnalysis` Pydantic schema-locked) — Qwen retired 2026-05-01
+- **Vision Models**: Claude Opus 4.7 via Anthropic tool use (`VisionAnalysis` Pydantic schema-locked)
 - **Layout + OCR (structural pass)**: PaddleOCR-VL on Modal (replaced Surya-2, YOLO, and Chandra; pytesseract + EasyOCR removed)
 - **Monitoring**: Sentry error tracking and structured logging
 - **Security**: JWT authentication and environment-based secrets
@@ -816,7 +815,7 @@ Use UFW to set default deny for incoming, default allow for outgoing, then expli
      - VOYAGE_API_KEY (for text embeddings)
      - SLIG_MODAL_URL (for visual embeddings — SigLIP2, on Modal)
      - SLIG_MODAL_API_KEY (for visual embeddings — SigLIP2, on Modal)
-     - PADDLEOCR_MODAL_API_KEY (for the layout+OCR structural pass on Modal; YOLO/Chandra/Qwen retired)
+     - PADDLEOCR_MODAL_API_KEY
      - FIRECRAWL_API_KEY (for price monitoring)
 
 2. **Environment Variable Mismatch**:
@@ -1221,7 +1220,6 @@ This section covers all third-party services used by the platform, their pricing
 | SigLIP2 (SLIG visual embeddings) | **Modal** | GPU | ~$0.80/hour active | Yes — scale-to-zero, $0 idle |
 | PaddleOCR-VL (layout + OCR structural pass) | **Modal** | GPU (L4) | ~$0.80/hour active | Yes — scale-to-zero, $0 idle |
 | ~~Chandra OCR v2 / YOLO DocParser~~ | ~~HuggingFace~~ | — | — | **REMOVED 2026-06-13** — replaced by PaddleOCR-VL on Modal |
-| ~~Qwen3-VL-32B~~ | ~~HuggingFace~~ | ~~GPU (A100)~~ | — | **DELETED 2026-05-01** — vision via Anthropic Claude Opus 4.7 |
 
 **Cost control**: both SLIG and PaddleOCR-VL scale to zero on Modal ($0 idle). Billed only when active. Typical monthly cost: $5–$20 depending on PDF processing volume.
 

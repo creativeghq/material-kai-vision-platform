@@ -28,11 +28,6 @@ const AI_PRICING = {
   voyage: {
     'voyage-4': { input: 0.06, output: 0.00 },
   },
-  // Qwen pricing intentionally absent — vision migrated to Anthropic Claude
-  // Opus 4.7 on 2026-05-01. Empty placeholder kept so the lookup path that
-  // iterates AI_PRICING.qwen still resolves to undefined cleanly without
-  // throwing "cannot read property of undefined".
-  qwen: {} as Record<string, { input: number; output: number }>,
   // Vision Models
   vision: {
     'clip': { input: 0.00, output: 0.00 }, // Free (open-source)
@@ -139,10 +134,6 @@ export class AICallLogger {
 
     if (provider === 'anthropic' || modelLower.includes('claude')) {
       pricing = Object.entries(AI_PRICING.claude).find(([key]) =>
-        modelLower.includes(key.toLowerCase())
-      )?.[1];
-    } else if (provider === 'together' || modelLower.includes('qwen')) {
-      pricing = Object.entries(AI_PRICING.qwen).find(([key]) =>
         modelLower.includes(key.toLowerCase())
       )?.[1];
     } else if (modelLower.includes('voyage')) {

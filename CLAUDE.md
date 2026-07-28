@@ -156,14 +156,14 @@ Unauthenticated lead-gen surface that lets anyone type a product or brand name a
 
 ---
 
-## Qwen removal — Anthropic-only vision (2026-05-01)
-Audit-discovered: the configured HF endpoint served `Qwen/Qwen3.6-35B-A3B-FP8` (text-only MoE) but the segmentation/classification/vision-analysis call sites all asked for `Qwen/Qwen3-VL-8B-Instruct`. Every Qwen vision call had been 404-ing in 0.7s and falling through to Anthropic Claude — Stage 3 had effectively been 100% Claude for months. Migration made the architecture honest:
+## Anthropic-only vision
+**There is no third-party vision model in this platform and there must not be one added casually.** Vision runs on Anthropic Claude, end to end.
 
 - **Vision is Anthropic-only.** Segmentation, image classification, vision_analysis, material analysis all run on `claude-opus-4-7`. The ingestion path (`_try_claude_material_analysis` → understanding embedding) uses **real Anthropic tool_use** as of 2026-05-23: `tools=[VISION_ANALYSIS_TOOL]` + `tool_choice={'type':'tool','name':...}` — the model is forced to emit a tool_use block whose `input` matches `VisionAnalysis.input_schema`. No regex repair, no JSON-parse fallback. Pydantic still validates as defense-in-depth before Voyage embeds. NOTE: the validation downstream path (`real_image_analysis_service._analyze_with_claude`, used by `ClaudeValidationService` in Stage 5) still uses free-form prompting + 3-strategy JSON regex repair — that's a separate flow used for quality scoring, not understanding-embedding ingestion. Schema lock applies to the ingestion path that feeds Voyage.
-- **Chunking → Sonnet 4.6.** `Settings.chunking_primary_model` default flipped from `Qwen/Qwen3.6-35B-A3B-FP8` to `claude-sonnet-4-6`. Chunking is a text task at the quality ceiling; Opus would be 5× the cost for marginal gain.
+- **Chunking → Sonnet 4.6.** `Settings.chunking_primary_model` is `claude-sonnet-4-6`. Chunking is a text task at the quality ceiling; Opus would be 5× the cost for marginal gain.
 - **Voyage drift detection.** Every understanding-embedding row now persists `embedding_model` + `schema_version` (in VECS metadata + mirrored on `document_images.understanding_embedding_model` / `understanding_schema_version`). Same on `products.text_embedding_1024_model` / `text_embedding_schema_version`. The OpenAI fallback is **disabled** for the understanding path so Voyage and OpenAI vectors never co-exist in the same VECS collection.
 - **Backfill.** `POST /admin/understanding-embeddings/backfill` re-runs vision_analysis (Opus + tool use) → Voyage on stale rows (no embedding / older schema_version / non-Voyage embedding_model). Bounded by `batch_size` + `max_images`.
-- **Dead code retired.** `qwen_endpoint_manager.py` deleted. All `Settings.qwen_*` fields, `validate_qwen_model`, `get_qwen_config`, `endpoint_registry.get_qwen_manager`, the `endpoint_controller.qwen` AdaptiveConcurrency gate, the qwen warmup task, the qwen pricing entries (backend + frontend + edge), and the qwen Operations dashboard widgets are all removed. The HF Qwen endpoint env vars (`QWEN_*`) on the systemd unit can be deleted at the next deploy. The only Qwen string left in the codebase is the `VisionProvider.QWEN` enum value, which is retained so historical pre-2026-05-01 rows in `document_images.vision_provider` still validate.
+- **`VisionProvider` provenance.** `document_images.vision_provider` is constrained to `claude` | `claude_fallback` (a Claude retry that rescued the image) — enforced by the `check_vision_provider_values` CHECK. `SKIPPED`/`FAILED` are in-memory-only enum members and must never be persisted.
 - **Stage 4 product embedding fail-closed.** Wrong-dim or missing embedding sets `embedding_failed=true` on the return; orchestrator marks for re-embedding rather than creating a row with NULL `text_embedding_1024` (audit gap C).
 
 ## Where vision actually runs in the pipeline (clarified 2026-05-23)
@@ -223,7 +223,7 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
 
 ### P2 hardening landed alongside P1s:
 - **Observability**: `cache_status` semantics propagated through `get_layout_from_document_cache_with_status`; per-product cost via `ai_usage_logs.product_id`; `pipeline_strategy_metrics` table for chunking-strategy distribution.
-- **Embeddings hardening**: Qwen vision_analysis schema validation (rejects malformed payloads before Voyage embeds garbage); atomic specialized VECS upsert (writes all 4 vectors first, then sets flags only for those that landed); Voyage 429 explicit handling with `Retry-After` honoring; `ai_usage_logs` mirror retries twice + ERRORs on persistent failure.
+- **Embeddings hardening**: vision_analysis schema validation (rejects malformed payloads before Voyage embeds garbage); atomic specialized VECS upsert (writes all 4 vectors first, then sets flags only for those that landed); Voyage 429 explicit handling with `Retry-After` honoring; `ai_usage_logs` mirror retries twice + ERRORs on persistent failure.
 - **Endpoint coordination**: `endpoint_controller.scale_all_to_zero(force=False)` now skips when other jobs are still running (active-job count = in-memory + DB-side); `register_job_start`/`register_job_done` from `progress_tracker`; `manager.warmup_completed` reset on scale.
 - **Reliability**: heartbeat thread is non-daemon AND gates per-tick write on terminal-status check (can't write to a finished job); entity linking surfaces skipped-chunk count when `product_pages` and `page_number` both null; icon unknown_field counts persisted in rollup as `_unknown_field_counts` for future alias curation; recovery `from_stage` reads `last_checkpoint.stage` directly when metadata field is missing.
 - **Image extraction accuracy**: bbox is normalized 0..1 in both `pdf_processor.py` extraction paths — fixed stage_3 spread-assignment that was treating it as PDF-points (every image was getting mis-assigned to left page); extraction stats log post-dedup actual counts alongside pre-dedup totals.
@@ -258,7 +258,7 @@ A 7-cluster audit of the PDF orchestration pipeline surfaced ~50 silent-failure 
 
 ### Warmup — health probe before trusting "running"
 - Previous flow: HF endpoint status="running" → skip warmup. Recent run showed `skipped_count=4, success_count=0, failed_count=0` because all 4 endpoints were "running" from prior jobs but never re-validated.
-- Fixed: when status="running", call `_test_inference()` (Chandra `/health`, others their lightweight probe) — only skip if probe also passes. URL refresh now runs for SLIG/YOLO/Chandra on the skip path (was only Qwen).
+- Fixed: when status="running", call `_test_inference()` (Chandra `/health`, others their lightweight probe) — only skip if probe also passes. URL refresh now runs for SLIG/YOLO/Chandra on the skip path.
 
 ### Per-product loop — no silent swallow on resume + per-layer dedup
 - `product_processor.py:116-125`: stage_history query failure no longer silently `pass` — logs at ERROR so operators see it.

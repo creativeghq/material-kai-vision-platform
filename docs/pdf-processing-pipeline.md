@@ -737,7 +737,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 
 **🚀 ON-DEMAND DOWNLOAD ARCHITECTURE**
 
-**Model**: Claude Opus 4.7 via Anthropic tool use (post-2026-05-01 — was Qwen3-VL pre-migration, but Qwen had been 404-ing for months and silently falling through to Claude anyway)
+**Model**: Claude Opus 4.7 via Anthropic tool use
 
 **Schema enforcement**: `VisionAnalysis` Pydantic schema + `VISION_ANALYSIS_TOOL` (`app/models/vision_analysis.py`). Tool-use guarantees the response matches the schema, so Voyage's understanding-embedding space stays clean.
 

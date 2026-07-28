@@ -21,6 +21,7 @@ import { Loader2, Plus, Search, X, ImagePlus, Ruler, Check, ChevronDown, Chevron
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/core/ui/tooltip';
@@ -94,6 +95,9 @@ interface LineRow {
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** AADE VAT-category code → percent. Mirrors the table in `_shared/fiscal/invoice-builder.ts`. */
+const VAT_PCT_BY_CATEGORY: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
 
 /** Read a File as raw base64 (no data-URL prefix) — what MIVAA's image search expects. */
 const fileToBase64 = (file: File): Promise<string> =>
@@ -445,7 +449,14 @@ export const ReceiveToWarehouseDialog: React.FC<{
           await warehouseService.updateProductFiscal(productId, fiscal);
         }
 
-        const price = parseDecimalOr(r.salePrice, NaN);
+        // "The sale price I typed includes VAT": store the NET list price, because that is
+        // what every downstream reader (quote/order lines, invoice-builder, marketplace)
+        // assumes. Netting here rather than at read time keeps one meaning for list_price.
+        const typed = parseDecimalOr(r.salePrice, NaN);
+        const saleVatPct = VAT_PCT_BY_CATEGORY[Number(r.vatCategory)] ?? null;
+        const price = r.pricesIncludeVat && Number.isFinite(typed) && saleVatPct != null
+          ? r2(typed / (1 + saleVatPct / 100))
+          : typed;
         const discount = num(r.defaultDiscount);
         if (productId && (Number.isFinite(price) && price > 0 || discount != null)) {
           await marketplacePricingService.setListPrice(
@@ -503,10 +514,14 @@ export const ReceiveToWarehouseDialog: React.FC<{
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
               <div className="flex items-center gap-2">
                 <label className="flex items-center gap-1.5 cursor-pointer" title="Select / deselect every line">
-                  <input type="checkbox" className="h-3.5 w-3.5 rounded"
-                    checked={includedCount === receivable.length && receivable.length > 0}
-                    ref={(el) => { if (el) el.indeterminate = includedCount > 0 && includedCount < receivable.length; }}
-                    onChange={(e) => toggleAll(e.target.checked)} />
+                  <Checkbox
+                    checked={
+                      includedCount === 0 ? false
+                        : includedCount === receivable.length ? true
+                        : 'indeterminate'
+                    }
+                    onCheckedChange={(v) => toggleAll(v === true)}
+                  />
                   <span>{includedCount} of {receivable.length} selected</span>
                 </label>
                 <span className="text-muted-foreground/60">·</span>
@@ -521,8 +536,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
                 </Select>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={addToCatalog}
-                  onChange={(e) => setAddToCatalog(e.target.checked)} />
+                <Checkbox checked={addToCatalog} onCheckedChange={(v) => setAddToCatalog(v === true)} />
                 <span>Also add new items to the sellable catalog</span>
               </label>
             </div>
@@ -649,9 +663,10 @@ const LineCard: React.FC<{
           Fixed-width right-hand columns keep every row's controls on the same vertical line
           however long the supplier's description is. */}
       <div className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 p-2.5">
-        <input
-          type="checkbox" className="h-4 w-4 rounded justify-self-center"
-          checked={row.include} onChange={(e) => onChange({ include: e.target.checked })}
+        <Checkbox
+          className="justify-self-center"
+          checked={row.include}
+          onCheckedChange={(v) => onChange({ include: v === true })}
           title={row.include ? 'Receiving this line' : 'Not receiving this line'}
         />
         <button
@@ -711,10 +726,14 @@ const LineCard: React.FC<{
 
       {row.expanded && row.include && creating && (
         <div className="space-y-4 border-t border-border/40 p-3">
-          {/* ── General ─────────────────────────────────────────────────────────────── */}
-          <Section title="General">
-            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
-              <Field className="sm:col-span-2" label="Description">
+          {/* Ordered by how often an operator touches it: what it is → how big → what it
+              costs → how it's classified. Codes and reference fields most items never need
+              collapse into "More details", so the common path is four short rows rather than
+              a wall of twenty inputs. */}
+
+          <Section title="Identity">
+            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-6">
+              <Field className="sm:col-span-3" label="Description">
                 <Input className="h-8 text-xs" value={row.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Product name" />
               </Field>
               <Field label="Code (SKU)">
@@ -731,95 +750,50 @@ const LineCard: React.FC<{
               </Field>
               <Field label="Category">
                 <Select value={row.categoryId || NONE_OPT} onValueChange={(v) => onChange({ categoryId: v === NONE_OPT ? '' : v })}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="No category" /></SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="None" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NONE_OPT}><span className="text-muted-foreground">No category</span></SelectItem>
                     {productCategories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Invoicing unit">
-                <Select value={row.unit} onValueChange={(v) => onChange({ unit: v })}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>{UNITS.map((u) => <SelectItem key={u.key} value={u.key}>{u.label}</SelectItem>)}</SelectContent>
-                </Select>
+              <Field className="sm:col-span-3" label="Manufacturer">
+                <Input className="h-8 text-xs" value={row.manufacturer} onChange={(e) => onChange({ manufacturer: e.target.value })} placeholder="maker" />
               </Field>
-              <Field label="Barcode">
-                <Input className="h-8 text-xs" value={row.barcode} onChange={(e) => onChange({ barcode: e.target.value })} />
-              </Field>
-              <Field label="Serial number">
-                <Input className="h-8 text-xs" value={row.serialNumber} onChange={(e) => onChange({ serialNumber: e.target.value })} />
-              </Field>
-              <Field label="CPV code">
-                <Input className="h-8 text-xs" value={row.cpv} onChange={(e) => onChange({ cpv: e.target.value })} />
-              </Field>
-              <Field label="TARIC code">
-                <Input className="h-8 text-xs" value={row.taric} onChange={(e) => onChange({ taric: e.target.value })} />
-              </Field>
-              <Field label="Supplier">
-                <div className="h-8 flex items-center rounded-md border border-border/60 bg-muted/40 px-2 text-xs truncate">
-                  {row.manufacturer || '—'}
-                </div>
-              </Field>
-              <Field label="Supplier product code">
+              <Field className="sm:col-span-3" label="Supplier product code">
                 <Input className="h-8 text-xs" value={row.supplierCode} onChange={(e) => onChange({ supplierCode: e.target.value })} placeholder="their code" />
               </Field>
             </div>
           </Section>
 
-          {/* ── Metadata ────────────────────────────────────────────────────────────── */}
-          <Section title="Metadata">
-            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
+          <Section title="Size, weight & placement">
+            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-6">
               <Field label={<span className="flex items-center gap-1"><Ruler className="h-3 w-3" /> Width (mm)</span>}>
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.width} onChange={(e) => onChange({ width: e.target.value })} />
               </Field>
               <Field label="Length (mm)">
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.length} onChange={(e) => onChange({ length: e.target.value })} />
               </Field>
-              <Field label="Height / thickness (mm)">
+              <Field label="Thickness (mm)">
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.thickness} onChange={(e) => onChange({ thickness: e.target.value })} />
               </Field>
               <Field label="Weight (kg)">
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.weight} onChange={(e) => onChange({ weight: e.target.value })} />
               </Field>
-              <Field className="sm:col-span-2" label="Link">
-                <Input className="h-8 text-xs" value={row.productUrl} onChange={(e) => onChange({ productUrl: e.target.value })} placeholder="https://" />
-              </Field>
-              <Field className="sm:col-span-2" label="Warranty">
-                <Input className="h-8 text-xs" value={row.warranty} onChange={(e) => onChange({ warranty: e.target.value })} placeholder="e.g. 2 years" />
-              </Field>
-            </div>
-          </Section>
-
-          {/* ── Availability ────────────────────────────────────────────────────────── */}
-          <Section title="Availability">
-            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
-              <Field label="Quantity">
-                <div className="h-8 flex items-center rounded-md border border-border/60 bg-muted/40 px-2 text-xs">
-                  {row.qty || '—'} {suffix}
-                </div>
+              <Field label="Shelf location">
+                <Input className="h-8 text-xs" value={row.location} onChange={(e) => onChange({ location: e.target.value })} placeholder="A-12" />
               </Field>
               <Field label="Stock threshold">
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.reorderPoint}
                   onChange={(e) => onChange({ reorderPoint: e.target.value })} placeholder="0" />
               </Field>
-              <Field label="Shelf location">
-                <Input className="h-8 text-xs" value={row.location} onChange={(e) => onChange({ location: e.target.value })} placeholder="e.g. A-12" />
-              </Field>
-              <div className="flex items-end pb-1.5">
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={row.pricesIncludeVat}
-                    onChange={(e) => onChange({ pricesIncludeVat: e.target.checked })} />
-                  <span>Prices include VAT</span>
-                </label>
-              </div>
             </div>
           </Section>
 
-          {/* ── Purchase / sale price. Cost is the document's; the operator sets margin. ── */}
-          <Section title="Purchase & sale price">
-            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
-              <Field label={`Purchase price / ${suffix}`}>
+          {/* Cost is the document's own arithmetic; the operator only chooses the margin. */}
+          <Section title="Pricing">
+            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-6">
+              <Field label={`Purchase / ${suffix}`}>
                 <div className="h-8 flex items-center rounded-md border border-border/60 bg-muted/40 px-2 text-xs">
                   {cost != null ? formatMoney(cost, currency) : '—'}
                 </div>
@@ -830,7 +804,7 @@ const LineCard: React.FC<{
               <Field label="Markup %">
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.markup} onChange={(e) => onMarkup(e.target.value)} placeholder="25" />
               </Field>
-              <Field label={`Sale price / ${suffix}`}>
+              <Field label={`Sale / ${suffix}`}>
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.salePrice} onChange={(e) => onSalePrice(e.target.value)} placeholder="—" />
               </Field>
               <Field label="Sale VAT">
@@ -845,8 +819,8 @@ const LineCard: React.FC<{
                     <TooltipContent side="top" className="max-w-xs">
                       <p className="text-xs">
                         Shown on the product&apos;s price card. It does <strong>not</strong> discount a quote or
-                        order line — the pricing engine takes that from the customer
-                        (their override, or their pricing level).
+                        order line — the pricing engine takes that from the customer (their
+                        override, or their pricing level).
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -855,15 +829,20 @@ const LineCard: React.FC<{
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.defaultDiscount}
                   onChange={(e) => onChange({ defaultDiscount: e.target.value })} placeholder="0" />
               </Field>
-              <div className="sm:col-span-2 flex items-end pb-2 text-[11px] text-muted-foreground">
-                {row.grade && <span className="mr-2">Grade {row.grade} ·</span>}
-                {cost != null && line.quantity != null && <>{line.quantity} {suffix} × {formatMoney(cost, currency)} = {formatMoney(Number(line.net_value ?? 0), currency)} net</>}
+              <div className="sm:col-span-6 flex flex-wrap items-center justify-between gap-3 pt-0.5">
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <Checkbox checked={row.pricesIncludeVat} onCheckedChange={(v) => onChange({ pricesIncludeVat: v === true })} />
+                  <span>The sale price I typed includes VAT</span>
+                </label>
+                <span className="text-[11px] text-muted-foreground">
+                  {row.grade && <>Grade {row.grade} · </>}
+                  {cost != null && line.quantity != null && <>{line.quantity} {suffix} × {formatMoney(cost, currency)} = {formatMoney(Number(line.net_value ?? 0), currency)} net</>}
+                </span>
               </div>
             </div>
           </Section>
 
-          {/* ── myDATA. What makes the item transmittable. ───────────────────────────── */}
-          <Section title="myDATA">
+          <Section title="myDATA classification">
             <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
               <Field label="Income category (wholesale)">
                 <RefSelect value={row.incomeCatWholesale} options={incomeCats} onChange={(v) => onChange({ incomeCatWholesale: v })} />
@@ -880,10 +859,36 @@ const LineCard: React.FC<{
             </div>
           </Section>
 
-          {/* ── Notes ───────────────────────────────────────────────────────────────── */}
-          <Section title="Notes">
-            <Input className="h-8 text-xs" value={row.notes} onChange={(e) => onChange({ notes: e.target.value })} placeholder="Optional notes…" />
-          </Section>
+          {/* Codes and reference fields most items never need. */}
+          <details className="group rounded-md border border-border/40 px-3 py-2">
+            <summary className="cursor-pointer list-none text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground">
+              <span className="group-open:hidden">▸ More details — barcode, customs codes, warranty, link, notes</span>
+              <span className="hidden group-open:inline">▾ More details</span>
+            </summary>
+            <div className="mt-2 grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
+              <Field label="Barcode">
+                <Input className="h-8 text-xs" value={row.barcode} onChange={(e) => onChange({ barcode: e.target.value })} />
+              </Field>
+              <Field label="Serial number">
+                <Input className="h-8 text-xs" value={row.serialNumber} onChange={(e) => onChange({ serialNumber: e.target.value })} />
+              </Field>
+              <Field label="CPV code">
+                <Input className="h-8 text-xs" value={row.cpv} onChange={(e) => onChange({ cpv: e.target.value })} />
+              </Field>
+              <Field label="TARIC code">
+                <Input className="h-8 text-xs" value={row.taric} onChange={(e) => onChange({ taric: e.target.value })} />
+              </Field>
+              <Field label="Warranty">
+                <Input className="h-8 text-xs" value={row.warranty} onChange={(e) => onChange({ warranty: e.target.value })} placeholder="e.g. 2 years" />
+              </Field>
+              <Field className="sm:col-span-3" label="Link">
+                <Input className="h-8 text-xs" value={row.productUrl} onChange={(e) => onChange({ productUrl: e.target.value })} placeholder="https://" />
+              </Field>
+              <Field className="sm:col-span-4" label="Notes">
+                <Input className="h-8 text-xs" value={row.notes} onChange={(e) => onChange({ notes: e.target.value })} placeholder="Optional notes…" />
+              </Field>
+            </div>
+          </details>
 
           {/* Catalog match + photos */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

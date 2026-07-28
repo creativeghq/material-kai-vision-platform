@@ -216,7 +216,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
    - Claude integration (Opus 4.7 vision via tool use, Sonnet 4.6 chunking, Haiku 4.5 classifiers)
    - Vision analysis (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`)
 
-10. **Model Endpoint APIs** (Qwen retired 2026-05-01, Surya-2 → PaddleOCR-VL 2026-06-13)
+10. **Model Endpoint APIs**
     - SLIG (SigLIP2) on Modal — visual embeddings (768D, 5 specialized types)
     - PaddleOCR-VL on Modal — two-stage structural layout (PP-DocLayoutV2) + OCR backbone
 
@@ -240,9 +240,9 @@ All tables use RLS policies that restrict access based on workspace membership. 
 
 ### Production AI Stack (post-2026-05-01)
 
-**Anthropic** (vision + chunking + agents, post-Qwen-removal):
+**Anthropic**:
 - **Claude Opus 4.7** — vision analysis (PRIMARY, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`); product discovery; JARVIS agent default
-- **Claude Sonnet 4.6** — chunking (PRIMARY, was Qwen pre-2026-05-01 but Qwen had been silently 404-ing for months)
+- **Claude Sonnet 4.6** — chunking
 - **Claude Haiku 4.5** — fast classification, demo agent, price-monitoring identity classifier
 
 **Voyage AI** (sole text embedder):
@@ -266,7 +266,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 - Text (Voyage 1024D) + 5× SLIG specialized (768D each) + Understanding (Voyage 1024D)
 - Synthesis: Claude Opus 4.7 (200K context)
 
-> **Qwen retirement**: All `qwen_endpoint_manager.py` code, `Settings.qwen_*` fields, qwen warmup task, qwen pricing entries, qwen Operations dashboard widgets, and the `endpoint_controller.qwen` AdaptiveConcurrency gate were deleted on 2026-05-01. Only the `VisionProvider.QWEN` enum value remains so historical pre-2026-05-01 rows still validate.
+py` code, `Settings. Only the `VisionProvider.
 
 ---
 

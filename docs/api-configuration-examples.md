@@ -31,7 +31,7 @@ If you don't provide `ai_config`, the system uses these defaults:
 
 **Defaults Used**:
 - Visual Embeddings: SLIG (SigLIP2 base, `siglip2-base-patch16-512`, native 768D) — Modal endpoint (768D)
-- Classification (primary): Claude Opus 4.7 via Anthropic tool use (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre-2026-05-01 attempted Qwen3-VL on HuggingFace with Claude fallback; the Qwen endpoint had been 404-ing for months and was retired 2026-05-01 — vision is now Anthropic-only.
+- Classification (primary): Claude Opus 4.7 via Anthropic tool use (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`). Pre;
 - Classification (validation pass): same as primary in DEFAULT_AI_CONFIG (`claude-opus-4-7`); fires when primary confidence < `classification_confidence_threshold` (default 0.7) OR primary fails. FAST_CONFIG and COST_OPTIMIZED_CONFIG override this to `claude-haiku-4-5`.
 - Discovery: Claude Opus 4.7
 - Metadata: Claude (claude-opus-4-7)

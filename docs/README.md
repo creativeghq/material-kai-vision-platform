@@ -59,7 +59,7 @@
 - Modal: SLIG SigLIP2 (768D visual, 5 specialized types — `siglip2-base-patch16-512`, native 768D; migrated off HuggingFace 2026-06-14, so HuggingFace now hosts nothing)
 - OpenAI: GPT-4o, GPT-5 (optional alternatives — NOT vision)
 - WorldLabs Marble: 3D Gaussian Splat generation
-- PaddleOCR-VL replaced Surya-2 (2026-06-13), which had replaced YOLO + Chandra; Qwen vision retired 2026-05-01
+- PaddleOCR-VL replaced Surya-2 (2026-06-13), which had replaced YOLO + Chandra;
 - Model usage by stage
 - Cost optimization
 

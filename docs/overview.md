@@ -116,11 +116,11 @@ Real-time updates → Frontend displays results
 **Claude Opus 4.7** (Vision + Deep Analysis):
 - **Use Cases**: Material image analysis (schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`), deep product analysis, quality validation, JARVIS agent
 - **Context**: 200,000 tokens
-- **Vision**: Sole vision engine post-2026-05-01. Sends base64 images with `tool_choice={'type':'tool','name':...}` forcing structured `VisionAnalysis` JSON output. Pre-2026-05-01 the stack said "Qwen for vision, Claude for validation" — but the Qwen HF endpoint had been 404-ing for months and silently falling through to Claude. The migration made the architecture honest. `qwen_endpoint_manager.py` and `QWEN_*` env vars deleted 2026-05-01.
+- **Vision**: Sole vision engine post-2026-05-01. Sends base64 images with `tool_choice={'type':'tool','name':...}` forcing structured `VisionAnalysis` JSON output. Pre. The migration made the architecture honest.
 - **Pipeline Stages**: Image Analysis (Stages 6, 8, 9), product discovery
 
 **Claude Sonnet 4.6** (Chunking):
-- **Use Cases**: Semantic text chunking (PRIMARY chunker, replaced Qwen 2026-05-01)
+- **Use Cases**: Semantic text chunking
 - **Pipeline Stages**: Stage 6 semantic chunking
 
 **Claude Haiku 4.5** (Classification):
@@ -419,7 +419,7 @@ The platform uses **7 embedding types** for comprehensive search:
 8. AI Services (10 endpoints — AI model integration)
 9. Background Jobs (7 endpoints — async job tracking)
 10. Anthropic APIs (3 endpoints — Claude integration)
-11. Model Endpoint APIs (SLIG SigLIP2 visual on Modal + PaddleOCR-VL structural layout/OCR on Modal; Qwen retired 2026-05-01, Surya-2 → PaddleOCR-VL 2026-06-13)
+11. Model Endpoint APIs
 12. Monitoring Routes (3 endpoints — health checks, metrics)
 13. AI Metrics Routes (2 endpoints — AI performance tracking)
 14. Duplicate Detection (7 endpoints — factory-based duplicate detection + merging)
@@ -538,5 +538,5 @@ The platform uses **7 embedding types** for comprehensive search:
 - ✨ VR World Generation — WorldLabs Marble + Spark.js 3D Gaussian Splat viewer (2026-02-10)
 - ✨ halfvec migration — All vector columns float16, 50% storage savings (2026-02-07)
 - ✨ 7-vector fusion search with query-adaptive weight profiles
-- ✨ Understanding embeddings — Claude Opus 4.7 vision_analysis (tool-use schema-locked) → Voyage AI 1024D embedding (Qwen path retired 2026-05-01)
+- ✨ Understanding embeddings — Claude Opus 4.7 vision_analysis (tool-use schema-locked) → Voyage AI 1024D embedding
 - ✨ B2B web search powered by Anthropic built-in web_search tool

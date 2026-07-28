@@ -35,7 +35,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    - Stage 3: Semantic Chunking
    - Stage 4: Text Embeddings (Voyage AI 1024D)
    - Stage 5: Image Extraction
-   - Stage 6: Image Analysis (Claude Opus 4.7 vision_analysis via Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` — sole vision pass post-2026-05-01; Qwen3-VL retired)
+   - Stage 6: Image Analysis
    - Stages 7-10: Multi-Vector SLIG 768D Embeddings (5 types) + Voyage 1024D understanding
    - Stage 11: Product Creation & Entity Linking
    - Stage 12: Entity Relationship Mapping
@@ -257,7 +257,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 
 | Flow | Entry Point | AI Models | Processing Time | Output |
 |------|-------------|-----------|-----------------|--------|
-| PDF Processing | Upload PDF | Claude (Opus 4.7 vision_analysis via Anthropic tool use + Sonnet 4.6 chunking), GPT-4o (alternative discovery). Qwen3-VL retired 2026-05-01 — HF endpoint had been 404-ing for months. | 2-10 min | Products, Images, Metadata |
 | Search | Search query | OpenAI, Claude | <1 sec | Ranked results |
 | Data Import | Upload XML | Claude | 1-5 min | Products, Images |
 | 3D Generation | Text prompt | Stable Diffusion | 10-30 sec | 3D models, Images |

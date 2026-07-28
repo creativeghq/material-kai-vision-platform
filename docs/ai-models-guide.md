@@ -6,7 +6,7 @@
 
 Complete reference of all AI models used across the Material KAI Vision Platform.
 
-> **Big change (2026-05-01)**: Vision is now **Anthropic-only**. Qwen has been retired from every vision call site (it had been 404-ing in 0.7s for months and silently falling through to Claude — the migration just made it honest). All segmentation, image classification, vision_analysis, and material analysis runs on `claude-opus-4-7` via Anthropic tool use, with hard schema guarantees via the `VisionAnalysis` Pydantic model.
+> **Big change (2026-05-01)**: Vision is now **Anthropic-only**.7s for months and silently falling through to Claude — the migration just made it honest). All segmentation, image classification, vision_analysis, and material analysis runs on `claude-opus-4-7` via Anthropic tool use, with hard schema guarantees via the `VisionAnalysis` Pydantic model.
 
 ---
 
@@ -68,9 +68,9 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 **Purpose**: Document chunking (sole primary chunker post-2026-05-01)
 
-**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-4-6'` (was `Qwen/Qwen3.6-35B-A3B-FP8` pre-2026-05-01)
+**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-4-6'`
 
-**Why Sonnet for chunking**: chunking is a text task at the quality ceiling — Sonnet matches Opus output quality on chunking work, so the extra Opus spend buys nothing. Qwen had been silently failing for months.
+**Why Sonnet for chunking**: chunking is a text task at the quality ceiling — Sonnet matches Opus output quality on chunking work, so the extra Opus spend buys nothing.
 
 **Capabilities**:
 - Semantic chunking
@@ -237,8 +237,6 @@ Plus the **Understanding Embedding** (1024D Voyage AI from Claude Opus 4.7 `visi
 |-------|---------------|-------|
 | Layout + Page OCR + figure boxes (Stage 1) | **PaddleOCR-VL 1.6** (Modal) | structure-first — runs BEFORE discovery |
 | Discovery | Claude Opus 4.7 (or GPT-5) | reads PaddleOCR reading-order text from the Stage 1 cache |
-| Chunking | **Claude Sonnet 4.6** | was Qwen pre-2026-05-01 |
-| Vision (primary) | **Claude Opus 4.7 (tool use)** | was Qwen pre-2026-05-01 |
 | Vision (validation pass) | Claude Opus 4.7 *or* Claude Haiku 4.5 | fires when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY → Opus; FAST/COST_OPTIMIZED → Haiku. Set via `classification_validation_model`. |
 | Phase 3 per-image OCR | **PaddleOCR-VL block OCR** | text-bearing images only; runs AFTER vision |
 | Visual Embeddings | SLIG (SigLIP2 base 768D, 5 types, 768D) | |
@@ -276,7 +274,7 @@ The canonical 100-page / 50-image reference workload lands at ~$0.36 — see the
 - `SLIG_MODAL_API_KEY` — SLIG Modal bearer (shared `paddleocr-api-key` Modal secret)
 - `PADDLEOCR_MODAL_API_KEY` — Modal PaddleOCR-VL endpoint key (the only required runtime var for the structural pass; the Modal URL is baked as a config default). CI auto-deploys the Modal app on `modal_app/**` changes via `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET`.
 
-> **Removed (2026-05-01)**: `QWEN_ENDPOINT_URL`, `QWEN_ENDPOINT_TOKEN`, and all `Settings.qwen_*` fields are gone. The HF Qwen endpoint env vars on the systemd unit can be deleted at the next deploy.
+> **Removed (2026.
 
 The model configuration maps each task to its designated model:
 - `discovery` → `claude-opus-4-7`

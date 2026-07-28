@@ -33,7 +33,7 @@ The multi-vector search has been **significantly enhanced** to be the single com
 ✅ **7 Specialized Embeddings** (SigLIP2 / SLIG + Voyage AI, updated 2026-04)
 - text_embedding (15%) - Semantic understanding (Voyage AI 1024D, dict key `text_1024`, stored in document_chunks.text_embedding)
 - visual_768 / image_slig_embeddings (15%) - Visual similarity (SigLIP2 cloud 768D)
-- understanding_1024 / image_understanding_embeddings (20%) - Spec-based semantic (Voyage AI 1024D from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage. Pre-2026-05-01 used Qwen3-VL JSON; migration retired Qwen vision (HF endpoint 404-ing for months). Provenance fields `embedding_model` + `schema_version` persisted on every row.)
+- understanding_1024 / image_understanding_embeddings (20%) - Spec-based semantic (Voyage AI 1024D from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage. Pre; Provenance fields `embedding_model` + `schema_version` persisted on every row.)
 - color_aspect_1024 / image_color_embeddings (12.5%) - Color matching (Voyage 1024D of `VisionAnalysis.colors[]`)
 - texture_aspect_1024 / image_texture_embeddings (12.5%) - Texture matching (Voyage 1024D of `VisionAnalysis.textures[] + finish`)
 - style_aspect_1024 / image_style_embeddings (12.5%) - Style matching (Voyage 1024D of `VisionAnalysis.style + surface_pattern + applications`)

@@ -96,10 +96,10 @@ BASELINE_SENTRY_ISSUES  # set in Step 2
 ### STEP 1 — Pre-flight: deploy live & prompt loaded
 
 ```
-Bash: curl -s https://v1api.materialshub.gr/health | jq '.services | {database, storage, anthropic, qwen}'
+Bash: curl -s https://v1api.materialshub.gr/health | jq '.services | {database, storage, anthropic}'
 ```
 
-**Gate 1.1**: `database.status`, `storage.status`, `anthropic.status` all `"healthy"`. Qwen may be unhealthy — that's fine, Claude fallback covers it.
+**Gate 1.1**: `database.status`, `storage.status`, `anthropic.status` all `"healthy"`. Anthropic is the only vision provider, so an unhealthy `anthropic` is a hard stop.
 
 ```
 mcp__ssh-mcp__exec: sudo journalctl -u mivaa-pdf-extractor.service --since "15 minutes ago" | grep -E "Loaded Material Image Analyzer prompt|Loaded classification prompt" | tail -5
@@ -210,8 +210,8 @@ mcp__ssh-mcp__exec: sudo journalctl -u mivaa-pdf-extractor.service --since "90 s
 | 5.2 | **Mode gate** (matches `RUN_MODE` in §2) | If `RUN_MODE = full`: `🧪 TEST MODE` MUST NOT appear; expect per-product progress for all 11 (e.g. `processing product 1/11`, ... `11/11`). If `RUN_MODE = single`: `🧪 TEST MODE: Processing first product only` MUST appear exactly once before Stage 1 starts. | Mismatch means the script was launched with the wrong flag. Reset the job via `/api/internal/reset-job/<JOB_ID>` and re-run Step 4 with the correct flag for your declared `RUN_MODE`. |
 | 5.3 | **Stage 1 — Layout extraction** | `YOLO` log lines appear OR `product_layout_regions` rows are written | If neither appears within 3 min, look up "YOLO endpoint paused" in §4. |
 | 5.4 | **Stage 2 — Chunking** | `chunks_created: N` (with N > 0) appears AND followed by `voyage-4` text-embedding calls per chunk | If chunks but no Voyage calls, look up "Voyage misconfigured" in §4. |
-| 5.5 | **Stage 3 — Image classification** | `🤖 Starting AI-based image classification` appears AND per-image classification results follow | If no Qwen calls within 3 min, look up "Qwen endpoint paused" in §4. |
-| 5.6 | **Stage 3 — Material analysis (vision_analysis)** | per material image: `🔬 ... vision_analysis valid for ... (qwen)` OR `🔬 ... vision_analysis valid for ... (claude_fallback)` | If `failed` provenance for >50% of images, look up "Qwen JSON malformed" in §4. |
+| 5.5 | **Stage 3 — Image classification** | `🤖 Starting AI-based image classification` appears AND per-image classification results follow | If no classification results within 3 min, look up "Vision calls stalled" in §4. |
+| 5.6 | **Stage 3 — Material analysis (vision_analysis)** | per material image: `🔬 ... vision_analysis valid for ... (claude)` OR `... (claude_fallback)` | If `failed` provenance for >50% of images, look up "Vision analysis failing" in §4. |
 | 5.7 | **Stage 3 — Visual SLIG embedding** | per material image: `✅ SLIG image embedding: 768D` AND `Saved visual embedding to VECS` | If absent, look up "SLIG endpoint paused" in §4. |
 | 5.8 | **Stage 3 — Specialized SLIG (color/texture/style/material)** | per material image: 4 lines of `✅ Generated color specialized embedding (768D, similarity=...)` — one each for color, texture, style, material | If only 1 of 4 appears, **STOP** the entire run — silent-fallback bug regression. Report immediately, do NOT proceed. Re-verify in Step 6 before continuing. |
 | 5.9 | **Stage 3 — Understanding embedding** | per material image with vision_analysis: `✅ Understanding embedding generated (1024D)` | If absent, look up "Voyage understanding broken" in §4. |
@@ -225,7 +225,7 @@ mcp__ssh-mcp__exec: sudo journalctl -u mivaa-pdf-extractor.service --since "90 s
 
 **Capture for the final report**: from the script's run, save the Stage 3 summary lines across all products:
 ```
-mcp__ssh-mcp__exec: grep -E "Vectors per type|Vision analysis: qwen|Icons: extracted" /tmp/test_run.log | tail -40
+mcp__ssh-mcp__exec: grep -E "Vectors per type|Vision analysis: claude|Icons: extracted" /tmp/test_run.log | tail -40
 ```
 You'll paste these into the final-result.html in Step 7.
 
@@ -260,7 +260,7 @@ mcp__supabase__execute_sql:
   WHERE document_id = '<DOCUMENT_ID>';
 ```
 
-**Gate 6.A**: `visual`, `color`, `texture`, `style`, `material` ALL equal `total_images`. `understanding >= floor(total_images * 0.9)` (allow 10% Qwen+Claude double-failure — that's the design tolerance).
+**Gate 6.A**: `visual`, `color`, `texture`, `style`, `material` ALL equal `total_images`. `understanding >= floor(total_images * 0.9)` (allow 10% vision failure — that's the design tolerance).
 
 #### Query B — Vision analysis provenance
 
@@ -272,7 +272,7 @@ mcp__supabase__execute_sql:
   GROUP BY vision_provider;
 ```
 
-**Gate 6.B**: at least one row exists with `vision_provider IN ('qwen', 'claude_fallback')`. `failed` should NOT appear (failed analyses don't write `vision_analysis`).
+**Gate 6.B**: at least one row exists with `vision_provider IN ('claude', 'claude_fallback')` — the only two values the `check_vision_provider_values` CHECK permits. `failed` should NOT appear (failed analyses don't write `vision_analysis`).
 
 #### Query C — Relationships and product count
 
@@ -607,7 +607,7 @@ Per-vector counts:
   style SLIG:         <n>/<total_regular_images>
   material SLIG:      <n>/<total_regular_images>
   understanding 1024: <n>/<total_regular_images>
-Vision analysis src:  qwen=<n> claude_fallback=<n> (failed=<n>)
+Vision analysis src:  claude=<n> claude_fallback=<n> (failed=<n>)
 Icon spec rollup:     <list of populated spec field names from Query H, e.g. slip_resistance, fire_rating, ...>
 Relationships:
   chunk-image:        <n>
@@ -641,14 +641,14 @@ Use this when a gate fails. Each row tells you the symptom, the root cause, the 
 | Symptom | Root cause | Fix → re-run step |
 |---|---|---|
 | `Material Image Analyzer prompt not found in database` at startup (Gate 1.2) | v2 prompt not seeded in DB | Run `mcp__supabase__execute_sql` to update the `prompts` row with the v2 strict-schema text. Then `mcp__ssh-mcp__sudo-exec`: `systemctl restart mivaa-pdf-extractor.service`. Wait 30s. Re-run Step 1. |
-| `Failed to resume Qwen endpoint` for every image (Stage 5.5) | HuggingFace endpoint paused or token expired | Try `mcp__ssh-mcp__exec`: `curl -s -H "Authorization: Bearer $HUGGINGFACE_API_KEY" https://huggingface.co/api/inference-endpoints/<endpoint>/resume` (only if you can find the endpoint name in env vars). Wait 60s. If that fails or token issue, **STOP** — needs user. |
-| `vision_analysis valid for ... (claude_fallback)` for >50% of images (Gate 5.6) | Qwen returning malformed JSON | The Claude fallback IS the safety net — this is acceptable for the run to pass. Note in the report and continue. If 100% claude_fallback, that's a red flag — report but don't fail. |
+| **Vision calls stalled** — no classification results for every image (Stage 5.5) | `ANTHROPIC_API_KEY` missing/expired, or Anthropic rate-limiting | Check `/health` → `services.anthropic`. Inspect `ai_usage_logs` for 401/429 rows in the run window. If the key is bad, **STOP** — needs user. |
+| **Vision analysis failing** — `claude_fallback` provenance for >50% of images (Gate 5.6) | The first Claude call is erroring or returning an off-schema tool payload; the retry is rescuing it | The retry IS the safety net, so the run can still pass. Note it in the report. 100% `claude_fallback` means the primary call never succeeds — report loudly, but don't fail the run. |
 | Step 6.G distance == 0.0 anywhere | Silent base-embedding fallback regression in `_generate_specialized_siglip_embeddings` | `Grep`: search for `specialized\[.*\] = base_image_embedding` in `mivaa-pdf-extractor/app/services/embeddings/real_embeddings_service.py`. If found, the Bug 2 fix was reverted — **STOP** and report to user. Do NOT loop. |
 | `image_understanding_embeddings` count is 0 but `vision_analysis` is populated (Gate 6.A understanding=0) | Voyage understanding call failing silently | `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service \| grep -E "Failed to generate understanding\|VOYAGE_API_KEY" \| tail -20`. If env var missing, **STOP** — needs user. |
 | `chunk_image_relationships` count is 0 for the new doc (Gate 6.C `chunk_image_links == 0`) | `entity_linking_service.link_images_to_chunks` did not run | `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service \| grep -E "Created.*chunk-image relationship\|link_images_to_chunks"`. If absent, the orchestration call was skipped. Read `mivaa-pdf-extractor/app/api/pdf_processing/product_processor.py` and trace why. |
 | `has_color_slig=false` but `vecs.image_color_embeddings` row exists (Gate 6.E mismatch) | `_set_image_flag` failed silently | `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service \| grep -E "Failed to set has_" \| tail -10`. Likely a Supabase REST client init issue. `mcp__ssh-mcp__sudo-exec`: `systemctl restart mivaa-pdf-extractor.service`. Re-run from Step 4. |
 | Step 5 `progress` stuck for 3 consecutive polls (90 s) — "stuck job" | A long-running stage is hung | `mcp__ssh-mcp__exec`: `journalctl -u mivaa-pdf-extractor.service --since "3 minutes ago" \| tail -100`. Look for the last log line. If a specific endpoint is unresponsive, that's the suspect. POST `/api/internal/reset-job/<JOB_ID>`, fix the upstream cause, re-run Step 4. |
-| Qwen 503/504 spam in Step 5 logs | HuggingFace endpoint scaling | The retry helper handles this automatically. Wait 60s and re-poll. If it persists past 5 min, scale up the endpoint replicas (if supported) or **STOP** and report. |
+| Modal 503/504 spam in Step 5 logs | SLIG / PaddleOCR endpoint cold-starting from scale-to-zero | The retry helper handles this automatically. Wait 60s and re-poll. If it persists past 5 min, **STOP** and report. |
 | Step 4 — `Job ID:` line not present in `/tmp/test_run.log` | Upload failed before producing a job | `mcp__ssh-mcp__exec`: `tail -100 /tmp/test_run.log`. Common causes: PDF URL unreachable, dedupe blocked because a stale `processing` job exists, health check failed. If dedupe, run reset on the stale job and re-run Step 4. |
 | Gate 5.1 — discovery returns count != 11 | Discovery prompt or model output drift | **STOP** the job immediately via `/api/internal/reset-job`. Report — this is a hard precondition violation and needs user investigation. |
 | Gate 5.2 — `🧪 TEST MODE` log line appears | Script was launched with `--test` by mistake | **STOP** the job via reset-job. Re-run Step 4 ensuring NO flag is passed (`./test_full_workflow.sh` only). |

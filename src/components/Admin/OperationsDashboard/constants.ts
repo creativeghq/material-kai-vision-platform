@@ -17,8 +17,6 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
 
   // Voyage AI Embeddings
   'voyage-4':         { input: 0.06, output: 0.00 },
-
-  // Qwen pricing entries removed 2026-05-01 — vision moved to Anthropic.
 };
 
 export const MODEL_CONFIGS: ModelConfig[] = [
@@ -29,8 +27,8 @@ export const MODEL_CONFIGS: ModelConfig[] = [
   // OpenAI Embeddings only
   { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small', provider: 'openai', model: 'text-embedding-3-small', inputCostPer1M: 0.02, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Text Embeddings'], totalInputTokens: 0, totalOutputTokens: 0 },
 
-  // Qwen models removed 2026-05-01 — image classification + vision analysis
-  // both run on Claude Opus 4.8 now (already listed under Anthropic above).
+  // Image classification + vision analysis both run on Claude Opus 4.8
+  // (already listed under Anthropic above).
 
   // Vision/Embedding Models (SLIG on Modal — siglip2-base-patch16-512, 768D)
   { id: 'slig-768d', name: 'SLIG 768D', provider: 'modal' as any, model: 'SLIG-768D', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Primary)'], totalInputTokens: 0, totalOutputTokens: 0 },

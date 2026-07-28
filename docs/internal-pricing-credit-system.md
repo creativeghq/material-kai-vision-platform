@@ -44,10 +44,8 @@ All three MUST be updated together.
   - Prompt caching support (reduced cost for cached tokens)
 - **Cost Calculation**: USD Cost = (input_tokens / 1M × input_price) + (output_tokens / 1M × output_price) + (cached_tokens / 1M × cached_price). Platform Credits = USD Cost × 100.
 
-### 3. **~~HuggingFace Endpoint Vision~~ — RETIRED 2026-05-01**
-- ~~Pricing Unit: Per million tokens~~
-- ~~Models Tracked: Qwen3-VL-32B, Qwen3-VL-8B~~
-- **Status**: Qwen vision endpoint deleted 2026-05-01 (had been silently 404-ing for months). Vision now runs on Anthropic Claude Opus 4.7 via tool use — billed under section 2 (Anthropic). Qwen pricing entries were removed from [`mivaa-pricing.ts`](../supabase/functions/_shared/mivaa-pricing.ts) and the Operations dashboard widgets.
+### 3. **~~HuggingFace Endpoint Vision~~ — RETIRED**
+- **Status**: HuggingFace hosts nothing. Vision runs on Anthropic Claude Opus 4.7 via tool use and is billed under section 2 (Anthropic); the GPU endpoints that remain are Modal-hosted (sections 3a and 4).
 
 ### 3a. **Modal Endpoint OCR (PaddleOCR-VL)**
 - **Pricing Unit**: Modal GPU (L4) usage, billed per second of container runtime (scale-to-zero when idle: `min_containers=0`, $0 idle)
@@ -148,7 +146,6 @@ Pricing is split across two layers:
 
 | Layer | What it covers | Storage | How to update |
 |-------|----------------|---------|---------------|
-| **AI model + external service pricing** | Claude (Opus 4.7 / Sonnet 4.6 / Haiku 4.5) / Voyage AI / SLIG SigLIP2 / PaddleOCR-VL (Modal) / OpenAI (alt) + Zernio WhatsApp, Apollo, Hunter.io, ZeroBounce, Firecrawl, FLUX, Kling, Runway, xAI Aurora, etc. (Qwen pricing entries removed 2026-05-01; Twilio/SMS removed 2026-06-08 — replaced by Zernio WhatsApp at 0.005 cr/msg billed as `zernio-whatsapp`; legacy ERP pricing entries removed when that connector was retired.) | `ai_model_pricing` DB table (`billing_type` ∈ `token_based` / `time_based` / `per_generation` / `per_unit`; `category` ∈ `llm` / `embedding` / `vision` / `generation` / `external_service`) | Admin UI at `/admin/agent-configs → AI Model Pricing` (live edit). Auto-updater cron (Sundays UTC) refreshes AI model rows where `auto_update_enabled=true`. External services are set to `auto_update_enabled=false` by default — admins update them by hand when providers change rates. |
 | **MIVAA gateway action pricing** | RAG search, image analysis (flat per-action credits) | Hardcoded TypeScript in [`mivaa-pricing.ts`](../supabase/functions/_shared/mivaa-pricing.ts) | Manual — these are platform-internal action-level prices, not third-party costs |
 
 ### Runtime behaviour

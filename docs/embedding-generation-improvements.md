@@ -172,7 +172,7 @@ Understanding embeddings capture the structured knowledge from the vision_analys
 3. **Voyage AI Embedding** → Embeds the text via `voyage-4` with `input_type="document"` → 1024D vector
 4. **VECS Storage** → Stored in `image_understanding_embeddings` collection (1024D halfvec, HNSW index)
 
-> **Why the migration matters (2026-05-01)**: Pre-migration, this pipeline read JSON from a Qwen vision endpoint that had been 404-ing for months — every Qwen call had been silently falling through to Anthropic Claude, but with regex-based JSON recovery instead of schema enforcement. The migration to Anthropic tool use locked the schema, so Voyage no longer risks embedding malformed payloads.
+> **Why the migration matters (2026. The migration to Anthropic tool use locked the schema, so Voyage no longer risks embedding malformed payloads.
 
 ### Provenance + Drift Detection
 

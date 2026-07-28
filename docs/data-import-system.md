@@ -50,7 +50,6 @@ XML Import uses **fully async processing** with unified concurrency limits:
 | **Product Batch Size** | 10 products | Memory optimization |
 | **Image Downloads** | 5 concurrent | Network optimization |
 | **Image Upload** | 10 concurrent | Supabase Storage limit |
-| **Claude Vision (Opus 4.7 via Anthropic tool use)** | 5 concurrent | AI classification — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`. (Pre-2026-05-01 was Qwen→Claude fallback; Qwen HF endpoint had been 404-ing for months → retired.) |
 | **CLIP Batch** | 20 images | Embedding generation |
 | **Download Timeout** | 30 seconds | Per-image timeout |
 | **Max File Size** | 10 MB | Image size limit |

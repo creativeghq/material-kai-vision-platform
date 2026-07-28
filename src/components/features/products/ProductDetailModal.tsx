@@ -2254,12 +2254,26 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 ].filter(Boolean) as Array<{ label: string; value: string }>;
               }
 
-              // ── Warranty (shown for categories that typically have it) ──
-              const warrantyCategories = new Set(['heating', 'sanitary', 'kitchen', 'lighting', 'furniture']);
-              if (warrantyCategories.has(uploadCat)) {
-                const warranty = tryExtract(allData?.warranty_years, commercialData?.warranty_years);
-                if (warranty) categorySpecRows.push({ label: 'Warranty', value: `${warranty} years` });
+              // ── Warranty ──
+              // The `products.warranty` COLUMN (set on warehouse intake) is free text and
+              // authoritative when present; the extracted `warranty_years` from ingestion is
+              // the fallback and only shown for categories that typically carry one.
+              const warrantyCol = (product as any)?.warranty as string | null | undefined;
+              if (warrantyCol) {
+                categorySpecRows.push({ label: 'Warranty', value: String(warrantyCol) });
+              } else {
+                const warrantyCategories = new Set(['heating', 'sanitary', 'kitchen', 'lighting', 'furniture']);
+                if (warrantyCategories.has(uploadCat)) {
+                  const warranty = tryExtract(allData?.warranty_years, commercialData?.warranty_years);
+                  if (warranty) categorySpecRows.push({ label: 'Warranty', value: `${warranty} years` });
+                }
               }
+
+              // Reference fields captured at intake. Shown here so they are not write-only.
+              const productUrl = (product as any)?.product_url as string | null | undefined;
+              if (productUrl) categorySpecRows.push({ label: 'Link', value: String(productUrl) });
+              const productNotes = (product as any)?.notes as string | null | undefined;
+              if (productNotes) categorySpecRows.push({ label: 'Notes', value: String(productNotes) });
 
               // ── Render ─────────────────────────────────────────────────
               return (

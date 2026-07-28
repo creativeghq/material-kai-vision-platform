@@ -51,7 +51,7 @@ Complete reference of all platform features and capabilities.
 **3. Multi-Vector Search** ✅
 - 7-vector fusion: text (1024D, Voyage AI), visual (768D, SigLIP2), understanding (1024D, Voyage AI), color, texture, style, material (768D each, SigLIP2)
 - All vectors stored as **halfvec** (float16) — 50% storage savings, zero accuracy loss
-- Understanding embeddings enable spec-based search (dimensions, finishes, properties) from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI 1024D. Pre-2026-05-01 used Qwen3-VL JSON; migration retired Qwen vision (HF endpoint had been 404-ing for months — was already 100% Claude in practice).
+- Understanding embeddings enable spec-based search (dimensions, finishes, properties) from Claude Opus 4.7 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI 1024D. Pre;
 - **Query-adaptive weight profiles**: 7 profiles (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced) automatically selected based on query intent
 - GPT-4o-mini parses query → selects optimal weights → adjusts fusion scoring per search
 - Response time: <200ms
@@ -389,7 +389,7 @@ Complete reference of all platform features and capabilities.
 - Anthropic (Claude Opus 4.7 / Haiku 4.5 + built-in web search for B2B)
 - OpenAI (GPT-4o, GPT-4o-mini for query parsing)
 - Voyage AI (voyage-4 text + understanding embeddings)
-- Modal Endpoint — PaddleOCR-VL layout+OCR backbone (post-2026-06-13; replaced Surya-2, which had replaced Chandra v2; pytesseract + EasyOCR removed). (Qwen3-VL HF endpoint retired 2026-05-01; vision analysis is now Anthropic-only via Claude Opus 4.7 tool use.)
+- Modal Endpoint — PaddleOCR-VL layout+OCR backbone (post-2026-06-13; replaced Surya-2, which had replaced Chandra v2; pytesseract + EasyOCR removed).
 - SLIG SigLIP2 via Modal Endpoint (5 visual embedding types, 768D each; moved off HuggingFace 2026-06-14)
 - Replicate (14 interior design generation models)
 - WorldLabs Marble (3D Gaussian Splat VR world generation)

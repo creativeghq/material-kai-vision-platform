@@ -166,8 +166,8 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 ### PDF Processing Pipeline (named stages — numbers retired)
 - **Layout + Page OCR + figure boxes (Stage 1, structure-first)**: **PaddleOCR-VL** structural pass — one call per page, runs BEFORE discovery
 - **Discovery**: Claude Opus 4.7 or GPT-5 — reads PaddleOCR's reading-order text from the cache (not raw `get_text`)
-- **Chunking**: **Claude Sonnet 4.6** (was Qwen pre-2026-05-01)
-- **Vision (primary)**: **Claude Opus 4.7 via tool use** (was Qwen pre-2026-05-01 — but Qwen had been 404-ing for months)
+- **Chunking**: **Claude Sonnet 4.6**
+- **Vision (primary)**: **Claude Opus 4.7 via tool use**
 - **Vision (validation pass)**: triggered when primary confidence < threshold OR primary fails. DEFAULT/HIGH_ACCURACY profiles use Claude Opus 4.7; FAST/COST_OPTIMIZED profiles use Claude Haiku 4.5. Driven by `classification_validation_model` in `ai_config`.
 - **Phase 3 OCR (per-image)**: **PaddleOCR-VL** block OCR, runs AFTER vision. Consumed by icon-metadata extraction + image-search labels (NOT by chunker, NOT a vision_analysis prompt input).
 - **Visual Embeddings**: SLIG (SigLIP2 base 768D, 5×768D)
@@ -292,13 +292,13 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 
 ## 🆕 Recent Model Changes
 
-**2026-05-01 — Qwen removal migration**:
-- ❌ Qwen vision models retired (HF endpoint had been 404-ing for months, falling through to Claude)
-- ❌ `qwen_endpoint_manager.py` deleted; all `Settings.qwen_*` removed; qwen warmup, dashboard widgets, pricing entries gone
+**2026-05-01
+
+.py` deleted; all `Settings.
 - ✅ Vision moved to **Claude Opus 4.7 via Anthropic tool use** (`VisionAnalysis` Pydantic schema)
-- ✅ Chunking moved from Qwen to **Claude Sonnet 4.6**
+.6**
 - ✅ Voyage drift detection: `embedding_model` + `schema_version` on every understanding-embedding row; OpenAI fallback disabled for understanding path
-- ✅ `VisionProvider.QWEN` enum value retained for historical row validation
+- ✅ `VisionProvider.
 
 **2026-06-13 — PaddleOCR-VL structural backbone** (replaced Surya-2, which had replaced YOLO + Chandra earlier the same day):
 - ✅ **PaddleOCR-VL** (two-stage: PP-DocLayoutV2 RT-DETR + 0.9B VLM) is the sole layout+OCR engine, hosted in-process on Modal; structure-first (runs before discovery)

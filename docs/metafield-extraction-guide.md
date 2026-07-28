@@ -169,7 +169,7 @@ Each chunk stores its `product_name`, `page_range`, and a `metafields` dictionar
 ## 🖼️ Stage 3: Image Processing & Visual Metafield Extraction
 
 ### AI Models & Process
-- **Claude Opus 4.7 vision_analysis**: Sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` (Anthropic tool use). Pre-2026-05-01 routed through Qwen3-VL on HuggingFace with Claude fallback; the Qwen endpoint had been 404-ing for months → retired.
+- **Claude Opus 4.7 vision_analysis**: Sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` (Anthropic tool use). Pre;
 - **SLIG (SigLIP2)**: Image embeddings (768D) for visual similarity. Note: pre-2026 docs referenced 512D CLIP; the platform migrated to 768D SLIG and dropped legacy CLIP columns in 2026-04.
 
 The AI extracts images and analyzes them for visual metafields:

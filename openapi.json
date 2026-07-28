@@ -1057,7 +1057,7 @@
           "Image Analysis"
         ],
         "summary": "Reclassify Image",
-        "description": "**🔄 Re-classify Image - Trigger AI Re-classification**\n\nRe-run the material vs non-material classification on a specific image.\n\nThis endpoint:\n1. Fetches the image from document_images table\n2. Downloads the image from Supabase Storage\n3. Re-runs Qwen Vision classification\n4. Optionally validates with secondary model (Qwen-32B or Claude)\n5. Updates the database with new classification results",
+        "description": "**🔄 Re-classify Image - Trigger AI Re-classification**\n\nRe-run the material vs non-material classification on a specific image.\n\nThis endpoint:\n1. Fetches the image from document_images table\n2. Downloads the image from Supabase Storage\n3. Re-runs Claude vision classification\n4. Optionally validates with a secondary Claude pass\n5. Updates the database with new classification results",
         "operationId": "reclassify_image_api_images_reclassify__image_id__post",
         "parameters": [
           {
