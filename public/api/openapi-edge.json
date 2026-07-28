@@ -108,10 +108,6 @@
       "description": "Saved-search material alerts."
     },
     {
-      "name": "Monitoring Crons",
-      "description": "Scheduled refreshers for price / mention / job research + LLM probes."
-    },
-    {
       "name": "Background Agents",
       "description": "Background agent execution + delegation."
     },
@@ -130,6 +126,10 @@
     {
       "name": "HR",
       "description": "HR functions."
+    },
+    {
+      "name": "Marketplace",
+      "description": "Marketplace functions."
     },
     {
       "name": "Stock",
@@ -2550,7 +2550,7 @@
         ],
         "summary": "Pull inbound documents from myDATA (RequestDocs) for configured workspaces",
         "operationId": "post_finance_inbound_sync",
-        "description": "Polls the AADE myDATA RequestDocs endpoint for each workspace that has configured inbound credentials, upserts received documents into inbound_documents, and advances the per-workspace MARK watermark. Cron path charges 2 credits per workspace; manual 'Sync now' (JWT) is free. No-ops cleanly when credentials are absent.\n\n**Response:** `{ok, workspaces, results: [{workspaceId, found, upserted, new_watermark} | {workspaceId, skipped|error}]}`",
+        "description": "Polls the AADE myDATA RequestDocs endpoint for each workspace that has configured inbound credentials, upserts received documents into inbound_documents, and advances the per-workspace MARK watermark. The manual 'Sync from myDATA' path may bound the pull to an issue-date window (date_from/date_to) so a sync doesn't drag in years of history. Cron path charges 2 credits per workspace; manual 'Sync now' (JWT) is free. No-ops cleanly when credentials are absent.\n\n**Response:** `{ok, workspaces, results: [{workspaceId, found, upserted, new_watermark, date_from?, date_to?} | {workspaceId, skipped|error}]}`",
         "security": [
           {
             "supabaseJwt": []
@@ -2606,6 +2606,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "date_from": {
+                    "type": "string",
+                    "description": "Manual path only. Start of the issue-date window to pull. Must be sent together with date_to and be <= it; sent to AADE as dateFrom in dd/MM/yyyy. Omit both to pull from the stored MARK watermark. (string (yyyy-mm-dd))"
+                  },
+                  "date_to": {
+                    "type": "string",
+                    "description": "Manual path only. End of the issue-date window to pull. Must be sent together with date_from. (string (yyyy-mm-dd))"
+                  }
                 }
               }
             }
@@ -3889,6 +3909,566 @@
         }
       }
     },
+    "/generate-contract-pdf": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Render a signed/draft contract to PDF",
+        "operationId": "post_generate_contract_pdf",
+        "description": "Renders the contract (with any collected signatures) to a PDF, overwrites it at pdf-documents/contract-output/{contract_id}.pdf (private bucket), and returns a 7-day signed URL. Requires a signed-in user; the caller is reconciled against the contract's workspace before rendering (#250 invariant 1).\n\n**Response:** `{success, url, storage_path, page_count}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contract_id": {
+                    "type": "string",
+                    "description": "contracts row ID to render"
+                  }
+                },
+                "required": [
+                  "contract_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/marketplace-price-check": {
+      "post": {
+        "tags": [
+          "Marketplace"
+        ],
+        "summary": "Check a surplus-listing price against the Operator's market cap",
+        "operationId": "post_marketplace_price_check",
+        "description": "Resolves the market price for a product (via MIVAA's market-check engine — Perplexity/DataForSEO/Firecrawl) and returns whether a proposed surplus listing price is within the Operator cap (market_median × (1 + cap%), default 20%). Same guard create_marketplace_listing enforces server-side so the client can't forge it. authenticate() + userCanAccessWorkspace(); workspace must be an approved marketplace participant.\n\n**Response:** `{ success, market_median, market_min, market_max, currency, cap_pct, max_allowed, allowed, unverified, from_cache }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workspace_id": {
+                    "type": "string"
+                  },
+                  "product_id": {
+                    "type": "string",
+                    "description": "product_id OR product_name is required"
+                  },
+                  "product_name": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "number",
+                    "description": "Proposed listing price to test against the cap"
+                  }
+                },
+                "required": [
+                  "workspace_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/seo-domain-tracker": {
+      "post": {
+        "tags": [
+          "SEO"
+        ],
+        "summary": "Weekly Rankings + Backlinks snapshots for a connected website",
+        "operationId": "post_seo_domain_tracker",
+        "description": "Snapshots DataForSEO domain rank overview (ranking keywords, organic traffic, position buckets, up/down/new/lost) + backlinks summary (backlinks, referring domains, spam score) + top ranked keywords for the site's MARKET (resolved from its GSC top country, else TLD, else US) into seo_domain_snapshots + seo_domain_keywords. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run action calls authenticate()+userCanAccessWorkspace().",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "website_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "run"
+                        ],
+                        "description": "Snapshot one website's rankings + backlinks now."
+                      },
+                      "website_id": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: { ok, error? }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "cron-run"
+                        ],
+                        "description": "x-cron-secret only — weekly snapshot of every active connected website."
+                      }
+                    },
+                    "description": "Returns: { ok, tracked, failed }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/seo-site-audit": {
+      "post": {
+        "tags": [
+          "SEO"
+        ],
+        "summary": "Site Health — homepage Lighthouse + on-page audit for a connected website",
+        "operationId": "post_seo_site_audit",
+        "description": "Runs a synchronous homepage audit (DataForSEO instant-page + Google Lighthouse) via MIVAA's quick-page route and stores Core Web Vitals / SEO / accessibility / best-practices scores + failing-audit issues in website_health_audits. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run action calls authenticate()+userCanAccessWorkspace(). The full multi-page OnPage crawl stays on-demand via the seo_site_crawl_start agent tool.",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "website_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "run"
+                        ],
+                        "description": "Audit one website's homepage now and store the result."
+                      },
+                      "website_id": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Returns: { ok, perf_score, a11y_score, bp_score, seo_score, issues }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "cron-run"
+                        ],
+                        "description": "x-cron-secret only — weekly audit of every active connected website + 180-day retention prune."
+                      }
+                    },
+                    "description": "Returns: { ok, audited, failed }"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gsc-api": {
+      "post": {
+        "tags": [
+          "SEO"
+        ],
+        "summary": "Google Search Console for connected websites (OAuth + performance sync)",
+        "operationId": "post_gsc_api",
+        "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. OAuth is SERVER-SIDE: Google's redirect_uri points at THIS function (GET ?code&state); it exchanges the code and 302s back to /profile?tab=websites&gsc=<connected|pick_property|error>. This avoids the SPA's supabase-js (detectSessionInUrl+PKCE) intercepting Google's ?code= as a login code. `state` is an HMAC-signed {website_id,user_id,ts} minted at authorize-time after authenticate()+userCanAccessWorkspace(). Tokens live in website_gsc_connections (service-role only). verify_jwt disabled so the GET callback + cron (x-cron-secret, action=cron-sync) work.\n\n**Routes / actions:**\n- `GET ?code&state` — Google's server-side redirect target. Verifies the signed state, exchanges the code, stores the connection, auto-matches the property + backfills 28 days, then 302s to the app. No JSON body.\n- `authorize` — Return the Google consent URL for a website (signed state binds the server-side callback to this website + user).\n- `list_properties` — List the GSC properties the connected Google account can access.\n- `set_property` — Bind a specific GSC property to the website when auto-match didn't.\n- `sync` — Pull the last N days of search-analytics now (default 28).\n- `disconnect` — Deactivate and clear the stored tokens (history is kept).\n- `cron-sync` — x-cron-secret only — nightly refresh of every active connection + 180-day retention prune.",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "SEO"
+        ],
+        "summary": "Google Search Console for connected websites (OAuth + performance sync)",
+        "operationId": "get_gsc_api",
+        "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. OAuth is SERVER-SIDE: Google's redirect_uri points at THIS function (GET ?code&state); it exchanges the code and 302s back to /profile?tab=websites&gsc=<connected|pick_property|error>. This avoids the SPA's supabase-js (detectSessionInUrl+PKCE) intercepting Google's ?code= as a login code. `state` is an HMAC-signed {website_id,user_id,ts} minted at authorize-time after authenticate()+userCanAccessWorkspace(). Tokens live in website_gsc_connections (service-role only). verify_jwt disabled so the GET callback + cron (x-cron-secret, action=cron-sync) work.\n\n**Routes / actions:**\n- `GET ?code&state` — Google's server-side redirect target. Verifies the signed state, exchanges the code, stores the connection, auto-matches the property + backfills 28 days, then 302s to the app. No JSON body.\n- `authorize` — Return the Google consent URL for a website (signed state binds the server-side callback to this website + user).\n- `list_properties` — List the GSC properties the connected Google account can access.\n- `set_property` — Bind a specific GSC property to the website when auto-match didn't.\n- `sync` — Pull the last N days of search-analytics now (default 28).\n- `disconnect` — Deactivate and clear the stored tokens (history is kept).\n- `cron-sync` — x-cron-secret only — nightly refresh of every active connection + 180-day retention prune.",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/generate-quote-pdf": {
       "post": {
         "tags": [
@@ -4580,140 +5160,6 @@
         }
       }
     },
-    "/job-research-cron": {
-      "post": {
-        "tags": [
-          "Monitoring Crons"
-        ],
-        "summary": "Hourly cron (at :45) that refreshes due internal job-research tracked jobs via MIVAA.",
-        "operationId": "post_job_research_cron",
-        "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/job-research/cron-refresh with limit=50. Respects volatility-aware cadence (6h/24h/48h/72h/168h). External API consumers are excluded.\n\n**Response:** `{success: boolean, message: string, backend_response: object, timestamp: string}`\n\n📖 [docs/api/job-research-api.md](job-research-api.md)",
-        "security": [
-          {
-            "cronSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/job-research-digest-cron": {
-      "post": {
-        "tags": [
-          "Monitoring Crons"
-        ],
-        "summary": "Hourly cron (at :05) that dispatches consolidated daily job-research digest emails per user.",
-        "operationId": "post_job_research_digest_cron",
-        "description": "Validates x-cron-secret, computes current UTC hour, and POSTs to MIVAA /api/v1/job-research/cron-digest?current_hour_utc=H. Users whose digest_hour_utc matches receive one consolidated email covering all their tracked job searches.\n\n**Response:** `{success: boolean, hour_utc: number, backend_response: object, timestamp: string}`\n\n📖 [docs/api/job-research-api.md](job-research-api.md)",
-        "security": [
-          {
-            "cronSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/kb-generate-embedding": {
       "post": {
         "tags": [
@@ -4797,140 +5243,6 @@
                 "required": [
                   "doc_id"
                 ]
-              }
-            }
-          }
-        }
-      }
-    },
-    "/llm-mention-probe-cron": {
-      "post": {
-        "tags": [
-          "Monitoring Crons"
-        ],
-        "summary": "Daily cron (03:00 UTC) that runs LLM visibility probes for tracked mention subjects.",
-        "operationId": "post_llm_mention_probe_cron",
-        "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/mention-monitoring/cron-probe-llm with limit=25 and min_age_days=7. Runs a 4-template x 4-model probe matrix per subject (~$0.008/subject/week).\n\n**Response:** `{success: boolean, message: string, backend_response: object, timestamp: string}`\n\n📖 [docs/api/mention-monitoring-api.md](mention-monitoring-api.md)",
-        "security": [
-          {
-            "cronSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/mention-monitoring-cron": {
-      "post": {
-        "tags": [
-          "Monitoring Crons"
-        ],
-        "summary": "Hourly cron that refreshes due internal mention-monitoring subjects via MIVAA.",
-        "operationId": "post_mention_monitoring_cron",
-        "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/mention-monitoring/cron-refresh with limit=50. Scheduled at :30 every hour by pg_cron mention-monitoring-refresh-hourly.\n\n**Response:** `{success: boolean, message: string, backend_response: object, timestamp: string}`\n\n📖 [docs/api/mention-monitoring-api.md](mention-monitoring-api.md)",
-        "security": [
-          {
-            "cronSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
               }
             }
           }
@@ -7289,73 +7601,6 @@
         }
       }
     },
-    "/price-monitoring-cron": {
-      "post": {
-        "tags": [
-          "Monitoring Crons"
-        ],
-        "summary": "Hourly cron that refreshes due internal price-monitoring tracked queries via MIVAA.",
-        "operationId": "post_price_monitoring_cron",
-        "description": "Validates x-cron-secret then delegates to MIVAA /api/v1/price-monitoring/tracked-queries/cron-refresh with limit=50. External API consumers (api_key_id IS NOT NULL) are intentionally excluded.\n\n**Response:** `{success: boolean, refreshed?: number, errors?: number}`",
-        "security": [
-          {
-            "cronSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/quote-public-share": {
       "post": {
         "tags": [
@@ -8758,17 +9003,82 @@
         }
       }
     },
-    "/ses-webhook": {
+    "/email-unsubscribe": {
+      "get": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "Public one-click marketing email opt-out (RFC 8058 List-Unsubscribe).",
+        "operationId": "get_email_unsubscribe",
+        "description": "Public compliance endpoint linked from every marketing send. GET renders a human confirmation page with a POST button (so mail-client link prefetch can't opt someone out by accident); POST is the RFC 8058 one-click path (mail client posts List-Unsubscribe=One-Click) or the form button — it verifies the token, records the opt-out, and renders a success page. No JWT (verify_jwt=false). The link carries ?w=<workspace>&e=<email>&t=<token>, where token is an HMAC-SHA256 of `workspace:lower(email)` under CRON_SECRET (no token table).\n\n**Response:** `text/html (confirmation page on GET, success page on POST)`",
+        "security": [
+          {
+            "queryToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Email"
         ],
-        "summary": "Processes SNS notifications from Amazon SES for bounces, complaints, and deliveries.",
-        "operationId": "post_ses_webhook",
-        "description": "Accepts POST from Amazon SNS; auto-confirms subscription on `SubscriptionConfirmation` messages. For `Notification` messages, parses SES bounce/complaint/delivery payloads and updates `email_logs` and `campaign_recipients` accordingly. No HMAC signature verification is performed — relies on SNS IP filtering.\n\n**Response:** `{message:string}`",
+        "summary": "Public one-click marketing email opt-out (RFC 8058 List-Unsubscribe).",
+        "operationId": "post_email_unsubscribe",
+        "description": "Public compliance endpoint linked from every marketing send. GET renders a human confirmation page with a POST button (so mail-client link prefetch can't opt someone out by accident); POST is the RFC 8058 one-click path (mail client posts List-Unsubscribe=One-Click) or the form button — it verifies the token, records the opt-out, and renders a success page. No JWT (verify_jwt=false). The link carries ?w=<workspace>&e=<email>&t=<token>, where token is an HMAC-SHA256 of `workspace:lower(email)` under CRON_SECRET (no token table).\n\n**Response:** `text/html (confirmation page on GET, success page on POST)`",
         "security": [
           {
-            "snsSignature": []
+            "queryToken": []
           }
         ],
         "responses": {
@@ -8830,27 +9140,23 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "Type": {
+                  "w": {
                     "type": "string",
-                    "description": "SNS message type: SubscriptionConfirmation or Notification"
+                    "description": "Workspace id (query param)"
                   },
-                  "Message": {
+                  "e": {
                     "type": "string",
-                    "description": "JSON-encoded SES notification payload (Bounce, Complaint, or Delivery)"
+                    "description": "Recipient email address (query param)"
                   },
-                  "TopicArn": {
+                  "t": {
                     "type": "string",
-                    "description": "SNS topic ARN"
-                  },
-                  "SubscribeURL": {
-                    "type": "string",
-                    "description": "Confirmation URL (only on SubscriptionConfirmation)"
+                    "description": "HMAC-SHA256 token of `workspace:lower(email)` under CRON_SECRET (query param)"
                   }
                 },
                 "required": [
-                  "Type",
-                  "Message",
-                  "TopicArn"
+                  "w",
+                  "e",
+                  "t"
                 ]
               }
             }
@@ -9488,6 +9794,108 @@
                 "required": [
                   "country_code",
                   "vat_number"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/company-enrich": {
+      "post": {
+        "tags": [
+          "Business Profile"
+        ],
+        "summary": "Auto-fill soft business identity (website, socials, phone, email, description, industry, employee band, city/state) via web search + Apollo, after a VAT lookup.",
+        "operationId": "post_company_enrich",
+        "description": "JWT-authenticated POST. Runs Anthropic web_search (always) merged with Apollo.io (only when APOLLO_API_KEY is set) to fill fields a VAT registry never carries. Credit-metered per invariant #10 (reserve ceiling then per-provider debit). If company_id is supplied and the caller owns the row (or is admin), only currently-empty columns are cached back onto crm_companies.\n\n**Response:** `{ok:boolean, fields:{website,email,phone,linkedin,facebook,twitter,description,industry,employee_count,city,state,country}, sources:string[], skipped:string[]}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Business/company name to research"
+                  },
+                  "country_name": {
+                    "type": "string",
+                    "description": "Country display name (e.g. Greece) to improve match quality"
+                  },
+                  "vat_number": {
+                    "type": "string",
+                    "description": "VAT/registration number, used as a research hint"
+                  },
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "Routes credit debit to the workspace pool when provided"
+                  },
+                  "company_id": {
+                    "type": "string",
+                    "description": "crm_companies.id - if provided and authorized, caches empty-only columns onto the row"
+                  }
+                },
+                "required": [
+                  "name"
                 ]
               }
             }

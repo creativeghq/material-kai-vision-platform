@@ -6,6 +6,12 @@
  * can be scheduled now and "switches on" the moment the operator pastes credentials.
  *
  * Cron: invoke with header `x-cron-secret: <CRON_SECRET>`.
+ *
+ * Manual ("Sync from myDATA") calls may bound the pull to an explicit issue-date window via
+ * `{ date_from, date_to }` (ISO `yyyy-mm-dd`) so the operator isn't dragged back through
+ * years of history. A dated pull ignores the MARK watermark on the REQUEST (`mark=0`) —
+ * otherwise an already-advanced watermark would silently empty an older window — but the
+ * stored watermark still only ever moves forward.
  */
 import { createClient } from '@supabase/supabase-js';
 import { resolveSecret } from '../_shared/secrets.ts';
@@ -26,10 +32,24 @@ function json(body: unknown, status = 200): Response {
 
 const num = (s: string | null) => (s != null && s !== '' ? Number(s) : null);
 
+/** myDATA wants `dd/MM/yyyy`; the UI sends ISO `yyyy-mm-dd`. Returns null when unparseable
+ *  so a malformed date is rejected rather than silently widening the pull. */
+function toAadeDate(iso: unknown): string | null {
+  if (typeof iso !== 'string') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
+  if (!m) return null;
+  const [, y, mo, d] = m;
+  const dt = new Date(`${y}-${mo}-${d}T00:00:00Z`);
+  if (Number.isNaN(dt.getTime())) return null;
+  return `${d}/${mo}/${y}`;
+}
+
 Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+  const body = await req.json().catch(() => ({}));
 
   // Auth: cron secret OR a signed-in finance manager (the "Sync now" button).
   const cronSecret = (await resolveSecret(supabase, 'CRON_SECRET')).value;
@@ -44,6 +64,22 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     allowedWorkspaceIds = await listUserWorkspaceIds(supabase, auth.userId);
     if (allowedWorkspaceIds.length === 0) return json({ ok: true, skipped: 'no_member_workspaces' });
   }
+
+  // Optional issue-date window (manual path only — the cron stays watermark-driven).
+  const dateFrom = cronOk ? null : toAadeDate((body as any)?.date_from);
+  const dateTo = cronOk ? null : toAadeDate((body as any)?.date_to);
+  if (!cronOk) {
+    // Reject a half-specified or malformed window instead of quietly pulling everything.
+    const gaveFrom = (body as any)?.date_from != null && (body as any)?.date_from !== '';
+    const gaveTo = (body as any)?.date_to != null && (body as any)?.date_to !== '';
+    if ((gaveFrom && !dateFrom) || (gaveTo && !dateTo) || (gaveFrom !== gaveTo)) {
+      return json({ error: 'date_from and date_to must both be supplied as yyyy-mm-dd' }, 400);
+    }
+    if (dateFrom && dateTo && String((body as any).date_from) > String((body as any).date_to)) {
+      return json({ error: 'date_from must not be after date_to' }, 400);
+    }
+  }
+  const dated = !!(dateFrom && dateTo);
 
   const defaultBase = (await resolveSecret(supabase, 'AADE_MYDATA_BASE_URL')).value || 'https://mydatapi.aade.gr/myDATA';
 
@@ -117,7 +153,11 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
 
     let xml: string;
     try {
-      const res = await fetch(`${baseUrl}/RequestDocs?mark=${encodeURIComponent(watermark)}`, {
+      // A dated pull asks from mark 0 and lets the date window do the bounding — the stored
+      // watermark may already be past the requested window's start, which would return nothing.
+      const params = new URLSearchParams({ mark: dated ? '0' : watermark });
+      if (dated) { params.set('dateFrom', dateFrom!); params.set('dateTo', dateTo!); }
+      const res = await fetch(`${baseUrl}/RequestDocs?${params.toString()}`, {
         headers: { 'aade-user-id': c.aade_user_id, 'Ocp-Apim-Subscription-Key': c.subscription_key },
       });
       xml = await res.text();
@@ -256,7 +296,10 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       }
     } catch (e) { console.error('[inbound-sync] product extraction failed', String(e)); }
 
-    summary.push({ workspaceId, found: blocks.length, upserted, extracted, new_watermark: maxMark });
+    summary.push({
+      workspaceId, found: blocks.length, upserted, extracted, new_watermark: maxMark,
+      ...(dated ? { date_from: dateFrom, date_to: dateTo } : {}),
+    });
   }
 
   return json({ ok: true, workspaces: summary.length, results: summary });

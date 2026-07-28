@@ -28,6 +28,7 @@ import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentD
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { QuickCategoryDialog } from '@/modules/finance/components/QuickCategoryDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
+import { MydataSyncDialog } from '@/modules/finance/components/MydataSyncDialog';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Input } from '@/components/core/ui/input';
@@ -109,11 +110,21 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [newCreditNoteOpen, setNewCreditNoteOpen] = useState(false);
   const [categoryKind, setCategoryKind] = useState<'income' | 'expense' | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const syncInbound = async () => {
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  // The pull is always date-bounded from the UI — the dialog asks for the window first so a
+  // sync never drags in years of AADE history.
+  const syncInbound = async (range: { dateFrom: string; dateTo: string }) => {
     setSyncing(true);
     try {
-      const res = await inboundService.syncNow();
-      toast({ title: 'myDATA sync ran', description: res?.skipped ? 'No inbound credentials configured yet (Settings → Documents).' : 'Inbox updated.' });
+      const res = await inboundService.syncNow(range);
+      const pulled = (res?.results ?? []).reduce((n: number, r: any) => n + (r?.upserted ?? 0), 0);
+      toast({
+        title: 'myDATA sync ran',
+        description: res?.skipped
+          ? 'No inbound credentials configured yet (Settings → Documents).'
+          : `${pulled} new document${pulled === 1 ? '' : 's'} for ${range.dateFrom} → ${range.dateTo}.`,
+      });
+      setSyncDialogOpen(false);
       await load();
     } catch (err: any) {
       toast({ title: 'Sync failed', description: err?.message, variant: 'destructive' });
@@ -224,7 +235,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         <Link to="/pos"><Button size="sm" variant="outline"><Receipt className="h-3.5 w-3.5 mr-1" /> Open POS</Button></Link>
       )}
       {(type === 'invoices' || type === 'expenses') && canOperateFinance && (
-        <Button size="sm" variant="outline" disabled={syncing} onClick={syncInbound}>
+        <Button size="sm" variant="outline" disabled={syncing} onClick={() => setSyncDialogOpen(true)}>
           {syncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Wallet className="h-3.5 w-3.5 mr-1" />} Sync from myDATA
         </Button>
       )}
@@ -417,6 +428,12 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           onCreated={() => { setNewExpenseOpen(false); load(); }}
         />
       )}
+      <MydataSyncDialog
+        open={syncDialogOpen}
+        onOpenChange={(v) => { if (!syncing) setSyncDialogOpen(v); }}
+        syncing={syncing}
+        onConfirm={syncInbound}
+      />
     </div>
   );
 };

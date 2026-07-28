@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (97)
+## 1. Supabase Edge Functions (98)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -100,6 +100,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `finance-send-invoice-email` | JWT | Email an invoice to its customer with optional PDF attachment |
 | `finance-send-statement` | JWT / cron | Render and email a party account-statement PDF (ledger / Καρτέλα) |
 | `finance-storefront` | public | Public online storefront: browse products and submit cart checkout |
+| `generate-contract-pdf` | JWT | Render a signed/draft contract to PDF |
 | `generate-purchase-sheet-pdf` | JWT / secret | Render a project purchase sheet (doors/windows + other purchase items) to PDF |
 | `parse-supplier-cost-list` | JWT | Parse a KB doc supplier cost list and apply costs to matching products |
 | `supplier-orders-api` _(GET + POST)_ | kai_* | Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back |
@@ -136,6 +137,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `company-enrich` | JWT | Auto-fill soft business identity (website, socials, phone, email, description, industry, employee band, city/state) via web search + Apollo, after a VAT lookup. |
 | `myaade-rgwspublic2` | JWT | Greek business lookup by ΑΦΜ via ΑΑΔΕ RgWsPublic2 SOAP service. |
 | `mygemi-opendata` | JWT | Greek company lookup by ΑΦΜ via the ΓΕΜΗ (GEMI) OpenData REST API. |
 | `role-upgrade-requests` | JWT | Dealer/factory role promotion workflow — submit, approve, and reject requests. |
@@ -184,8 +186,8 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `email-api` _(GET + POST)_ | JWT / secret | Action-discriminated email sending, domain management, logs, and analytics via Resend. |
+| `email-unsubscribe` _(GET + POST)_ | token | Public one-click marketing email opt-out (RFC 8058 List-Unsubscribe). |
 | `email-webhooks` | sig | Receives Resend delivery event webhooks and updates email_logs. |
-| `ses-webhook` | sig | Processes SNS notifications from Amazon SES for bounces, complaints, and deliveries. |
 
 **Messaging**
 
@@ -217,7 +219,10 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `gsc-api` _(GET + POST)_ | JWT / public | Google Search Console for connected websites (OAuth + performance sync) |
 | `seo-api` | JWT / cron | Unified SEO API — action-discriminated keyword research, planning, writing, analysis, and toolkit. |
+| `seo-domain-tracker` | JWT | Weekly Rankings + Backlinks snapshots for a connected website |
+| `seo-site-audit` | JWT | Site Health — homepage Lighthouse + on-page audit for a connected website |
 
 **Flows**
 
@@ -232,16 +237,6 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `check-material-alerts` | JWT | Daily cron (08:00 UTC) that matches new products against active saved searches and sends bell notifications. |
-
-**Monitoring Crons**
-
-| Function | Auth | Summary |
-|---|---|---|
-| `job-research-cron` | cron | Hourly cron (at :45) that refreshes due internal job-research tracked jobs via MIVAA. |
-| `job-research-digest-cron` | cron | Hourly cron (at :05) that dispatches consolidated daily job-research digest emails per user. |
-| `llm-mention-probe-cron` | cron | Daily cron (03:00 UTC) that runs LLM visibility probes for tracked mention subjects. |
-| `mention-monitoring-cron` | cron | Hourly cron that refreshes due internal mention-monitoring subjects via MIVAA. |
-| `price-monitoring-cron` | cron | Hourly cron that refreshes due internal price-monitoring tracked queries via MIVAA. |
 
 **Background Agents**
 
@@ -285,6 +280,12 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `hr-careers` _(GET + POST)_ | public | Public careers page + job-board API - list a workspace's open postings, read one, accept applications |
 | `hr-checkin-cron` | cron | Cron: fire late check-in alerts for employees who haven't clocked in |
 | `hr-kiosk` | public | Public attendance kiosk — VAT (+ optional PIN) clock in/out |
+
+**Marketplace**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `marketplace-price-check` | JWT | Check a surplus-listing price against the Operator's market cap |
 
 **Stock**
 

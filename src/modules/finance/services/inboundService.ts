@@ -50,9 +50,12 @@ export const inboundService = {
     return data as string;
   },
 
-  /** Manually trigger the myDATA RequestDocs pull (finance-manager). */
-  async syncNow(): Promise<any> {
-    const { data, error } = await supabase.functions.invoke('finance-inbound-sync', { body: {} });
+  /** Manually trigger the myDATA RequestDocs pull (finance-manager).
+   *  Pass an ISO `yyyy-mm-dd` window to bound the pull to those issue dates — without it the
+   *  pull runs from the stored MARK watermark, which on a first sync means all of history. */
+  async syncNow(range?: { dateFrom: string; dateTo: string }): Promise<any> {
+    const body = range ? { date_from: range.dateFrom, date_to: range.dateTo } : {};
+    const { data, error } = await supabase.functions.invoke('finance-inbound-sync', { body });
     if (error) throw await edgeError(error);
     return data;
   },

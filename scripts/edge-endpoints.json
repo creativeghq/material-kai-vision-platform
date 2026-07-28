@@ -1076,7 +1076,7 @@
     "name": "finance-inbound-sync",
     "tag": "Finance",
     "summary": "Pull inbound documents from myDATA (RequestDocs) for configured workspaces",
-    "description": "Polls the AADE myDATA RequestDocs endpoint for each workspace that has configured inbound credentials, upserts received documents into inbound_documents, and advances the per-workspace MARK watermark. Cron path charges 2 credits per workspace; manual 'Sync now' (JWT) is free. No-ops cleanly when credentials are absent.",
+    "description": "Polls the AADE myDATA RequestDocs endpoint for each workspace that has configured inbound credentials, upserts received documents into inbound_documents, and advances the per-workspace MARK watermark. The manual 'Sync from myDATA' path may bound the pull to an issue-date window (date_from/date_to) so a sync doesn't drag in years of history. Cron path charges 2 credits per workspace; manual 'Sync now' (JWT) is free. No-ops cleanly when credentials are absent.",
     "security": [
       "supabaseJwt",
       "cronSecret"
@@ -1085,8 +1085,21 @@
     "methods": [
       "POST"
     ],
-    "request": [],
-    "response": "{ok, workspaces, results: [{workspaceId, found, upserted, new_watermark} | {workspaceId, skipped|error}]}"
+    "request": [
+      {
+        "name": "date_from",
+        "type": "string (yyyy-mm-dd)",
+        "required": false,
+        "desc": "Manual path only. Start of the issue-date window to pull. Must be sent together with date_to and be <= it; sent to AADE as dateFrom in dd/MM/yyyy. Omit both to pull from the stored MARK watermark."
+      },
+      {
+        "name": "date_to",
+        "type": "string (yyyy-mm-dd)",
+        "required": false,
+        "desc": "Manual path only. End of the issue-date window to pull. Must be sent together with date_from."
+      }
+    ],
+    "response": "{ok, workspaces, results: [{workspaceId, found, upserted, new_watermark, date_from?, date_to?} | {workspaceId, skipped|error}]}"
   },
   {
     "name": "finance-invoice-pdf",

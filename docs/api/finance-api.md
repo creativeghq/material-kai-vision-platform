@@ -72,7 +72,7 @@ Party ledger (καρτέλα). **Single** `{ party_type:'company'|'contact', par
 
 ## `finance-inbound-sync`
 
-Pulls AADE `RequestDocs` into `inbound_documents`. **Cron** (`x-cron-secret`): all enabled workspaces, 2 cr each after success. **Manual** (finance JWT): caller's workspaces only, free. Per-workspace `is_workspace_entitled('sales-finance')` gate. `GET {baseUrl}/RequestDocs?mark={watermark}` with `aade-user-id` + `Ocp-Apim-Subscription-Key`; advances `finance_settings.inbound_last_mark`. See [finance §4](../finance-system.md#4-inbound-document-sync-finance-inbound-sync).
+Pulls AADE `RequestDocs` into `inbound_documents`. **Cron** (`x-cron-secret`): all enabled workspaces, 2 cr each after success. **Manual** (finance JWT): caller's workspaces only, free. Per-workspace `is_workspace_entitled('sales-finance')` gate. `GET {baseUrl}/RequestDocs?mark={watermark}` with `aade-user-id` + `Ocp-Apim-Subscription-Key`; advances `finance_settings.inbound_last_mark`. Optional body `{date_from, date_to}` (ISO `yyyy-mm-dd`, manual path only, both-or-neither, `from <= to` else 400) bounds the pull to that issue-date window (`dateFrom`/`dateTo` as `dd/MM/yyyy`, requested with `mark=0`). See [finance §4](../finance-system.md#4-inbound-document-sync-finance-inbound-sync).
 
 ---
 
