@@ -133,7 +133,7 @@ const CreateWorkspaceDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>New workspace</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New Workspace</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Name</Label>

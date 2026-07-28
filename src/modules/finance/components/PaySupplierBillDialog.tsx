@@ -85,7 +85,7 @@ export const PaySupplierBillDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Pay supplier bill</DialogTitle>
+          <DialogTitle>Pay Supplier Bill</DialogTitle>
           <DialogDescription>
             {bill ? <>Settle {bill.supplier_bill_number ?? 'bill'}{bill.party_name ? ` · ${bill.party_name}` : ''} — {formatMoney(bill.amount_due, bill.currency ?? 'EUR')} due.</> : 'Record a payment against this bill.'}
           </DialogDescription>

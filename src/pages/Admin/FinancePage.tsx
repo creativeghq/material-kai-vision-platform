@@ -1078,7 +1078,7 @@ const FinancePage: React.FC = () => {
           <TabsContent value="followups" className="space-y-4">
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
-                <CardTitle>Quotes needing a nudge</CardTitle>
+                <CardTitle>Quotes Needing a Nudge</CardTitle>
                 {followUps.length > 0 && (
                   <FilterBar groups={followUpGroups} values={fuValues} onChange={setFuValues} previewCount={fuPreview} title="Filter follow-ups" />
                 )}

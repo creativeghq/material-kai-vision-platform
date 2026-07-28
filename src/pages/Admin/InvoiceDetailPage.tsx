@@ -315,7 +315,7 @@ const InvoiceDetailPage: React.FC = () => {
 
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3">
-          <CardTitle>Line items</CardTitle>
+          <CardTitle>Line Items</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <table className="w-full text-sm">
@@ -392,7 +392,7 @@ const InvoiceDetailPage: React.FC = () => {
         ].filter((r) => r[1]) as [string, any][];
         return rows.length > 0 ? (
           <Card>
-            <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Payment &amp; document details</CardTitle></CardHeader>
+            <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Payment &amp; Document Details</CardTitle></CardHeader>
             <CardContent className="grid gap-x-8 gap-y-3 p-5 text-sm sm:grid-cols-2">
               {rows.map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-3">
@@ -446,7 +446,7 @@ const InvoiceDetailPage: React.FC = () => {
       {(invoice.credit_notes ?? []).length > 0 && (
         <Card>
           <CardHeader className="border-b border-border/60 px-5 py-3">
-            <CardTitle>Credit notes</CardTitle>
+            <CardTitle>Credit Notes</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <table className="w-full text-sm">
@@ -655,7 +655,7 @@ const RecordPaymentDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Record payment</DialogTitle><DialogDescription className="sr-only">Record a payment against this invoice (supports foreign-currency settlement).</DialogDescription>
+          <DialogTitle>Record Payment</DialogTitle><DialogDescription className="sr-only">Record a payment against this invoice (supports foreign-currency settlement).</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
@@ -795,7 +795,7 @@ const CreditNoteDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Issue credit note</DialogTitle><DialogDescription className="sr-only">Issue a credit note against this invoice.</DialogDescription>
+          <DialogTitle>Issue Credit Note</DialogTitle><DialogDescription className="sr-only">Issue a credit note against this invoice.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">

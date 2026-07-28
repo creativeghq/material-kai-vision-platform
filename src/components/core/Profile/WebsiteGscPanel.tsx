@@ -151,7 +151,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
     return (
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle>Pick a Search Console property</CardTitle>
+          <CardTitle>Pick a Search Console Property</CardTitle>
           <CardDescription>Connected as {status.google_email}. We couldn't auto-match a property to this site's domain — choose which one to pull data from.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">

@@ -194,7 +194,7 @@ const AddShipmentDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) =>
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Track an inbound shipment</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Track an Inbound Shipment</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-1"><Label>Reference</Label><Input autoFocus value={reference} onChange={(e) => setReference(e.target.value)} placeholder="MSCU1234567" /></div>

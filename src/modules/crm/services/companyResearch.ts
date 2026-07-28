@@ -74,6 +74,8 @@ export interface KadEntry {
   description?: string | null;
   source?: 'aade' | 'gemi';
   primary?: boolean;
+  /** The other registry that also lists this code, when both do. */
+  also_in?: 'aade' | 'gemi';
 }
 
 /** Columns that only exist on `crm_companies` — stripped when the target is a contact. */
@@ -87,9 +89,16 @@ const COMPANY_ONLY_FIELDS = new Set([
   'name',
 ]);
 
+const KAD_SOURCE_RANK: Record<'aade' | 'gemi', number> = { aade: 0, gemi: 1 };
+
 /**
- * Merge one source's ΚΑΔ into an existing kad_all, preserving the other source's entries
- * (mirrors the server-side mergeKad in the enrich edge functions).
+ * Merge one source's ΚΑΔ into an existing kad_all, preserving the other source's entries, then
+ * dedupe the union by code. Mirrors `supabase/functions/_shared/kad.ts` (same contract, other
+ * runtime) — change both together.
+ *
+ * ΑΑΔΕ and ΓΕΜΗ publish heavily overlapping activity codes. Concatenating them without a
+ * dedupe on `kad_all` is what produced a live row with 57 entries for 35 distinct codes and
+ * three rows flagged `primary` — a company has exactly one primary activity.
  */
 export function mergeKad(
   existing: unknown,
@@ -97,19 +106,50 @@ export function mergeKad(
   items: Array<{ code: string | null; description: string | null; primary: boolean }>,
 ): { kad_all: KadEntry[]; kad_codes: string[] } {
   const kept: KadEntry[] = Array.isArray(existing)
-    ? (existing as KadEntry[]).filter((x) => x && x.source && x.source !== source)
+    ? (existing as KadEntry[]).filter((x) => x && x.code && x.source && x.source !== source)
     : [];
   const fresh: KadEntry[] = items
     .filter((a) => a.code && String(a.code).trim())
     .map((a) => ({ code: String(a.code).trim(), description: a.description ?? null, source, primary: !!a.primary }));
-  const kad_all = [...kept, ...fresh];
-  const seen = new Set<string>();
-  const kad_codes: string[] = [];
-  for (const e of kad_all) {
-    const k = e.code.toLowerCase();
-    if (!seen.has(k)) { seen.add(k); kad_codes.push(e.code); }
+
+  return dedupeKad([...kept, ...fresh]);
+}
+
+/** Collapse a concatenated ΚΑΔ list to one entry per code and one primary overall. */
+export function dedupeKad(all: KadEntry[]): { kad_all: KadEntry[]; kad_codes: string[] } {
+  const byCode = new Map<string, KadEntry>();
+
+  for (const e of all) {
+    if (!e || !e.code) continue;
+    const key = String(e.code).trim().toLowerCase();
+    if (!key) continue;
+    const existing = byCode.get(key);
+    if (!existing) {
+      byCode.set(key, { ...e, code: String(e.code).trim() });
+      continue;
+    }
+    // Same code from both registries: ΑΑΔΕ (the tax registry of record) wins, but keep the
+    // other's description / primary claim and record that it listed the code too.
+    const winner = KAD_SOURCE_RANK[e.source ?? 'gemi'] < KAD_SOURCE_RANK[existing.source ?? 'gemi'] ? e : existing;
+    const loser = winner === existing ? e : existing;
+    byCode.set(key, {
+      ...winner,
+      code: String(winner.code).trim(),
+      description: winner.description ?? loser.description ?? null,
+      primary: !!winner.primary || !!loser.primary,
+      ...(winner.source !== loser.source && loser.source ? { also_in: loser.source } : {}),
+    });
   }
-  return { kad_all, kad_codes };
+
+  const kad_all = [...byCode.values()];
+
+  const primaryIdx = kad_all.findIndex((e) => e.primary && e.source === 'aade');
+  const keepIdx = primaryIdx >= 0 ? primaryIdx : kad_all.findIndex((e) => e.primary);
+  for (let i = 0; i < kad_all.length; i++) kad_all[i].primary = i === keepIdx;
+
+  kad_all.sort((a, b) => (Number(b.primary) - Number(a.primary)) || a.code.localeCompare(b.code));
+
+  return { kad_all, kad_codes: kad_all.map((e) => e.code) };
 }
 
 /** A bare 9-digit number is a Greek ΑΦΜ — the only shape ΑΑΔΕ / ΓΕΜΗ can resolve. */

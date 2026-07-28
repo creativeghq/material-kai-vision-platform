@@ -46,7 +46,7 @@ export default function SupplierClaimsPage() {
     <div className="p-6 space-y-4">
       <SectionHeader
         icon={ShieldCheck}
-        title="Supplier identity claims"
+        title="Supplier Identity Claims"
         subtitle="Approving grants the workspace cross-workspace order visibility — operator-only."
         actions={
           <Button size="sm" variant="outline" onClick={load} disabled={loading}>

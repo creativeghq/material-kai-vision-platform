@@ -119,7 +119,7 @@ export const ModuleSubscribersPanel: React.FC = () => {
     <div className="space-y-4">
       <SectionHeader
         icon={CreditCard}
-        title="Module add-ons"
+        title="Module Add-Ons"
         subtitle="Per-module activation, subscribers, and add-on MRR across all workspaces."
         actions={
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading} className="gap-2">

@@ -91,7 +91,7 @@ export const ProvidersPanel: React.FC<Props> = (_props) => {
 
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle className="font-light">Adding a new payment provider</CardTitle>
+          <CardTitle className="font-light">Adding a New Payment Provider</CardTitle>
           <CardDescription>
             Each provider is its own module under <code>src/modules/payments-&lt;slug&gt;/</code>. To add one:
             create the folder with a manifest declaring <code>provides: {'{'} payments: true {'}'}</code>,

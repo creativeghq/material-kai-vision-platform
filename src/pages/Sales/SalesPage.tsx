@@ -327,7 +327,7 @@ const NewOrderDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New order</DialogTitle>
+          <DialogTitle>New Order</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">

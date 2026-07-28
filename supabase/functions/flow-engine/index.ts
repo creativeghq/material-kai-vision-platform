@@ -354,12 +354,21 @@ async function executeAction(
     }
 
     case 'send_email': {
-      // Same migration safety guard as create_notification: if the recipient
-      // template didn't resolve (older client predating the notification→flow
-      // migration), skip rather than send a broken email.
-      const emailTo = String(resolved.to ?? '');
-      if (!emailTo || emailTo.includes('{{')) {
-        return { output: { skipped: true, reason: 'unresolved_to' } };
+      // Guard the recipient. There are TWO ways `to` arrives broken and only one was caught:
+      //   • the template never resolved            -> still contains "{{…}}"   (caught)
+      //   • the template resolved to JSON null     -> String() yields the LITERAL "null",
+      //     which is non-empty and brace-free, so it sailed through and got handed to Resend.
+      // The seeded "Order Dispatched" flow does exactly this whenever the customer has no
+      // email on file (`_notify_order_dispatched` passes customer_email: null): every dispatch
+      // then produced a 500 from email-api and a permanently `queued` row in email_logs, retried
+      // on every re-run. Anything not email-shaped is an upstream payload bug — skip it, and put
+      // the offending value in the run output so the flow run says WHY instead of failing blind.
+      const emailTo = String(resolved.to ?? '').trim();
+      const emailParts = emailTo.split(',').map((p) => p.trim()).filter(Boolean);
+      const emailToValid = emailParts.length > 0
+        && emailParts.every((p) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(p));
+      if (!emailTo || emailTo.includes('{{') || !emailToValid) {
+        return { output: { skipped: true, reason: 'unresolved_to', to: emailTo || null } };
       }
       // `variables` lets a flow fill an email template's {{tag}} placeholders.
       // The config holds it as a JSON object (templated values already resolved

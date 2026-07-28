@@ -175,7 +175,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
       <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <CardTitle className="shrink-0">Warehouse stock</CardTitle>
+          <CardTitle className="shrink-0">Warehouse Stock</CardTitle>
           {warehouses.length > 0 && (
             <Select value={selectedWh} onValueChange={(v) => load(v)}>
               <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
@@ -506,7 +506,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Add stock item</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Add Stock Item</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
 
           {!selected ? (
             <div className="space-y-3">
@@ -607,7 +607,7 @@ const AddWarehouseDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) =
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
-        <DialogHeader><DialogTitle>Add warehouse</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Add Warehouse</DialogTitle><DialogDescription className="sr-only">Warehouse stock item form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1"><Label>Name *</Label><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Athens depot" /></div>
           <div className="grid grid-cols-2 gap-3">

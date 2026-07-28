@@ -249,7 +249,7 @@ export const WorkspaceKeysTab: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      <SectionHeader icon={KeyRound} title="Keys & connections" subtitle="API keys, integrations and per-workspace credentials." />
+      <SectionHeader icon={KeyRound} title="Keys & Connections" subtitle="API keys, integrations and per-workspace credentials." />
 
       <div className="flex flex-col gap-6 md:flex-row">
         {/* Sidebar — horizontal scroll on mobile, left column on desktop */}

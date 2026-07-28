@@ -31,6 +31,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { mergeKad } from '../_shared/kad.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -69,31 +70,6 @@ interface GemiNormalized {
   is_branch: boolean | null;
   auto_registered: boolean | null;
   activities: Array<{ code: string | null; description: string | null; type: string | null }>;
-}
-
-/** One entry in the normalized ΚΑΔ list on crm_companies.kad_all (shared shape with myaade). */
-interface KadEntry { code: string; description: string | null; source: 'aade' | 'gemi'; primary: boolean }
-
-/** Merge ΓΕΜΗ ΚΑΔ into the row's kad_all, preserving ΑΑΔΕ entries. Dedupes codes. */
-function mergeKad(
-  existingAll: unknown,
-  source: 'aade' | 'gemi',
-  items: Array<{ code: string | null; description: string | null; primary: boolean }>,
-): { kad_all: KadEntry[]; kad_codes: string[] } {
-  const kept: KadEntry[] = Array.isArray(existingAll)
-    ? (existingAll as KadEntry[]).filter((x) => x && x.source && x.source !== source)
-    : [];
-  const fresh: KadEntry[] = items
-    .filter((a) => a.code && String(a.code).trim())
-    .map((a) => ({ code: String(a.code).trim(), description: a.description ?? null, source, primary: !!a.primary }));
-  const kad_all = [...kept, ...fresh];
-  const seen = new Set<string>();
-  const kad_codes: string[] = [];
-  for (const e of kad_all) {
-    const k = e.code.toLowerCase();
-    if (!seen.has(k)) { seen.add(k); kad_codes.push(e.code); }
-  }
-  return { kad_all, kad_codes };
 }
 
 function jsonResponse(body: unknown, status = 200) {

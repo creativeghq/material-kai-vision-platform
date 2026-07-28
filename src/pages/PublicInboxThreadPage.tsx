@@ -135,7 +135,7 @@ const PublicInboxThreadPage: React.FC = () => {
 
       <Dialog open={showConvert} onOpenChange={setShowConvert}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Create an account to continue</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Create an Account to Continue</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
             You can keep this conversation and access the full platform by creating a free account.
             Your messages here will be linked to your new account.

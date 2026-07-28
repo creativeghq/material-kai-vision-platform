@@ -57,7 +57,7 @@ const PublicAccountStatementPage: React.FC = () => {
               <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10">
                 <CheckCircle2 className="h-5 w-5 text-emerald-500" />
               </div>
-              <CardTitle>Payment received</CardTitle>
+              <CardTitle>Payment Received</CardTitle>
               <p className="text-sm text-muted-foreground">Thank you — your payment was completed. A receipt will be emailed to you. You can close this page, or unlock your statement below to review the balance.</p>
             </CardHeader>
           </Card>
@@ -69,7 +69,7 @@ const PublicAccountStatementPage: React.FC = () => {
               <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                 <ShieldCheck className="h-5 w-5 text-primary" />
               </div>
-              <CardTitle>Your account statement</CardTitle>
+              <CardTitle>Your Account Statement</CardTitle>
               <p className="text-sm text-muted-foreground">Enter your VAT number and email to view your statement.</p>
             </CardHeader>
             <CardContent>

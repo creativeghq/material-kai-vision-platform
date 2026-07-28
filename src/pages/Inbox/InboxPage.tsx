@@ -1674,7 +1674,7 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
         {shareUrl ? (
           <>
             <DialogHeader>
-              <DialogTitle>Share this conversation</DialogTitle>
+              <DialogTitle>Share This Conversation</DialogTitle>
               <DialogDescription>
                 This customer has no account yet. Send them this private link — they can read and reply with no login.
               </DialogDescription>
@@ -1693,7 +1693,7 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>New conversation</DialogTitle>
+              <DialogTitle>New Conversation</DialogTitle>
               <DialogDescription>Start a private team chat, or reach out to a customer.</DialogDescription>
             </DialogHeader>
             <div className="flex items-center gap-1 p-0.5 rounded-full bg-muted/40">
@@ -1815,7 +1815,7 @@ const AddParticipantDialog: React.FC<{ thread: InboxThread; onClose: () => void;
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add a teammate</DialogTitle>
+          <DialogTitle>Add a Teammate</DialogTitle>
           <DialogDescription>They'll be able to read this conversation and reply to the customer.</DialogDescription>
         </DialogHeader>
         <div className="max-h-64 overflow-y-auto space-y-1">

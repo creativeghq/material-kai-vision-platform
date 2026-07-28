@@ -378,7 +378,7 @@ export const CatalogBuilderPage: React.FC = () => {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Back cover</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Back Cover</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2">
                 <Label>Closing message</Label>
@@ -405,7 +405,7 @@ export const CatalogBuilderPage: React.FC = () => {
 
         <TabsContent value="access" className="space-y-4 mt-4">
           <Card>
-            <CardHeader><CardTitle>Email allowlist</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Email Allowlist</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
                 Visitors with these emails get access to the published catalog (in addition to platform users + CRM contacts that match by email automatically).
@@ -444,7 +444,7 @@ export const CatalogBuilderPage: React.FC = () => {
 
           <Card>
             <CardHeader className="flex-row items-center justify-between pb-3">
-              <CardTitle>Page views & downloads</CardTitle>
+              <CardTitle>Page Views & Downloads</CardTitle>
               <Button size="sm" variant="ghost" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
@@ -483,7 +483,7 @@ export const CatalogBuilderPage: React.FC = () => {
           </Card>
 
           <Card>
-            <CardHeader className="pb-3"><CardTitle>Email-gate attempts</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle>Email-Gate Attempts</CardTitle></CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               {accessLog.length === 0 ? (
                 <div className="text-sm text-muted-foreground py-4 px-4">No gate attempts yet.</div>

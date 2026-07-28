@@ -21,8 +21,15 @@ export type { KadEntry } from '@/modules/crm/services/companyResearch';
 import type { KadEntry } from '@/modules/crm/services/companyResearch';
 interface GemiPerson { personName?: string | null; businessName?: string | null; role?: string | null; percentage?: string | null; category?: string | null }
 
-const SourceBadge: React.FC<{ source?: string }> = ({ source }) =>
-  source ? <Badge variant="outline" className="text-[9px] py-0 uppercase">{source === 'gemi' ? 'ΓΕΜΗ' : 'ΑΑΔΕ'}</Badge> : null;
+const registryLabel = (s?: string) => (s === 'gemi' ? 'ΓΕΜΗ' : 'ΑΑΔΕ');
+
+/** Which registry lists this code. `alsoIn` is set when BOTH do — one row, both credited. */
+const SourceBadge: React.FC<{ source?: string; alsoIn?: string }> = ({ source, alsoIn }) =>
+  source ? (
+    <Badge variant="outline" className="text-[9px] py-0 uppercase shrink-0">
+      {alsoIn ? `${registryLabel(source)} + ${registryLabel(alsoIn)}` : registryLabel(source)}
+    </Badge>
+  ) : null;
 
 export const CompanyRegistryDetails: React.FC<{
   companyId?: string;
@@ -82,14 +89,14 @@ export const CompanyRegistryDetails: React.FC<{
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Activity codes (ΚΑΔ)</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>Activity Codes (ΚΑΔ)</DialogTitle></DialogHeader>
             <div className="max-h-[60vh] overflow-y-auto space-y-1.5">
               {codes.map((k, i) => (
                 <div key={`${k.code}-${i}`} className="flex items-start gap-2 rounded-md border border-border/50 px-2.5 py-1.5 text-xs">
                   {k.primary && <Star className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />}
                   <span className="font-mono text-foreground shrink-0">{k.code}</span>
                   <span className="text-muted-foreground flex-1">{k.description || '—'}</span>
-                  <SourceBadge source={k.source} />
+                  <SourceBadge source={k.source} alsoIn={k.also_in} />
                 </div>
               ))}
             </div>
@@ -105,7 +112,7 @@ export const CompanyRegistryDetails: React.FC<{
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>People from ΓΕΜΗ registry</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>People from ΓΕΜΗ Registry</DialogTitle></DialogHeader>
             <p className="text-[11px] text-muted-foreground -mt-1">Add any as a contact under this company.</p>
             <div className="max-h-[60vh] overflow-y-auto space-y-1.5">
               {persons.map((p, i) => {

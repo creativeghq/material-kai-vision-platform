@@ -74,7 +74,7 @@ export const BillingHistoryTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={Receipt} title="Billing history" subtitle="All your credit transactions and purchases." />
+      <SectionHeader icon={Receipt} title="Billing History" subtitle="All your credit transactions and purchases." />
       <Card className="rounded-2xl">
         <CardContent className="p-0">
         {loading ? (

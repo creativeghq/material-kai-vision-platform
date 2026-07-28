@@ -150,7 +150,7 @@ export const AddDealerProductDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Add product</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Add Product</DialogTitle></DialogHeader>
 
         <div className="space-y-4">
           {/* Basics */}

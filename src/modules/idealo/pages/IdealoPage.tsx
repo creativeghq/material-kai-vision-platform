@@ -170,7 +170,7 @@ const IdealoPage: React.FC = () => {
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <CardTitle>How it works</CardTitle>
+                <CardTitle>How It Works</CardTitle>
                 <CardDescription className="mt-2">
                   When enabled, this module runs in parallel with Perplexity, DataForSEO, and the
                   Greek marketplaces on every price discovery refresh — only for products whose
@@ -190,7 +190,7 @@ const IdealoPage: React.FC = () => {
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <div>
-              <CardTitle>Usage · last 7 days</CardTitle>
+              <CardTitle>Usage · Last 7 Days</CardTitle>
               <CardDescription>From <code>ai_usage_logs</code> tagged with this module.</CardDescription>
             </div>
             <Button variant="ghost" size="sm" onClick={loadStatus} disabled={statusLoading} className="gap-2">
@@ -258,7 +258,7 @@ const IdealoPage: React.FC = () => {
         {/* Test search */}
         <Card>
           <CardHeader>
-            <CardTitle>Test search</CardTitle>
+            <CardTitle>Test Search</CardTitle>
             <CardDescription>
               Run a one-off query against the chosen locale. Does not write to{' '}
               <code>tracked_queries</code> or <code>tracked_query_price_history</code>. Firecrawl credits debit normally.

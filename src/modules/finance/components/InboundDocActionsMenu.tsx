@@ -73,15 +73,19 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
     setExisting(null);
     setCrmOpen(true);
     // Dedupe: is a supplier with this VAT already in the workspace? RLS scopes the read.
+    // Match on BOTH the raw string and the digits-only form — a CRM row saved as "EL800370260"
+    // must still dedupe against a myDATA issuer_vat of "800370260" (an exact-string match let
+    // duplicates straight through).
     const vat = doc.issuer_vat?.trim();
     if (vat) {
       setChecking(true);
       try {
+        const forms = Array.from(new Set([vat, vat.replace(/\D/g, ''), `EL${vat.replace(/\D/g, '')}`].filter(Boolean)));
         const { data } = await supabase
           .from('crm_companies')
           .select('id, name')
           .eq('workspace_id', workspaceId)
-          .eq('vat_number', vat)
+          .in('vat_number', forms)
           .limit(1)
           .maybeSingle();
         if (data) setExisting({ id: (data as any).id, name: (data as any).name ?? null });
@@ -176,7 +180,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
       {/* Add issuer → CRM supplier */}
       <Dialog open={crmOpen} onOpenChange={setCrmOpen}>
         <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
-          <DialogHeader><DialogTitle>Add issuer as CRM supplier</DialogTitle><DialogDescription className="sr-only">Process this received (myDATA) document.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Add Issuer as CRM Supplier</DialogTitle><DialogDescription className="sr-only">Process this received (myDATA) document.</DialogDescription></DialogHeader>
           {existing ? (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
               <div className="flex items-center justify-between gap-2">

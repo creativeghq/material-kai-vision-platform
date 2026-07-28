@@ -160,7 +160,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
       <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Add employee</Button></DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add employee</DialogTitle>
+          <DialogTitle>Add Employee</DialogTitle>
           <DialogDescription>Create a new employee record with role, employment type and compensation.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

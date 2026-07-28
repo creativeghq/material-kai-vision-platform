@@ -228,7 +228,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
       {/* Unbilled + bill action */}
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
-          <CardTitle>Unbilled time</CardTitle>
+          <CardTitle>Unbilled Time</CardTitle>
           <div className="flex items-center gap-3 text-xs">
             {selectedRows.length > 0 && (
               <>

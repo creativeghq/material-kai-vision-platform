@@ -78,7 +78,7 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
     <div className="space-y-4">
       {/* Standalone gets its own page hero; embedded (Profile / Finance tab) uses the shared SectionHeader. */}
       {embedded ? (
-        <SectionHeader icon={Inbox} title="Incoming orders" subtitle="Purchase orders sent to you across every buyer." actions={headerActions} />
+        <SectionHeader icon={Inbox} title="Incoming Orders" subtitle="Purchase orders sent to you across every buyer." actions={headerActions} />
       ) : (
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">

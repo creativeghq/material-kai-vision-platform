@@ -124,7 +124,7 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Invite clients to view this project</DialogTitle>
+          <DialogTitle>Invite Clients to View This Project</DialogTitle>
           <DialogDescription>
             Invitees get an email with a link. They sign in with just their email — no password.
             They see the project overview, rooms, moodboards, sheets, and any tasks you've marked client-visible.

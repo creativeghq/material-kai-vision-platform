@@ -291,7 +291,7 @@ const AddProductDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Add product to project</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Add Product to Project</DialogTitle></DialogHeader>
 
         <div className="flex gap-2">
           <Button size="sm" variant={tab === 'catalog' ? 'default' : 'outline'} className="rounded-full flex-1" onClick={() => setTab('catalog')}>From catalog</Button>

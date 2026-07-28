@@ -95,7 +95,7 @@ export const MessagingOptoutsTab: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <SectionHeader
-        title="Opt-out List"
+        title="Opt-Out List"
         subtitle="Manage phone numbers that have opted out of messaging"
         actions={
           <Button onClick={() => setShowAddModal(true)}>
@@ -272,7 +272,7 @@ const AddOptoutModal: React.FC<AddOptoutModalProps> = ({ onClose, onSuccess }) =
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Opt-out</DialogTitle>
+          <DialogTitle>Add Opt-Out</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">

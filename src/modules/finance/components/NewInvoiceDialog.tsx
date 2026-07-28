@@ -881,7 +881,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[98vw] max-w-[1500px] h-[96vh] max-h-[96vh] overflow-hidden p-0 flex flex-col">
         <DialogHeader className="border-b border-border/60 px-5 py-3 shrink-0">
-          <DialogTitle>New invoice</DialogTitle><DialogDescription className="sr-only">Create a sales invoice or receipt and add its line items.</DialogDescription>
+          <DialogTitle>New Invoice</DialogTitle><DialogDescription className="sr-only">Create a sales invoice or receipt and add its line items.</DialogDescription>
         </DialogHeader>
 
         {/* ───────── Editable form (left) + live styled-template preview (right) ───────── */}

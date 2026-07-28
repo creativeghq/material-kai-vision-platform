@@ -20,6 +20,7 @@
  */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { mergeKad } from '../_shared/kad.ts';
 import {
   resolveAadeCredentials,
   buildSoapEnvelope,
@@ -197,35 +198,6 @@ ${JSON.stringify(src, null, 2)}`,
     console.error('[myaade-rgwspublic2] translation failed (keeping Greek only):', err);
     return null;
   }
-}
-
-/** One entry in the normalized, queryable ΚΑΔ list on crm_companies.kad_all. */
-interface KadEntry { code: string; description: string | null; source: 'aade' | 'gemi'; primary: boolean }
-
-/**
- * Merge this source's ΚΑΔ into the company's existing `kad_all`, preserving entries from the
- * OTHER source (ΑΑΔΕ enrich and ΓΕΜΗ enrich run independently and must not clobber each other).
- * Returns { kad_all, kad_codes } ready to persist. Dedupes codes case-insensitively.
- */
-export function mergeKad(
-  existingAll: unknown,
-  source: 'aade' | 'gemi',
-  items: Array<{ code: string | null; description: string | null; primary: boolean }>,
-): { kad_all: KadEntry[]; kad_codes: string[] } {
-  const kept: KadEntry[] = Array.isArray(existingAll)
-    ? (existingAll as KadEntry[]).filter((x) => x && x.source && x.source !== source)
-    : [];
-  const fresh: KadEntry[] = items
-    .filter((a) => a.code && String(a.code).trim())
-    .map((a) => ({ code: String(a.code).trim(), description: a.description ?? null, source, primary: !!a.primary }));
-  const kad_all = [...kept, ...fresh];
-  const seen = new Set<string>();
-  const kad_codes: string[] = [];
-  for (const e of kad_all) {
-    const k = e.code.toLowerCase();
-    if (!seen.has(k)) { seen.add(k); kad_codes.push(e.code); }
-  }
-  return { kad_all, kad_codes };
 }
 
 /** Operation-specific SOAP body for rgWsPublic2AfmMethod. */

@@ -51,7 +51,7 @@ export const InboundDocPreviewDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[88vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display">AADE document preview</DialogTitle>
+          <DialogTitle className="font-display">AADE Document Preview</DialogTitle>
           <DialogDescription>
             The received document as the tax authority holds it — read-only.
           </DialogDescription>

@@ -81,7 +81,7 @@ const PlansPage: React.FC = () => {
                 <CardHeader className="flex-row items-start gap-2 space-y-0">
                   <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-500" />
                   <div>
-                    <CardTitle>Dependency warnings</CardTitle>
+                    <CardTitle>Dependency Warnings</CardTitle>
                     <CardDescription>
                       A module can&apos;t work unless its prerequisite is on the same or a lower plan. Fix these:
                       <ul className="mt-1 list-disc pl-5">
@@ -98,7 +98,7 @@ const PlansPage: React.FC = () => {
             {/* Plans × modules grid */}
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3">
-                <CardTitle>Module → plan</CardTitle>
+                <CardTitle>Module → Plan</CardTitle>
                 <CardDescription className="text-xs">The lowest plan that includes each module. A plan also includes everything below it.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
@@ -143,7 +143,7 @@ const PlansPage: React.FC = () => {
             {/* Per-plan quotas */}
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3">
-                <CardTitle>Per-plan limits</CardTitle>
+                <CardTitle>Per-Plan Limits</CardTitle>
                 <CardDescription className="text-xs">Usage caps per plan. Leave blank or enter <code>-1</code> for unlimited (∞).</CardDescription>
               </CardHeader>
               <CardContent className="p-0">

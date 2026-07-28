@@ -99,7 +99,7 @@ export const ProfileMeetingsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={CalendarDays} title="Meetings & calendar" subtitle="Meetings you've logged on CRM contacts & companies. Log a meeting from a contact's Activity tab." />
+      <SectionHeader icon={CalendarDays} title="Meetings & Calendar" subtitle="Meetings you've logged on CRM contacts & companies. Log a meeting from a contact's Activity tab." />
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

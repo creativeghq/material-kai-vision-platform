@@ -137,7 +137,7 @@ export const UserProfilePage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="reviews" className="space-y-6">
-          <SectionHeader icon={Star} title="Reviews from clients" subtitle="Reviews left by people who have worked with you. You can reply to each one." />
+          <SectionHeader icon={Star} title="Reviews from Clients" subtitle="Reviews left by people who have worked with you. You can reply to each one." />
           {user && (<ReviewsSection profileUserId={user.id} currentUserId={user.id} />)}
         </TabsContent>
 

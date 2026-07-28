@@ -338,7 +338,7 @@ export const ChatStartersTab: React.FC = () => {
                 <AlertTriangle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <DialogTitle>Delete starter</DialogTitle>
+                <DialogTitle>Delete Starter</DialogTitle>
                 <DialogDescription>
                   Permanently remove "{deleting?.name}"? This cannot be undone.
                 </DialogDescription>

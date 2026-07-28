@@ -79,7 +79,7 @@ export const QuoteEmailButton: React.FC<Props> = ({ quoteId, defaultEmail, onSen
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Email this quote</DialogTitle>
+            <DialogTitle>Email This Quote</DialogTitle>
             <DialogDescription>
               We’ll send a link to a no-login view of this quote. Leave the recipient blank to
               send to the customer on file.

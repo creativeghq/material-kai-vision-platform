@@ -609,7 +609,7 @@ export function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isA
               <Coins className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-xl">Out of credits</CardTitle>
+              <CardTitle className="text-xl">Out of Credits</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 You have {(quota.credits_balance ?? 0).toLocaleString()} credits left — each scan costs {quota.credits_per_scan}. Top up to keep scanning.
               </p>

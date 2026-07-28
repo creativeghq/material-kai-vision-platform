@@ -279,6 +279,26 @@ Deno.serve(withApiLogging('email-api', async (req) => {
 
         const body: SendEmailRequest = requestBody;
 
+        // Reject a malformed recipient BEFORE any provider work. A `to` of the literal string
+        // "null" is what a flow template renders when its recipient variable is absent (the
+        // seeded Order-Dispatched flow does this whenever the customer has no email on file).
+        // Handing that to Resend is a guaranteed rejection that surfaced as a 500 — an
+        // our-fault status for what is really a bad request — and left the row stuck at
+        // `queued` forever, retried on every re-run. 400 is the honest code, and api-logger
+        // deliberately skips Sentry for 4xx so this stops looking like an outage.
+        const addrOf = (raw: string) => {
+          const m = raw.match(/<([^>]+)>\s*$/);   // accept "Name <a@b.com>" as well as "a@b.com"
+          return (m ? m[1] : raw).trim();
+        };
+        const toList = (Array.isArray(body.to) ? body.to : [body.to])
+          .map((t) => String(t ?? '').trim())
+          .filter(Boolean);
+        const toValid = toList.length > 0
+          && toList.every((t) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(addrOf(t)));
+        if (!toValid) {
+          throw new HttpError(400, `Invalid recipient address: ${JSON.stringify(body.to ?? null)}`);
+        }
+
         // Pentest #250 H4: body.workspace_id selects WHOSE Resend key + verified sender
         // domain is used. Without binding it to the caller, a workspace-A owner could
         // send from workspace B's verified domain — billed to B's key, counted against

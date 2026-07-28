@@ -123,7 +123,7 @@ export const NewCreditNoteDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>New credit note</DialogTitle><DialogDescription className="sr-only">Issue a credit note against an existing invoice.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>New Credit Note</DialogTitle><DialogDescription className="sr-only">Issue a credit note against an existing invoice.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Against invoice *</Label>

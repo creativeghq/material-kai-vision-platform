@@ -74,7 +74,7 @@ export const NewChequeDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>New cheque</DialogTitle><DialogDescription className="sr-only">Record a cheque you received or issued.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>New Cheque</DialogTitle><DialogDescription className="sr-only">Record a cheque you received or issued.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">

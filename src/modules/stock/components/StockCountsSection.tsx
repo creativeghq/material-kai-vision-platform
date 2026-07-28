@@ -161,7 +161,7 @@ const NewCountDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => vo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>New stock count</DialogTitle>
+          <DialogTitle>New Stock Count</DialogTitle>
           <DialogDescription>Start a physical stocktake for a warehouse and reconcile counted quantities.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

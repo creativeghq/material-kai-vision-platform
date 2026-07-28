@@ -121,7 +121,7 @@ function AddTaskDialog({ workspaceId, employees, onDone }: { workspaceId: string
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Add task</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Add onboarding task</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Add Onboarding Task</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Employee *</Label>

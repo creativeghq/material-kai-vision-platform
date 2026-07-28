@@ -691,7 +691,7 @@ const PosPage: React.FC = () => {
       {/* ── Doc-type modal (retail / service receipt) ── */}
       <Dialog open={docTypeOpen} onOpenChange={setDocTypeOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Select document type</DialogTitle><DialogDescription className="sr-only">Point-of-sale action.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Select Document Type</DialogTitle><DialogDescription className="sr-only">Point-of-sale action.</DialogDescription></DialogHeader>
           <div className="space-y-2">
             {(Object.keys(DOC_TYPES) as DocType[]).map((k) => (
               <button key={k} type="button" onClick={() => { setDocType(k); setDocTypeOpen(false); }}
@@ -707,7 +707,7 @@ const PosPage: React.FC = () => {
       {/* ── Customer attach modal ── */}
       <Dialog open={custOpen} onOpenChange={setCustOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Customer (optional)</DialogTitle><DialogDescription className="sr-only">Point-of-sale action.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Customer (Optional)</DialogTitle><DialogDescription className="sr-only">Point-of-sale action.</DialogDescription></DialogHeader>
           {customer && (
             <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
               <span>{customer.name}</span>

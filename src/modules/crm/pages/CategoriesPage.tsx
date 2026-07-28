@@ -337,7 +337,7 @@ export const CategoriesPanel: React.FC = () => {
       {/* Edit dialog */}
       <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit category</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Edit Category</DialogTitle></DialogHeader>
           {editing && (
             <div className="space-y-3">
               <div className="space-y-1">

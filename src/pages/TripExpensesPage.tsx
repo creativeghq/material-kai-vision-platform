@@ -16,7 +16,7 @@ const TripExpensesPage: React.FC = () => {
   return (
     <div className="mx-auto max-w-6xl p-4 sm:p-6 space-y-4">
       <SectionHeader
-        title="My expenses"
+        title="My Expenses"
         subtitle="Track your expenses by card — a sales trip, a month of expenses, anything — attach receipts, and submit to finance for approval."
       />
       {loading ? (

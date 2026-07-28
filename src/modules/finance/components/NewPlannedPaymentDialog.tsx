@@ -141,7 +141,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Add planned payment</DialogTitle>
+          <DialogTitle>Add Planned Payment</DialogTitle>
           <DialogDescription>
             Schedule an upcoming payment (or expected receipt). Won't affect AR/AP totals until you mark it Paid.
           </DialogDescription>

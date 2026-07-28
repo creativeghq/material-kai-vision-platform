@@ -240,7 +240,7 @@ export const ImageEmbeddingsInspector: React.FC<ImageEmbeddingsInspectorProps> =
       {/* Non-aspect embeddings — visual SLIG + understanding */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Primary embeddings</CardTitle>
+          <CardTitle>Primary Embeddings</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <NonAspectRow

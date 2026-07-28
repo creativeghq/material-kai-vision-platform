@@ -376,7 +376,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="digest" className="mt-0 space-y-4">
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Account statements</CardTitle></CardHeader>
+        <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Account Statements</CardTitle></CardHeader>
         <CardContent className="space-y-4 p-5">
           <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
             <div>

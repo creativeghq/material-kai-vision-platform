@@ -79,7 +79,7 @@ const MyAadeModulePage: React.FC = () => {
         {/* Registration hint */}
         <Card>
           <CardHeader>
-            <CardTitle>Don't have credentials yet?</CardTitle>
+            <CardTitle>Don't Have Credentials Yet?</CardTitle>
             <CardDescription>
               AADE requires a separate <strong>Special Access Codes</strong> credential pair — distinct from your regular TAXISnet login — created specifically for software to use on your behalf.
             </CardDescription>

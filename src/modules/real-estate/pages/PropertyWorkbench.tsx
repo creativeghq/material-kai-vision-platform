@@ -600,7 +600,7 @@ export default function PropertyWorkbench() {
       {ws && <CmaReportDialog ws={ws} propertyId={id} open={cmaOpen} onOpenChange={setCmaOpen} />}
       <Dialog open={delOpen} onOpenChange={setDelOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Delete this listing?</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Delete This Listing?</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">This permanently removes “{property.title || 'this listing'}” and its offers, viewings, photos and related records. This cannot be undone.</p>
           <DialogFooter>
             <Button variant="outline" className="rounded-full" onClick={() => setDelOpen(false)}>Cancel</Button>

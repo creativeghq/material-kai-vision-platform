@@ -111,7 +111,7 @@ export default function EmployeeSelfServicePage() {
               </CardContent>
             </Card>
             <Card>
-              <CardHeader><CardTitle>Recent punches</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Recent Punches</CardTitle></CardHeader>
               <CardContent className="p-0">
                 {punches.length === 0 ? <EmptyState icon={Clock} title="No punches yet" hint="Clock in above to start." /> : (
                   <div className="divide-y divide-border/40">
@@ -242,7 +242,7 @@ function RequestTimeOffDialog({ workspaceId, onDone }: { workspaceId: string; on
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Request time off</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Request time off</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Request Time Off</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Type</Label>

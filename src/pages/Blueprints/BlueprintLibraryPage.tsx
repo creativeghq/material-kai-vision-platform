@@ -189,7 +189,7 @@ export const BlueprintLibraryPage: React.FC = () => {
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>New blueprint</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>New Blueprint</DialogTitle></DialogHeader>
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground">Name</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Bathroom Renovation" autoFocus

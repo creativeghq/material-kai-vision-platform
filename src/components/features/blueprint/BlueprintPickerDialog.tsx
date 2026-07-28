@@ -57,7 +57,7 @@ export function BlueprintPickerDialog({ open, onOpenChange, workspaceId, onPick 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Import a blueprint</DialogTitle>
+          <DialogTitle>Import a Blueprint</DialogTitle>
           <DialogDescription>Start the plan from a reusable scope-of-works template. You can edit everything after.</DialogDescription>
         </DialogHeader>
 

@@ -106,7 +106,7 @@ export const KbCommandSearch: React.FC<Props> = ({ open, onOpenChange, allDocs, 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden p-0 shadow-lg max-w-2xl">
-        <DialogTitle className="sr-only">Search the knowledge base</DialogTitle>
+        <DialogTitle className="sr-only">Search the Knowledge Base</DialogTitle>
         <DialogDescription className="sr-only">Search articles, filter by category or brand</DialogDescription>
         <Command shouldFilter={false} className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground">
           <CommandInput value={query} onValueChange={setQuery} placeholder="Search the knowledge base…" />

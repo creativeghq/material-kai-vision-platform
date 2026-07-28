@@ -71,7 +71,7 @@ export function AccountingSection({ workspaceId, canManage }: { workspaceId: str
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Accounting documents"
+        title="Accounting Documents"
         subtitle="Upload the month's statutory payment docs (EFKA / Tax / APD) — AI reads the Payment ID & amounts"
         actions={
           <div className="flex items-center gap-2">

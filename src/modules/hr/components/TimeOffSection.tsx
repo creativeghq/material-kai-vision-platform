@@ -149,7 +149,7 @@ function LogAbsenceDialog({ workspaceId, employees, onDone }: { workspaceId: str
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
       <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Log time off</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Log time off</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Log Time Off</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Employee *</Label>
@@ -206,7 +206,7 @@ function FileLeaveDialog({ workspaceId, absence, leaveTypes, onDone }: { workspa
         <Button size="sm" variant="outline" className="rounded-full h-7 text-xs"><Send className="h-3.5 w-3.5 mr-1" />File</Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>File leave to Ergani</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>File Leave to Ergani</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">
             Files this approved absence ({absence.start_date} → {absence.end_date}) as an official leave declaration

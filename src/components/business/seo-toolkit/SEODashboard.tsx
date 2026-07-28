@@ -210,7 +210,7 @@ const KeywordResearchTab: React.FC = () => {
   return (
     <Card className="dashboard-card">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <CardTitle>Research history</CardTitle>
+        <CardTitle>Research History</CardTitle>
         <div className="flex items-center gap-2">
           <Button
             size="sm" variant={filter === 'all' ? 'default' : 'outline'}
@@ -346,7 +346,7 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
     <>
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Tracked domains</CardTitle>
+          <CardTitle>Tracked Domains</CardTitle>
           <Button onClick={() => setShowAdd(true)} size="sm" className="rounded-full">
             <Plus className="h-3 w-3 mr-1" /> Track domain
           </Button>
@@ -491,7 +491,7 @@ const AddDomainDialog: React.FC<{ open: boolean; onClose: () => void; onAdded: (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Track a new domain</DialogTitle>
+          <DialogTitle>Track a New Domain</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div>
@@ -553,7 +553,7 @@ const BacklinksTab: React.FC = () => {
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle>Backlink overview across tracked domains</CardTitle>
+        <CardTitle>Backlink Overview Across Tracked Domains</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         {domains.length === 0 ? (
@@ -604,7 +604,7 @@ const CompetitiveIntelTab: React.FC = () => {
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle>Competitive intel</CardTitle>
+        <CardTitle>Competitive Intel</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3 text-sm">

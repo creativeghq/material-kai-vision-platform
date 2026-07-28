@@ -130,7 +130,7 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between px-5 py-3 border-b border-border/60">
-          <CardTitle>Submission history</CardTitle>
+          <CardTitle>Submission History</CardTitle>
           <Button size="sm" variant="ghost" onClick={load}><RefreshCw className="h-4 w-4" /></Button>
         </CardHeader>
         <CardContent className="p-0">
@@ -218,7 +218,7 @@ function NewSubmissionDialog({ workspaceId, onDone }: { workspaceId: string; onD
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm" className="rounded-full"><Send className="h-4 w-4 mr-2" />New submission</Button></DialogTrigger>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>New Ergani submission</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New Ergani Submission</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">
             Pick a document type, load Ergani's live schema, fill in the values, and submit. Use this for E3 hire

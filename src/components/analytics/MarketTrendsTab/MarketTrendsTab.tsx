@@ -1082,7 +1082,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       {materialGrowthRates.length > 0 && (
         <>
           <SectionHeader
-            title="Where the Market is Going"
+            title="Where the Market Is Going"
             desc="Week-over-week momentum signals — emerging materials, shifting design contexts, and growing buyer segments"
             icon={TrendingUp}
           />

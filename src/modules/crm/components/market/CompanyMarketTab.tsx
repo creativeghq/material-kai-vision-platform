@@ -281,7 +281,7 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
       <CardHeader>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <CardTitle className="flex items-center gap-2"><Wallet className="h-4 w-4 text-primary" />Financial relationship</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Wallet className="h-4 w-4 text-primary" />Financial Relationship</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
               What this supplier has billed you, what you've paid, and what's outstanding — plus invoices sitting in your myDATA inbox.
             </p>
@@ -312,7 +312,9 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
 
             {unbooked && unbooked.count > 0 && (
               <Link
-                to="/finance?tab=doc_expenses"
+                // Carry the VAT so the inbox lands narrowed to THIS company — the callout counts
+                // this company's documents, so the destination must show the same set.
+                to={`/finance?tab=doc_expenses${company.vat_number ? `&issuer_vat=${encodeURIComponent(company.vat_number.replace(/\D/g, ''))}` : ''}`}
                 className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2.5 hover:bg-amber-500/[0.1] transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">

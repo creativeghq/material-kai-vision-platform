@@ -12,9 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { VatCountryCombobox } from '@/components/core/VatCountryCombobox';
 import { validateVatViaVies } from '@/services/viesService';
-import { enrichCompany } from '@/services/companyEnrichService';
-import { aadeService, type AadeLookupResult } from '@/modules/myaade';
-import { gemiService, type GemiLookupResult } from '@/services/gemiService';
+import { researchCompany, summarizeResearch } from '@/modules/crm/services/companyResearch';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 
@@ -32,79 +30,6 @@ type Role = 'customer' | 'supplier';
  * full commercial card set. See CompanyDetailPage role gating.
  */
 const isEu = (code: string) => VAT_COUNTRY_OPTIONS.find((o) => o.code === code)?.eu === true;
-
-/** Map an ΑΑΔΕ lookup onto crm_companies columns (mirrors CompanyDetailPage.adoptAadeAll). */
-function prefillFromAade(res: AadeLookupResult, vatNumber: string): Record<string, any> {
-  const r = res.basic_rec;
-  const primaryAct = res.activities.find((a) => a.kind === 1) ?? res.activities[0] ?? null;
-  const secondaryActs = res.activities.filter((a) => a.kind !== 1);
-  const combinedAddress = r.postal_address
-    ? `${r.postal_address} ${r.postal_address_no ?? ''}`.replace(/\s+/g, ' ').trim()
-    : null;
-  return {
-    name: r.onomasia ?? '',
-    vat_number: vatNumber,
-    country_code: 'EL',
-    street: r.postal_address ?? null,
-    street_number: r.postal_address_no ?? null,
-    address: combinedAddress,
-    postal_code: r.postal_zip_code ?? null,
-    city: r.postal_area_description ?? null,
-    country: r.postal_area_description ? 'Greece' : null,
-    tax_office: r.doy_descr ?? null,
-    profession: primaryAct?.description ?? null,
-    commercial_title: r.commer_title,
-    legal_status: r.legal_status_descr,
-    kad_primary: primaryAct?.code ?? null,
-    kad_primary_description: primaryAct?.description ?? null,
-    kad_secondary: secondaryActs.length > 0 ? secondaryActs : null,
-    // Normalized queryable ΚΑΔ (ΑΑΔΕ source; ΓΕΜΗ merges in later on the detail page).
-    kad_all: res.activities
-      .filter((a) => a.code)
-      .map((a) => ({ code: String(a.code), description: a.description ?? null, source: 'aade', primary: a.kind === 1 })),
-    kad_codes: [...new Set(res.activities.map((a) => a.code).filter(Boolean) as string[])],
-    business_start_date: r.regist_date ? (r.regist_date.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? null) : null,
-    aade_data: { basic_rec: r, activities: res.activities },
-    aade_data_at: res.checked_at,
-    vat_validated: r.deactivation_flag === '1' ? true : (r.deactivation_flag === '2' ? false : null),
-    vat_validated_at: res.checked_at,
-    vat_validated_name: r.onomasia,
-    vat_validated_address: combinedAddress
-      ? `${combinedAddress} ${r.postal_zip_code ?? ''} ${r.postal_area_description ?? ''}`.replace(/\s+/g, ' ').trim()
-      : null,
-    vat_validation_source: 'aade',
-  };
-}
-
-/**
- * Merge a ΓΕΜΗ lookup into the accumulated prefill (mirrors CompanyDetailPage's GEMI chain +
- * server-side mergeKad). ΑΑΔΕ never returns the GEMI number, legal form, or status, so ΓΕΜΗ fills
- * those and contributes its own ΚΑΔ activities WITHOUT clobbering the ΑΑΔΕ entries already present.
- */
-function mergeGemiIntoPrefill(prefill: Record<string, any>, g: GemiLookupResult): Record<string, any> {
-  const gm = g.gemi;
-  const existing: Array<{ code: string | null; source?: string; primary?: boolean; description?: string | null }> =
-    Array.isArray(prefill.kad_all) ? prefill.kad_all : [];
-  // Keep every non-ΓΕΜΗ entry (i.e. the ΑΑΔΕ ones) and de-dupe against codes already present.
-  const keptOther = existing.filter((x) => x && x.source !== 'gemi');
-  const seen = new Set(keptOther.map((x) => x.code));
-  const gemiKad = (gm.activities || [])
-    .filter((a) => a.code)
-    .map((a) => ({ code: String(a.code), description: a.description ?? null, source: 'gemi', primary: /κ[υύ]ρι/i.test(a.type ?? '') }))
-    .filter((x) => !seen.has(x.code));
-  const kad_all = [...keptOther, ...gemiKad];
-  const kad_codes = [...new Set(kad_all.map((x) => x.code).filter(Boolean) as string[])];
-  return {
-    ...prefill,
-    gemi_number: gm.ar_gemi,
-    gemi_legal_form: gm.legal_form,
-    gemi_status: gm.status,
-    gemi_data: g.raw ?? null,
-    gemi_data_at: g.checked_at,
-    kad_all,
-    kad_codes,
-  };
-}
 
 export const AddCompanyModal: React.FC<{
   open: boolean;
@@ -148,50 +73,25 @@ export const AddCompanyModal: React.FC<{
   };
 
   /**
-   * Auto-enrichment after a successful VAT lookup — fills the *soft* identity a VAT
-   * registry never carries (website, socials, phone, email, description, industry).
-   * Best-effort: only fills prefill slots that are still empty, and never throws, so a
-   * failed enrichment can't undo the VIES/ΑΑΔΕ result the user just got.
+   * Soft-identity enrichment (website, socials, phone, email, description, industry) for the
+   * NON-Greek path, where VIES has already resolved the legal identity. Runs the shared chain
+   * with the registry legs inert — a non-Greek VAT skips ΑΑΔΕ/ΓΕΜΗ by construction — so the
+   * blank-only fill rules stay identical to every other CRM surface.
    */
   const runEnrichment = async (companyName: string, countryName: string | null, vat: string) => {
     if (!companyName) return;
-    setStatusLine('Finding business info…');
-    try {
-      const res = await enrichCompany({
-        name: companyName,
-        countryName: countryName ?? undefined,
-        vatNumber: vat || undefined,
-        workspaceId: activeWorkspaceId ?? undefined,
-      });
-      if (res.ok && res.fields) {
-        const f = res.fields;
-        setPrefill((p) => ({
-          ...p,
-          website: p.website || f.website || null,
-          email: p.email || f.email || null,
-          phone: p.phone || f.phone || null,
-          linkedin: p.linkedin || f.linkedin || null,
-          facebook: p.facebook || f.facebook || null,
-          twitter: p.twitter || f.twitter || null,
-          description: p.description || f.description || null,
-          industry: p.industry || f.industry || null,
-          employee_count: p.employee_count || f.employee_count || null,
-          city: p.city || f.city || null,
-          state: p.state || f.state || null,
-          country: p.country || f.country || null,
-        }));
-        const filled = [
-          f.website && 'website',
-          f.phone && 'phone',
-          f.email && 'email',
-          (f.linkedin || f.facebook || f.twitter) && 'socials',
-        ].filter(Boolean);
-        if (filled.length) {
-          toast({ title: 'Business info found', description: `Added ${filled.join(', ')}. Review on the next screen.` });
-        }
-      }
-    } finally {
-      setStatusLine(null);
+    const res = await researchCompany({
+      name: companyName,
+      countryName: countryName ?? undefined,
+      vatNumber: vat || undefined,
+      workspaceId: activeWorkspaceId ?? undefined,
+      reason: 'crm_enrichment',
+      existing: prefill,
+      onProgress: setStatusLine,
+    });
+    if (Object.keys(res.fields).length > 0) {
+      setPrefill((p) => ({ ...p, ...res.fields }));
+      toast({ title: 'Business info found', description: `${summarizeResearch(res.steps)} Review on the next screen.` });
     }
   };
 
@@ -209,37 +109,38 @@ export const AddCompanyModal: React.FC<{
     setBusy(true);
     try {
       const afm = vat.replace(/[^0-9]/g, '');
-      // Greek ΑΦΜ → ΑΑΔΕ (richer: ΔΟΥ, ΚΑΔ, legal form, structured address). reason='crm_enrichment'
-      // is legitimate — we only research a business we are about to onboard as a counterparty.
+      // Greek ΑΦΜ → the ONE shared research chain (ΑΑΔΕ → ΓΕΜΗ → business research), the same
+      // routine the company/contact records and the Expenses-inbox "Add issuer to CRM" run.
+      // No companyId: the row doesn't exist yet, so everything comes back as a field patch that
+      // rides into the create form. reason='crm_enrichment' is legitimate — we only research a
+      // business we are about to onboard as a counterparty.
       if (cc === 'EL' && afm.length === 9) {
-        const res = await aadeService.lookup({ afm, reason: 'crm_enrichment', workspaceId: activeWorkspaceId ?? undefined });
-        if ('error' in res && res.error) {
-          toast({ title: 'ΑΑΔΕ lookup failed', description: res.message || res.error, variant: 'destructive' });
+        const res = await researchCompany({
+          vatNumber: vat,
+          countryCode: cc,
+          name: name.trim() || undefined,
+          workspaceId: activeWorkspaceId ?? undefined,
+          reason: 'crm_enrichment',
+          existing: prefill,
+          onProgress: setStatusLine,
+        });
+        if (!res.ok) {
+          toast({ title: 'Lookup found nothing', description: summarizeResearch(res.steps), variant: 'destructive' });
           return;
         }
-        if ('ok' in res && res.ok) {
-          const pf = prefillFromAade(res, vat);
-          setPrefill(pf);
-          if (pf.name) setName(pf.name);
-          setVerified({ name: pf.vat_validated_name ?? pf.name, address: pf.vat_validated_address, source: 'aade' });
-          toast({ title: 'ΑΑΔΕ data fetched', description: pf.name ? `Imported ${pf.name}.` : 'Business details imported.' });
-
-          // ΓΕΜΗ (Greek Commercial Registry): pulls the GEMI number — which ΑΑΔΕ does NOT return —
-          // plus legal form/status, and merges its ΚΑΔ into the ΑΑΔΕ set. Best-effort: a ΓΕΜΗ miss or
-          // outage never blocks the ΑΑΔΕ import the operator just got.
-          setStatusLine('Checking ΓΕΜΗ registry…');
-          try {
-            const g = await gemiService.lookup({ afm, reason: 'crm_enrichment', workspaceId: activeWorkspaceId ?? undefined });
-            if ('ok' in g && g.ok && g.gemi.ar_gemi) {
-              setPrefill((p) => mergeGemiIntoPrefill(p, g));
-              setVerified((v) => (v ? { ...v, gemiNumber: g.gemi.ar_gemi } : v));
-              toast({ title: 'ΓΕΜΗ number added', description: `Γ.Ε.ΜΗ.: ${g.gemi.ar_gemi}` });
-            }
-          } catch { /* ΓΕΜΗ is a best-effort add-on; ignore failures */ }
-          finally { setStatusLine(null); }
-
-          await runEnrichment(pf.name || name, 'Greece', vat);
-        }
+        const pf: Record<string, any> = { ...prefill, ...res.fields, vat_number: vat, country_code: 'EL' };
+        setPrefill(pf);
+        if (res.resolvedName) setName(res.resolvedName);
+        setVerified({
+          name: (pf.vat_validated_name as string) ?? res.resolvedName,
+          address: (pf.vat_validated_address as string) ?? null,
+          source: 'aade',
+          gemiNumber: (pf.gemi_number as string) ?? null,
+        });
+        toast({
+          title: res.resolvedName ? `Imported ${res.resolvedName}` : 'Business details imported',
+          description: summarizeResearch(res.steps),
+        });
         return;
       }
       // EU (non-Greek) → VIES. Non-EU countries are skipped (no registry to hit).
@@ -311,7 +212,7 @@ export const AddCompanyModal: React.FC<{
         {step === 'role' ? (
           <>
             <DialogHeader>
-              <DialogTitle>What are you adding?</DialogTitle>
+              <DialogTitle>What Are You Adding?</DialogTitle>
               <DialogDescription>
                 Pick the role first — it decides which form you get. Suppliers stay lean
                 (no pricing/invoicing) and can be matched to a brand; customers get the full

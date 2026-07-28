@@ -195,7 +195,7 @@ const ProductSEOTab: React.FC<Props> = ({ productId, productName, manufacturer, 
     <div className="space-y-4 p-4">
       <SectionHeader
         icon={Search}
-        title="SEO snapshot"
+        title="SEO Snapshot"
         subtitle={(
           <>
             Auto-derived target keyword: <Badge variant="outline" className="text-[10px] ml-1">{targetKeyword}</Badge>

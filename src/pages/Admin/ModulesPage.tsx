@@ -150,7 +150,7 @@ const ModulesPage: React.FC = () => {
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
                 <div>
-                  <CardTitle>Unregistered modules in database</CardTitle>
+                  <CardTitle>Unregistered Modules in Database</CardTitle>
                   <CardDescription>
                     {orphanedRows.length} module row{orphanedRows.length === 1 ? '' : 's'} in the database
                     {' '}have no matching folder under <code>src/modules/</code>:

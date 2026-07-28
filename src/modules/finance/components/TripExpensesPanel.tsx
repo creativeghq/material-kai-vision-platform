@@ -81,7 +81,7 @@ export const TripExpensesPanel: React.FC<Props> = ({ workspaceId, canReview }) =
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Expense cards"
+        title="Expense Cards"
         subtitle={canReview
           ? 'Review the team’s expense cards (trips, monthly expenses, …). Approve or reject each line; approved totals can post a reimbursement payable.'
           : 'Track your expenses by card — a sales trip, a month of expenses, anything — attach receipts, and submit to finance for approval.'}
@@ -494,7 +494,7 @@ const NewTripCardDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>New expense card</DialogTitle><DialogDescription className="sr-only">Expense card form.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>New Expense Card</DialogTitle><DialogDescription className="sr-only">Expense card form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Type</label>
@@ -583,7 +583,7 @@ const RequestCardDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Request an expense card</DialogTitle><DialogDescription className="sr-only">Expense card form.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Request an Expense Card</DialogTitle><DialogDescription className="sr-only">Expense card form.</DialogDescription></DialogHeader>
         <p className="text-xs text-muted-foreground">Create a card for a team member to fill in — they’ll get a notification with a link to add their expenses and submit.</p>
         <div className="space-y-3">
           <div className="space-y-1">
@@ -673,7 +673,7 @@ const AddExpenseDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Add expense</DialogTitle><DialogDescription className="sr-only">Expense card form.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Add Expense</DialogTitle><DialogDescription className="sr-only">Expense card form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">

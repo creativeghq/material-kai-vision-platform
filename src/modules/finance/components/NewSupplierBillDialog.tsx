@@ -199,7 +199,7 @@ export const NewSupplierBillDialog: React.FC<Props> = ({ workspaceId, open, onOp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Record supplier bill</DialogTitle>
+          <DialogTitle>Record Supplier Bill</DialogTitle>
           <DialogDescription>
             Add an incoming bill from a supplier. Supplier must be marked <code>is_supplier</code> on its CRM record.
           </DialogDescription>

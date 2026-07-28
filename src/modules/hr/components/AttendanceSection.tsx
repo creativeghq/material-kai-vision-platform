@@ -168,7 +168,7 @@ function SettingsDialog({ workspaceId, settings, onSaved }: { workspaceId: strin
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm" variant="outline" className="rounded-full"><Settings className="h-4 w-4 mr-2" />Settings</Button></DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Attendance & clock-in settings</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Attendance & Clock-In Settings</DialogTitle></DialogHeader>
         <div className="space-y-5">
           {/* Kiosk */}
           <div className="space-y-3">

@@ -105,7 +105,7 @@ function UploadDialog({ workspaceId, employees, onDone }: { workspaceId: string;
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
       <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />Upload</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Upload document</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Upload Document</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">

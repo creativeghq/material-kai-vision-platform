@@ -117,7 +117,7 @@ export const BillingTab: React.FC<{ projectId: string }> = ({ projectId }) => {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>New invoice from project</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>New Invoice from Project</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Source quote (accepted)</Label>

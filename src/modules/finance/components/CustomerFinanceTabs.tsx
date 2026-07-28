@@ -288,7 +288,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   return (
     <div className="space-y-4">
       <SectionHeader
-        title="Account overview"
+        title="Account Overview"
         actions={<>
           {ledgerHref && (
             <Link to={ledgerHref}><Button size="sm" variant="ghost"><FileText className="h-3.5 w-3.5 mr-2" /> View ledger in Finance</Button></Link>

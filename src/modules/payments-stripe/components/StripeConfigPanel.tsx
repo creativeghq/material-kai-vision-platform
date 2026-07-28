@@ -67,7 +67,7 @@ export const StripeConfigPanel: React.FC<Props> = (_props) => {
 
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle className="font-light">Quick links</CardTitle>
+          <CardTitle className="font-light">Quick Links</CardTitle>
           <CardDescription>
             Stripe Dashboard surfaces for the bits you can't configure inside the platform.
           </CardDescription>

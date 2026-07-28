@@ -216,7 +216,7 @@ export const SocialAccountsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={Share2} title="Social accounts" subtitle="Connect the accounts you publish to." />
+      <SectionHeader icon={Share2} title="Social Accounts" subtitle="Connect the accounts you publish to." />
 
       {/* Connected accounts */}
       {accounts.length > 0 && (

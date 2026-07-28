@@ -111,7 +111,7 @@ export const PaymentRowActions: React.FC<{
       {/* Edit — metadata only */}
       <Dialog open={editOpen} onOpenChange={(o) => { if (!o) setEditOpen(false); }}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Edit payment</DialogTitle><DialogDescription className="sr-only">Edit or remove this payment.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Edit Payment</DialogTitle><DialogDescription className="sr-only">Edit or remove this payment.</DialogDescription></DialogHeader>
           <p className="text-[11px] text-muted-foreground -mt-2">
             Correct where/how the money moved. The amount can't be changed here — to change it, delete this payment and record it again.
           </p>
@@ -232,7 +232,7 @@ const ReturnPaymentDialog: React.FC<{
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>Issue return</DialogTitle><DialogDescription className="sr-only">Edit or remove this payment.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Issue Return</DialogTitle><DialogDescription className="sr-only">Edit or remove this payment.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-xs text-amber-600 dark:text-amber-400">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />

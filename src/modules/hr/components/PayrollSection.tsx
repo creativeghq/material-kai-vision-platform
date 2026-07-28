@@ -258,7 +258,7 @@ function NewRunDialog({ workspaceId, onDone }: { workspaceId: string; onDone: ()
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />New run</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>New payroll run</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New Payroll Run</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1"><Label>Month *</Label><Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></div>
           <p className="text-xs text-muted-foreground">Pulls all active employees, fills gross from their salary, and computes EFKA + income tax from your payroll settings. Adjust each line before approving.</p>
@@ -319,7 +319,7 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) loadSettings(); }}>
       <DialogTrigger asChild><Button size="sm" variant="outline" className="rounded-full"><Settings2 className="h-4 w-4 mr-2" />Settings</Button></DialogTrigger>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Payroll settings</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Payroll Settings</DialogTitle></DialogHeader>
         {loading || !s ? <Skeleton className="h-40 w-full" /> : (
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">Defaults are the Greek 2026 rates. These change yearly — adjust as needed. Set country to “None” to disable auto-tax and enter deductions manually.</p>

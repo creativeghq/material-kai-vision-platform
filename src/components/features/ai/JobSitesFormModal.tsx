@@ -163,7 +163,7 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add a job site</DialogTitle>
+          <DialogTitle>Add a Job Site</DialogTitle>
         </DialogHeader>
         <Tabs value={tab} onValueChange={v => setTab(v as 'single' | 'bulk')}>
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-3">

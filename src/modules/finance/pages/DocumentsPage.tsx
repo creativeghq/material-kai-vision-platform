@@ -6,7 +6,7 @@
  * Expenses inbox (`inbound_documents`) are fully wired surfaces alongside invoices.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -82,6 +82,7 @@ const CategoryCell: React.FC<{
 const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { isAccountant, canOperateFinance } = usePermissions();
@@ -204,6 +205,21 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
 
   // Switching document type carries no meaningful filter state across — start clean.
   useEffect(() => { setFilterValues({}); setPage(1); }, [type]);
+
+  // Arriving from a CRM company's "N invoices … not yet booked" callout: land on the inbox
+  // already narrowed to that counterparty. The VAT (not the name) is the key — myDATA issuer
+  // names rarely match the CRM record verbatim, and the free-text field already searches VAT.
+  // Declared AFTER the reset effect above so it wins on the same commit; the param is consumed
+  // so a later manual filter change isn't silently re-overwritten.
+  useEffect(() => {
+    const vat = searchParams.get('issuer_vat');
+    if (!vat || type !== 'expenses') return;
+    setFilterValues({ q: vat });
+    setPage(1);
+    const p = new URLSearchParams(searchParams);
+    p.delete('issuer_vat');
+    setSearchParams(p, { replace: true });
+  }, [searchParams, setSearchParams, type, setFilterValues]);
   // A narrowed result set is a different list — restart at the first page.
   useEffect(() => { setPage(1); }, [filterValues]);
 

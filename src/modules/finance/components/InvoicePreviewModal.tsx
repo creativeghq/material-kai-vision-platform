@@ -153,7 +153,7 @@ export function InvoicePreviewModal({
       >
         {/* Radix requires a title + description on every dialog for screen readers; the toolbar
             shows a visible label, so these are visually hidden but announced. */}
-        <DialogTitle className="sr-only">Invoice preview</DialogTitle>
+        <DialogTitle className="sr-only">Invoice Preview</DialogTitle>
         <DialogDescription className="sr-only">Full-page preview of the invoice document with a download action.</DialogDescription>
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-3 px-4 h-14 shrink-0 border-b border-border/40 bg-background">

@@ -1116,7 +1116,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle>VR World Quality Split (draft vs 1.1)</CardTitle><p className="text-xs text-muted-foreground mt-1">draft = 18 credits (~30s), 1.1 = 190 credits (~5min)</p></CardHeader>
+          <CardHeader><CardTitle>VR World Quality Split (Draft vs 1.1)</CardTitle><p className="text-xs text-muted-foreground mt-1">draft = 18 credits (~30s), 1.1 = 190 credits (~5min)</p></CardHeader>
           <CardContent>
             {vrQualitySplit.length === 0 ? <EmptyState message="No VR worlds generated yet" /> : (
               <ResponsiveContainer width="100%" height={220}>
@@ -1187,7 +1187,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle>SVBRDF Extractions (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>SVBRDF Extractions (Weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={svbrdfTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1230,7 +1230,7 @@ export function PlatformOverviewTab() {
         </Card>
       </div>
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle>Avg Segment Confidence Score (weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Higher = AI is more certain about detected materials in each zone</p></CardHeader>
+        <CardHeader><CardTitle>Avg Segment Confidence Score (Weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Higher = AI is more certain about detected materials in each zone</p></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={avgConfidenceTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
@@ -1263,7 +1263,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle>Agent Success vs Failure (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Agent Success vs Failure (Weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={agentSuccessTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1310,7 +1310,7 @@ export function PlatformOverviewTab() {
         </Card>
       </div>
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle>AI Agent Runs by Type (weekly stacked)</CardTitle></CardHeader>
+        <CardHeader><CardTitle>AI Agent Runs by Type (Weekly Stacked)</CardTitle></CardHeader>
         <CardContent>
           {agentsByType.length === 0 || topAgentTypes.length === 0 ? <EmptyState message="No agent runs recorded" /> : (
             <ResponsiveContainer width="100%" height={260}>
@@ -1400,7 +1400,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle>Review Velocity & Avg Rating (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Review Velocity & Avg Rating (Weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={reviewVelocity} margin={{ top: 5, right: 30, left: -20, bottom: 5 }}>
@@ -1416,7 +1416,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle>Moodboard Activity (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Moodboard Activity (Weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={moodboardActivity} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1431,7 +1431,7 @@ export function PlatformOverviewTab() {
         </Card>
       </div>
       <Card className="rounded-2xl">
-        <CardHeader><CardTitle>Creator Community Growth by Professional Type (weekly signups)</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Creator Community Growth by Professional Type (Weekly Signups)</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={creatorGrowth} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -1477,7 +1477,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle>Search Latency (avg ms per week)</CardTitle><p className="text-xs text-muted-foreground mt-1">Lower = faster search pipeline</p></CardHeader>
+          <CardHeader><CardTitle>Search Latency (Avg ms per Week)</CardTitle><p className="text-xs text-muted-foreground mt-1">Lower = faster search pipeline</p></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={searchLatencyTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
@@ -1490,7 +1490,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle>Click-Through Rate (weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Clicks per search — higher = more relevant results</p></CardHeader>
+          <CardHeader><CardTitle>Click-Through Rate (Weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Clicks per search — higher = more relevant results</p></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={searchCTRTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
@@ -1653,7 +1653,7 @@ export function PlatformOverviewTab() {
           </CardContent>
         </Card>
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle>XML / Data Import Throughput (weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Records imported per week via XML/batch jobs</p></CardHeader>
+          <CardHeader><CardTitle>XML / Data Import Throughput (Weekly)</CardTitle><p className="text-xs text-muted-foreground mt-1">Records imported per week via XML/batch jobs</p></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={importThroughput} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>

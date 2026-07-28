@@ -99,7 +99,7 @@ function EditDepartmentDialog({ workspaceId, department, onClose, onDone }: { wo
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Edit department</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Edit Department</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1"><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
@@ -142,7 +142,7 @@ function AddDepartmentDialog({ workspaceId, onDone }: { workspaceId: string; onD
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button size="sm" className="rounded-full"><Plus className="h-4 w-4 mr-2" />New department</Button></DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>New department</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>New Department</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1"><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Engineering" /></div>
           <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></div>

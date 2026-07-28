@@ -97,7 +97,7 @@ export const MyDocumentsTab: React.FC = () => {
   if (isEmpty) {
     return (
       <div className="space-y-6">
-        <SectionHeader icon={Receipt} title="My account" subtitle="Your orders, invoices and receipts." />
+        <SectionHeader icon={Receipt} title="My Account" subtitle="Your orders, invoices and receipts." />
         <Card className="dashboard-card p-12 text-center space-y-3">
           <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto" />
           <p className="text-sm text-muted-foreground">Nothing here yet.</p>
@@ -111,7 +111,7 @@ export const MyDocumentsTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <SectionHeader icon={Receipt} title="My account" subtitle="Your orders, invoices and receipts." />
+      <SectionHeader icon={Receipt} title="My Account" subtitle="Your orders, invoices and receipts." />
 
       {/* ── Account summary (per currency) ── */}
       {summary.map((s) => (

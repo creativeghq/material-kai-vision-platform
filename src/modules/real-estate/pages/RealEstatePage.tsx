@@ -374,7 +374,7 @@ const ScheduleViewingButton: React.FC<{ ws: string; onAdded: () => void }> = ({ 
       <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Schedule viewing</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Schedule a viewing</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Schedule a Viewing</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><label className="mb-1 block text-xs text-muted-foreground">Property</label><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
             <div className="grid grid-cols-2 gap-2">
@@ -422,7 +422,7 @@ const AddBuyerButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onA
       <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add buyer</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add a buyer</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add a Buyer</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><label className="mb-1 block text-xs text-muted-foreground">Contact</label><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Search CRM contacts…" /></div>
             <input placeholder="Label (e.g. “3-bed in Athens”)" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={label} onChange={(e) => setLabel(e.target.value)} />
@@ -491,7 +491,7 @@ const AddLeadButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onAd
       <Button size="sm" variant="outline" className="rounded-full" onClick={() => setOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add lead</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add a lead</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add a Lead</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><label className="mb-1 block text-xs text-muted-foreground">Property they’re interested in</label><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
             <div className="grid grid-cols-2 gap-2">{field('name', 'Name')}{field('email', 'Email', 'email')}</div>
@@ -566,7 +566,7 @@ const LeadRow: React.FC<{ ws: string; q: PropertyInquiry; onChanged: () => void 
       <DeleteIconButton title="Delete lead" confirmText={`Delete the lead “${q.name || q.email || 'this lead'}”? This removes the inquiry record.`} onDelete={() => realEstateService.deleteInquiry(ws, q.id).then(() => onChanged())} />
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Edit lead</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Edit Lead</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">{field('name', 'Name')}{field('email', 'Email', 'email')}</div>
             {field('phone', 'Phone')}
