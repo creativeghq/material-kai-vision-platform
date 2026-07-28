@@ -57,10 +57,19 @@ export const marketplacePricingService = {
       list_price: listPrice,
       currency: opts.currency ?? 'EUR',
       unit: opts.unit ?? null,
-      // The product's standing discount. `get_product_price_for_workspace` already folds this
-      // into final_sell, so it is the single place a per-product discount belongs — there is
-      // deliberately no competing column on `products`.
-      ...(opts.discountPercent !== undefined ? { discount_percent: opts.discountPercent } : {}),
+      // The catalog discount shown on the product (ProductPricingCard / PriceLookupDrawer).
+      // NOTE: this is NOT the discount the pricing engine applies — verified against the live
+      // RPC, `get_product_price_for_workspace` resolves discount from the CUSTOMER only
+      // (crm_contacts/crm_companies override → pricing_level_discounts → workspace level) and
+      // never reads this column, returning discount_source 'none' when only this is set.
+      // `discount_percent` and `discount_price` must be written together or the row is
+      // inconsistent — same as ProductPricingCard does.
+      ...(opts.discountPercent !== undefined ? {
+        discount_percent: opts.discountPercent,
+        discount_price: listPrice != null && opts.discountPercent != null
+          ? Math.round(listPrice * (1 - opts.discountPercent / 100) * 100) / 100
+          : null,
+      } : {}),
       confirmed_at: new Date().toISOString(),
     }, { onConflict: 'workspace_id,product_id' });
     if (error) throw error;

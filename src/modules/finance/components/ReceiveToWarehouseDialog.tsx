@@ -836,7 +836,22 @@ const LineCard: React.FC<{
               <Field label="Sale VAT">
                 <VatSelect value={row.vatCategory} options={vatCats} onChange={(v) => onChange({ vatCategory: v })} />
               </Field>
-              <Field label="Default discount %">
+              <Field label={
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help underline decoration-dotted underline-offset-4">Catalog discount %</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p className="text-xs">
+                        Shown on the product&apos;s price card. It does <strong>not</strong> discount a quote or
+                        order line — the pricing engine takes that from the customer
+                        (their override, or their pricing level).
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              }>
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.defaultDiscount}
                   onChange={(e) => onChange({ defaultDiscount: e.target.value })} placeholder="0" />
               </Field>
