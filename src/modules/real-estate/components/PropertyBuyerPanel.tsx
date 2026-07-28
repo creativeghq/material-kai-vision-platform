@@ -1,18 +1,20 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Plus, Search, Trash2, Save, Sparkles } from 'lucide-react';
+import { Home, Plus, Search, Trash2, Save, Sparkles, Pencil, ExternalLink, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { Card, CardContent } from '@/components/core/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { realEstateService, type BuyerRequirement, type ContactExt, type PropertyListItem } from '../services/realEstateService';
+import { PropertyFormDialog, type PropertyFormValues } from './PropertyFormDialog';
 import { scoreLead } from '@/modules/crm/services/leadScoring';
 import { statusTone } from '@/utils/statusTone';
 
-// #249 — real-estate panel on the CRM contact page: buyer profile (budget / pre-approval / seller AVM)
-// + saved searches with an on-demand match against the workspace inventory.
+// #249 — real-estate panel on the CRM contact page: the person's PROPERTIES (own as many as they
+// like — each a real listing record), their buyer profile (budget / pre-approval) and saved
+// searches with an on-demand match against the workspace inventory.
 export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: string | null }> = ({ contactId, workspaceId: ws }) => {
   const { toast } = useToast();
   const [ext, setExt] = useState<Partial<ContactExt>>({});
@@ -22,6 +24,11 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
   const [score, setScore] = useState<{ lead_score: number; health_score: number; rationale?: string } | null>(null);
   const [scoring, setScoring] = useState(false);
   const [cp, setCp] = useState<{ selling: PropertyListItem[]; interested: (PropertyListItem & { interest_type: string })[] } | null>(null);
+  // Property add/edit dialog. `editId` null = creating; `prefill` seeds a new record from an
+  // inbound valuation request so that lead isn't retyped.
+  const [propOpen, setPropOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [prefill, setPrefill] = useState<Partial<PropertyFormValues> | undefined>(undefined);
 
   const load = useCallback(async () => {
     if (!ws) return;
@@ -55,24 +62,123 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
   };
 
   const money2 = (n: number | null, ccy: string) => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
-  const propRow = (p: PropertyListItem & { interest_type?: string }) => (
-    <Link key={p.id} to={`/properties/${p.id}`} className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/50">
-      <span className="min-w-0 flex-1 truncate">{p.title || 'Listing'} <span className="text-muted-foreground">{[p.town, p.region].filter(Boolean).join(', ')}</span></span>
-      {p.interest_type && <span className="text-[10px] capitalize text-muted-foreground">{p.interest_type.replace('_', ' ')}</span>}
-      <span className={`text-[10px] capitalize ${statusTone(p.listing_status)}`}>{p.listing_status.replace('_', ' ')}</span>
-      <span className="shrink-0 font-medium">{money2(p.price, p.currency)}</span>
-    </Link>
-  );
+
+  const openNew = (seed?: Partial<PropertyFormValues>) => { setEditId(null); setPrefill(seed); setPropOpen(true); };
+  const openEdit = (id: string) => { setEditId(id); setPrefill(undefined); setPropOpen(true); };
+
+  const owned = cp?.selling ?? [];
+  const interested = cp?.interested ?? [];
+  // A valuation request captured through the public lead-magnet writes these three loose columns.
+  // It is NOT a property record — surface it as a lead the user can promote into one.
+  const valuationLead = !!(ext.owned_property_address || ext.owned_property_value);
 
   return (
     <div className="space-y-4">
-      {cp && (cp.selling.length > 0 || cp.interested.length > 0) && (
-        <Card><CardContent className="p-4">
-          <div className="mb-2 flex items-center gap-2"><Home className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Properties</span></div>
-          {cp.selling.length > 0 && <div className="mb-2"><div className="mb-1 text-xs font-medium text-muted-foreground">Selling ({cp.selling.length})</div><div className="space-y-0.5">{cp.selling.map((p) => propRow(p))}</div></div>}
-          {cp.interested.length > 0 && <div><div className="mb-1 text-xs font-medium text-muted-foreground">Interested in ({cp.interested.length})</div><div className="space-y-0.5">{cp.interested.map((p) => propRow(p))}</div></div>}
-        </CardContent></Card>
-      )}
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border/60 px-5 py-3">
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-2"><Home className="h-4 w-4" /> Properties</CardTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">Every property this person owns or is selling. Add as many as they have.</p>
+          </div>
+          <Button size="sm" variant="outline" className="rounded-full" onClick={() => openNew()} disabled={!ws}>
+            <Plus className="mr-1 h-3.5 w-3.5" /> Add property
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {owned.length === 0 && interested.length === 0 && !valuationLead ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              No properties on this record yet. Use “Add property” to create one — it becomes a full listing
+              you can price, photograph, publish and take offers on.
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-xs text-muted-foreground">
+                <tr className="border-b border-border/60">
+                  <th className="px-4 py-2 text-left">Property</th>
+                  <th className="px-4 py-2 text-left">Location</th>
+                  <th className="px-4 py-2 text-left">Type</th>
+                  <th className="px-4 py-2 text-left">Relation</th>
+                  <th className="px-4 py-2 text-left">Status</th>
+                  <th className="px-4 py-2 text-right">Price</th>
+                  <th className="px-4 py-2 text-right w-24"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {owned.map((p) => (
+                  <tr key={p.id} className="border-b border-border/30 hover:bg-muted/30">
+                    <td className="px-4 py-2">
+                      <div className="font-medium">{p.title || 'Untitled property'}</div>
+                      {p.reference_code && <div className="text-xs font-mono text-muted-foreground">{p.reference_code}</div>}
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground">{[p.town, p.region].filter(Boolean).join(', ') || '—'}</td>
+                    <td className="px-4 py-2 capitalize text-muted-foreground">{[p.property_type, p.subtype].filter(Boolean).join(' · ')}</td>
+                    <td className="px-4 py-2 text-muted-foreground">Owner</td>
+                    <td className={`px-4 py-2 capitalize ${statusTone(p.listing_status)}`}>{p.listing_status.replace(/_/g, ' ')}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{money2(p.price, p.currency)}</td>
+                    <td className="px-4 py-2 text-right">
+                      <span className="inline-flex items-center gap-1">
+                        <Button size="icon" variant="ghost" className="h-8 w-8" title="Edit details" onClick={() => openEdit(p.id)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Link to={`/properties/${p.id}`} title="Open full listing"><Button size="icon" variant="ghost" className="h-8 w-8"><ExternalLink className="h-3.5 w-3.5" /></Button></Link>
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {interested.map((p) => (
+                  <tr key={`i-${p.id}`} className="border-b border-border/30 hover:bg-muted/30">
+                    <td className="px-4 py-2">
+                      <div className="font-medium">{p.title || 'Untitled property'}</div>
+                      {p.reference_code && <div className="text-xs font-mono text-muted-foreground">{p.reference_code}</div>}
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground">{[p.town, p.region].filter(Boolean).join(', ') || '—'}</td>
+                    <td className="px-4 py-2 capitalize text-muted-foreground">{[p.property_type, p.subtype].filter(Boolean).join(' · ')}</td>
+                    <td className="px-4 py-2 capitalize text-muted-foreground">{p.interest_type.replace(/_/g, ' ')}</td>
+                    <td className={`px-4 py-2 capitalize ${statusTone(p.listing_status)}`}>{p.listing_status.replace(/_/g, ' ')}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{money2(p.price, p.currency)}</td>
+                    <td className="px-4 py-2 text-right">
+                      <Link to={`/properties/${p.id}`} title="Open full listing"><Button size="icon" variant="ghost" className="h-8 w-8"><ExternalLink className="h-3.5 w-3.5" /></Button></Link>
+                    </td>
+                  </tr>
+                ))}
+                {valuationLead && (
+                  <tr className="border-b border-border/30">
+                    <td className="px-4 py-2" colSpan={2}>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{ext.owned_property_address || 'Address not given'}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground" colSpan={2}>Valuation request — not a listing yet</td>
+                    <td className="px-4 py-2 text-muted-foreground">Lead</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                      {ext.owned_property_value != null ? `~${money2(Number(ext.owned_property_value), 'EUR')}` : '—'}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <Button size="sm" variant="ghost" className="rounded-full text-xs"
+                        onClick={() => openNew({
+                          address: ext.owned_property_address ?? '',
+                          price: ext.owned_property_value != null ? Number(ext.owned_property_value) : null,
+                        })}>
+                        Create listing
+                      </Button>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+
+      <PropertyFormDialog
+        open={propOpen}
+        onOpenChange={setPropOpen}
+        workspaceId={ws}
+        propertyId={editId}
+        vendorContactId={contactId}
+        initial={prefill}
+        onSaved={() => { void load(); }}
+      />
+
       <Card><CardContent className="p-4">
         <div className="mb-3 flex flex-wrap items-center gap-2"><Home className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">Buyer / Seller profile</span>
           {score && <Badge className="rounded-full border-0 bg-primary/15 text-[11px] text-primary" title={score.rationale}>Lead {score.lead_score} · Health {score.health_score}</Badge>}
@@ -93,10 +199,11 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
           <Fld label="Pre-approval"><Input value={ext.pre_approval_status ?? ''} onChange={(e) => setE('pre_approval_status', e.target.value)} placeholder="approved / pending" /></Fld>
           <Fld label="Pre-approval amount"><Input type="number" value={ext.pre_approval_amount ?? ''} onChange={(e) => setE('pre_approval_amount', e.target.value)} /></Fld>
           <Fld label="Lender"><Input value={ext.lender ?? ''} onChange={(e) => setE('lender', e.target.value)} /></Fld>
-          <Fld label="Owns — value (AVM)"><Input type="number" value={ext.owned_property_value ?? ''} onChange={(e) => setE('owned_property_value', e.target.value)} /></Fld>
-          <Fld label="Owns — address"><Input value={ext.owned_property_address ?? ''} onChange={(e) => setE('owned_property_address', e.target.value)} /></Fld>
-          <Fld label="Owns — equity"><Input type="number" value={ext.owned_property_equity ?? ''} onChange={(e) => setE('owned_property_equity', e.target.value)} /></Fld>
         </div>
+        {/* What they OWN is no longer three loose fields here — it lives in the Properties table
+            above, one row per property, so a person with two flats can hold both. The legacy
+            `owned_property_*` columns stay on the record (the public valuation lead-magnet still
+            writes them) and surface above as a "Valuation request" row you can promote. */}
       </CardContent></Card>
 
       <Card><CardContent className="p-4">

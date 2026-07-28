@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban } from 'lucide-react';
+import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
   CustomerAccountOverview,
@@ -713,6 +714,7 @@ export const CompanyDetailPage: React.FC = () => {
                   <TabsTrigger value="account" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wallet className="h-4 w-4 mr-2"/>Account</TabsTrigger>
                 )}
                 <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Users className="h-4 w-4 mr-2"/>Contacts ({company.contacts?.length || 0})</TabsTrigger>
+                <TabsTrigger value="projects" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FolderKanban className="h-4 w-4 mr-2"/>Projects</TabsTrigger>
                 {company.is_supplier && (
                   <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Products</TabsTrigger>
                 )}
@@ -1056,6 +1058,20 @@ export const CompanyDetailPage: React.FC = () => {
               "virtual receivable/payable" concept was removed. Shown for customers AND suppliers
               — for a supplier the overview flips to "we owe them" + their bills & money-out, and
               the customer-only cards (repeat-buy, pricing rules) are hidden. */}
+          {/* Projects — the same shared element the contact record mounts. Includes projects
+              booked against this company's people, since that's still the company's work. */}
+          <TabsContent value="projects" className="space-y-4">
+            {company.id ? (
+              <PartyProjectsCard
+                companyId={company.id}
+                partyName={company.name}
+                memberContactIds={(company.contacts ?? []).map((c: any) => c.id).filter(Boolean)}
+              />
+            ) : (
+              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to attach projects.</CardContent></Card>
+            )}
+          </TabsContent>
+
           {(showCommercial || showSupplierFeatures) && (
           <TabsContent value="account" className="space-y-4">
             <ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance"

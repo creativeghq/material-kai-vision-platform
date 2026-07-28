@@ -361,6 +361,39 @@ class ProjectsService {
     }));
   }
 
+  /**
+   * Projects belonging to ONE CRM party — the company's or the contact's. Used by the Projects tab
+   * on the CRM record. A company's projects include those booked against the company itself AND
+   * (optionally) against its people, since a project attached to an employee is still that
+   * company's work.
+   */
+  async listProjectsForClient(opts: {
+    companyId?: string | null;
+    contactId?: string | null;
+    /** Extra contact ids to fold in (a company's people). */
+    alsoContactIds?: string[];
+  }): Promise<ProjectWithClient[]> {
+    const contactIds = [...new Set([opts.contactId, ...(opts.alsoContactIds ?? [])].filter(Boolean))] as string[];
+    if (!opts.companyId && contactIds.length === 0) return [];
+
+    // PostgREST `.or()` with an `in.(…)` list — one round trip, no client-side union.
+    const clauses: string[] = [];
+    if (opts.companyId) clauses.push(`client_company_id.eq.${opts.companyId}`);
+    if (contactIds.length) clauses.push(`client_contact_id.in.(${contactIds.join(',')})`);
+
+    const { data, error } = await (supabase as any)
+      .from('projects')
+      .select(`
+        *,
+        client_company:crm_companies(id, name),
+        client_contact:crm_contacts(id, name, first_name, last_name, email)
+      `)
+      .or(clauses.join(','))
+      .order('last_activity_at', { ascending: false });
+    if (error) throw error;
+    return (data || []) as ProjectWithClient[];
+  }
+
   async getProject(id: string): Promise<ProjectWithClient | null> {
     const { data, error } = await (supabase as any)
       .from('projects')

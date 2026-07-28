@@ -301,6 +301,8 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bills, setBills] = useState<SupplierBill[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  /** Their cash we hold that isn't settled against anything yet (unallocated money-in). */
+  const [credit, setCredit] = useState(0);
   // Each drill-down list pages independently — these used to be `.slice(0, 15)` / `.slice(0, 10)`,
   // which silently hid every older invoice/bill/payment with no way to reach it.
   const [invPage, setInvPage] = useState(1);
@@ -413,14 +415,23 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   };
 
   useEffect(() => {
-    if (!party) { setInvoices([]); setBills([]); setPayments([]); return; }
+    if (!party) { setInvoices([]); setBills([]); setPayments([]); setCredit(0); return; }
     void (async () => {
       try {
         setLoading(true);
-        const res = await financeService.getPartyDetail({
-          workspaceId: party.workspace_id, partyType: party.party_type, partyId: party.party_id,
-        });
+        const [res, bal] = await Promise.all([
+          financeService.getPartyDetail({
+            workspaceId: party.workspace_id, partyType: party.party_type, partyId: party.party_id,
+          }),
+          // Unallocated money-in, so this drill-down reads the same net position as the CRM
+          // Account tab (which shows it as "On account").
+          financeService.getCustomerBalance(party.workspace_id, {
+            companyId: party.party_type === 'company' ? party.party_id : null,
+            contactId: party.party_type === 'contact' ? party.party_id : null,
+          }).catch(() => null),
+        ]);
         setInvoices(res.invoices); setBills(res.bills); setPayments(res.payments);
+        setCredit(Number(bal?.customer_credit ?? 0));
       } catch (err: any) {
         toast({ title: 'Failed to load detail', description: err?.message, variant: 'destructive' });
       } finally {
@@ -448,6 +459,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                 ? { billed: Number(party.billed_total || 0), paid: Number(party.payable_paid_total || 0), outstanding: Number(party.payable_outstanding || 0) }
                 : null}
               aging={aging ? { not_due: Number(aging.not_due), due_0_30: Number(aging.due_0_30), due_31_90: Number(aging.due_31_90), due_90_plus: Number(aging.due_90_plus) } : null}
+              credit={credit}
             />
 
             <StatementActions

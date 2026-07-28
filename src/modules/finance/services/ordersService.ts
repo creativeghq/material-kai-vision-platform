@@ -339,12 +339,18 @@ export const ordersService = {
   },
 
   /**
-   * Settled-so-far per order for a set of order ids, from the allocation ledger (money actually
-   * received on sales / paid on purchase). Lets a list show "outstanding = total − settled"
-   * without an N+1 getOrderFinance per row. One query, keyed by order id.
+   * Settled-so-far per order for a set of order ids, from the allocation ledger, split BY
+   * DIRECTION. Lets a list show "outstanding = total − settled" without an N+1 getOrderFinance
+   * per row. One query, keyed by order id.
+   *
+   * Returns both halves rather than the net, because netting them is wrong: on a SALES order the
+   * money-out is what we paid our supplier for the goods (a cost), not a give-back to the
+   * customer. Netting made a fully-paid sales order with a paid supplier bill read as still
+   * owing exactly the supplier's amount. Callers pick the side their order type settles on:
+   * sales → `in`, purchase → `out`.
    */
-  async settledByOrder(orderIds: string[]): Promise<Map<string, number>> {
-    const out = new Map<string, number>();
+  async settledByOrder(orderIds: string[]): Promise<Map<string, { in: number; out: number }>> {
+    const out = new Map<string, { in: number; out: number }>();
     if (orderIds.length === 0) return out;
     // Model B (#280 corrected): an order settles on allocations against IT directly OR against the
     // invoices/bills that belong to it. Paying an order's invoice is an invoice-targeted allocation
@@ -352,10 +358,8 @@ export const ordersService = {
     // fully-paid orders read as unpaid. `get_order_settlements` applies the join in SQL so this
     // agrees with recompute_order_payment_status and getOrderFinance.
     const { data } = await supabase.rpc('get_order_settlements', { p_order_ids: orderIds });
-    // A sales order settles on money IN; a purchase order on money OUT. We don't know each order's
-    // type here, so return the net (in − out) and let the caller use its sign.
     for (const r of (data ?? []) as Array<{ order_id: string; settled_in: number; settled_out: number }>) {
-      out.set(r.order_id, Number(r.settled_in) - Number(r.settled_out));
+      out.set(r.order_id, { in: Number(r.settled_in), out: Number(r.settled_out) });
     }
     return out;
   },

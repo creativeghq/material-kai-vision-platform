@@ -42,14 +42,20 @@ export const PartyAccountSummary: React.FC<{
   aging?: { not_due: number; due_0_30: number; due_31_90: number; due_90_plus: number } | null;
   /** Orders roll-up (count, total ordered value, amount still owed on un-invoiced orders). */
   orders?: { count: number; ordered: number; owedUninvoiced: number } | null;
+  /** Cash of theirs we're holding that isn't settled against anything yet (unallocated money-in). */
+  credit?: number | null;
   /** Gross margin earned on this customer, from the invoice lines' cost snapshots. */
   profitability?: {
     revenue_net: number; cogs: number; gross_margin: number;
     gross_margin_pct: number | null; cost_coverage_pct: number | null;
   } | null;
   meta?: Array<{ label: string; value: React.ReactNode }>;
-}> = ({ customer, supplier, aging, orders, profitability, meta }) => {
-  const net = (customer?.outstanding ?? 0) - (supplier?.outstanding ?? 0);
+}> = ({ customer, supplier, aging, orders, credit, profitability, meta }) => {
+  // Unallocated cash of theirs is a liability — we're holding money that isn't settled against
+  // anything yet — so it pushes the net position toward "we owe them", exactly like a supplier
+  // balance does. Leaving it out was why a customer who had overpaid still read "settled · €0".
+  const heldCredit = Math.max(0, credit ?? 0);
+  const net = (customer?.outstanding ?? 0) - heldCredit - (supplier?.outstanding ?? 0);
   const netDir = net > 0 ? 'they owe us' : net < 0 ? 'we owe them' : 'settled';
   const netTone = net > 0 ? 'text-emerald-400' : net < 0 ? 'text-destructive' : 'text-muted-foreground';
   const netRing = net > 0 ? 'ring-1 ring-emerald-500/25' : net < 0 ? 'ring-1 ring-destructive/30' : '';
@@ -90,9 +96,13 @@ export const PartyAccountSummary: React.FC<{
     formatMoney(Math.abs(net)),
     { tone: netTone, title: 'Net invoiced position: what they owe us on issued invoices minus what we owe them as a supplier. Separate from un-invoiced order cash (Owed on orders).' },
   );
-  const showTopStrip = !!orders || (!!meta && meta.length > 0);
+  const showCredit = heldCredit > 0.005;
+  const showTopStrip = !!orders || showCredit || (!!meta && meta.length > 0);
   const balanceInCustomer = !showTopStrip && !!customer;
   const balanceInSupplier = !showTopStrip && !customer && !!supplier;
+  // Profitability is earned on orders as well as invoices, so it must render even for a party
+  // with no invoices at all (where `customer` is null) — it used to be nested inside that block.
+  const showProfit = !!profitability && profitability.revenue_net > 0;
 
   return (
     <div className="space-y-3">
@@ -100,10 +110,15 @@ export const PartyAccountSummary: React.FC<{
           icon columns in one row. Rendered only when there's an orders roll-up or account meta;
           in the compact drill-down the Balance moves into the role row below (see below). */}
       {showTopStrip && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 ${showCredit ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
           {orders && stat(<ShoppingCart className="h-3.5 w-3.5" />, 'Orders', orders.count, { title: 'Active (non-cancelled) orders for this party' })}
           {orders && stat(<Banknote className="h-3.5 w-3.5" />, 'Ordered', formatMoney(orders.ordered), { title: 'Total value of those orders (incl. VAT)' })}
           {orders && stat(<AlertCircle className="h-3.5 w-3.5" />, 'Owed on orders', formatMoney(orders.owedUninvoiced), { danger: orders.owedUninvoiced > 0, title: 'Cash still owed on orders that have NOT been invoiced yet (order total − payments). Once invoiced, it moves into the Balance below.' })}
+          {showCredit && stat(
+            <Wallet className="h-3.5 w-3.5" />, 'On account',
+            formatMoney(heldCredit),
+            { tone: 'text-amber-500', title: 'Money of theirs we hold that is not settled against any order, invoice or bill yet. Apply it to an order, or refund it.' },
+          )}
           {balanceStat}
           {meta && meta.length > 0 && (
             <Card className="dashboard-card border-0">
@@ -132,32 +147,6 @@ export const PartyAccountSummary: React.FC<{
             {cell('Paid', formatMoney(customer.paid))}
             {cell('They owe us', formatMoney(customer.outstanding), customer.outstanding > 0)}
           </div>
-          {/* Profitability — what this customer is actually worth, not just what they bought.
-              Revenue is net of VAT and COGS comes from each line's cost snapshot, so this is
-              gross margin, not the cash position. `cost_coverage_pct` is shown whenever some
-              lines carry no cost, because those inflate the margin to 100%. */}
-          {profitability && profitability.revenue_net > 0 && (
-            <div className="grid grid-cols-3 gap-3 pt-0.5">
-              {cell('Revenue (net)', formatMoney(profitability.revenue_net))}
-              {cell('Cost of goods', formatMoney(profitability.cogs))}
-              <Card className="dashboard-card border-0">
-                <CardContent className="p-3">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Gross margin</div>
-                  <div className={`text-lg font-semibold ${profitability.gross_margin < 0 ? 'text-destructive' : 'text-emerald-400'}`}>
-                    {formatMoney(profitability.gross_margin)}
-                    {profitability.gross_margin_pct != null && (
-                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">{profitability.gross_margin_pct}%</span>
-                    )}
-                  </div>
-                  {profitability.cost_coverage_pct != null && profitability.cost_coverage_pct < 99 && (
-                    <div className="mt-0.5 text-[10px] text-amber-500" title="Lines with no cost snapshot count as pure margin, so the real figure is lower.">
-                      only {profitability.cost_coverage_pct}% of revenue has a cost
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
           {aging && (aging.not_due + aging.due_0_30 + aging.due_31_90 + aging.due_90_plus) > 0 && (
             <div className="grid grid-cols-4 gap-2 pt-0.5">
               {agingCell('Not due', aging.not_due)}
@@ -166,6 +155,37 @@ export const PartyAccountSummary: React.FC<{
               {agingCell('90+ days', aging.due_90_plus, aging.due_90_plus > 0)}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Profitability — what this customer is actually worth, not just what they bought. Revenue is
+          net of VAT and COGS comes from each line's cost snapshot, so this is gross margin, not the
+          cash position. Covers invoiced revenue AND un-invoiced sales orders, so a business that
+          sells on orders alone still sees its margin. `cost_coverage_pct` is shown whenever some
+          lines carry no cost, because those inflate the margin to 100%. */}
+      {showProfit && profitability && (
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-medium text-muted-foreground">Profitability</div>
+          <div className="grid grid-cols-3 gap-3">
+            {cell('Revenue (net)', formatMoney(profitability.revenue_net))}
+            {cell('Cost of goods', formatMoney(profitability.cogs))}
+            <Card className="dashboard-card border-0">
+              <CardContent className="p-3">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Gross margin</div>
+                <div className={`text-lg font-semibold ${profitability.gross_margin < 0 ? 'text-destructive' : 'text-emerald-400'}`}>
+                  {formatMoney(profitability.gross_margin)}
+                  {profitability.gross_margin_pct != null && (
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">{profitability.gross_margin_pct}%</span>
+                  )}
+                </div>
+                {profitability.cost_coverage_pct != null && profitability.cost_coverage_pct < 99 && (
+                  <div className="mt-0.5 text-[10px] text-amber-500" title="Lines with no cost snapshot count as pure margin, so the real figure is lower.">
+                    only {profitability.cost_coverage_pct}% of revenue has a cost
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
@@ -202,6 +222,8 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   // Orders roll-up for the KPI strip. Receivables/payables now live PER ORDER (open an order),
   // not as a separate party-level section.
   const [orderStats, setOrderStats] = useState<{ count: number; ordered: number; owedUninvoiced: number } | null>(null);
+  // Their cash we hold that isn't settled against anything (overpayment / deposit on account).
+  const [credit, setCredit] = useState(0);
   const [profitability, setProfitability] = useState<Awaited<ReturnType<typeof financeService.getCustomerProfitability>> | null>(null);
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId, isSupplier]);
@@ -244,6 +266,13 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         setProfitability(await financeService
           .getCustomerProfitability(activeWorkspaceId, { companyId, contactId })
           .catch(() => null));
+
+        // Unallocated money-in — cash of theirs sitting on account. Invisible before, so a
+        // customer who had paid ahead of the paperwork showed a €0 "settled" balance.
+        const bal = await financeService
+          .getCustomerBalance(activeWorkspaceId, { companyId, contactId })
+          .catch(() => null);
+        setCredit(Number(bal?.customer_credit ?? 0));
       }
     } catch (e) {
       console.error('account overview load failed', e);
@@ -280,6 +309,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         supplier={supplierAcct ? { billed: supplierAcct.billedTotal, paid: supplierAcct.paidTotal, outstanding: supplierAcct.outstandingTotal, ordered: supplierAcct.orderedTotal } : null}
         aging={aging}
         orders={orderStats}
+        credit={credit}
         profitability={profitability}
         meta={[
           { label: 'Open orders', value: openOrders },

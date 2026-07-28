@@ -32,6 +32,14 @@ interface CreateProjectModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: (projectId: string, projectName: string) => void;
+  /**
+   * Pre-bind the client. Set when opening from a CRM record — the party is already known, so the
+   * picker is replaced by a read-only line instead of asking the user to find the record they are
+   * literally standing on.
+   */
+  initialClient?: ClientPickerValue & { name?: string | null };
+  /** Hide the client picker entirely (implied by `initialClient`). */
+  lockClient?: boolean;
 }
 
 interface RoomDraft {
@@ -55,17 +63,29 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   open,
   onClose,
   onSuccess,
+  initialClient,
+  lockClient,
 }) => {
   const { toast } = useToast();
   const { isAdmin } = useUserRole();
   const [processing, setProcessing] = useState(false);
+  const clientLocked = lockClient ?? !!initialClient;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [client, setClient] = useState<ClientPickerValue>({
-    client_company_id: null,
-    client_contact_id: null,
+    client_company_id: initialClient?.client_company_id ?? null,
+    client_contact_id: initialClient?.client_contact_id ?? null,
   });
+
+  // Opening from a different CRM record must re-bind — the modal instance is reused.
+  React.useEffect(() => {
+    if (!open || !initialClient) return;
+    setClient({
+      client_company_id: initialClient.client_company_id ?? null,
+      client_contact_id: initialClient.client_contact_id ?? null,
+    });
+  }, [open, initialClient?.client_company_id, initialClient?.client_contact_id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Chosen sub-unit address of the client (null = main address).
   const [addrUnitId, setAddrUnitId] = useState<string | null>(null);
   const [rooms, setRooms] = useState<RoomDraft[]>([]);
@@ -78,7 +98,10 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const reset = () => {
     setName('');
     setDescription('');
-    setClient({ client_company_id: null, client_contact_id: null });
+    setClient({
+      client_company_id: initialClient?.client_company_id ?? null,
+      client_contact_id: initialClient?.client_contact_id ?? null,
+    });
     setAddrUnitId(null);
     setRooms([]);
     setNewRoomName('');
@@ -179,13 +202,19 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
           {/* Client — admins get the full CRM (B2B + B2C tabs); non-admins get a
               contact-only picker scoped to their own contacts, with inline add-new. */}
           <div className="space-y-2">
-            <Label>{isAdmin ? 'Client (Optional)' : 'Client'}</Label>
-            <ClientPicker
-              value={client}
-              onChange={(next) => { setClient(next); setAddrUnitId(null); }}
-              disabled={processing}
-              mode={isAdmin ? 'admin' : 'simple'}
-            />
+            <Label>{isAdmin && !clientLocked ? 'Client (Optional)' : 'Client'}</Label>
+            {clientLocked ? (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                {initialClient?.name || 'This record'}
+              </div>
+            ) : (
+              <ClientPicker
+                value={client}
+                onChange={(next) => { setClient(next); setAddrUnitId(null); }}
+                disabled={processing}
+                mode={isAdmin ? 'admin' : 'simple'}
+              />
+            )}
             {/* Address of the client this project is for — main or a sub-unit. Self-hides
                 when the client has no sub-units. */}
             <AddressUnitSelect

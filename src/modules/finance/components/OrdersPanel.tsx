@@ -204,13 +204,15 @@ export const OrdersPanel: React.FC<{
       if (clamped !== page) { setPage(clamped); return; }
       setRows(res.rows);
       setTotal(res.count);
-      // Outstanding for just this page — one batched query. Sales settle on money-in (positive
-      // net), purchase on money-out (negative net), so we take the magnitude against the total.
+      // Outstanding for just this page — one batched query. A sales order settles on money IN,
+      // a purchase order on money OUT; the other direction is the OTHER side of the trade (what
+      // we paid our supplier for a sales order) and must never reduce what the customer owes.
       try {
         const settled = await ordersService.settledByOrder(res.rows.map((r) => r.id));
         setOutstandingById(new Map(res.rows.map((r) => {
-          const net = Math.abs(settled.get(r.id) ?? 0);
-          return [r.id, Math.round((Number(r.total) - net) * 100) / 100] as const;
+          const s = settled.get(r.id);
+          const paid = r.order_type === 'purchase' ? (s?.out ?? 0) : (s?.in ?? 0);
+          return [r.id, Math.round((Number(r.total) - paid) * 100) / 100] as const;
         })));
       } catch { setOutstandingById(new Map()); }
     } catch (err: any) {
