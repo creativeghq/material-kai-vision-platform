@@ -1,4 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
+import { PRODUCT_IMAGE_SELECT, getProductImageUrl } from '@/utils/productMetadata';
+
+/** A catalog product offered as the match for a supplier line. */
+export interface CatalogMatch {
+  id: string;
+  name: string;
+  sku: string | null;
+  image_url: string | null;
+}
 
 export interface Warehouse {
   id: string;
@@ -28,6 +37,33 @@ export interface WarehouseItem {
   taric_code: string | null;
   mydata_classification_type: string | null;
   mydata_classification_category: string | null;
+  // Physical + identity metadata, mostly parsed from the supplier line at intake.
+  width_mm: number | null;
+  length_mm: number | null;
+  thickness_mm: number | null;
+  weight_kg: number | null;
+  manufacturer: string | null;
+  supplier_product_code: string | null;
+  image_urls: string[];
+  notes: string | null;
+  is_active: boolean;
+}
+
+/**
+ * Physical / identity metadata. Populated at intake by `parseSupplierLine` (dimensions out of
+ * "AMALFI GRIS 80X80", maker from the issuer) and by operator photo uploads. Lengths are
+ * canonical millimetres regardless of how the supplier wrote them.
+ */
+export interface WarehouseItemPhysicalFields {
+  width_mm?: number | null;
+  length_mm?: number | null;
+  thickness_mm?: number | null;
+  weight_kg?: number | null;
+  manufacturer?: string | null;
+  supplier_product_code?: string | null;
+  image_urls?: string[];
+  notes?: string | null;
+  is_active?: boolean;
 }
 
 /** The #207 catalog-depth fields, set on create and editable afterwards. */
@@ -97,7 +133,7 @@ export const warehouseService = {
   async createItem(input: {
     workspaceId: string; name: string; warehouse_id: string; sku?: string; unit?: string;
     qty_on_hand?: number; reorder_point?: number; location?: string; product_id?: string | null;
-  } & WarehouseItemCatalogFields): Promise<string> {
+  } & WarehouseItemCatalogFields & WarehouseItemPhysicalFields): Promise<string> {
     const { data, error } = await supabase.from('warehouse_items').insert({
       workspace_id: input.workspaceId,
       warehouse_id: input.warehouse_id,
@@ -114,9 +150,32 @@ export const warehouseService = {
       taric_code: input.taric_code ?? null,
       mydata_classification_type: input.mydata_classification_type ?? null,
       mydata_classification_category: input.mydata_classification_category ?? null,
+      width_mm: input.width_mm ?? null,
+      length_mm: input.length_mm ?? null,
+      thickness_mm: input.thickness_mm ?? null,
+      weight_kg: input.weight_kg ?? null,
+      manufacturer: input.manufacturer ?? null,
+      supplier_product_code: input.supplier_product_code ?? null,
+      image_urls: input.image_urls ?? [],
+      notes: input.notes ?? null,
     }).select('id').single();
     if (error) throw error;
     return (data as any).id as string;
+  },
+
+  /** Patch a stock item's physical/identity metadata. Same patch-only semantics as
+   *  `updateItemCatalog` — an omitted key is left alone, never nulled. */
+  async updateItemPhysical(id: string, fields: WarehouseItemPhysicalFields): Promise<void> {
+    const patch: Record<string, unknown> = {};
+    for (const k of [
+      'width_mm', 'length_mm', 'thickness_mm', 'weight_kg',
+      'manufacturer', 'supplier_product_code', 'image_urls', 'notes', 'is_active',
+    ] as const) {
+      if (fields[k] !== undefined) patch[k] = fields[k];
+    }
+    if (Object.keys(patch).length === 0) return;
+    const { error } = await supabase.from('warehouse_items').update(patch).eq('id', id);
+    if (error) throw error;
   },
 
   /** Update a stock item's catalog-depth fields (#207 codes/classification) and/or its operational
@@ -138,16 +197,80 @@ export const warehouseService = {
   },
 
   /** Minimal catalog product (name + sku) — used when building stock from a supplier
-   *  expense line so the received good is also sellable. Returns the new product id. */
-  async createProduct(input: { workspaceId: string; name: string; sku?: string | null; itemType?: 'good' | 'service' }): Promise<string> {
+   *  expense line so the received good is also sellable. Returns the new product id.
+   *
+   *  `products` has no dimension/unit columns (they live in `metadata`, which is what the
+   *  catalog search and the product modal read), so the physical facts parsed at intake are
+   *  written there rather than invented as new columns. */
+  async createProduct(input: {
+    workspaceId: string; name: string; sku?: string | null; itemType?: 'good' | 'service';
+    unit?: string | null; cost?: number | null; costCurrency?: string | null;
+    dimensions?: { width_mm?: number | null; length_mm?: number | null; thickness_mm?: number | null };
+    manufacturer?: string | null; externalSku?: string | null; grade?: string | null;
+  }): Promise<string> {
+    const dims = input.dimensions ?? {};
+    const hasDims = dims.width_mm != null || dims.length_mm != null || dims.thickness_mm != null;
+    const metadata: Record<string, unknown> = {};
+    if (input.unit) metadata.unit = input.unit;
+    if (input.manufacturer) metadata.factory_name = input.manufacturer;
+    if (input.grade) metadata.quality_grade = input.grade;
+    if (hasDims) {
+      metadata.dimensions = [{
+        width: dims.width_mm ?? null, height: dims.length_mm ?? null,
+        depth: dims.thickness_mm ?? null, unit: 'mm', source: 'supplier_line',
+      }];
+    }
     const { data, error } = await supabase.from('products').insert({
       workspace_id: input.workspaceId,
       name: input.name,
       sku: input.sku ?? null,
+      external_sku: input.externalSku ?? null,
       item_type: input.itemType ?? 'good',
+      cost: input.cost ?? null,
+      cost_currency: input.cost != null ? (input.costCurrency ?? 'EUR') : null,
+      cost_updated_at: input.cost != null ? new Date().toISOString() : null,
+      cost_source: input.cost != null ? 'supplier_invoice' : null,
+      ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     }).select('id').single();
     if (error) throw error;
     return (data as any).id as string;
+  },
+
+  /** Catalog candidates for matching a supplier line to an existing product. Searches name,
+   *  sku and external_sku, and brings back the best image so the operator confirms visually
+   *  rather than on a name alone. */
+  async searchCatalogProducts(workspaceId: string, query: string, limit = 8): Promise<CatalogMatch[]> {
+    const q = query.trim();
+    if (q.length < 2) return [];
+    const esc = q.replace(/[,%()]/g, ' ').trim();
+    const { data, error } = await supabase
+      .from('products')
+      .select(`id, name, sku, external_sku, metadata, ${PRODUCT_IMAGE_SELECT}`)
+      .eq('workspace_id', workspaceId)
+      .neq('supply_mode', 'reference_only')
+      .or(`name.ilike.%${esc}%,sku.ilike.%${esc}%,external_sku.ilike.%${esc}%`)
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).map((p: any) => ({
+      id: p.id, name: p.name, sku: p.sku ?? p.external_sku ?? null,
+      image_url: getProductImageUrl(p),
+    }));
+  },
+
+  /** Upload intake photos for a stock item. Public bucket — these are product shots, and the
+   *  catalog matcher needs a stable URL it can hand to visual search later. */
+  async uploadItemImages(workspaceId: string, files: File[]): Promise<string[]> {
+    const urls: string[] = [];
+    for (const file of files) {
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const path = `warehouse/${workspaceId}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from('generation-images').upload(path, file, {
+        cacheControl: '3600', upsert: false, contentType: file.type || 'image/jpeg',
+      });
+      if (error) throw error;
+      urls.push(supabase.storage.from('generation-images').getPublicUrl(path).data.publicUrl);
+    }
+    return urls;
   },
 
   async recordMovement(itemId: string, direction: 'in' | 'out' | 'adjust', quantity: number, reason?: string): Promise<number> {

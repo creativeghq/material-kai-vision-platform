@@ -20,6 +20,7 @@ import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { pickTag, pickAllTagBlocks } from '../_shared/aade/soap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { extractProductsFromLines } from '../_shared/finance/extract-products.ts';
+import { resolveInboundIssuerNames } from '../_shared/finance/resolve-issuer-names.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -82,6 +83,9 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
   const dated = !!(dateFrom && dateTo);
 
   const defaultBase = (await resolveSecret(supabase, 'AADE_MYDATA_BASE_URL')).value || 'https://mydatapi.aade.gr/myDATA';
+  // Platform-wide ΓΕΜΗ key — public open data, so one key serves every tenant (unlike the
+  // per-workspace ΑΑΔΕ codes). Absent key just means names stay unresolved.
+  const gemiApiKey = (await resolveSecret(supabase, 'GEMI_API_KEY')).value || null;
 
   // Every workspace that configured its own myDATA received-docs credentials.
   let credsQuery = supabase
@@ -211,6 +215,9 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         issuer_name: pickTag(issuerBlock, 'name'),
         issue_date: pickTag(headerB, 'issueDate'),
         doc_type: pickTag(headerB, 'invoiceType'),
+        // The issuer's own document number — what's printed on the paper copy.
+        series: pickTag(headerB, 'series'),
+        aa: pickTag(headerB, 'aa'),
         total_net: num(pickTag(summaryB, 'totalNetValue')),
         total_vat: num(pickTag(summaryB, 'totalVatAmount')),
         total_gross: num(pickTag(summaryB, 'totalGrossValue')),
@@ -296,8 +303,18 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       }
     } catch (e) { console.error('[inbound-sync] product extraction failed', String(e)); }
 
+    // ── Resolve the issuer names AADE omits ──────────────────────────────────────────
+    // RequestDocs identifies the issuer by ΑΦΜ only — there is no <name> in the feed — so
+    // ~2/3 of received documents would otherwise show a bare VAT number. Resolved from the
+    // ΓΕΜΗ public registry (see resolve-issuer-names.ts for why not ΑΑΔΕ). Best-effort:
+    // never fails the sync, and each run also chips away at pre-existing name-less rows.
+    let issuers: unknown = null;
+    try {
+      issuers = await resolveInboundIssuerNames(supabase, workspaceId, gemiApiKey);
+    } catch (e) { console.error('[inbound-sync] issuer name resolution failed', String(e)); }
+
     summary.push({
-      workspaceId, found: blocks.length, upserted, extracted, new_watermark: maxMark,
+      workspaceId, found: blocks.length, upserted, extracted, new_watermark: maxMark, issuers,
       ...(dated ? { date_from: dateFrom, date_to: dateTo } : {}),
     });
   }

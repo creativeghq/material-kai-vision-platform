@@ -13,7 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation, type SupplierBill, type SupplierBillStatus, type RecurringExpense } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation, type SupplierBill, type RecurringExpense } from '@/modules/finance/services/financeService';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
@@ -29,14 +29,13 @@ import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteD
 import { QuickCategoryDialog } from '@/modules/finance/components/QuickCategoryDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { MydataSyncDialog } from '@/modules/finance/components/MydataSyncDialog';
+import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
+import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Input } from '@/components/core/ui/input';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
-import { warehouseService, type WarehouseItem, type Warehouse } from '@/services/warehouseService';
+import { supabase } from '@/integrations/supabase/client';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
-import { parseDecimalOr } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildDocumentFilters, type DocFilterType } from '@/modules/finance/components/documentFilters';
@@ -808,11 +807,58 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
   );
 };
 
+/**
+ * The issuer of a received document. When we already know them — a CRM company carrying the
+ * same ΑΦΜ — the name becomes a link to that record; otherwise it stays plain text and the
+ * row's ⋮ menu offers "Add issuer to CRM". The VAT always shows, because for ~2/3 of AADE's
+ * documents it is the ONLY identity the feed carries until ΓΕΜΗ resolution fills the name in.
+ */
+const IssuerCell: React.FC<{ doc: InboundDocument; crmCompanyId?: string }> = ({ doc, crmCompanyId }) => {
+  const label = doc.issuer_name ?? '—';
+  return (
+    <>
+      {crmCompanyId ? (
+        <Link
+          to={`/crm/companies/${crmCompanyId}`}
+          className="font-medium text-primary hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {label}
+        </Link>
+      ) : (
+        <div className="font-medium">{label}</div>
+      )}
+      <div className="text-xs text-muted-foreground font-mono">{doc.issuer_vat ?? ''}</div>
+    </>
+  );
+};
+
 const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string }> = ({ rows, workspaceId, readOnly, onChanged, categories, categoryName }) => {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);
   const [localCat, setLocalCat] = React.useState<Record<string, string | null>>({});
+  // VAT → CRM company id, so a known issuer's name links straight to their record instead of
+  // making the operator go and search for them.
+  const [crmByVat, setCrmByVat] = React.useState<Record<string, string>>({});
+
+  React.useEffect(() => {
+    if (!workspaceId) return;
+    let live = true;
+    (async () => {
+      const { data } = await supabase
+        .from('crm_companies').select('id, vat_number')
+        .eq('workspace_id', workspaceId).not('vat_number', 'is', null);
+      if (!live) return;
+      const map: Record<string, string> = {};
+      for (const c of (data ?? []) as { id: string; vat_number: string }[]) {
+        const key = String(c.vat_number).replace(/\D/g, '');
+        if (key) map[key] = c.id;
+      }
+      setCrmByVat(map);
+    })();
+    return () => { live = false; };
+  }, [workspaceId, rows.length]);
 
   const createBill = async (id: string) => {
     setBusy(id);
@@ -845,10 +891,13 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
       <thead className="border-b border-border/60 text-xs text-muted-foreground">
         <tr>
           <th className="px-4 py-2 text-left">Date</th>
+          <th className="px-4 py-2 text-left">Number</th>
           <th className="px-4 py-2 text-left">Issuer</th>
           <th className="px-4 py-2 text-left">Type</th>
           <th className="px-4 py-2 text-left">Category</th>
-          <th className="px-4 py-2 text-right">Total</th>
+          <th className="px-4 py-2 text-right">Net</th>
+          <th className="px-4 py-2 text-right">VAT</th>
+          <th className="px-4 py-2 text-right">Payable</th>
           <th className="px-4 py-2 text-center">Status</th>
           <th className="px-4 py-2 text-right" />
         </tr>
@@ -860,15 +909,20 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           <tr key={d.id} className="border-b border-border/30">
             <td className="px-4 py-2">{d.issue_date ? new Date(d.issue_date).toLocaleDateString() : '—'}</td>
             <td className="px-4 py-2">
-              <div className="font-medium">{d.issuer_name ?? '—'}</div>
-              <div className="text-xs text-muted-foreground font-mono">{d.issuer_vat ?? ''}</div>
+              <div className="text-xs font-medium">{d.series ?? '—'}{d.aa ? ` ${d.aa}` : ''}</div>
+              <div className="text-[10px] text-muted-foreground font-mono" title={`MARK ${d.mark}`}>{d.mark}</div>
             </td>
-            <td className="px-4 py-2"><span className="text-xs text-muted-foreground">{d.doc_type ?? '—'}</span></td>
+            <td className="px-4 py-2">
+              <IssuerCell doc={d} crmCompanyId={d.issuer_vat ? crmByVat[d.issuer_vat.replace(/\D/g, '')] : undefined} />
+            </td>
+            <td className="px-4 py-2"><MydataTypeLabel code={d.doc_type} /></td>
             <td className="px-4 py-2">
               {readOnly
                 ? <span className="text-xs text-muted-foreground">{categoryName(cat)}</span>
                 : <CategoryCell value={cat} options={categories} onChange={(v) => setCategory(d.id, v)} />}
             </td>
+            <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(d.total_net ?? 0, d.currency)}</td>
+            <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(d.total_vat ?? 0, d.currency)}</td>
             <td className="px-4 py-2 text-right font-medium">{formatMoney(d.total_gross ?? 0, d.currency)}</td>
             <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(d.status)}`}>{humanizeLabel(d.status)}</span></td>
             <td className="px-4 py-2 text-right">
@@ -899,166 +953,6 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
         />
       )}
     </table>
-  );
-};
-
-/**
- * #206/#207 — receive a myDATA inbound doc's lines into the warehouse. Each line can be
- * MATCHED to an existing stock item, or used to CREATE a brand-new stock item (and,
- * optionally, a catalog product) right from the supplier line. Lines auto-match to an
- * existing item by name; unmatched lines default to "create". One 'in' movement per line.
- */
-type LineMode = 'skip' | string /* existing item id */ | '__create';
-interface LineRow { mode: LineMode; name: string; sku: string; unit: string; qty: string; }
-
-const ReceiveToWarehouseDialog: React.FC<{
-  doc: InboundDocument; workspaceId: string; onOpenChange: (v: boolean) => void; onDone: () => void;
-}> = ({ doc, workspaceId, onOpenChange, onDone }) => {
-  const { toast } = useToast();
-  const [items, setItems] = useState<WarehouseItem[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [targetWh, setTargetWh] = useState('');
-  const [addToCatalog, setAddToCatalog] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const lines = doc.lines ?? [];
-  const [rows, setRows] = useState<Record<number, LineRow>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [its, whs] = await Promise.all([
-          warehouseService.listItems(workspaceId),
-          warehouseService.listWarehouses(workspaceId).catch(() => [] as Warehouse[]),
-        ]);
-        if (cancelled) return;
-        setItems(its);
-        setWarehouses(whs);
-        setTargetWh(whs.find((w) => w.is_default)?.id ?? whs[0]?.id ?? '');
-        // Auto-match each line to an existing item by name; else default to create.
-        const init: Record<number, LineRow> = {};
-        lines.forEach((ln, i) => {
-          const desc = (ln.item_description ?? '').trim();
-          const match = desc ? its.find((it) => it.name && (it.name.toLowerCase().includes(desc.toLowerCase()) || desc.toLowerCase().includes(it.name.toLowerCase()))) : undefined;
-          init[i] = {
-            mode: match ? match.id : (desc ? '__create' : 'skip'),
-            name: desc || `Item ${ln.line_number ?? i + 1}`,
-            sku: '', unit: '',
-            qty: ln.quantity != null ? String(ln.quantity) : '',
-          };
-        });
-        setRows(init);
-      } catch (e: any) {
-        toast({ title: 'Failed to load', description: e?.message, variant: 'destructive' });
-      } finally { if (!cancelled) setLoading(false); }
-    })();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId]);
-
-  const setRow = (i: number, patch: Partial<LineRow>) => setRows((m) => ({ ...m, [i]: { ...m[i], ...patch } }));
-
-  const submit = async () => {
-    const active = lines.map((_, i) => ({ i, r: rows[i] })).filter(({ r }) => r && r.mode !== 'skip' && parseDecimalOr(r.qty, 0) > 0);
-    if (active.length === 0) { toast({ title: 'Nothing to receive', description: 'Match or create at least one line.', variant: 'destructive' }); return; }
-    const needsCreate = active.some(({ r }) => r.mode === '__create');
-    if (needsCreate && !targetWh) { toast({ title: 'Pick a target warehouse', description: 'New stock items need a warehouse.', variant: 'destructive' }); return; }
-    try {
-      setBusy(true);
-      const mappings: { item_id: string; quantity: number }[] = [];
-      let created = 0;
-      for (const { r } of active) {
-        const qty = parseDecimalOr(r.qty, 0);
-        if (r.mode === '__create') {
-          const productId = addToCatalog ? await warehouseService.createProduct({ workspaceId, name: r.name.trim() || 'Item', sku: r.sku.trim() || null }) : null;
-          const itemId = await warehouseService.createItem({
-            workspaceId, warehouse_id: targetWh, name: r.name.trim() || 'Item',
-            sku: r.sku.trim() || undefined, unit: r.unit.trim() || undefined, product_id: productId, qty_on_hand: 0,
-          });
-          mappings.push({ item_id: itemId, quantity: qty });
-          created += 1;
-        } else {
-          mappings.push({ item_id: r.mode, quantity: qty });
-        }
-      }
-      const n = await inboundService.receiveToWarehouse(doc.id, mappings);
-      toast({ title: `Received ${n} line(s)`, description: created > 0 ? `${created} new stock item(s) created.` : undefined });
-      onDone();
-    } catch (e: any) {
-      toast({ title: 'Failed to receive', description: e?.message, variant: 'destructive' });
-    } finally { setBusy(false); }
-  };
-
-  return (
-    <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Receive into warehouse — {doc.issuer_name ?? doc.issuer_vat ?? doc.mark}</DialogTitle><DialogDescription className="sr-only">Receive this document's lines into the warehouse.</DialogDescription>
-        </DialogHeader>
-        {loading ? (
-          <div className="py-8 text-center"><Loader2 className="h-5 w-5 animate-spin inline" /></div>
-        ) : lines.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
-            This document has no line detail from myDATA. Add stock manually in Finance → Warehouse.
-          </div>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">New items → warehouse:</span>
-                <Select value={targetWh} onValueChange={setTargetWh}>
-                  <SelectTrigger className="h-7 w-44 text-xs"><SelectValue placeholder="Default warehouse" /></SelectTrigger>
-                  <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}{w.is_default ? ' (default)' : ''}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={addToCatalog} onChange={(e) => setAddToCatalog(e.target.checked)} />
-                <span>Also add new items to the sellable catalog</span>
-              </label>
-            </div>
-            <div className="space-y-2 max-h-[52vh] overflow-y-auto">
-              {lines.map((ln, i) => {
-                const r = rows[i] ?? { mode: 'skip', name: '', sku: '', unit: '', qty: '' };
-                return (
-                  <div key={i} className="rounded-md border border-border/50 p-2">
-                    <div className="grid grid-cols-[1fr_2fr_84px] items-center gap-2">
-                      <div className="text-xs">
-                        <div className="font-medium">#{ln.line_number ?? i + 1}{ln.item_description ? ` · ${ln.item_description}` : ''}</div>
-                        <div className="text-muted-foreground">net {formatMoney(ln.net_value ?? 0, doc.currency)}{ln.quantity != null ? ` · qty ${ln.quantity}` : ''}</div>
-                      </div>
-                      <Select value={r.mode} onValueChange={(v) => setRow(i, { mode: v })}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="skip">— Skip —</SelectItem>
-                          <SelectItem value="__create">➕ Create new stock item</SelectItem>
-                          {items.map((it) => <SelectItem key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ''}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <Input className="h-8 text-xs text-right" type="text" inputMode="decimal"
-                        value={r.qty} onChange={(e) => setRow(i, { qty: e.target.value })} placeholder="qty" disabled={r.mode === 'skip'} />
-                    </div>
-                    {r.mode === '__create' && (
-                      <div className="mt-2 grid grid-cols-[2fr_1fr_72px] gap-2">
-                        <Input className="h-8 text-xs" value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} placeholder="New product name" />
-                        <Input className="h-8 text-xs" value={r.sku} onChange={(e) => setRow(i, { sku: e.target.value })} placeholder="SKU (optional)" />
-                        <Input className="h-8 text-xs" value={r.unit} onChange={(e) => setRow(i, { unit: e.target.value })} placeholder="unit" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={submit} disabled={busy || loading || lines.length === 0}>
-            {busy ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Receiving…</> : 'Receive stock'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 };
 

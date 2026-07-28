@@ -22,6 +22,9 @@ export interface InboundDocument {
   issuer_name: string | null;
   issue_date: string | null;
   doc_type: string | null;
+  /** Issuer's own document number, e.g. series 'ΤΔΑ' + aa '5160'. */
+  series: string | null;
+  aa: string | null;
   currency: string;
   total_net: number | null;
   total_vat: number | null;
