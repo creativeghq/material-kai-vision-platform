@@ -33,13 +33,7 @@ export interface WarehouseItem {
   qty_reserved: number;
   reorder_point: number;
   location: string | null;
-  // #207 — catalog depth (Oxygen warehouse_products parity)
-  barcode: string | null;
   serial_number: string | null;
-  cpv_code: string | null;
-  taric_code: string | null;
-  mydata_classification_type: string | null;
-  mydata_classification_category: string | null;
   // Physical + identity metadata, mostly parsed from the supplier line at intake.
   width_mm: number | null;
   length_mm: number | null;
@@ -69,18 +63,70 @@ export interface WarehouseItemPhysicalFields {
   is_active?: boolean;
 }
 
-/** The #207 catalog-depth fields, set on create and editable afterwards. */
+/**
+ * Stock-level operational fields.
+ *
+ * Fiscal identity (barcode, CPV, TARIC, myDATA classifications, VAT categories, invoicing
+ * unit) deliberately does NOT live here — it lives on `products`, which is what
+ * `_shared/fiscal/invoice-builder.ts`, the POS and OrdersPanel actually read when they build
+ * a line. Duplicating it on the stock row produced fields an operator could fill in that
+ * were then submitted nowhere; see `ProductFiscalFields` below.
+ */
 export interface WarehouseItemCatalogFields {
-  barcode?: string | null;
   serial_number?: string | null;
-  cpv_code?: string | null;
-  taric_code?: string | null;
-  mydata_classification_type?: string | null;
-  mydata_classification_category?: string | null;
-  // Operational fields — editable after creation (previously only settable at create time).
   reorder_point?: number;
   location?: string | null;
+  /** The WAREHOUSE unit — how stock is counted. The invoicing unit is
+   *  products.measurement_unit_code. They legitimately differ (buy by pallet, sell by m²). */
   unit?: string;
+}
+
+/**
+ * Catalog + fiscal identity of a product. Every field here is read by at least one
+ * downstream process: invoice-builder (VAT category + income classification + unit), the POS
+ * (same three), OrdersPanel (unit), quote/order lines (discount), and the product modal.
+ */
+export interface ProductFiscalFields {
+  barcode?: string | null;
+  cpv_code?: string | null;
+  taric_code?: string | null;
+  /** AADE measurement-unit code 1-6 — the invoicing unit. */
+  measurement_unit_code?: number | null;
+  /** Sale-side AADE VAT category (1 = 24%, 2 = 13%, 3 = 6%, …). */
+  mydata_vat_category?: number | null;
+  /** Purchase-side VAT category — differs on imports / reverse charge. */
+  mydata_purchase_vat_category?: number | null;
+  /** Wholesale income classification (χονδρική). */
+  mydata_income_classification_category?: string | null;
+  mydata_income_classification_type?: string | null;
+  /** Retail income classification (λιανική) — a different E3 code for the same item. */
+  mydata_income_classification_category_retail?: string | null;
+  mydata_income_classification_type_retail?: string | null;
+  prices_include_vat?: boolean;
+  markup_percent?: number | null;
+  warranty?: string | null;
+  product_url?: string | null;
+  notes?: string | null;
+  item_type?: string;
+  category_id?: string | null;
+  supplier_company_id?: string | null;
+}
+
+/** The one place the fiscal column list is written down, shared by create and update. */
+const FISCAL_KEYS = [
+  'barcode', 'cpv_code', 'taric_code', 'measurement_unit_code',
+  'mydata_vat_category', 'mydata_purchase_vat_category',
+  'mydata_income_classification_category', 'mydata_income_classification_type',
+  'mydata_income_classification_category_retail', 'mydata_income_classification_type_retail',
+  'prices_include_vat', 'markup_percent',
+  'warranty', 'product_url', 'notes', 'item_type', 'category_id', 'supplier_company_id',
+] as const;
+
+function pickFiscal(fields: ProductFiscalFields | undefined): Record<string, unknown> {
+  if (!fields) return {};
+  const patch: Record<string, unknown> = {};
+  for (const k of FISCAL_KEYS) if (fields[k] !== undefined) patch[k] = fields[k];
+  return patch;
 }
 
 export const warehouseService = {
@@ -147,12 +193,7 @@ export const warehouseService = {
       reorder_point: input.reorder_point ?? 0,
       location: input.location ?? null,
       product_id: input.product_id ?? null,
-      barcode: input.barcode ?? null,
       serial_number: input.serial_number ?? null,
-      cpv_code: input.cpv_code ?? null,
-      taric_code: input.taric_code ?? null,
-      mydata_classification_type: input.mydata_classification_type ?? null,
-      mydata_classification_category: input.mydata_classification_category ?? null,
       width_mm: input.width_mm ?? null,
       length_mm: input.length_mm ?? null,
       thickness_mm: input.thickness_mm ?? null,
@@ -181,16 +222,14 @@ export const warehouseService = {
     if (error) throw error;
   },
 
-  /** Update a stock item's catalog-depth fields (#207 codes/classification) and/or its operational
-   *  fields (reorder point, location, unit). Only the keys present in `fields` are written, so a
-   *  caller editing just the reorder point never clears the codes and vice-versa. RLS enforces
-   *  finance-manager + the 'stock' entitlement (same gate as stock-api). */
+  /** Update a stock item's operational fields (serial, reorder point, location, warehouse
+   *  unit). Only the keys present in `fields` are written, so a caller editing just the
+   *  reorder point never clears the rest. RLS enforces finance-manager + the 'stock'
+   *  entitlement (same gate as stock-api). Fiscal fields → `updateProductFiscal`. */
   async updateItemCatalog(id: string, fields: WarehouseItemCatalogFields): Promise<void> {
     const patch: Record<string, unknown> = {};
     for (const k of [
-      'barcode', 'serial_number', 'cpv_code', 'taric_code',
-      'mydata_classification_type', 'mydata_classification_category',
-      'reorder_point', 'location', 'unit',
+      'serial_number', 'reorder_point', 'location', 'unit',
     ] as const) {
       if (fields[k] !== undefined) patch[k] = fields[k];
     }
@@ -210,6 +249,8 @@ export const warehouseService = {
     unit?: string | null; cost?: number | null; costCurrency?: string | null;
     dimensions?: { width_mm?: number | null; length_mm?: number | null; thickness_mm?: number | null };
     manufacturer?: string | null; externalSku?: string | null; grade?: string | null;
+    /** Fiscal identity — what makes the item submittable to myDATA. */
+    fiscal?: ProductFiscalFields;
   }): Promise<string> {
     const dims = input.dimensions ?? {};
     const hasDims = dims.width_mm != null || dims.length_mm != null || dims.thickness_mm != null;
@@ -234,9 +275,19 @@ export const warehouseService = {
       cost_updated_at: input.cost != null ? new Date().toISOString() : null,
       cost_source: input.cost != null ? 'supplier_invoice' : null,
       ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+      ...pickFiscal(input.fiscal),
     }).select('id').single();
     if (error) throw error;
     return (data as any).id as string;
+  },
+
+  /** Patch the fiscal/catalog identity of an existing product. Patch-only: an omitted key is
+   *  left alone. This is the write path for everything that must reach AADE. */
+  async updateProductFiscal(productId: string, fields: ProductFiscalFields): Promise<void> {
+    const patch = pickFiscal(fields);
+    if (Object.keys(patch).length === 0) return;
+    const { error } = await supabase.from('products').update(patch).eq('id', productId);
+    if (error) throw error;
   },
 
   /** Catalog candidates for matching a supplier line to an existing product. Searches name,

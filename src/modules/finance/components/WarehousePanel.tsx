@@ -246,9 +246,9 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                     </td>
                     <td className="px-4 py-2 font-mono text-xs">
                       {it.sku ?? '—'}
-                      {(it.barcode || it.cpv_code || it.taric_code || it.serial_number) && (
+                      {(it.serial_number || it.supplier_product_code) && (
                         <div className="text-[10px] text-muted-foreground/70 normal-case font-sans">
-                          {[it.barcode && `bc:${it.barcode}`, it.serial_number && `s/n:${it.serial_number}`, it.cpv_code && `CPV:${it.cpv_code}`, it.taric_code && `TARIC:${it.taric_code}`].filter(Boolean).join(' · ')}
+                          {[it.serial_number && `s/n:${it.serial_number}`, it.supplier_product_code && `sup:${it.supplier_product_code}`].filter(Boolean).join(' · ')}
                         </div>
                       )}
                     </td>
@@ -485,10 +485,17 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
         sku: selected.sku || undefined, unit: unit.trim() || 'pcs',
         qty_on_hand: parseDecimalOr(qty, 0), reorder_point: parseDecimalOr(reorder, 0),
         location: location.trim() || undefined,
-        barcode: barcode.trim() || null, serial_number: serial.trim() || null,
-        cpv_code: cpv.trim() || null, taric_code: taric.trim() || null,
-        mydata_classification_type: clsType.trim() || null,
-        mydata_classification_category: clsCategory.trim() || null,
+        serial_number: serial.trim() || null,
+      });
+      // Barcode / CPV / TARIC / myDATA classification are fiscal identity: they live on the
+      // PRODUCT, which is what invoice-builder and the POS read when they build a line.
+      // Writing them onto the stock row (as this dialog used to) meant they reached nothing.
+      await warehouseService.updateProductFiscal(selected.id, {
+        barcode: barcode.trim() || null,
+        cpv_code: cpv.trim() || null,
+        taric_code: taric.trim() || null,
+        mydata_income_classification_type: clsType.trim() || null,
+        mydata_income_classification_category: clsCategory.trim() || null,
       });
       onAdded();
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
@@ -633,12 +640,28 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
   const [unit, setUnit] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Fiscal fields are loaded from the linked PRODUCT, not the stock row — that is where the
+  // invoice builder and POS read them from, so it is where they must be edited.
   useEffect(() => {
     if (!item) return;
-    setBarcode(item.barcode ?? ''); setSerial(item.serial_number ?? '');
-    setCpv(item.cpv_code ?? ''); setTaric(item.taric_code ?? '');
-    setClsType(item.mydata_classification_type ?? ''); setClsCategory(item.mydata_classification_category ?? '');
+    setSerial(item.serial_number ?? '');
     setReorderPoint(String(item.reorder_point ?? 0)); setLocation(item.location ?? ''); setUnit(item.unit ?? '');
+    setBarcode(''); setCpv(''); setTaric(''); setClsType(''); setClsCategory('');
+    if (!item.product_id) return;
+    let live = true;
+    (async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('barcode, cpv_code, taric_code, mydata_income_classification_type, mydata_income_classification_category')
+        .eq('id', item.product_id).maybeSingle();
+      if (!live || !data) return;
+      setBarcode(data.barcode ?? '');
+      setCpv(data.cpv_code ?? '');
+      setTaric(data.taric_code ?? '');
+      setClsType(data.mydata_income_classification_type ?? '');
+      setClsCategory(data.mydata_income_classification_category ?? '');
+    })();
+    return () => { live = false; };
   }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async () => {
@@ -647,14 +670,20 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
       setBusy(true);
       const rp = Number(reorderPoint);
       await warehouseService.updateItemCatalog(item.id, {
-        barcode: barcode.trim() || null, serial_number: serial.trim() || null,
-        cpv_code: cpv.trim() || null, taric_code: taric.trim() || null,
-        mydata_classification_type: clsType.trim() || null,
-        mydata_classification_category: clsCategory.trim() || null,
+        serial_number: serial.trim() || null,
         reorder_point: Number.isFinite(rp) && rp >= 0 ? rp : 0,
         location: location.trim() || null,
         unit: unit.trim() || 'pcs',
       });
+      if (item.product_id) {
+        await warehouseService.updateProductFiscal(item.product_id, {
+          barcode: barcode.trim() || null,
+          cpv_code: cpv.trim() || null,
+          taric_code: taric.trim() || null,
+          mydata_income_classification_type: clsType.trim() || null,
+          mydata_income_classification_category: clsCategory.trim() || null,
+        });
+      }
       toast({ title: 'Item updated' });
       onSaved();
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }

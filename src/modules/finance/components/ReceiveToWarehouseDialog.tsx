@@ -32,7 +32,8 @@ import {
 } from '@/services/warehouseService';
 import { marketplacePricingService } from '@/services/marketplacePricingService';
 import { parseSupplierLine } from '@/modules/finance/utils/parseSupplierLine';
-import { UNITS, unitSuffix, normalizeUnit, unitFromMydataCode } from '@/lib/units';
+import { UNITS, unitSuffix, normalizeUnit, unitFromMydataCode, unitDef } from '@/lib/units';
+import { invoicingSetupService, type RefRow, type DocTypeSetting } from '@/services/invoicingSetupService';
 import { parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -66,6 +67,30 @@ interface LineRow {
   /** Why the unit was pre-selected — surfaced as a tooltip so the guess is never silent. */
   unitReason: string;
   uploading: boolean;
+
+  // ── Fiscal identity (written to `products`, read by invoice-builder / POS / orders) ──
+  itemType: string;
+  categoryId: string;
+  barcode: string;
+  cpv: string;
+  taric: string;
+  /** Sale-side AADE VAT category; seeded from the supplier line's own vatCategory. */
+  vatCategory: string;
+  purchaseVatCategory: string;
+  incomeCatWholesale: string;
+  incomeTypeWholesale: string;
+  incomeCatRetail: string;
+  incomeTypeRetail: string;
+  defaultDiscount: string;
+  pricesIncludeVat: boolean;
+  warranty: string;
+  productUrl: string;
+  notes: string;
+
+  // ── Stock-level ──
+  location: string;
+  reorderPoint: string;
+  serialNumber: string;
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -93,6 +118,12 @@ export const ReceiveToWarehouseDialog: React.FC<{
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [rows, setRows] = useState<Record<number, LineRow>>({});
+  // AADE reference tables — the codes a line must carry to be transmittable. Loaded from
+  // `mydata_reference` so a new AADE code appears without a deploy.
+  const [vatCats, setVatCats] = useState<RefRow[]>([]);
+  const [incomeCats, setIncomeCats] = useState<RefRow[]>([]);
+  const [incomeTypes, setIncomeTypes] = useState<RefRow[]>([]);
+  const [productCategories, setProductCategories] = useState<{ id: string; name: string }[]>([]);
 
   const lines = doc.lines ?? [];
   // A line only becomes stock if it says WHAT was supplied. myDATA omits item descriptions on
@@ -107,7 +138,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
     let cancelled = false;
     (async () => {
       try {
-        const [its, whs, pendingRes, settingsRes, crmRes] = await Promise.all([
+        const [its, whs, pendingRes, settingsRes, crmRes, vatRef, incCatRef, incTypeRef, cats, docTypeDefaults] = await Promise.all([
           warehouseService.listItems(workspaceId),
           warehouseService.listWarehouses(workspaceId).catch(() => [] as Warehouse[]),
           // The nightly sync may already have run Haiku over these very lines. Reuse that
@@ -119,14 +150,38 @@ export const ReceiveToWarehouseDialog: React.FC<{
             .maybeSingle().then((r) => r.data, () => null),
           supabase.from('crm_companies').select('name').eq('workspace_id', workspaceId).limit(500)
             .then((r) => r.data ?? [], () => []),
+          invoicingSetupService.listReference('vat_category').catch(() => [] as RefRow[]),
+          invoicingSetupService.listReference('income_classification_category').catch(() => [] as RefRow[]),
+          invoicingSetupService.listReference('income_classification_type').catch(() => [] as RefRow[]),
+          supabase.from('material_categories').select('id, name').order('name').limit(200)
+            .then((r) => (r.data ?? []) as { id: string; name: string }[], () => []),
+          // The workspace's own per-doc-type income-classification defaults — the same ones
+          // NewInvoiceDialog seeds a line with, so an intake-created product is classified
+          // exactly as the operator's outgoing invoices already are.
+          invoicingSetupService.getDocTypeSettings(workspaceId).catch(() => ({})),
         ]);
         if (cancelled) return;
 
         setItems(its);
         setWarehouses(whs);
         setTargetWh(whs.find((w) => w.is_default)?.id ?? whs[0]?.id ?? '');
+        setVatCats(vatRef as RefRow[]);
+        setIncomeCats(incCatRef as RefRow[]);
+        setIncomeTypes(incTypeRef as RefRow[]);
+        setProductCategories(cats as { id: string; name: string }[]);
+
         // Workspace default markup seeds every line's margin; 0 means "operator decides".
         const markup = settingsRes?.default_markup_pct != null ? String(settingsRes.default_markup_pct) : '';
+
+        // Wholesale defaults from doc type 1.1 (sales invoice), retail from 11.1 (retail
+        // receipt) — the two document types these classifications are actually used on.
+        const dts = docTypeDefaults as Record<string, DocTypeSetting>;
+        const defaults = {
+          incomeCatWholesale: dts['1.1']?.default_income_classification_category ?? '',
+          incomeTypeWholesale: dts['1.1']?.default_income_classification_type ?? '',
+          incomeCatRetail: dts['11.1']?.default_income_classification_category ?? '',
+          incomeTypeRetail: dts['11.1']?.default_income_classification_type ?? '',
+        };
 
         // Maker names we can recognise inside a description: existing stock, the CRM, and the
         // issuer itself (which is the right default — they sent us the document).
@@ -194,6 +249,28 @@ export const ReceiveToWarehouseDialog: React.FC<{
               ? 'Unit stated by AADE on this line (myDATA measurementUnit).'
               : parsed.unit_reason,
             uploading: false,
+            itemType: 'good',
+            categoryId: '',
+            barcode: '',
+            cpv: '',
+            taric: '',
+            // The supplier's own VAT category for this line is the best available default for
+            // BOTH sides: we bought it at that rate, and absent other information we resell
+            // at the same rate. Editable per line.
+            vatCategory: ln.vat_category != null ? String(ln.vat_category) : '',
+            purchaseVatCategory: ln.vat_category != null ? String(ln.vat_category) : '',
+            incomeCatWholesale: defaults.incomeCatWholesale,
+            incomeTypeWholesale: defaults.incomeTypeWholesale,
+            incomeCatRetail: defaults.incomeCatRetail,
+            incomeTypeRetail: defaults.incomeTypeRetail,
+            defaultDiscount: '',
+            pricesIncludeVat: false,
+            warranty: '',
+            productUrl: '',
+            notes: '',
+            location: '',
+            reorderPoint: '',
+            serialNumber: '',
           };
         });
         setRows(init);
@@ -326,6 +403,29 @@ export const ReceiveToWarehouseDialog: React.FC<{
         };
         const name = r.name.trim() || 'Item';
 
+        // Everything that must reach AADE goes on the PRODUCT — invoice-builder, the POS and
+        // order lines all read it from there when they build a line.
+        const num = (v: string) => (v.trim() === '' ? null : Number(v));
+        const fiscal = {
+          barcode: r.barcode.trim() || null,
+          cpv_code: r.cpv.trim() || null,
+          taric_code: r.taric.trim() || null,
+          measurement_unit_code: unitDef(r.unit)?.mydataCode ?? null,
+          mydata_vat_category: num(r.vatCategory),
+          mydata_purchase_vat_category: num(r.purchaseVatCategory),
+          mydata_income_classification_category: r.incomeCatWholesale || null,
+          mydata_income_classification_type: r.incomeTypeWholesale || null,
+          mydata_income_classification_category_retail: r.incomeCatRetail || null,
+          mydata_income_classification_type_retail: r.incomeTypeRetail || null,
+          prices_include_vat: r.pricesIncludeVat,
+          markup_percent: num(r.markup),
+          warranty: r.warranty.trim() || null,
+          product_url: r.productUrl.trim() || null,
+          notes: r.notes.trim() || null,
+          item_type: r.itemType,
+          category_id: r.categoryId || null,
+        };
+
         // An operator-confirmed catalog match wins over creating a duplicate product.
         let productId: string | null = r.match?.id ?? null;
         if (!productId && addToCatalog) {
@@ -335,20 +435,31 @@ export const ReceiveToWarehouseDialog: React.FC<{
             externalSku: r.supplierCode.trim() || null,
             unit: r.unit, cost, costCurrency: doc.currency,
             dimensions, manufacturer: r.manufacturer.trim() || null, grade: r.grade,
+            itemType: r.itemType === 'service' ? 'service' : 'good',
+            fiscal,
           });
           created += 1;
+        } else if (productId) {
+          // Matched an existing product — still push the fiscal codes the operator just set,
+          // otherwise editing them here would silently do nothing.
+          await warehouseService.updateProductFiscal(productId, fiscal);
         }
 
         const price = parseDecimalOr(r.salePrice, NaN);
-        if (productId && Number.isFinite(price) && price > 0) {
-          await marketplacePricingService.setListPrice(workspaceId, productId, price, {
-            currency: doc.currency, unit: r.unit,
-          });
+        const discount = num(r.defaultDiscount);
+        if (productId && (Number.isFinite(price) && price > 0 || discount != null)) {
+          await marketplacePricingService.setListPrice(
+            workspaceId, productId, Number.isFinite(price) && price > 0 ? price : null,
+            { currency: doc.currency, unit: r.unit, discountPercent: discount },
+          );
         }
 
         const itemId = await warehouseService.createItem({
           workspaceId, warehouse_id: targetWh, name,
           sku: r.sku.trim() || undefined, unit: r.unit, product_id: productId, qty_on_hand: 0,
+          location: r.location.trim() || undefined,
+          reorder_point: r.reorderPoint.trim() ? parseDecimalOr(r.reorderPoint, 0) : undefined,
+          serial_number: r.serialNumber.trim() || null,
           width_mm: Number.isFinite(dimensions.width_mm as number) ? dimensions.width_mm : null,
           length_mm: Number.isFinite(dimensions.length_mm as number) ? dimensions.length_mm : null,
           thickness_mm: Number.isFinite(dimensions.thickness_mm as number) ? dimensions.thickness_mm : null,
@@ -430,6 +541,10 @@ export const ReceiveToWarehouseDialog: React.FC<{
                     cost={cost}
                     items={items}
                     workspaceId={workspaceId}
+                    vatCats={vatCats}
+                    incomeCats={incomeCats}
+                    incomeTypes={incomeTypes}
+                    productCategories={productCategories}
                     onChange={(patch) => setRow(i, patch)}
                     onMarkup={(v) => applyMarkup(i, v)}
                     onSalePrice={(v) => applySalePrice(i, v)}
@@ -472,6 +587,11 @@ function blankRow(mode: LineMode): LineRow {
     mode, name: '', sku: '', unit: 'pcs', qty: '', width: '', length: '', thickness: '', weight: '',
     manufacturer: '', supplierCode: '', grade: null, markup: '', salePrice: '', match: null,
     images: [], visualMatches: [], matching: false, unitReason: '', uploading: false,
+    itemType: 'good', categoryId: '', barcode: '', cpv: '', taric: '',
+    vatCategory: '', purchaseVatCategory: '',
+    incomeCatWholesale: '', incomeTypeWholesale: '', incomeCatRetail: '', incomeTypeRetail: '',
+    defaultDiscount: '', pricesIncludeVat: false, warranty: '', productUrl: '', notes: '',
+    location: '', reorderPoint: '', serialNumber: '',
   };
 }
 
@@ -503,11 +623,19 @@ const LineCard: React.FC<{
   cost: number | null;
   items: WarehouseItem[];
   workspaceId: string;
+  vatCats: RefRow[];
+  incomeCats: RefRow[];
+  incomeTypes: RefRow[];
+  productCategories: { id: string; name: string }[];
   onChange: (patch: Partial<LineRow>) => void;
   onMarkup: (v: string) => void;
   onSalePrice: (v: string) => void;
   onImages: (files: FileList | null) => void;
-}> = ({ index, line, row, currency, cost, items, workspaceId, onChange, onMarkup, onSalePrice, onImages }) => {
+}> = ({
+  index, line, row, currency, cost, items, workspaceId,
+  vatCats, incomeCats, incomeTypes, productCategories,
+  onChange, onMarkup, onSalePrice, onImages,
+}) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const creating = row.mode === '__create';
   const suffix = unitSuffix(row.unit);
@@ -582,57 +710,165 @@ const LineCard: React.FC<{
       )}
 
       {row.expanded && row.include && creating && (
-        <div className="space-y-3 border-t border-border/40 p-3">
-          {/* Identity */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-            <Field label="Product name">
-              <Input className="h-8 text-xs" value={row.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Product name" />
-            </Field>
-            <Field label="SKU">
-              <Input className="h-8 text-xs" value={row.sku} onChange={(e) => onChange({ sku: e.target.value })} placeholder="optional" />
-            </Field>
-            <Field label="Supplier code">
-              <Input className="h-8 text-xs" value={row.supplierCode} onChange={(e) => onChange({ supplierCode: e.target.value })} placeholder="their code" />
-            </Field>
-          </div>
-
-          {/* Physical metadata read out of the description */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.5fr)]">
-            <Field label={<span className="flex items-center gap-1"><Ruler className="h-3 w-3" /> Width (mm)</span>}>
-              <Input className="h-8 text-xs" inputMode="decimal" value={row.width} onChange={(e) => onChange({ width: e.target.value })} />
-            </Field>
-            <Field label="Length (mm)">
-              <Input className="h-8 text-xs" inputMode="decimal" value={row.length} onChange={(e) => onChange({ length: e.target.value })} />
-            </Field>
-            <Field label="Thickness (mm)">
-              <Input className="h-8 text-xs" inputMode="decimal" value={row.thickness} onChange={(e) => onChange({ thickness: e.target.value })} />
-            </Field>
-            <Field label="Weight (kg)">
-              <Input className="h-8 text-xs" inputMode="decimal" value={row.weight} onChange={(e) => onChange({ weight: e.target.value })} />
-            </Field>
-            <Field label="Manufacturer">
-              <Input className="h-8 text-xs" value={row.manufacturer} onChange={(e) => onChange({ manufacturer: e.target.value })} placeholder="maker" />
-            </Field>
-          </div>
-
-          {/* Pricing — cost is the document's, the operator only chooses the margin */}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
-            <Field label={`Cost / ${suffix} (ex. VAT)`}>
-              <div className="h-8 flex items-center rounded-md border border-border/60 bg-muted/40 px-2 text-xs">
-                {cost != null ? formatMoney(cost, currency) : '—'}
-              </div>
-            </Field>
-            <Field label="Markup %">
-              <Input className="h-8 text-xs" inputMode="decimal" value={row.markup} onChange={(e) => onMarkup(e.target.value)} placeholder="25" />
-            </Field>
-            <Field label={`Sale price / ${suffix}`}>
-              <Input className="h-8 text-xs" inputMode="decimal" value={row.salePrice} onChange={(e) => onSalePrice(e.target.value)} placeholder="—" />
-            </Field>
-            <div className="text-[11px] text-muted-foreground pb-2">
-              {row.grade && <>Grade {row.grade} · </>}
-              {cost != null && line.quantity != null && <>{line.quantity} {suffix} × {formatMoney(cost, currency)}</>}
+        <div className="space-y-4 border-t border-border/40 p-3">
+          {/* ── General ─────────────────────────────────────────────────────────────── */}
+          <Section title="General">
+            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
+              <Field className="sm:col-span-2" label="Description">
+                <Input className="h-8 text-xs" value={row.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Product name" />
+              </Field>
+              <Field label="Code (SKU)">
+                <Input className="h-8 text-xs" value={row.sku} onChange={(e) => onChange({ sku: e.target.value })} placeholder="optional" />
+              </Field>
+              <Field label="Type">
+                <Select value={row.itemType} onValueChange={(v) => onChange({ itemType: v })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="good">Merchandise</SelectItem>
+                    <SelectItem value="service">Service</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Category">
+                <Select value={row.categoryId || NONE_OPT} onValueChange={(v) => onChange({ categoryId: v === NONE_OPT ? '' : v })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="No category" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_OPT}><span className="text-muted-foreground">No category</span></SelectItem>
+                    {productCategories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Invoicing unit">
+                <Select value={row.unit} onValueChange={(v) => onChange({ unit: v })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>{UNITS.map((u) => <SelectItem key={u.key} value={u.key}>{u.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </Field>
+              <Field label="Barcode">
+                <Input className="h-8 text-xs" value={row.barcode} onChange={(e) => onChange({ barcode: e.target.value })} />
+              </Field>
+              <Field label="Serial number">
+                <Input className="h-8 text-xs" value={row.serialNumber} onChange={(e) => onChange({ serialNumber: e.target.value })} />
+              </Field>
+              <Field label="CPV code">
+                <Input className="h-8 text-xs" value={row.cpv} onChange={(e) => onChange({ cpv: e.target.value })} />
+              </Field>
+              <Field label="TARIC code">
+                <Input className="h-8 text-xs" value={row.taric} onChange={(e) => onChange({ taric: e.target.value })} />
+              </Field>
+              <Field label="Supplier">
+                <div className="h-8 flex items-center rounded-md border border-border/60 bg-muted/40 px-2 text-xs truncate">
+                  {row.manufacturer || '—'}
+                </div>
+              </Field>
+              <Field label="Supplier product code">
+                <Input className="h-8 text-xs" value={row.supplierCode} onChange={(e) => onChange({ supplierCode: e.target.value })} placeholder="their code" />
+              </Field>
             </div>
-          </div>
+          </Section>
+
+          {/* ── Metadata ────────────────────────────────────────────────────────────── */}
+          <Section title="Metadata">
+            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
+              <Field label={<span className="flex items-center gap-1"><Ruler className="h-3 w-3" /> Width (mm)</span>}>
+                <Input className="h-8 text-xs" inputMode="decimal" value={row.width} onChange={(e) => onChange({ width: e.target.value })} />
+              </Field>
+              <Field label="Length (mm)">
+                <Input className="h-8 text-xs" inputMode="decimal" value={row.length} onChange={(e) => onChange({ length: e.target.value })} />
+              </Field>
+              <Field label="Height / thickness (mm)">
+                <Input className="h-8 text-xs" inputMode="decimal" value={row.thickness} onChange={(e) => onChange({ thickness: e.target.value })} />
+              </Field>
+              <Field label="Weight (kg)">
+                <Input className="h-8 text-xs" inputMode="decimal" value={row.weight} onChange={(e) => onChange({ weight: e.target.value })} />
+              </Field>
+              <Field className="sm:col-span-2" label="Link">
+                <Input className="h-8 text-xs" value={row.productUrl} onChange={(e) => onChange({ productUrl: e.target.value })} placeholder="https://" />
+              </Field>
+              <Field className="sm:col-span-2" label="Warranty">
+                <Input className="h-8 text-xs" value={row.warranty} onChange={(e) => onChange({ warranty: e.target.value })} placeholder="e.g. 2 years" />
+              </Field>
+            </div>
+          </Section>
+
+          {/* ── Availability ────────────────────────────────────────────────────────── */}
+          <Section title="Availability">
+            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
+              <Field label="Quantity">
+                <div className="h-8 flex items-center rounded-md border border-border/60 bg-muted/40 px-2 text-xs">
+                  {row.qty || '—'} {suffix}
+                </div>
+              </Field>
+              <Field label="Stock threshold">
+                <Input className="h-8 text-xs" inputMode="decimal" value={row.reorderPoint}
+                  onChange={(e) => onChange({ reorderPoint: e.target.value })} placeholder="0" />
+              </Field>
+              <Field label="Shelf location">
+                <Input className="h-8 text-xs" value={row.location} onChange={(e) => onChange({ location: e.target.value })} placeholder="e.g. A-12" />
+              </Field>
+              <div className="flex items-end pb-1.5">
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={row.pricesIncludeVat}
+                    onChange={(e) => onChange({ pricesIncludeVat: e.target.checked })} />
+                  <span>Prices include VAT</span>
+                </label>
+              </div>
+            </div>
+          </Section>
+
+          {/* ── Purchase / sale price. Cost is the document's; the operator sets margin. ── */}
+          <Section title="Purchase & sale price">
+            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
+              <Field label={`Purchase price / ${suffix}`}>
+                <div className="h-8 flex items-center rounded-md border border-border/60 bg-muted/40 px-2 text-xs">
+                  {cost != null ? formatMoney(cost, currency) : '—'}
+                </div>
+              </Field>
+              <Field label="Purchase VAT">
+                <VatSelect value={row.purchaseVatCategory} options={vatCats} onChange={(v) => onChange({ purchaseVatCategory: v })} />
+              </Field>
+              <Field label="Markup %">
+                <Input className="h-8 text-xs" inputMode="decimal" value={row.markup} onChange={(e) => onMarkup(e.target.value)} placeholder="25" />
+              </Field>
+              <Field label={`Sale price / ${suffix}`}>
+                <Input className="h-8 text-xs" inputMode="decimal" value={row.salePrice} onChange={(e) => onSalePrice(e.target.value)} placeholder="—" />
+              </Field>
+              <Field label="Sale VAT">
+                <VatSelect value={row.vatCategory} options={vatCats} onChange={(v) => onChange({ vatCategory: v })} />
+              </Field>
+              <Field label="Default discount %">
+                <Input className="h-8 text-xs" inputMode="decimal" value={row.defaultDiscount}
+                  onChange={(e) => onChange({ defaultDiscount: e.target.value })} placeholder="0" />
+              </Field>
+              <div className="sm:col-span-2 flex items-end pb-2 text-[11px] text-muted-foreground">
+                {row.grade && <span className="mr-2">Grade {row.grade} ·</span>}
+                {cost != null && line.quantity != null && <>{line.quantity} {suffix} × {formatMoney(cost, currency)} = {formatMoney(Number(line.net_value ?? 0), currency)} net</>}
+              </div>
+            </div>
+          </Section>
+
+          {/* ── myDATA. What makes the item transmittable. ───────────────────────────── */}
+          <Section title="myDATA">
+            <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
+              <Field label="Income category (wholesale)">
+                <RefSelect value={row.incomeCatWholesale} options={incomeCats} onChange={(v) => onChange({ incomeCatWholesale: v })} />
+              </Field>
+              <Field label="Income type (wholesale)">
+                <RefSelect value={row.incomeTypeWholesale} options={incomeTypes} onChange={(v) => onChange({ incomeTypeWholesale: v })} />
+              </Field>
+              <Field label="Income category (retail)">
+                <RefSelect value={row.incomeCatRetail} options={incomeCats} onChange={(v) => onChange({ incomeCatRetail: v })} />
+              </Field>
+              <Field label="Income type (retail)">
+                <RefSelect value={row.incomeTypeRetail} options={incomeTypes} onChange={(v) => onChange({ incomeTypeRetail: v })} />
+              </Field>
+            </div>
+          </Section>
+
+          {/* ── Notes ───────────────────────────────────────────────────────────────── */}
+          <Section title="Notes">
+            <Input className="h-8 text-xs" value={row.notes} onChange={(e) => onChange({ notes: e.target.value })} placeholder="Optional notes…" />
+          </Section>
 
           {/* Catalog match + photos */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -697,11 +933,52 @@ const LineCard: React.FC<{
   );
 };
 
-const Field: React.FC<{ label: React.ReactNode; children: React.ReactNode }> = ({ label, children }) => (
-  <div className="space-y-1">
-    <Label className="text-[11px] text-muted-foreground">{label}</Label>
+/** Sentinel for "no selection" — Radix Select forbids an empty-string item value. */
+const NONE_OPT = '__none';
+
+const Field: React.FC<{ label: React.ReactNode; children: React.ReactNode; className?: string }> = ({ label, children, className }) => (
+  <div className={`space-y-1 min-w-0 ${className ?? ''}`}>
+    <Label className="block truncate text-[11px] text-muted-foreground">{label}</Label>
     {children}
   </div>
+);
+
+/** A titled block of fields — the ERP form's sections, in the same order. */
+const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div className="space-y-2">
+    <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
+    {children}
+  </div>
+);
+
+/** AADE VAT category picker. Shows the rate, since that is what an operator recognises. */
+const VatSelect: React.FC<{ value: string; options: RefRow[]; onChange: (v: string) => void }> = ({ value, options, onChange }) => (
+  <Select value={value || NONE_OPT} onValueChange={(v) => onChange(v === NONE_OPT ? '' : v)}>
+    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+    <SelectContent>
+      <SelectItem value={NONE_OPT}><span className="text-muted-foreground">—</span></SelectItem>
+      {options.map((o) => (
+        <SelectItem key={o.code} value={o.code}>
+          {o.rate != null ? `${o.rate}%` : o.description}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+);
+
+/** Generic `mydata_reference` picker (income classification category / type). */
+const RefSelect: React.FC<{ value: string; options: RefRow[]; onChange: (v: string) => void }> = ({ value, options, onChange }) => (
+  <Select value={value || NONE_OPT} onValueChange={(v) => onChange(v === NONE_OPT ? '' : v)}>
+    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+    <SelectContent className="max-w-[420px]">
+      <SelectItem value={NONE_OPT}><span className="text-muted-foreground">—</span></SelectItem>
+      {options.map((o) => (
+        <SelectItem key={o.code} value={o.code}>
+          <span className="truncate">{o.description || o.code}</span>
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
 );
 
 /**

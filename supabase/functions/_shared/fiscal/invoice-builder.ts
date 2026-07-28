@@ -228,10 +228,24 @@ export async function buildInvoiceInputFromDb(
   if (productIds.length) {
     const { data: prods } = await supabase
       .from('products')
-      .select('id, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category')
+      .select('id, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category, mydata_income_classification_type_retail, mydata_income_classification_category_retail')
       .in('id', productIds);
     for (const p of prods ?? []) prodMap[p.id] = p;
   }
+
+  // The SAME product is classified differently wholesale vs retail (E3_561_001 vs
+  // E3_561_003). Document family 11.x is retail; everything else is wholesale. Without this
+  // split a shop transmitting retail receipts files every sale under the wholesale code.
+  const docTypeForClassification = String(
+    overrides.invoiceType ?? inv.document_type ?? (counterpart.vatNumber ? '1.1' : '11.1'),
+  );
+  const isRetailDoc = docTypeForClassification.startsWith('11.');
+  const productIncomeType = (p: any) => (isRetailDoc
+    ? (p?.mydata_income_classification_type_retail ?? p?.mydata_income_classification_type)
+    : p?.mydata_income_classification_type);
+  const productIncomeCategory = (p: any) => (isRetailDoc
+    ? (p?.mydata_income_classification_category_retail ?? p?.mydata_income_classification_category)
+    : p?.mydata_income_classification_category);
 
   const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => {
     const prod = it.product_id ? prodMap[it.product_id] : null;
@@ -280,8 +294,8 @@ export async function buildInvoiceInputFromDb(
       otherTaxesCategory: it.other_taxes_category ?? undefined,
       deductionsAmount: Number(it.deductions_amount ?? 0) || undefined,
       lineComments: it.line_comments ?? undefined,
-      incomeClassificationType: it.income_classification_type ?? prod?.mydata_income_classification_type ?? incType,
-      incomeClassificationCategory: it.income_classification_category ?? prod?.mydata_income_classification_category ?? incCat,
+      incomeClassificationType: it.income_classification_type ?? productIncomeType(prod) ?? incType,
+      incomeClassificationCategory: it.income_classification_category ?? productIncomeCategory(prod) ?? incCat,
     };
   });
 

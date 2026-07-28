@@ -49,7 +49,7 @@ export const marketplacePricingService = {
     workspaceId: string,
     productId: string,
     listPrice: number | null,
-    opts: { currency?: string; unit?: string | null } = {},
+    opts: { currency?: string; unit?: string | null; discountPercent?: number | null } = {},
   ): Promise<void> {
     const { error } = await supabase.from('product_prices').upsert({
       workspace_id: workspaceId,
@@ -57,6 +57,10 @@ export const marketplacePricingService = {
       list_price: listPrice,
       currency: opts.currency ?? 'EUR',
       unit: opts.unit ?? null,
+      // The product's standing discount. `get_product_price_for_workspace` already folds this
+      // into final_sell, so it is the single place a per-product discount belongs — there is
+      // deliberately no competing column on `products`.
+      ...(opts.discountPercent !== undefined ? { discount_percent: opts.discountPercent } : {}),
       confirmed_at: new Date().toISOString(),
     }, { onConflict: 'workspace_id,product_id' });
     if (error) throw error;

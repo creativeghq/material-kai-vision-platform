@@ -10600,63 +10600,129 @@ export type Database = {
       }
       inbound_documents: {
         Row: {
+          aa: string | null
+          authentication_code: string | null
           category_id: string | null
+          counterpart_address: Json | null
+          counterpart_name: string | null
+          counterpart_vat: string | null
           created_at: string
           created_supplier_bill_id: string | null
           currency: string
+          delivery_addresses: Json | null
           doc_type: string | null
+          download_url: string | null
           id: string
+          is_delivery_note: boolean | null
           issue_date: string | null
+          issuer_address: Json | null
+          issuer_branch: string | null
+          issuer_country: string | null
           issuer_name: string | null
           issuer_vat: string | null
           lines: Json
           mark: string
+          move_purpose: string | null
+          payment_methods: Json | null
+          qr_code_url: string | null
           raw: Json | null
+          series: string | null
           status: string
+          total_deductions: number | null
+          total_fees: number | null
           total_gross: number | null
           total_net: number | null
+          total_other_taxes: number | null
+          total_stamp_duty: number | null
           total_vat: number | null
+          total_withheld: number | null
+          uid: string | null
           updated_at: string
+          vat_payment_suspension: boolean | null
           workspace_id: string
         }
         Insert: {
+          aa?: string | null
+          authentication_code?: string | null
           category_id?: string | null
+          counterpart_address?: Json | null
+          counterpart_name?: string | null
+          counterpart_vat?: string | null
           created_at?: string
           created_supplier_bill_id?: string | null
           currency?: string
+          delivery_addresses?: Json | null
           doc_type?: string | null
+          download_url?: string | null
           id?: string
+          is_delivery_note?: boolean | null
           issue_date?: string | null
+          issuer_address?: Json | null
+          issuer_branch?: string | null
+          issuer_country?: string | null
           issuer_name?: string | null
           issuer_vat?: string | null
           lines?: Json
           mark: string
+          move_purpose?: string | null
+          payment_methods?: Json | null
+          qr_code_url?: string | null
           raw?: Json | null
+          series?: string | null
           status?: string
+          total_deductions?: number | null
+          total_fees?: number | null
           total_gross?: number | null
           total_net?: number | null
+          total_other_taxes?: number | null
+          total_stamp_duty?: number | null
           total_vat?: number | null
+          total_withheld?: number | null
+          uid?: string | null
           updated_at?: string
+          vat_payment_suspension?: boolean | null
           workspace_id: string
         }
         Update: {
+          aa?: string | null
+          authentication_code?: string | null
           category_id?: string | null
+          counterpart_address?: Json | null
+          counterpart_name?: string | null
+          counterpart_vat?: string | null
           created_at?: string
           created_supplier_bill_id?: string | null
           currency?: string
+          delivery_addresses?: Json | null
           doc_type?: string | null
+          download_url?: string | null
           id?: string
+          is_delivery_note?: boolean | null
           issue_date?: string | null
+          issuer_address?: Json | null
+          issuer_branch?: string | null
+          issuer_country?: string | null
           issuer_name?: string | null
           issuer_vat?: string | null
           lines?: Json
           mark?: string
+          move_purpose?: string | null
+          payment_methods?: Json | null
+          qr_code_url?: string | null
           raw?: Json | null
+          series?: string | null
           status?: string
+          total_deductions?: number | null
+          total_fees?: number | null
           total_gross?: number | null
           total_net?: number | null
+          total_other_taxes?: number | null
+          total_stamp_duty?: number | null
           total_vat?: number | null
+          total_withheld?: number | null
+          uid?: string | null
           updated_at?: string
+          vat_payment_suspension?: boolean | null
           workspace_id?: string
         }
         Relationships: [
@@ -18468,6 +18534,7 @@ export type Database = {
           cost_currency: string | null
           cost_source: string | null
           cost_updated_at: string | null
+          cpv_code: string | null
           created_at: string | null
           created_by: string | null
           created_from_type: string | null
@@ -18484,13 +18551,20 @@ export type Database = {
           layout_detection_date: string | null
           layout_stats: Json | null
           long_description: string | null
+          markup_percent: number | null
           measurement_unit_code: number | null
           metadata: Json | null
           mydata_income_classification_category: string | null
+          mydata_income_classification_category_retail: string | null
           mydata_income_classification_type: string | null
+          mydata_income_classification_type_retail: string | null
+          mydata_purchase_vat_category: number | null
           mydata_vat_category: number | null
           name: string
+          notes: string | null
           numeric_specs: Json | null
+          prices_include_vat: boolean
+          product_url: string | null
           properties: Json | null
           quality_assessment: string | null
           quality_metrics: Json | null
@@ -18508,6 +18582,7 @@ export type Database = {
           supplier_company_id: string | null
           supply_mode: string
           tables_extracted: boolean | null
+          taric_code: string | null
           text_embedding_1024: unknown
           text_embedding_1024_model: string | null
           text_embedding_schema_version: number | null
@@ -18515,6 +18590,7 @@ export type Database = {
           total_tables: number | null
           total_tables_extracted: number | null
           updated_at: string | null
+          warranty: string | null
           work_category: string | null
           workspace_id: string
         }
@@ -18532,6 +18608,7 @@ export type Database = {
           cost_currency?: string | null
           cost_source?: string | null
           cost_updated_at?: string | null
+          cpv_code?: string | null
           created_at?: string | null
           created_by?: string | null
           created_from_type?: string | null
@@ -18548,13 +18625,20 @@ export type Database = {
           layout_detection_date?: string | null
           layout_stats?: Json | null
           long_description?: string | null
+          markup_percent?: number | null
           measurement_unit_code?: number | null
           metadata?: Json | null
           mydata_income_classification_category?: string | null
+          mydata_income_classification_category_retail?: string | null
           mydata_income_classification_type?: string | null
+          mydata_income_classification_type_retail?: string | null
+          mydata_purchase_vat_category?: number | null
           mydata_vat_category?: number | null
           name: string
+          notes?: string | null
           numeric_specs?: Json | null
+          prices_include_vat?: boolean
+          product_url?: string | null
           properties?: Json | null
           quality_assessment?: string | null
           quality_metrics?: Json | null
@@ -18572,6 +18656,7 @@ export type Database = {
           supplier_company_id?: string | null
           supply_mode?: string
           tables_extracted?: boolean | null
+          taric_code?: string | null
           text_embedding_1024?: unknown
           text_embedding_1024_model?: string | null
           text_embedding_schema_version?: number | null
@@ -18579,6 +18664,7 @@ export type Database = {
           total_tables?: number | null
           total_tables_extracted?: number | null
           updated_at?: string | null
+          warranty?: string | null
           work_category?: string | null
           workspace_id: string
         }
@@ -18596,6 +18682,7 @@ export type Database = {
           cost_currency?: string | null
           cost_source?: string | null
           cost_updated_at?: string | null
+          cpv_code?: string | null
           created_at?: string | null
           created_by?: string | null
           created_from_type?: string | null
@@ -18612,13 +18699,20 @@ export type Database = {
           layout_detection_date?: string | null
           layout_stats?: Json | null
           long_description?: string | null
+          markup_percent?: number | null
           measurement_unit_code?: number | null
           metadata?: Json | null
           mydata_income_classification_category?: string | null
+          mydata_income_classification_category_retail?: string | null
           mydata_income_classification_type?: string | null
+          mydata_income_classification_type_retail?: string | null
+          mydata_purchase_vat_category?: number | null
           mydata_vat_category?: number | null
           name?: string
+          notes?: string | null
           numeric_specs?: Json | null
+          prices_include_vat?: boolean
+          product_url?: string | null
           properties?: Json | null
           quality_assessment?: string | null
           quality_metrics?: Json | null
@@ -18636,6 +18730,7 @@ export type Database = {
           supplier_company_id?: string | null
           supply_mode?: string
           tables_extracted?: boolean | null
+          taric_code?: string | null
           text_embedding_1024?: unknown
           text_embedding_1024_model?: string | null
           text_embedding_schema_version?: number | null
@@ -18643,6 +18738,7 @@ export type Database = {
           total_tables?: number | null
           total_tables_extracted?: number | null
           updated_at?: string | null
+          warranty?: string | null
           work_category?: string | null
           workspace_id?: string
         }
@@ -27770,8 +27866,6 @@ export type Database = {
       }
       warehouse_items: {
         Row: {
-          barcode: string | null
-          cpv_code: string | null
           created_at: string
           id: string
           image_urls: string[]
@@ -27779,8 +27873,6 @@ export type Database = {
           length_mm: number | null
           location: string | null
           manufacturer: string | null
-          mydata_classification_category: string | null
-          mydata_classification_type: string | null
           name: string
           notes: string | null
           product_id: string | null
@@ -27790,7 +27882,6 @@ export type Database = {
           serial_number: string | null
           sku: string | null
           supplier_product_code: string | null
-          taric_code: string | null
           thickness_mm: number | null
           unit: string
           updated_at: string
@@ -27800,8 +27891,6 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
-          barcode?: string | null
-          cpv_code?: string | null
           created_at?: string
           id?: string
           image_urls?: string[]
@@ -27809,8 +27898,6 @@ export type Database = {
           length_mm?: number | null
           location?: string | null
           manufacturer?: string | null
-          mydata_classification_category?: string | null
-          mydata_classification_type?: string | null
           name: string
           notes?: string | null
           product_id?: string | null
@@ -27820,7 +27907,6 @@ export type Database = {
           serial_number?: string | null
           sku?: string | null
           supplier_product_code?: string | null
-          taric_code?: string | null
           thickness_mm?: number | null
           unit?: string
           updated_at?: string
@@ -27830,8 +27916,6 @@ export type Database = {
           workspace_id: string
         }
         Update: {
-          barcode?: string | null
-          cpv_code?: string | null
           created_at?: string
           id?: string
           image_urls?: string[]
@@ -27839,8 +27923,6 @@ export type Database = {
           length_mm?: number | null
           location?: string | null
           manufacturer?: string | null
-          mydata_classification_category?: string | null
-          mydata_classification_type?: string | null
           name?: string
           notes?: string | null
           product_id?: string | null
@@ -27850,7 +27932,6 @@ export type Database = {
           serial_number?: string | null
           sku?: string | null
           supplier_product_code?: string | null
-          taric_code?: string | null
           thickness_mm?: number | null
           unit?: string
           updated_at?: string
@@ -30910,6 +30991,7 @@ export type Database = {
           cost_currency: string | null
           cost_source: string | null
           cost_updated_at: string | null
+          cpv_code: string | null
           created_at: string | null
           created_by: string | null
           created_from_type: string | null
@@ -30926,13 +31008,20 @@ export type Database = {
           layout_detection_date: string | null
           layout_stats: Json | null
           long_description: string | null
+          markup_percent: number | null
           measurement_unit_code: number | null
           metadata: Json | null
           mydata_income_classification_category: string | null
+          mydata_income_classification_category_retail: string | null
           mydata_income_classification_type: string | null
+          mydata_income_classification_type_retail: string | null
+          mydata_purchase_vat_category: number | null
           mydata_vat_category: number | null
           name: string
+          notes: string | null
           numeric_specs: Json | null
+          prices_include_vat: boolean
+          product_url: string | null
           properties: Json | null
           quality_assessment: string | null
           quality_metrics: Json | null
@@ -30950,6 +31039,7 @@ export type Database = {
           supplier_company_id: string | null
           supply_mode: string
           tables_extracted: boolean | null
+          taric_code: string | null
           text_embedding_1024: unknown
           text_embedding_1024_model: string | null
           text_embedding_schema_version: number | null
@@ -30957,6 +31047,7 @@ export type Database = {
           total_tables: number | null
           total_tables_extracted: number | null
           updated_at: string | null
+          warranty: string | null
           work_category: string | null
           workspace_id: string
         }[]

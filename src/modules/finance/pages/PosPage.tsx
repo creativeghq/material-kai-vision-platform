@@ -139,7 +139,7 @@ const PosPage: React.FC = () => {
       const [{ data: prices }, { data: fs }, br, banks] = await Promise.all([
         supabase
           .from('product_prices')
-          .select('list_price, currency, unit, product:products(id, name, item_type, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category)')
+          .select('list_price, currency, unit, product:products(id, name, item_type, mydata_vat_category, mydata_income_classification_type, mydata_income_classification_category, mydata_income_classification_type_retail, mydata_income_classification_category_retail)')
           .eq('workspace_id', activeWorkspaceId),
         supabase.from('finance_settings').select(
           'default_vat_rate, business_name, business_vat, business_tax_office, business_profession, business_address, business_street_number, business_postal_code, business_city, business_country, business_phone, business_email, business_gemi, business_company_type',
@@ -168,8 +168,12 @@ const PosPage: React.FC = () => {
           currency: r.currency ?? 'EUR',
           unit: r.unit ?? null,
           vat_category: r.product.mydata_vat_category ?? null,
-          inc_type: r.product.mydata_income_classification_type ?? null,
-          inc_cat: r.product.mydata_income_classification_category ?? null,
+          // The POS issues RETAIL receipts (11.x), so the retail classification wins here;
+          // the wholesale pair is the fallback for products that only carry one.
+          inc_type: r.product.mydata_income_classification_type_retail
+            ?? r.product.mydata_income_classification_type ?? null,
+          inc_cat: r.product.mydata_income_classification_category_retail
+            ?? r.product.mydata_income_classification_category ?? null,
         }));
       setItems(sell);
       if (fs?.default_vat_rate != null) setVatRate(Number(fs.default_vat_rate));
