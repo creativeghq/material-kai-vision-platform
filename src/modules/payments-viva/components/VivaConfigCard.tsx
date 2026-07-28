@@ -132,12 +132,12 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
           <CreditCard className="h-4 w-4 text-primary" />
           Viva.com
           {fullyConnected ? (
-            <Badge variant="outline" className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+            <Badge variant="outline" className="bg-success/10 text-success border-success/30">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Connected
             </Badge>
           ) : (
-            <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/30">
+            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
               <AlertCircle className="h-3 w-3 mr-1" />
               {credsReady ? 'Webhook not verified' : 'Not connected'}
             </Badge>
@@ -163,7 +163,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs">
-                Client ID {status?.has_client_id && <span className="text-emerald-400">· saved</span>}
+                Client ID {status?.has_client_id && <span className="text-success">· saved</span>}
               </Label>
               <Input
                 value={clientId}
@@ -174,7 +174,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">
-                Client Secret {status?.has_client_secret && <span className="text-emerald-400">· saved</span>}
+                Client Secret {status?.has_client_secret && <span className="text-success">· saved</span>}
               </Label>
               <Input
                 type="password"
@@ -187,7 +187,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
             <div className="space-y-1.5">
               <Label className="text-xs">
                 Merchant ID {status?.merchant_id_hint && (
-                  <span className="text-emerald-400">· {status.merchant_id_hint}</span>
+                  <span className="text-success">· {status.merchant_id_hint}</span>
                 )}
               </Label>
               <Input
@@ -199,7 +199,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">
-                API Key {status?.has_api_key && <span className="text-emerald-400">· saved</span>}
+                API Key {status?.has_api_key && <span className="text-success">· saved</span>}
               </Label>
               <Input
                 type="password"
@@ -225,7 +225,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
             <div className="space-y-1.5">
               <Label className="text-xs">Environment</Label>
               <select
-                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                className="w-full h-10 rounded-lg border border-white/12 bg-white/5 px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all duration-200 hover:border-white/20"
                 value={environment}
                 onChange={(e) => setEnvironment(e.target.value as VivaEnvironment)}
               >
@@ -242,7 +242,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
         </div>
 
         {/* Step 1b — the source's return URLs */}
-        <div className="space-y-2 border-t border-white/8 pt-5">
+        <div className="space-y-2 border-t border-border pt-5">
           <p className="text-sm font-medium">2. Set your payment source's return URL</p>
           <p className="text-xs text-muted-foreground">
             Viva sends customers back to the URL on your <strong>payment source</strong>, not
@@ -264,16 +264,16 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
         </div>
 
         {/* Step 3 — the manual webhook registration */}
-        <div className="space-y-3 border-t border-white/8 pt-5">
+        <div className="space-y-3 border-t border-border pt-5">
           <p className="text-sm font-medium flex items-center gap-2">
             3. Register the webhook in Viva
             {webhookReady ? (
-              <Badge variant="outline" className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+              <Badge variant="outline" className="bg-success/10 text-success border-success/30">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Verified
               </Badge>
             ) : (
-              <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/30">Required</Badge>
+              <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">Required</Badge>
             )}
           </p>
           <p className="text-xs text-muted-foreground">
@@ -320,7 +320,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
         </div>
 
         {/* Step 3 — methods + go live */}
-        <div className="space-y-3 border-t border-white/8 pt-5">
+        <div className="space-y-3 border-t border-border pt-5">
           <p className="text-sm font-medium">4. Payment methods</p>
           <div className="flex items-center justify-between">
             <div>
@@ -335,7 +335,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm">RF code (bank transfer) <span className="text-amber-500">— coming soon</span></p>
+              <p className="text-sm">RF code (bank transfer) <span className="text-warning">— coming soon</span></p>
               <p className="text-xs text-muted-foreground">
                 Greek merchants only. The buyer pays from their banking app using a 20-digit
                 reference — no IBAN needed. Temporarily unavailable while we finish verifying the
@@ -349,7 +349,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
             />
           </div>
 
-          <div className="flex items-center justify-between border-t border-white/8 pt-4">
+          <div className="flex items-center justify-between border-t border-border pt-4">
             <div>
               <p className="text-sm">Offer Viva at checkout</p>
               <p className="text-xs text-muted-foreground">

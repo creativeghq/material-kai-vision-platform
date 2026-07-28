@@ -46,7 +46,7 @@ export const ProvidersPanel: React.FC<Props> = (_props) => {
         <CardContent>
           {providers.length === 0 ? (
             <div className="text-center py-8 space-y-3">
-              <AlertCircle className="h-8 w-8 text-amber-300 mx-auto" />
+              <AlertCircle className="h-8 w-8 text-warning mx-auto" />
               <p className="text-sm font-medium">No payment providers are enabled.</p>
               <p className="text-xs text-muted-foreground">
                 Subscriptions, credit purchases, and invoice payment all require at least one
