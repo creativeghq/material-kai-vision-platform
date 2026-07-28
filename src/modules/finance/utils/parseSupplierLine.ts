@@ -37,6 +37,13 @@ export interface ParsedSupplierLine {
   supplier_product_code: string | null;
   /** Maker detected in the text (matched against known names), else null. */
   manufacturer: string | null;
+  /** Canonical lowercase-English colour read from the name ("GRIS" → "grey"), else null. */
+  color: string | null;
+  /** Canonical lowercase-English surface finish ("LAPPATO" → "lappato"), else null. */
+  finish: string | null;
+  /** Leading words left after every known token is stripped — usually the range/collection
+   *  ("AMALFI GRIS 80X80 A'" → "AMALFI"). Null when nothing distinctive remains. */
+  series: string | null;
   /** Canonical unit key — see src/lib/units.ts. */
   unit: string;
   /** Why that unit was chosen, shown as a tooltip so the guess is never silent. */
@@ -61,6 +68,53 @@ const THICKNESS_RE = /\b(\d{1,3}(?:[.,]\d+)?)\s*(mm|cm)\b/i;
 
 /** Quality grade: A', B', Α' (Greek Alpha), "1η", "2nd". */
 const GRADE_RE = /\b([ABΑΒ])['’´]/;
+
+/**
+ * Colour words seen on Greek/Southern-European building-material invoices, mapped to the
+ * lowercase-English canonical form the platform's facet layer expects (see the L0 prompt rule
+ * and `facet_whitelist.py` — `color` is a canonicalized facet, so feeding it English here
+ * saves the multilingual canonicalizer a round trip).
+ *
+ * Deliberately a dictionary, not an LLM call: it runs instantly, costs nothing, and is
+ * predictable. Anything it misses falls through to the Haiku `attributes` the nightly sync
+ * already extracted, and failing that the operator types it.
+ */
+const COLOR_WORDS: Record<string, string> = {
+  // English
+  white: 'white', black: 'black', grey: 'grey', gray: 'grey', beige: 'beige', cream: 'cream',
+  ivory: 'ivory', sand: 'sand', brown: 'brown', taupe: 'taupe', anthracite: 'anthracite',
+  charcoal: 'charcoal', silver: 'silver', gold: 'gold', bronze: 'bronze', copper: 'copper',
+  blue: 'blue', green: 'green', red: 'red', yellow: 'yellow', pink: 'pink', natural: 'natural',
+  // Spanish / Italian / French — common on tile ranges
+  blanco: 'white', bianco: 'white', blanc: 'white',
+  negro: 'black', nero: 'black', noir: 'black',
+  gris: 'grey', grigio: 'grey', perla: 'pearl', perle: 'pearl',
+  marron: 'brown', marrone: 'brown', avorio: 'ivory', crema: 'cream', arena: 'sand',
+  antracita: 'anthracite', antracite: 'anthracite',
+  // Greek
+  λευκο: 'white', λευκό: 'white', μαυρο: 'black', μαύρο: 'black',
+  γκρι: 'grey', μπεζ: 'beige', καφε: 'brown', καφέ: 'brown',
+};
+
+/** Surface finishes. Same canonical-English rule as colours. */
+const FINISH_WORDS: Record<string, string> = {
+  matt: 'matt', matte: 'matt', mat: 'matt', ματ: 'matt',
+  glossy: 'glossy', gloss: 'glossy', lucido: 'glossy', brillo: 'glossy', γυαλιστερο: 'glossy',
+  polished: 'polished', pulido: 'polished', lappato: 'lappato', semipulido: 'semi-polished',
+  honed: 'honed', satin: 'satin', satinado: 'satin',
+  rectified: 'rectified', rettificato: 'rectified',
+  structured: 'structured', estructurado: 'structured', relief: 'relief',
+  antislip: 'anti-slip', 'anti-slip': 'anti-slip', antideslizante: 'anti-slip',
+};
+
+/** First dictionary hit among the line's words, or null. */
+function lookupWord(tokens: string[], dict: Record<string, string>): { canonical: string; raw: string } | null {
+  for (const t of tokens) {
+    const hit = dict[t.toLowerCase()];
+    if (hit) return { canonical: hit, raw: t };
+  }
+  return null;
+}
 
 const numOf = (s: string | undefined): number | null => {
   if (!s) return null;
@@ -204,6 +258,10 @@ export function parseSupplierLine(input: ParseSupplierLineInput): ParsedSupplier
 
   const { unit, reason } = inferUnit(dimensions, input.quantity);
 
+  const words = raw.split(/[\s,;/()]+/).filter(Boolean);
+  const colorHit = lookupWord(words, COLOR_WORDS);
+  const finishHit = lookupWord(words, FINISH_WORDS);
+
   // Name = the description minus the tokens we've already understood.
   let name = raw;
   for (const token of [dimensions.matched, gradeM?.[0], supplier_product_code]) {
@@ -213,6 +271,15 @@ export function parseSupplierLine(input: ParseSupplierLineInput): ParsedSupplier
     .replace(/\s*[-–]\s*\d+(?=\s|$)/g, ' ')   // trailing "-3 -1" batch/lot markers
     .replace(/\s{2,}/g, ' ')
     .replace(/^[\s,;·-]+|[\s,;·-]+$/g, '')
+    .trim();
+
+  // The range/collection is what's left once colour and finish are also removed. Keeping the
+  // colour IN the product name is deliberate — "AMALFI GRIS" is how the item is ordered — so
+  // this is reported separately rather than subtracted from `name`.
+  const seriesText = [colorHit?.raw, finishHit?.raw]
+    .filter(Boolean)
+    .reduce((acc, w) => acc.split(w!).join(' '), name)
+    .replace(/\s{2,}/g, ' ')
     .trim();
 
   const qty = input.quantity ?? null;
@@ -227,6 +294,9 @@ export function parseSupplierLine(input: ParseSupplierLineInput): ParsedSupplier
     grade,
     supplier_product_code,
     manufacturer,
+    color: colorHit?.canonical ?? null,
+    finish: finishHit?.canonical ?? null,
+    series: seriesText && seriesText !== name ? seriesText : null,
     unit,
     unit_reason: reason,
     unit_cost,

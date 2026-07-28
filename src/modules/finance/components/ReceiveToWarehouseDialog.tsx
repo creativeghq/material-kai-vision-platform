@@ -57,6 +57,9 @@ interface LineRow {
   manufacturer: string;
   supplierCode: string;
   grade: string | null;
+  color: string;
+  finish: string;
+  series: string;
   markup: string;
   salePrice: string;
   /** Catalog product this line was matched to, if any. */
@@ -95,6 +98,33 @@ interface LineRow {
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * How well an existing stock item matches a supplier line, 0..1.
+ *
+ * The old test was `a.includes(b) || b.includes(a)`, which matched "TILE" against every tile
+ * in the warehouse and missed "AMALFI GRIS 80X80" ↔ "Amalfi Gris" because neither string
+ * contains the other. This scores shared distinctive tokens instead: an exact SKU or supplier
+ * code is decisive, otherwise it is the proportion of the item's own words that appear in the
+ * line. Below `MATCH_MIN` nothing is offered as a likely match.
+ */
+const MATCH_MIN = 0.5;
+
+const tokenize = (s: string): string[] =>
+  (s ?? '').toLowerCase().split(/[^a-z0-9α-ωά-ώ]+/i).filter((t) => t.length >= 2);
+
+function matchScore(item: WarehouseItem, description: string, supplierCode: string | null): number {
+  const desc = (description ?? '').toLowerCase();
+  // A code the supplier printed is an identity, not a hint.
+  const code = (item.sku ?? item.supplier_product_code ?? '').trim().toLowerCase();
+  if (code && (code === (supplierCode ?? '').trim().toLowerCase() || desc.includes(code))) return 1;
+
+  const itemTokens = tokenize(item.name ?? '');
+  if (itemTokens.length === 0) return 0;
+  const lineTokens = new Set(tokenize(description));
+  const hits = itemTokens.filter((t) => lineTokens.has(t)).length;
+  return hits / itemTokens.length;
+}
 
 /** AADE VAT-category code → percent. Mirrors the table in `_shared/fiscal/invoice-builder.ts`. */
 const VAT_PCT_BY_CATEGORY: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
@@ -215,10 +245,13 @@ export const ReceiveToWarehouseDialog: React.FC<{
             defaultManufacturer: doc.issuer_name,
           });
           const ai = pendingByDesc.get(desc);
-          const existing = its.find((it) => {
-            const n = (it.name ?? '').toLowerCase();
-            return n && (n.includes(desc.toLowerCase()) || desc.toLowerCase().includes(n));
-          });
+          // Only auto-select an existing item when the match is convincing; otherwise the
+          // operator starts on "New stock item" rather than silently topping up the wrong one.
+          const scored = its
+            .map((it) => ({ it, score: matchScore(it, desc, ln.item_code) }))
+            .filter((x) => x.score >= MATCH_MIN)
+            .sort((a, b) => b.score - a.score);
+          const existing = scored[0]?.it;
           // AADE states the unit on the line (`measurementUnit`). When it does, that IS the
           // unit — the description heuristic is only a fallback for lines that omit it.
           const aadeUnit = unitFromMydataCode(ln.measurement_unit);
@@ -243,6 +276,11 @@ export const ReceiveToWarehouseDialog: React.FC<{
             // Same rule: the supplier's own `itemCode` beats anything scraped out of the text.
             supplierCode: ln.item_code ?? parsed.supplier_product_code ?? '',
             grade: parsed.grade,
+            // Dictionary hit from the name first; the nightly Haiku pass's free-text
+            // `attributes` is the fallback for wording the dictionary doesn't know.
+            color: parsed.color ?? '',
+            finish: parsed.finish ?? '',
+            series: parsed.series ?? '',
             markup: markupPct,
             salePrice: cost != null && markupPct ? String(r2(cost * (1 + Number(markupPct) / 100))) : '',
             match: null,
@@ -439,6 +477,8 @@ export const ReceiveToWarehouseDialog: React.FC<{
             externalSku: r.supplierCode.trim() || null,
             unit: r.unit, cost, costCurrency: doc.currency,
             dimensions, manufacturer: r.manufacturer.trim() || null, grade: r.grade,
+            color: r.color.trim() || null, finish: r.finish.trim() || null,
+            series: r.series.trim() || null,
             itemType: r.itemType === 'service' ? 'service' : 'good',
             fiscal,
           });
@@ -599,7 +639,8 @@ function blankRow(mode: LineMode): LineRow {
   return {
     include: false, expanded: false,
     mode, name: '', sku: '', unit: 'pcs', qty: '', width: '', length: '', thickness: '', weight: '',
-    manufacturer: '', supplierCode: '', grade: null, markup: '', salePrice: '', match: null,
+    manufacturer: '', supplierCode: '', grade: null, color: '', finish: '', series: '',
+    markup: '', salePrice: '', match: null,
     images: [], visualMatches: [], matching: false, unitReason: '', uploading: false,
     itemType: 'good', categoryId: '', barcode: '', cpv: '', taric: '',
     vatCategory: '', purchaseVatCategory: '',
@@ -653,9 +694,19 @@ const LineCard: React.FC<{
   const fileRef = useRef<HTMLInputElement>(null);
   const creating = row.mode === '__create';
   const suffix = unitSuffix(row.unit);
-  const destination = row.mode === '__create'
-    ? (row.match ? `New stock · ${row.match.name}` : 'New stock item')
-    : (items.find((it) => it.id === row.mode)?.name ?? 'Existing item');
+
+  // Split the stock list into "plausibly this item" and everything else, so the select's
+  // first entries are the ones worth considering.
+  const { rankedItems, otherItems } = useMemo(() => {
+    const desc = line.item_description ?? '';
+    const scored = items
+      .map((it) => ({ it, score: matchScore(it, desc, row.supplierCode || null) }))
+      .sort((a, b) => b.score - a.score);
+    return {
+      rankedItems: scored.filter((x) => x.score >= MATCH_MIN).slice(0, 5).map((x) => x.it),
+      otherItems: scored.filter((x) => x.score < MATCH_MIN).map((x) => x.it),
+    };
+  }, [items, line.item_description, row.supplierCode]);
 
   return (
     <div className={`rounded-md border ${row.include ? 'border-border/60' : 'border-border/30 opacity-60'}`}>
@@ -684,10 +735,37 @@ const LineCard: React.FC<{
             net {formatMoney(line.net_value ?? 0, currency)}
             {row.qty ? ` · ${row.qty} ${suffix}` : ''}
             {cost != null && <> · <span className="text-foreground">{formatMoney(cost, currency)}/{suffix}</span></>}
-            {' · '}{destination}
           </div>
         </button>
         <div className="flex items-center gap-1">
+          {/* "Where does this quantity go?" belongs on the header row next to the quantity it
+              governs — it was a lone full-width select in the body, reading as a stray field.
+              Existing items are ranked by how well they match the supplier's description, so
+              the plausible ones are at the top instead of buried in an alphabetical list. */}
+          <Select value={row.mode} onValueChange={(v) => onChange({ mode: v })} disabled={!row.include}>
+            <SelectTrigger className="h-8 w-[188px] text-xs">
+              <SelectValue placeholder="Add to…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__create">➕ New stock item</SelectItem>
+              {rankedItems.length > 0 && (
+                <>
+                  <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Likely match</div>
+                  {rankedItems.map((it) => (
+                    <SelectItem key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ''}</SelectItem>
+                  ))}
+                </>
+              )}
+              {otherItems.length > 0 && (
+                <>
+                  <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">All stock</div>
+                  {otherItems.map((it) => (
+                    <SelectItem key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ''}</SelectItem>
+                  ))}
+                </>
+              )}
+            </SelectContent>
+          </Select>
           <Input className="h-8 w-24 text-xs text-right" type="text" inputMode="decimal" placeholder="qty"
             value={row.qty} onChange={(e) => onChange({ qty: e.target.value })} disabled={!row.include} />
           <TooltipProvider delayDuration={200}>
@@ -707,22 +785,6 @@ const LineCard: React.FC<{
           </TooltipProvider>
         </div>
       </div>
-
-      {row.expanded && row.include && (
-        <div className="space-y-3 border-t border-border/40 p-3">
-          <Field label="Destination">
-            <Select value={row.mode} onValueChange={(v) => onChange({ mode: v })}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__create">➕ Create new stock item</SelectItem>
-                {items.map((it) => (
-                  <SelectItem key={it.id} value={it.id}>{it.name}{it.sku ? ` (${it.sku})` : ''}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-      )}
 
       {row.expanded && row.include && creating && (
         <div className="space-y-4 border-t border-border/40 p-3">
@@ -757,11 +819,25 @@ const LineCard: React.FC<{
                   </SelectContent>
                 </Select>
               </Field>
-              <Field className="sm:col-span-3" label="Manufacturer">
+              <Field className="sm:col-span-2" label="Manufacturer">
                 <Input className="h-8 text-xs" value={row.manufacturer} onChange={(e) => onChange({ manufacturer: e.target.value })} placeholder="maker" />
               </Field>
-              <Field className="sm:col-span-3" label="Supplier product code">
+              <Field className="sm:col-span-2" label="Series / collection">
+                <Input className="h-8 text-xs" value={row.series} onChange={(e) => onChange({ series: e.target.value })} placeholder="e.g. AMALFI" />
+              </Field>
+              <Field className="sm:col-span-2" label="Supplier product code">
                 <Input className="h-8 text-xs" value={row.supplierCode} onChange={(e) => onChange({ supplierCode: e.target.value })} placeholder="their code" />
+              </Field>
+              {/* Read out of the name where possible ("GRIS" → grey). Canonical lowercase
+                  English, because these are canonicalized facets used by search + filters. */}
+              <Field className="sm:col-span-2" label="Colour">
+                <Input className="h-8 text-xs" value={row.color} onChange={(e) => onChange({ color: e.target.value })} placeholder="e.g. grey" />
+              </Field>
+              <Field className="sm:col-span-2" label="Finish">
+                <Input className="h-8 text-xs" value={row.finish} onChange={(e) => onChange({ finish: e.target.value })} placeholder="e.g. matt" />
+              </Field>
+              <Field className="sm:col-span-2" label="Quality grade">
+                <Input className="h-8 text-xs" value={row.grade ?? ''} onChange={(e) => onChange({ grade: e.target.value || null })} placeholder="e.g. A" />
               </Field>
             </div>
           </Section>

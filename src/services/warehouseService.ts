@@ -249,6 +249,9 @@ export const warehouseService = {
     unit?: string | null; cost?: number | null; costCurrency?: string | null;
     dimensions?: { width_mm?: number | null; length_mm?: number | null; thickness_mm?: number | null };
     manufacturer?: string | null; externalSku?: string | null; grade?: string | null;
+    /** Canonicalized facets read from the supplier line. Written into `metadata` under the
+     *  keys the facet canonicalizer and faceted search already use. */
+    color?: string | null; finish?: string | null; series?: string | null;
     /** Fiscal identity — what makes the item submittable to myDATA. */
     fiscal?: ProductFiscalFields;
   }): Promise<string> {
@@ -258,6 +261,11 @@ export const warehouseService = {
     if (input.unit) metadata.unit = input.unit;
     if (input.manufacturer) metadata.factory_name = input.manufacturer;
     if (input.grade) metadata.quality_grade = input.grade;
+    // `color` and `finish` are whitelisted facet keys — writing them here means the product
+    // is filterable and canonicalizable on day one instead of after a re-tag pass.
+    if (input.color) metadata.color = input.color;
+    if (input.finish) metadata.finish = input.finish;
+    if (input.series) metadata.collection = input.series;
     if (hasDims) {
       metadata.dimensions = [{
         width: dims.width_mm ?? null, height: dims.length_mm ?? null,
