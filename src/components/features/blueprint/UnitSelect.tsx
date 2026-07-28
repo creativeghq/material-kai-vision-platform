@@ -6,14 +6,18 @@ import React from 'react';
  * consistent across blueprints and lets the engine pair the rate with the right
  * dimension formula. Any pre-existing custom unit is preserved as an option.
  */
+/**
+ * Blueprint pricing units. The VALUES are canonical keys from src/lib/units.ts (so a
+ * blueprint line and an order line for the same work agree); the labels stay
+ * blueprint-flavoured ("per m²") because that is how an estimator reads them.
+ */
 export const STANDARD_UNITS: { value: string; label: string }[] = [
-  { value: 'm²', label: 'per m² (area)' },
+  { value: 'm2', label: 'per m² (area)' },
   { value: 'm', label: 'per metre' },
   { value: 'point', label: 'per point' },
-  { value: 'pc', label: 'per piece' },
+  { value: 'pcs', label: 'per piece' },
   { value: 'room', label: 'per room' },
   { value: 'bath', label: 'per bathroom' },
-  { value: 'unit', label: 'per unit' },
   { value: 'day', label: 'per day' },
   { value: 'hour', label: 'per hour' },
   { value: 'job', label: 'per job (lump)' },

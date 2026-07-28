@@ -29,6 +29,7 @@ import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import { TablePagination, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { FilterBar, type FilterGroupDef, type FilterValues } from '@/components/core/filters';
+import { UNITS } from '@/lib/units';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import {
@@ -104,13 +105,11 @@ const pctOf = (code: string) => VAT_CATEGORIES.find((v) => v.code === code)?.pct
 const DEFAULT_VAT_CODE = '1'; // 24%
 const vatCodeOf = (pct?: number | null) => VAT_CATEGORIES.find((v) => v.pct === (pct ?? 0))?.code ?? DEFAULT_VAT_CODE;
 
-// Units of measure for a line (sqm, item, …). Stored as a code on the line + carried to the invoice.
-const UNIT_OPTIONS: Array<{ code: string; label: string }> = [
-  { code: 'item', label: 'item' }, { code: 'm2', label: 'm²' }, { code: 'm', label: 'm' },
-  { code: 'kg', label: 'kg' }, { code: 'lt', label: 'lt' }, { code: 'hour', label: 'hour' },
-  { code: 'set', label: 'set' }, { code: 'box', label: 'box' }, { code: 'pallet', label: 'pallet' },
-];
-const DEFAULT_UNIT = 'item';
+// Units of measure for a line. Derived from the canonical list in src/lib/units.ts — this
+// used to be its own array whose 'item' disagreed with quotes' 'pcs' and ingestion's 'sqm'.
+const UNIT_OPTIONS: Array<{ code: string; label: string }> =
+  UNITS.map((u) => ({ code: u.key, label: u.label }));
+const DEFAULT_UNIT = 'pcs';
 
 /** Orders list + create — mounted as the first Finance → Documents tab. */
 export const OrdersPanel: React.FC<{

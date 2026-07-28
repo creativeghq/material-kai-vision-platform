@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { UNITS } from '@/lib/units';
 import { Package, Plus, Eye, Trash2, Minus, Ruler, Loader2, PenLine, Home, Wrench, Truck, ChevronDown, ChevronUp, DollarSign, Send } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -806,7 +807,9 @@ const FFETextAreaCell: React.FC<{
 };
 
 /** Inline editable unit cell for custom items */
-const UNIT_OPTIONS = ['pcs', 'sqm', 'lm', 'kg', 'liters', 'sets', 'rolls', 'boxes', 'pairs'] as const;
+// Canonical units — was a bespoke list whose 'sqm'/'liters'/'boxes' did not match the
+// order lines ('m2'/'lt'/'box') the same product ends up on.
+const UNIT_OPTIONS = UNITS.map((u) => u.key);
 
 const UnitCell: React.FC<{ value: string; onSave: (v: string) => void }> = ({ value, onSave }) => (
   <Select value={value} onValueChange={v => { if (v !== value) onSave(v); }}>

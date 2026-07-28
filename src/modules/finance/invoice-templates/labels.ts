@@ -1,3 +1,4 @@
+import { UNITS, unitSuffix } from '@/lib/units';
 // Bilingual label dictionary for invoice documents. MUST stay identical to the copy
 // in supabase/functions/finance-invoice-pdf/index.ts so HTML and PDF read the same.
 // This is a legal tax document (παραστατικό) — the Greek here is intentional and is NOT
@@ -80,4 +81,8 @@ export const PAYMENT_METHOD_LABELS: Record<number, string> = {
 
 // myDATA VAT category → percent (when a line carries an explicit category).
 export const VAT_PCT_BY_CAT: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
-export const UNIT_LABEL_BY_CODE: Record<number, string> = { 1: 'pcs', 2: 'kg', 3: 'lt', 4: 'm', 5: 'm²', 6: 'm³' };
+/** AADE measurement-unit code → printed label. Derived from the canonical unit list so the
+ *  PDF cannot drift from what the line was actually stored as. */
+export const UNIT_LABEL_BY_CODE: Record<number, string> = Object.fromEntries(
+  UNITS.filter((u) => u.mydataCode != null).map((u) => [u.mydataCode as number, unitSuffix(u.key)]),
+) as Record<number, string>;
