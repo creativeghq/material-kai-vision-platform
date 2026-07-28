@@ -148,6 +148,19 @@ export interface GscRow {
 
 export interface GscTrendPoint { date: string; clicks: number; impressions: number }
 
+export interface WebsiteHealth {
+  id: number;
+  url: string;
+  status: 'ok' | 'error';
+  perf_score: number | null;
+  a11y_score: number | null;
+  bp_score: number | null;
+  seo_score: number | null;
+  issues: { title: string; score: number; display_value: string | null }[] | null;
+  error: string | null;
+  created_at: string;
+}
+
 export interface GscSummary {
   days: number;
   from: string;
@@ -373,5 +386,19 @@ export const userWebsitesService = {
     const { data, error } = await supabase.functions.invoke('gsc-api', { body: { action: 'disconnect', website_id: websiteId } });
     if (error) throw new Error(await edgeErrorMessage(error, 'Disconnect failed'));
     if (!data?.ok) throw new Error(data?.error || 'Disconnect failed');
+  },
+
+  // ── Site Health (Lighthouse + on-page audit) ─────────────────────────────
+  async healthLatest(websiteId: string): Promise<WebsiteHealth | null> {
+    const { data, error } = await supabase.rpc('get_website_health', { p_website_id: websiteId });
+    if (error) throw error;
+    return (data as WebsiteHealth) ?? null;
+  },
+
+  async healthRun(websiteId: string): Promise<WebsiteHealth> {
+    const { data, error } = await supabase.functions.invoke('seo-site-audit', { body: { action: 'run', website_id: websiteId } });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Audit failed'));
+    if (!data?.ok) throw new Error(data?.error || 'Audit failed');
+    return data as WebsiteHealth;
   },
 };

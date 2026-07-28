@@ -1879,6 +1879,19 @@
     "response": "{ success, market_median, market_min, market_max, currency, cap_pct, max_allowed, allowed, unverified, from_cache }"
   },
   {
+    "name": "seo-site-audit",
+    "tag": "SEO",
+    "summary": "Site Health — homepage Lighthouse + on-page audit for a connected website",
+    "description": "Runs a synchronous homepage audit (DataForSEO instant-page + Google Lighthouse) via MIVAA's quick-page route and stores Core Web Vitals / SEO / accessibility / best-practices scores + failing-audit issues in website_health_audits. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run action calls authenticate()+userCanAccessWorkspace(). The full multi-page OnPage crawl stays on-demand via the seo_site_crawl_start agent tool.",
+    "security": ["supabaseJwt"],
+    "docs": null,
+    "methods": ["POST"],
+    "actions": [
+      { "action": "run", "description": "Audit one website's homepage now and store the result.", "params": [ { "name": "website_id", "type": "string", "required": true } ], "response": "{ ok, perf_score, a11y_score, bp_score, seo_score, issues }" },
+      { "action": "cron-run", "description": "x-cron-secret only — weekly audit of every active connected website + 180-day retention prune.", "params": [], "response": "{ ok, audited, failed }" }
+    ]
+  },
+  {
     "name": "gsc-api",
     "tag": "SEO",
     "summary": "Google Search Console for connected websites (OAuth + performance sync)",

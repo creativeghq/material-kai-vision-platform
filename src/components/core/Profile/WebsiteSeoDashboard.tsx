@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
-  FlaskConical, Radar, AlertTriangle, LineChart,
+  FlaskConical, Radar, AlertTriangle, LineChart, Gauge,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
+import { WebsiteHealthPanel } from '@/components/core/Profile/WebsiteHealthPanel';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -160,6 +161,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           <TabsTrigger value="runs" className="gap-1"><FlaskConical className="w-3.5 h-3.5" /> Toolkit Runs</TabsTrigger>
           <TabsTrigger value="domains" className="gap-1"><Radar className="w-3.5 h-3.5" /> Domain Audits</TabsTrigger>
           <TabsTrigger value="gsc" className="gap-1"><LineChart className="w-3.5 h-3.5" /> Search Performance</TabsTrigger>
+          <TabsTrigger value="health" className="gap-1"><Gauge className="w-3.5 h-3.5" /> Site Health</TabsTrigger>
         </TabsList>
 
         {/* Articles */}
@@ -331,6 +333,11 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         {/* Search Performance (Google Search Console) */}
         <TabsContent value="gsc">
           <WebsiteGscPanel website={website} />
+        </TabsContent>
+
+        {/* Site Health (Lighthouse + on-page) */}
+        <TabsContent value="health">
+          <WebsiteHealthPanel website={website} />
         </TabsContent>
       </Tabs>
 
