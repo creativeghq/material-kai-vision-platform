@@ -46,6 +46,17 @@ function pickBest(results: any[], afm: string): any | null {
     ?? null;
 }
 
+/**
+ * One registry lookup.
+ *
+ * Returns the best hit, `null` for a genuine "no such company", or `'error'` for anything
+ * transient. The distinction matters: only a genuine miss may be cached as `not_found`.
+ *
+ * ΓΕΜΗ signals throttling as **HTTP 200** with `{"message":"API rate limit exceeded"}` and no
+ * `searchResults` key — so status alone is not enough to tell a miss from a throttle. Reading
+ * an absent `searchResults` as "no results" would permanently record live companies as
+ * not-found; measured on a real backfill, that was 152 of 166 ΑΦΜ.
+ */
 async function gemiLookup(afm: string, apiKey: string): Promise<any | null | 'error'> {
   try {
     const ctrl = new AbortController();
@@ -56,15 +67,19 @@ async function gemiLookup(afm: string, apiKey: string): Promise<any | null | 'er
       signal: ctrl.signal,
     });
     clearTimeout(t);
-    // 503 is ΓΕΜΗ's routine maintenance window — an error, not a "no such company", so it
-    // must NOT be cached as not_found.
+    // 503 is ΓΕΜΗ's routine maintenance window; 429 is an explicit throttle. Both transient.
     if (!res.ok) return 'error';
     const body = await res.json().catch(() => null);
-    return pickBest(body?.searchResults ?? [], afm);
+    // The only shape that carries a real answer. Anything else (rate limit, auth failure, an
+    // error envelope) is transient by definition — we did not learn that the ΑΦΜ is unknown.
+    if (!body || !Array.isArray(body.searchResults)) return 'error';
+    return pickBest(body.searchResults, afm);
   } catch {
     return 'error';
   }
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Resolve issuer names for a workspace's name-less inbound documents and write them back.
@@ -135,11 +150,21 @@ export async function resolveInboundIssuerNames(
   }).slice(0, maxLookups);
 
   if (gemiApiKey && toLookUp.length > 0) {
-    // Small concurrency — the registry is a shared public service, not a CDN.
-    const CONCURRENCY = 4;
+    // ΓΕΜΗ throttles aggressively — measured, it starts refusing at roughly one call per
+    // second even sequentially. So: two at a time, paced, with a backoff retry. Going faster
+    // does not resolve more names, it just converts them into rate-limit responses.
+    const CONCURRENCY = 2;
+    const PACE_MS = 1200;
     for (let i = 0; i < toLookUp.length; i += CONCURRENCY) {
       const batch = toLookUp.slice(i, i + CONCURRENCY);
-      const hits = await Promise.all(batch.map((afm) => gemiLookup(afm, gemiApiKey)));
+      const hits = await Promise.all(batch.map(async (afm) => {
+        let hit = await gemiLookup(afm, gemiApiKey);
+        for (let attempt = 0; hit === 'error' && attempt < 2; attempt++) {
+          await sleep(1500 * (attempt + 1));
+          hit = await gemiLookup(afm, gemiApiKey);
+        }
+        return hit;
+      }));
       const rows: any[] = [];
       batch.forEach((afm, k) => {
         const hit = hits[k];
@@ -170,6 +195,7 @@ export async function resolveInboundIssuerNames(
       if (rows.length > 0) {
         await admin.from('greek_registry_companies').upsert(rows, { onConflict: 'afm' });
       }
+      if (i + CONCURRENCY < toLookUp.length) await sleep(PACE_MS);
     }
   }
 

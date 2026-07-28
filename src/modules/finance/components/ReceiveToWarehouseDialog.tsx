@@ -60,12 +60,24 @@ interface LineRow {
   /** Catalog product this line was matched to, if any. */
   match: CatalogMatch | null;
   images: string[];
+  /** Catalog products the uploaded photo looks like, from the 7-vector visual search. */
+  visualMatches: CatalogMatch[];
+  matching: boolean;
   /** Why the unit was pre-selected — surfaced as a tooltip so the guess is never silent. */
   unitReason: string;
   uploading: boolean;
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Read a File as raw base64 (no data-URL prefix) — what MIVAA's image search expects. */
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 
 export const ReceiveToWarehouseDialog: React.FC<{
   doc: InboundDocument;
@@ -172,6 +184,8 @@ export const ReceiveToWarehouseDialog: React.FC<{
             salePrice: cost != null && markupPct ? String(r2(cost * (1 + Number(markupPct) / 100))) : '',
             match: null,
             images: [],
+            visualMatches: [],
+            matching: false,
             unitReason: parsed.unit_reason,
             uploading: false,
           };
@@ -222,14 +236,31 @@ export const ReceiveToWarehouseDialog: React.FC<{
     });
   };
 
+  /**
+   * Upload the photos, then run visual search on the first one. The picture is usually a far
+   * better matcher than the supplier's abbreviated description — "AMALFI GRIS 80X80 A' -3 -1"
+   * tells a text search very little, while the tile itself is exactly what the 7-vector index
+   * was built for. Suggestions are offered, never auto-applied.
+   */
   const pickImages = async (i: number, files: FileList | null) => {
     if (!files || files.length === 0) return;
+    const list = Array.from(files);
     setRow(i, { uploading: true });
     try {
-      const urls = await warehouseService.uploadItemImages(workspaceId, Array.from(files));
-      setRow(i, { images: [...(rows[i]?.images ?? []), ...urls], uploading: false });
+      const urls = await warehouseService.uploadItemImages(workspaceId, list);
+      const already = rows[i]?.images ?? [];
+      setRow(i, { images: [...already, ...urls], uploading: false });
+
+      if (already.length === 0) {
+        setRow(i, { matching: true });
+        const base64 = await fileToBase64(list[0]);
+        const suggestions = await warehouseService.matchCatalogByImage(
+          workspaceId, base64, rows[i]?.name ?? '',
+        );
+        setRow(i, { visualMatches: suggestions, matching: false });
+      }
     } catch (e: any) {
-      setRow(i, { uploading: false });
+      setRow(i, { uploading: false, matching: false });
       toast({ title: 'Upload failed', description: e?.message, variant: 'destructive' });
     }
   };
@@ -400,7 +431,7 @@ function blankRow(mode: LineMode): LineRow {
     include: false, expanded: false,
     mode, name: '', sku: '', unit: 'pcs', qty: '', width: '', length: '', thickness: '', weight: '',
     manufacturer: '', supplierCode: '', grade: null, markup: '', salePrice: '', match: null,
-    images: [], unitReason: '', uploading: false,
+    images: [], visualMatches: [], matching: false, unitReason: '', uploading: false,
   };
 }
 
@@ -592,9 +623,32 @@ const LineCard: React.FC<{
                   <span className="ml-1 text-xs">Add photo</span>
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground">
-                Stored on the stock item so it can be matched against the catalog later.
-              </p>
+              {row.matching ? (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Looking for catalog products that look like this…
+                </p>
+              ) : row.visualMatches.length > 0 && !row.match ? (
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground">Looks like these catalog products:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {row.visualMatches.slice(0, 4).map((m) => (
+                      <button key={m.id} type="button" title={`${m.name} — use as the catalog product`}
+                        className="flex items-center gap-1.5 rounded-full border border-border/60 py-0.5 pl-0.5 pr-2 hover:border-primary"
+                        onClick={() => onChange({ match: m })}>
+                        {m.image_url
+                          ? <img src={m.image_url} alt="" className="h-5 w-5 rounded-full object-cover" />
+                          : <span className="h-5 w-5 rounded-full bg-muted" />}
+                        <span className="max-w-[110px] truncate text-[10px]">{m.name}</span>
+                        {m.score != null && <span className="text-[9px] text-muted-foreground">{Math.round(m.score * 100)}%</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[10px] text-muted-foreground">
+                  Stored on the stock item; the first photo is searched against the catalog.
+                </p>
+              )}
             </div>
           </div>
         </div>

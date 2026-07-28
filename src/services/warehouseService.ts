@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PRODUCT_IMAGE_SELECT, getProductImageUrl } from '@/utils/productMetadata';
+import { mivaaApi } from '@/services/mivaaApiClient';
 
 /** A catalog product offered as the match for a supplier line. */
 export interface CatalogMatch {
@@ -7,6 +8,8 @@ export interface CatalogMatch {
   name: string;
   sku: string | null;
   image_url: string | null;
+  /** Visual-similarity score when the match came from an image; null for a text match. */
+  score?: number | null;
 }
 
 export interface Warehouse {
@@ -255,6 +258,45 @@ export const warehouseService = {
       id: p.id, name: p.name, sku: p.sku ?? p.external_sku ?? null,
       image_url: getProductImageUrl(p),
     }));
+  },
+
+  /**
+   * Find catalog products that LOOK like the supplied photo.
+   *
+   * Runs the platform's existing 7-vector search (`strategy: 'multi_vector'` in MIVAA) over
+   * the image — the same engine the material picker and segmentation flows use, which is why
+   * this needs no new embedding infrastructure: catalog images are already embedded in
+   * `vecs.image_*_embeddings`, and the query image is embedded on the fly.
+   *
+   * Best-effort: a MIVAA outage returns [] rather than blocking a warehouse intake.
+   */
+  async matchCatalogByImage(workspaceId: string, imageBase64: string, hint = '', topK = 6): Promise<CatalogMatch[]> {
+    try {
+      const res = await mivaaApi.searchByImageCrop({
+        image_base64: imageBase64, query: hint, workspace_id: workspaceId, top_k: topK,
+      });
+      const results = (res?.success && (res.data as any)?.results) as any[] | undefined;
+      if (!Array.isArray(results)) return [];
+      const seen = new Set<string>();
+      const out: CatalogMatch[] = [];
+      for (const r of results) {
+        // The multi-vector index is image-first: a hit may be an image that belongs to a
+        // product, or the product itself. Only image hits carrying a product are usable here.
+        const id = r.product_id ?? r.id;
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        out.push({
+          id,
+          name: r.product_name ?? r.name ?? r.title ?? 'Untitled product',
+          sku: r.sku ?? r.external_sku ?? null,
+          image_url: r.image_url ?? r.thumbnail_url ?? null,
+          score: typeof r.score === 'number' ? r.score : (typeof r.similarity === 'number' ? r.similarity : null),
+        });
+      }
+      return out;
+    } catch {
+      return [];
+    }
   },
 
   /** Upload intake photos for a stock item. Public bucket — these are product shots, and the
