@@ -31340,8 +31340,14 @@ export type Database = {
         Args: { p_order_ids: string[] }
         Returns: {
           order_id: string
+          order_type: string
+          currency: string
+          total: number
           settled_in: number
           settled_out: number
+          settled: number
+          outstanding: number
+          payment_status: string
         }[]
       }
       get_popular_searches: {

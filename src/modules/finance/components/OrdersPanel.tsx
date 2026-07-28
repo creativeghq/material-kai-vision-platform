@@ -204,16 +204,12 @@ export const OrdersPanel: React.FC<{
       if (clamped !== page) { setPage(clamped); return; }
       setRows(res.rows);
       setTotal(res.count);
-      // Outstanding for just this page — one batched query. A sales order settles on money IN,
-      // a purchase order on money OUT; the other direction is the OTHER side of the trade (what
-      // we paid our supplier for a sales order) and must never reduce what the customer owes.
+      // Outstanding for just this page — one batched query. The figure is derived in SQL by
+      // `get_order_settlements` (the same definition behind the payment badge), so this row can
+      // never show "Paid" next to a non-zero balance again.
       try {
-        const settled = await ordersService.settledByOrder(res.rows.map((r) => r.id));
-        setOutstandingById(new Map(res.rows.map((r) => {
-          const s = settled.get(r.id);
-          const paid = r.order_type === 'purchase' ? (s?.out ?? 0) : (s?.in ?? 0);
-          return [r.id, Math.round((Number(r.total) - paid) * 100) / 100] as const;
-        })));
+        const balances = await ordersService.orderBalances(res.rows.map((r) => r.id));
+        setOutstandingById(new Map(res.rows.map((r) => [r.id, balances.get(r.id)?.outstanding ?? 0] as const)));
       } catch { setOutstandingById(new Map()); }
     } catch (err: any) {
       toast({ title: 'Failed to load orders', description: err?.message, variant: 'destructive' });
@@ -977,11 +973,11 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     setExpenseOpen(true);
   };
 
-  // How much of this order is settled, per the #280 allocation ledger (NOT `fin.received`, which only
-  // sees cash tagged with `payments.order_id` and misses credit re-homed from an on-account payment).
-  // Sales settle from money-in allocations, purchases from money-out. This mirrors
-  // `recompute_order_payment_status`, so "outstanding" agrees with the order's payment_status.
-  const orderSettled = () => (order?.order_type === 'sales' ? (fin?.settled_in ?? 0) : (fin?.settled_out ?? 0));
+  // How much of this order is settled, per the allocation ledger (NOT `fin.received`, which only
+  // sees cash tagged with `payments.order_id` and misses credit re-homed from an on-account
+  // payment). Already direction-resolved by `get_order_settlements` — do not re-apply the
+  // sales→in / purchase→out rule here; that duplication is what produced the €945 bug.
+  const orderSettled = () => fin?.settled ?? 0;
 
   // Settle this sales order from the customer's on-account credit — no new cash. Re-homes existing
   // "money in" onto the order (server-side, split-safe); the order flips to paid/partial via trigger.

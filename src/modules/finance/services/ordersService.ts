@@ -44,6 +44,28 @@ export interface Order {
   updated_at: string;
 }
 
+/**
+ * The canonical settlement position of an order, as returned by `get_order_settlements`.
+ * `settled` is already the direction-correct half and `outstanding` is already `total − settled`
+ * — the TypeScript layer formats these, it does not compute them.
+ */
+export interface OrderBalance {
+  order_id: string;
+  order_type: OrderType;
+  currency: string;
+  total: number;
+  /** Money-in allocations (a sales order's settlement; a purchase order's refunds). */
+  settled_in: number;
+  /** Money-out allocations (a purchase order's settlement; what we paid suppliers on a sale). */
+  settled_out: number;
+  /** The half THIS order type settles on. */
+  settled: number;
+  /** `total − settled`. Negative means over-settled. */
+  outstanding: number;
+  /** What payment_status should be, derived from the ledger. */
+  payment_status: OrderPaymentStatus;
+}
+
 export type ThreeWayMatchStatus =
   | 'no_lines' | 'awaiting_receipt' | 'awaiting_bill' | 'matched' | 'variance';
 
@@ -285,13 +307,13 @@ export const ordersService = {
     const ids = candidates.map((o) => o.id);
 
     // Batch the finance lookups (3 queries total, not 3 per order). We only need presence of an
-    // invoice/bill and the settled amount — not the full getOrderFinance payload.
-    // Settlement now reads the allocation ledger (#280): payment_allocations rows targeting the
-    // order, joined to their payment's direction. `payments.order_id` is provenance only.
-    const [inv, bills, allocs] = await Promise.all([
+    // invoice/bill plus the canonical settlement position — not the full getOrderFinance payload.
+    // Settlement comes from `orderBalances` (the shared SQL definition), NOT from re-summing
+    // allocations here; this used to be its own hand-rolled direction split.
+    const [inv, bills, balances] = await Promise.all([
       supabase.from('invoices').select('order_id').in('order_id', ids),
       supabase.from('supplier_bills').select('order_id').in('order_id', ids),
-      supabase.from('payment_allocations').select('order_id, amount, payment:payments(direction)').in('order_id', ids),
+      this.orderBalances(ids),
     ]);
     const invoiced = new Set<string>((inv.data ?? []).map((r: any) => r.order_id));
     (bills.data ?? []).forEach((r: any) => invoiced.add(r.order_id));
@@ -303,30 +325,26 @@ export const ordersService = {
       const { data: cats } = await supabase.from('finance_categories').select('id, name').in('id', catIds);
       for (const c of (cats ?? []) as Array<{ id: string; name: string }>) catNames.set(c.id, c.name);
     }
-    const settledIn = new Map<string, number>();
-    const settledOut = new Map<string, number>();
-    for (const a of (allocs.data ?? []) as Array<{ order_id: string; amount: number; payment: { direction: 'in' | 'out' } | { direction: 'in' | 'out' }[] | null }>) {
-      const dir = (Array.isArray(a.payment) ? a.payment[0]?.direction : a.payment?.direction);
-      if (!dir) continue;
-      const map = dir === 'in' ? settledIn : settledOut;
-      map.set(a.order_id, (map.get(a.order_id) ?? 0) + Number(a.amount));
-    }
-    const hasCash = (id: string) => settledIn.has(id) || settledOut.has(id);
+    // A draft/pre-order only counts as real once cash has actually moved on it, either way.
+    const hasCash = (id: string) => {
+      const b = balances.get(id);
+      return !!b && (b.settled_in > 0.005 || b.settled_out > 0.005);
+    };
 
     return candidates
       .filter((o) => !invoiced.has(o.id))
       // Confirmed+ orders always; drafts/pre-orders only once cash has moved on them.
       .filter((o) => o.status !== 'draft' || hasCash(o.id))
       .map((o) => {
-        const settled = (o.order_type === 'sales' ? settledIn : settledOut).get(o.id) ?? 0;
+        const b = balances.get(o.id);
         return {
           id: o.id,
           order_number: o.order_number,
           order_type: o.order_type,
           party_name: o.party_name,
           total: Number(o.total),
-          settled,
-          outstanding: Math.round((Number(o.total) - settled) * 100) / 100,
+          settled: b?.settled ?? 0,
+          outstanding: b?.outstanding ?? Number(o.total),
           currency: o.currency,
           status: o.status,
           created_at: o.created_at,
@@ -339,27 +357,28 @@ export const ordersService = {
   },
 
   /**
-   * Settled-so-far per order for a set of order ids, from the allocation ledger, split BY
-   * DIRECTION. Lets a list show "outstanding = total − settled" without an N+1 getOrderFinance
-   * per row. One query, keyed by order id.
+   * Settlement position per order, straight from `get_order_settlements` — the SINGLE definition
+   * of how much an order is settled and how much is still owed.
    *
-   * Returns both halves rather than the net, because netting them is wrong: on a SALES order the
-   * money-out is what we paid our supplier for the goods (a cost), not a give-back to the
-   * customer. Netting made a fully-paid sales order with a paid supplier bill read as still
-   * owing exactly the supplier's amount. Callers pick the side their order type settles on:
-   * sales → `in`, purchase → `out`.
+   * Do NOT re-derive `outstanding` from these numbers. The rule (a sales order settles on money
+   * IN; a purchase order on money OUT; the opposite direction is the other side of the trade and
+   * must never reduce what the counterparty owes) used to be restated at five call sites in two
+   * languages. One of them netted the two directions, and a fully-paid sales order with a paid
+   * supplier bill reported as still owing exactly the supplier's amount — while the payment badge
+   * on the same row said "Paid". The RPC now returns `settled` / `outstanding` / `payment_status`
+   * already derived, and the same function backs `recompute_order_payment_status` and the
+   * `finance.order_payment_status_drift` integrity check, so the three cannot disagree.
    */
-  async settledByOrder(orderIds: string[]): Promise<Map<string, { in: number; out: number }>> {
-    const out = new Map<string, { in: number; out: number }>();
+  async orderBalances(orderIds: string[]): Promise<Map<string, OrderBalance>> {
+    const out = new Map<string, OrderBalance>();
     if (orderIds.length === 0) return out;
-    // Model B (#280 corrected): an order settles on allocations against IT directly OR against the
-    // invoices/bills that belong to it. Paying an order's invoice is an invoice-targeted allocation
-    // (order_id NULL by the one-target constraint), so a plain `.eq('order_id', …)` missed it and
-    // fully-paid orders read as unpaid. `get_order_settlements` applies the join in SQL so this
-    // agrees with recompute_order_payment_status and getOrderFinance.
     const { data } = await supabase.rpc('get_order_settlements', { p_order_ids: orderIds });
-    for (const r of (data ?? []) as Array<{ order_id: string; settled_in: number; settled_out: number }>) {
-      out.set(r.order_id, { in: Number(r.settled_in), out: Number(r.settled_out) });
+    for (const r of (data ?? []) as OrderBalance[]) {
+      out.set(r.order_id, {
+        ...r,
+        total: Number(r.total), settled_in: Number(r.settled_in), settled_out: Number(r.settled_out),
+        settled: Number(r.settled), outstanding: Number(r.outstanding),
+      });
     }
     return out;
   },
@@ -548,12 +567,15 @@ export const ordersService = {
     received: number;
     paid_out: number;
     profit: number;
-    // Canonical settlement per #280: Σ payment_allocations for this order, by payment direction.
-    // This is what `recompute_order_payment_status` uses — and unlike `received`/`paid_out` (which
-    // only see cash whose `payments.order_id` = this order) it also counts credit re-homed onto the
-    // order from an on-account payment (whose `order_id` is NULL). Drive "outstanding" off this.
+    // Canonical settlement from `get_order_settlements` — the same definition that drives
+    // `payment_status` and the drift check. Unlike `received`/`paid_out` (which only see cash
+    // whose `payments.order_id` = this order) it also counts credit re-homed onto the order from
+    // an on-account payment (whose `order_id` is NULL). Read `settled`/`outstanding` directly;
+    // never recompute them from the two halves.
     settled_in: number;
     settled_out: number;
+    settled: number;
+    outstanding: number;
     // Money re-homed onto this order from a payment that is NOT tagged to it (an on-account credit
     // applied here). Shown read-only in the Payments list so a credit-settled order isn't blank.
     creditApplied: Array<{ allocation_id: string; payment_id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; counterparty_name: string | null }>;
@@ -602,16 +624,15 @@ export const ordersService = {
       + creditApplied.filter((c) => c.direction === 'in').reduce((s, c) => s + c.amount, 0);
     const paid_out = rawPayments.filter((p) => p.direction === 'out').reduce((s, p) => s + Number(p.amount), 0)
       + creditApplied.filter((c) => c.direction === 'out').reduce((s, c) => s + c.amount, 0);
-    // Canonical settlement (model B, #280 corrected) — drives `outstanding` / payment_status
-    // agreement. Counts allocations against this order OR its invoices/bills, so paying the order's
-    // invoice settles the order. Order-direct-only summing (the old code) missed invoice payments.
-    const settleRow = ((settlement.data ?? []) as Array<{ settled_in: number; settled_out: number }>)[0];
-    const settled_in = Number(settleRow?.settled_in ?? 0);
-    const settled_out = Number(settleRow?.settled_out ?? 0);
+    // Canonical settlement — already direction-resolved by the RPC.
+    const b = ((settlement.data ?? []) as OrderBalance[])[0];
     return {
       invoices: (inv.data ?? []) as Array<{ id: string; internal_number: string | null; status: string; total: number; amount_due: number; currency: string }>,
       supplierBills: (bills.data ?? []) as Array<{ id: string; supplier_bill_number: string | null; status: string; total: number; amount_due: number; currency: string }>,
-      payments, received, paid_out, profit: received - paid_out, settled_in, settled_out, creditApplied,
+      payments, received, paid_out, profit: received - paid_out,
+      settled_in: Number(b?.settled_in ?? 0), settled_out: Number(b?.settled_out ?? 0),
+      settled: Number(b?.settled ?? 0), outstanding: Number(b?.outstanding ?? 0),
+      creditApplied,
     };
   },
 
