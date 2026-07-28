@@ -30,6 +30,7 @@ import { QuickCategoryDialog } from '@/modules/finance/components/QuickCategoryD
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { MydataSyncDialog } from '@/modules/finance/components/MydataSyncDialog';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
+import { useMydataTypeLabels } from '@/modules/finance/components/mydataTypes';
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -191,9 +192,11 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     }
   }, [type, invoices, creditNotes, inbound, payments, deliveryNotes, cheques]);
 
+  // myDATA code → name, so the document-type filter offers "Sales Invoice", not a bare "1.1".
+  const mydataTypes = useMydataTypeLabels();
   const filterGroups = useMemo(
-    () => buildDocumentFilters(type as DocFilterType, { rows: baseRows, categories: sideCategories, categoryName }),
-    [type, baseRows, sideCategories, categoryMap],
+    () => buildDocumentFilters(type as DocFilterType, { rows: baseRows, categories: sideCategories, categoryName, mydataTypes }),
+    [type, baseRows, sideCategories, categoryMap, mydataTypes],
   );
   const { values: filterValues, setValues: setFilterValues, filtered: activeRows, previewCount } =
     useFilters<any>(baseRows, filterGroups);

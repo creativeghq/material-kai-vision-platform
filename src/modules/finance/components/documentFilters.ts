@@ -10,6 +10,7 @@
 import { CalendarDays, Coins, FileText, Tags } from 'lucide-react';
 import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import { paymentMethodLabel } from '@/modules/finance/services/financeService';
+import { mydataTypeName, mydataTypeRank } from '@/modules/finance/components/mydataTypes';
 import { humanizeLabel } from '@/utils/humanize';
 import type { FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
@@ -32,11 +33,27 @@ const categoryOptions = (categories: FinanceCategory[]): FilterOption[] => [
 
 const statusOptions = (rows: any[], key = 'status') => optionsFromRows(rows, (r) => r[key], humanizeLabel);
 
+/**
+ * myDATA type options read as their NAME with the code as the secondary line — a bare "1.1"
+ * is unfilterable for anyone who hasn't memorised the AADE table. Ordered numerically, so
+ * "2.1" precedes "11.1" (a label sort puts those the wrong way round).
+ */
+const mydataTypeOptions = (rows: any[], accessor: (r: any) => any, labels: Record<string, string>): FilterOption[] =>
+  optionsFromRows(rows, accessor, (code) => mydataTypeName(code, labels))
+    .map((o) => ({ ...o, hint: `AADE code ${o.value}` }))
+    .sort((a, b) => mydataTypeRank(a.value) - mydataTypeRank(b.value));
+
 export function buildDocumentFilters(
   type: DocFilterType,
-  ctx: { rows: any[]; categories: FinanceCategory[]; categoryName: (id: any) => string },
+  ctx: {
+    rows: any[];
+    categories: FinanceCategory[];
+    categoryName: (id: any) => string;
+    /** myDATA code → name, from `useMydataTypeLabels()`. Empty until the lookup lands. */
+    mydataTypes?: Record<string, string>;
+  },
 ): FilterGroupDef[] {
-  const { rows, categories, categoryName } = ctx;
+  const { rows, categories, categoryName, mydataTypes = {} } = ctx;
 
   switch (type) {
     case 'payments': {
@@ -160,7 +177,7 @@ export function buildDocumentFilters(
             },
             {
               key: 'document_type', type: 'multi', label: 'Type',
-              options: optionsFromRows(rows, (r) => r.document_type),
+              options: mydataTypeOptions(rows, (r) => r.document_type, mydataTypes),
               accessor: (r) => r.document_type,
             },
             {
@@ -194,13 +211,14 @@ export function buildDocumentFilters(
           fields: [
             {
               key: 'q', type: 'text', label: 'Search',
-              placeholder: 'Search supplier / VAT…',
-              accessor: (r) => [r.issuer_name, r.issuer_vat, r.doc_type],
+              placeholder: 'Search supplier / VAT / document type…',
+              // The type name as well as its code — nobody searches for "2.1".
+              accessor: (r) => [r.issuer_name, r.issuer_vat, r.doc_type, r.doc_type && mydataTypeName(r.doc_type, mydataTypes)],
             },
             { key: 'status', type: 'multi', label: 'Status', options: statusOptions(rows), accessor: (r) => r.status },
             {
               key: 'doc_type', type: 'multi', label: 'Document type',
-              options: optionsFromRows(rows, (r) => r.doc_type),
+              options: mydataTypeOptions(rows, (r) => r.doc_type, mydataTypes),
               accessor: (r) => r.doc_type,
             },
           ],
