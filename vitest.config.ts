@@ -26,5 +26,16 @@ export default defineConfig({
     // Integration tests hit prod; give them room. Unit tests finish in ms regardless.
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    // Retry transport flakes. The integration tier makes ~68 real network calls to live
+    // endpoints, so a single ECONNRESET is a matter of when, not if — and because the deploy
+    // job gates on this suite, one blip blocks EVERY deploy. That happened on 2026-07-28:
+    // `hr-careers-public` died on `read ECONNRESET` with 67 of 68 passing, and it held back an
+    // email-guard fix for half an hour while the bug it fixed kept firing.
+    //
+    // This does not paper over real failures: a genuine bug fails all three attempts. Hermetic
+    // unit tests are deterministic, so a retry never changes their verdict — only the wall-clock
+    // of an already-failing run, by milliseconds. If a test only passes on retry, that is a
+    // signal worth chasing, not a green light.
+    retry: 2,
   },
 });
