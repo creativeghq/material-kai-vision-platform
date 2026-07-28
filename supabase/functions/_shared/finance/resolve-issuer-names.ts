@@ -31,6 +31,8 @@ export interface ResolveIssuerResult {
   from_gemi: number;
   not_found: number;
   docs_updated: number;
+  /** The run stopped early on ΓΕΜΗ's per-minute budget; the rest resume next run. */
+  throttled: boolean;
 }
 
 const digits = (s: unknown) => String(s ?? '').replace(/\D/g, '');
@@ -57,7 +59,14 @@ function pickBest(results: any[], afm: string): any | null {
  * an absent `searchResults` as "no results" would permanently record live companies as
  * not-found; measured on a real backfill, that was 152 of 166 ΑΦΜ.
  */
-async function gemiLookup(afm: string, apiKey: string): Promise<any | null | 'error'> {
+interface GemiResult {
+  hit: any | null | 'error';
+  /** Requests left in the current minute, from ΓΕΜΗ's own headers. null when absent. */
+  remaining: number | null;
+  throttled: boolean;
+}
+
+async function gemiLookup(afm: string, apiKey: string): Promise<GemiResult> {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 20000);
@@ -67,15 +76,20 @@ async function gemiLookup(afm: string, apiKey: string): Promise<any | null | 'er
       signal: ctrl.signal,
     });
     clearTimeout(t);
-    // 503 is ΓΕΜΗ's routine maintenance window; 429 is an explicit throttle. Both transient.
-    if (!res.ok) return 'error';
+
+    const rawRemaining = res.headers.get('x-ratelimit-remaining-minute')
+      ?? res.headers.get('ratelimit-remaining');
+    const remaining = rawRemaining != null && rawRemaining !== '' ? Number(rawRemaining) : null;
+
+    // 503 is ΓΕΜΗ's routine maintenance window; 429 an explicit throttle. Both transient.
+    if (!res.ok) return { hit: 'error', remaining, throttled: res.status === 429 };
     const body = await res.json().catch(() => null);
-    // The only shape that carries a real answer. Anything else (rate limit, auth failure, an
-    // error envelope) is transient by definition — we did not learn that the ΑΦΜ is unknown.
-    if (!body || !Array.isArray(body.searchResults)) return 'error';
-    return pickBest(body.searchResults, afm);
+    if (!body || !Array.isArray(body.searchResults)) {
+      return { hit: 'error', remaining, throttled: true };
+    }
+    return { hit: pickBest(body.searchResults, afm), remaining, throttled: false };
   } catch {
-    return 'error';
+    return { hit: 'error', remaining: null, throttled: false };
   }
 }
 
@@ -85,17 +99,20 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Resolve issuer names for a workspace's name-less inbound documents and write them back.
  * Best-effort throughout: a registry outage leaves the rows as they were.
  *
- * @param maxLookups hard ceiling on live ΓΕΜΗ calls per run, so a first sync over a large
- *        backlog spreads its lookups across runs instead of hammering the registry.
+ * @param maxLookups hard ceiling on live ΓΕΜΗ calls per run. Defaults to ΓΕΜΗ's whole
+ *        per-minute budget (8), so one run costs ~1 minute of wall clock and a backlog
+ *        drains across runs. Raising it does not resolve more names — the limit is the
+ *        limit — it only makes the function sit there sleeping.
  */
 export async function resolveInboundIssuerNames(
   admin: any,
   workspaceId: string,
   gemiApiKey: string | null,
-  maxLookups = 40,
+  maxLookups = 8,
 ): Promise<ResolveIssuerResult> {
   const out: ResolveIssuerResult = {
     candidates: 0, from_cache: 0, from_crm: 0, from_gemi: 0, not_found: 0, docs_updated: 0,
+    throttled: false,
   };
 
   const { data: unnamed } = await admin
@@ -150,37 +167,38 @@ export async function resolveInboundIssuerNames(
   }).slice(0, maxLookups);
 
   if (gemiApiKey && toLookUp.length > 0) {
-    // ΓΕΜΗ throttles aggressively — measured, it starts refusing at roughly one call per
-    // second even sequentially. So: two at a time, paced, with a backoff retry. Going faster
-    // does not resolve more names, it just converts them into rate-limit responses.
-    const CONCURRENCY = 2;
-    const PACE_MS = 1200;
-    for (let i = 0; i < toLookUp.length; i += CONCURRENCY) {
-      const batch = toLookUp.slice(i, i + CONCURRENCY);
-      const hits = await Promise.all(batch.map(async (afm) => {
-        let hit = await gemiLookup(afm, gemiApiKey);
-        for (let attempt = 0; hit === 'error' && attempt < 2; attempt++) {
-          await sleep(1500 * (attempt + 1));
-          hit = await gemiLookup(afm, gemiApiKey);
-        }
-        return hit;
-      }));
-      const rows: any[] = [];
-      batch.forEach((afm, k) => {
-        const hit = hits[k];
-        if (hit === 'error') return;          // transient — cache nothing, retry next run
-        if (!hit) {
-          rows.push({ afm, name: null, not_found: true, source: 'gemi', resolved_at: new Date().toISOString() });
-          out.not_found++;
-          return;
-        }
+    // ΓΕΜΗ's published budget is 8 requests per MINUTE (`X-RateLimit-Limit-Minute: 8`).
+    // So the loop is strictly sequential and spends exactly that budget: pace one call per
+    // ~8s, follow the `X-RateLimit-Remaining-Minute` header, and stop the moment we're
+    // throttled rather than retrying. Retrying inside a run cannot help — the budget is
+    // per-minute and already spent — it just burns the function's wall clock. The backlog
+    // drains across runs instead, which is what the cache exists for.
+    //
+    // Measured the hard way: an unpaced backfill of 166 ΑΦΜ needed ~600 requests to resolve
+    // 162 because ~75% came back throttled.
+    const PACE_MS = 8000;
+    for (let i = 0; i < toLookUp.length; i++) {
+      const afm = toLookUp[i];
+      const { hit, remaining, throttled } = await gemiLookup(afm, gemiApiKey);
+
+      if (hit === 'error') {
+        out.throttled = out.throttled || throttled;
+        // Throttled or unreachable: nothing more will get through this minute. Leave the
+        // rest for the next run — they stay uncached, so nothing is recorded as a miss.
+        if (throttled) break;
+      } else if (!hit) {
+        await admin.from('greek_registry_companies').upsert(
+          [{ afm, name: null, not_found: true, source: 'gemi', resolved_at: new Date().toISOString() }],
+          { onConflict: 'afm' },
+        );
+        out.not_found++;
+      } else {
         const name: string | null = hit.coNameEl
           ?? (Array.isArray(hit.coNamesEn) ? hit.coNamesEn[0] : null)
           ?? (Array.isArray(hit.coTitlesEl) ? hit.coTitlesEl[0] : null)
           ?? null;
-        rows.push({
-          afm,
-          name,
+        await admin.from('greek_registry_companies').upsert([{
+          afm, name,
           ar_gemi: hit.arGemi != null ? String(hit.arGemi) : null,
           legal_form: hit.legalType?.descr ?? null,
           status: hit.status?.descr ?? null,
@@ -189,13 +207,13 @@ export async function resolveInboundIssuerNames(
           source: 'gemi',
           resolved_at: new Date().toISOString(),
           raw: hit,
-        });
+        }], { onConflict: 'afm' });
         if (name) { resolved.set(afm, name); out.from_gemi++; } else { out.not_found++; }
-      });
-      if (rows.length > 0) {
-        await admin.from('greek_registry_companies').upsert(rows, { onConflict: 'afm' });
       }
-      if (i + CONCURRENCY < toLookUp.length) await sleep(PACE_MS);
+
+      // Budget exhausted for this minute — stop rather than spend the run sleeping.
+      if (remaining != null && remaining <= 0) { out.throttled = true; break; }
+      if (i + 1 < toLookUp.length) await sleep(PACE_MS);
     }
   }
 
