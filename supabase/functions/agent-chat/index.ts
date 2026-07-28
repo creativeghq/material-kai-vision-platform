@@ -852,6 +852,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_site_review', 'seo_brand_search_audit',
       // Google Search Console (first-party performance)
       'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+      // Gap-fillers (DataForSEO data GSC can't provide)
+      'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
+      'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
+      'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
+      'seo_ai_overview', 'seo_google_maps', 'seo_gbp_info',
       // Escape hatch — admin only
       'seo_dataforseo_call',
       // SEO article pipeline (admin/owner only)
@@ -1011,6 +1016,10 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search', 'seo_pinterest_search', 'seo_reddit_search',
       'seo_site_review', 'seo_brand_search_audit', 'seo_dataforseo_call',
       'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+      'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
+      'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
+      'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
+      'seo_ai_overview', 'seo_google_maps', 'seo_gbp_info',
       'create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer',
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
       'research_analysis', 'analytics_analysis',
@@ -1282,6 +1291,7 @@ async function executeAgent(
         'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume',
         'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps',
         'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+        'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview',
       ],
     },
     'seo-domain': {
@@ -1289,15 +1299,18 @@ async function executeAgent(
         'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors',
         'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains',
         'seo_relevant_pages', 'seo_categories_for_domain',
+        'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_domain_intersection',
       ],
     },
     'seo-backlinks': {
-      tool_ids: ['seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains'],
+      tool_ids: ['seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains',
+        'seo_backlinks_timeseries', 'seo_backlinks_competitors'],
     },
     'seo-content': {
       tool_ids: [
         'seo_content_sentiment', 'seo_domain_technologies', 'seo_domain_whois',
         'seo_site_crawl_start', 'seo_site_crawl_status', 'seo_llm_mentions_search',
+        'seo_onpage_issues',
       ],
     },
     'seo-multi-engine': {
@@ -1305,6 +1318,7 @@ async function executeAgent(
         'seo_youtube_search', 'seo_local_pack', 'seo_google_trends',
         'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search',
         'seo_pinterest_search', 'seo_reddit_search',
+        'seo_google_maps', 'seo_gbp_info',
       ],
     },
     'seo-composite': {
@@ -1525,6 +1539,10 @@ async function executeAgent(
     'seo_site_review', 'seo_brand_search_audit',
     'seo_dataforseo_call',
     'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+    'seo_onpage_issues', 'seo_backlinks_timeseries', 'seo_backlinks_competitors',
+    'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_keyword_ideas',
+    'seo_related_keywords', 'seo_search_volume', 'seo_domain_intersection',
+    'seo_ai_overview', 'seo_google_maps', 'seo_gbp_info',
   ];
   const needsSeoAgent = config.tools.some((t: string) => SEO_AGENT_TOOL_NAMES.includes(t));
   const needsBg = config.tools.includes('dispatch_background_task');
@@ -1669,6 +1687,19 @@ async function executeAgent(
   const createSEOAIKeywordVolumeTool = seoAgentMod?.createSEOAIKeywordVolumeTool;
   const createSEOCategoriesForDomainTool = seoAgentMod?.createSEOCategoriesForDomainTool;
   const createSEODataForSEOCallTool = seoAgentMod?.createSEODataForSEOCallTool;
+  // Gap-filler tools (DataForSEO data GSC can't provide)
+  const createSEOOnpageIssuesTool = seoAgentMod?.createSEOOnpageIssuesTool;
+  const createSEOBacklinksTimeseriesTool = seoAgentMod?.createSEOBacklinksTimeseriesTool;
+  const createSEOBacklinksCompetitorsTool = seoAgentMod?.createSEOBacklinksCompetitorsTool;
+  const createSEOHistoricalRankOverviewTool = seoAgentMod?.createSEOHistoricalRankOverviewTool;
+  const createSEOKeywordsForSiteTool = seoAgentMod?.createSEOKeywordsForSiteTool;
+  const createSEOKeywordIdeasTool = seoAgentMod?.createSEOKeywordIdeasTool;
+  const createSEORelatedKeywordsTool = seoAgentMod?.createSEORelatedKeywordsTool;
+  const createSEOSearchVolumeTool = seoAgentMod?.createSEOSearchVolumeTool;
+  const createSEODomainIntersectionTool = seoAgentMod?.createSEODomainIntersectionTool;
+  const createSEOAiOverviewTool = seoAgentMod?.createSEOAiOverviewTool;
+  const createSEOGoogleMapsTool = seoAgentMod?.createSEOGoogleMapsTool;
+  const createSEOGbpInfoTool = seoAgentMod?.createSEOGbpInfoTool;
   const createDispatchBackgroundTaskTool = bgMod?.createDispatchBackgroundTaskTool;
   const createPriceLookupTool = priceMod?.createPriceLookupTool;
   const createPresentationSheetTool = presentationMod?.createPresentationSheetTool;
@@ -1966,6 +1997,19 @@ async function executeAgent(
   if (config.tools.includes('seo_dataforseo_call') && createSEODataForSEOCallTool) {
     tools.push(createSEODataForSEOCallTool(userId, onChunk));
   }
+  // Gap-filler tools (DataForSEO data GSC can't provide)
+  if (config.tools.includes('seo_onpage_issues') && createSEOOnpageIssuesTool) tools.push(createSEOOnpageIssuesTool(userId, onChunk));
+  if (config.tools.includes('seo_backlinks_timeseries') && createSEOBacklinksTimeseriesTool) tools.push(createSEOBacklinksTimeseriesTool(userId, onChunk));
+  if (config.tools.includes('seo_backlinks_competitors') && createSEOBacklinksCompetitorsTool) tools.push(createSEOBacklinksCompetitorsTool(userId, onChunk));
+  if (config.tools.includes('seo_historical_rank_overview') && createSEOHistoricalRankOverviewTool) tools.push(createSEOHistoricalRankOverviewTool(userId, onChunk));
+  if (config.tools.includes('seo_keywords_for_site') && createSEOKeywordsForSiteTool) tools.push(createSEOKeywordsForSiteTool(userId, onChunk));
+  if (config.tools.includes('seo_keyword_ideas') && createSEOKeywordIdeasTool) tools.push(createSEOKeywordIdeasTool(userId, onChunk));
+  if (config.tools.includes('seo_related_keywords') && createSEORelatedKeywordsTool) tools.push(createSEORelatedKeywordsTool(userId, onChunk));
+  if (config.tools.includes('seo_search_volume') && createSEOSearchVolumeTool) tools.push(createSEOSearchVolumeTool(userId, onChunk));
+  if (config.tools.includes('seo_domain_intersection') && createSEODomainIntersectionTool) tools.push(createSEODomainIntersectionTool(userId, onChunk));
+  if (config.tools.includes('seo_ai_overview') && createSEOAiOverviewTool) tools.push(createSEOAiOverviewTool(userId, onChunk));
+  if (config.tools.includes('seo_google_maps') && createSEOGoogleMapsTool) tools.push(createSEOGoogleMapsTool(userId, onChunk));
+  if (config.tools.includes('seo_gbp_info') && createSEOGbpInfoTool) tools.push(createSEOGbpInfoTool(userId, onChunk));
   } // end isAdmin SEO gate
 
   // Mention monitoring tools (all users; module-gated + per-tool credit cost inside each tool)

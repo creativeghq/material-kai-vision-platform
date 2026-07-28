@@ -1622,3 +1622,323 @@ export const createSEODataForSEOCallTool = (
     },
   );
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Gap-filler tools (2026-07) — data DataForSEO offers that GSC can't, promoted
+// from the escape hatch to first-class tools. Each is a thin wrapper over
+// callDataForSEO(<unified-client-method>, params).
+// ═══════════════════════════════════════════════════════════════════════════
+
+const ONPAGE_ISSUE_KIND: Record<string, string> = {
+  non_indexable: 'onpage_non_indexable',
+  redirects: 'onpage_redirect_chains',
+  duplicate_tags: 'onpage_duplicate_tags',
+  duplicate_content: 'onpage_duplicate_content',
+  broken_links: 'onpage_links',
+  lighthouse: 'onpage_lighthouse',
+  structured_data: 'onpage_microdata',
+  pages: 'onpage_pages',
+};
+
+/** OnPage granular issues for a finished site crawl (needs a task_id from seo_site_crawl_start). */
+export const createSEOOnpageIssuesTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ task_id, issue_type, limit }) => {
+      const kind = ONPAGE_ISSUE_KIND[issue_type];
+      if (!kind) return JSON.stringify({ success: false, error: `unknown issue_type: ${issue_type}` });
+      onChunk?.({ type: 'tool_progress', status: `Fetching ${issue_type} for crawl ${task_id}...`, timestamp: Date.now() });
+      const r = await callDataForSEO(kind, { id: task_id, task_id, limit: limit ?? 100 }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_onpage_issues_card', task_id, issue_type, items, timestamp: Date.now() });
+      return JSON.stringify({ success: true, issue_type, count: items.length, sample: items.slice(0, 8) });
+    },
+    {
+      name: 'seo_onpage_issues',
+      description: 'Technical site-audit detail for a FINISHED crawl (from seo_site_crawl_start → seo_site_crawl_status=finished). issue_type: non_indexable | redirects | duplicate_tags | duplicate_content | broken_links | lighthouse (Core Web Vitals) | structured_data | pages. This is what GSC Index Coverage only hints at.',
+      schema: z.object({
+        task_id: z.string().describe('Crawl task_id from seo_site_crawl_start.'),
+        issue_type: z.enum(['non_indexable', 'redirects', 'duplicate_tags', 'duplicate_content', 'broken_links', 'lighthouse', 'structured_data', 'pages']),
+        limit: z.number().int().min(1).max(1000).optional(),
+      }),
+    },
+  );
+};
+
+/** Backlinks over time — referring-domains / backlinks history. */
+export const createSEOBacklinksTimeseriesTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ target }) => {
+      onChunk?.({ type: 'tool_progress', status: `Loading backlink history for ${target}...`, timestamp: Date.now() });
+      const r = await callDataForSEO('backlinks_timeseries_summary', { target }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_backlinks_timeseries_card', target, items, timestamp: Date.now() });
+      return JSON.stringify({ success: true, target, points: items.length });
+    },
+    {
+      name: 'seo_backlinks_timeseries',
+      description: 'Backlink profile OVER TIME — monthly referring domains, backlinks, and rank trend. Reveals link growth/decay velocity (GSC barely reports links).',
+      schema: z.object({ target: z.string().min(3).describe('Domain or URL.') }),
+    },
+  );
+};
+
+/** Backlink competitors — domains with the most-similar backlink profiles. */
+export const createSEOBacklinksCompetitorsTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ target, limit }) => {
+      onChunk?.({ type: 'tool_progress', status: `Finding backlink competitors for ${target}...`, timestamp: Date.now() });
+      const r = await callDataForSEO('backlinks_competitors', { target, limit: limit ?? 20 }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_backlinks_competitors_card', target, items, timestamp: Date.now() });
+      return JSON.stringify({ success: true, target, count: items.length, top: items.slice(0, 10) });
+    },
+    {
+      name: 'seo_backlinks_competitors',
+      description: 'Domains that share the most referring domains with the target — your real link-building competitors + intersection counts.',
+      schema: z.object({ target: z.string().min(3), limit: z.number().int().min(5).max(100).optional() }),
+    },
+  );
+};
+
+/** Historical rank overview — domain organic rank/traffic month by month. */
+export const createSEOHistoricalRankOverviewTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ domain, country_code, language_code }) => {
+      onChunk?.({ type: 'tool_progress', status: `Historical rank overview for ${domain}...`, timestamp: Date.now() });
+      const r = await callDataForSEO('labs_historical_rank_overview', {
+        target: domain, country_code: country_code || null, language_code: (language_code || 'en').toLowerCase(),
+      }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_historical_rank_card', domain, items, timestamp: Date.now() });
+      return JSON.stringify({ success: true, domain, points: items.length });
+    },
+    {
+      name: 'seo_historical_rank_overview',
+      description: 'Domain organic visibility OVER TIME — ranking-keyword count, estimated traffic (ETV) and traffic value month by month. The rank-tracker view GSC lacks (GSC gives only a blended avg position for queries you already get impressions on).',
+      schema: z.object({
+        domain: z.string().min(3),
+        country_code: z.string().length(2).optional(),
+        language_code: z.string().optional(),
+      }),
+    },
+  );
+};
+
+/** Keywords for site — every keyword a domain ranks for (fuller than ranked_keywords). */
+export const createSEOKeywordsForSiteTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ domain, country_code, language_code, limit }) => {
+      onChunk?.({ type: 'tool_progress', status: `Keyword universe for ${domain}...`, timestamp: Date.now() });
+      const r = await callDataForSEO('labs_keywords_for_site', {
+        target: domain, country_code: country_code || null, language_code: (language_code || 'en').toLowerCase(), limit: limit ?? 100,
+      }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_keywords_for_site_card', domain, items, timestamp: Date.now() });
+      return JSON.stringify({ success: true, domain, count: items.length });
+    },
+    {
+      name: 'seo_keywords_for_site',
+      description: 'Every keyword the domain ranks for (positions 1–100) with volume, CPC and search intent — including the 11–100 rankings GSC buries. Use to size the full organic footprint.',
+      schema: z.object({
+        domain: z.string().min(3),
+        country_code: z.string().length(2).optional(),
+        language_code: z.string().optional(),
+        limit: z.number().int().min(10).max(1000).optional(),
+      }),
+    },
+  );
+};
+
+/** Keyword ideas — expansion around seed keywords. */
+export const createSEOKeywordIdeasTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ keywords, country_code, language_code, limit }) => {
+      onChunk?.({ type: 'tool_progress', status: `Keyword ideas for ${keywords.join(', ')}...`, timestamp: Date.now() });
+      const r = await callDataForSEO('labs_keyword_ideas', {
+        keywords, country_code: (country_code || 'US').toUpperCase(), language_code: (language_code || 'en').toLowerCase(), limit: limit ?? 100,
+      }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_keyword_ideas_card', seeds: keywords, items, timestamp: Date.now() });
+      return JSON.stringify({ success: true, count: items.length, top: items.slice(0, 15) });
+    },
+    {
+      name: 'seo_keyword_ideas',
+      description: 'Keyword expansion — ideas semantically related to seed keywords, with volume + difficulty. Broader than phrase-match suggestions. Use to build a topic cluster.',
+      schema: z.object({
+        keywords: z.array(z.string()).min(1).max(200),
+        country_code: z.string().length(2).optional(),
+        language_code: z.string().optional(),
+        limit: z.number().int().min(10).max(1000).optional(),
+      }),
+    },
+  );
+};
+
+/** Related keywords — the "searches related to" expansion tree. */
+export const createSEORelatedKeywordsTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ keyword, country_code, language_code, limit }) => {
+      onChunk?.({ type: 'tool_progress', status: `Related keywords for "${keyword}"...`, timestamp: Date.now() });
+      const r = await callDataForSEO('labs_related_keywords', {
+        keyword, country_code: (country_code || 'US').toUpperCase(), language_code: (language_code || 'en').toLowerCase(), limit: limit ?? 100,
+      }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_related_keywords_card', keyword, items, timestamp: Date.now() });
+      return JSON.stringify({ success: true, keyword, count: items.length });
+    },
+    {
+      name: 'seo_related_keywords',
+      description: 'The Google "related searches" expansion tree for a seed keyword (depth-based), with volume. Use for intent mapping and FAQ discovery.',
+      schema: z.object({
+        keyword: z.string().min(1),
+        country_code: z.string().length(2).optional(),
+        language_code: z.string().optional(),
+        limit: z.number().int().min(10).max(1000).optional(),
+      }),
+    },
+  );
+};
+
+/** Real search volume + CPC + competition (Google Ads). */
+export const createSEOSearchVolumeTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ keywords, country_code, language_code }) => {
+      onChunk?.({ type: 'tool_progress', status: `Search volume + CPC for ${keywords.length} keywords...`, timestamp: Date.now() });
+      const r = await callDataForSEO('kw_google_ads_search_volume', {
+        keywords, country_code: (country_code || 'US').toUpperCase(), language_code: (language_code || 'en').toLowerCase(),
+      }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_search_volume_card', items, timestamp: Date.now() });
+      return JSON.stringify({
+        success: true, count: items.length,
+        sample: items.slice(0, 12).map((i: any) => ({ keyword: i.keyword, volume: i.search_volume, cpc: i.cpc, competition: i.competition })),
+      });
+    },
+    {
+      name: 'seo_search_volume',
+      description: 'Real Google Ads search volume + CPC + competition for up to 1000 keywords. GSC has NONE of this — it only reports YOUR impressions. Use to turn GSC striking-distance into a prioritised, revenue-weighted list.',
+      schema: z.object({
+        keywords: z.array(z.string()).min(1).max(1000),
+        country_code: z.string().length(2).optional(),
+        language_code: z.string().optional(),
+      }),
+    },
+  );
+};
+
+/** Domain intersection — keyword gap between two domains. */
+export const createSEODomainIntersectionTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ target1, target2, country_code, language_code, limit }) => {
+      onChunk?.({ type: 'tool_progress', status: `Keyword intersection: ${target1} vs ${target2}...`, timestamp: Date.now() });
+      const r = await callDataForSEO('labs_domain_intersection', {
+        target1, target2, country_code: country_code || null, language_code: (language_code || 'en').toLowerCase(), limit: limit ?? 100,
+      }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_domain_intersection_card', target1, target2, items, timestamp: Date.now() });
+      return JSON.stringify({ success: true, target1, target2, count: items.length });
+    },
+    {
+      name: 'seo_domain_intersection',
+      description: 'Keywords BOTH domains rank for, side by side with each domain\'s position — the true competitive keyword overlap (and, filtered, the gap). GSC has zero competitor data.',
+      schema: z.object({
+        target1: z.string().min(3).describe('Your domain.'),
+        target2: z.string().min(3).describe('Competitor domain.'),
+        country_code: z.string().length(2).optional(),
+        language_code: z.string().optional(),
+        limit: z.number().int().min(10).max(1000).optional(),
+      }),
+    },
+  );
+};
+
+/** Google AI Overview / AI mode summary for a keyword. */
+export const createSEOAiOverviewTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ keyword, country_code, language_code }) => {
+      onChunk?.({ type: 'tool_progress', status: `Fetching Google AI Overview for "${keyword}"...`, timestamp: Date.now() });
+      const r = await callDataForSEO('serp_google_ai_summary', {
+        keyword, country_code: (country_code || 'US').toUpperCase(), language_code: (language_code || 'en').toLowerCase(),
+      }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_ai_overview_card', keyword, items, timestamp: Date.now() });
+      return JSON.stringify({ success: true, keyword, present: items.length > 0 });
+    },
+    {
+      name: 'seo_ai_overview',
+      description: 'Google AI Overview (AI-mode) answer + cited sources for a keyword. Use to check whether the brand/site is cited in Google\'s generative answer, and who is.',
+      schema: z.object({
+        keyword: z.string().min(1),
+        country_code: z.string().length(2).optional(),
+        language_code: z.string().optional(),
+      }),
+    },
+  );
+};
+
+/** Google Maps / local pack results for a keyword. */
+export const createSEOGoogleMapsTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ keyword, country_code, language_code }) => {
+      onChunk?.({ type: 'tool_progress', status: `Google Maps results for "${keyword}"...`, timestamp: Date.now() });
+      const r = await callDataForSEO('serp_google_maps', {
+        keyword, country_code: country_code || null, language_code: (language_code || 'en').toLowerCase(),
+      }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const items = r.data?.items || [];
+      onChunk?.({ type: 'seo_google_maps_card', keyword, items, timestamp: Date.now() });
+      return JSON.stringify({
+        success: true, keyword, count: items.length,
+        top: items.slice(0, 5).map((p: any) => ({ title: p.title, rating: p.rating?.value, reviews: p.rating?.votes_count, address: p.address })),
+      });
+    },
+    {
+      name: 'seo_google_maps',
+      description: 'Google Maps organic results for a keyword (fuller than the 3-pack local finder) — titles, ratings, review counts, addresses. Local-SEO ranking view.',
+      schema: z.object({
+        keyword: z.string().min(1),
+        country_code: z.string().length(2).optional(),
+        language_code: z.string().optional(),
+      }),
+    },
+  );
+};
+
+/** Google Business Profile info for a business. */
+export const createSEOGbpInfoTool = (_userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ keyword, country_code, language_code }) => {
+      onChunk?.({ type: 'tool_progress', status: `Google Business Profile for "${keyword}"...`, timestamp: Date.now() });
+      const r = await callDataForSEO('business_google_my_business_info', {
+        keyword, country_code: country_code || null, language_code: (language_code || 'en').toLowerCase(),
+      }, { user_id: _userId });
+      if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+      const item = (r.data?.items || [])[0] || {};
+      onChunk?.({ type: 'seo_gbp_info_card', keyword, item, timestamp: Date.now() });
+      return JSON.stringify({
+        success: true, keyword,
+        title: item.title, rating: item.rating?.value, reviews: item.rating?.votes_count,
+        category: item.category, address: item.address,
+      });
+    },
+    {
+      name: 'seo_gbp_info',
+      description: 'Google Business Profile snapshot for a business name/brand — rating, review count, category, hours, attributes. Local reputation + listing health.',
+      schema: z.object({
+        keyword: z.string().min(1).describe('Business name or brand.'),
+        country_code: z.string().length(2).optional(),
+        language_code: z.string().optional(),
+      }),
+    },
+  );
+};

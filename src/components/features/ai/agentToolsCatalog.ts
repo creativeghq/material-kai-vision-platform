@@ -1990,6 +1990,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume',
       'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps',
       'seo_gsc_striking_distance', 'seo_gsc_top_movers',
+      'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview',
     ],
     quick_starts: [
       {
@@ -2032,6 +2033,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors',
       'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains',
       'seo_relevant_pages', 'seo_categories_for_domain',
+      'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_domain_intersection',
     ],
     quick_starts: [
       {
@@ -2072,6 +2074,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     icon: 'Link2',
     tool_ids: [
       'seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains',
+      'seo_backlinks_timeseries', 'seo_backlinks_competitors',
     ],
     quick_starts: [
       {
@@ -2102,6 +2105,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: [
       'seo_content_sentiment', 'seo_domain_technologies', 'seo_domain_whois',
       'seo_site_crawl_start', 'seo_site_crawl_status', 'seo_llm_mentions_search',
+      'seo_onpage_issues',
     ],
     quick_starts: [
       {
@@ -2143,6 +2147,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'seo_youtube_search', 'seo_local_pack', 'seo_google_trends',
       'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search',
       'seo_pinterest_search', 'seo_reddit_search',
+      'seo_google_maps', 'seo_gbp_info',
     ],
     quick_starts: [
       {

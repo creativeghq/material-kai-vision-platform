@@ -303,6 +303,19 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // SEO — Google Search Console (first-party performance)
   seo_gsc_striking_distance_card: 'Striking-distance keywords',
   seo_gsc_movers_card: 'Search Console movers',
+  // SEO — DataForSEO gap-fillers
+  seo_onpage_issues_card: 'Site-audit issues',
+  seo_backlinks_timeseries_card: 'Backlink history',
+  seo_backlinks_competitors_card: 'Backlink competitors',
+  seo_historical_rank_card: 'Rank history',
+  seo_keywords_for_site_card: 'Keyword universe',
+  seo_keyword_ideas_card: 'Keyword ideas',
+  seo_related_keywords_card: 'Related keywords',
+  seo_search_volume_card: 'Search volume & CPC',
+  seo_domain_intersection_card: 'Keyword intersection',
+  seo_ai_overview_card: 'Google AI Overview',
+  seo_google_maps_card: 'Google Maps results',
+  seo_gbp_info_card: 'Google Business Profile',
   // Contracts
   contracts_list: 'Contracts',
   contract_created: 'Contract drafted',
