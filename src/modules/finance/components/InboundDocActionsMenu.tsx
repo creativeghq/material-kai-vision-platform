@@ -26,7 +26,7 @@ import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { companiesAPI } from '@/services/crm.service';
-import { researchCompany, greekAfm, summarizeResearch } from '@/modules/crm/services/companyResearch';
+import { researchCompany, greekAfm, summarizeResearch, missingSoftIdentity } from '@/modules/crm/services/companyResearch';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
 import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
 
@@ -104,6 +104,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
       return;
     }
     setSaving(true);
+    let researchNote: string | null = null;
     try {
       let payload: Record<string, unknown> = {
         name: typedName || vat,
@@ -123,16 +124,18 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           onProgress: setStatusLine,
         });
         payload = { ...payload, ...res.fields, name: typedName || res.resolvedName || vat };
-        if (!res.ok) {
-          // Research came back empty — still create the bare supplier rather than losing the action.
-          toast({ title: 'Research found nothing — added without enrichment', description: summarizeResearch(res.steps) });
-        }
+        // Report the outcome either way. `res.ok` is true if ANY leg worked, so gating the
+        // message on failure hid the common case: registries answered, the web pass found only a
+        // website, and the supplier arrived with no phone or industry and no explanation.
+        researchNote = summarizeResearch(res.steps);
+        const stillMissing = missingSoftIdentity(payload);
+        if (stillMissing.length) researchNote += ` Still missing: ${stillMissing.join(', ')}.`;
       }
       if (!payload.name) { toast({ title: 'Name required', variant: 'destructive' }); setSaving(false); return; }
       const { data } = await companiesAPI.createCompany(payload);
       toast({
         title: 'Supplier added to CRM',
-        description: doResearch ? 'Enriched from ΑΑΔΕ / ΓΕΜΗ + business research.' : undefined,
+        description: researchNote ?? undefined,
       });
       setCrmOpen(false);
       onChanged?.();

@@ -16,6 +16,7 @@ import { StatementActions } from '@/modules/finance/components/StatementActions'
 import { humanizeLabel } from '@/utils/humanize';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { FilterBar, NONE_VALUE, useFilters, type FilterGroupDef } from '@/components/core/filters';
+import { RefreshResearchButton } from '@/modules/crm/components/RefreshResearchButton';
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
@@ -475,6 +476,13 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
               variant="buttons"
               className="flex-wrap"
             />
+
+            {/* Same registry + business research the company record runs, without leaving the
+                ledger. Company parties only — `party_id` is a crm_contacts.id for contact
+                parties, and the registry functions write onto crm_companies. */}
+            {party.party_type === 'company' && (
+              <RefreshResearchButton companyId={party.party_id} workspaceId={party.workspace_id} />
+            )}
 
             {loading ? (
               <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>

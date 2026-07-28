@@ -26,6 +26,10 @@ export interface ResearchStep {
   status: ResearchStepStatus;
   /** Human-readable reason — surfaced in the toast when a step is skipped or fails. */
   detail?: string;
+  /** Providers inside the step that returned data (enrich: `web_search`, `apollo`). */
+  sources?: string[];
+  /** Providers that returned nothing, WITH the reason — e.g. `apollo (no APOLLO_API_KEY)`. */
+  skipped?: string[];
 }
 
 export interface CompanyResearchOptions {
@@ -324,10 +328,15 @@ export async function researchCompany(opts: CompanyResearchOptions): Promise<Com
         if (!isBlank(v) && isBlank(merged[key])) soft[key] = v;
       }
       fields = { ...fields, ...soft };
+      // Carry the provider-level breakdown up: a run where Apollo is unconfigured and web search
+      // found only a URL is NOT the same as "enrichment worked", and the caller must be able to
+      // say so. Dropping these is what made a half-empty company look like a successful import.
       steps.push({
         step: 'enrich',
         status: Object.keys(soft).length > 0 ? 'ok' : 'skipped',
         detail: Object.keys(soft).length > 0 ? Object.keys(soft).join(', ') : 'Nothing new found',
+        sources: res.sources,
+        skipped: res.skipped,
       });
     } else {
       steps.push({ step: 'enrich', status: 'failed', detail: res.message ?? res.error });
@@ -351,13 +360,51 @@ export async function researchCompany(opts: CompanyResearchOptions): Promise<Com
   };
 }
 
-/** One-line "what happened" summary for a toast. */
+const STEP_LABEL: Record<ResearchStepName, string> = { aade: 'ΑΑΔΕ', gemi: 'ΓΕΜΗ', enrich: 'Business info' };
+
+/** `apollo (no APOLLO_API_KEY)` → `Apollo (not configured)` — a reason an operator can act on. */
+function providerLabel(raw: string): string {
+  const m = raw.match(/^([^\s(]+)(?:\s*\(no ([A-Z0-9_]+)\))?/);
+  const name = (m?.[1] ?? raw).replace(/_/g, ' ');
+  const pretty = name === 'apollo' ? 'Apollo' : name === 'web search' ? 'web search' : name;
+  return m?.[2] ? `${pretty} (not configured)` : pretty;
+}
+
+/**
+ * Full "what happened" summary — every leg is accounted for, including the ones that were
+ * SKIPPED. Reporting only ok/failed is what let a company arrive with no phone or industry and
+ * no explanation: `ok` is true if ANY leg worked, so a run where Apollo was never configured
+ * and web search returned one URL read as a clean success.
+ */
 export function summarizeResearch(steps: ResearchStep[]): string {
-  const label: Record<ResearchStepName, string> = { aade: 'ΑΑΔΕ', gemi: 'ΓΕΜΗ', enrich: 'Business info' };
-  const ok = steps.filter((s) => s.status === 'ok').map((s) => label[s.step]);
-  const bad = steps.filter((s) => s.status === 'failed').map((s) => label[s.step]);
   const parts: string[] = [];
+
+  const ok = steps.filter((s) => s.status === 'ok').map((s) => STEP_LABEL[s.step]);
   if (ok.length) parts.push(`Updated from ${ok.join(' + ')}.`);
-  if (bad.length) parts.push(`No data from ${bad.join(', ')}.`);
+
+  for (const s of steps) {
+    if (s.status === 'failed') {
+      parts.push(`${STEP_LABEL[s.step]} failed${s.detail ? `: ${s.detail}` : ''}.`);
+    } else if (s.status === 'skipped') {
+      parts.push(`${STEP_LABEL[s.step]} skipped${s.detail ? ` — ${s.detail.toLowerCase()}` : ''}.`);
+    }
+  }
+
+  // Provider-level gaps inside a leg that otherwise "worked" (Apollo unconfigured, etc.).
+  const gaps = steps.flatMap((s) => s.skipped ?? []).map(providerLabel);
+  if (gaps.length) parts.push(`Not consulted: ${Array.from(new Set(gaps)).join(', ')}.`);
+
   return parts.join(' ') || 'Nothing new found.';
+}
+
+/** Fields a company record wants filled that registries never carry — used to flag a thin result. */
+const SOFT_IDENTITY = ['website', 'phone', 'email', 'industry'] as const;
+
+/**
+ * Which soft-identity fields are STILL blank after a research run. Lets a surface say
+ * "still missing phone, industry" instead of leaving the operator to notice empty inputs.
+ */
+export function missingSoftIdentity(row: Record<string, unknown> | null | undefined): string[] {
+  if (!row) return [];
+  return SOFT_IDENTITY.filter((k) => isBlank(row[k]));
 }

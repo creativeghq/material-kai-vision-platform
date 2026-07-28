@@ -26,7 +26,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { financeService } from '@/modules/finance/services/financeService';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { validateVatViaVies } from '@/services/viesService';
-import { researchCompany, summarizeResearch } from '@/modules/crm/services/companyResearch';
+import { researchCompany, summarizeResearch, missingSoftIdentity } from '@/modules/crm/services/companyResearch';
 import { CompanyRegistryDetails, type KadEntry } from '@/modules/crm/components/CompanyRegistryDetails';
 import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { CategoryAssignmentPicker } from '@/components/business/catalogs/CategoryAssignmentPicker';
@@ -156,6 +156,8 @@ export const CompanyDetailPage: React.FC = () => {
   const [aadeBusy, setAadeBusy] = useState(false);
   // Sub-phase label while the research chain runs ("Checking ΓΕΜΗ registry…").
   const [researchStatus, setResearchStatus] = useState<string | null>(null);
+  /** Outcome of the last research run, kept visible after the toast is gone. */
+  const [researchSummary, setResearchSummary] = useState<string | null>(null);
   // Which top-level record tab is showing (activity-first record layout, 2026-07).
   // Companies open on Activity — the unified feed (notes/calls/meetings/tracked actions),
   // aligned with the contact record.
@@ -377,11 +379,19 @@ export const CompanyDetailPage: React.FC = () => {
         await patchInline(res.fields as Partial<Company>);
       }
       const failed = res.steps.filter((s) => s.status === 'failed');
+      const summary = summarizeResearch(res.steps);
       toast({
         title: res.ok ? 'Company refreshed' : 'Nothing new found',
-        description: summarizeResearch(res.steps),
+        description: summary,
         variant: res.ok ? undefined : (failed.length ? 'destructive' : undefined),
       });
+      // Keep the outcome on the record, not just in a toast that vanishes. A run where the
+      // registries answered but the web pass found no phone/industry is a PARTIAL success, and
+      // the operator has to be able to see that after the toast is gone.
+      const stillMissing = missingSoftIdentity({ ...(company as any), ...res.fields });
+      setResearchSummary(
+        stillMissing.length ? `${summary} Still missing: ${stillMissing.join(', ')}.` : summary,
+      );
 
       // Log a CRM activity so the enrichment shows up in the company timeline (fire-and-forget).
       if (res.ok && !isNew && id) {
@@ -599,17 +609,22 @@ export const CompanyDetailPage: React.FC = () => {
             /* Refresh = re-run the whole research chain (ΑΑΔΕ → ΓΕΜΗ → business research) and
                write what it finds straight onto this record. Registry data overwrites; web
                research only fills blanks. */
-            <div className="flex items-center gap-2">
-              {researchStatus && <span className="text-xs text-muted-foreground">{researchStatus}</span>}
-              <Button
-                variant="outline"
-                onClick={() => runResearch({ silentSkip: true })}
-                disabled={aadeBusy}
-                title="Refresh from ΑΑΔΕ + ΓΕΜΗ registries and re-run business research (website, phone, socials)"
-              >
-                {aadeBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <RefreshCw className="h-4 w-4 mr-2"/>}
-                {aadeBusy ? 'Researching…' : 'Refresh research'}
-              </Button>
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-2">
+                {researchStatus && <span className="text-xs text-muted-foreground">{researchStatus}</span>}
+                <Button
+                  variant="outline"
+                  onClick={() => runResearch({ silentSkip: true })}
+                  disabled={aadeBusy}
+                  title="Refresh from ΑΑΔΕ + ΓΕΜΗ registries and re-run business research (website, phone, socials)"
+                >
+                  {aadeBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <RefreshCw className="h-4 w-4 mr-2"/>}
+                  {aadeBusy ? 'Researching…' : 'Refresh research'}
+                </Button>
+              </div>
+              {researchSummary && !aadeBusy && (
+                <p className="text-[11px] text-muted-foreground max-w-md text-right leading-snug">{researchSummary}</p>
+              )}
             </div>
           )}
         </div>
