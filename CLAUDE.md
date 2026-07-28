@@ -49,6 +49,54 @@ Monitoring follows the same ladder: raw discovery hits → classified/deduped `t
 
 **Do NOT build analytics rollup tables yet.** Measured 2026-07-20: `ai_usage_logs` is 4,120 rows / $5.98 lifetime — a rollup would be slower than the scan and pure maintenance overhead. **Revisit only when `ai_usage_logs` passes ~5M rows or a cost-dashboard query exceeds ~500 ms.** Same test before adding one for any other telemetry table.
 
+## Two anti-regression rules (2026-07-28) — READ BEFORE ADDING A DERIVED NUMBER OR A JANITOR CRON
+
+Two bug shapes account for nearly every "small issue" found by hand in this platform. Both now have
+enforcement; do not work around either.
+
+### 1. One derivation per money quantity. TypeScript formats; SQL derives.
+"How much is settled / still owed on an order" was implemented **five times** — twice in SQL, three
+times in TypeScript. Four applied the rule correctly (a **sales** order settles on money **IN**; a
+**purchase** order on money **OUT**; the opposite direction is the other side of the trade and must
+never reduce what the counterparty owes); one netted the directions, so a fully-paid sales order
+with a paid supplier bill showed `Payment: Paid` next to `Outstanding: €945` — the supplier's
+amount. The stored data was flawless, so no integrity check could see it; a wrong number is a valid
+`number`, so no typecheck could either.
+
+- **`get_order_settlements(uuid[])` is the single source.** It returns the DERIVED answer —
+  `settled` (direction-correct half), `outstanding`, and the `payment_status` the ledger implies.
+  `recompute_order_payment_status`, `dic_detect__finance_order_over_settled` and
+  `finance.order_payment_status_drift` all read it. Client code calls
+  `ordersService.orderBalances()` and formats the result.
+- **Never** re-pick a half by order type, re-compute `total − settled`, or hand-roll an
+  allocation-by-direction query in the frontend. [tests/unit/moneyDerivation.test.ts](tests/unit/moneyDerivation.test.ts)
+  fails the build if you do (verified against all 5 historical offenders).
+- Applying the same pattern to a NEW money quantity: derive it in SQL, return it derived, and add
+  a drift check comparing any cached copy against the derivation.
+
+### 2. Silent zero — check the world, not the exit code.
+The dominant historical failure here is **a number that should be non-zero sitting at zero forever
+while nothing complains**: `stamp_job_refresh_cost` referencing a column that didn't exist (billing
+stuck at 0, exception swallowed); the Qwen endpoint 404-ing on 100% of calls for months; the Stripe
+webhook failing 100% since it shipped; `xml-import-orchestrator` throwing before every handoff;
+`generate-pbr-maps` deleted so `metadata.pbr_maps` is never written; customer margin reading €0
+because "revenue" meant invoice lines in an order-driven business.
+
+- **`ops.silent_zero`** (`dic_detect__ops_silent_zero`) probes: activity happened in the window and
+  the metric it should have produced is zero across the board; plus endpoints and cron jobs with a
+  <5% success rate (**not** 0% — real breakage is near-total, and an exact-zero test reported this
+  platform clean while two endpoints sat at 0.8% and 4.5%).
+- **`ops.test_artifacts_accumulating`** watches the reaper's OUTPUT, not its exit code — the
+  `cleanup-test-artifacts-daily` cron reported success nightly while deleting nothing (its name
+  pattern required `[._-]` and the harness emits `E2E wsA <rid>` with a space), and 3,057 test
+  workspaces piled up under a green cron. **When you add a janitor cron, add a probe on the mess it
+  is supposed to clear.**
+- **`ops.integrity_registry_broken`** validates the registry itself: `run_data_integrity_checks`
+  calls `detect_fn()` and `heal_fn()` with **no arguments** and expects heal to return `integer`.
+  A wrong signature aborts the whole nightly sweep, which then reports nothing at all.
+- Probes are **hardcoded in the detect function on purpose** — a table of admin-editable SQL run by
+  a SECURITY DEFINER function would be a privilege-escalation surface. Adding a probe is a migration.
+
 ## Telemetry retention (2026-07-20)
 
 Log tables are bronze and need a TTL, enforced in SQL — never assume the writer is well-behaved.
