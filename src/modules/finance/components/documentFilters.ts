@@ -11,6 +11,7 @@ import { CalendarDays, Coins, FileText, Tags } from 'lucide-react';
 import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import { paymentMethodLabel } from '@/modules/finance/services/financeService';
 import { mydataTypeName, mydataTypeRank } from '@/modules/finance/components/mydataTypes';
+import { inboundStatusLabel } from '@/modules/finance/components/inboundStatus';
 import { humanizeLabel } from '@/utils/humanize';
 import type { FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 
@@ -215,7 +216,13 @@ export function buildDocumentFilters(
               // The type name as well as its code — nobody searches for "2.1".
               accessor: (r) => [r.issuer_name, r.issuer_vat, r.doc_type, r.doc_type && mydataTypeName(r.doc_type, mydataTypes)],
             },
-            { key: 'status', type: 'multi', label: 'Status', options: statusOptions(rows), accessor: (r) => r.status },
+            {
+              // Worded as the outcome, matching the table's "Handled" column — "classified"
+              // is a state name, not something an operator would look for.
+              key: 'status', type: 'multi', label: 'Handled',
+              options: optionsFromRows(rows, (r) => r.status, inboundStatusLabel),
+              accessor: (r) => r.status,
+            },
             {
               key: 'doc_type', type: 'multi', label: 'Document type',
               options: mydataTypeOptions(rows, (r) => r.doc_type, mydataTypes),

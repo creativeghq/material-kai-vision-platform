@@ -39,13 +39,26 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
   const allFields = useMemo(() => groups.flatMap((g) => g.fields), [groups]);
   const searchField = searchKey ? allFields.find((f) => f.key === searchKey && f.type === 'text') : undefined;
-  // The promoted search box owns its field — don't duplicate it inside the modal.
-  const modalGroups = useMemo(() => {
-    if (!searchField) return groups;
-    return groups
-      .map((g) => ({ ...g, fields: g.fields.filter((f) => f.key !== searchField.key) }))
-      .filter((g) => g.fields.length > 0);
-  }, [groups, searchField]);
+  /**
+   * What the modal actually shows: everything except the promoted search box (it owns that
+   * field) and except choice fields that cannot narrow anything — a list whose options were
+   * derived from the rows can collapse to a single value ("Status: New — 1000"), and ticking
+   * the only box returns the same list. Pruned here rather than per-surface so it holds for
+   * every filterable list. A value already set on a pruned field still applies and still has
+   * its removable chip; it just isn't offered again.
+   */
+  const modalGroups = useMemo(() => (
+    groups
+      .map((g) => ({
+        ...g,
+        fields: g.fields.filter((f) => {
+          if (f.key === searchField?.key) return false;
+          if (f.type === 'multi' || f.type === 'select') return f.options.length > 1;
+          return true;
+        }),
+      }))
+      .filter((g) => g.fields.length > 0)
+  ), [groups, searchField]);
 
   const chips = allFields
     .filter((f) => f.key !== searchField?.key && isFieldActive(f, values[f.key]))
