@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft, Globe, ExternalLink, RefreshCw, Loader2, FileText, Search,
-  FlaskConical, Radar, AlertTriangle, LineChart, Gauge,
+  FlaskConical, Radar, AlertTriangle, LineChart, Gauge, TrendingUp,
 } from 'lucide-react';
 import { WebsiteGscPanel } from '@/components/core/Profile/WebsiteGscPanel';
 import { WebsiteHealthPanel } from '@/components/core/Profile/WebsiteHealthPanel';
+import { WebsiteDomainIntelPanel } from '@/components/core/Profile/WebsiteDomainIntelPanel';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -161,6 +162,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
           <TabsTrigger value="runs" className="gap-1"><FlaskConical className="w-3.5 h-3.5" /> Toolkit Runs</TabsTrigger>
           <TabsTrigger value="domains" className="gap-1"><Radar className="w-3.5 h-3.5" /> Domain Audits</TabsTrigger>
           <TabsTrigger value="gsc" className="gap-1"><LineChart className="w-3.5 h-3.5" /> Search Performance</TabsTrigger>
+          <TabsTrigger value="rankings" className="gap-1"><TrendingUp className="w-3.5 h-3.5" /> Rankings &amp; Links</TabsTrigger>
           <TabsTrigger value="health" className="gap-1"><Gauge className="w-3.5 h-3.5" /> Site Health</TabsTrigger>
         </TabsList>
 
@@ -333,6 +335,11 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
         {/* Search Performance (Google Search Console) */}
         <TabsContent value="gsc">
           <WebsiteGscPanel website={website} />
+        </TabsContent>
+
+        {/* Rankings & Links (DataForSEO domain intel) */}
+        <TabsContent value="rankings">
+          <WebsiteDomainIntelPanel website={website} />
         </TabsContent>
 
         {/* Site Health (Lighthouse + on-page) */}

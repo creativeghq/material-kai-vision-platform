@@ -1879,6 +1879,19 @@
     "response": "{ success, market_median, market_min, market_max, currency, cap_pct, max_allowed, allowed, unverified, from_cache }"
   },
   {
+    "name": "seo-domain-tracker",
+    "tag": "SEO",
+    "summary": "Weekly Rankings + Backlinks snapshots for a connected website",
+    "description": "Snapshots DataForSEO domain rank overview (ranking keywords, organic traffic, position buckets, up/down/new/lost) + backlinks summary (backlinks, referring domains, spam score) + top ranked keywords for the site's MARKET (resolved from its GSC top country, else TLD, else US) into seo_domain_snapshots + seo_domain_keywords. verify_jwt disabled so the weekly cron-run (x-cron-secret) works; the run action calls authenticate()+userCanAccessWorkspace().",
+    "security": ["supabaseJwt"],
+    "docs": null,
+    "methods": ["POST"],
+    "actions": [
+      { "action": "run", "description": "Snapshot one website's rankings + backlinks now.", "params": [ { "name": "website_id", "type": "string", "required": true } ], "response": "{ ok, error? }" },
+      { "action": "cron-run", "description": "x-cron-secret only — weekly snapshot of every active connected website.", "params": [], "response": "{ ok, tracked, failed }" }
+    ]
+  },
+  {
     "name": "seo-site-audit",
     "tag": "SEO",
     "summary": "Site Health — homepage Lighthouse + on-page audit for a connected website",

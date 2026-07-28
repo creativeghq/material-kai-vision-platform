@@ -148,6 +148,25 @@ export interface GscRow {
 
 export interface GscTrendPoint { date: string; clicks: number; impressions: number }
 
+export interface DomainSnapshot {
+  captured_at: string;
+  country_code: string | null; language_code: string | null;
+  ranking_keywords: number | null; organic_traffic: number | null; organic_traffic_value: number | null;
+  kw_up: number | null; kw_down: number | null; kw_new: number | null; kw_lost: number | null;
+  pos_1: number | null; pos_2_3: number | null; pos_4_10: number | null; pos_11_20: number | null;
+  pos_21_50: number | null; pos_51_100: number | null;
+  backlinks: number | null; referring_domains: number | null; referring_main_domains: number | null;
+  domain_rank: number | null; spam_score: number | null; broken_backlinks: number | null;
+  error: string | null;
+}
+export interface DomainKeyword { keyword: string; position: number | null; search_volume: number | null; etv: number | null; url: string | null }
+export interface DomainTrendPoint { date: string; ranking_keywords: number | null; organic_traffic: number | null; backlinks: number | null; referring_domains: number | null }
+export interface DomainIntel {
+  latest: DomainSnapshot | null;
+  trend: DomainTrendPoint[];
+  top_keywords: DomainKeyword[];
+}
+
 export interface WebsiteHealth {
   id: number;
   url: string;
@@ -400,5 +419,18 @@ export const userWebsitesService = {
     if (error) throw new Error(await edgeErrorMessage(error, 'Audit failed'));
     if (!data?.ok) throw new Error(data?.error || 'Audit failed');
     return data as WebsiteHealth;
+  },
+
+  // ── Rankings & Links (DataForSEO domain intel) ───────────────────────────
+  async domainIntel(websiteId: string, days = 180): Promise<DomainIntel | null> {
+    const { data, error } = await supabase.rpc('get_website_domain_intel', { p_website_id: websiteId, p_days: days });
+    if (error) throw error;
+    return (data as DomainIntel) ?? null;
+  },
+
+  async domainTrackRun(websiteId: string): Promise<void> {
+    const { data, error } = await supabase.functions.invoke('seo-domain-tracker', { body: { action: 'run', website_id: websiteId } });
+    if (error) throw new Error(await edgeErrorMessage(error, 'Snapshot failed'));
+    if (!data?.ok) throw new Error(data?.error || 'Snapshot failed');
   },
 };
