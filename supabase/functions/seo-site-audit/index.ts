@@ -32,6 +32,23 @@ function json(body: unknown, status = 200): Response {
 }
 const pct = (s: any): number | null => (typeof s === 'number' ? Math.round(s * 100) : null);
 
+// DataForSEO instant-page `checks` that mean a real problem when true. (Other checks like
+// seo_friendly_url / has_html_doctype are GOOD when true, so we only whitelist negatives.)
+const BAD_CHECKS: Record<string, string> = {
+  no_title: 'Missing <title>', title_too_long: 'Title too long', title_too_short: 'Title too short',
+  no_description: 'Missing meta description', no_h1_tag: 'Missing H1 heading', no_image_alt: 'Images missing alt text',
+  no_favicon: 'Missing favicon', no_doctype: 'Missing doctype', is_http: 'Not served over HTTPS',
+  high_loading_time: 'Slow page load', high_waiting_time: 'High server response time', large_page_size: 'Large page size',
+  low_content_rate: 'Thin content', low_readability_rate: 'Low readability', duplicate_title_tag: 'Duplicate title tag',
+  duplicate_meta_tags: 'Duplicate meta tags', duplicate_description: 'Duplicate meta description',
+  no_content_encoding: 'No gzip/brotli compression', has_render_blocking_resources: 'Render-blocking resources',
+  redirect: 'Homepage redirects', is_4xx_code: 'Returns a 4xx error', is_5xx_code: 'Returns a 5xx error',
+  canonical_another_domain: 'Canonical points to another domain', has_meta_refresh_redirect: 'Uses meta-refresh redirect',
+  frame: 'Uses <frame>/<iframe> for content', lorem_ipsum: 'Contains placeholder (lorem ipsum) text',
+  broken_links: 'Has broken links', broken_resources: 'Has broken resources', irrelevant_description: 'Meta description looks irrelevant',
+  irrelevant_title: 'Title looks irrelevant', small_page_size: 'Very small page (possibly empty)',
+};
+
 /** Call MIVAA's quick-page audit for one URL (instant on-page + Lighthouse). */
 async function quickPage(url: string, userId: string | null): Promise<any> {
   const resp = await fetch(`${MIVAA_GATEWAY_URL()}/api/v1/seo-agent/onpage/quick-page`, {
@@ -52,21 +69,29 @@ async function auditWebsite(supabase: any, website: { id: string; workspace_id: 
   try {
     const data = await quickPage(homepage, userId);
     const sections = data?.sections || {};
-    const lh = sections?.lighthouse?.items?.[0] || {};
-    const cats = lh?.categories || {};
-    // Trim Lighthouse audits down to the failing ones (score < 0.9) for the issues list.
-    const audits = lh?.audits || {};
-    const issues = Object.values(audits)
-      .filter((a: any) => a && typeof a.score === 'number' && a.score < 0.9 && a.title)
-      .sort((a: any, b: any) => (a.score ?? 1) - (b.score ?? 1))
-      .slice(0, 20)
-      .map((a: any) => ({ title: a.title, score: a.score, display_value: a.display_value ?? a.displayValue ?? null }));
+
+    // Google Lighthouse is async on DataForSEO and often empty in the sync window — treat as a bonus.
+    const cats = (sections?.lighthouse?.items?.[0]?.categories) || {};
+    // The synchronous signal is the instant on-page audit.
+    const ip = sections?.instant_page?.items?.[0] || {};
+    const checks = ip?.checks || {};
+
+    // Failing on-page checks → issues (score is the on-page score for context, not per-check).
+    const issues = Object.entries(BAD_CHECKS)
+      .filter(([k]) => checks[k] === true || ip[k] === true)
+      .map(([, title]) => ({ title, score: null as number | null, display_value: null as string | null }));
+    if ((ip.broken_links ?? 0) > 0 && !issues.some((i) => i.title.includes('broken links')))
+      issues.push({ title: `Broken links: ${ip.broken_links}`, score: null, display_value: null });
+
+    // Prefer the Lighthouse SEO score when present; else the instant on-page score (0-100).
+    const seoScore = pct(cats.seo?.score) ?? (typeof ip.onpage_score === 'number' ? Math.round(ip.onpage_score) : null);
 
     const row = {
       website_id: website.id, workspace_id: website.workspace_id, url: homepage, status: 'ok',
       perf_score: pct(cats.performance?.score), a11y_score: pct(cats.accessibility?.score),
-      bp_score: pct(cats['best-practices']?.score), seo_score: pct(cats.seo?.score),
-      lighthouse: { categories: cats }, onpage: sections?.page ?? sections?.instant_pages ?? null,
+      bp_score: pct(cats['best-practices']?.score), seo_score: seoScore,
+      lighthouse: Object.keys(cats).length ? { categories: cats } : null,
+      onpage: { onpage_score: ip.onpage_score ?? null, meta: ip.meta ?? null, page_timing: ip.page_timing ?? null, checks },
       issues, error: null,
     };
     const { error } = await supabase.from('website_health_audits').insert(row);

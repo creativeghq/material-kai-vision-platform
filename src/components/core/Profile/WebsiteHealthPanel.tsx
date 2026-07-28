@@ -100,12 +100,19 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
               <span className="break-all">{health.error || 'Audit failed'}</span>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 justify-items-center">
-              <Gauge100 label="Performance" score={health.perf_score} />
-              <Gauge100 label="SEO" score={health.seo_score} />
-              <Gauge100 label="Accessibility" score={health.a11y_score} />
-              <Gauge100 label="Best practices" score={health.bp_score} />
-            </div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 justify-items-center">
+                <Gauge100 label="On-page SEO" score={health.seo_score} />
+                <Gauge100 label="Performance" score={health.perf_score} />
+                <Gauge100 label="Accessibility" score={health.a11y_score} />
+                <Gauge100 label="Best practices" score={health.bp_score} />
+              </div>
+              {health.perf_score == null && (
+                <p className="text-xs text-muted-foreground text-center mt-3">
+                  Performance / Accessibility / Best-practices come from Google Lighthouse, which finishes a few minutes after the first check — re-check shortly to fill them in. The On-page SEO score is live.
+                </p>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -113,15 +120,13 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
       {health?.status === 'ok' && (health.issues?.length ?? 0) > 0 && (
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">Top issues to fix</CardTitle>
-            <CardDescription>Failing Lighthouse audits on the homepage, worst first.</CardDescription>
+            <CardTitle className="text-base">Issues to fix ({health.issues!.length})</CardTitle>
+            <CardDescription>On-page problems detected on the homepage.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {health.issues!.map((it, i) => (
-              <div key={i} className="flex items-start gap-3 p-2 border rounded-lg">
-                <span className={`text-xs font-semibold tabular-nums w-8 text-right ${scoreColor(Math.round((it.score ?? 0) * 100))}`}>
-                  {Math.round((it.score ?? 0) * 100)}
-                </span>
+              <div key={i} className="flex items-start gap-2 p-2 border rounded-lg">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{it.title}</p>
                   {it.display_value && <p className="text-xs text-muted-foreground">{it.display_value}</p>}
@@ -134,7 +139,7 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
 
       {health?.status === 'ok' && (health.issues?.length ?? 0) === 0 && (
         <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 px-1">
-          <CheckCircle2 className="w-4 h-4" /> No failing Lighthouse audits on the homepage. For a full multi-page crawl, ask the agent to "run a site crawl".
+          <CheckCircle2 className="w-4 h-4" /> No on-page issues on the homepage. For a full multi-page crawl, ask the agent to "run a site crawl".
         </div>
       )}
     </div>
