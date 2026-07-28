@@ -8,10 +8,24 @@ import { edgeError } from '@/utils/edgeError';
 
 export interface InboundDocLine {
   line_number: number | null;
-  quantity: number | null;
-  net_value: number | null;
-  vat_amount: number | null;
+  /** Supplier's own article code (myDATA `itemCode`). Authoritative — never guessed. */
+  item_code: string | null;
   item_description: string | null;
+  quantity: number | null;
+  /** AADE measurement-unit code: 1 pcs · 2 kg · 3 lt · 4 m · 5 m² · 6 m³. Authoritative. */
+  measurement_unit: number | null;
+  net_value: number | null;
+  /** AADE VAT category code (1 = 24%, 2 = 13%, 3 = 6%, …). */
+  vat_category: number | null;
+  vat_amount: number | null;
+  comments: string | null;
+}
+
+export interface InboundAddress {
+  street: string | null;
+  number: string | null;
+  postal_code: string | null;
+  city: string | null;
 }
 
 export interface InboundDocument {
@@ -25,6 +39,29 @@ export interface InboundDocument {
   /** Issuer's own document number, e.g. series 'ΤΔΑ' + aa '5160'. */
   series: string | null;
   aa: string | null;
+  // ── Full myDATA payload (parsed 2026-07-28; previously discarded) ──
+  uid: string | null;
+  authentication_code: string | null;
+  qr_code_url: string | null;
+  /** The issuer's own rendered document, when their provider publishes one. */
+  download_url: string | null;
+  issuer_country: string | null;
+  issuer_branch: string | null;
+  issuer_address: InboundAddress | null;
+  counterpart_vat: string | null;
+  counterpart_name: string | null;
+  counterpart_address: InboundAddress | null;
+  /** ΕΙΝΑΙ & ΔΑ — the document doubles as a delivery note. */
+  is_delivery_note: boolean | null;
+  move_purpose: string | null;
+  vat_payment_suspension: boolean | null;
+  delivery_addresses: { loading: InboundAddress | null; delivery: InboundAddress | null } | null;
+  payment_methods: { type: number | null; amount: number | null; info: string | null }[] | null;
+  total_withheld: number | null;
+  total_fees: number | null;
+  total_stamp_duty: number | null;
+  total_other_taxes: number | null;
+  total_deductions: number | null;
   currency: string;
   total_net: number | null;
   total_vat: number | null;

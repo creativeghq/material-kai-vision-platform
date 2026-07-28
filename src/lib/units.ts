@@ -36,6 +36,17 @@ export const UNITS: UnitDef[] = [
 ];
 
 const BY_KEY = new Map(UNITS.map((u) => [u.key, u]));
+const BY_MYDATA = new Map(UNITS.filter((u) => u.mydataCode != null).map((u) => [u.mydataCode!, u]));
+
+/**
+ * AADE measurement-unit code → our key. myDATA states the unit on every line
+ * (`<measurementUnit>5</measurementUnit>` = square metres), so wherever a code is present it
+ * is the authority — never infer the unit from a product description instead.
+ */
+export function unitFromMydataCode(code: number | null | undefined): string | null {
+  if (code == null) return null;
+  return BY_MYDATA.get(Number(code))?.key ?? null;
+}
 
 /** Tolerant lookup — historical rows carry 'sqm', 'm²', 'item', 'τεμ' and friends. */
 const ALIASES: Record<string, string> = {

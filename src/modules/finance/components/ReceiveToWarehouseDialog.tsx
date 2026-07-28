@@ -32,7 +32,7 @@ import {
 } from '@/services/warehouseService';
 import { marketplacePricingService } from '@/services/marketplacePricingService';
 import { parseSupplierLine } from '@/modules/finance/utils/parseSupplierLine';
-import { UNITS, unitSuffix, normalizeUnit } from '@/lib/units';
+import { UNITS, unitSuffix, normalizeUnit, unitFromMydataCode } from '@/lib/units';
 import { parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -160,7 +160,10 @@ export const ReceiveToWarehouseDialog: React.FC<{
             const n = (it.name ?? '').toLowerCase();
             return n && (n.includes(desc.toLowerCase()) || desc.toLowerCase().includes(n));
           });
-          const unit = normalizeUnit(ai?.unit ?? parsed.unit);
+          // AADE states the unit on the line (`measurementUnit`). When it does, that IS the
+          // unit — the description heuristic is only a fallback for lines that omit it.
+          const aadeUnit = unitFromMydataCode(ln.measurement_unit);
+          const unit = aadeUnit ?? normalizeUnit(ai?.unit ?? parsed.unit);
           const cost = parsed.unit_cost;
           const markupPct = markup && Number(markup) > 0 ? markup : '';
           init[i] = {
@@ -178,7 +181,8 @@ export const ReceiveToWarehouseDialog: React.FC<{
             thickness: parsed.dimensions.thickness_mm != null ? String(parsed.dimensions.thickness_mm) : '',
             weight: '',
             manufacturer: parsed.manufacturer ?? '',
-            supplierCode: parsed.supplier_product_code ?? '',
+            // Same rule: the supplier's own `itemCode` beats anything scraped out of the text.
+            supplierCode: ln.item_code ?? parsed.supplier_product_code ?? '',
             grade: parsed.grade,
             markup: markupPct,
             salePrice: cost != null && markupPct ? String(r2(cost * (1 + Number(markupPct) / 100))) : '',
@@ -186,7 +190,9 @@ export const ReceiveToWarehouseDialog: React.FC<{
             images: [],
             visualMatches: [],
             matching: false,
-            unitReason: parsed.unit_reason,
+            unitReason: aadeUnit
+              ? 'Unit stated by AADE on this line (myDATA measurementUnit).'
+              : parsed.unit_reason,
             uploading: false,
           };
         });
@@ -203,6 +209,28 @@ export const ReceiveToWarehouseDialog: React.FC<{
     setRows((m) => ({ ...m, [i]: { ...(m[i] ?? blankRow('skip')), ...patch } }));
 
   const includedCount = receivable.filter(({ i }) => rows[i]?.include).length;
+
+  /**
+   * What is actually being received, per unit — "17.92 m²" is the number the operator is
+   * reconciling against the delivery, and it was nowhere on screen before. Grouped by unit
+   * because one document can mix m², pieces and metres, which must never be summed together.
+   */
+  const totalsByUnit = useMemo(() => {
+    const acc = new Map<string, { qty: number; net: number }>();
+    for (const { i, ln } of receivable) {
+      const r = rows[i];
+      if (!r?.include) continue;
+      const unit = r.unit || 'pcs';
+      const qty = parseDecimalOr(r.qty, 0);
+      const cur = acc.get(unit) ?? { qty: 0, net: 0 };
+      cur.qty += qty;
+      cur.net += Number(ln.net_value ?? 0);
+      acc.set(unit, cur);
+    }
+    return [...acc.entries()].map(([unit, v]) => ({
+      unit, qty: Math.round(v.qty * 1000) / 1000, net: Math.round(v.net * 100) / 100,
+    }));
+  }, [receivable, rows]);
   const toggleAll = (on: boolean) =>
     setRows((m) => {
       const next = { ...m };
@@ -411,6 +439,18 @@ export const ReceiveToWarehouseDialog: React.FC<{
               })}
             </div>
           </>
+        )}
+
+        {!loading && receivable.length > 0 && totalsByUnit.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs">
+            <span className="text-muted-foreground">Receiving</span>
+            {totalsByUnit.map((t) => (
+              <span key={t.unit}>
+                <span className="font-medium">{t.qty}</span> {unitSuffix(t.unit)}
+                <span className="text-muted-foreground"> · {formatMoney(t.net, doc.currency)} net</span>
+              </span>
+            ))}
+          </div>
         )}
 
         <DialogFooter>

@@ -193,34 +193,86 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       const mark = pickTag(b, 'mark');
       if (!mark) continue;
       const issuerBlock = pickTag(b, 'issuer') ?? '';
+      const counterpartBlock = pickTag(b, 'counterpart') ?? '';
       const headerB = pickTag(b, 'invoiceHeader') ?? b;
       const summaryB = pickTag(b, 'invoiceSummary') ?? b;
-      // Per-line detail (for warehouse intake). myDATA carries tax-level line data; an item
-      // description is often absent, so the intake UI lets the operator map each line to a
-      // warehouse item manually. lineNumber/quantity/net/vat are what AADE reliably returns.
+      const deliveryB = pickTag(headerB, 'otherDeliveryNoteHeader') ?? '';
+
+      // Per-line detail. `itemCode` and `measurementUnit` are AUTHORITATIVE — AADE states the
+      // supplier's article code and the unit of measure outright (code 5 = square metres), so
+      // nothing downstream may infer them from the description text when they are present.
       const lines = pickAllTagBlocks(b, 'invoiceDetails').map((lb) => ({
         line_number: num(pickTag(lb, 'lineNumber')),
-        quantity: num(pickTag(lb, 'quantity')),
-        net_value: num(pickTag(lb, 'netValue')),
-        vat_amount: num(pickTag(lb, 'vatAmount')),
+        item_code: pickTag(lb, 'itemCode'),
         item_description: pickTag(lb, 'itemDescr') ?? pickTag(lb, 'productDescription') ?? null,
+        quantity: num(pickTag(lb, 'quantity')),
+        measurement_unit: num(pickTag(lb, 'measurementUnit')),
+        net_value: num(pickTag(lb, 'netValue')),
+        vat_category: num(pickTag(lb, 'vatCategory')),
+        vat_amount: num(pickTag(lb, 'vatAmount')),
+        comments: pickTag(lb, 'lineComments') || null,
       }));
+
+      const paymentMethods = pickAllTagBlocks(b, 'paymentMethodDetails').map((pb) => ({
+        type: num(pickTag(pb, 'type')),
+        amount: num(pickTag(pb, 'amount')),
+        info: pickTag(pb, 'paymentMethodInfo') || null,
+      }));
+      const addressOf = (block: string) => {
+        const a = pickTag(block, 'address');
+        if (!a) return null;
+        return {
+          street: pickTag(a, 'street'), number: pickTag(a, 'number'),
+          postal_code: pickTag(a, 'postalCode'), city: pickTag(a, 'city'),
+        };
+      };
+      const namedAddress = (block: string, tag: string) => {
+        const a = pickTag(block, tag);
+        if (!a) return null;
+        return {
+          street: pickTag(a, 'street'), number: pickTag(a, 'number'),
+          postal_code: pickTag(a, 'postalCode'), city: pickTag(a, 'city'),
+        };
+      };
+
       const issuerVat = pickTag(issuerBlock, 'vatNumber');
       // Learned supplier default wins over the generic myAADE fallback.
       const defaultCategoryId = (issuerVat && issuerCatMap.get(issuerVat)) || myaadeCategoryId;
       const row = {
         workspace_id: workspaceId,
         mark,
+        uid: pickTag(b, 'uid'),
+        authentication_code: pickTag(b, 'authenticationCode'),
+        qr_code_url: pickTag(b, 'qrCodeUrl'),
+        download_url: pickTag(b, 'downloadingInvoiceUrl'),
         issuer_vat: issuerVat,
         issuer_name: pickTag(issuerBlock, 'name'),
+        issuer_country: pickTag(issuerBlock, 'country'),
+        issuer_branch: pickTag(issuerBlock, 'branch'),
+        issuer_address: addressOf(issuerBlock),
+        counterpart_vat: pickTag(counterpartBlock, 'vatNumber'),
+        counterpart_name: pickTag(counterpartBlock, 'name'),
+        counterpart_address: addressOf(counterpartBlock),
         issue_date: pickTag(headerB, 'issueDate'),
         doc_type: pickTag(headerB, 'invoiceType'),
         // The issuer's own document number — what's printed on the paper copy.
         series: pickTag(headerB, 'series'),
         aa: pickTag(headerB, 'aa'),
+        is_delivery_note: pickTag(headerB, 'isDeliveryNote') === 'true',
+        move_purpose: pickTag(headerB, 'movePurpose'),
+        vat_payment_suspension: pickTag(headerB, 'vatPaymentSuspension') === 'true',
+        delivery_addresses: deliveryB
+          ? { loading: namedAddress(deliveryB, 'loadingAddress'), delivery: namedAddress(deliveryB, 'deliveryAddress') }
+          : null,
+        payment_methods: paymentMethods.length > 0 ? paymentMethods : null,
         total_net: num(pickTag(summaryB, 'totalNetValue')),
         total_vat: num(pickTag(summaryB, 'totalVatAmount')),
         total_gross: num(pickTag(summaryB, 'totalGrossValue')),
+        total_withheld: num(pickTag(summaryB, 'totalWithheldAmount')),
+        total_fees: num(pickTag(summaryB, 'totalFeesAmount')),
+        total_stamp_duty: num(pickTag(summaryB, 'totalStampDutyAmount')),
+        total_other_taxes: num(pickTag(summaryB, 'totalOtherTaxesAmount')),
+        total_deductions: num(pickTag(summaryB, 'totalDeductionsAmount')),
         lines,
         category_id: defaultCategoryId,
         raw: { xml: b.slice(0, 20000) },

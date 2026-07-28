@@ -9,7 +9,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, PackagePlus, FileText, Trash2, Loader2, ExternalLink, Sparkles } from 'lucide-react';
+import { MoreVertical, Building2, PackagePlus, FileText, Trash2, Loader2, ExternalLink, Sparkles, Eye } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -23,6 +23,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { companiesAPI } from '@/services/crm.service';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
+import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
 
 interface Props {
   doc: InboundDocument;
@@ -82,6 +83,9 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   const canReceive = doc.status === 'new' || doc.status === 'classified';
   const canDismiss = doc.status === 'new';
   const hasIssuer = !!(doc.issuer_vat || doc.issuer_name);
+
+  // Read-only view of the document exactly as AADE holds it.
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // ---- Add issuer → CRM supplier dialog ----
   const [crmOpen, setCrmOpen] = useState(false);
@@ -159,6 +163,11 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuItem onClick={() => setPreviewOpen(true)}>
+            <Eye className="h-4 w-4 mr-2" /> Preview
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Add to platform</DropdownMenuLabel>
           <DropdownMenuItem onClick={openCrm} disabled={!hasIssuer}>
             <Building2 className="h-4 w-4 mr-2" /> Add issuer to CRM
@@ -177,6 +186,8 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <InboundDocPreviewDialog doc={doc} open={previewOpen} onOpenChange={setPreviewOpen} />
 
       {/* Add issuer → CRM supplier */}
       <Dialog open={crmOpen} onOpenChange={setCrmOpen}>
