@@ -32,6 +32,7 @@ import {
   warehouseService, type WarehouseItem, type Warehouse, type CatalogMatch, type PendingProduct,
 } from '@/services/warehouseService';
 import { marketplacePricingService } from '@/services/marketplacePricingService';
+import type { ManualImageRef } from '@/services/dealerProductsService';
 import { parseSupplierLine } from '@/modules/finance/utils/parseSupplierLine';
 import { UNITS, unitSuffix, normalizeUnit, unitFromMydataCode, unitDef } from '@/lib/units';
 import { invoicingSetupService, type RefRow, type DocTypeSetting } from '@/services/invoicingSetupService';
@@ -64,7 +65,7 @@ interface LineRow {
   salePrice: string;
   /** Catalog product this line was matched to, if any. */
   match: CatalogMatch | null;
-  images: string[];
+  images: ManualImageRef[];
   /** Catalog products the uploaded photo looks like, from the 7-vector visual search. */
   visualMatches: CatalogMatch[];
   matching: boolean;
@@ -394,9 +395,9 @@ export const ReceiveToWarehouseDialog: React.FC<{
     const list = Array.from(files);
     setRow(i, { uploading: true });
     try {
-      const urls = await warehouseService.uploadItemImages(workspaceId, list);
+      const refs = await warehouseService.uploadItemImages(workspaceId, list);
       const already = rows[i]?.images ?? [];
-      setRow(i, { images: [...already, ...urls], uploading: false });
+      setRow(i, { images: [...already, ...refs], uploading: false });
 
       if (already.length === 0) {
         setRow(i, { matching: true });
@@ -433,6 +434,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
     try {
       const mappings: { item_id: string; quantity: number }[] = [];
       let created = 0;
+      let notEmbedded = 0;
       for (const { i, r } of active) {
         const qty = parseDecimalOr(r.qty, 0);
         if (r.mode !== '__create') { mappings.push({ item_id: r.mode, quantity: qty }); continue; }
@@ -471,7 +473,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
         // An operator-confirmed catalog match wins over creating a duplicate product.
         let productId: string | null = r.match?.id ?? null;
         if (!productId && addToCatalog) {
-          productId = await warehouseService.createProduct({
+          const res = await warehouseService.createProductViaIngestCore({
             workspaceId, name,
             sku: r.sku.trim() || null,
             externalSku: r.supplierCode.trim() || null,
@@ -479,9 +481,13 @@ export const ReceiveToWarehouseDialog: React.FC<{
             dimensions, manufacturer: r.manufacturer.trim() || null, grade: r.grade,
             color: r.color.trim() || null, finish: r.finish.trim() || null,
             series: r.series.trim() || null,
+            images: r.images,
             itemType: r.itemType === 'service' ? 'service' : 'good',
-            fiscal,
           });
+          productId = res.productId;
+          if (!res.embedded) notEmbedded += 1;
+          // The ingest core doesn't model the fiscal columns, so they are applied after.
+          await warehouseService.updateProductFiscal(productId, fiscal);
           created += 1;
         } else if (productId) {
           // Matched an existing product — still push the fiscal codes the operator just set,
@@ -517,7 +523,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
           weight_kg: r.weight ? parseDecimalOr(r.weight, NaN) : null,
           manufacturer: r.manufacturer.trim() || null,
           supplier_product_code: r.supplierCode.trim() || null,
-          image_urls: r.images,
+          image_urls: r.images.map((x) => x.storage_url),
         });
         mappings.push({ item_id: itemId, quantity: qty });
       }
@@ -525,7 +531,10 @@ export const ReceiveToWarehouseDialog: React.FC<{
       const n = await inboundService.receiveToWarehouse(doc.id, mappings);
       toast({
         title: `Received ${n} line${n === 1 ? '' : 's'}`,
-        description: created > 0 ? `${created} new catalog product${created === 1 ? '' : 's'} created.` : undefined,
+        description: [
+          created > 0 ? `${created} new catalog product${created === 1 ? '' : 's'} created.` : null,
+          notEmbedded > 0 ? `${notEmbedded} created without embeddings — the ingest service was unreachable.` : null,
+        ].filter(Boolean).join(' ') || undefined,
       });
       onDone();
     } catch (e: any) {
@@ -977,12 +986,12 @@ const LineCard: React.FC<{
             <div className="space-y-1">
               <Label className="text-[11px] text-muted-foreground">Photos</Label>
               <div className="flex flex-wrap items-center gap-2">
-                {row.images.map((url) => (
-                  <div key={url} className="relative">
-                    <img src={url} alt="" className="h-10 w-10 rounded object-cover border border-border/50" />
+                {row.images.map((img) => (
+                  <div key={img.storage_path} className="relative">
+                    <img src={img.storage_url} alt="" className="h-10 w-10 rounded object-cover border border-border/50" />
                     <button type="button" title="Remove"
                       className="absolute -right-1.5 -top-1.5 rounded-full bg-background border border-border/60 p-0.5 text-muted-foreground hover:text-destructive"
-                      onClick={() => onChange({ images: row.images.filter((u) => u !== url) })}>
+                      onClick={() => onChange({ images: row.images.filter((x) => x.storage_path !== img.storage_path) })}>
                       <X className="h-2.5 w-2.5" />
                     </button>
                   </div>

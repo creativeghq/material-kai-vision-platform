@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PRODUCT_IMAGE_SELECT, getProductImageUrl, getProductName } from '@/utils/productMetadata';
 import { mivaaApi } from '@/services/mivaaApiClient';
+import { dealerProductsService, type ManualImageRef } from '@/services/dealerProductsService';
 
 /** A catalog product offered as the match for a supplier line. */
 export interface CatalogMatch {
@@ -238,8 +239,77 @@ export const warehouseService = {
     if (error) throw error;
   },
 
-  /** Minimal catalog product (name + sku) — used when building stock from a supplier
-   *  expense line so the received good is also sellable. Returns the new product id.
+  /**
+   * Create the catalog product for a received supplier line through the SHARED ingest core
+   * (`/api/products/create-manual`) — the same path the dealer "Add product" form uses.
+   *
+   * This is what makes an intake-created product a first-class catalog citizen: the core
+   * registers each photo in `document_images`, runs the full image suite (SLIG visual +
+   * Claude vision_analysis → Voyage understanding + the 4 aspect vectors), canonicalizes the
+   * facets, and writes the Voyage text embedding. Doing a bare `products` insert here — as
+   * this used to — produced a product that was invisible to every search surface and whose
+   * photos lived nowhere the platform looks.
+   *
+   * Falls back to the local insert when MIVAA is unreachable: a warehouse receipt must never
+   * be blocked by the AI backend being down. The product is then created without embeddings
+   * and can be re-ingested later.
+   */
+  async createProductViaIngestCore(input: {
+    workspaceId: string; name: string; sku?: string | null; externalSku?: string | null;
+    unit?: string | null; cost?: number | null; costCurrency?: string | null; price?: number | null;
+    materialCategory?: string | null;
+    dimensions?: { width_mm?: number | null; length_mm?: number | null; thickness_mm?: number | null };
+    manufacturer?: string | null; grade?: string | null;
+    color?: string | null; finish?: string | null; series?: string | null;
+    images?: ManualImageRef[];
+    itemType?: 'good' | 'service';
+  }): Promise<{ productId: string; embedded: boolean }> {
+    const dims = input.dimensions ?? {};
+    const sizeLabel = dims.width_mm != null && dims.length_mm != null
+      ? `${dims.width_mm}x${dims.length_mm}mm` : undefined;
+    const metadata: Record<string, unknown> = {};
+    if (input.unit) metadata.unit = input.unit;
+    if (input.manufacturer) metadata.factory_name = input.manufacturer;
+    if (input.grade) metadata.quality_grade = input.grade;
+    if (input.color) metadata.color = input.color;
+    if (input.finish) metadata.finish = input.finish;
+    if (input.series) metadata.collection = input.series;
+    if (dims.width_mm != null || dims.length_mm != null || dims.thickness_mm != null) {
+      metadata.dimensions = [{
+        width: dims.width_mm ?? null, height: dims.length_mm ?? null,
+        depth: dims.thickness_mm ?? null, unit: 'mm', source: 'supplier_line',
+      }];
+    }
+    try {
+      const productId = await dealerProductsService.createManualProduct(input.workspaceId, {
+        name: input.name,
+        material_category: input.materialCategory ?? undefined,
+        unit: input.unit ?? undefined,
+        dimensions: sizeLabel,
+        external_sku: input.externalSku ?? undefined,
+        cost: input.cost ?? null,
+        cost_currency: input.costCurrency ?? 'EUR',
+        price: input.price ?? null,
+        metadata,
+        images: input.images ?? [],
+        source: 'warehouse_intake',
+      });
+      return { productId, embedded: true };
+    } catch {
+      const productId = await this.createProduct({
+        workspaceId: input.workspaceId, name: input.name, sku: input.sku ?? null,
+        externalSku: input.externalSku ?? null, unit: input.unit, cost: input.cost,
+        costCurrency: input.costCurrency, dimensions: input.dimensions,
+        manufacturer: input.manufacturer, grade: input.grade,
+        color: input.color, finish: input.finish, series: input.series,
+        itemType: input.itemType,
+      });
+      return { productId, embedded: false };
+    }
+  },
+
+  /** Minimal catalog product (name + sku) — the LOCAL fallback used when the ingest core is
+   *  unreachable. Prefer `createProductViaIngestCore`, which also embeds the images.
    *
    *  `products` has no dimension/unit columns (they live in `metadata`, which is what the
    *  catalog search and the product modal read), so the physical facts parsed at intake are
@@ -362,20 +432,19 @@ export const warehouseService = {
     }
   },
 
-  /** Upload intake photos for a stock item. Public bucket — these are product shots, and the
-   *  catalog matcher needs a stable URL it can hand to visual search later. */
-  async uploadItemImages(workspaceId: string, files: File[]): Promise<string[]> {
-    const urls: string[] = [];
+  /**
+   * Upload intake photos. Returns full storage refs, not just URLs, because the shared
+   * ingest core (`/api/products/create-manual`) needs `storage_path` to register each image
+   * in `document_images` and run the embedding suite over it.
+   */
+  async uploadItemImages(workspaceId: string, files: File[]): Promise<ManualImageRef[]> {
+    const refs: ManualImageRef[] = [];
     for (const file of files) {
-      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const path = `warehouse/${workspaceId}/${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from('generation-images').upload(path, file, {
-        cacheControl: '3600', upsert: false, contentType: file.type || 'image/jpeg',
-      });
-      if (error) throw error;
-      urls.push(supabase.storage.from('generation-images').getPublicUrl(path).data.publicUrl);
+      // Same prefix the dealer "Add product" flow uses, so intake photos and dealer photos
+      // are one class of object with one lifecycle.
+      refs.push(await dealerProductsService.uploadImage(workspaceId, file, refs.length));
     }
-    return urls;
+    return refs;
   },
 
   async recordMovement(itemId: string, direction: 'in' | 'out' | 'adjust', quantity: number, reason?: string): Promise<number> {
