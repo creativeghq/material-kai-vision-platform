@@ -807,7 +807,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
       // Core tools (all users)
-      'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
+      'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url',
       // Docs module (#254) — internal workspace docs FTS. Currently a free tool for all workspaces
       // (the push site has NO entitlement gate); the docs UI is entitlement-gated but the agent tool
       // is not. If Docs becomes a paid/gated module, add an is_workspace_entitled('docs') check at
@@ -970,7 +970,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // CRM + appointments help work leads and book viewings
       'search_crm_by_kad', 'manage_appointments',
       // core search + calculators (all users)
-      'knowledge_base_search', 'material_search', 'analyze_inspiration_url',
+      'knowledge_base_search', 'read_document_section', 'material_search', 'analyze_inspiration_url',
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
     ],
     // systemPrompt loaded from the database (prompts.category = 'property-advisor')
@@ -985,7 +985,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'Product & business — catalogs, B2B research, product knowledge-graph, tech radar, job research',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
-      'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
+      'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url',
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs', 'translate_pdf_to_catalog',
       'add_material_to_catalog', 'find_image_for_material', 'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
       'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery',
@@ -1005,7 +1005,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'Marketing, SEO & reputation — keyword/SERP research, audits, content, brand & LLM-visibility monitoring',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
-      'knowledge_base_search', 'material_search', 'analyze_inspiration_url',
+      'knowledge_base_search', 'read_document_section', 'material_search', 'analyze_inspiration_url',
       'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
       'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url',
       'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors', 'seo_keyword_gap',
@@ -1033,7 +1033,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'Finance & quotes — build client quotes + branded PDFs, customer/supplier overviews, price history',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
-      'knowledge_base_search', 'material_search',
+      'knowledge_base_search', 'read_document_section', 'material_search',
       'create_quote', 'generate_quote_pdf', 'list_my_quotes',
       'customer_overview', 'supplier_overview', 'product_price_history',
       'products_in_project', 'projects_using_product', 'price_lookup',
@@ -1052,7 +1052,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'Social media — publish/schedule posts and read analytics across connected accounts',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
-      'knowledge_base_search',
+      'knowledge_base_search', 'read_document_section',
       'manage_social',
       // Hermes is the comms agent — also handles WhatsApp messaging (send is confirm-gated)
       'manage_messaging',
@@ -1184,7 +1184,7 @@ async function executeAgent(
   const SERVER_TOOLKITS: Record<string, { alwaysOn?: boolean; tool_ids: string[] }> = {
     'core': {
       alwaysOn: true,
-      tool_ids: ['knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url'],
+      tool_ids: ['knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url'],
     },
     'catalogs': {
       tool_ids: [
@@ -1512,7 +1512,7 @@ async function executeAgent(
   // Lazy-load ALL tool modules at request time (not boot time).
   // Each module does top-level await for @langchain/core + zod.
   // Loading them at boot exceeds the 2s Supabase Edge Runtime limit.
-  const needsSearch = config.tools.some((t: string) => ['knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url'].includes(t));
+  const needsSearch = config.tools.some((t: string) => ['knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url'].includes(t));
   const needsDocs = config.tools.includes('search_workspace_docs') || config.tools.includes('manage_docs');
   const needsGen = config.tools.some((t: string) => ['generate_3d'].includes(t));
   const needsOps = config.tools.some((t: string) => ['check_server_health', 'query_sentry', 'cost_estimation'].includes(t));
@@ -1620,6 +1620,7 @@ async function executeAgent(
   const createSearchTool = searchMod?.createSearchTool;
   const createVisualSearchTool = searchMod?.createVisualSearchTool;
   const createKnowledgeBaseSearchTool = searchMod?.createKnowledgeBaseSearchTool;
+  const createReadDocumentSectionTool = searchMod?.createReadDocumentSectionTool;
   const createInspirationUrlTool = searchMod?.createInspirationUrlTool;
   const create3DGenerationTool = generationMod?.create3DGenerationTool;
   const createGeminiGenerationTool = generationMod?.createGeminiGenerationTool;
@@ -1789,6 +1790,13 @@ async function executeAgent(
   if (config.tools.includes('knowledge_base_search')) {
     // agentId is passed so MIVAA can enforce per-doc allowed_agents allow-lists.
     tools.push(createKnowledgeBaseSearchTool(workspaceId, isAdmin, agentId));
+  }
+
+  // The read half of locate-then-read: search finds WHERE an answer lives, this reads
+  // the surrounding sections in document order. Same gates as KB search (server-side),
+  // no embedding and no LLM call, so it costs nothing to bind alongside it.
+  if (config.tools.includes('read_document_section') && createReadDocumentSectionTool) {
+    tools.push(createReadDocumentSectionTool(workspaceId, isAdmin, agentId));
   }
 
   // Docs module (#254) — internal workspace docs via Postgres FTS (no embeddings). The tool is

@@ -343,6 +343,13 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
             results.found = true;
             results.articles = data.chunks.map((chunk: any) => ({
               docId: chunk.id,
+              // chunkIndex + heading are the ADDRESS of this section inside the doc.
+              // They're what makes `read_document_section` usable as a follow-up —
+              // without them the agent knows what it found but not where it is, and
+              // can only re-query with new keywords when an answer runs past the
+              // section boundary.
+              chunkIndex: chunk.chunk_index,
+              heading: chunk.heading ?? chunk.metadata?.heading ?? null,
               content: chunk.content || chunk.text,
               documentTitle: chunk.document_title || chunk.metadata?.title || 'Knowledge Base Article',
               category: chunk.category || chunk.metadata?.category || 'general',
@@ -414,7 +421,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
     },
     {
       name: 'knowledge_base_search',
-      description: 'Search the Knowledge Base for articles, guides, installation instructions, and documentation. Use this FIRST when users ask how-to questions, troubleshooting, or general information queries. If articles are found, use them to provide accurate answers. If no articles are found, proceed to answer using your general knowledge. Optional category filters scope the search (e.g. categorySlug="pricing" to search only pricing docs).',
+      description: 'Search the Knowledge Base for articles, guides, installation instructions, and documentation. Use this FIRST when users ask how-to questions, troubleshooting, or general information queries. If articles are found, use them to provide accurate answers. If no articles are found, proceed to answer using your general knowledge. Optional category filters scope the search (e.g. categorySlug="pricing" to search only pricing docs). Each result is ONE SECTION of a document and carries docId + chunkIndex + heading. When a section is clearly the right place but its text is cut off mid-topic, continues into the next section, or refers to something stated just before it, call read_document_section with that docId and chunkIndex to read the surrounding sections IN ORDER — do not re-run this search with reworded keywords.',
       schema: z.object({
         query: z.string().describe('Search query - describe what information the user is looking for'),
         searchTypes: z.array(z.string()).default(['kb_docs', 'chunks', 'products']).describe('Types to search: kb_docs (authored Knowledge Base articles/docs), chunks (text extracted from ingested PDFs), products. Keep the default unless the user is clearly asking only about PDFs or products.'),
@@ -422,6 +429,117 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
         categorySlug: z.string().optional().describe('Restrict search to a category by slug (e.g. "pricing")'),
         categoryId: z.string().optional().describe('Restrict search to a category by UUID'),
         priceDocType: z.enum(['price_list', 'discount_rule', 'contract_terms', 'promotion']).optional().describe('When searching pricing docs, filter by sub-type'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Read Document Section
+ *
+ * The read half of "locate-then-read". `knowledge_base_search` finds WHERE an answer
+ * lives (docId + chunkIndex); this reads the surrounding sections in document order.
+ *
+ * It exists because vector search returns disconnected fragments: an answer that runs
+ * past a section boundary is unreachable by similarity alone, and the agent's only
+ * other move is to guess new keywords and hope the missing half scores above threshold.
+ * Reading outward from a known-good hit is both cheaper and more reliable.
+ *
+ * Cost: none — pure SQL on the backend, no embedding and no LLM call.
+ */
+export const createReadDocumentSectionTool = (workspaceId: string, isAdmin = false, agentId?: string) => {
+  return tool(
+    async ({ docId, chunkIndex, before = 1, after = 2, query = '', maxTokens = 6000 }) => {
+      try {
+        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+        const TIMEOUT_MS = 30000; // pure SQL — should answer in well under a second
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        try {
+          const from = Math.max(0, chunkIndex - Math.max(0, before));
+          const to = chunkIndex + Math.max(0, after);
+
+          const body: Record<string, any> = {
+            kb_doc_id: docId,
+            workspace_id: workspaceId,
+            from_chunk_index: from,
+            to_chunk_index: to,
+            // Passed through for parity with search: agent-level categories are
+            // trigger_keyword-gated against the query, so an empty query can make a
+            // keyword-gated doc unreadable even though search just returned it.
+            query,
+            caller: isAdmin ? 'admin' : 'agent',
+            max_tokens: maxTokens,
+          };
+          if (agentId && !isAdmin) body.agent_id = agentId;
+
+          const response = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search/read-section`, {
+            method: 'POST',
+            headers: mivaaAuthHeaders(),
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (response.status === 404) {
+            return JSON.stringify({
+              found: false,
+              error: 'That document section is not available to you, or the index is out of range.',
+            });
+          }
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ Read section API error: ${response.status} - ${errorText}`);
+            throw new Error(`Read section API error: ${response.status} ${response.statusText}`);
+          }
+
+          const data = await response.json();
+
+          return JSON.stringify({
+            found: (data.chunks || []).length > 0,
+            documentTitle: data.document_title,
+            docId: data.kb_doc_id,
+            docSectionCount: data.doc_chunk_count,
+            sections: (data.chunks || []).map((c: any) => ({
+              chunkIndex: c.chunk_index,
+              heading: c.heading,
+              content: c.content,
+            })),
+            // When the span exceeded the token budget the agent gets the outline of what
+            // it did NOT receive, so it can ask for a narrower, specific range instead of
+            // re-reading the same window and getting the same cut.
+            truncated: data.truncated,
+            outline: data.outline,
+          });
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            return JSON.stringify({ found: false, error: 'Read section timeout.', timeout: true });
+          }
+          throw fetchError;
+        }
+      } catch (error) {
+        console.error('Read document section error:', error);
+        return JSON.stringify({
+          found: false,
+          error: error instanceof Error ? error.message : 'Read document section failed',
+        });
+      }
+    },
+    {
+      name: 'read_document_section',
+      description: 'Read a run of consecutive sections from ONE Knowledge Base document, in document order. Use this after knowledge_base_search when a result is clearly the right document but the section is incomplete — the text stops mid-topic, continues into the next heading, or depends on something explained just before it. Pass the docId and chunkIndex from that search result. This is the correct move instead of re-searching with different keywords, and it costs nothing. If the response says truncated, use the returned outline to request a narrower range.',
+      schema: z.object({
+        docId: z.string().describe('The docId from a knowledge_base_search result'),
+        chunkIndex: z.number().describe('The chunkIndex of the section to read around, from the same search result'),
+        before: z.number().default(1).describe('How many sections to include before it (default 1)'),
+        after: z.number().default(2).describe('How many sections to include after it (default 2)'),
+        query: z.string().default('').describe("The user's original question — pass it through so access rules match the search that found this document"),
+        maxTokens: z.number().default(6000).describe('Token budget for the returned text (default 6000)'),
       }),
     }
   );

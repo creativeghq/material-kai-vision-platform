@@ -67,6 +67,14 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'read_document_section', name: 'Read Document Section', category: 'Search',
+    desc: 'Read consecutive sections of one knowledge base document in order. Used after a KB search when the answer runs past the section that was found, instead of re-searching with different words.',
+    examples: [
+      'Read the rest of that section',
+      'Show me what comes after that in the same document',
+    ],
+  },
+  {
     id: 'material_search', name: 'Material Search', category: 'Search',
     desc: '7-vector fusion search across the catalog: text + visual + understanding + color + texture + style + material.',
     examples: [
@@ -1145,7 +1153,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     icon: 'Compass',
     alwaysOn: true,
     tool_ids: [
-      'knowledge_base_search', 'material_search', 'visual_search', 'analyze_inspiration_url',
+      'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url',
     ],
     quick_starts: [
       {
