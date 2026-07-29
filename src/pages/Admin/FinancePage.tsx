@@ -63,6 +63,7 @@ import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog'
 import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
 import { PaySupplierBillDialog, type PayableBillRef } from '@/modules/finance/components/PaySupplierBillDialog';
+import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
 import { ReportsTab } from '@/modules/finance/tabs/ReportsTab';
@@ -198,6 +199,8 @@ const FinancePage: React.FC = () => {
   const [scnOpen, setScnOpen] = useState(false);
   const [scnBillId, setScnBillId] = useState<string | undefined>(undefined);
   const [payBill, setPayBill] = useState<PayableBillRef | null>(null);
+  /** Expense whose payment history is open (from the Bill # link in Payables). */
+  const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
 
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
@@ -950,8 +953,19 @@ const FinancePage: React.FC = () => {
                               <span className="text-xs">{r.description}</span>
                               <span className="text-[10px] text-muted-foreground">· Order, not invoiced</span>
                             </span>
-                          ) : (
+                          ) : isAccountant ? (
                             <span className="font-mono text-xs">{r.supplier_bill_number ?? '—'}</span>
+                          ) : (
+                            // Opens the expense's payment history — what's been paid against it,
+                            // and the way to attach a payment that was recorded earlier.
+                            <button
+                              type="button"
+                              className="font-mono text-xs text-primary hover:underline"
+                              title="Payments on this expense"
+                              onClick={(e) => { e.stopPropagation(); setPaymentsExpenseId(r.id); }}
+                            >
+                              {r.supplier_bill_number ?? '—'}
+                            </button>
                           )}
                         </td>
                         <td className="px-4 py-2 text-xs">{r.party_name ?? '—'}</td>
@@ -1157,6 +1171,13 @@ const FinancePage: React.FC = () => {
         open={!!payBill}
         onOpenChange={(v) => { if (!v) setPayBill(null); }}
         onSaved={async () => { setPayBill(null); if (workspaceId) await loadAll(workspaceId); }}
+      />
+      <ExpensePaymentsDialog
+        workspaceId={workspaceId}
+        expenseId={paymentsExpenseId}
+        open={!!paymentsExpenseId}
+        onOpenChange={(v) => { if (!v) setPaymentsExpenseId(null); }}
+        onChanged={async () => { if (workspaceId) await loadAll(workspaceId); }}
       />
     </div>
   );

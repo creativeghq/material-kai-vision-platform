@@ -14,7 +14,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, PackagePlus, FileText, Trash2, Loader2, ExternalLink, Sparkles, Eye } from 'lucide-react';
+import { MoreVertical, Building2, PackagePlus, FileText, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -35,6 +35,8 @@ interface Props {
   workspaceId: string;
   busy?: boolean;
   onCreateBill: () => void;
+  /** Open the payments view for the expense this document becomes (creating it if needed). */
+  onRecordPayment: () => void;
   onReceiveStock: () => void;
   onDismiss: () => void;
   onChanged?: () => void;
@@ -43,13 +45,16 @@ interface Props {
 /** A bare 9-digit number is a Greek ΑΦΜ — only those are resolvable via the ΑΑΔΕ / ΓΕΜΗ registries. */
 const isGreekVat = (vat: string | null | undefined) => !!greekAfm(vat);
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, onCreateBill, onReceiveStock, onDismiss, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, onCreateBill, onRecordPayment, onReceiveStock, onDismiss, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const canBill = doc.status === 'new';
   const canReceive = doc.status === 'new' || doc.status === 'classified';
   const canDismiss = doc.status === 'new';
+  // Paying works whether or not the document has been turned into an expense yet — the
+  // conversion is idempotent, so this covers both "new" and "already billed".
+  const canPay = doc.status === 'new' || doc.status === 'classified' || doc.status === 'received';
   const hasIssuer = !!(doc.issuer_vat || doc.issuer_name);
 
   // Read-only view of the document exactly as AADE holds it.
@@ -171,6 +176,9 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Document</DropdownMenuLabel>
           <DropdownMenuItem onClick={onCreateBill} disabled={!canBill}>
             <FileText className="h-4 w-4 mr-2" /> Create supplier bill
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay}>
+            <Wallet className="h-4 w-4 mr-2" /> Payments…
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onDismiss} disabled={!canDismiss}>
             <Trash2 className="h-4 w-4 mr-2" /> Dismiss

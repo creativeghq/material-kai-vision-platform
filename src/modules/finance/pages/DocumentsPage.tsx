@@ -25,6 +25,7 @@ import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog'
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { QuickCategoryDialog } from '@/modules/finance/components/QuickCategoryDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
@@ -109,6 +110,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [dispatchRefresh, setDispatchRefresh] = useState(0);
   const [newChequeOpen, setNewChequeOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
+  // The expense whose payments are open — set from either side of the link (an Inbox row or an
+  // open bill), both of which resolve to the same supplier_bill id.
+  const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
   const [newCreditNoteOpen, setNewCreditNoteOpen] = useState(false);
   const [categoryKind, setCategoryKind] = useState<'income' | 'expense' | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -320,7 +324,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 ) : type === 'credit_notes' ? (
                   <CreditNoteTable rows={paginate(activeRows as CreditNote[], page)} financeBase={financeBase} />
                 ) : type === 'expenses' ? (
-                  <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} />
+                  <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} onOpenExpense={setPaymentsExpenseId} />
                 ) : type === 'payments' ? (
                   <PaymentsTable rows={paginate(filteredPayments, page)} categoryName={categoryName} financeBase={financeBase} />
                 ) : type === 'delivery_notes' ? (
@@ -384,7 +388,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                 Payments tab instead (the money ledger). Keeps Expenses = "what you still owe". */}
             {type === 'expenses' && !loading && (() => {
               const openBills = supplierBills.filter((b) => b.status !== 'paid' && Number(b.amount_due) > 0.005);
-              return openBills.length > 0 ? <RecordedExpensesCard rows={openBills} categoryName={categoryName} /> : null;
+              return openBills.length > 0
+                ? <RecordedExpensesCard rows={openBills} categoryName={categoryName} readOnly={!canOperateFinance} onOpenExpense={setPaymentsExpenseId} />
+                : null;
             })()}
           </div>
         </div>
@@ -420,6 +426,15 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           open={recordPaymentOpen}
           onOpenChange={setRecordPaymentOpen}
           onSaved={() => { setRecordPaymentOpen(false); load(); }}
+        />
+      )}
+      {activeWorkspaceId && (
+        <ExpensePaymentsDialog
+          workspaceId={activeWorkspaceId}
+          expenseId={paymentsExpenseId}
+          open={!!paymentsExpenseId}
+          onOpenChange={(v) => { if (!v) setPaymentsExpenseId(null); }}
+          onChanged={load}
         />
       )}
       {activeWorkspaceId && (
@@ -537,7 +552,7 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
 /** Open (unpaid) supplier bills shown under the myDATA inbox on the Expenses tab — what you still
  *  owe. These `supplier_bills` also age in Payables (AP). Once paid, a bill drops off here and its
  *  cash-out appears in the Payments tab (the money ledger). */
-const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: any) => string }> = ({ rows, categoryName }) => {
+const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: any) => string; readOnly: boolean; onOpenExpense: (billId: string) => void }> = ({ rows, categoryName, readOnly, onOpenExpense }) => {
   const [page, setPage] = useState(1);
   useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
   return (
@@ -556,6 +571,7 @@ const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: 
               <th className="px-4 py-2 text-right">Total</th>
               <th className="px-4 py-2 text-right">Due</th>
               <th className="px-4 py-2 text-center">Status</th>
+              {!readOnly && <th className="px-4 py-2 text-right" />}
             </tr>
           </thead>
           <tbody>
@@ -567,6 +583,13 @@ const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: 
                 <td className="px-4 py-2 text-right">{formatMoney(b.total, b.currency)}</td>
                 <td className="px-4 py-2 text-right font-medium">{formatMoney(b.amount_due, b.currency)}</td>
                 <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(b.status)}`}>{humanizeLabel(b.status)}</span></td>
+                {!readOnly && (
+                  <td className="px-4 py-2 text-right">
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => onOpenExpense(b.id)}>
+                      Payments
+                    </Button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -853,7 +876,7 @@ const IssuerCell: React.FC<{ doc: InboundDocument; crmCompanyId?: string }> = ({
   );
 };
 
-const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string }> = ({ rows, workspaceId, readOnly, onChanged, categories, categoryName }) => {
+const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string; onOpenExpense: (billId: string) => void }> = ({ rows, workspaceId, readOnly, onChanged, categories, categoryName, onOpenExpense }) => {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);
@@ -884,6 +907,17 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
     setBusy(id);
     try { await inboundService.toSupplierBill(id); toast({ title: 'Supplier bill created' }); onChanged(); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setBusy(null); }
+  };
+  /** Payments on a received document = payments on the expense it becomes. The conversion RPC is
+   *  idempotent, so this works from either side and never creates a second payable. */
+  const openPayments = async (id: string) => {
+    setBusy(id);
+    try {
+      const billId = await inboundService.toSupplierBill(id);
+      onOpenExpense(billId);
+      onChanged();
+    } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
   };
   const setCategory = async (id: string, categoryId: string | null) => {
@@ -958,6 +992,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
                     workspaceId={workspaceId}
                     busy={busy === d.id}
                     onCreateBill={() => createBill(d.id)}
+                    onRecordPayment={() => openPayments(d.id)}
                     onReceiveStock={() => setReceiveDoc(d)}
                     onDismiss={() => dismiss(d.id)}
                     onChanged={onChanged}

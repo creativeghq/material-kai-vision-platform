@@ -272,6 +272,73 @@ export interface SupplierBill {
   updated_at: string;
 }
 
+/**
+ * An open expense offered as a payment target, annotated with where it came from.
+ *
+ * An expense IS a `supplier_bills` row. When it was created from a myDATA received document
+ * (the Expenses Inbox), `inbox` carries the originating document. That link lives ONLY on
+ * `inbound_documents.created_supplier_bill_id` — there is deliberately no back-pointer column
+ * on the bill, so there is nothing to drift out of sync.
+ */
+export interface PayableExpense {
+  id: string;
+  supplier_bill_number: string | null;
+  supplier_company_id: string | null;
+  supplier_contact_id: string | null;
+  supplier_name: string | null;
+  /** Resolved display name — CRM company/contact, else the one-off `supplier_name`. */
+  party_name: string | null;
+  currency: string;
+  total: number;
+  amount_paid: number;
+  amount_due: number;
+  issued_at: string | null;
+  due_at: string | null;
+  status: SupplierBillStatus;
+  category_id: string | null;
+  notes: string | null;
+  /** Non-null when this expense came from the Inbox (a myDATA received document). */
+  inbox: {
+    document_id: string;
+    mark: string;
+    issuer_name: string | null;
+    issuer_vat: string | null;
+    series: string | null;
+    aa: string | null;
+    issue_date: string | null;
+  } | null;
+}
+
+/** A payment attached to an expense — one `payment_allocations` row joined to its payment. */
+export interface ExpensePayment {
+  allocation_id: string;
+  payment_id: string;
+  /** Settled against the expense, in the expense's currency. */
+  amount: number;
+  paid_at: string;
+  method: PaymentMethod | null;
+  direction: PaymentDirection;
+  currency: string;
+  reference: string | null;
+  notes: string | null;
+  bank_account_id: string | null;
+}
+
+/** An already-recorded money-out payment that still has room to be attached to an expense. */
+export interface AttachablePayment {
+  id: string;
+  amount: number;
+  allocated: number;
+  unallocated: number;
+  currency: string;
+  paid_at: string;
+  method: PaymentMethod | null;
+  reference: string | null;
+  party_name: string | null;
+  counterparty_company_id: string | null;
+  counterparty_contact_id: string | null;
+}
+
 export type RecurringCadence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 export interface RecurringExpense {
@@ -1484,6 +1551,193 @@ const _financeServiceCore = {
       allocations: [{ target_id: input.supplierBillId, target_type: 'supplier_bill', amount: input.amount }],
       sendReceipt: false,
     });
+  },
+
+  // -------- Payment ↔ expense, both directions --------
+  //
+  // An expense IS a supplier bill, and `payment_allocations.supplier_bill_id` is the ONE
+  // settlement ledger for it: a BEFORE trigger guards over-allocation and an AFTER trigger
+  // derives the bill's amount_paid / status / paid_at from the allocation rows. So every
+  // method here either writes an allocation or reads one — none of them re-derives "what is
+  // still owed" independently.
+
+  /**
+   * Expenses annotated with their Inbox origin (and a resolved payee name), newest first.
+   *
+   * Defaults to what can still take a payment — open, non-void, something still due. Pass
+   * `ids` + `includeSettled` to read specific expenses regardless of state; `getPayableExpense`
+   * is that call, so the party-name / Inbox enrichment below has exactly one implementation.
+   * `inboxOnly` narrows to expenses created from a received document.
+   */
+  async listPayableExpenses(
+    workspaceId: string,
+    opts: { inboxOnly?: boolean; ids?: string[]; includeSettled?: boolean } = {},
+  ): Promise<PayableExpense[]> {
+    if (opts.ids && opts.ids.length === 0) return [];
+    let q = supabase
+      .from('supplier_bills')
+      .select('id, supplier_bill_number, supplier_company_id, supplier_contact_id, supplier_name, currency, total, amount_paid, amount_due, issued_at, due_at, status, category_id, notes')
+      .eq('workspace_id', workspaceId)
+      .order('issued_at', { ascending: false, nullsFirst: false });
+    if (opts.ids) q = q.in('id', opts.ids);
+    if (!opts.includeSettled) q = q.not('status', 'in', '("void","paid")').gt('amount_due', 0);
+    const { data, error } = await q;
+    if (error) throw error;
+    const rows = (data ?? []) as any[];
+    if (rows.length === 0) return [];
+
+    const ids = rows.map((r) => r.id);
+    // The Inbox link is held on the document side only — this is the reverse lookup
+    // (indexed by idx_inbound_documents_created_supplier_bill).
+    const companyIds = [...new Set(rows.map((r) => r.supplier_company_id).filter(Boolean))] as string[];
+    const contactIds = [...new Set(rows.map((r) => r.supplier_contact_id).filter(Boolean))] as string[];
+    const [inbound, companies, contacts] = await Promise.all([
+      supabase
+        .from('inbound_documents')
+        .select('id, mark, issuer_name, issuer_vat, series, aa, issue_date, created_supplier_bill_id')
+        .eq('workspace_id', workspaceId)
+        .in('created_supplier_bill_id', ids),
+      companyIds.length ? supabase.from('crm_companies').select('id, name').in('id', companyIds) : Promise.resolve({ data: [] as any[] }),
+      contactIds.length ? supabase.from('crm_contacts').select('id, name, first_name, last_name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    const inboxByBill = new Map<string, PayableExpense['inbox']>();
+    for (const d of ((inbound as any).data ?? []) as any[]) {
+      inboxByBill.set(d.created_supplier_bill_id, {
+        document_id: d.id, mark: d.mark, issuer_name: d.issuer_name ?? null, issuer_vat: d.issuer_vat ?? null,
+        series: d.series ?? null, aa: d.aa ?? null, issue_date: d.issue_date ?? null,
+      });
+    }
+    const companyName = new Map<string, string>(((companies as any).data ?? []).map((c: any) => [c.id, c.name]));
+    const contactName = new Map<string, string>(((contacts as any).data ?? []).map((c: any) => [c.id, c.name || [c.first_name, c.last_name].filter(Boolean).join(' ')]));
+
+    const out: PayableExpense[] = rows.map((r) => ({
+      ...r,
+      party_name: r.supplier_company_id
+        ? (companyName.get(r.supplier_company_id) ?? null)
+        : r.supplier_contact_id
+          ? (contactName.get(r.supplier_contact_id) ?? null)
+          : (r.supplier_name ?? null),
+      inbox: inboxByBill.get(r.id) ?? null,
+    }));
+    return opts.inboxOnly ? out.filter((e) => e.inbox) : out;
+  },
+
+  /** One expense in the same enriched shape, settled or not. */
+  async getPayableExpense(expenseId: string): Promise<PayableExpense | null> {
+    const { data, error } = await supabase
+      .from('supplier_bills').select('workspace_id').eq('id', expenseId).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const rows = await this.listPayableExpenses((data as any).workspace_id, { ids: [expenseId], includeSettled: true });
+    return rows[0] ?? null;
+  },
+
+  /** Every payment attached to an expense — the reverse view of the allocation ledger. */
+  async listExpensePayments(supplierBillId: string): Promise<ExpensePayment[]> {
+    const { data, error } = await supabase
+      .from('payment_allocations')
+      .select('id, amount, payment:payments(id, paid_at, method, direction, currency, reference, notes, bank_account_id)')
+      .eq('supplier_bill_id', supplierBillId);
+    if (error) throw error;
+    return ((data ?? []) as any[])
+      // A credit-note-sourced allocation has no payment row — it settles the bill without cash.
+      .filter((a) => a.payment)
+      .map((a) => ({
+        allocation_id: a.id,
+        payment_id: a.payment.id,
+        amount: Number(a.amount),
+        paid_at: a.payment.paid_at,
+        method: a.payment.method ?? null,
+        direction: a.payment.direction,
+        currency: a.payment.currency,
+        reference: a.payment.reference ?? null,
+        notes: a.payment.notes ?? null,
+        bank_account_id: a.payment.bank_account_id ?? null,
+      }))
+      .sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1));
+  },
+
+  /**
+   * Money-out payments already recorded that still have an unallocated remainder — the
+   * candidates for "I paid this earlier, attach it to this expense". Filtered to the
+   * expense's currency because a cross-currency attach would need a rate we'd be guessing.
+   */
+  async listAttachablePayments(workspaceId: string, opts: { currency?: string; companyId?: string | null; contactId?: string | null; limit?: number } = {}): Promise<AttachablePayment[]> {
+    let q = supabase
+      .from('payments')
+      .select('id, amount, currency, paid_at, method, reference, counterparty_company_id, counterparty_contact_id, allocations:payment_allocations(amount, amount_doc_currency)')
+      .eq('workspace_id', workspaceId)
+      .eq('direction', 'out')
+      .order('paid_at', { ascending: false })
+      .limit(opts.limit ?? 200);
+    if (opts.currency) q = q.eq('currency', opts.currency);
+    const { data, error } = await q;
+    if (error) throw error;
+
+    const rows = (data ?? []) as any[];
+    const withRoom = rows
+      .map((p) => {
+        const allocated = (p.allocations ?? []).reduce(
+          (s: number, a: any) => s + Number(a.amount_doc_currency ?? a.amount ?? 0), 0);
+        return { p, allocated, unallocated: Number((Number(p.amount) - allocated).toFixed(2)) };
+      })
+      .filter((r) => r.unallocated > 0.005);
+    if (withRoom.length === 0) return [];
+
+    const companyIds = [...new Set(withRoom.map((r) => r.p.counterparty_company_id).filter(Boolean))] as string[];
+    const contactIds = [...new Set(withRoom.map((r) => r.p.counterparty_contact_id).filter(Boolean))] as string[];
+    const [companies, contacts] = await Promise.all([
+      companyIds.length ? supabase.from('crm_companies').select('id, name').in('id', companyIds) : Promise.resolve({ data: [] as any[] }),
+      contactIds.length ? supabase.from('crm_contacts').select('id, name, first_name, last_name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
+    ]);
+    const companyName = new Map<string, string>(((companies as any).data ?? []).map((c: any) => [c.id, c.name]));
+    const contactName = new Map<string, string>(((contacts as any).data ?? []).map((c: any) => [c.id, c.name || [c.first_name, c.last_name].filter(Boolean).join(' ')]));
+
+    const named = withRoom.map(({ p, allocated, unallocated }) => ({
+      id: p.id,
+      amount: Number(p.amount),
+      allocated,
+      unallocated,
+      currency: p.currency,
+      paid_at: p.paid_at,
+      method: p.method ?? null,
+      reference: p.reference ?? null,
+      counterparty_company_id: p.counterparty_company_id ?? null,
+      counterparty_contact_id: p.counterparty_contact_id ?? null,
+      party_name: p.counterparty_company_id
+        ? (companyName.get(p.counterparty_company_id) ?? null)
+        : p.counterparty_contact_id ? (contactName.get(p.counterparty_contact_id) ?? null) : null,
+    }));
+
+    // Same-supplier payments first — that's almost always the one being attached.
+    if (!opts.companyId && !opts.contactId) return named;
+    const isSameParty = (p: AttachablePayment) =>
+      (opts.companyId && p.counterparty_company_id === opts.companyId) ||
+      (opts.contactId && p.counterparty_contact_id === opts.contactId);
+    return [...named.filter(isSameParty), ...named.filter((p) => !isSameParty(p))];
+  },
+
+  /**
+   * Attach an ALREADY-RECORDED money-out payment to an expense. Server-side RPC because the
+   * source side needs guarding — the over-allocation trigger only protects the target, so a
+   * raw insert could spread more of a payment than it holds. Omit `amount` to settle as much
+   * as both sides allow. Returns the allocation id.
+   */
+  async attachPaymentToExpense(input: { paymentId: string; supplierBillId: string; amount?: number }): Promise<string> {
+    const { data, error } = await supabase.rpc('allocate_payment_to_supplier_bill', {
+      p_payment_id: input.paymentId,
+      p_supplier_bill_id: input.supplierBillId,
+      p_amount: input.amount ?? null,
+    });
+    if (error) throw error;
+    return data as string;
+  },
+
+  /** Detach a payment from an expense. The bill's settled state re-derives from the ledger. */
+  async detachPaymentFromExpense(allocationId: string): Promise<void> {
+    const { error } = await supabase.rpc('deallocate_payment_from_supplier_bill', { p_allocation_id: allocationId });
+    if (error) throw error;
   },
 
   // -------- Recurring expenses (auto-generate a bill each period) --------
