@@ -8,8 +8,9 @@
  * Used by ContactDetailPage / CompanyDetailPage.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Pencil, Copy, Check, Loader2, ChevronsUpDown } from 'lucide-react';
+import { Pencil, Copy, Check, Loader2, ChevronsUpDown, Plus, X } from 'lucide-react';
 import { Input } from '@/components/core/ui/input';
+import { Badge } from '@/components/core/ui/badge';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import {
@@ -168,6 +169,149 @@ export const InlineText: React.FC<InlineTextProps> = ({
             <Pencil className="h-3.5 w-3.5 shrink-0 opacity-0 group-hover:opacity-60" />
           </>
         )}
+      </div>
+    </Field>
+  );
+};
+
+interface InlineMultiSelectProps {
+  /** Currently-selected option values. */
+  values: string[];
+  options: Array<{ value: string; label: string; searchText?: string }>;
+  /** Toggle one option. The parent owns persistence (and optimistic state). */
+  onToggle: (value: string) => void | Promise<void>;
+  label?: string;
+  hint?: string;
+  /** Shown when nothing is selected. */
+  placeholder?: string;
+  /** Parent-driven spinner (a save is in flight). */
+  saving?: boolean;
+  readOnly?: boolean;
+  searchThreshold?: number;
+  /** When provided, the popover grows a "create a new option" footer. */
+  onCreate?: (name: string) => void | Promise<void>;
+  createPlaceholder?: string;
+  emptyListText?: string;
+}
+
+/**
+ * Multi-select sibling of InlineSelect: the selected chips ARE the trigger, so the field
+ * reads like the text rows around it instead of parking a permanent dropdown button under
+ * the value. Click anywhere on the chip row to open the searchable list; the chevron fades
+ * in on hover exactly like InlineSelect. The popover stays open while toggling (unlike the
+ * single-select, where picking is terminal), and each chip keeps an × for one-click removal.
+ *
+ * The trigger is a div, not a button: the chips carry their own × buttons and a button
+ * cannot nest a button. role/tabIndex/Enter-Space restore the keyboard behaviour.
+ */
+export const InlineMultiSelect: React.FC<InlineMultiSelectProps> = ({
+  values, options, onToggle, label, hint, placeholder = 'Not set', saving, readOnly,
+  searchThreshold = 6, onCreate, createPlaceholder = 'Add new…', emptyListText = 'Nothing to choose from yet.',
+}) => {
+  const [open, setOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const selected = options.filter((o) => values.includes(o.value));
+  const showSearch = options.length >= searchThreshold;
+
+  const create = async () => {
+    const name = newName.trim();
+    if (!name || !onCreate) return;
+    setCreating(true);
+    try { await onCreate(name); setNewName(''); } finally { setCreating(false); }
+  };
+
+  const chips = (
+    <div className="flex flex-1 flex-wrap items-center gap-1.5">
+      {selected.length === 0
+        ? <span className="text-sm text-muted-foreground">{placeholder}</span>
+        : selected.map((o) => (
+          <Badge key={o.value} variant="secondary" className="gap-1">
+            {o.label}
+            {!readOnly && (
+              <button
+                type="button"
+                aria-label={`Remove ${o.label}`}
+                // Removing must not also open the popover.
+                onClick={(e) => { e.stopPropagation(); void onToggle(o.value); }}
+                className="ml-0.5 opacity-70 hover:opacity-100"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </Badge>
+        ))}
+    </div>
+  );
+
+  if (readOnly) {
+    return <Field label={label} hint={hint}><div className="flex min-h-[28px] items-center px-2">{chips}</div></Field>;
+  }
+
+  return (
+    <Field label={label} hint={hint}>
+      <div className="group flex items-center gap-1">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <div
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } }}
+              className="group/trigger flex min-h-[28px] w-full cursor-pointer items-center justify-between gap-2 rounded px-2 py-1 hover:bg-muted/40 focus:outline-none"
+            >
+              {chips}
+              <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-50" />
+            </div>
+          </PopoverTrigger>
+          <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[240px] p-0" align="start">
+            <Command>
+              {showSearch && <CommandInput placeholder="Search…" />}
+              <CommandList>
+                <CommandEmpty>No match.</CommandEmpty>
+                <CommandGroup>
+                  {options.length === 0 && (
+                    <p className="px-2 py-1.5 text-xs text-muted-foreground">{emptyListText}</p>
+                  )}
+                  {options.map((o) => (
+                    <CommandItem
+                      key={o.value}
+                      // Filter on the LABEL, not the id: these options are UUID-keyed, and
+                      // folding the uuid into cmdk's search value makes almost every keystroke
+                      // match every row. Selection uses the closure, so the value is free.
+                      value={o.searchText ?? o.label}
+                      onSelect={() => onToggle(o.value)}
+                    >
+                      <Check className={`mr-2 h-3.5 w-3.5 shrink-0 ${values.includes(o.value) ? 'opacity-100' : 'opacity-0'}`} />
+                      <span className="flex-1">{o.label}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+            {onCreate && (
+              <div className="flex items-center gap-1.5 border-t p-2">
+                <Input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void create(); } }}
+                  placeholder={createPlaceholder}
+                  className="h-8 text-sm"
+                />
+                <button
+                  type="button"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-input hover:bg-muted disabled:opacity-50"
+                  onClick={() => void create()}
+                  disabled={creating || !newName.trim()}
+                  aria-label="Add"
+                >
+                  {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+        {saving && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />}
       </div>
     </Field>
   );

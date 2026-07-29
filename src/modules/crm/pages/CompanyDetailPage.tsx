@@ -687,14 +687,14 @@ export const CompanyDetailPage: React.FC = () => {
                   <div>
                     <InlineText alwaysEdit={isNew} label="Company Name *" value={company.name} onSave={(v) => patchInline({ name: (v as string) ?? '' })} placeholder="Acme LLC" copy={false} />
                   </div>
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground">Industry</div>
-                    {isNew ? (
+                  {isNew ? (
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground">Industry</div>
                       <p className="text-sm text-muted-foreground mt-0.5">Save the company first to assign industries.</p>
-                    ) : (
-                      <div className="mt-1"><IndustrySelect companyId={id!} onChange={(names) => patchInline({ industry: names.join(', ') })} /></div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <IndustrySelect label="Industry" companyId={id!} onChange={(names) => patchInline({ industry: names.join(', ') })} />
+                  )}
                   <div className="flex items-end gap-2">
                     <div className="flex-1">
                       <InlineText alwaysEdit={isNew} type="email" label="Email" value={company.email} onSave={(v) => patchInline({ email: v })} placeholder="contact@company.com" />
