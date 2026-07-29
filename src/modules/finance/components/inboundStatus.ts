@@ -18,6 +18,7 @@ export const INBOUND_OUTCOME: Record<string, { label: string; tone: string }> = 
   // became an expense you owe — say that, in the same word the tab and the menu use.
   classified: { label: 'In Expenses', tone: 'text-emerald-600 dark:text-emerald-400' },
   received: { label: 'Stocked', tone: 'text-emerald-600 dark:text-emerald-400' },
+  ordered: { label: 'Ordered', tone: 'text-emerald-600 dark:text-emerald-400' },
   dismissed: { label: 'Dismissed', tone: 'text-muted-foreground line-through' },
 };
 
@@ -27,10 +28,14 @@ export const INBOUND_OUTCOME: Record<string, { label: string; tone: string }> = 
  * hold one of them. `created_supplier_bill_id` is the durable record that a bill exists, so
  * billing is read from that rather than from the status the last action happened to write.
  */
-export function inboundOutcomes(doc: { status: string; created_supplier_bill_id?: string | null }):
-  { label: string; tone: string }[] {
+export function inboundOutcomes(
+  doc: { status: string; created_supplier_bill_id?: string | null },
+  /** `ordered` is held on the expense (`supplier_bills.order_id`), so the caller resolves it. */
+  opts?: { ordered?: boolean },
+): { label: string; tone: string }[] {
   if (doc.status === 'dismissed') return [INBOUND_OUTCOME.dismissed];
   const out: { label: string; tone: string }[] = [];
+  if (opts?.ordered) out.push(INBOUND_OUTCOME.ordered);
   if (doc.created_supplier_bill_id) out.push(INBOUND_OUTCOME.classified);
   if (doc.status === 'received') out.push(INBOUND_OUTCOME.received);
   return out;

@@ -26,6 +26,8 @@ import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryN
 import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
+import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
+import { orderLinesFromDoc, linkOrderToDocument, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { QuickCategoryDialog } from '@/modules/finance/components/QuickCategoryDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
@@ -893,6 +895,10 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
   const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);
   /** Document being paid before it is an expense — the conversion happens when that form saves. */
   const [payDoc, setPayDoc] = React.useState<InboundDocument | null>(null);
+  /** Document being turned into the purchase order it was always for. */
+  const [orderDoc, setOrderDoc] = React.useState<InboundDocument | null>(null);
+  /** Which rows already produced an order — held on their expense (`supplier_bills.order_id`). */
+  const [ordered, setOrdered] = React.useState<Set<string>>(new Set());
   const [localCat, setLocalCat] = React.useState<Record<string, string | null>>({});
   // VAT → CRM company id, so a known issuer's name links straight to their record instead of
   // making the operator go and search for them.
@@ -930,6 +936,12 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
    * the "why are there two of these?" the operator hit. Opening never writes either way.)
    */
   const openPayments = (d: InboundDocument) => setPayDoc(d);
+
+  React.useEffect(() => {
+    let live = true;
+    docsWithOrders(rows).then((s) => { if (live) setOrdered(s); }).catch(() => {});
+    return () => { live = false; };
+  }, [rows]);
   const setCategory = async (id: string, categoryId: string | null) => {
     setLocalCat((m) => ({ ...m, [id]: categoryId }));
     try { await inboundService.setCategory(id, categoryId); }
@@ -969,7 +981,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
       <tbody>
         {rows.map((d) => {
           const cat = d.id in localCat ? localCat[d.id] : (d.category_id ?? null);
-          const outcomes = inboundOutcomes(d);
+          const outcomes = inboundOutcomes(d, { ordered: ordered.has(d.id) });
           return (
           <tr key={d.id} className={`border-b border-border/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}>
             <td className="px-4 py-2">{d.issue_date ? new Date(d.issue_date).toLocaleDateString() : '—'}</td>
@@ -1011,6 +1023,8 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
                     crmCompanyId={d.issuer_vat ? crmByVat[d.issuer_vat.replace(/\D/g, '')] : undefined}
                     onCreateBill={() => createBill(d.id)}
                     onRecordPayment={() => openPayments(d)}
+                    onCreateOrder={() => setOrderDoc(d)}
+                    hasOrder={ordered.has(d.id)}
                     onReceiveStock={() => setReceiveDoc(d)}
                     onDismiss={() => dismiss(d.id)}
                     onChanged={onChanged}
@@ -1028,6 +1042,24 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           workspaceId={workspaceId}
           onOpenChange={(v) => { if (!v) setReceiveDoc(null); }}
           onDone={() => { setReceiveDoc(null); onChanged(); }}
+        />
+      )}
+      {orderDoc && workspaceId && (
+        <NewOrderModal
+          workspaceId={workspaceId}
+          lockedCompanyId={orderDoc.issuer_vat ? crmByVat[orderDoc.issuer_vat.replace(/\D/g, '')] : undefined}
+          preset={{ orderType: 'purchase', draft: false }}
+          prefill={{ currency: orderDoc.currency, notes: `From myDATA ${orderDoc.series ?? ''}${orderDoc.aa ? ` ${orderDoc.aa}` : ''} · MARK ${orderDoc.mark}`.trim(), lines: orderLinesFromDoc(orderDoc) }}
+          categories={categories}
+          open
+          onOpenChange={(v) => { if (!v) setOrderDoc(null); }}
+          onCreated={async (orderId) => {
+            const d = orderDoc;
+            setOrderDoc(null);
+            try { await linkOrderToDocument(d, orderId); }
+            catch (err: any) { toast({ title: 'Order created, but not linked', description: err?.message, variant: 'destructive' }); }
+            onChanged();
+          }}
         />
       )}
       {payDoc && workspaceId && (

@@ -22,6 +22,9 @@ import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { InboundDocActionsMenu } from '@/modules/finance/components/InboundDocActionsMenu';
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
+import { orderLinesFromDoc, linkOrderToDocument, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
+import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
 export const PartyInboundDocsCard: React.FC<{
@@ -40,16 +43,29 @@ export const PartyInboundDocsCard: React.FC<{
   const [busy, setBusy] = useState<string | null>(null);
   const [receiveDoc, setReceiveDoc] = useState<InboundDocument | null>(null);
   const [payDoc, setPayDoc] = useState<InboundDocument | null>(null);
+  const [orderDoc, setOrderDoc] = useState<InboundDocument | null>(null);
+  /** Documents that already produced an order — read via their expense's `order_id`. */
+  const [ordered, setOrdered] = useState<Set<string>>(new Set());
+  const [categories, setCategories] = useState<FinanceCategory[]>([]);
 
   const load = useCallback(async () => {
     if (!workspaceId || !vatNumber) { setRows([]); setLoading(false); return; }
     setLoading(true);
-    try { setRows(await inboundService.listForIssuerVat(workspaceId, vatNumber)); }
+    try {
+      const docs = await inboundService.listForIssuerVat(workspaceId, vatNumber);
+      setRows(docs);
+      setOrdered(await docsWithOrders(docs).catch(() => new Set<string>()));
+    }
     catch { setRows([]); }
     finally { setLoading(false); }
   }, [workspaceId, vatNumber]);
 
   useEffect(() => { void load(); }, [load]);
+  // Categories only matter for the order form; fetched once so opening it is instant.
+  useEffect(() => {
+    if (!workspaceId) return;
+    financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
+  }, [workspaceId]);
   useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
 
   const createBill = async (id: string) => {
@@ -108,7 +124,7 @@ export const PartyInboundDocsCard: React.FC<{
                 </thead>
                 <tbody>
                   {paginate(rows, page).map((d) => {
-                    const outcomes = inboundOutcomes(d);
+                    const outcomes = inboundOutcomes(d, { ordered: ordered.has(d.id) });
                     return (
                       <tr key={d.id} className={`border-b border-border/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}>
                         <td className="px-4 py-2">{d.issue_date ? new Date(d.issue_date).toLocaleDateString() : '—'}</td>
@@ -143,6 +159,8 @@ export const PartyInboundDocsCard: React.FC<{
                                 crmCompanyId={companyId}
                                 onCreateBill={() => createBill(d.id)}
                                 onRecordPayment={() => setPayDoc(d)}
+                                onCreateOrder={() => setOrderDoc(d)}
+                                hasOrder={ordered.has(d.id)}
                                 onReceiveStock={() => setReceiveDoc(d)}
                                 onDismiss={() => dismiss(d.id)}
                                 onChanged={load}
@@ -167,6 +185,26 @@ export const PartyInboundDocsCard: React.FC<{
           workspaceId={workspaceId}
           onOpenChange={(v) => { if (!v) setReceiveDoc(null); }}
           onDone={() => { setReceiveDoc(null); void load(); }}
+        />
+      )}
+      {orderDoc && (
+        // The platform's ONE order form, seeded from the document. Everything stays editable, so
+        // the order can be corrected before saving — the whole point of keeping them separate.
+        <NewOrderModal
+          workspaceId={workspaceId}
+          lockedCompanyId={companyId}
+          preset={{ orderType: 'purchase', draft: false }}
+          prefill={{ currency: orderDoc.currency, notes: `From myDATA ${orderDoc.series ?? ''}${orderDoc.aa ? ` ${orderDoc.aa}` : ''} · MARK ${orderDoc.mark}`.trim(), lines: orderLinesFromDoc(orderDoc) }}
+          categories={categories}
+          open
+          onOpenChange={(v) => { if (!v) setOrderDoc(null); }}
+          onCreated={async (orderId) => {
+            const d = orderDoc;
+            setOrderDoc(null);
+            try { await linkOrderToDocument(d, orderId); }
+            catch (err: any) { toast({ title: 'Order created, but not linked', description: err?.message, variant: 'destructive' }); }
+            void load();
+          }}
         />
       )}
       {payDoc && (

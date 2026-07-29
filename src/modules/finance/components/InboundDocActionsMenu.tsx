@@ -14,7 +14,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, PackagePlus, FileText, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet } from 'lucide-react';
+import { MoreVertical, Building2, PackagePlus, FileText, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet, ShoppingCart } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -40,6 +40,10 @@ interface Props {
   onCreateBill: () => void;
   /** Open this document's payments. READ-only — it must not convert the document. */
   onRecordPayment: () => void;
+  /** Seed a purchase order from this document's lines. Absent → the entry isn't offered. */
+  onCreateOrder?: () => void;
+  /** This document already produced an order — offered as done rather than repeated. */
+  hasOrder?: boolean;
   onReceiveStock: () => void;
   onDismiss: () => void;
   onChanged?: () => void;
@@ -48,7 +52,7 @@ interface Props {
 /** A bare 9-digit number is a Greek ΑΦΜ — only those are resolvable via the ΑΑΔΕ / ΓΕΜΗ registries. */
 const isGreekVat = (vat: string | null | undefined) => !!greekAfm(vat);
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onCreateBill, onRecordPayment, onReceiveStock, onDismiss, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onCreateBill, onRecordPayment, onCreateOrder, hasOrder, onReceiveStock, onDismiss, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -185,6 +189,16 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           <DropdownMenuItem onClick={onReceiveStock} disabled={!canReceive}>
             <PackagePlus className="h-4 w-4 mr-2" /> Add products to warehouse
           </DropdownMenuItem>
+          {onCreateOrder && (
+            // The order already happened — this records it, seeded from what they billed, so the
+            // two stay separate rows that can disagree (which is what makes over-billing visible).
+            <DropdownMenuItem onClick={onCreateOrder} disabled={hasOrder || doc.status === 'dismissed'} className="flex-col items-start gap-0.5">
+              <span className="flex items-center"><ShoppingCart className="h-4 w-4 mr-2" /> {hasOrder ? 'Order already created' : 'Create the order for this'}</span>
+              {!hasOrder && (
+                <span className="pl-6 text-[10px] text-muted-foreground">Seeds a purchase order from its lines, adds it to Expenses and links them.</span>
+              )}
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Money</DropdownMenuLabel>

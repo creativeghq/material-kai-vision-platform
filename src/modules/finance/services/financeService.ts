@@ -1551,6 +1551,16 @@ const _financeServiceCore = {
    * this to pay a bill that already exists (an unpaid expense, the
    * recurring-expense cron, or the agent), so paying it never duplicates the payable.
    */
+  /**
+   * Match an expense to the purchase order it belongs to (or clear it). `supplier_bills.order_id`
+   * is what 3-way match already reads, so this is the ONLY place the link is written — a document
+   * that became an order gets linked through its bill, not through a second column.
+   */
+  async setSupplierBillOrder(supplierBillId: string, orderId: string | null): Promise<void> {
+    const { error } = await supabase.from('supplier_bills').update({ order_id: orderId }).eq('id', supplierBillId);
+    if (error) throw error;
+  },
+
   async paySupplierBill(input: {
     workspaceId: string;
     supplierBillId: string;

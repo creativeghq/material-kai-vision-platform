@@ -376,22 +376,30 @@ export const OrdersPanel: React.FC<{
 
 // ---------------------------------------------------------------------------
 
-type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; unit_code: string; vat_code: string; available?: number | null; supplier_company_id?: string | null };
+export type Line = { product_id?: string | null; description: string; quantity: number; unit_price: number; unit_cost: number | null; unit_code: string; vat_code: string; available?: number | null; supplier_company_id?: string | null };
 const blankLine = (): Line => ({ description: '', quantity: 1, unit_price: 0, unit_cost: null, unit_code: DEFAULT_UNIT, vat_code: DEFAULT_VAT_CODE, available: null, supplier_company_id: null });
 
 
-const NewOrderModal: React.FC<{
+export const NewOrderModal: React.FC<{
   workspaceId: string;
   /** When the modal is opened from inside a CRM party, that party is pre-selected and locked. */
   lockedCompanyId?: string;
   lockedContactId?: string;
   /** Chosen from the New-order dropdown: sell vs buy + draft (pre-order) vs confirmed. */
   preset: { orderType: OrderType; draft: boolean };
+  /**
+   * Seed the form from a document that already describes the order — today a myDATA received
+   * document, whose lines ARE what the supplier says we bought. Everything stays editable; this
+   * is a prefill, so the order can still be corrected before it is saved (which is the point:
+   * the invoice and the order are allowed to disagree).
+   */
+  prefill?: { currency?: string | null; notes?: string | null; lines?: Array<Partial<Line> & { description: string }> };
   categories: FinanceCategory[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreated: () => void;
-}> = ({ workspaceId, lockedCompanyId, lockedContactId, preset, categories, open, onOpenChange, onCreated }) => {
+  /** Receives the new order's id, so a caller can link it to the record it came from. */
+  onCreated: (orderId: string) => void;
+}> = ({ workspaceId, lockedCompanyId, lockedContactId, preset, prefill, categories, open, onOpenChange, onCreated }) => {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const orderType = preset.orderType;
@@ -425,7 +433,11 @@ const NewOrderModal: React.FC<{
     setProject(null); setProjectSearch(''); setProjectOpts([]); setCurrency('EUR');
     setCategoryId('none'); setExpectedDate('');
     setDiscountType('percent'); setDiscountValue('');
-    setItems([blankLine()]);
+    setCurrency(prefill?.currency || 'EUR');
+    setNotes(prefill?.notes || '');
+    setItems(prefill?.lines?.length
+      ? prefill.lines.map((l) => ({ ...blankLine(), ...l }))
+      : [blankLine()]);
     // Opened from inside a CRM party → that party IS the order's party (customer for a sales
     // order, supplier for a purchase order). Pre-select + lock it so the user isn't re-searching.
     if (lockedCompanyId) {
@@ -443,7 +455,7 @@ const NewOrderModal: React.FC<{
             sub: [data.vat_number ? `VAT ${data.vat_number}` : null, data.email, 'Contact'].filter(Boolean).join(' · ') });
         });
     }
-  }, [open, lockedCompanyId, lockedContactId]);
+  }, [open, lockedCompanyId, lockedContactId, prefill]);
 
   // Project search (optional link — workspace-scoped).
   useEffect(() => {
@@ -571,7 +583,7 @@ const NewOrderModal: React.FC<{
         const rolled = await financeService.resolvePrimaryCompanyId(ctId).catch(() => null);
         if (rolled) { coId = rolled; ctId = null; }
       }
-      await ordersService.create({
+      const orderId = await ordersService.create({
         workspaceId,
         orderType,
         status,
@@ -600,7 +612,7 @@ const NewOrderModal: React.FC<{
         })),
       });
       toast({ title: status === 'draft' ? 'Pre-order saved' : 'Order created' });
-      onCreated();
+      onCreated(orderId);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setBusy(false); }
