@@ -10610,6 +10610,7 @@ export type Database = {
           created_supplier_bill_id: string | null
           currency: string
           delivery_addresses: Json | null
+          dispatch_date: string | null
           doc_type: string | null
           download_url: string | null
           id: string
@@ -10639,6 +10640,7 @@ export type Database = {
           uid: string | null
           updated_at: string
           vat_payment_suspension: boolean | null
+          vehicle_number: string | null
           workspace_id: string
         }
         Insert: {
@@ -10652,6 +10654,7 @@ export type Database = {
           created_supplier_bill_id?: string | null
           currency?: string
           delivery_addresses?: Json | null
+          dispatch_date?: string | null
           doc_type?: string | null
           download_url?: string | null
           id?: string
@@ -10681,6 +10684,7 @@ export type Database = {
           uid?: string | null
           updated_at?: string
           vat_payment_suspension?: boolean | null
+          vehicle_number?: string | null
           workspace_id: string
         }
         Update: {
@@ -10694,6 +10698,7 @@ export type Database = {
           created_supplier_bill_id?: string | null
           currency?: string
           delivery_addresses?: Json | null
+          dispatch_date?: string | null
           doc_type?: string | null
           download_url?: string | null
           id?: string
@@ -10723,6 +10728,7 @@ export type Database = {
           uid?: string | null
           updated_at?: string
           vat_payment_suspension?: boolean | null
+          vehicle_number?: string | null
           workspace_id?: string
         }
         Relationships: [

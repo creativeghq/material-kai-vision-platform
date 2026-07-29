@@ -7,11 +7,11 @@
  * is derived or inferred, so it is the thing to check when a figure elsewhere looks wrong.
  */
 import React from 'react';
-import { ExternalLink, QrCode } from 'lucide-react';
+import { ExternalLink, QrCode, Truck } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
-import type { InboundAddress, InboundDocument } from '@/modules/finance/services/inboundService';
+import { inboundService, type InboundAddress, type InboundDocument, type IssuerProfile } from '@/modules/finance/services/inboundService';
 import { unitSuffix, unitFromMydataCode } from '@/lib/units';
 
 /** AADE VAT-category code → rate. Codes 1-8 per the myDATA reference table. */
@@ -32,6 +32,16 @@ const fmtAddress = (a: InboundAddress | null | undefined): string | null => {
   return [line, town].filter(Boolean).join(', ') || null;
 };
 
+/** One `Label value` pair in the issuer strip. Renders nothing when there's no value, so the
+ *  strip shows what we actually know instead of a row of em-dashes. */
+const Fact: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) =>
+  value ? (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-xs">{value}</span>
+    </span>
+  ) : null;
+
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div className="flex items-baseline justify-between gap-4 border-b border-border/30 py-1.5 last:border-b-0">
     <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
@@ -47,6 +57,28 @@ export const InboundDocPreviewDialog: React.FC<{
   const lines = doc.lines ?? [];
   const number = [doc.series, doc.aa].filter(Boolean).join(' ');
 
+  // The issuer's business identity, which myDATA does not transmit — resolved from their CRM
+  // record (populated by the ΑΑΔΕ → ΓΕΜΗ research chain). Loaded only while the dialog is open.
+  const [issuer, setIssuer] = React.useState<IssuerProfile | null>(null);
+  React.useEffect(() => {
+    if (!open || !doc.issuer_vat) { setIssuer(null); return; }
+    let alive = true;
+    inboundService.issuerProfile(doc.workspace_id, doc.issuer_vat)
+      .then((p) => { if (alive) setIssuer(p); })
+      .catch(() => { if (alive) setIssuer(null); });
+    return () => { alive = false; };
+  }, [open, doc.workspace_id, doc.issuer_vat]);
+
+  const issuerAddress = fmtAddress(doc.issuer_address)
+    // AADE omits the issuer address on ~2/3 of documents; the registry has it when CRM does.
+    ?? (issuer && (issuer.street || issuer.city)
+      ? [[issuer.street, issuer.street_number].filter(Boolean).join(' '),
+         [issuer.postal_code, issuer.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+      : null);
+  const activity = issuer?.kad_primary_description ?? issuer?.profession ?? null;
+  const loading = doc.delivery_addresses?.loading;
+  const hasDispatch = !!(doc.dispatch_date || doc.vehicle_number || loading);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[88vh] overflow-y-auto">
@@ -56,6 +88,55 @@ export const InboundDocPreviewDialog: React.FC<{
             The received document as the tax authority holds it — read-only.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Who issued it — the first thing to establish, so it leads. AADE sends the ΑΦΜ (and
+            sometimes a name/address); everything on the second line is the issuer's registry
+            identity, which myDATA never transmits and we hold on their CRM record. */}
+        <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className="text-base font-medium font-display">{issuer?.name ?? doc.issuer_name ?? doc.issuer_vat ?? 'Unknown issuer'}</p>
+            <span className="font-mono text-xs text-muted-foreground">
+              ΑΦΜ {doc.issuer_vat ?? '—'}{doc.issuer_country && doc.issuer_country !== 'GR' ? ` · ${doc.issuer_country}` : ''}
+            </span>
+          </div>
+          {issuerAddress && <p className="mt-0.5 text-xs text-muted-foreground">{issuerAddress}</p>}
+          {(issuer?.tax_office || issuer?.gemi_number || activity || issuer?.legal_status || issuer?.gemi_legal_form) && (
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-border/40 pt-2">
+              <Fact label="Δ.Ο.Υ." value={issuer?.tax_office} />
+              <Fact label="Γ.Ε.ΜΗ." value={issuer?.gemi_number ? <span className="font-mono">{issuer.gemi_number}</span> : null} />
+              <Fact label="Form" value={issuer?.legal_status ?? issuer?.gemi_legal_form} />
+              <Fact label="Activity" value={activity} />
+              <Fact label="ΚΑΔ" value={issuer?.kad_primary ? <span className="font-mono">{issuer.kad_primary}</span> : null} />
+            </div>
+          )}
+          {(issuer?.phone || issuer?.email || issuer?.website) && (
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+              <Fact label="Tel" value={issuer?.phone} />
+              <Fact label="Email" value={issuer?.email} />
+              <Fact label="Web" value={issuer?.website} />
+            </div>
+          )}
+          {!issuer && doc.issuer_vat && (
+            // Not a gap in the sync — AADE simply doesn't send this. Say so, and say where it
+            // comes from, rather than leaving an operator hunting for a missing field.
+            <p className="mt-2 border-t border-border/40 pt-2 text-[11px] text-muted-foreground">
+              Δ.Ο.Υ., Γ.Ε.ΜΗ. and contact details aren&apos;t part of the myDATA feed. Add this issuer
+              to CRM to pull them from the ΑΑΔΕ and ΓΕΜΗ registries.
+            </p>
+          )}
+        </div>
+
+        {/* Dispatch — a ΤΔΑ's whole point. Shown only when the document carries it. */}
+        {hasDispatch && (
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-md border border-border/60 px-3 py-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <Truck className="h-3.5 w-3.5" /> Dispatch
+            </span>
+            <Fact label="Date" value={doc.dispatch_date ? new Date(doc.dispatch_date).toLocaleDateString() : null} />
+            <Fact label="Vehicle" value={doc.vehicle_number ? <span className="font-mono">{doc.vehicle_number}</span> : null} />
+            <Fact label="From" value={fmtAddress(loading)} />
+          </div>
+        )}
 
         {/* Identity — two columns, mirroring the myDATA viewer layout */}
         <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
@@ -67,9 +148,11 @@ export const InboundDocPreviewDialog: React.FC<{
             <Row label="MARK"><span className="font-mono text-[11px]">{doc.mark}</span></Row>
           </div>
           <div>
-            <Row label="Issuer VAT"><span className="font-mono">{doc.issuer_vat ?? '—'}</span></Row>
-            <Row label="Issuer country">{doc.issuer_country ?? '—'}</Row>
-            <Row label="Issuer branch">{doc.issuer_branch ?? '—'}</Row>
+            {/* Issuer ΑΦΜ / country moved to the header above; only branch is left, and only when
+                it identifies an actual establishment ('0' is the head office, i.e. no branch). */}
+            {doc.issuer_branch && doc.issuer_branch !== '0' && (
+              <Row label="Issuer branch">{doc.issuer_branch}</Row>
+            )}
             <Row label="Series · number">{number || '—'}</Row>
             <Row label="UID"><span className="font-mono text-[10px] break-all">{doc.uid ?? '—'}</span></Row>
             {doc.authentication_code && (
@@ -80,22 +163,14 @@ export const InboundDocPreviewDialog: React.FC<{
           </div>
         </div>
 
-        {/* Parties */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-md border border-border/60 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Issuer</p>
-            <p className="text-sm font-medium">{doc.issuer_name ?? doc.issuer_vat ?? '—'}</p>
-            {fmtAddress(doc.issuer_address) && (
-              <p className="text-xs text-muted-foreground">{fmtAddress(doc.issuer_address)}</p>
-            )}
-          </div>
-          <div className="rounded-md border border-border/60 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Counterpart (you)</p>
-            <p className="text-sm font-medium">{doc.counterpart_name ?? doc.counterpart_vat ?? '—'}</p>
-            {fmtAddress(doc.counterpart_address) && (
-              <p className="text-xs text-muted-foreground">{fmtAddress(doc.counterpart_address)}</p>
-            )}
-          </div>
+        {/* The receiving side. The issuer half of this pair moved into the header block above —
+            keeping both would have printed the same name and address twice. */}
+        <div className="rounded-md border border-border/60 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Billed to (you)</p>
+          <p className="text-sm font-medium">{doc.counterpart_name ?? doc.counterpart_vat ?? '—'}</p>
+          {fmtAddress(doc.counterpart_address) && (
+            <p className="text-xs text-muted-foreground">{fmtAddress(doc.counterpart_address)}</p>
+          )}
         </div>
 
         {/* Analytic lines */}

@@ -28,6 +28,30 @@ export interface InboundAddress {
   city: string | null;
 }
 
+/**
+ * The registry-sourced identity of an issuer, read off their CRM company record. Every field
+ * here is one myDATA never sends — see [[inboundService.issuerProfile]].
+ */
+export interface IssuerProfile {
+  id: string;
+  name: string | null;
+  tax_office: string | null;
+  gemi_number: string | null;
+  gemi_legal_form: string | null;
+  gemi_status: string | null;
+  legal_status: string | null;
+  kad_primary: string | null;
+  kad_primary_description: string | null;
+  profession: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  street: string | null;
+  street_number: string | null;
+  postal_code: string | null;
+  city: string | null;
+}
+
 export interface InboundDocument {
   id: string;
   workspace_id: string;
@@ -35,6 +59,10 @@ export interface InboundDocument {
   issuer_vat: string | null;
   issuer_name: string | null;
   issue_date: string | null;
+  /** When the goods left — myDATA `dispatchDate`, distinct from the issue date. */
+  dispatch_date: string | null;
+  /** Plate of the vehicle that carried them (delivery notes). */
+  vehicle_number: string | null;
   doc_type: string | null;
   /** Issuer's own document number, e.g. series 'ΤΔΑ' + aa '5160'. */
   series: string | null;
@@ -122,6 +150,33 @@ export const inboundService = {
       .limit(limit);
     if (error) throw error;
     return (data ?? []) as InboundDocument[];
+  },
+
+  /**
+   * The issuer's business identity, which myDATA does NOT transmit.
+   *
+   * `RequestDocs` sends the issuer as ΑΦΜ + country + branch, sometimes a name and address, and
+   * nothing else — measured on live data, 1,147 of 1,732 issuer blocks carry no address at all.
+   * Δ.Ο.Υ., Γ.Ε.ΜΗ. number, activity (ΚΑΔ), phone, email and website are the supplier's own
+   * letterhead; on our side they come from the registries via [[researchCompany]] and live on the
+   * CRM company row. So the preview reads them from there rather than pretending AADE sent them.
+   *
+   * Matched on the VAT number in all three forms it gets written in (raw / digits / EL-prefixed),
+   * the same live-match rule as `listForIssuerVat`. Returns null when the issuer isn't in CRM.
+   */
+  async issuerProfile(workspaceId: string, vat: string | null): Promise<IssuerProfile | null> {
+    const digits = (vat ?? '').replace(/\D/g, '');
+    if (!digits) return null;
+    const forms = Array.from(new Set([(vat ?? '').trim(), digits, `EL${digits}`].filter(Boolean)));
+    const { data, error } = await supabase
+      .from('crm_companies')
+      .select('id, name, tax_office, gemi_number, gemi_legal_form, gemi_status, legal_status, kad_primary, kad_primary_description, profession, phone, email, website, street, street_number, postal_code, city')
+      .eq('workspace_id', workspaceId)
+      .in('vat_number', forms)
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as IssuerProfile | null) ?? null;
   },
 
   async toSupplierBill(docId: string): Promise<string> {

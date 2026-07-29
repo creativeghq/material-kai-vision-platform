@@ -256,6 +256,13 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         counterpart_name: pickTag(counterpartBlock, 'name'),
         counterpart_address: addressOf(counterpartBlock),
         issue_date: pickTag(headerB, 'issueDate'),
+        // When the goods actually left, and on what truck. Distinct from issueDate and the only
+        // dispatch evidence a ΤΔΑ carries — both were parsed by nobody until 2026-07-29.
+        dispatch_date: pickTag(headerB, 'dispatchDate') || null,
+        vehicle_number: pickTag(headerB, 'vehicleNumber') || null,
+        // The column defaults to EUR; read the header rather than assume it, so a
+        // foreign-currency document isn't silently relabelled.
+        currency: pickTag(headerB, 'currency') || 'EUR',
         doc_type: pickTag(headerB, 'invoiceType'),
         // The issuer's own document number — what's printed on the paper copy.
         series: pickTag(headerB, 'series'),
