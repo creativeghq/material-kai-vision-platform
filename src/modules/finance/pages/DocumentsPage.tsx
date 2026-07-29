@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -316,7 +316,12 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         // picked by accident — the two are opposite sides of the trade.
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm"><Plus className="h-3.5 w-3.5 mr-1" /> Record payment</Button>
+            {/* The chevron is the only thing telling you this opens a choice rather than the
+                payment form directly — same affordance as OrdersPanel's "New order". */}
+            <Button size="sm">
+              <Plus className="h-3.5 w-3.5 mr-1" /> Record payment
+              <ChevronDown className="h-3.5 w-3.5 ml-1" />
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setRecordPaymentOpen(true)}>
