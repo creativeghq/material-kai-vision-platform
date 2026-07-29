@@ -8,6 +8,27 @@
  *
  * Only rows with a non-null `published_at` are ever returned. Drafts are invisible to both
  * surfaces, and to anonymous visitors the RLS policy enforces the same thing server-side.
+ *
+ * ────────────────────────────────────────────────────────────────────────────────────────
+ * WHAT BELONGS IN THE CHANGELOG
+ *
+ * Functionality, from the user's side. An entry earns its place when a reader can act on it:
+ * something they can now do, something that now behaves differently, or something that was
+ * wrong on their screen and no longer is.
+ *
+ * Write what changed for them, not how it was built. "An order could show Paid while still
+ * displaying an amount outstanding" is an entry; "consolidated five settlement derivations
+ * into one SQL function" is the commit message for it.
+ *
+ * NOT changelog material — this is the trap, because it feels like progress:
+ *   • documentation, OpenAPI/spec coverage, README and comment updates
+ *   • refactors, test coverage, CI, lint and type cleanups
+ *   • internal observability, integrity probes, operator-only admin tooling
+ *   • migrations, dependency bumps, infrastructure and deploy changes
+ *
+ * A release that produced nothing users can see should produce no entry at all. An empty
+ * month is honest; a month padded with internal work teaches people to stop reading.
+ * ────────────────────────────────────────────────────────────────────────────────────────
  */
 import { supabase } from '@/integrations/supabase/client';
 
