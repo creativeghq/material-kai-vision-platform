@@ -323,6 +323,12 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     // Entitlement was already checked above; each doc costs EXTRACT_CREDIT_COST credits.
     let extracted = 0;
     let autoStocked = 0;
+    /** How many documents the extraction SELECT returned. Declared out here with the other
+     *  counters because the summary below reports it: reading the `try`-scoped `docs` binding
+     *  from the summary threw `docs is not defined` and 500'd the whole sync at the very last
+     *  statement — after the upserts, the watermark and the name resolution had all committed,
+     *  so the work landed and the caller was told the run failed. */
+    let extractionBatch = 0;
     try {
       const EXTRACT_CREDIT_COST = 1;
       /** Documents read per run. The batch now only contains documents that can actually produce
@@ -362,6 +368,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         summary.push({ workspaceId, extraction_error: sel.error.message });
       }
       const docs = sel.data;
+      extractionBatch = (docs ?? []).length;
       for (const d of (docs ?? []) as any[]) {
         const all = Array.isArray(d.lines) ? d.lines : [];
         const usable = all.filter((l: any) => String(l?.item_description ?? '').trim());
@@ -460,7 +467,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
 
     summary.push({
       workspaceId, found: blocks.length, upserted, auto_billed: autoBilled,
-      extraction_batch: (docs ?? []).length, extracted, auto_stocked: autoStocked,
+      extraction_batch: extractionBatch, extracted, auto_stocked: autoStocked,
       new_watermark: maxMark, issuers,
       ...(dated ? { date_from: dateFrom, date_to: dateTo } : {}),
     });
