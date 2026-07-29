@@ -1530,7 +1530,7 @@ const OperationsDashboardInner: React.FC = () => {
                             cx="50%"
                             cy="50%"
                             outerRadius={100}
-                            label={({ label, percent }) => `${label} (${(percent * 100).toFixed(0)}%)`}
+                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                           >
                             {extServiceData.by_service.map((_, index) => (
                               <Cell key={`cell-${index}`} fill={EXT_SERVICE_COLORS[index % EXT_SERVICE_COLORS.length]} />
