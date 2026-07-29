@@ -168,6 +168,8 @@ const FinancePage: React.FC = () => {
   const [cashFlow, setCashFlow] = useState<CashFlowRow[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
   const [cashPosition, setCashPosition] = useState(0); // money in bank = Σ payments in − out
+  const [cashIn, setCashIn] = useState(0);   // Σ payments in  — money actually received
+  const [cashOut, setCashOut] = useState(0); // Σ payments out — money actually paid
   const [bankBalances, setBankBalances] = useState<BankAccountBalance[]>([]);
   // Money received but not yet invoiced (deposits / on-account) — cash held, not yet revenue.
   const [deposits, setDeposits] = useState<Awaited<ReturnType<typeof financeService.getDepositsOnAccount>>>({ total: 0, currency: 'EUR', rows: [] });
@@ -361,7 +363,11 @@ const FinancePage: React.FC = () => {
       setRecentInvoices(invoices);
       // Cash in bank — actual money in/out across all payments (not planned).
       const { data: pays } = await supabase.from('payments').select('direction, amount').eq('workspace_id', wsId);
-      setCashPosition((pays ?? []).reduce((a: number, p: any) => a + (p.direction === 'in' ? Number(p.amount) : -Number(p.amount)), 0));
+      const moneyIn = (pays ?? []).reduce((a: number, p: any) => a + (p.direction === 'in' ? Number(p.amount) : 0), 0);
+      const moneyOut = (pays ?? []).reduce((a: number, p: any) => a + (p.direction === 'out' ? Number(p.amount) : 0), 0);
+      setCashIn(Math.round(moneyIn * 100) / 100);
+      setCashOut(Math.round(moneyOut * 100) / 100);
+      setCashPosition(Math.round((moneyIn - moneyOut) * 100) / 100);
       // Per-account balances (where the money actually sits).
       setBankBalances(await financeService.getBankAccountBalances(wsId).catch(() => [] as BankAccountBalance[]));
     } catch (err: any) {
@@ -401,6 +407,16 @@ const FinancePage: React.FC = () => {
 
   const arBuckets = useMemo(() => bucketize(ar), [ar]);
   const apBuckets = useMemo(() => bucketize(ap), [ap]);
+
+  // What we actually made on what we sold, over the loaded P&L window. Revenue is what was sold
+  // (issued invoices + confirmed sales orders not yet invoiced), NOT cash received — a paid order
+  // and a still-owed one both count once, when sold. Cash movement is the "Money received" card.
+  const profit = useMemo(() => {
+    const revenue = pnl.reduce((a, p) => a + Number(p.revenue_net ?? 0), 0);
+    const cogs = pnl.reduce((a, p) => a + Number(p.cogs ?? 0), 0);
+    const margin = pnl.reduce((a, p) => a + Number(p.gross_margin ?? 0), 0);
+    return { revenue, cogs, margin, pct: revenue > 0 ? Math.round((1000 * margin) / revenue) / 10 : null };
+  }, [pnl]);
 
   const incomeCats = useMemo(() => categories.filter((c) => c.kind === 'income' || c.kind === 'both'), [categories]);
   const expenseCats = useMemo(() => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'), [categories]);
@@ -781,6 +797,32 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── RECEIVABLES ─────────── */}
           <TabsContent value="ar" className="space-y-4">
+            {/* The buckets below answer "who owes us and how late". These three answer the money
+                question operators actually open this tab with: what came in, what is still out,
+                and what we made on it. */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <MoneySummaryCard
+                label="Money received"
+                value={formatMoney(cashIn)}
+                sub={`${formatMoney(cashOut)} paid out · ${formatMoney(cashPosition)} net in bank`}
+              />
+              <MoneySummaryCard
+                label="Still owed to us"
+                value={formatMoney(kpis.arOutstanding)}
+                sub={deposits.total > 0
+                  ? `net of ${formatMoney(deposits.total)} customer credit held`
+                  : 'across all open receivables'}
+              />
+              <MoneySummaryCard
+                label="Gross profit"
+                value={formatMoney(profit.margin)}
+                sub={profit.pct !== null
+                  ? `${formatMoney(profit.revenue)} sold − ${formatMoney(profit.cogs)} cost · ${profit.pct}%`
+                  : 'nothing sold yet'}
+                accent={profit.margin < 0 ? 'destructive' : 'default'}
+              />
+            </div>
+
             <BucketCards buckets={arBuckets} active={arBucket} onPick={pickArBucket} noun="receivable(s)" />
 
             <Card>
@@ -1193,6 +1235,20 @@ const FinancePage: React.FC = () => {
 // ============================================================================
 // Sub-components
 // ============================================================================
+
+/** Flat money figure for the Receivables header strip — same visual weight as a bucket card so
+ *  the two rows read as one block. */
+const MoneySummaryCard: React.FC<{
+  label: string; value: string; sub: string; accent?: 'default' | 'destructive';
+}> = ({ label, value, sub, accent }) => (
+  <Card className="dashboard-card border-0">
+    <CardContent className="p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={`text-lg font-semibold ${accent === 'destructive' ? 'text-destructive' : ''}`}>{value}</div>
+      <div className="text-[10px] text-muted-foreground">{sub}</div>
+    </CardContent>
+  </Card>
+);
 
 const KpiCard: React.FC<{
   icon: React.ComponentType<{ className?: string }>;
