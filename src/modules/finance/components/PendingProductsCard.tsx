@@ -14,6 +14,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Loader2, Check, X, PackagePlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { warehouseService, type PendingProduct, type Warehouse } from '@/services/warehouseService';
+import { supabase } from '@/integrations/supabase/client';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { parseDecimalOr } from '@/utils/decimal';
@@ -27,16 +28,22 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  /** How supplier lines get here at all. Lives on this card because this card IS the thing it
+   *  governs — as a standalone control above the stock table it read as a dropdown from nowhere. */
+  const [mode, setMode] = useState<'off' | 'suggest' | 'auto'>('suggest');
 
   const defaultWh = useMemo(() => warehouses.find((w) => w.is_default)?.id ?? warehouses[0]?.id ?? '', [warehouses]);
 
   const load = async () => {
     try {
       setLoading(true);
-      const [rows, cats] = await Promise.all([
+      const [rows, cats, fin] = await Promise.all([
         warehouseService.listPending(workspaceId),
         financeCategoriesService.list(workspaceId).then((c) => c.filter((x) => x.kind === 'income' || x.kind === 'both')).catch(() => []),
+        supabase.from('finance_settings').select('warehouse_autosync_mode').eq('workspace_id', workspaceId).maybeSingle()
+          .then((r) => r.data, () => null),
       ]);
+      setMode((((fin as any)?.warehouse_autosync_mode) ?? 'suggest') as 'off' | 'suggest' | 'auto');
       setItems(rows);
       setCategories(cats);
       const e: Record<string, Edit> = {};
@@ -50,6 +57,14 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [workspaceId, defaultWh]);
+
+  const saveMode = async (next: 'off' | 'suggest' | 'auto') => {
+    const prev = mode;
+    setMode(next);
+    const { error } = await supabase.from('finance_settings')
+      .update({ warehouse_autosync_mode: next }).eq('workspace_id', workspaceId);
+    if (error) { setMode(prev); toast({ title: 'Could not save', description: error.message, variant: 'destructive' }); }
+  };
 
   const setEdit = (id: string, patch: Partial<Edit>) => setEdits((m) => ({ ...m, [id]: { ...m[id], ...patch } }));
 
@@ -88,16 +103,45 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
   };
 
   if (loading) return null;
-  if (items.length === 0) return null;
+
+  const header = (
+    <CardHeader className="border-b border-border/60 px-5 py-3 flex-row flex-wrap items-center gap-2 space-y-0">
+      <PackagePlus className={`h-4 w-4 ${items.length > 0 ? 'text-amber-500' : 'text-muted-foreground'}`} />
+      <CardTitle>From Supplier Invoices</CardTitle>
+      {items.length > 0 && <Badge variant="outline" className="text-[10px]">{items.length}</Badge>}
+      <div className="ml-auto flex items-center gap-2">
+        <span className="text-[11px] text-muted-foreground">Intake</span>
+        <Select value={mode} onValueChange={(v) => saveMode(v as 'off' | 'suggest' | 'auto')}>
+          <SelectTrigger className="h-7 w-[190px] text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="off">Off — ignore supplier lines</SelectItem>
+            <SelectItem value="suggest">Review before adding</SelectItem>
+            <SelectItem value="auto">Auto-add exact matches</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </CardHeader>
+  );
+
+  // An empty queue must explain itself. Rendering nothing at all is why this looked broken:
+  // the operator sees no products, no queue, and no way to tell whether that means "all clear"
+  // or "the pipeline never ran".
+  if (items.length === 0) {
+    return (
+      <Card>
+        {header}
+        <CardContent className="px-5 py-6 text-sm text-muted-foreground">
+          {mode === 'off'
+            ? 'Intake is off, so lines on your suppliers’ myDATA invoices are ignored. Switch to “Review before adding” to start queueing them here.'
+            : <>Nothing waiting. Lines from your suppliers&rsquo; myDATA invoices are read once a day and queued here to review. To pull them now, use <strong>Sync from myDATA</strong> in Finance &rarr; Documents &rarr; Expenses.</>}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-amber-500/40">
-      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center gap-2 space-y-0">
-        <PackagePlus className="h-4 w-4 text-amber-500" />
-        <CardTitle>Pending Products from Expenses</CardTitle>
-        <Badge variant="outline" className="text-[10px]">{items.length}</Badge>
-        <span className="text-xs text-muted-foreground">AI-extracted from your myDATA supplier invoices — review and add or dismiss.</span>
-      </CardHeader>
+      {header}
       <CardContent className="p-0">
         <div className="divide-y divide-border/40">
           {items.map((it) => {

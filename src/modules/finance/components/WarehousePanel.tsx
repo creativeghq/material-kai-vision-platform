@@ -21,7 +21,6 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { FilterBar, useFilters, optionsFromRows, type FilterGroupDef } from '@/components/core/filters';
 
 import { PendingProductsCard } from '@/modules/finance/components/PendingProductsCard';
-import { WarehouseAutosyncCard } from '@/modules/finance/components/WarehouseAutosyncCard';
 
 export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -172,7 +171,6 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
 
   return (
     <div className="space-y-4">
-      <WarehouseAutosyncCard workspaceId={workspaceId} />
       <PendingProductsCard workspaceId={workspaceId} warehouses={warehouses} onChanged={() => load(selectedWh)} />
       <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 flex flex-row items-center justify-between gap-2">
