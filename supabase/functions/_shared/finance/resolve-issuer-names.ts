@@ -49,6 +49,9 @@ export interface ResolveIssuerResult {
   aade_calls: number;
   /** Why the ΑΑΔΕ step did nothing: not opted in, no codes configured, or nothing to ask. */
   aade_skipped: 'disabled' | 'not_configured' | 'nothing_to_ask' | null;
+  /** ΑΑΔΕ refused us (expired codes, spent daily quota, 5xx). Surfaced, not swallowed —
+   *  otherwise a dead credential is indistinguishable from "everyone is already named". */
+  aade_error: string | null;
   not_found: number;
   docs_updated: number;
   /** The run stopped early on ΓΕΜΗ's per-minute budget; the rest resume next run. */
@@ -148,7 +151,7 @@ export async function resolveInboundIssuerNames(
   const { maxLookups = 8, aadeFallback = false, maxAadeLookups = 5 } = opts;
   const out: ResolveIssuerResult = {
     candidates: 0, from_cache: 0, from_crm: 0, from_gemi: 0, from_aade: 0, aade_calls: 0,
-    aade_skipped: aadeFallback ? null : 'disabled', not_found: 0, docs_updated: 0,
+    aade_skipped: aadeFallback ? null : 'disabled', aade_error: null, not_found: 0, docs_updated: 0,
     throttled: false,
   };
 
@@ -286,24 +289,26 @@ export async function resolveInboundIssuerNames(
       } else {
         for (const afm of targets) {
           const envelope = buildSoapEnvelope(creds, buildRgWsPublic2Body(creds.afmCalledBy, afm));
-          const { ok, xml, err } = await postSoap(RGWSPUBLIC2_ENDPOINT, envelope);
+          const { ok, xml, httpStatus, err } = await postSoap(RGWSPUBLIC2_ENDPOINT, envelope);
           // A transport failure never reached ΑΑΔΕ: nothing was notified, nothing is known, so
           // record nothing and stop — the rest of the batch would fail the same way.
-          if (err) break;
+          if (err) { out.aade_error = err; break; }
           out.aade_calls++;
 
           const aadeErr = summarizeAadeError(xml);
+          const code = `${aadeErr?.code ?? ''}`.toUpperCase();
+          // Did ΑΑΔΕ answer about THEM, or refuse US? A refusal is bad codes, a spent daily
+          // quota, a 5xx — transient, and about our access rather than their existence.
+          // Caching one as "no such business" would mark live companies permanently unnameable:
+          // precisely the ΓΕΜΗ-404 bug, one registry over. Only a verdict on the ΑΦΜ itself
+          // ("wrong afm" / "not found") is allowed to become a cached miss.
+          const refusal = !ok || (!!aadeErr
+            && !(code.includes('WRONG_AFM') || code.includes('NOT_FOUND') || code.endsWith('_NF')));
+
           const rec = aadeErr ? null : parseBasicRec(xml);
           const name = displayNameFromBasicRec(rec);
-          if (!ok || aadeErr || !name) {
-            // ΑΑΔΕ answered, and the answer is "nothing usable". Cache it as an ΑΑΔΕ-sourced
-            // miss so this ΑΦΜ is never looked up — never re-notified — again.
-            await admin.from('greek_registry_companies').upsert(
-              [{ afm, name: null, not_found: true, source: 'aade', resolved_at: new Date().toISOString() }],
-              { onConflict: 'afm' },
-            );
-            out.not_found++;
-          } else {
+
+          if (name) {
             await admin.from('greek_registry_companies').upsert([{
               afm, name,
               legal_form: rec?.legal_status_descr ?? null,
@@ -316,6 +321,18 @@ export async function resolveInboundIssuerNames(
             }], { onConflict: 'afm' });
             resolved.set(afm, name);
             out.from_aade++;
+          } else if (!refusal) {
+            // ΑΑΔΕ genuinely has no name for this ΑΦΜ. Cache it as an ΑΑΔΕ-sourced miss so the
+            // business is never looked up — never re-notified — again.
+            await admin.from('greek_registry_companies').upsert(
+              [{ afm, name: null, not_found: true, source: 'aade', resolved_at: new Date().toISOString() }],
+              { onConflict: 'afm' },
+            );
+            out.not_found++;
+          } else {
+            // Surfaced in the sync summary rather than swallowed — an expired credential here
+            // would otherwise look identical to "every supplier is already named".
+            out.aade_error = aadeErr?.message ?? `ΑΑΔΕ HTTP ${httpStatus}`;
           }
 
           // Our own record of who/when/why/which ΑΦΜ. `requested_by` is null because no human
@@ -330,6 +347,10 @@ export async function resolveInboundIssuerNames(
               valid_afm: rec?.deactivation_flag === '1' ? true : (rec?.deactivation_flag === '2' ? false : null),
             });
           } catch (logErr) { console.error('[resolve-issuer-names] audit log failed', String(logErr)); }
+
+          // A refusal is about our access, so it will repeat for every remaining ΑΦΜ. Stop
+          // rather than spend the batch collecting the same answer.
+          if (refusal) break;
         }
       }
     }
