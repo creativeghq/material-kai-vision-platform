@@ -31,20 +31,41 @@ const DEFAULT_VAT_CODE = '1'; // 24%
  * form uses, and `measurement_unit` maps through the shared AADE unit table.
  */
 export function orderLinesFromDoc(doc: InboundDocument): PrefillLine[] {
-  return (doc.lines ?? [])
-    .filter((l) => String(l?.item_description ?? '').trim())
-    .map((l) => {
-      const qty = Number(l.quantity) || 1;
-      const net = Number(l.net_value) || 0;
-      return {
-        description: String(l.item_description),
-        quantity: qty,
-        // Guard the divide: a zero/absent quantity would otherwise make the unit price Infinity.
-        unit_price: qty > 0 ? Math.round((net / qty) * 100) / 100 : net,
-        unit_code: unitFromMydataCode(l.measurement_unit) ?? DEFAULT_UNIT,
-        vat_code: l.vat_category != null ? String(l.vat_category) : DEFAULT_VAT_CODE,
-      };
-    });
+  const lines = doc.lines ?? [];
+  // EVERY line becomes an order line. Filtering on `item_description` looked reasonable but
+  // dropped the majority of real documents on the floor: myDATA omits descriptions on most
+  // service/summary invoices, and measured against live data only 585 of 1,732 documents have
+  // ANY described line (1,903 of 3,592 lines). Those orders were being created EMPTY — the
+  // supplier's money vanished from the order it was supposed to record. A line with a value and
+  // no name is still a line; name it from what the document does tell us.
+  const out: PrefillLine[] = lines.map((l, i) => {
+    const qty = Number(l.quantity) || 1;
+    const net = Number(l.net_value) || 0;
+    const described = String(l.item_description ?? '').trim();
+    return {
+      description: described || `Line ${i + 1}`,
+      quantity: qty,
+      // Guard the divide: a zero/absent quantity would otherwise make the unit price Infinity.
+      unit_price: qty > 0 ? Math.round((net / qty) * 100) / 100 : net,
+      unit_code: unitFromMydataCode(l.measurement_unit) ?? DEFAULT_UNIT,
+      vat_code: l.vat_category != null ? String(l.vat_category) : DEFAULT_VAT_CODE,
+    };
+  });
+
+  // No line detail at all (the document is a single total). Still produce ONE line carrying the
+  // document's net, so the order totals match what the supplier billed instead of reading zero.
+  if (out.length === 0) {
+    const net = Number(doc.total_net ?? 0) || 0;
+    if (net === 0) return [];
+    return [{
+      description: [doc.series, doc.aa].filter(Boolean).join(' ') || 'Invoice total',
+      quantity: 1,
+      unit_price: Math.round(net * 100) / 100,
+      unit_code: DEFAULT_UNIT,
+      vat_code: DEFAULT_VAT_CODE,
+    }];
+  }
+  return out;
 }
 
 /**

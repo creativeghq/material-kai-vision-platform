@@ -14,7 +14,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, PackagePlus, FileText, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet, ShoppingCart } from 'lucide-react';
+import { MoreVertical, Building2, PackagePlus, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet, ShoppingCart } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -37,7 +37,6 @@ interface Props {
   /** Set when the issuer's ΑΦΜ already matches a CRM company — the row resolved it, so the
    *  "add" action is offered as already-done rather than letting a duplicate be started. */
   crmCompanyId?: string;
-  onCreateBill: () => void;
   /** Open this document's payments. READ-only — it must not convert the document. */
   onRecordPayment: () => void;
   /** Seed a purchase order from this document's lines. Absent → the entry isn't offered. */
@@ -52,11 +51,10 @@ interface Props {
 /** A bare 9-digit number is a Greek ΑΦΜ — only those are resolvable via the ΑΑΔΕ / ΓΕΜΗ registries. */
 const isGreekVat = (vat: string | null | undefined) => !!greekAfm(vat);
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onCreateBill, onRecordPayment, onCreateOrder, hasOrder, onReceiveStock, onDismiss, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onReceiveStock, onDismiss, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const canBill = doc.status === 'new';
   const canReceive = doc.status === 'new' || doc.status === 'classified';
   const canDismiss = doc.status === 'new';
   // Paying is offered on anything not dismissed: either the expense exists (→ its payments) or
@@ -187,26 +185,23 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={onReceiveStock} disabled={!canReceive}>
-            <PackagePlus className="h-4 w-4 mr-2" /> Add products to warehouse
+            <PackagePlus className="h-4 w-4 mr-2" /> Add Products to Warehouse
           </DropdownMenuItem>
-          {onCreateOrder && (
-            // The order already happened — this records it, seeded from what they billed, so the
-            // two stay separate rows that can disagree (which is what makes over-billing visible).
-            <DropdownMenuItem onClick={onCreateOrder} disabled={hasOrder || doc.status === 'dismissed'} className="flex-col items-start gap-0.5">
-              <span className="flex items-center"><ShoppingCart className="h-4 w-4 mr-2" /> {hasOrder ? 'Order already created' : 'Create the order for this'}</span>
-              {!hasOrder && (
-                <span className="pl-6 text-[10px] text-muted-foreground">Seeds a purchase order from its lines, adds it to Expenses and links them.</span>
-              )}
-            </DropdownMenuItem>
-          )}
 
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Money</DropdownMenuLabel>
-          {/* Two outcomes, named by what they DO to your books — not by the row they write.
-              "Create supplier bill" told the operator nothing: both of these create the expense. */}
-          <DropdownMenuItem onClick={onCreateBill} disabled={!canBill} className="flex-col items-start gap-0.5">
-            <span className="flex items-center"><FileText className="h-4 w-4 mr-2" /> Add to Expenses — not paid</span>
-            <span className="pl-6 text-[10px] text-muted-foreground">Owe it now: shows in Payables until you pay.</span>
+          {/* ONE way in. You cannot buy from a supplier and hold only an expense — the purchase
+              happened, so the order is the record of it and the expense hangs off that. This used
+              to be two items ("Add to Expenses — not paid" wrote a bare bill; "Create the order
+              for this" wrote order + bill), and the bill-only one produced a payable with nothing
+              to match it against, which is precisely what 3-way match exists to prevent. */}
+          <DropdownMenuItem onClick={onCreateOrder} disabled={hasOrder || doc.status === 'dismissed' || !onCreateOrder} className="flex-col items-start gap-0.5">
+            <span className="flex items-center"><ShoppingCart className="h-4 w-4 mr-2" /> {hasOrder ? 'Already in Expenses' : 'Add to Expenses'}</span>
+            {!hasOrder && (
+              <span className="pl-6 text-[10px] text-muted-foreground">
+                Creates the unpaid purchase order from its lines and the expense against it — shows in Payables until you pay.
+              </span>
+            )}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay} className="flex-col items-start gap-0.5">
             <span className="flex items-center"><Wallet className="h-4 w-4 mr-2" /> Record payment</span>

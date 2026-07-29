@@ -186,6 +186,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   };
   useEffect(() => { void load(); }, [activeWorkspaceId]);
 
+  /** Supplier scope for the Expenses Inbox, set when arriving from a company's CRM record. */
+  const issuerVatParam = searchParams.get('issuer_vat');
+
   // Which finance-category side applies to the active surface (drives filter + inline picker).
   const sideKind: 'income' | 'expense' | null =
     type === 'expenses' ? 'expense' : (type === 'invoices' || type === 'receipts') ? 'income' : null;
@@ -201,13 +204,20 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       case 'invoices': return invoices.filter((i) => !isReceipt((i as any).document_type));
       case 'receipts': return invoices.filter((i) => isReceipt((i as any).document_type));
       case 'credit_notes': return creditNotes;
-      case 'expenses': return inbound;
+      // `?issuer_vat=` scopes the Inbox to one supplier — how their CRM record links here.
+      // VAT is the join key (it is the only thing tying a received document to a company), and
+      // it is compared on digits so EL800370260 and 800370260 are the same supplier.
+      case 'expenses': {
+        const want = (issuerVatParam ?? '').replace(/\D/g, '');
+        if (!want) return inbound;
+        return inbound.filter((d) => String(d.issuer_vat ?? '').replace(/\D/g, '') === want);
+      }
       case 'payments': return payments;
       case 'delivery_notes': return deliveryNotes;
       case 'cheques': return cheques;
       default: return [];
     }
-  }, [type, invoices, creditNotes, inbound, payments, deliveryNotes, cheques]);
+  }, [type, invoices, creditNotes, inbound, payments, deliveryNotes, cheques, issuerVatParam]);
 
   // myDATA code → name, so the document-type filter offers "Sales Invoice", not a bare "1.1".
   const mydataTypes = useMydataTypeLabels();
@@ -955,12 +965,6 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
     return () => { live = false; };
   }, [workspaceId, rows.length]);
 
-  const createBill = async (id: string) => {
-    setBusy(id);
-    try { await inboundService.toSupplierBill(id); toast({ title: 'Supplier bill created' }); onChanged(); }
-    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
-    finally { setBusy(null); }
-  };
   /**
    * Recording a payment is ONE act with ONE form — the platform's Record Payment dialog, preset
    * to this document. Whether an expense exists yet is our bookkeeping, not the operator's
@@ -1054,7 +1058,6 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
                     workspaceId={workspaceId}
                     busy={busy === d.id}
                     crmCompanyId={d.issuer_vat ? crmByVat[d.issuer_vat.replace(/\D/g, '')] : undefined}
-                    onCreateBill={() => createBill(d.id)}
                     onRecordPayment={() => openPayments(d)}
                     onCreateOrder={() => setOrderDoc(d)}
                     hasOrder={ordered.has(d.id)}

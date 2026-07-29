@@ -1,18 +1,22 @@
 // The single "where did the money move" picker used by every finance dialog.
 //
-// Two things it fixes over the old two-select pattern:
-//   1. Accounts are grouped by what they ARE (Banks / Cash / Cards / Online / Other) and each
-//      one shows its live running balance, so you pick the account knowing what's in it.
-//   2. "Method" is derived from the account kind instead of being asked twice. A cash account
-//      IS cash; a card account IS card. The method select only appears for kinds where it
-//      still carries information (a bank clears transfers AND cheques).
+// ONE control: the account. Accounts are grouped by what they ARE (Banks / Cash / Cards /
+// Online / Other) and each shows its live running balance, so you pick knowing what's in it.
+//
+// There is deliberately NO method select. The account already answers it — a cash account IS
+// cash, a card account IS card, a bank account books as a transfer — and asking again produced
+// a second control that could contradict the first. `method` is still reported to the caller
+// (payments.method is constrained), derived from the account's kind. Manage the accounts, and
+// the method follows.
+//
+// There is also no "unassigned" option: money that moved, moved somewhere.
 import React, { useEffect, useMemo } from 'react';
 import { Label } from '@/components/core/ui/label';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
 import {
-  financeService, PAYMENT_METHOD_LABEL, methodsForAccountKind, defaultMethodForAccountKind,
+  financeService, PAYMENT_METHOD_LABEL, defaultMethodForAccountKind,
   ACCOUNT_KIND_LABEL, ACCOUNT_KIND_ORDER,
   type PaymentMethod, type BankAccountKind, type BankAccountBalance,
 } from '@/modules/finance/services/financeService';
@@ -28,12 +32,8 @@ interface Props {
   onAccountsLoaded?: (accounts: BankAccountBalance[]) => void;
   disabled?: boolean;
   label?: string;
-  /** Offer an "unassigned" option for money whose account isn't known yet. */
-  allowUnassigned?: boolean;
   className?: string;
 }
-
-const NONE = '__none__';
 
 const fmt = (n: number, currency: string) => {
   try {
@@ -43,8 +43,7 @@ const fmt = (n: number, currency: string) => {
 
 export const PaidFromSelect: React.FC<Props> = ({
   workspaceId, value, onChange, method, onMethodChange,
-  accounts: accountsProp, onAccountsLoaded, disabled, label = 'Paid from',
-  allowUnassigned = false, className,
+  accounts: accountsProp, onAccountsLoaded, disabled, label = 'Paid from', className,
 }) => {
   const [rows, setRows] = React.useState<BankAccountBalance[]>(accountsProp ?? []);
 
@@ -65,37 +64,30 @@ export const PaidFromSelect: React.FC<Props> = ({
 
   const selected = useMemo(() => rows.find((r) => r.bank_account_id === value) ?? null, [rows, value]);
   const kind = (selected?.kind ?? null) as BankAccountKind | null;
-  const methodOptions = useMemo(() => methodsForAccountKind(kind), [kind]);
-
-  // Keep the method consistent with the account: if the chosen account can't have the current
-  // method (switched bank → cash), snap it to the one the account implies.
+  // The account decides the method. Snap on every account change so the value the caller
+  // submits can never disagree with the account it says the money moved through.
   useEffect(() => {
     if (!selected) return;
-    if (!methodOptions.includes(method)) onMethodChange(defaultMethodForAccountKind(kind));
+    const implied = defaultMethodForAccountKind(kind);
+    if (method !== implied) onMethodChange(implied);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.bank_account_id, methodOptions.join(',')]);
+  }, [selected?.bank_account_id]);
 
   const grouped = useMemo(() => ACCOUNT_KIND_ORDER
     .map((k) => ({ kind: k, items: rows.filter((r) => r.kind === k) }))
     .filter((g) => g.items.length > 0), [rows]);
 
-  // Only ask for a method where the account kind leaves it genuinely open. With no account
-  // picked at all there is nothing to derive from, so the full list stays available.
-  const showMethod = methodOptions.length > 1;
-
   return (
     <div className={className}>
-      <div className={showMethod ? 'grid grid-cols-2 gap-3' : ''}>
-        <div>
+      <div>
           <Label className="text-xs text-muted-foreground">{label}</Label>
           <Select
-            value={value || (allowUnassigned ? NONE : '')}
-            onValueChange={(v) => onChange(v === NONE ? '' : v)}
+            value={value || ''}
+            onValueChange={onChange}
             disabled={disabled}
           >
             <SelectTrigger className="mt-1"><SelectValue placeholder="Select an account" /></SelectTrigger>
             <SelectContent>
-              {allowUnassigned && <SelectItem value={NONE}>— Unassigned (no account) —</SelectItem>}
               {grouped.map((g) => (
                 <SelectGroup key={g.kind}>
                   <SelectLabel>{ACCOUNT_KIND_LABEL[g.kind]}</SelectLabel>
@@ -121,28 +113,9 @@ export const PaidFromSelect: React.FC<Props> = ({
           {selected && (
             <p className="mt-1 text-xs text-muted-foreground">
               Balance {fmt(Number(selected.current_balance ?? 0), selected.currency)}
-              {!showMethod ? ` · booked as ${PAYMENT_METHOD_LABEL[defaultMethodForAccountKind(kind)]}` : ''}
+              {` · booked as ${PAYMENT_METHOD_LABEL[defaultMethodForAccountKind(kind)]}`}
             </p>
           )}
-        </div>
-        {showMethod && (
-          <div>
-            <Label className="text-xs text-muted-foreground">Method</Label>
-            <Select value={method} onValueChange={(v) => onMethodChange(v as PaymentMethod)} disabled={disabled}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {methodOptions.map((m) => (
-                  <SelectItem key={m} value={m}>{PAYMENT_METHOD_LABEL[m]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {/* The account says WHERE the money sits; for kinds that clear more than one way this
-                says HOW it left. Cash/card/online accounts derive it and never render this. */}
-            <p className="mt-1 text-xs text-muted-foreground">
-              {selected ? `How it cleared this ${ACCOUNT_KIND_LABEL[kind as BankAccountKind].replace(/s$/, '').toLowerCase()} account.` : 'How the money moved.'}
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );

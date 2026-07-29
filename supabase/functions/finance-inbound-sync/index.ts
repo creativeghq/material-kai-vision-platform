@@ -188,6 +188,8 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
 
     const blocks = pickAllTagBlocks(xml, 'invoice');
     let maxMark = watermark;
+    /** Documents INSERTED by this run — the only ones auto-convert is allowed to touch. */
+    const freshDocIds: string[] = [];
     let upserted = 0;
     for (const b of blocks) {
       const mark = pickTag(b, 'mark');
@@ -277,12 +279,34 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         category_id: defaultCategoryId,
         raw: { xml: b.slice(0, 20000) },
       };
-      const { error } = await supabase.from('inbound_documents').upsert(row, { onConflict: 'workspace_id,mark', ignoreDuplicates: true });
+      // `.select()` on an ignoreDuplicates upsert returns ONLY the rows actually inserted, which
+      // is exactly the set auto-convert may touch: documents polled now, never the backlog.
+      const { data: ins, error } = await supabase
+        .from('inbound_documents')
+        .upsert(row, { onConflict: 'workspace_id,mark', ignoreDuplicates: true })
+        .select('id');
       if (!error) upserted++;
+      const newId = (ins as Array<{ id: string }> | null)?.[0]?.id;
+      if (newId) freshDocIds.push(newId);
       if (Number(mark) > Number(maxMark)) maxMark = mark;
     }
     if (maxMark !== watermark) {
       await supabase.from('finance_settings').update({ inbound_last_mark: maxMark }).eq('workspace_id', workspaceId);
+    }
+
+    // ── Auto-convert to expenses (opt-in per workspace) ──
+    // A document the supplier filed against us IS an obligation, so the "Add to Expenses" click
+    // is ceremony. The RPC re-reads the workspace setting itself and applies the family rule
+    // (goods / services / expenditure / retail / cross-border only — never credit notes or
+    // delivery notes). Scoped to `freshDocIds`, so switching the setting on never converts the
+    // historic backlog: those stay in the Inbox until someone asks for them.
+    let autoBilled = 0;
+    if (freshDocIds.length > 0) {
+      const { data: n, error: acErr } = await supabase.rpc('autoconvert_inbound_docs', {
+        p_workspace_id: workspaceId, p_doc_ids: freshDocIds,
+      });
+      if (acErr) console.error('[inbound-sync] auto-convert failed', acErr.message);
+      else autoBilled = Number(n) || 0;
     }
 
     // ── Background AI product extraction → pending-products queue (credit-gated) ──
@@ -401,7 +425,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     } catch (e) { console.error('[inbound-sync] issuer name resolution failed', String(e)); }
 
     summary.push({
-      workspaceId, found: blocks.length, upserted, extracted, auto_stocked: autoStocked, new_watermark: maxMark, issuers,
+      workspaceId, found: blocks.length, upserted, auto_billed: autoBilled, extracted, auto_stocked: autoStocked, new_watermark: maxMark, issuers,
       ...(dated ? { date_from: dateFrom, date_to: dateTo } : {}),
     });
   }

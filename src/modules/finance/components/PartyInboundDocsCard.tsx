@@ -68,12 +68,6 @@ export const PartyInboundDocsCard: React.FC<{
   }, [workspaceId]);
   useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
 
-  const createBill = async (id: string) => {
-    setBusy(id);
-    try { await inboundService.toSupplierBill(id); await load(); }
-    catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
-    finally { setBusy(null); }
-  };
   const dismiss = async (id: string) => {
     setBusy(id);
     try { await inboundService.dismiss(id); await load(); }
@@ -92,7 +86,7 @@ export const PartyInboundDocsCard: React.FC<{
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 space-y-0">
           <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2"><InboxIcon className="h-4 w-4" /> Documents from myDATA</CardTitle>
+            <CardTitle className="flex items-center gap-2"><InboxIcon className="h-4 w-4" /> Invoices</CardTitle>
             <p className="mt-0.5 text-xs text-muted-foreground">
               What this supplier filed with AADE against us.
               {notInBooks > 0
@@ -100,7 +94,9 @@ export const PartyInboundDocsCard: React.FC<{
                 : ' All of them are in Expenses.'}
             </p>
           </div>
-          <Link to={inboxHref}>
+          {/* Carry the supplier through, so the Inbox opens on THEIR documents rather than
+              everyone's and the operator has to re-find them. */}
+          <Link to={vatNumber ? `${inboxHref}${inboxHref.includes('?') ? '&' : '?'}issuer_vat=${encodeURIComponent(vatNumber)}` : inboxHref}>
             <Button size="sm" variant="ghost"><ExternalLink className="h-3.5 w-3.5 mr-2" /> Open Inbox</Button>
           </Link>
         </CardHeader>
@@ -157,7 +153,6 @@ export const PartyInboundDocsCard: React.FC<{
                                 busy={busy === d.id}
                                 // We ARE on the issuer's record, so the CRM action is already done.
                                 crmCompanyId={companyId}
-                                onCreateBill={() => createBill(d.id)}
                                 onRecordPayment={() => setPayDoc(d)}
                                 onCreateOrder={() => setOrderDoc(d)}
                                 hasOrder={ordered.has(d.id)}

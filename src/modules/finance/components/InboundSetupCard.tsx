@@ -13,6 +13,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Loader2, Save, Inbox } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { inboundService } from '@/modules/finance/services/inboundService';
+import { supabase } from '@/integrations/supabase/client';
 
 export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -20,6 +21,11 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
   const [key, setKey] = useState('');
   const [hasKey, setHasKey] = useState(false);
   const [enabled, setEnabled] = useState(true);
+  /**
+   * Whether a polled document becomes an expense on its own. Off by default: it changes what
+   * Payables says you owe, so it is the operator's call, not a default we make for them.
+   */
+  const [autoConvert, setAutoConvert] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -33,6 +39,9 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       setKey(''); // never prefill the secret — the server only tells us whether one is set
       setHasKey(!!c?.has_key);
       setEnabled(c?.enabled ?? true);
+      const { data: fin } = await supabase.from('finance_settings')
+        .select('auto_convert_inbound_expenses').eq('workspace_id', workspaceId).maybeSingle();
+      setAutoConvert(!!(fin as any)?.auto_convert_inbound_expenses);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -44,6 +53,9 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       // Only send the key when the manager typed a new one — blank preserves the stored key.
       // Base URL is always production (myDATA RequestDocs) — the poller defaults to it.
       await inboundService.saveCreds(workspaceId, { aadeUserId: userId, subscriptionKey: key.trim() || undefined, enabled });
+      const { error: finErr } = await supabase.from('finance_settings')
+        .update({ auto_convert_inbound_expenses: autoConvert }).eq('workspace_id', workspaceId);
+      if (finErr) throw finErr;
       if (key.trim()) setHasKey(true);
       setKey('');
       toast({ title: 'Inbound credentials saved' });
@@ -77,6 +89,20 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
         <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
           <div className="text-sm">Enabled</div>
           <Switch checked={enabled} onCheckedChange={setEnabled} />
+        </div>
+        <div className="flex items-start justify-between gap-3 rounded-md border border-border/60 p-3">
+          <div className="min-w-0 text-sm">
+            Add received documents to Expenses automatically
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              A supplier's document is money you owe, so this skips the manual step: goods, services,
+              expenditure, retail and cross-border invoices become expenses as they arrive, and land in
+              Payables and the P&L. Credit notes and delivery notes are never converted — one reduces
+              what you owe, the other is followed by its own invoice.
+              {' '}<strong>Not retroactive:</strong> only documents polled from now on. The documents
+              already in your Inbox stay there until you handle them.
+            </p>
+          </div>
+          <Switch checked={autoConvert} onCheckedChange={setAutoConvert} />
         </div>
         <div>
           <Button size="sm" onClick={save} disabled={saving} className="rounded-full">
