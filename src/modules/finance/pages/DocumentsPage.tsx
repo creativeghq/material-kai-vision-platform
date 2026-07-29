@@ -814,7 +814,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
             </td>
             <td className="px-4 py-2">
               {p.order_id
-                ? <Link to={`${financeBase}?tab=doc_orders&order=${p.order_id}`} className="text-primary hover:underline text-xs">{p.order_number ?? 'open'}</Link>
+                ? <Link to={`${financeBase}/orders/${p.order_id}`} className="text-primary hover:underline text-xs">{p.order_number ?? 'open'}</Link>
                 : <span className="text-muted-foreground">—</span>}
             </td>
             <td className="px-4 py-2">{p.method ? paymentMethodLabel(p.method) : '—'}</td>

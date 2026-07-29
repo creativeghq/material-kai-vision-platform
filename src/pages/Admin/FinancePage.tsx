@@ -147,14 +147,9 @@ const FinancePage: React.FC = () => {
     if (v !== 'parties') p.delete('party');
     setSearchParams(p, { replace: true });
   };
-  /** Jump to the Orders tab AND open one order — OrdersPanel consumes `?order=` then clears it. */
-  const openOrder = (orderId: string) => {
-    const p = new URLSearchParams(searchParams);
-    p.set('tab', 'doc_orders');
-    p.delete('party');
-    p.set('order', orderId);
-    setSearchParams(p, { replace: true });
-  };
+  /** Open ONE order on its own page. This used to switch to the Orders tab and pop a modal over
+   *  the list, which is not "the details of that order" — no URL, nothing to bookmark or send. */
+  const openOrder = (orderId: string) => navigate(`${financeBase}/orders/${orderId}`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Seed the standard income/expense category set once per workspace when finance is first
@@ -303,7 +298,9 @@ const FinancePage: React.FC = () => {
           status: o.status,
           ...agingFromExpected(o.due_date),
           entry_kind: 'order',
-          description: `Order ${o.order_number ?? o.id.slice(0, 8)}`,
+          // Bare number only — the row already says "Order, not invoiced" next to it, so the
+          // word "Order" in front of the number just read as "Order ORD-2026-0001".
+          description: o.order_number ?? o.id.slice(0, 8),
           party_name: o.party_name,
           category_id: o.category_id,
           category_name: o.category_name,
@@ -829,7 +826,6 @@ const FinancePage: React.FC = () => {
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-4 w-4" /> Receivables
-                  <span className="text-[10px] font-normal text-muted-foreground">· money customers owe us</span>
                 </CardTitle>
                 <div className="flex items-center gap-2 flex-wrap">
                   <FilterBar

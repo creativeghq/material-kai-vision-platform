@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Copy, RotateCcw, PackagePlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -147,6 +147,8 @@ export const OrdersPanel: React.FC<{
   // Inside a CRM party (company/contact) the list is already scoped — hide the filter cluster.
   const embedded = !!(companyId || contactId);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -168,18 +170,15 @@ export const OrdersPanel: React.FC<{
     }
   }, [embedded, searchParams, setSearchParams]);
 
-  // Deep-link straight into ONE order: /finance?tab=doc_orders&order=<id>. Used by the AR/AP
-  // aging tables' "Open order" button and by the purchase_order.received flow notification —
-  // both previously landed on the bare list because nothing read this param.
+  // Legacy deep-link `?tab=doc_orders&order=<id>`: orders now have their own page, so forward
+  // there instead of opening a modal over the list. Notification action_urls already stored in
+  // the DB carry the old shape, so this redirect has to stay for them to keep working.
   useEffect(() => {
     if (embedded) return;
     const target = searchParams.get('order');
     if (!target) return;
-    setOpenId(target);
-    const p = new URLSearchParams(searchParams);
-    p.delete('order');
-    setSearchParams(p, { replace: true });
-  }, [embedded, searchParams, setSearchParams]);
+    navigate(`${financeBase}/orders/${target}`, { replace: true });
+  }, [embedded, searchParams, navigate, financeBase]);
 
   // Role-aware New-order menu. No role context (global Finance list / project tab) or an
   // unclassified party → offer both kinds, unchanged. A customer-only party can't be a
@@ -865,7 +864,9 @@ const MATCH_META: Record<ThreeWayMatchStatus, { label: string; cls: string }> = 
   variance:         { label: 'Variance',         cls: 'text-destructive border-destructive/40' },
 };
 
-const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceCategory[]; open: boolean; onClose: () => void; onChanged: () => void; onOpenOrder?: (id: string) => void }> = ({ orderId, categories, open, onClose, onChanged, onOpenOrder }) => {
+/** Exported so the dedicated order page (`/finance/orders/:orderId`) renders the SAME detail
+ *  surface as the list's row click — one order form, two entry points, no second copy. */
+export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceCategory[]; open: boolean; onClose: () => void; onChanged: () => void; onOpenOrder?: (id: string) => void }> = ({ orderId, categories, open, onClose, onChanged, onOpenOrder }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
@@ -1124,7 +1125,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
           user_id: u?.user?.id ?? null,
           title: `Purchase order ${order.order_number ?? order.id.slice(0, 8)} received`,
           body: `${data ?? 0} warehouse line(s) updated`,
-          action_url: `/finance?tab=doc_orders&order=${order.id}`,
+          action_url: `/finance/orders/${order.id}`,
           order_id: order.id,
           order_number: order.order_number,
           supplier_id: order.supplier_company_id,

@@ -49,6 +49,7 @@ const CRMPage = lazy(() => import('./modules/crm/pages/CRMPage'));
 const CrmContactDetailPage = lazy(() => import('./modules/crm/pages/ContactDetailPage').then(m => ({ default: m.ContactDetailPage })));
 const CrmCompanyDetailPage = lazy(() => import('./modules/crm/pages/CompanyDetailPage').then(m => ({ default: m.CompanyDetailPage })));
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
+const OrderDetailPage = lazy(() => import('./pages/Admin/OrderDetailPage'));
 const PosPage = lazy(() => import('./modules/finance/pages/PosPage'));
 const SalesPage = lazy(() => import('./pages/Sales/SalesPage'));
 const EmployeeSelfServicePage = lazy(() => import('./modules/hr/pages/EmployeeSelfServicePage'));
@@ -401,6 +402,18 @@ const App = () => (
                       <CapabilityGuard capability="finance.manage">
                         <Layout>
                           <InvoiceDetailPage />
+                        </Layout>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/finance/orders/:orderId"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="finance.manage">
+                        <Layout>
+                          <OrderDetailPage />
                         </Layout>
                       </CapabilityGuard>
                     </AuthGuard>
