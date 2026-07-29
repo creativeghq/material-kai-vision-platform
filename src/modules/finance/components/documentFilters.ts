@@ -8,7 +8,7 @@
  * carry live counts.
  */
 import { CalendarDays, Coins, FileText, Tags } from 'lucide-react';
-import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
+import { optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import { paymentMethodLabel } from '@/modules/finance/services/financeService';
 import { mydataTypeName, mydataTypeRank } from '@/modules/finance/components/mydataTypes';
 import { inboundStatusLabel } from '@/modules/finance/components/inboundStatus';
@@ -27,10 +27,11 @@ function amountBounds(rows: any[], pick: (r: any) => any): { min: number; max: n
   return { min: 0, max: Math.max(Math.ceil(max / 10) * 10, 10) };
 }
 
-const categoryOptions = (categories: FinanceCategory[]): FilterOption[] => [
-  { value: NONE_VALUE, label: 'Uncategorized' },
-  ...categories.map((c) => ({ value: c.id, label: c.name })),
-];
+// A filter list headed "Category" contains CATEGORIES. "Uncategorized" is not one — it was a
+// sentinel for "no category", and printing it alongside the real names made the workspace look
+// like it had a category nobody created and which appears nowhere in the backend list.
+const categoryOptions = (categories: FinanceCategory[]): FilterOption[] =>
+  categories.map((c) => ({ value: c.id, label: c.name }));
 
 const statusOptions = (rows: any[], key = 'status') => optionsFromRows(rows, (r) => r[key], humanizeLabel);
 

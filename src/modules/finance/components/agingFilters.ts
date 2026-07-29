@@ -7,7 +7,7 @@
  * value and can never disagree.
  */
 import { CalendarDays, Coins, FileText, Tags, Users } from 'lucide-react';
-import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
+import { optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 import { ageBucketLabel, type AgeBucket, type AgingRow } from '@/modules/finance/services/financeService';
 import { humanizeLabel } from '@/utils/humanize';
 import type { FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
@@ -31,10 +31,9 @@ export function buildAgingFilters(
   const { rows, categories } = ctx;
   const total = amountBounds(rows, (r) => r.total);
   const due = amountBounds(rows, (r) => r.amount_due);
-  const categoryOptions: FilterOption[] = [
-    { value: NONE_VALUE, label: 'Uncategorized' },
-    ...categories.map((c) => ({ value: c.id, label: c.name })),
-  ];
+  // Real categories only — see documentFilters: the "Uncategorized" sentinel read as a category
+  // the operator never created.
+  const categoryOptions: FilterOption[] = categories.map((c) => ({ value: c.id, label: c.name }));
 
   return [
     {
