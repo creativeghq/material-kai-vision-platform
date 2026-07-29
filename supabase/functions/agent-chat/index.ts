@@ -916,7 +916,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Trip cards / sales expenses (all users; 0 cr — DB-only)
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L); 0 cr
-      'record_expense', 'list_recent_expenses',
+      'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments',
       // Company assets register (vehicles/phones/cards/laptops) shared with Finance + HR; 0 cr — DB-only
       'manage_company_assets',
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
@@ -1041,7 +1041,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Finance reads + confirm-gated invoice issue (Trinity is the finance agent)
       'manage_finance',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L)
-      'record_expense', 'list_recent_expenses',
+      'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments',
       // Contracts & e-signature (finance/legal domain)
       'manage_contracts',
     ],
@@ -1254,7 +1254,7 @@ async function executeAgent(
       tool_ids: ['create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card'],
     },
     'expenses': {
-      tool_ids: ['record_expense', 'list_recent_expenses'],
+      tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments'],
     },
     'company-assets': {
       tool_ids: ['manage_company_assets'],
@@ -2198,11 +2198,13 @@ async function executeAgent(
   }
 
   // Business operating expenses → categorized supplier bill (Payables/AP + P&L). 0 cr, DB-only.
-  if (config.tools.some((t: string) => ['record_expense', 'list_recent_expenses'].includes(t))) {
+  if (config.tools.some((t: string) => ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments'].includes(t))) {
     try {
       const expMod = await import('../_shared/tools/expense-tools.ts');
       if (config.tools.includes('record_expense')) tools.push(expMod.createRecordExpenseTool(userId, workspaceId, onChunk));
       if (config.tools.includes('list_recent_expenses')) tools.push(expMod.createListExpensesTool(userId, workspaceId, onChunk));
+      if (config.tools.includes('pay_expense')) tools.push(expMod.createPayExpenseTool(userId, workspaceId, onChunk));
+      if (config.tools.includes('get_expense_payments')) tools.push(expMod.createGetExpensePaymentsTool(userId, workspaceId, onChunk));
     } catch (expErr) {
       console.warn('⚠️ Could not register expense tools:', expErr);
     }

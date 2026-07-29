@@ -4,8 +4,16 @@
  * Mirrors the Finance "Add expense" page flow: an expense is a categorized supplier bill (the
  * canonical spend record that feeds Payables/AP + P&L per category). Payee is required by the
  * DB (supplier_bills CHECK). Tools:
- *   - record_expense        — create a categorized expense bill (optionally paid now)
- *   - list_recent_expenses  — read the workspace's recent expense bills
+ *   - record_expense         — create a categorized expense bill (optionally paid now)
+ *   - list_recent_expenses   — read the workspace's recent expense bills
+ *   - pay_expense            — settle an EXISTING expense, including one still sitting in the
+ *                              myDATA Expenses Inbox as an unconverted received document
+ *   - get_expense_payments   — the reverse direction: what has settled a given expense
+ *
+ * pay_expense / get_expense_payments are the agent mirror of ExpensePaymentsDialog. They write
+ * only through the allocation ledger (record_payment_fx → payment_allocations), so the bill's
+ * amount_paid / status are derived by the same triggers the UI relies on — nothing here decides
+ * for itself what is settled.
  *
  * All writes are scoped to the caller's workspace_id (resolved upstream by agent-chat).
  * Category + payee are resolved by name (find-or-create). record_payment_fx settles the
@@ -125,6 +133,232 @@ export const createRecordExpenseTool = (userId: string, workspaceId: string, onC
       currency: z.string().optional().describe('ISO currency (default EUR)'),
       expense_date: z.string().optional().describe('YYYY-MM-DD (defaults to today)'),
       paid: z.boolean().optional().describe('true = also record the payment now (settled); false/omitted = leave as an open payable'),
+    }),
+  });
+
+// ───────────────────────────── pay_expense ─────────────────────────────
+
+/** An expense the agent can name back to the user when a search matched more than one. */
+interface ExpenseCandidate {
+  id: string; supplier_bill_number: string | null; supplier_name: string | null;
+  supplier_company_id: string | null; total: number; amount_due: number;
+  currency: string; issued_at: string | null;
+}
+
+/**
+ * Resolve the expense the user meant. Searches OPEN expenses by bill number / payee, and — when
+ * nothing matches — the myDATA Inbox for a received document not yet turned into an expense, so
+ * "pay the Vodafone bill that came in" works before anyone has pressed "Create bill".
+ * Returns a single match, or the candidates so the agent can ask which one.
+ */
+async function resolveExpense(workspaceId: string, ref: string): Promise<
+  { kind: 'expense'; row: ExpenseCandidate } |
+  { kind: 'inbox'; docId: string; label: string; total: number; currency: string } |
+  { kind: 'ambiguous'; candidates: ExpenseCandidate[] } |
+  { kind: 'none' }
+> {
+  const sb = svc();
+  const needle = ref.trim();
+  const cols = 'id, supplier_bill_number, supplier_name, supplier_company_id, total, amount_due, currency, issued_at';
+
+  const open = await sb.from('supplier_bills').select(cols)
+    .eq('workspace_id', workspaceId)
+    .not('status', 'in', '("void","paid")')
+    .gt('amount_due', 0)
+    .order('issued_at', { ascending: false, nullsFirst: false })
+    .limit(200);
+  const rows = (open.data ?? []) as ExpenseCandidate[];
+
+  // Payee names live on the bill (one-off) or on the linked CRM company — resolve both.
+  const companyIds = [...new Set(rows.map((r) => r.supplier_company_id).filter(Boolean))] as string[];
+  const names = new Map<string, string>();
+  if (companyIds.length) {
+    const cs = await sb.from('crm_companies').select('id, name').in('id', companyIds);
+    for (const c of (cs.data ?? []) as any[]) names.set(c.id, c.name ?? '');
+  }
+  const lower = needle.toLowerCase();
+  const matches = rows.filter((r) =>
+    (r.supplier_bill_number ?? '').toLowerCase().includes(lower) ||
+    (r.supplier_name ?? '').toLowerCase().includes(lower) ||
+    (r.supplier_company_id ? (names.get(r.supplier_company_id) ?? '') : '').toLowerCase().includes(lower));
+
+  if (matches.length === 1) return { kind: 'expense', row: matches[0] };
+  if (matches.length > 1) {
+    return {
+      kind: 'ambiguous',
+      candidates: matches.slice(0, 8).map((r) => ({
+        ...r,
+        supplier_name: r.supplier_name ?? (r.supplier_company_id ? names.get(r.supplier_company_id) ?? null : null),
+      })),
+    };
+  }
+
+  // Nothing open matched — try the Inbox (MARK, issuer name, or the issuer's own series/number).
+  const inbox = await sb.from('inbound_documents')
+    .select('id, mark, issuer_name, series, aa, total_gross, currency')
+    .eq('workspace_id', workspaceId).eq('status', 'new')
+    .is('created_supplier_bill_id', null).gt('total_gross', 0)
+    .order('issue_date', { ascending: false, nullsFirst: false }).limit(200);
+  const docs = ((inbox.data ?? []) as any[]).filter((d) =>
+    String(d.mark ?? '').includes(needle) ||
+    String(d.issuer_name ?? '').toLowerCase().includes(lower) ||
+    `${d.series ?? ''} ${d.aa ?? ''}`.trim().toLowerCase().includes(lower));
+  if (docs.length === 1) {
+    const d = docs[0];
+    return {
+      kind: 'inbox', docId: d.id, total: Number(d.total_gross ?? 0), currency: d.currency ?? 'EUR',
+      label: `${d.issuer_name ?? 'received document'}${d.series ? ` · ${d.series} ${d.aa ?? ''}`.trimEnd() : ''}`,
+    };
+  }
+  return { kind: 'none' };
+}
+
+export const createPayExpenseTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
+  tool(async ({ expense, amount, paid_on, method, reference }: {
+    expense: string; amount?: number; paid_on?: string; method?: string; reference?: string;
+  }) => {
+    try {
+      const found = await resolveExpense(workspaceId, expense);
+      if (found.kind === 'none') {
+        return JSON.stringify({ success: false, error: `No unpaid expense or Inbox document matches "${expense}".` });
+      }
+      if (found.kind === 'ambiguous') {
+        return JSON.stringify({
+          success: false, needs_disambiguation: true,
+          message: `More than one unpaid expense matches "${expense}". Ask which one.`,
+          candidates: found.candidates.map((c) => ({
+            reference: c.supplier_bill_number, payee: c.supplier_name,
+            due: c.amount_due, currency: c.currency, issued_at: c.issued_at,
+          })),
+        });
+      }
+
+      const sb = svc();
+      // An Inbox document becomes an expense first. The RPC is idempotent, so this can never
+      // create a second payable for the same received document.
+      let billId: string; let due: number; let currency: string; let label: string;
+      if (found.kind === 'inbox') {
+        const conv = await sb.rpc('inbound_doc_to_supplier_bill', { p_doc_id: found.docId });
+        if (conv.error) throw conv.error;
+        billId = conv.data as string;
+        const b = await sb.from('supplier_bills').select('amount_due, currency').eq('id', billId).single();
+        due = Number(b.data?.amount_due ?? found.total);
+        currency = b.data?.currency ?? found.currency;
+        label = found.label;
+      } else {
+        billId = found.row.id; due = Number(found.row.amount_due); currency = found.row.currency;
+        label = found.row.supplier_bill_number ?? found.row.supplier_name ?? 'expense';
+      }
+
+      const pay = amount == null ? due : Number(amount);
+      if (!(pay > 0)) return JSON.stringify({ success: false, error: 'Payment amount must be positive.' });
+      if (pay > due + 0.01) {
+        return JSON.stringify({ success: false, error: `That expense only has ${due} ${currency} outstanding.` });
+      }
+
+      const bill = await sb.from('supplier_bills')
+        .select('supplier_company_id, supplier_contact_id, category_id').eq('id', billId).single();
+      const acct = await sb.from('finance_bank_accounts')
+        .select('id').eq('workspace_id', workspaceId).eq('is_active', true)
+        .order('is_default', { ascending: false }).limit(1).maybeSingle();
+
+      const rp = await sb.rpc('record_payment_fx', {
+        p_workspace_id: workspaceId, p_direction: 'out', p_amount: pay, p_currency: currency,
+        p_fx_rate_to_base: 1, p_method: method ?? 'bank_transfer',
+        p_paid_at: paid_on ? new Date(paid_on).toISOString() : new Date().toISOString(),
+        p_counterparty_contact_id: bill.data?.supplier_contact_id ?? null,
+        p_counterparty_company_id: bill.data?.supplier_company_id ?? null,
+        p_reference: reference ?? null, p_notes: null,
+        p_allocations: [{ target_id: billId, target_type: 'supplier_bill', amount_doc: pay, fx_rate: 1 }],
+        p_category_id: bill.data?.category_id ?? null, p_bank_account_id: acct.data?.id ?? null,
+      });
+      if (rp.error) throw rp.error;
+
+      const after = await sb.from('supplier_bills').select('amount_due, status').eq('id', billId).single();
+      const settled = Number(after.data?.amount_due ?? 0) <= 0.005;
+      onChunk?.({ type: 'expense_paid', data: { bill_id: billId, label, amount: pay, currency, settled, remaining: Number(after.data?.amount_due ?? 0) } });
+      return JSON.stringify({
+        success: true, bill_id: billId, payment_id: rp.data, amount: pay, currency,
+        from_inbox: found.kind === 'inbox', status: after.data?.status,
+        remaining_due: Number(after.data?.amount_due ?? 0),
+        message: settled
+          ? `Paid ${pay} ${currency} to settle ${label}. It is now fully paid and out of Payables.`
+          : `Paid ${pay} ${currency} against ${label}. ${after.data?.amount_due} ${currency} still due.`,
+      });
+    } catch (e: any) {
+      return JSON.stringify({ success: false, error: e?.message || 'Could not pay the expense' });
+    }
+  }, {
+    name: 'pay_expense',
+    description: 'Record a payment against an EXISTING expense / supplier bill so it settles and drops out of Payables. Also works for a myDATA received document still sitting in the Expenses Inbox — it is turned into an expense first. Pays the full outstanding amount unless an amount is given. Use for "pay the Vodafone bill", "I paid 200 off the rent invoice". Do NOT use to create a new cost — that is record_expense.',
+    schema: z.object({
+      expense: z.string().describe('Which expense: a bill reference/number, the payee name, or a myDATA MARK / issuer name for something still in the Inbox'),
+      amount: z.number().optional().describe('How much to pay (defaults to the full outstanding amount)'),
+      paid_on: z.string().optional().describe('YYYY-MM-DD (defaults to today)'),
+      method: z.string().optional().describe('bank_transfer | cash | card | check | other (default bank_transfer)'),
+      reference: z.string().optional().describe('Bank reference / cheque number'),
+    }),
+  });
+
+// ───────────────────────────── get_expense_payments ─────────────────────────────
+export const createGetExpensePaymentsTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
+  tool(async ({ expense }: { expense: string }) => {
+    try {
+      const found = await resolveExpense(workspaceId, expense);
+      // A fully-paid expense is exactly what someone asks about here, and resolveExpense only
+      // searches OPEN ones — fall back to a wider search including settled bills.
+      let billId: string | null = null;
+      if (found.kind === 'expense') billId = found.row.id;
+      else if (found.kind === 'ambiguous') {
+        return JSON.stringify({
+          success: false, needs_disambiguation: true,
+          candidates: found.candidates.map((c) => ({ reference: c.supplier_bill_number, payee: c.supplier_name, due: c.amount_due })),
+        });
+      } else {
+        const sb0 = svc();
+        const any = await sb0.from('supplier_bills')
+          .select('id, supplier_bill_number, supplier_name')
+          .eq('workspace_id', workspaceId)
+          .or(`supplier_bill_number.ilike.%${expense.trim()}%,supplier_name.ilike.%${expense.trim()}%`)
+          .order('issued_at', { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+        billId = (any.data as any)?.id ?? null;
+      }
+      if (!billId) return JSON.stringify({ success: false, error: `No expense matches "${expense}".` });
+
+      const sb = svc();
+      const bill = await sb.from('supplier_bills')
+        .select('supplier_bill_number, supplier_name, total, amount_paid, amount_due, currency, status')
+        .eq('id', billId).single();
+      const allocs = await sb.from('payment_allocations')
+        .select(`id, amount,
+          payment:payments(id, paid_at, method, reference, currency),
+          supplier_credit_note:supplier_credit_notes(supplier_credit_note_number, issued_at, currency, reason)`)
+        .eq('supplier_bill_id', billId);
+
+      // Both sources relieve the bill — listing only the cash would disagree with amount_paid.
+      const settlements = ((allocs.data ?? []) as any[]).map((a) => a.payment
+        ? { how: 'payment', amount: Number(a.amount), date: a.payment.paid_at, method: a.payment.method, reference: a.payment.reference }
+        : a.supplier_credit_note
+          ? { how: 'supplier_credit_note', amount: Number(a.amount), date: a.supplier_credit_note.issued_at, reference: a.supplier_credit_note.supplier_credit_note_number, reason: a.supplier_credit_note.reason }
+          : null).filter(Boolean);
+
+      const b: any = bill.data ?? {};
+      onChunk?.({ type: 'expense_payments', data: { bill_id: billId, label: b.supplier_bill_number ?? b.supplier_name, settlements, amount_due: Number(b.amount_due ?? 0), currency: b.currency } });
+      return JSON.stringify({
+        success: true, bill_id: billId,
+        expense: b.supplier_bill_number ?? b.supplier_name, status: b.status,
+        total: Number(b.total ?? 0), settled: Number(b.amount_paid ?? 0),
+        still_due: Number(b.amount_due ?? 0), currency: b.currency,
+        settlements,
+      });
+    } catch (e: any) {
+      return JSON.stringify({ success: false, error: e?.message || 'Could not read the expense payments' });
+    }
+  }, {
+    name: 'get_expense_payments',
+    description: 'Show everything that has settled a given expense / supplier bill — each payment AND any supplier credit notes — plus how much is still due. Use for "what have I paid on the Vodafone bill?" or "is that expense settled?".',
+    schema: z.object({
+      expense: z.string().describe('Bill reference/number or payee name'),
     }),
   });
 

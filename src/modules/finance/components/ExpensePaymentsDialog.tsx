@@ -18,8 +18,12 @@ import { Loader2, Link2, Unlink, Inbox as InboxIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   financeService, formatMoney, paymentMethodLabel,
-  type PayableExpense, type ExpensePayment, type AttachablePayment,
+  type PayableExpense, type ExpenseSettlement, type AttachablePayment,
 } from '@/modules/finance/services/financeService';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/core/ui/alert-dialog';
 import { PaySupplierBillDialog, type PayableBillRef } from '@/modules/finance/components/PaySupplierBillDialog';
 import { parseDecimal } from '@/utils/decimal';
 
@@ -34,7 +38,9 @@ export const ExpensePaymentsDialog: React.FC<{
 }> = ({ workspaceId, expenseId, open, onOpenChange, onChanged }) => {
   const { toast } = useToast();
   const [expense, setExpense] = useState<PayableExpense | null>(null);
-  const [payments, setPayments] = useState<ExpensePayment[]>([]);
+  const [settlements, setSettlements] = useState<ExpenseSettlement[]>([]);
+  /** Detach is destructive to the books — hold the row until it's confirmed. */
+  const [detaching, setDetaching] = useState<ExpenseSettlement | null>(null);
   const [attachable, setAttachable] = useState<AttachablePayment[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -50,10 +56,10 @@ export const ExpensePaymentsDialog: React.FC<{
       // expense is still open, so paying it in full doesn't blank the dialog.
       const [row, paid] = await Promise.all([
         financeService.getPayableExpense(expenseId),
-        financeService.listExpensePayments(expenseId),
+        financeService.listExpenseSettlements(expenseId),
       ]);
       setExpense(row);
-      setPayments(paid);
+      setSettlements(paid);
       setPickedPaymentId('');
       setAttachAmount('');
     } catch (err: any) {
@@ -100,11 +106,13 @@ export const ExpensePaymentsDialog: React.FC<{
     } finally { setBusy(false); }
   };
 
-  const detach = async (allocationId: string) => {
+  const detach = async () => {
+    if (!detaching) return;
     setBusy(true);
     try {
-      await financeService.detachPaymentFromExpense(allocationId);
+      await financeService.detachPaymentFromExpense(detaching.allocation_id);
       toast({ title: 'Payment detached', description: 'The payment is unallocated again — the expense is owed once more.' });
+      setDetaching(null);
       await load(); onChanged?.();
     } catch (err: any) {
       toast({ title: 'Could not detach', description: err?.message, variant: 'destructive' });
@@ -125,7 +133,7 @@ export const ExpensePaymentsDialog: React.FC<{
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Payments on this expense</DialogTitle>
+            <DialogTitle>Payments on This Expense</DialogTitle>
             <DialogDescription>
               {expense
                 ? <>{expense.supplier_bill_number ?? 'Expense'}{expense.party_name ? ` · ${expense.party_name}` : ''} — {formatMoney(expense.total, expense.currency)} total, {formatMoney(expense.amount_due, expense.currency)} still due.</>
@@ -161,7 +169,7 @@ export const ExpensePaymentsDialog: React.FC<{
                 <div className="border-b border-border/60 px-3 py-2 text-xs font-semibold">
                   Paid so far — {formatMoney(expense.amount_paid, expense.currency)} of {formatMoney(expense.total, expense.currency)}
                 </div>
-                {payments.length === 0 ? (
+                {settlements.length === 0 ? (
                   <p className="px-3 py-4 text-center text-xs text-muted-foreground">
                     Nothing paid against this expense yet.
                   </p>
@@ -170,28 +178,38 @@ export const ExpensePaymentsDialog: React.FC<{
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
                       <tr>
                         <th className="px-3 py-1.5 text-left">Date</th>
-                        <th className="px-3 py-1.5 text-left">Method</th>
+                        <th className="px-3 py-1.5 text-left">How</th>
                         <th className="px-3 py-1.5 text-left">Reference</th>
                         <th className="px-3 py-1.5 text-right">Amount</th>
                         <th className="px-3 py-1.5" />
                       </tr>
                     </thead>
                     <tbody>
-                      {payments.map((p) => (
-                        <tr key={p.allocation_id} className="border-b border-border/30 last:border-0">
-                          <td className="px-3 py-1.5">{new Date(p.paid_at).toLocaleDateString()}</td>
-                          <td className="px-3 py-1.5 text-xs text-muted-foreground">{paymentMethodLabel(p.method)}</td>
-                          <td className="px-3 py-1.5 text-xs text-muted-foreground">{p.reference ?? '—'}</td>
-                          <td className="px-3 py-1.5 text-right font-medium">{formatMoney(p.amount, p.currency)}</td>
+                      {settlements.map((s) => (
+                        <tr key={s.allocation_id} className="border-b border-border/30 last:border-0">
+                          <td className="px-3 py-1.5">{s.occurred_at ? new Date(s.occurred_at).toLocaleDateString() : '—'}</td>
+                          <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                            {s.source === 'payment'
+                              ? paymentMethodLabel(s.method)
+                              : <span className="text-amber-600 dark:text-amber-400">Credit note</span>}
+                          </td>
+                          <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                            {s.document_number ?? s.reference ?? '—'}
+                          </td>
+                          <td className="px-3 py-1.5 text-right font-medium">{formatMoney(s.amount, s.currency)}</td>
                           <td className="px-3 py-1.5 text-right">
-                            <Button
-                              size="sm" variant="ghost" disabled={busy}
-                              className="h-7 px-2 text-muted-foreground hover:text-destructive"
-                              title="Detach — the payment stays recorded but stops settling this expense"
-                              onClick={() => detach(p.allocation_id)}
-                            >
-                              <Unlink className="h-3.5 w-3.5" />
-                            </Button>
+                            {/* Credit-note rows aren't detachable here — the credit note owns that
+                                allocation, so unpicking it means voiding the note, not the link. */}
+                            {s.source === 'payment' ? (
+                              <Button
+                                size="sm" variant="ghost" disabled={busy}
+                                className="h-7 px-2 text-muted-foreground hover:text-destructive"
+                                title="Detach — the payment stays recorded but stops settling this expense"
+                                onClick={() => setDetaching(s)}
+                              >
+                                <Unlink className="h-3.5 w-3.5" />
+                              </Button>
+                            ) : null}
                           </td>
                         </tr>
                       ))}
@@ -267,6 +285,37 @@ export const ExpensePaymentsDialog: React.FC<{
         onOpenChange={setPayOpen}
         onSaved={() => { void load(); onChanged?.(); }}
       />
+
+      {/* Detaching moves money on the books — it reopens a payable and can flip an expense out
+          of "paid". Spell out both consequences rather than doing it on a single click. */}
+      <AlertDialog open={!!detaching} onOpenChange={(v) => { if (!v) setDetaching(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Detach this payment from the expense?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  {detaching && expense
+                    ? <>{formatMoney(detaching.amount, detaching.currency)} will stop settling{' '}
+                        {expense.supplier_bill_number ?? 'this expense'}.</>
+                    : null}
+                </p>
+                <p>
+                  The payment itself is <strong>not</strong> deleted — it stays in the money ledger and
+                  goes back to being unallocated, so you can attach it to the right expense. This one
+                  becomes owed again{detaching && expense && detaching.amount >= expense.amount_paid ? ' and returns to Payables' : ''}.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); void detach(); }} disabled={busy}>
+              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null} Detach
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

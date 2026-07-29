@@ -242,9 +242,10 @@ export interface PaymentWithAllocation extends Payment {
   party_name?: string | null;
   order_number?: string | null;
   /** What this payment settled, one entry per allocation — so the money ledger says which
-   *  invoice / expense / order it went against, not just how much was allocated. */
+   *  invoice / expense / order it went against, not just how much was allocated. Credit-note
+   *  allocations never appear here: they are sourced from a credit note, not a payment. */
   settled?: Array<{
-    kind: 'invoice' | 'expense' | 'order' | 'credit';
+    kind: 'invoice' | 'expense' | 'order';
     id: string;
     label: string;
     amount: number;
@@ -317,15 +318,24 @@ export interface PayableExpense {
   } | null;
 }
 
-/** A payment attached to an expense — one `payment_allocations` row joined to its payment. */
-export interface ExpensePayment {
+/**
+ * One thing that settled an expense — a `payment_allocations` row resolved through its SOURCE.
+ * An expense is relieved either by cash (a money-out payment) or by a supplier credit note, and
+ * BOTH count toward `amount_paid`. Listing only the cash would make "paid so far" disagree with
+ * the rows underneath it.
+ */
+export interface ExpenseSettlement {
   allocation_id: string;
-  payment_id: string;
+  source: 'payment' | 'supplier_credit_note';
   /** Settled against the expense, in the expense's currency. */
   amount: number;
-  paid_at: string;
+  /** Payment date, or the credit note's issue date. */
+  occurred_at: string;
+  /** Payment id when cash; supplier credit note id when credited. */
+  source_id: string;
+  /** Credit-note number when credited; null for cash. */
+  document_number: string | null;
   method: PaymentMethod | null;
-  direction: PaymentDirection;
   currency: string;
   reference: string | null;
   notes: string | null;
@@ -1267,11 +1277,6 @@ const _financeServiceCore = {
         if (a.order_id) {
           return { kind: 'order' as const, id: a.order_id, amount: Number(a.amount ?? 0), label: a.allocated_order?.order_number ?? 'Order' };
         }
-        // The 4th allowed target. Named rather than dropped — an unlabelled allocation would
-        // still count toward the row's "Allocated" total and read as a missing number.
-        if (a.supplier_credit_note_id) {
-          return { kind: 'credit' as const, id: a.supplier_credit_note_id, amount: Number(a.amount ?? 0), label: 'Supplier credit note' };
-        }
         return null;
       }).filter(Boolean) as PaymentWithAllocation['settled'],
     })) as PaymentWithAllocation[];
@@ -1662,29 +1667,44 @@ const _financeServiceCore = {
     return rows[0] ?? null;
   },
 
-  /** Every payment attached to an expense — the reverse view of the allocation ledger. */
-  async listExpensePayments(supplierBillId: string): Promise<ExpensePayment[]> {
+  /**
+   * Everything that settled an expense — the reverse view of the allocation ledger. Includes
+   * BOTH sources: cash payments and supplier credit notes. They both reduce `amount_due`, so
+   * both belong here; returning only the cash is what makes a part-credited bill look like it
+   * has money missing.
+   */
+  async listExpenseSettlements(supplierBillId: string): Promise<ExpenseSettlement[]> {
     const { data, error } = await supabase
       .from('payment_allocations')
-      .select('id, amount, payment:payments(id, paid_at, method, direction, currency, reference, notes, bank_account_id)')
+      .select(`id, amount,
+        payment:payments(id, paid_at, method, currency, reference, notes, bank_account_id),
+        supplier_credit_note:supplier_credit_notes(id, supplier_credit_note_number, issued_at, currency, reason)`)
       .eq('supplier_bill_id', supplierBillId);
     if (error) throw error;
     return ((data ?? []) as any[])
-      // A credit-note-sourced allocation has no payment row — it settles the bill without cash.
-      .filter((a) => a.payment)
-      .map((a) => ({
-        allocation_id: a.id,
-        payment_id: a.payment.id,
-        amount: Number(a.amount),
-        paid_at: a.payment.paid_at,
-        method: a.payment.method ?? null,
-        direction: a.payment.direction,
-        currency: a.payment.currency,
-        reference: a.payment.reference ?? null,
-        notes: a.payment.notes ?? null,
-        bank_account_id: a.payment.bank_account_id ?? null,
-      }))
-      .sort((a, b) => (a.paid_at < b.paid_at ? 1 : -1));
+      .map((a): ExpenseSettlement | null => {
+        if (a.payment) {
+          return {
+            allocation_id: a.id, source: 'payment', source_id: a.payment.id,
+            amount: Number(a.amount), occurred_at: a.payment.paid_at,
+            document_number: null, method: a.payment.method ?? null,
+            currency: a.payment.currency, reference: a.payment.reference ?? null,
+            notes: a.payment.notes ?? null, bank_account_id: a.payment.bank_account_id ?? null,
+          };
+        }
+        if (a.supplier_credit_note) {
+          return {
+            allocation_id: a.id, source: 'supplier_credit_note', source_id: a.supplier_credit_note.id,
+            amount: Number(a.amount), occurred_at: a.supplier_credit_note.issued_at,
+            document_number: a.supplier_credit_note.supplier_credit_note_number ?? null,
+            method: null, currency: a.supplier_credit_note.currency,
+            reference: a.supplier_credit_note.reason ?? null, notes: null, bank_account_id: null,
+          };
+        }
+        return null;
+      })
+      .filter((r): r is ExpenseSettlement => r !== null)
+      .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
   },
 
   /**

@@ -1391,9 +1391,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'Record a business operating expense as a categorized supplier bill.',
     icon: 'ReceiptText',
     moduleSlug: 'finance',
-    tool_ids: ['record_expense', 'list_recent_expenses'],
+    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments'],
     quick_starts: [
       { label: 'Recent expenses', description: 'List recent expenses', prompt: 'Show my recent expenses.', icon: 'ListChecks' },
+      { label: 'Pay an expense', description: 'Settle a supplier bill', prompt: 'I want to pay an expense — show me what is unpaid.', icon: 'Banknote' },
       { label: 'Record an expense', description: 'Log a business cost', prompt: 'Record a business expense — I\'ll give you the details.', icon: 'Plus' },
     ],
   },
