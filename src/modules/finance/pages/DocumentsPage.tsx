@@ -71,10 +71,12 @@ const CategoryCell: React.FC<{
   options: FinanceCategory[];
   onChange: (categoryId: string | null) => void;
 }> = ({ value, options, onChange }) => (
+  // "No category" is the CLEAR action, not a category — it must not read as one more entry in
+  // the workspace's category list, which is what "Uncategorized" sitting above the real names did.
   <Select value={value ?? NONE} onValueChange={(v) => onChange(v === NONE ? null : v)}>
-    <SelectTrigger className="h-7 w-40 text-xs"><SelectValue placeholder="Uncategorized" /></SelectTrigger>
+    <SelectTrigger className="h-7 w-40 text-xs"><SelectValue placeholder="No category" /></SelectTrigger>
     <SelectContent>
-      <SelectItem value={NONE}><span className="text-muted-foreground">Uncategorized</span></SelectItem>
+      <SelectItem value={NONE}><span className="text-muted-foreground">— No category —</span></SelectItem>
       {options.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
     </SelectContent>
   </Select>
@@ -889,6 +891,8 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
   const { toast } = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);
+  /** Document being paid before it is an expense — the conversion happens when that form saves. */
+  const [payDoc, setPayDoc] = React.useState<InboundDocument | null>(null);
   const [localCat, setLocalCat] = React.useState<Record<string, string | null>>({});
   // VAT → CRM company id, so a known issuer's name links straight to their record instead of
   // making the operator go and search for them.
@@ -918,16 +922,15 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
   };
-  /** Payments on a received document = payments on the expense it becomes. The conversion RPC is
-   *  idempotent, so this works from either side and never creates a second payable. */
-  const openPayments = async (id: string) => {
-    setBusy(id);
-    try {
-      const billId = await inboundService.toSupplierBill(id);
-      onOpenExpense(billId);
-      onChanged();
-    } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
-    finally { setBusy(null); }
+  /**
+   * Payments on a received document. Opening this is a READ — it must never create a payable.
+   * Already an expense → its payments view. Not yet → the shared Record Payment form preset to
+   * the document, which converts on SAVE. (This used to convert on open, which silently turned
+   * documents into supplier bills just for looking at them.)
+   */
+  const openPayments = (d: InboundDocument) => {
+    if (d.created_supplier_bill_id) onOpenExpense(d.created_supplier_bill_id);
+    else setPayDoc(d);
   };
   const setCategory = async (id: string, categoryId: string | null) => {
     setLocalCat((m) => ({ ...m, [id]: categoryId }));
@@ -1007,8 +1010,9 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
                     doc={d}
                     workspaceId={workspaceId}
                     busy={busy === d.id}
+                    crmCompanyId={d.issuer_vat ? crmByVat[d.issuer_vat.replace(/\D/g, '')] : undefined}
                     onCreateBill={() => createBill(d.id)}
-                    onRecordPayment={() => openPayments(d.id)}
+                    onRecordPayment={() => openPayments(d)}
                     onReceiveStock={() => setReceiveDoc(d)}
                     onDismiss={() => dismiss(d.id)}
                     onChanged={onChanged}
@@ -1026,6 +1030,15 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           workspaceId={workspaceId}
           onOpenChange={(v) => { if (!v) setReceiveDoc(null); }}
           onDone={() => { setReceiveDoc(null); onChanged(); }}
+        />
+      )}
+      {payDoc && workspaceId && (
+        <RecordPaymentDialog
+          workspaceId={workspaceId}
+          presetInboxDocId={payDoc.id}
+          open
+          onOpenChange={(v) => { if (!v) setPayDoc(null); }}
+          onSaved={() => { setPayDoc(null); onChanged(); }}
         />
       )}
     </table>

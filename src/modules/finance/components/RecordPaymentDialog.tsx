@@ -51,13 +51,16 @@ export const RecordPaymentDialog: React.FC<{
   /** Settle THIS expense (a `supplier_bills` id): opens on the money-out branch with the expense
    *  fixed, so the type/expense pickers are replaced by what is being paid. */
   presetExpenseId?: string;
+  /** Same, for an Inbox document that is NOT an expense yet (an `inbound_documents` id). It is
+   *  converted on SAVE — opening this dialog must never create a payable on its own. */
+  presetInboxDocId?: string;
   /** When set (order-attached, received, no invoice yet), the fiscal document can be issued in the
    *  same step. `fiscalDocKind` is the kind the SHARED buyer rule resolved — this dialog never
    *  re-derives it — and `onIssueDoc` runs after the payment is recorded. */
   fiscalDocKind?: SalesDocumentKind;
   fiscalDocReason?: string;
   onIssueDoc?: () => Promise<void>;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, fiscalDocKind, fiscalDocReason, onIssueDoc }) => {
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, presetInboxDocId, fiscalDocKind, fiscalDocReason, onIssueDoc }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -103,8 +106,8 @@ export const RecordPaymentDialog: React.FC<{
   const [busy, setBusy] = useState(false);
   const showOrderPicker = kind === 'received' && !orderId;
   const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
-  /** Opened on one specific expense — the branch and the target are both already decided. */
-  const expenseLocked = !!presetExpenseId;
+  /** Opened on one specific expense / Inbox document — branch and target are both already decided. */
+  const expenseLocked = !!presetExpenseId || !!presetInboxDocId;
   // Settling an expense is only offered in the general "Record payment" context. Opened for a
   // specific order / invoice the dialog is customer-scoped, and mixing a supplier cost into
   // that flow would attach it to the wrong side of the trade.
@@ -122,7 +125,7 @@ export const RecordPaymentDialog: React.FC<{
     setIssueCreditNote(true);
     setIssueChoice('payment_receipt');
     setPickedOrderId('');
-    setExpenseId(presetExpenseId ? `exp:${presetExpenseId}` : ''); setExpenseSource('all');
+    setExpenseId(presetExpenseId ? `exp:${presetExpenseId}` : presetInboxDocId ? `doc:${presetInboxDocId}` : ''); setExpenseSource('all');
     (async () => {
       // Open expenses for the money-out branch. Scoped to the party when the dialog was opened
       // from one, same rule as the invoice picker.
@@ -137,6 +140,18 @@ export const RecordPaymentDialog: React.FC<{
           })
           .catch(() => setExpenses([]));
         setInboxDocs([]);
+      } else if (presetInboxDocId) {
+        // Still just a received document. Read it — do NOT convert; `save` does that, so backing
+        // out of this dialog leaves the Inbox exactly as it was.
+        setExpenses([]);
+        inboundService.listUnbilled(workspaceId, 500)
+          .then((docs) => {
+            const one = docs.filter((d) => d.id === presetInboxDocId);
+            setInboxDocs(one);
+            const due = Number(one[0]?.total_gross ?? 0);
+            if (defaultAmount == null && due > 0) setAmount(String(due));
+          })
+          .catch(() => setInboxDocs([]));
       } else if (allowExpense) {
         financeService.listPayableExpenses(workspaceId)
           .then((rows) => setExpenses(
@@ -171,7 +186,7 @@ export const RecordPaymentDialog: React.FC<{
       // Default to the workspace's default account so cash location is always captured.
       setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
     })();
-  }, [open, workspaceId, presetExpenseId]);
+  }, [open, workspaceId, presetExpenseId, presetInboxDocId]);
 
   // Received → open invoices. Refund → any issued invoice (usually paid).
   // When opened from a party page (initialCounterparty set) the picker is HARD-SCOPED to that
@@ -424,6 +439,13 @@ export const RecordPaymentDialog: React.FC<{
                     <p className="text-[11px] text-muted-foreground">
                       From the Inbox — {selectedOption.expense.inbox.issuer_name ?? selectedOption.expense.inbox.issuer_vat ?? 'received document'}
                       {' · '}<span className="font-mono">MARK {selectedOption.expense.inbox.mark}</span>.
+                    </p>
+                  )}
+                  {selectedOption.doc && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Still in the Inbox — {selectedOption.doc.issuer_name ?? selectedOption.doc.issuer_vat ?? 'received document'}
+                      {' · '}<span className="font-mono">MARK {selectedOption.doc.mark}</span>. Saving turns it into an
+                      expense and settles it in one step. Cancelling leaves it untouched.
                     </p>
                   )}
                 </>

@@ -34,8 +34,11 @@ interface Props {
   doc: InboundDocument;
   workspaceId: string;
   busy?: boolean;
+  /** Set when the issuer's ΑΦΜ already matches a CRM company — the row resolved it, so the
+   *  "add" action is offered as already-done rather than letting a duplicate be started. */
+  crmCompanyId?: string;
   onCreateBill: () => void;
-  /** Open the payments view for the expense this document becomes (creating it if needed). */
+  /** Open this document's payments. READ-only — it must not convert the document. */
   onRecordPayment: () => void;
   onReceiveStock: () => void;
   onDismiss: () => void;
@@ -45,17 +48,19 @@ interface Props {
 /** A bare 9-digit number is a Greek ΑΦΜ — only those are resolvable via the ΑΑΔΕ / ΓΕΜΗ registries. */
 const isGreekVat = (vat: string | null | undefined) => !!greekAfm(vat);
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, onCreateBill, onRecordPayment, onReceiveStock, onDismiss, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onCreateBill, onRecordPayment, onReceiveStock, onDismiss, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const canBill = doc.status === 'new';
   const canReceive = doc.status === 'new' || doc.status === 'classified';
   const canDismiss = doc.status === 'new';
-  // Paying works whether or not the document has been turned into an expense yet — the
-  // conversion is idempotent, so this covers both "new" and "already billed".
-  const canPay = doc.status === 'new' || doc.status === 'classified' || doc.status === 'received';
+  // Paying is offered on anything not dismissed: either the expense exists (→ its payments) or
+  // the document is converted when the payment is actually saved.
+  const canPay = doc.status !== 'dismissed';
   const hasIssuer = !!(doc.issuer_vat || doc.issuer_name);
+  /** Already a CRM company — adding again would only make a duplicate to merge later. */
+  const inCrm = !!crmCompanyId;
 
   // Read-only view of the document exactly as AADE holds it.
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -165,9 +170,16 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
 
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Add to platform</DropdownMenuLabel>
-          <DropdownMenuItem onClick={openCrm} disabled={!hasIssuer}>
-            <Building2 className="h-4 w-4 mr-2" /> Add issuer to CRM
-          </DropdownMenuItem>
+          {inCrm ? (
+            // Not disabled-and-silent: say it is already there, and make the row the way in.
+            <DropdownMenuItem onClick={() => navigate(`/crm/companies/${crmCompanyId}`)}>
+              <Building2 className="h-4 w-4 mr-2" /> Issuer in CRM — open
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={openCrm} disabled={!hasIssuer}>
+              <Building2 className="h-4 w-4 mr-2" /> Add issuer to CRM
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={onReceiveStock} disabled={!canReceive}>
             <PackagePlus className="h-4 w-4 mr-2" /> Add products to warehouse
           </DropdownMenuItem>
