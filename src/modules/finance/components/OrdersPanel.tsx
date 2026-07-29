@@ -1915,6 +1915,64 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               receipt/invoice is the separate Create document action.
             </p>
 
+            {/* 3-way match — purchase orders only: PO cost × goods received × supplier bill. Sits
+                directly above the note as the last read-only block: it is a verdict on everything
+                above it, so it only makes sense once the lines, cash and delivery state are read. */}
+            {order.order_type === 'purchase' && match && match.match_status !== 'no_lines' && (
+              <div className="rounded-md border border-border/60 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold">3-way match</span>
+                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${MATCH_META[match.match_status].cls}`}>
+                    {MATCH_META[match.match_status].label}
+                  </span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">PO cost × goods received × supplier bill</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  The safety check before you pay this supplier: what you <strong>ordered</strong>, what actually{' '}
+                  <strong>arrived</strong>, and what they <strong>billed</strong> you should all say the same thing.
+                  It reads <em>Matched</em> only when they do — anything else is flagged below, so you never pay for
+                  goods that never turned up or at a price you did not agree.
+                </p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded bg-muted/40 p-2">
+                    <div className="text-muted-foreground">Ordered (PO net)</div>
+                    <div className="tabular-nums font-medium">{formatMoney(match.po_net, order.currency)}</div>
+                  </div>
+                  <div className="rounded bg-muted/40 p-2">
+                    <div className="text-muted-foreground">Received</div>
+                    <div className="tabular-nums font-medium">{match.received_qty} / {match.ordered_qty}</div>
+                  </div>
+                  <div className="rounded bg-muted/40 p-2">
+                    <div className="text-muted-foreground">Billed{match.bill_count > 0 ? ` (${match.bill_count})` : ''}</div>
+                    <div className="tabular-nums font-medium">{formatMoney(match.bill_net, order.currency)}</div>
+                  </div>
+                </div>
+                {match.variances.length > 0 && (
+                  <ul className="space-y-0.5 text-[11px] text-destructive">
+                    {match.variances.map((v, i) => (
+                      <li key={i} className="flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        {v.type === 'amount'
+                          ? `Bill net ${formatMoney(v.bill_net, order.currency)} vs PO ${formatMoney(v.po_net, order.currency)} (${v.delta >= 0 ? '+' : ''}${formatMoney(v.delta, order.currency)})`
+                          : `Received ${v.received} vs ordered ${v.ordered} (${v.delta >= 0 ? '+' : ''}${v.delta})`}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {/* Each state says what to DO next, not just what it is — the badge alone left the
+                    operator guessing which of the three documents was still missing. */}
+                <p className="text-[11px] text-muted-foreground">
+                  {match.match_status === 'awaiting_receipt'
+                    ? 'Nothing delivered yet. Mark the lines delivered above as the goods arrive.'
+                    : match.match_status === 'awaiting_bill'
+                      ? 'Goods received — record the supplier bill against this order to complete the check.'
+                      : match.match_status === 'variance'
+                        ? 'The three do not agree. Fix whatever is wrong above — or take it up with the supplier — before paying.'
+                        : 'Ordered, received and billed all agree. Safe to pay.'}
+                </p>
+              </div>
+            )}
+
             {/* Order note — moved below payments to keep the top of the order clean. Captured when the
                 order is placed; prints on the invoice + receipt. */}
             <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
