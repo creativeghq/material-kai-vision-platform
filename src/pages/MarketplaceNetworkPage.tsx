@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { workspaceManagementService } from '@/services/workspaceManagementService';
+import { CatalogGrantRequestsCard } from '@/modules/finance/components/CatalogGrantRequestsCard';
 
 interface WsRow {
   id: string;
@@ -220,6 +221,11 @@ const MarketplaceNetworkPage: React.FC = () => {
           {!loading && <TablePagination page={page} total={childRows.length} onPageChange={setPage} label="sub-workspaces" />}
         </CardContent>
       </Card>
+
+      {/* Per-factory grants sit directly under the coarse per-workspace switch above, because
+          they are the fine-grained version of the same decision: "Full catalog" is the
+          all-factories case, a grant is one factory. */}
+      <CatalogGrantRequestsCard workspaceIds={childRows.map((r) => r.id)} />
       </div>
     </div>
   );
