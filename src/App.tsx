@@ -133,6 +133,7 @@ const ModuleSettingsPage = lazy(() => import('./components/Admin/Secrets/ModuleS
 const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
 const TermsOfServicePage = lazy(() => import('./pages/legal/TermsOfServicePage'));
 const HomePage = lazy(() => import('./pages/HomePage'));
+const ChangelogPage = lazy(() => import('./pages/ChangelogPage'));
 
 // Module system — registers module routes declared in src/modules/*/index.ts
 import { buildModuleRoutes } from './modules/_core';
@@ -202,6 +203,10 @@ const App = () => (
                 <Route path="/tools/project-plan" element={<PageErrorBoundary name="Project Plan Estimator"><ProjectPlanPage /></PageErrorBoundary>} />
                 <Route path="/tools/heat-pump" element={<PageErrorBoundary name="Heat Pump Sizer"><HeatPumpToolPage /></PageErrorBoundary>} />
                 <Route path="/tools/heating-cost" element={<PageErrorBoundary name="Heating Cost Comparison"><HeatingCostPage /></PageErrorBoundary>} />
+                {/* Public changelog — deliberately outside AuthGuard: a changelog you must log in to
+                    read is useless to the two audiences that need it (prospects and API consumers).
+                    Only published rows are reachable; the RLS policy enforces that for anon too. */}
+                <Route path="/changelog" element={<PageErrorBoundary name="Changelog"><ChangelogPage /></PageErrorBoundary>} />
                 {/* Public legal pages — no auth required */}
                 <Route path="/privacy" element={<PageErrorBoundary name="Privacy Policy"><PrivacyPolicyPage /></PageErrorBoundary>} />
                 <Route path="/terms" element={<PageErrorBoundary name="Terms of Service"><TermsOfServicePage /></PageErrorBoundary>} />

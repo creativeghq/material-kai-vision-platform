@@ -189,7 +189,7 @@ for (const fn of fns) {
 
 const TAG_ORDER = [
   'AI Agents', 'AI Generation', 'Social', 'Search', 'MIVAA Gateway', 'Knowledge Base',
-  'Finance', 'Payments', 'Quotes', 'CRM', 'Business Profile',
+  'Finance', 'Payments', 'Quotes', 'CRM', 'Business Profile', 'Real Estate',
   'Catalogs', 'Moodboard & Sheets', 'PDF Processing', 'Data Import', 'Scraping',
   'Email', 'Messaging', 'Pinterest', 'Notifications', 'Recommendations',
   'SEO', 'Flows', 'Alerts', 'Monitoring Crons', 'Background Agents', 'Crons', 'Admin', 'Internal', 'Misc',
@@ -206,6 +206,7 @@ const TAG_DESCRIPTIONS = {
   'Quotes': 'Quote documents, public white-label share, email, PDF.',
   'CRM': 'Companies, contacts, users, Stripe state (consolidated crm-api router).',
   'Business Profile': 'VAT/registry validation (VIES, ΑΑΔΕ) and role upgrades.',
+  'Real Estate': 'Property listings, leads, viewings, offers, sales, lettings, investments — plus the anonymous public listing pages, buyer portal and portal syndication feed.',
   'Catalogs': 'Presentation catalogs: extract, translate, render, email-gate, send.',
   'Moodboard & Sheets': 'Presentation sheets + project Client View deliverables.',
   'PDF Processing': 'Batch PDF processing.',

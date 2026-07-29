@@ -123,6 +123,7 @@
         { file: "real-estate-syndication.html", title: "Portal syndication" },
       ]},
       { file: "stock.html", title: "Stock Management", icon: "📦" },
+      { file: "company-assets.html", title: "Company Assets", icon: "🚗" },
       { file: "contracts.html", title: "Contracts & e-Signature", icon: "✍️" },
       { file: "email-marketing.html", title: "Email Marketing (BYOK)", icon: "📣" },
       { file: "seo.html", title: "SEO & Content", icon: "📈", children: [
@@ -187,6 +188,7 @@
         '<span class="t-sub">Documentation</span>' +
       "</a>" +
       '<span class="spacer"></span>' +
+      '<a class="hlink" href="' + APP_URL + 'changelog" target="_blank" rel="noopener">What’s new ↗</a>' +
       '<a class="hlink" href="' + APP_URL + '" target="_blank" rel="noopener">Open app ↗</a>';
     return el;
   }

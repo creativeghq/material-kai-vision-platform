@@ -16,18 +16,25 @@ import {
   ArrowRight,
   Bot,
   Boxes,
-  Briefcase,
   Building2,
   Calculator,
+  CreditCard,
   FileText,
-  Home,
   Image as ImageIcon,
+  KeyRound,
   LineChart,
   LogIn,
+  Megaphone,
+  MessagesSquare,
+  Package,
+  PenLine,
+  PiggyBank,
   Receipt,
   ScanSearch,
   Sparkles,
   Store,
+  TrendingUp,
+  Users,
   Wand2,
   Workflow,
   type LucideIcon,
@@ -79,13 +86,25 @@ const FEATURES: Feature[] = [
     icon: Building2,
     title: 'CRM & projects',
     description:
-      'Manage customers, suppliers and projects end to end — with automatic Greek business-registry (ΑΑΔΕ) enrichment and per-workspace tenancy.',
+      'Customers, suppliers and projects end to end. One research chain enriches a company from the Greek registries (ΑΑΔΕ → ΓΕΜΗ) and the open web, with multiple named addresses and phone numbers per party.',
   },
   {
     icon: LineChart,
     title: 'Price & market monitoring',
     description:
       'Track competitor prices, brand mentions and market coverage across the web, with alerts when prices drop or new retailers and mentions appear.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'SEO & content',
+    description:
+      'Connect your website once, then pull Search Console performance, run site-health and backlink audits, research keywords and publish SEO articles with internal links written in.',
+  },
+  {
+    icon: MessagesSquare,
+    title: 'Shared inbox & WhatsApp',
+    description:
+      'Team, customer and WhatsApp conversations in one inbox. A reply assigns itself to the person who started the thread, so nothing sits unowned.',
   },
   {
     icon: Wand2,
@@ -97,25 +116,71 @@ const FEATURES: Feature[] = [
     icon: Store,
     title: 'Marketplace & storefronts',
     description:
-      'Publish an online storefront, share catalogs, and connect with brands and buyers through the materials marketplace.',
-  },
-  {
-    icon: Home,
-    title: 'Real estate & listings',
-    description:
-      'Run property listings end to end — publish public listing pages, capture buyer requirements with auto-matching, schedule viewings, track offers, and syndicate to portals.',
-  },
-  {
-    icon: Briefcase,
-    title: 'Hiring & careers',
-    description:
-      'Post openings to a branded public careers page and job board, collect résumés, and manage candidates — your own recruiting pipeline built in.',
+      'Publish an online storefront, share catalogs, run a counter with point of sale, and connect with brands and buyers through the materials marketplace.',
   },
   {
     icon: Workflow,
-    title: 'Automations & add-on apps',
+    title: 'Automations & flows',
     description:
-      'Enable modular add-ons from a Hub-grouped app store and automate notifications, emails and workflows with a visual flow builder — no code required.',
+      'Automate notifications, emails and workflows with a visual flow builder — no code. Every alert on the platform runs through it, so you can retarget or pause any of them.',
+  },
+];
+
+interface App {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}
+
+/** Purchasable add-on modules — switch them on per workspace from the in-app app store. */
+const APPS: App[] = [
+  {
+    icon: Building2,
+    title: 'Real Estate',
+    description:
+      'Listings, leads, viewings, offers and sales, with public listing pages, a buyer portal that matches saved requirements automatically, and syndication to property portals.',
+  },
+  {
+    icon: KeyRound,
+    title: 'Property Management',
+    description:
+      'Tenancies, rent schedules, maintenance jobs and landlord statements. Rent due becomes a draft invoice for you to review — never an automatic filing.',
+  },
+  {
+    icon: PiggyBank,
+    title: 'Investments',
+    description:
+      'Model a property as an investment case: purchase, costs, financing and projected yield and ROI.',
+  },
+  {
+    icon: Users,
+    title: 'HR & payroll',
+    description:
+      'Employees, absences, attendance and clock-in, payroll runs, document OCR, Greek Εργάνη filing, and a branded public careers page with its own job board.',
+  },
+  {
+    icon: Package,
+    title: 'Stock & warehouse',
+    description:
+      'Multi-warehouse inventory, transfers, stocktakes, inbound shipments and reorder points — wired straight into order fulfilment and delivery notes.',
+  },
+  {
+    icon: PenLine,
+    title: 'Contracts & e-signature',
+    description:
+      'Draft, send and countersign contracts. The counterparty signs from a link with no account, and the signed PDF is archived against the record it came from.',
+  },
+  {
+    icon: Megaphone,
+    title: 'Email marketing',
+    description:
+      'Campaigns built on a visual editor, sent through your own provider account, with working one-click unsubscribe and suppression handled for you.',
+  },
+  {
+    icon: CreditCard,
+    title: 'Payments',
+    description:
+      'Take card payments through Stripe or Viva, send pay-by-link invoices, and reconcile settlements back against the invoice automatically.',
   },
 ];
 
@@ -160,6 +225,9 @@ export default function HomePage() {
             </Link>
             <Link to="/brands">
               <Button variant="ghost" size="sm" className="hidden sm:inline-flex">Brands</Button>
+            </Link>
+            <Link to="/changelog">
+              <Button variant="ghost" size="sm" className="hidden md:inline-flex">What's new</Button>
             </Link>
             <Link to="/auth">
               <Button variant="ghost" size="sm" className="gap-2">
@@ -258,6 +326,36 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Business apps (add-on modules) */}
+      <section className="container mx-auto max-w-6xl px-4 pb-16">
+        <div className="text-center mb-12">
+          <h2 className="font-display text-3xl font-semibold tracking-tight mb-3">
+            Switch on only the apps you need
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            The platform is modular. Every workspace starts with the core, and you enable the rest
+            from the in-app store when the business actually needs them.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {APPS.map((a) => {
+            const Icon = a.icon;
+            return (
+              <Card key={a.title} className="dashboard-card h-full">
+                <CardContent className="p-5 flex flex-col h-full">
+                  <div className="rounded-xl bg-primary/10 p-2 w-fit mb-3">
+                    <Icon className="h-4 w-4 text-primary" />
+                  </div>
+                  <h3 className="text-base font-semibold mb-1.5">{a.title}</h3>
+                  <p className="text-sm text-muted-foreground flex-1">{a.description}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Free tools strip */}
       <section className="container mx-auto max-w-5xl px-4 pb-16">
         <Card className="dashboard-card">
@@ -318,6 +416,8 @@ export default function HomePage() {
             <Link to="/tools" className="hover:text-foreground transition-colors">Tools</Link>
             <Link to="/brands" className="hover:text-foreground transition-colors">Brands</Link>
             <Link to="/knowledge-base" className="hover:text-foreground transition-colors">Knowledge base</Link>
+            <Link to="/changelog" className="hover:text-foreground transition-colors">Changelog</Link>
+            <a href="/documentation/" className="hover:text-foreground transition-colors">Documentation</a>
             <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
             <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
             <a href="mailto:support@materialshub.gr" className="hover:text-foreground transition-colors">

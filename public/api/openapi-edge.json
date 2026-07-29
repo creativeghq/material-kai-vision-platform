@@ -56,6 +56,10 @@
       "description": "VAT/registry validation (VIES, ΑΑΔΕ) and role upgrades."
     },
     {
+      "name": "Real Estate",
+      "description": "Property listings, leads, viewings, offers, sales, lettings, investments — plus the anonymous public listing pages, buyer portal and portal syndication feed."
+    },
+    {
       "name": "Catalogs",
       "description": "Presentation catalogs: extract, translate, render, email-gate, send."
     },
@@ -106,6 +110,10 @@
     {
       "name": "Alerts",
       "description": "Saved-search material alerts."
+    },
+    {
+      "name": "Monitoring Crons",
+      "description": "Scheduled refreshers for price / mention / job research + LLM probes."
     },
     {
       "name": "Background Agents",
@@ -15849,6 +15857,2843 @@
             }
           }
         }
+      }
+    },
+    "/real-estate-api": {
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals",
+        "operationId": "post_real_estate_api",
+        "description": "Single action router for the Real Estate module (#249/#281). Gate order per request: `authenticate` → `userCanAccessWorkspace` (404 on mismatch) → `isModuleEnabled('real-estate')` (404) → `assertEntitled(ws, 'real-estate')` (402) → Real-Estate RBAC (`canView` / `canManage`).\n\n**Agent scoping.** A broker sees every listing in the workspace. A `realestate_agent` sees a listing only when they are its `listing_agent_id`, they created it, or it is flagged `open_for_all` (view-only). Ownership failures return **404**, not 403, so listing ids cannot be enumerated.\n\n**Sub-module add-ons.** Tenancy / rent / maintenance / landlord-statement actions additionally require the `real-estate-management` entitlement; investment actions require `real-estate-investments`. Either returns **402** when the workspace has not purchased the add-on.\n\n**Response:** `{ ok, ...action-specific payload } | { error }`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ping"
+                        ],
+                        "description": "Connectivity + resolved RBAC probe. Returns the caller's Real Estate access flags."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "dashboard"
+                        ],
+                        "description": "Module dashboard: listing counts by status, pipeline value, recent inquiries and viewings."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-properties"
+                        ],
+                        "description": "List listings visible to the caller."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "status": {
+                        "type": "string",
+                        "description": "Filter by listing_status."
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "Page size."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get-property"
+                        ],
+                        "description": "Read one listing (404 when not visible to the caller)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-property"
+                        ],
+                        "description": "Create a listing. Server sets workspace_id, created_by and listing_agent_id."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property": {
+                        "type": "object",
+                        "description": "Allow-listed listing fields (title, type, price, address, features…)."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id",
+                      "patch"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-property"
+                        ],
+                        "description": "Update a listing the caller owns (or any, for a broker)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      },
+                      "patch": {
+                        "type": "object",
+                        "description": "Allow-listed fields to change."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-property"
+                        ],
+                        "description": "Delete a listing and its dependent rows."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "publish-property"
+                        ],
+                        "description": "Publish publicly: mints/keeps the opaque public_listing_token behind /p/:token and sets listing_status=active."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      },
+                      "in_discovery": {
+                        "type": "boolean",
+                        "description": "Also expose to cross-workspace discovery + the syndication feed."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "unpublish-property"
+                        ],
+                        "description": "Withdraw from the public page, discovery and the syndication feed."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "draft-description"
+                        ],
+                        "description": "AI-draft a listing description from the structured listing fields. Credit-metered."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      },
+                      "tone": {
+                        "type": "string",
+                        "description": "Optional copy tone hint."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id",
+                      "filename"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "photo-upload-url"
+                        ],
+                        "description": "Mint a signed upload URL for a listing photo."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      },
+                      "filename": {
+                        "type": "string",
+                        "description": "Original file name (extension is used for the storage key)."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id",
+                      "storage_path"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "add-photo"
+                        ],
+                        "description": "Register an uploaded photo against the listing."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      },
+                      "storage_path": {
+                        "type": "string",
+                        "description": "Path returned by photo-upload-url."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "analyze-photos"
+                        ],
+                        "description": "Claude-vision pass over the listing photos: room labels, condition and feature hints. Credit-metered."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "photo_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-photo"
+                        ],
+                        "description": "Remove a listing photo."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "photo_id": {
+                        "type": "string",
+                        "description": "Photo id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "photo_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "set-cover"
+                        ],
+                        "description": "Set the listing cover photo."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "photo_id": {
+                        "type": "string",
+                        "description": "Photo id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id",
+                      "ordered_ids"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "reorder-photos"
+                        ],
+                        "description": "Persist a new photo display order."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      },
+                      "ordered_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Photo ids in display order."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-inquiries"
+                        ],
+                        "description": "List inbound leads for the workspace or one listing."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Scope to one listing. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "inquiry"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-inquiry"
+                        ],
+                        "description": "Log a lead captured off-platform (walk-in, phone, portal)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "inquiry": {
+                        "type": "object",
+                        "description": "Lead fields (name, email, phone, message, property_id?)."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "inquiry_id",
+                      "patch"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-inquiry"
+                        ],
+                        "description": "Update a lead's status, owner or notes."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "inquiry_id": {
+                        "type": "string",
+                        "description": "Lead id. (string (uuid))"
+                      },
+                      "patch": {
+                        "type": "object",
+                        "description": "Fields to change."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "inquiry_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "convert-inquiry"
+                        ],
+                        "description": "Convert a lead into a crm_contacts record (and optionally a buyer requirement)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "inquiry_id": {
+                        "type": "string",
+                        "description": "Lead id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-viewings"
+                        ],
+                        "description": "List scheduled viewings."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Scope to one listing. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "viewing"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-viewing"
+                        ],
+                        "description": "Schedule a viewing and notify the attendees."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "viewing": {
+                        "type": "object",
+                        "description": "property_id, contact_id, scheduled_at, notes."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "viewing_id",
+                      "patch"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-viewing"
+                        ],
+                        "description": "Reschedule a viewing or record its outcome/feedback."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "viewing_id": {
+                        "type": "string",
+                        "description": "Viewing id. (string (uuid))"
+                      },
+                      "patch": {
+                        "type": "object",
+                        "description": "Fields to change."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id",
+                      "contact_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "add-interest"
+                        ],
+                        "description": "Flag a contact as interested in a listing (feeds buyer matching)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      },
+                      "contact_id": {
+                        "type": "string",
+                        "description": "CRM contact id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-offers"
+                        ],
+                        "description": "List offers on a listing or across the workspace."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Scope to one listing. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "offer"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-offer"
+                        ],
+                        "description": "Record a buyer offer."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "offer": {
+                        "type": "object",
+                        "description": "property_id, contact_id, amount, currency, conditions."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "offer_id",
+                      "patch"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-offer"
+                        ],
+                        "description": "Update an offer amount, conditions or status."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "offer_id": {
+                        "type": "string",
+                        "description": "Offer id. (string (uuid))"
+                      },
+                      "patch": {
+                        "type": "object",
+                        "description": "Fields to change."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "offer_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "accept-offer"
+                        ],
+                        "description": "Accept an offer — marks the listing under-offer and rejects competing offers."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "offer_id": {
+                        "type": "string",
+                        "description": "Offer id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id",
+                      "sale"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "complete-sale"
+                        ],
+                        "description": "Close the sale: writes a property_sales row, records commission and moves the listing to sold."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      },
+                      "sale": {
+                        "type": "object",
+                        "description": "Completion price, date, buyer/seller contacts and commission."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-sales"
+                        ],
+                        "description": "List completed sales with commission totals."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "sale_id",
+                      "invoice_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "link-sale-invoice"
+                        ],
+                        "description": "Link a Finance invoice to a completed sale (commission invoicing)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "sale_id": {
+                        "type": "string",
+                        "description": "Sale id. (string (uuid))"
+                      },
+                      "invoice_id": {
+                        "type": "string",
+                        "description": "Finance invoice id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-sellers"
+                        ],
+                        "description": "List seller/vendor contacts with their instructed listings."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "contact_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "contact-properties"
+                        ],
+                        "description": "Every listing a CRM contact touches — as seller, buyer, tenant or enquirer."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "contact_id": {
+                        "type": "string",
+                        "description": "CRM contact id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-buyer-requirements"
+                        ],
+                        "description": "List saved buyer requirements (the auto-matching search profiles)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "requirement"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "upsert-buyer-requirement"
+                        ],
+                        "description": "Create or update a buyer requirement, incl. the /buyer/:token portal + digest opt-in."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "requirement": {
+                        "type": "object",
+                        "description": "contact_id, budget, area, beds, property types, digest_enabled."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "requirement_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-buyer-requirement"
+                        ],
+                        "description": "Delete a buyer requirement."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "requirement_id": {
+                        "type": "string",
+                        "description": "Requirement id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "requirement_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "match-buyer-requirement"
+                        ],
+                        "description": "Run a requirement against live listings and return the ranked matches."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "requirement_id": {
+                        "type": "string",
+                        "description": "Requirement id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "buyers-for-property"
+                        ],
+                        "description": "Reverse match — which saved buyer requirements this listing satisfies."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "contact_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get-contact-ext"
+                        ],
+                        "description": "Read the real-estate extension record on a CRM contact."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "contact_id": {
+                        "type": "string",
+                        "description": "CRM contact id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "contact_id",
+                      "patch"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "upsert-contact-ext"
+                        ],
+                        "description": "Write the real-estate extension record on a CRM contact."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "contact_id": {
+                        "type": "string",
+                        "description": "CRM contact id. (string (uuid))"
+                      },
+                      "patch": {
+                        "type": "object",
+                        "description": "Extension fields."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get-feed-settings"
+                        ],
+                        "description": "Read the syndication feed settings (format, enabled, tokenized URL)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "patch"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-feed-settings"
+                        ],
+                        "description": "Enable/disable syndication and choose the feed format."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "patch": {
+                        "type": "object",
+                        "description": "feed_enabled, feed_format (kyero | openimmo | generic)."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "rotate-feed-token"
+                        ],
+                        "description": "Rotate the syndication feed token — instantly revokes every portal that holds the old URL."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "cma-report"
+                        ],
+                        "description": "Comparative market analysis: comparable listings + a per-m² price estimate for a property."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Subject listing. (string (uuid))"
+                      },
+                      "criteria": {
+                        "type": "object",
+                        "description": "Ad-hoc subject when no listing exists yet."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-deals"
+                        ],
+                        "description": "List real-estate deals (the module pipeline board)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "deal"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "upsert-deal"
+                        ],
+                        "description": "Create or update a deal / pipeline stage."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "deal": {
+                        "type": "object",
+                        "description": "Deal fields (title, stage, value, property_id, contact_id)."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "deal_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-deal"
+                        ],
+                        "description": "Delete a deal."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "deal_id": {
+                        "type": "string",
+                        "description": "Deal id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "deal_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-deal-tasks"
+                        ],
+                        "description": "List the task checklist on a deal."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "deal_id": {
+                        "type": "string",
+                        "description": "Deal id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "deal_id",
+                      "title"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "add-deal-task"
+                        ],
+                        "description": "Add a task to a deal."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "deal_id": {
+                        "type": "string",
+                        "description": "Deal id. (string (uuid))"
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Task title."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "task_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "toggle-deal-task"
+                        ],
+                        "description": "Toggle a deal task done/undone."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "task_id": {
+                        "type": "string",
+                        "description": "Task id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "task_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-deal-task"
+                        ],
+                        "description": "Delete a deal task."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "task_id": {
+                        "type": "string",
+                        "description": "Task id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-tenancies"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. List tenancies."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Scope to one property. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "tenancy"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "upsert-tenancy"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. Create or update a tenancy (tenant, term, rent, deposit)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "tenancy": {
+                        "type": "object",
+                        "description": "Tenancy fields."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "tenancy_id",
+                      "patch"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "renew-tenancy"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. Renew a tenancy onto a new term, optionally re-basing the rent."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "tenancy_id": {
+                        "type": "string",
+                        "description": "Tenancy id. (string (uuid))"
+                      },
+                      "patch": {
+                        "type": "object",
+                        "description": "New end date and rent."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "tenancy_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-tenancy"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. Delete a tenancy."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "tenancy_id": {
+                        "type": "string",
+                        "description": "Tenancy id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-rent-charges"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. List the rent schedule with paid/due/overdue state."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "tenancy_id": {
+                        "type": "string",
+                        "description": "Scope to one tenancy. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "tenancy_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "generate-rent-schedule"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. Generate the recurring rent charges for a tenancy term."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "tenancy_id": {
+                        "type": "string",
+                        "description": "Tenancy id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "charge_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "mark-rent-paid"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. Mark a rent charge settled."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "charge_id": {
+                        "type": "string",
+                        "description": "Rent charge id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "charge_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "invoice-rent-charge"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. Raise a Finance invoice for one rent charge (the manual twin of the nightly real-estate-rent-invoicing cron)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "charge_id": {
+                        "type": "string",
+                        "description": "Rent charge id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-maintenance"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. List maintenance jobs."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Scope to one property. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "job"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "upsert-maintenance"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. Create or update a maintenance job."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "job": {
+                        "type": "object",
+                        "description": "Maintenance fields (property, issue, contractor, cost, status)."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "maintenance_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-maintenance"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. Delete a maintenance job."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "maintenance_id": {
+                        "type": "string",
+                        "description": "Maintenance job id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "property_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "landlord-statement"
+                        ],
+                        "description": "ADD-ON `real-estate-management`. Landlord statement for a period: rent collected, fees, maintenance and net due."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Property id. (string (uuid))"
+                      },
+                      "from": {
+                        "type": "string",
+                        "description": "Period start. (string (date))"
+                      },
+                      "to": {
+                        "type": "string",
+                        "description": "Period end. (string (date))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-investments"
+                        ],
+                        "description": "ADD-ON `real-estate-investments`. List investment cases with yield/ROI."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "investment_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get-investment"
+                        ],
+                        "description": "ADD-ON `real-estate-investments`. Read one investment case."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "investment_id": {
+                        "type": "string",
+                        "description": "Investment id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "investment"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "upsert-investment"
+                        ],
+                        "description": "ADD-ON `real-estate-investments`. Create or update an investment case (purchase, costs, financing, projected yield)."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "investment": {
+                        "type": "object",
+                        "description": "Investment fields."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "investment_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-investment"
+                        ],
+                        "description": "ADD-ON `real-estate-investments`. Delete an investment case."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "investment_id": {
+                        "type": "string",
+                        "description": "Investment id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "inquiry_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-inquiry"
+                        ],
+                        "description": "Delete a lead."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "inquiry_id": {
+                        "type": "string",
+                        "description": "Lead id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "offer_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-offer"
+                        ],
+                        "description": "Delete an offer."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "offer_id": {
+                        "type": "string",
+                        "description": "Offer id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "viewing_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-viewing"
+                        ],
+                        "description": "Delete a viewing."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "viewing_id": {
+                        "type": "string",
+                        "description": "Viewing id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "sale_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-sale"
+                        ],
+                        "description": "Delete a completed-sale record."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "sale_id": {
+                        "type": "string",
+                        "description": "Sale id. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_id",
+                      "contact_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-contact-ext"
+                        ],
+                        "description": "Delete the real-estate extension record on a CRM contact."
+                      },
+                      "workspace_id": {
+                        "type": "string",
+                        "description": "Target workspace. Reconciled against the caller via userCanAccessWorkspace — a mismatch 404s. (string (uuid))"
+                      },
+                      "contact_id": {
+                        "type": "string",
+                        "description": "CRM contact id. (string (uuid))"
+                      }
+                    }
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/real-estate-public": {
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Anonymous, token-gated public listing pages, buyer portal, discovery and lead capture",
+        "operationId": "post_real_estate_public",
+        "description": "The unauthenticated half of Real Estate — deliberately a separate function from `real-estate-api` so no authed surface is reachable without a session. Uses the service-role client, but every read is bound to an opaque capability token (`public_listing_token` / buyer `portal_token`); there is no id-addressable public read. Only listings that are `is_public` **and** `listing_status='active'` resolve — anything else 404s.\n\nResponses are the `toPublic()` projection only: internal pricing, owner and lead fields never leave. Lead-writing actions require `gdpr_consent`, derive property + workspace from the token (never the body), and are throttled to **8 submissions per hour per IP** (IP is SHA-256 hashed, never stored raw) → 429.\n\n**Response:** `{ listing | listings | buyer | estimate | ok } | { error } — toPublic() projection only`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [
+          {
+            "queryToken": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "get"
+                        ],
+                        "description": "Resolve a public listing token into the public listing payload for /p/:token."
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "public_listing_token from the shared link."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token",
+                      "name",
+                      "email",
+                      "gdpr_consent"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "inquire"
+                        ],
+                        "description": "Anonymous lead capture from the public listing page. Requires gdpr_consent; rate-limited per IP."
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "public_listing_token."
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Enquirer name."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Enquirer email."
+                      },
+                      "phone": {
+                        "type": "string",
+                        "description": "Enquirer phone."
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "Enquiry text."
+                      },
+                      "gdpr_consent": {
+                        "type": "boolean",
+                        "description": "Must be true — the write is rejected without explicit consent."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "discover"
+                        ],
+                        "description": "Cross-workspace discovery feed — listings explicitly opted in with in_discovery=true."
+                      },
+                      "filters": {
+                        "type": "object",
+                        "description": "type, price range, area, beds."
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "Page size."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_slug"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "agency-listings"
+                        ],
+                        "description": "Public listing wall for a single agency/workspace."
+                      },
+                      "workspace_slug": {
+                        "type": "string",
+                        "description": "Public agency slug."
+                      },
+                      "filters": {
+                        "type": "object",
+                        "description": "Same filter shape as discover."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "buyer-portal"
+                        ],
+                        "description": "Resolve a buyer portal token into that buyer's matched listings, favourites and requirement summary (/buyer/:token)."
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "Buyer requirement portal_token."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token",
+                      "property_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "buyer-favorite"
+                        ],
+                        "description": "Toggle a favourite from the buyer portal."
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "Buyer portal_token."
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing to favourite/unfavourite. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "token",
+                      "property_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "buyer-request-viewing"
+                        ],
+                        "description": "Buyer requests a viewing from their portal — creates a viewing request on the agency side. Rate-limited."
+                      },
+                      "token": {
+                        "type": "string",
+                        "description": "Buyer portal_token."
+                      },
+                      "property_id": {
+                        "type": "string",
+                        "description": "Listing id. (string (uuid))"
+                      },
+                      "preferred_at": {
+                        "type": "string",
+                        "description": "Preferred slot. (string (date-time))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "workspace_slug",
+                      "address",
+                      "email",
+                      "gdpr_consent"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "request-valuation"
+                        ],
+                        "description": "Public \"what is my property worth\" lead — returns a per-m² median estimate and files the lead. Requires gdpr_consent; rate-limited."
+                      },
+                      "workspace_slug": {
+                        "type": "string",
+                        "description": "Agency to route the lead to."
+                      },
+                      "address": {
+                        "type": "string",
+                        "description": "Subject property address."
+                      },
+                      "size_sqm": {
+                        "type": "number",
+                        "description": "Subject size for the estimate."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Lead email."
+                      },
+                      "gdpr_consent": {
+                        "type": "boolean",
+                        "description": "Must be true."
+                      }
+                    }
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/real-estate-feed": {
+      "get": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Tokenized XML syndication feed (Kyero / OpenImmo / generic) for property portals",
+        "operationId": "get_real_estate_feed",
+        "description": "PULL syndication: a portal fetches `GET /real-estate-feed?token=…&format=kyero|openimmo|generic` and receives the workspace's live listings as XML. The opaque `feed_token` (rotatable from `real-estate-api → rotate-feed-token`) is the only credential — it gates cross-workspace enumeration.\n\nA listing only appears when it is `is_public`, `listing_status='active'` **and** `in_discovery=true`, so a listing published only to the agency's own site never leaks to third-party portals. Output is the `toPublic()` projection with XML-escaped values. `format` falls back to the workspace's configured `feed_format`. A disabled or unknown token returns a 404 XML error document.\n\n**Response:** `application/xml — Kyero <root><property>… | OpenImmo <immobilie>… | generic <listings><listing>…`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [
+          {
+            "queryToken": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "description": "Workspace feed_token.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "description": "Feed dialect. Defaults to real_estate_settings.feed_format, then kyero.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Tokenized XML syndication feed (Kyero / OpenImmo / generic) for property portals",
+        "operationId": "post_real_estate_feed",
+        "description": "PULL syndication: a portal fetches `GET /real-estate-feed?token=…&format=kyero|openimmo|generic` and receives the workspace's live listings as XML. The opaque `feed_token` (rotatable from `real-estate-api → rotate-feed-token`) is the only credential — it gates cross-workspace enumeration.\n\nA listing only appears when it is `is_public`, `listing_status='active'` **and** `in_discovery=true`, so a listing published only to the agency's own site never leaks to third-party portals. Output is the `toPublic()` projection with XML-escaped values. `format` falls back to the workspace's configured `feed_format`. A disabled or unknown token returns a 404 XML error document.\n\n**Response:** `application/xml — Kyero <root><property>… | OpenImmo <immobilie>… | generic <listings><listing>…`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [
+          {
+            "queryToken": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Alternative to the query param when the portal POSTs."
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "Alternative to the query param when the portal POSTs."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/real-estate-buyer-digests": {
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Daily cron — emails saved-search digests to buyers with a matching new listing",
+        "operationId": "post_real_estate_buyer_digests",
+        "description": "For every active buyer requirement with `digest_enabled`, a `portal_token` and a contact email, finds listings that match the saved criteria **and** were published since `last_digest_at`, then emails a summary linking to `/buyer/:token`. Stamps `last_digest_at` so the same listing never re-sends. A buyer with nothing new is skipped silently (no empty email). Runs daily via pg_cron; auth is the shared cron gate (`x-cron-secret` **or** service-role bearer).\n\n**Response:** `{ success, buyers_considered, emails_sent, listings_matched }`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/real-estate-rent-invoicing": {
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Daily cron — drafts Finance invoices for rent charges coming due",
+        "operationId": "post_real_estate_rent_invoicing",
+        "description": "For every `due`/`overdue` rent charge on an active tenancy with a tenant, falling due within the next **7 days** and not yet invoiced, creates a **DRAFT** Finance invoice to the tenant and links it back on the charge (`property_rent_charges.invoice_id`). Drafts are deliberately never transmitted to myDATA — the property manager reviews VAT and document type and issues them from Finance. Batched at 500 charges per run. Requires the `real-estate-management` add-on to have produced the rent schedule in the first place.\n\n**Response:** `{ success, charges_considered, invoices_drafted, errors }`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crm-lead-score": {
+      "post": {
+        "tags": [
+          "CRM"
+        ],
+        "summary": "AI lead + health scoring for any CRM contact (canonical platform scorer)",
+        "operationId": "post_crm_lead_score",
+        "description": "Scores **any** `crm_contacts` lead from generic CRM signals (activity recency, engagement, company fit, pipeline position), enriched with property signals when the Real Estate module is enabled. Writes the shared `crm_contacts.lead_score` (0-100, likelihood to transact soon) and `health_score` (0-100, engagement/fit) so CRM, Sales and Real Estate all render the SAME number rather than three private scores.\n\nNot module-gated — lead scoring is a CRM-wide capability. Uses Anthropic tool-use (`emit_lead_score`) so the verdict is schema-locked, never a parsed blob. Credit-metered reserve→settle at a 3-credit ceiling, with an automatic refund when the model returns no usable output.\n\n**Response:** `{ lead_score, health_score, rationale, credits }`\n\n📖 [docs/api/crm-api.md](crm-api.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "Workspace owning the contact. Reconciled against the caller — a mismatch 404s. (string (uuid))"
+                  },
+                  "crm_contact_id": {
+                    "type": "string",
+                    "description": "Contact to score. 404 when it is not in the workspace. (string (uuid))"
+                  }
+                },
+                "required": [
+                  "workspace_id",
+                  "crm_contact_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitoring-cron": {
+      "post": {
+        "tags": [
+          "Monitoring Crons"
+        ],
+        "summary": "Unified monitoring dispatcher — one function behind all five price / mention / job cron tasks",
+        "operationId": "post_monitoring_cron",
+        "description": "Replaces the five near-identical monitoring crons (`price-monitoring-cron`, `mention-monitoring-cron`, `llm-mention-probe-cron`, `job-research-cron`, `job-research-digest-cron`). Each was the same boilerplate — cron-secret check → module gate → POST to a MIVAA cron endpoint — differing only in module slug and path.\n\npg_cron passes `?task=<task>`. The task gates on its own module toggle (a disabled module returns `{skipped:'module_disabled'}` rather than running a paid refresh) and then delegates to MIVAA, which selects the due rows and processes them in batch. Auth is the shared cron gate: `x-cron-secret` **or** a service-role bearer, so a vault/env secret-name drift can no longer 401 all five tasks at once.\n\nExternal API consumers (`api_key_id IS NOT NULL`) are intentionally never touched by the refresh tasks — they pay per call and control their own cadence.\n\n**Response:** `{ success, task, ...MIVAA result } | { success:true, task, skipped:\"module_disabled\" } | { error }`",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/moodboard-dormancy-cron": {
+      "post": {
+        "tags": [
+          "Crons"
+        ],
+        "summary": "Daily cron — notify-then-delete lifecycle for idle moodboards",
+        "operationId": "post_moodboard_dormancy_cron",
+        "description": "Storage-retention sweep for moodboards. A board idle for 30 days gets a **warning** email + bell notification carrying a one-click keep-active link; a reminder follows as the grace window closes; only then is the board removed. Nothing is deleted without the owner having been told first, twice.\n\nThe keep-active link resolves through the public `moodboard-keep-active` function. Backed by the `moodboard_dormancy_scan` RPC. Note that moodboards are **user**-scoped, not workspace-scoped, so notification targeting is per-owner.\n\n**Response:** `{ success, warned, reminded, deleted }`",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/moodboard-keep-active": {
+      "get": {
+        "tags": [
+          "Moodboard & Sheets"
+        ],
+        "summary": "Public one-click \"keep this moodboard\" target for the dormancy warning email",
+        "operationId": "get_moodboard_keep_active",
+        "description": "GET `/moodboard-keep-active?token=<keep_active_token>`. Validates the token, clears the pending dormancy schedule and bumps `updated_at` so the activity clock resets, then renders a small self-contained HTML confirmation page.\n\nPublic by design (`verify_jwt = false`) so the link works straight from an email client with no login. The 96-hex-character random token **is** the capability; an invalid or already-consumed token renders the failure page rather than revealing whether the board exists.\n\n**Response:** `text/html — confirmation or failure page`",
+        "security": [
+          {
+            "queryToken": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "description": "keep_active_token from the dormancy email link.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     }
   },

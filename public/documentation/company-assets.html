@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Company Assets | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / Company Assets</div>
+  <h1>Company Assets</h1>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge route">/my-hr</span> <span class="badge gated">Workspace member</span></div>
+  <p class="lead">The register of everything the company owns, leases or finances and hands to somebody — vehicles, phones, laptops, payment cards and equipment. It records what each asset is, how it was acquired, what it costs each month, and who is holding it right now.</p>
+
+  <div class="callout"><p><strong>How to open it.</strong> The same panel appears in <strong>two</strong> places, because it answers two different questions. In <strong>Finance</strong> it sits with the rest of your cost and lease picture. In <strong>HR</strong> it sits with the people the assets are assigned to. There is deliberately no separate “Assets” page — whichever of the two you already had open is the right one.</p></div>
+
+  <h2>What you can track</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Category</th><th>Typical use</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Vehicle</strong></td><td>Company cars and vans — usually leased or financed, so the monthly cost matters as much as the asset.</td></tr>
+      <tr><td><strong>Phone</strong></td><td>Handsets and their contracts.</td></tr>
+      <tr><td><strong>Laptop</strong></td><td>Computers issued to staff.</td></tr>
+      <tr><td><strong>Payment card</strong></td><td>Company cards handed to a named holder — pairs with <a href="finance-op-expense-cards.html">Expense cards</a>.</td></tr>
+      <tr><td><strong>Equipment</strong> / <strong>Other</strong></td><td>Tools, machinery, anything else worth knowing the location of.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Acquisition and cost</h2>
+  <p>Each asset is <strong>owned</strong>, <strong>leased</strong> or <strong>financed</strong>.</p>
+  <ul>
+    <li><strong>Leased and financed</strong> assets can be linked to a <strong>recurring expense</strong>. The monthly cost then flows through the normal expense machinery — a supplier bill is raised on schedule, it lands in Payables, and it settles like any other bill. Nothing about car leases is accounted for separately.</li>
+    <li><strong>Owned</strong> assets can carry straight-line <strong>depreciation</strong>: give the acquisition cost, useful life and (optionally) a residual value, and the panel shows the monthly charge and the current book value. Leased assets need none — the lease payment already <em>is</em> the expense — so depreciation is off by default.</li>
+  </ul>
+
+  <h2>Who's holding it</h2>
+  <p>An asset is assigned to an <strong>employee</strong> or a <strong>CRM contact</strong>. An asset can have only <strong>one active holder at a time</strong> — the system enforces this rather than trusting the register to stay tidy, so you can't end up with two people apparently holding the same phone.</p>
+  <p>Returning an asset <em>closes</em> the assignment instead of erasing it, so the history of who held what, and when, stays intact. That's the record you need when a device goes missing or a car changes driver mid-lease.</p>
+
+  <h2>Status</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Status</th><th>Means</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Active</strong></td><td>In service, normally with a holder.</td></tr>
+      <tr><td><strong>In repair</strong></td><td>Temporarily out of service; the assignment stands.</td></tr>
+      <tr><td><strong>Returned</strong></td><td>Back with the company, waiting to be reassigned.</td></tr>
+      <tr><td><strong>Retired</strong></td><td>Disposed of, sold, or the lease ended. Kept for history.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>From the Agent Hub</h2>
+  <p>Everything above can be done in conversation instead of on the panel — “register the new van as a leased vehicle”, “who has the Dell laptop?”, “assign the company card to Maria”, “retire the old phone”. See <a href="agent-hub.html">Agent Hub</a>.</p>
+
+  <h2>Related</h2>
+  <ul>
+    <li><a href="finance-doc-expenses.html">Expenses</a> — recurring expenses and supplier bills, where leased assets show up as cost.</li>
+    <li><a href="finance-op-expense-cards.html">Expense cards</a> — out-of-pocket spend, often on a company card from this register.</li>
+    <li><a href="hr-employees.html">Employees &amp; org</a> — the people assets are assigned to.</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -100,6 +100,36 @@
         <td><span class="badge public">public</span></td>
         <td>Views a material in augmented reality, typically by scanning a QR code handed off from a desktop screen.</td>
       </tr>
+      <tr>
+        <td>Property listing</td>
+        <td><span class="badge route">/p/:token</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Browses a published property listing and sends an enquiry. See <a href="real-estate-listings.html">Real Estate</a>.</td>
+      </tr>
+      <tr>
+        <td>Buyer portal</td>
+        <td><span class="badge route">/buyer/:token</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>A buyer's own page of matched properties — favourite them and request a viewing, with no account. See <a href="real-estate-leads.html">Leads &amp; matching</a>.</td>
+      </tr>
+      <tr>
+        <td>Careers page &amp; job posting</td>
+        <td><span class="badge route">/careers/:slug</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Your branded jobs board and the individual postings candidates apply through. See <a href="hr-recruitment.html">Recruitment</a>.</td>
+      </tr>
+      <tr>
+        <td>Contract signing</td>
+        <td><span class="badge route">/sign/:token</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>The counterparty reads and signs a contract without an account. See <a href="contracts.html">Contracts</a>.</td>
+      </tr>
+      <tr>
+        <td>Clock-in kiosk</td>
+        <td><span class="badge route">/:slug/clockin</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>A shared-device kiosk where staff clock in and out. See <a href="hr-attendance.html">Attendance</a>.</td>
+      </tr>
     </tbody>
   </table>
   </div>
@@ -127,6 +157,8 @@
       <tr><td><strong>Home</strong></td><td><span class="badge route">/home</span></td><td>The public marketing landing page — the branded front door for prospects, with links to the free tools, the knowledge base, and sign-in. It's what OAuth/branding points at.</td></tr>
       <tr><td><strong>Privacy Policy</strong></td><td><span class="badge route">/privacy</span></td><td>How the platform handles data — the information you provide (account/profile, business content, contacts/customers) and how it's used. Linked from sign-up and the footer.</td></tr>
       <tr><td><strong>Terms of Service</strong></td><td><span class="badge route">/terms</span></td><td>The terms governing use of the platform. Linked from sign-up and the footer.</td></tr>
+      <tr><td><strong>Changelog</strong></td><td><span class="badge route">/changelog</span></td><td>What's new on the platform, newest first — features, fixes, API changes and breaking changes, grouped by month. Public, so you can link a customer or an API consumer straight to a change.</td></tr>
+      <tr><td><strong>Free tools</strong></td><td><span class="badge route">/tools</span></td><td>The public tools hub: material search, price scan, mention scan, project-plan estimator, heat-pump sizer and heating-cost comparison. See <a href="tools.html">Tools</a>.</td></tr>
     </tbody>
   </table></div>
   <p>The <a href="tools.html">free tools</a> and public <a href="knowledge-base.html">knowledge base</a> are also public entry points reachable without an account.</p>

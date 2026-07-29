@@ -8,7 +8,7 @@ Single source of truth for every API surface in the platform. Two layers:
 For deep per-endpoint docs see [`docs/api/`](api/) (edge) and [`docs/api-endpoints.md`](api-endpoints.md) (Python).
 
 **Machine-readable specs / Swagger:**
-- **Edge Functions** → hand-maintained OpenAPI 3.0.3 (all 93). Repo: [`public/api/openapi-edge.json`](../public/api/openapi-edge.json). **Live** (after frontend deploy): Swagger UI `https://app.materialshub.gr/api/edge-swagger.html`, spec `https://app.materialshub.gr/api/openapi-edge.json` (served from `public/api/`; `/api/*` is excluded from the SPA rewrite). Regenerate: edit [`scripts/edge-endpoints.json`](../scripts/edge-endpoints.json), run `node scripts/build-openapi-edge.mjs` (writes both `docs/api/` and `public/api/`).
+- **Edge Functions** → hand-maintained OpenAPI 3.0.3 (all 107). Repo: [`public/api/openapi-edge.json`](../public/api/openapi-edge.json). **Live** (after frontend deploy): Swagger UI `https://app.materialshub.gr/api/edge-swagger.html`, spec `https://app.materialshub.gr/api/openapi-edge.json` (served from `public/api/`; `/api/*` is excluded from the SPA rewrite). Regenerate: edit [`scripts/edge-endpoints.json`](../scripts/edge-endpoints.json), run `node scripts/build-openapi-edge.mjs` (writes both `docs/api/` and `public/api/`).
 - **MIVAA Python** → FastAPI-generated `https://v1api.materialshub.gr/openapi.json` + Swagger UI at `https://v1api.materialshub.gr/docs`. (Edge functions are a separate runtime and are **not** in that spec.)
 
 ---
@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (98)
+## 1. Supabase Edge Functions (107)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -131,6 +131,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `crm-api` _(GET + POST)_ | JWT / secret | REST CRM resource router for companies, contacts, users, and Stripe. |
+| `crm-lead-score` | JWT | AI lead + health scoring for any CRM contact (canonical platform scorer) |
 | `crm-meeting-reminders` | cron | Cron: send reminders for upcoming CRM meetings whose reminder time has arrived. |
 
 **Business Profile**
@@ -142,6 +143,16 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `mygemi-opendata` | JWT | Greek company lookup by ΑΦΜ via the ΓΕΜΗ (GEMI) OpenData REST API. |
 | `role-upgrade-requests` | JWT | Dealer/factory role promotion workflow — submit, approve, and reject requests. |
 | `vies-validate` | JWT | Server-side EU VAT validation via the VIES REST API with optional crm_companies cache write. |
+
+**Real Estate**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `real-estate-api` | JWT | Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals |
+| `real-estate-buyer-digests` | cron | Daily cron — emails saved-search digests to buyers with a matching new listing |
+| `real-estate-feed` _(GET + POST)_ | token / public | Tokenized XML syndication feed (Kyero / OpenImmo / generic) for property portals |
+| `real-estate-public` | token / public | Anonymous, token-gated public listing pages, buyer portal, discovery and lead capture |
+| `real-estate-rent-invoicing` | cron | Daily cron — drafts Finance invoices for rent charges coming due |
 
 **Catalogs**
 
@@ -160,6 +171,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `generate-moodboard-sheet-pdf` | JWT | Render a moodboard presentation sheet or project client-view to PDF |
+| `moodboard-keep-active` _(GET)_ | token / public | Public one-click "keep this moodboard" target for the dormancy warning email |
 | `moodboard-sheet-share` | public | Public token resolver for shared presentation sheets and project client views |
 
 **PDF Processing**
@@ -238,6 +250,12 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `check-material-alerts` | JWT | Daily cron (08:00 UTC) that matches new products against active saved searches and sends bell notifications. |
 
+**Monitoring Crons**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `monitoring-cron` | cron | Unified monitoring dispatcher — one function behind all five price / mention / job cron tasks |
+
 **Background Agents**
 
 | Function | Auth | Summary |
@@ -254,6 +272,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `campaign-processor` | secret | Every-minute cron: start scheduled campaigns and drip-send emails to recipients |
 | `email-contacts-sync-cron` | cron | Daily cron: push CRM contacts to each workspace's Resend audience |
 | `job-cleanup-cron` | cron | Weekly cron (Sunday 03:00 UTC): purge old completed/failed jobs and logs |
+| `moodboard-dormancy-cron` | cron | Daily cron — notify-then-delete lifecycle for idle moodboards |
 | `storage-orphan-cleanup-cron` | cron | Nightly cron (04:00 UTC): delete storage objects with no live DB reference |
 
 **Admin**

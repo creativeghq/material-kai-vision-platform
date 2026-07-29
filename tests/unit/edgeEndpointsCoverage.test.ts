@@ -30,16 +30,11 @@ const FUNCTIONS_DIR = join(ROOT, 'supabase/functions');
 // documenting each; never grow. A new undocumented function should fail instead.
 // Emptied 2026-07-21: contracts-api and stock-api both gained spec entries in d5045782, and the
 // "stays honest" assertion correctly failed until they were pruned. Keep at zero.
-const KNOWN_UNDOCUMENTED = new Set<string>([
-  // Internal cron / non-public functions (x-cron-secret or service-role only) — not part of the
-  // public partner API, so tracked as debt rather than published in the OpenAPI spec.
-  'monitoring-cron',            // consolidated price/mention/job monitoring cron
-  'moodboard-dormancy-cron', 'moodboard-keep-active',
-  'crm-lead-score',
-  'real-estate-buyer-digests', 'real-estate-rent-invoicing',
-  // Real Estate surfaces — document when the module's public API is finalised.
-  'real-estate-api', 'real-estate-public', 'real-estate-feed',
-]);
+// Emptied again 2026-07-29: the Real Estate surfaces (api/public/feed + the buyer-digest and
+// rent-invoicing crons), the consolidated monitoring-cron, the moodboard dormancy pair and
+// crm-lead-score all gained spec entries. Keep at zero — a cron being internal is a reason to
+// document its auth and payload, not a reason to hide it from the spec.
+const KNOWN_UNDOCUMENTED = new Set<string>([]);
 
 interface EndpointEntry { name: string }
 

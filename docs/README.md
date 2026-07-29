@@ -278,7 +278,51 @@ The multi-tenant business suite (#207/#208/#185/#206/#201/#196/#195/#212/#174/#1
 - Module entitlements (#212): `is_workspace_entitled`, `EntitlementGuard`, plan/grant pathways
 - Workspace tenancy: signup→own-workspace, hierarchy, `assert_workspace_member` guard RPCs
 
+**[company-assets.md](company-assets.md)** — Company assets register ✨ NEW (2026-07)
+- Fleet / phones / laptops / cards / equipment; one active holder enforced by a partial unique index
+- Leased & financed assets link to a recurring-expense template → the existing supplier-bill flow
+- Straight-line depreciation **derived**, never stored; one shared panel mounted in Finance *and* HR
+
+**[units-and-measures.md](units-and-measures.md)** — Canonical units ✨ NEW (2026-07)
+- One vocabulary keyed to the AADE `measurement_unit` codes, enforced by DB triggers on 10 tables
+- Fixes a live divergence where m² was stored 4 ways and price comparisons silently dropped comparables
+- Unknown units pass through **unchanged** rather than being guessed at
+
 **[api/finance-api.md](api/finance-api.md)** — `finance-*` edge function reference
+
+---
+
+### 🏢 Real Estate ✨ NEW (2026-07)
+
+**[real-estate-system.md](real-estate-system.md)** — Property module (#249 / #281)
+- Listings, leads, viewings, offers, sales, buyer matching, deals pipeline, CMA
+- Two paid sub-modules mounting extra tabs on the same route: Property Management (lettings, rent → draft invoice, landlord statements) and Investments (yield / ROI)
+- Four personas; ownership failures return **404**, not 403
+- Public surface is a **separate edge function** — `/p/:token` listing page, `/buyer/:token` portal, discovery, and portal syndication (Kyero / OpenImmo / generic)
+
+**[api/real-estate-api.md](api/real-estate-api.md)** — all five functions, every action and gate
+
+---
+
+### 📈 SEO & Content ✨ NEW (2026-07)
+
+**[seo-system.md](seo-system.md)** — Connected Websites and everything hanging off them
+- Google Search Console with a **server-side** OAuth callback (supabase-js was hijacking Google's `?code`)
+- Site Health: on-page score is the live figure; Lighthouse gauges only when present
+- Rankings & Links: weekly DataForSEO snapshots, movement alerts routed via the Flows engine
+- Five content functions consolidated into one action-discriminated `seo-api`; inter-link suggestions now inserted **into** the article
+
+**[api/seo-api.md](api/seo-api.md)** — endpoint reference
+
+---
+
+### 🩺 Platform Health ✨ NEW (2026-07)
+
+**[data-integrity-framework.md](data-integrity-framework.md)** — nightly detect/heal checks
+- 16 checks across finance, tenancy, credits, CRM, security and ops; `/admin/data-health`
+- `ops.silent_zero` — a metric that should be non-zero sitting at zero, plus **<5 %** success-rate endpoints (an exact-zero test called this platform clean while two endpoints sat at 0.8 % and 4.5 %)
+- `ops.test_artifacts_accumulating` — watches a janitor's **output**, not its exit code
+- Adding a check is a migration, not an admin-editable SQL row
 
 ---
 

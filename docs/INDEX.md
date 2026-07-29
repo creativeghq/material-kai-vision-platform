@@ -238,6 +238,34 @@ Complete documentation for Material Kai Vision Platform.
 
 ### 🆕 New Features
 
+**[real-estate-system.md](real-estate-system.md)** — Real Estate module ✨ NEW (2026-07)
+- Listings, leads, viewings, offers, sales, buyer matching (both directions), deals pipeline, CMA
+- Paid add-on with two sub-add-ons that mount extra tabs on the same route: **Property Management** (tenancies, rent schedules, maintenance, landlord statements, rent → draft invoice) and **Investments** (yield / ROI)
+- Four personas (operator / broker / agent / member); ownership failures return **404**, never 403
+- Public surface is a separate edge function: `/p/:token` listing page, `/buyer/:token` portal, cross-workspace discovery, and Kyero / OpenImmo / generic portal syndication
+- Anonymous lead writes require GDPR consent and are capped at 8/hour/IP (hashed)
+- API: [api/real-estate-api.md](api/real-estate-api.md)
+
+**[seo-system.md](seo-system.md)** — SEO & Content ✨ NEW (2026-07)
+- **Connected Websites** is the organising unit — GSC, Site Health, Rankings, research and articles all scope to a site
+- Google Search Console with a server-side OAuth callback + full performance breakdown (device, country, appearance, trend)
+- Site Health (on-page + Lighthouse-when-present) and weekly Rankings & Links snapshots
+- Five content functions consolidated into one `seo-api`; inter-link suggestions inserted into the article
+
+**[data-integrity-framework.md](data-integrity-framework.md)** — Data health ✨ NEW (2026-07)
+- 16 nightly detect/heal checks across finance, tenancy, credits, CRM, security and ops; `/admin/data-health`
+- `ops.silent_zero` catches the dominant failure here: a number that should be non-zero sitting at zero while nothing complains
+- Janitor crons must ship with a probe on the mess they clear — an exit code proves it ran, not that it worked
+
+**[company-assets.md](company-assets.md)** — Company assets register ✨ NEW (2026-07)
+- Fleet / phones / laptops / payment cards / equipment, one active holder each
+- Leased & financed assets flow through the existing recurring-expense → supplier-bill machinery
+- One shared panel mounted in **both** Finance and HR; no dedicated page
+
+**[units-and-measures.md](units-and-measures.md)** — Canonical units ✨ NEW (2026-07)
+- One vocabulary keyed to AADE `measurement_unit` codes, enforced by triggers on 10 tables
+- Closed a live divergence: m² stored 4 ways, silently breaking marketplace price comparisons
+
 **myAADE Module — Greek Business Registry (ΑΑΔΕ)** ✨ NEW (2026-05-24) — see `src/modules/myaade/README.md`
 - Family of `myaade-*` edge functions wrapping ΑΑΔΕ web services (SOAP 1.2 + WS-Security)
 - Today: `myaade-rgwspublic2` — Greek business lookup by ΑΦΜ. Auto-fills legal name, ΔΟΥ, ΚΑΔ, legal form, structured address into the Business profile
@@ -543,9 +571,11 @@ Complete documentation for Material Kai Vision Platform.
 
 ### 🔌 API Reference
 
-**[api-master-reference.md](api-master-reference.md)** ✨ **START HERE** — Single-page master index covering **all 90+ Supabase edge functions + MIVAA Python endpoints**. Auth models, categories (AI agents / generation / SEO / KB / CRM / finance / messaging / social / pinterest / scraping / flows / crons / admin), and standard call patterns.
+**[api-master-reference.md](api-master-reference.md)** ✨ **START HERE** — Single-page master index covering **all 107 Supabase edge functions + MIVAA Python endpoints**. Auth models, categories (AI agents / generation / real estate / SEO / KB / CRM / finance / stock / messaging / social / pinterest / scraping / flows / crons / admin), and standard call patterns. The edge-function index is regenerated from `scripts/edge-endpoints.json` so it cannot drift from the OpenAPI spec.
 
-**[api/README.md](api/README.md)** — Per-edge-function deep docs index (25 dedicated function pages).
+**[api/README.md](api/README.md)** — Per-edge-function deep docs index (30 dedicated function pages).
+
+**[../public/api/openapi-edge.json](../public/api/openapi-edge.json)** — machine-readable OpenAPI 3.0.3 for **all 107** edge functions; Swagger UI at [`/api/edge-swagger.html`](../public/api/edge-swagger.html). A CI guard ([`tests/unit/edgeEndpointsCoverage.test.ts`](../tests/unit/edgeEndpointsCoverage.test.ts)) fails the build when a function exists without a spec entry, or a spec entry without a function.
 
 **[api-endpoints.md](api-endpoints.md)** - Complete MIVAA Python API reference
 - 114 endpoints across 14 categories
@@ -702,10 +732,19 @@ All documentation follows these standards:
 
 ## Documentation Updates
 
-**Last Updated**: July 2026
-**Version**: 3.8.0
+**Last Updated**: 29 July 2026
+**Version**: 3.9.0
 **Status**: Production
 **Maintainer**: Development Team
+
+**Recent Changes (2026-07-29):**
+- ✨ **NEW**: [real-estate-system.md](real-estate-system.md) + [api/real-estate-api.md](api/real-estate-api.md) — the Real Estate module and its two paid sub-modules
+- ✨ **NEW**: [seo-system.md](seo-system.md) — Connected Websites, Google Search Console, Site Health, Rankings & Links
+- ✨ **NEW**: [data-integrity-framework.md](data-integrity-framework.md) — the nightly detect/heal registry and the silent-zero probe
+- ✨ **NEW**: [company-assets.md](company-assets.md), [units-and-measures.md](units-and-measures.md)
+- ✨ **UPDATED**: OpenAPI edge spec now covers **all 107** edge functions (was 98). `KNOWN_UNDOCUMENTED` is empty and the CI parity guard keeps it there
+- ✨ **UPDATED**: [api/README.md](api/README.md) — Real Estate / Stock / Contracts sections, rebuilt cron table from the live `cron.job` schedule, removed the dead `field-templates` / `suggest-fields` entries
+- ✨ **NEW**: public [`/changelog`](https://app.materialshub.gr/changelog) page, backed by `changelog_entries`
 
 **Recent Changes (2026-04-25):**
 - ✨ **NEW**: **Modular Architecture** — platform now ships as 7 toggleable modules. Each module owns its routes/services/agents/admin-cards and is gated by a row in `public.modules`. Toggle from `/admin/modules`. Modules: `greek-marketplaces`, `crm`, `email`, `messaging`, `quotes`, `notifications`, `social-media`. See `.claude/plans/modular-architecture.md` + `.claude/plans/modules-extraction-roadmap.md`.

@@ -2,11 +2,11 @@
 
 This directory contains per-function deep docs for Supabase Edge Function APIs.
 
-> **📑 Looking for the master list?** See [**api-master-reference.md**](../api-master-reference.md) — single page covering all **96 edge functions + MIVAA Python endpoints** (auth models, categories, call patterns). Start there if you're integrating; come here for endpoint details.
+> **📑 Looking for the master list?** See [**api-master-reference.md**](../api-master-reference.md) — single page covering all **107 edge functions + MIVAA Python endpoints** (auth models, categories, call patterns). Start there if you're integrating; come here for endpoint details.
 >
 > **🧪 Machine-readable / Swagger.** Three OpenAPI surfaces cover the platform:
 > 1. **MIVAA Python API** — FastAPI-generated spec at `https://v1api.materialshub.gr/openapi.json` (Swagger UI `/docs`). Auto-generated; nothing to maintain.
-> 2. **Supabase Edge Functions (Deno)** — **not** in MIVAA's spec; their own OpenAPI at [**openapi-edge.json**](../../public/api/openapi-edge.json), browsable via [**edge-swagger.html**](../../public/api/edge-swagger.html). Covers all **96 edge functions**. (Single source: `public/api/` — committed to git AND served live; there is no second copy under `docs/api/`.)
+> 2. **Supabase Edge Functions (Deno)** — **not** in MIVAA's spec; their own OpenAPI at [**openapi-edge.json**](../../public/api/openapi-edge.json), browsable via [**edge-swagger.html**](../../public/api/edge-swagger.html). Covers all **107 edge functions**. (Single source: `public/api/` — committed to git AND served live; there is no second copy under `docs/api/`.)
 > 3. **Supabase PostgREST (tables/views/RPCs)** — PostgREST auto-serves a Swagger 2.0 spec at the REST root `https://<project>.supabase.co/rest/v1/`. **As of 2026-06 this endpoint is locked to the `service_role` key** (anon/publishable keys get `401 "Only the service_role API key can be used for this endpoint"`), so fetch it server-side: `curl -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" https://<project>.supabase.co/rest/v1/` → ~2.9 MB, 700+ paths / 340+ RPCs (includes every table + RPC, e.g. the Workstream-F `platform_suppliers` / `supplier_claim_requests` / `request_supplier_claim`). It's auto-generated from the live schema — fetch on demand rather than committing the blob.
 >
 > **Live URLs** (served from the frontend's `public/api/` after the next build+deploy; `/api/*` is excluded from the SPA rewrite in `vercel.json`):
@@ -39,8 +39,10 @@ WhatsApp messaging via **Zernio** (Meta Cloud API). SMS + the former Twilio inte
 
 #### [CRM API](./crm-api.md)
 Consolidated CRM — the `crm-api` edge function routes by first path segment to `companies` / `contacts` / `users` / `stripe` handlers. (The former separate `crm-companies-api` / `crm-contacts-api` / `crm-users-api` / `crm-stripe-api` functions were merged into one.)
-- **Function:** `crm-api`
-- **Features:** Company + contact CRUD, user/contact linking, potential-matches, platform user admin, Stripe customer/subscription/credits state
+- **Functions:** `crm-api`, plus `crm-lead-score`, `company-enrich`, `crm-meeting-reminders`
+- **Features:** Company + contact CRUD, multiple named addresses and phone numbers per party, user/contact linking, potential-matches, platform user admin, Stripe customer/subscription/credits state, meetings + reminders, shared record-activity feed
+- **Enrichment:** one shared research chain — ΑΑΔΕ → ΓΕΜΗ → web/Apollo enrichment — behind a single `researchCompany()` entry point, reachable from every CRM surface and from the agent. ΓΕΜΗ is paced to its published 8-requests-per-minute budget and **stops** rather than retrying; a throttle response is never cached as "company not found".
+- **Lead scoring:** `crm-lead-score` is the canonical platform scorer. It writes the shared `crm_contacts.lead_score` + `health_score` so CRM, Sales and Real Estate render the same number instead of three private ones. Anthropic tool-use (`emit_lead_score`) keeps the verdict schema-locked; credit-metered reserve→settle with a 3-credit ceiling and automatic refund on empty output.
 - **Access:** Admin / Factory (per resource); `manager` role removed 2026-05-23
 
 #### [Quotes API](./quotes-api.md)
@@ -247,19 +249,18 @@ Dealer/Factory promotion workflow. User submits → admin reviews → approval f
 - **Tables:** `role_upgrade_requests`
 - **Access:** JWT (submit own); admin/super_admin/owner (approve/reject)
 
-### SEO Pipeline (admin/owner only)
+### SEO & Content APIs
 
-Complete SEO content generation pipeline — 5 functions, all POST + JWT.
+The former five separate functions (`seo-research` / `seo-plan` / `seo-write` / `seo-analyze` / `seo-pipeline`) were **consolidated into one action-discriminated `seo-api`**. Three companion functions add the per-website intelligence layer introduced 2026-07.
 
-| Function | Purpose |
-|----------|---------|
-| `seo-research` | DataForSEO keyword research (6 parallel API calls) |
-| `seo-plan` | Article structure + meta tags + FAQ schema |
-| `seo-write` | Full article via Claude Opus |
-| `seo-analyze` | 15+ SEO quality checks, auto-fix via Gemini |
-| `seo-pipeline` | Orchestrator: research → plan → write → analyze |
+| Function | Actions | Purpose |
+|----------|---------|---------|
+| `seo-api` | `research`, `plan`, `write`, `analyze`, `pipeline`, `toolkit_research`, `toolkit_audit` | Keyword research (DataForSEO), article structure + meta + FAQ schema, full article via Claude, 15+ quality checks with auto-fix, and the end-to-end orchestrator. Inter-link suggestions are inserted **into** the article, not just offered on the clipboard. |
+| `gsc-api` | `authorize`, `GET ?code&state`, `list_properties`, `set_property`, `sync`, `disconnect`, `cron-sync` | Google Search Console per connected website. The OAuth callback is **server-side** so supabase-js can't hijack Google's `?code`. Pulls full performance: queries, pages, devices, countries, appearance and trend. Nightly refresh + 180-day retention prune. |
+| `seo-site-audit` | `run`, `cron-run` | Site Health — on-page audit (instant) plus Lighthouse gauges when the async run returns. The on-page score *is* the live Site Health; Lighthouse is shown only when present rather than blocking on it. |
+| `seo-domain-tracker` | `run`, `cron-run` | Weekly Rankings & Links — tracked DataForSEO domain intel (ranked keywords, positions, backlinks) per connected website. Movement fires workspace-scoped alerts through the Flows engine. |
 
-Surfaced to the `kai` agent as sub-agent tools (admin-gated). Full reference: [**seo-api.md**](./seo-api.md).
+**Connected Websites** is the organising unit: a workspace connects a site once, then Site Health, Rankings & Links, GSC and the writing toolkits are all scoped to it. Surfaced to the `kai` agent as first-class tools. Full reference: [**seo-api.md**](./seo-api.md).
 
 ### Social Media APIs
 
@@ -308,6 +309,31 @@ External ERP-facing API for the sourcing/fulfillment spine (Workstream F) — su
 - **Access:** partner API key / supplier portal auth
 - **Architecture:** [sourcing-fulfillment.md](../sourcing-fulfillment.md)
 
+#### Stock API
+Inventory / warehouse as a **paid add-on** (promoted out of Finance; mirrors the HR entitlement model).
+- **Function:** `stock-api`
+- **Features:** Items, warehouses, adjustments + transfers, movement ledger, low-stock + reorder, stocktakes, inbound shipments, shipping quotes, valuation. Order fulfilment decrements through the same movement ledger, with per-line warehouse and automatic reservation.
+- **Access:** JWT; gate chain authenticate → `userCanAccessWorkspace` → `isModuleEnabled('stock')` → `assertEntitled(ws,'stock')` → finance-manager RBAC on writes
+- **Architecture:** [warehouse-and-billing.md](../warehouse-and-billing.md) · [orders-system.md](../orders-system.md)
+- **Spec:** OpenAPI tag **Stock**
+
+#### Contracts API
+Contract lifecycle with e-signature — draft → send → countersign → archive.
+- **Functions:** `contracts-api`, `generate-contract-pdf`; public signing via `/sign/:token`
+- **Features:** Counterparty prefilled from the mounted entity (CRM company/contact, project, order), captured value + currency, `signer_role` stamped on each signature, signed-PDF download, `contract_signed` flow event, daily auto-expire cron
+- **Access:** JWT + module entitlement; the signing surface is token-gated and anonymous
+- **Architecture:** [contracts-system.md](../contracts-system.md)
+- **Spec:** OpenAPI tag **Contracts**
+
+### Real Estate APIs
+
+#### [Real Estate API](./real-estate-api.md) <span style="color:#ec4899">(NEW — 2026-07)</span>
+Full property module (#249) with two paid sub-modules (#281). Five functions, deliberately split so the authenticated and anonymous surfaces never share code.
+- **Functions:** `real-estate-api` (agent/broker surface), `real-estate-public` (public listing page, buyer portal, discovery, lead capture), `real-estate-feed` (portal syndication XML), `real-estate-buyer-digests` + `real-estate-rent-invoicing` (crons)
+- **Features:** Listings + photo AI analysis, leads → CRM conversion, viewings, offers, sales + commission invoicing, buyer requirements with two-way auto-matching and a `/buyer/:token` portal, CMA reports, deals pipeline; **lettings** (tenancies, rent schedules, maintenance, landlord statements) and **investments** (yield/ROI) behind their own add-ons
+- **Access:** JWT + `real-estate` entitlement + persona RBAC (operator / broker / agent / member). Ownership failures return **404**, not 403. Public surface is bound to opaque capability tokens and rate-limits anonymous lead writes to 8/hour/IP
+- **Spec:** OpenAPI tag **Real Estate**
+
 ### HR APIs
 
 #### [HR API](./hr-api.md)
@@ -341,23 +367,39 @@ SigLIP2 visual embedding generation.
 
 ### Cron / Scheduled Functions (service-role only)
 
-Not user-callable. pg_cron invokes these on a schedule. No auth header from frontend — they use `SUPABASE_SERVICE_ROLE_KEY`.
+Not user-callable. pg_cron invokes these on a schedule. Auth is the shared cron gate (`isCronAuthorized`): an `x-cron-secret` header **or** a service-role bearer — either satisfies it, so a vault/env secret-name drift can no longer 401 every scheduled job at once.
 
-| Function | Schedule | Purpose |
-|----------|----------|---------|
-| `agent-scheduler-cron` | 1 min | Dispatch background agents whose cron is due |
-| `auto-recovery-cron` | 5 min | Re-dispatch stuck runs (>8 min no heartbeat, <3 attempts) |
-| `job-cleanup-cron` | weekly | Purge old jobs, logs, stale progress |
-| `flow-scheduler-cron` | 1 min | Run due scheduled flows |
+| Function | Schedule (UTC) | Purpose |
+|----------|----------------|---------|
+| `agent-scheduler-cron` | every min | Dispatch background agents whose cron is due |
+| `flow-scheduler-cron` | every min | Run due scheduled flows |
+| `campaign-processor` | every min | Email campaign dispatcher (Resend, 8/min) |
+| `messaging-processor` | every min *(currently inactive)* | WhatsApp campaign batch sender (Zernio) |
+| `auto-recovery-cron` | every 5 min | Re-dispatch stuck runs (>8 min no heartbeat, <3 attempts) |
+| `crm-meeting-reminders` | every 5 min | Send + retry meeting reminders (email / ICS) |
+| `hr-checkin-cron` | every 5 min | Late-arrival attendance alerts |
+| `scheduled-import-runner` | every 15 min | Run due XML imports |
+| `finance-fiscal-offline-recovery` | every 15 min | Backfill myDATA MARK on offline-queued documents (Novus `RequestTransmittedDocs`) |
+| `kb-embedding-backfill` | every 3 min | Drain the KB chunk-embedding queue |
+| `monitoring-cron` | hourly (`?task=…`) | **Unified** dispatcher for the 5 monitoring sweeps — `price-refresh` (:15), `mention-refresh` (:30), `job-refresh` (:45), `job-digest` (:05), `mention-probe` (03:00). Each gates on its own module toggle before spending |
+| `seo-site-audit` (cron-run) | hourly / weekly | Lighthouse + on-page audit per connected website |
+| `seo-domain-tracker` (cron-run) | weekly (Mon) | DataForSEO rankings + backlinks snapshot per website |
+| `gsc-api` (cron-sync) | daily 03:30 | Google Search Console performance pull + 180-day prune |
+| `crawl-user-website` | every 6 h | Re-crawl connected websites |
+| `finance-send-statement` (cron_batch) | hourly :20 | Auto-send party statements per `finance_settings.auto_statement_*` |
+| `finance-inbound-sync` (cron mode) | daily 05:00 | Pull AADE `RequestDocs` into `inbound_documents` (2 cr/workspace) |
+| `finance-digest-aggregate` | daily | AR/AP + P&L + follow-up digest email |
+| `real-estate-rent-invoicing` | daily 06:00 | Draft Finance invoices for rent charges due within 7 days |
+| `real-estate-buyer-digests` | daily 08:00 | Saved-search digest email to buyers with new matches |
+| `check-material-alerts` | daily 08:00 | Run saved searches + email subscribers |
+| `email-contacts-sync-cron` | daily 03:20 | Sync CRM contacts into marketing audiences |
+| `moodboard-dormancy-cron` | daily 05:00 | Notify-then-delete lifecycle for idle moodboards (warn → remind → remove) |
+| `storage-orphan-cleanup-cron` | daily 04:00 | GC unreferenced storage objects (per-bucket grace windows) |
+| `data-integrity-runner` | daily 04:25 | Run the detect/heal integrity registry; surfaces at `/admin/data-health` |
+| `job-cleanup-cron` | weekly (Sun 03:00) | Purge old jobs, logs, stale progress |
 | `ai-pricing-updater` | weekly | Sync AI model pricing into `ai_model_pricing` |
-| `campaign-processor` | 1 min | Email campaign dispatcher (Resend, 8/min) |
-| `check-material-alerts` | daily | Run saved searches + email subscribers |
-| `scheduled-import-runner` | 5 min | Run due XML imports |
-| `messaging-processor` | 1 min | WhatsApp campaign batch sender (Zernio) |
-| `finance-fiscal-offline-recovery` | hourly | Backfill myDATA MARK on offline-queued documents (Novus `RequestTransmittedDocs`) |
-| `finance-inbound-sync` (cron mode) | scheduled | Pull AADE `RequestDocs` into `inbound_documents` (2 cr/workspace) |
-| `finance-send-statement` (cron_batch) | scheduled | Auto-send party statements per `finance_settings.auto_statement_*` |
-| `finance-digest-aggregate` | scheduled | AR/AP + P&L + follow-up digest email |
+
+Around 57 pg_cron jobs are scheduled in total; the rest are pure-SQL retention/prune jobs with no edge function behind them (`system-logs-daily-cleanup`, `api-usage-logs-cleanup-daily`, `cron-run-details-cleanup-daily`, `retention-sweep-daily`, `contracts-expire-daily`, `quotes-expire-daily`, `tenant-purity-audit-daily`, …). Query `cron.job` for the live list rather than trusting this table.
 
 ### Admin / Maintenance
 
@@ -372,15 +414,15 @@ Aggregated health status across AI providers + MIVAA + external APIs.
 - **Function:** `health-check`
 - **Access:** Public (no auth)
 
-#### Field Templates
-Reusable field-mapping templates for XML/scraping imports.
-- **Function:** `field-templates`
-- **Access:** JWT
+#### Data Integrity Runner
+Executes the detect/heal check registry nightly and surfaces violations at `/admin/data-health`.
+- **Function:** `data-integrity-runner`
+- **Features:** Each check is a pair of SQL functions (`detect_fn()` / `heal_fn()`, both zero-arg, heal returns `integer`) registered in a table. Includes the `ops.silent_zero` probe (activity happened but the metric it should have produced is zero) and `ops.test_artifacts_accumulating` (watches a janitor's *output*, not its exit code). Adding a check is a migration, not an admin-editable SQL row — a table of admin-authored SQL run by a `SECURITY DEFINER` function would be a privilege-escalation surface.
+- **Access:** cron gate; results readable by admins
 
-#### Suggest Fields
-AI-suggested field mappings from HTML analysis.
-- **Function:** `suggest-fields`
-- **Access:** JWT
+> **Removed:** the former `field-templates` and `suggest-fields` functions no longer exist. Field
+> detection and mapping suggestion were folded into `xml-import-orchestrator` (`analyze` mode, backed
+> by the dictionary-first classifier in `_shared/xml-field-dictionary.ts`).
 
 ## Authentication
 
@@ -479,6 +521,10 @@ Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE, PATCH
 - [Agent System](../agent-system.md) - AI agent architecture
 - [CRM System](../crm-system.md) - CRM architecture
 - [Price Monitoring](../price-monitoring-system.md) - Price monitoring system
+- [Real Estate System](../real-estate-system.md) - Property module architecture
+- [Stock & Warehouse](../warehouse-and-billing.md) - Inventory add-on architecture
+- [SEO & Content](../seo-system.md) - Connected websites, GSC, Site Health, Rankings
+- [Data Integrity](../data-integrity-framework.md) - detect/heal checks + the silent-zero probe
 
 ## Support
 
