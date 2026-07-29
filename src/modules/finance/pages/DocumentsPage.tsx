@@ -923,15 +923,13 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
     finally { setBusy(null); }
   };
   /**
-   * Payments on a received document. Opening this is a READ — it must never create a payable.
-   * Already an expense → its payments view. Not yet → the shared Record Payment form preset to
-   * the document, which converts on SAVE. (This used to convert on open, which silently turned
-   * documents into supplier bills just for looking at them.)
+   * Recording a payment is ONE act with ONE form — the platform's Record Payment dialog, preset
+   * to this document. Whether an expense exists yet is our bookkeeping, not the operator's
+   * question: if it does the payment settles it, if it doesn't the document is converted on
+   * save. (This briefly branched to a different modal when the expense existed, which is exactly
+   * the "why are there two of these?" the operator hit. Opening never writes either way.)
    */
-  const openPayments = (d: InboundDocument) => {
-    if (d.created_supplier_bill_id) onOpenExpense(d.created_supplier_bill_id);
-    else setPayDoc(d);
-  };
+  const openPayments = (d: InboundDocument) => setPayDoc(d);
   const setCategory = async (id: string, categoryId: string | null) => {
     setLocalCat((m) => ({ ...m, [id]: categoryId }));
     try { await inboundService.setCategory(id, categoryId); }
@@ -1035,7 +1033,10 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
       {payDoc && workspaceId && (
         <RecordPaymentDialog
           workspaceId={workspaceId}
-          presetInboxDocId={payDoc.id}
+          // Same form either way — it settles the expense if this document already became one,
+          // and converts it on save if it hasn't.
+          presetExpenseId={payDoc.created_supplier_bill_id ?? undefined}
+          presetInboxDocId={payDoc.created_supplier_bill_id ? undefined : payDoc.id}
           open
           onOpenChange={(v) => { if (!v) setPayDoc(null); }}
           onSaved={() => { setPayDoc(null); onChanged(); }}

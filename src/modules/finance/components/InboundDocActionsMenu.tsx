@@ -187,12 +187,18 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
-          <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Document</DropdownMenuLabel>
-          <DropdownMenuItem onClick={onCreateBill} disabled={!canBill}>
-            <FileText className="h-4 w-4 mr-2" /> Create supplier bill
+          <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Money</DropdownMenuLabel>
+          {/* Two outcomes, named by what they DO to your books — not by the row they write.
+              "Create supplier bill" told the operator nothing: both of these create the expense. */}
+          <DropdownMenuItem onClick={onCreateBill} disabled={!canBill} className="flex-col items-start gap-0.5">
+            <span className="flex items-center"><FileText className="h-4 w-4 mr-2" /> Add to Expenses — not paid</span>
+            <span className="pl-6 text-[10px] text-muted-foreground">Owe it now: shows in Payables until you pay.</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay}>
-            <Wallet className="h-4 w-4 mr-2" /> Payments…
+          <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay} className="flex-col items-start gap-0.5">
+            <span className="flex items-center"><Wallet className="h-4 w-4 mr-2" /> Record payment</span>
+            <span className="pl-6 text-[10px] text-muted-foreground">
+              {doc.created_supplier_bill_id ? 'Settles the expense this document became.' : 'Adds it to Expenses and settles it in one step.'}
+            </span>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onDismiss} disabled={!canDismiss}>
             <Trash2 className="h-4 w-4 mr-2" /> Dismiss

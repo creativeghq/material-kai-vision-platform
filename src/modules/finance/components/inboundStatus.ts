@@ -14,7 +14,9 @@ export type InboundStatus = 'new' | 'classified' | 'received' | 'dismissed';
 
 /** Table cell: only the acted-on states get a word. `new` is absent on purpose. */
 export const INBOUND_OUTCOME: Record<string, { label: string; tone: string }> = {
-  classified: { label: 'Billed', tone: 'text-emerald-600 dark:text-emerald-400' },
+  // "Billed" reads as something that was sent OUT. What actually happened is that the document
+  // became an expense you owe — say that, in the same word the tab and the menu use.
+  classified: { label: 'In Expenses', tone: 'text-emerald-600 dark:text-emerald-400' },
   received: { label: 'Stocked', tone: 'text-emerald-600 dark:text-emerald-400' },
   dismissed: { label: 'Dismissed', tone: 'text-muted-foreground line-through' },
 };
