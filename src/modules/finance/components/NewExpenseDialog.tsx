@@ -37,7 +37,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
   /** Link the expense to an order (so it shows on that order) + seed the amount/description. Used by
-   *  the order's "Add expense" to turn a line cost into a real supplier bill in one step. */
+   *  the order's "Record expense" to turn a line cost into a real supplier bill in one step. */
   orderId?: string;
   prefill?: {
     amount?: number;
@@ -102,7 +102,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   // Draft persistence — survives navigating away + reopening; cleared on Save / Cancel.
   // DISABLED in order mode: an order expense is seeded authoritatively from the line/order every
-  // open, so a shared draft (from a prior general "Add expense") must never restore stale values
+  // open, so a shared draft (from a prior general "Record expense") must never restore stale values
   // over the Order category / the line's supplier. Only the general expense form keeps a draft.
   const clearDraft = useSessionDraft(
     `fin-expense:${workspaceId}`,
@@ -150,7 +150,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workspaceId, orderId]);
 
-  // Seed when opened from an order's "Mark as paid" / "Add expense" (turning a line cost into a bill).
+  // Seed when opened from an order's "Mark as paid" / "Record expense" (turning a line cost into a bill).
   // In ORDER MODE this is AUTHORITATIVE + resets the form to a clean state every open (the dialog is
   // persistent, so last-open values would otherwise linger): amount + supplier come straight from the
   // line/order, everything else resets to defaults. The Order category is applied by the load effect.
@@ -426,7 +426,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Add Expense</DialogTitle>
+          <DialogTitle>Record Expense</DialogTitle>
           <DialogDescription>
             A business cost (rent, utilities, fees…). Recorded as a categorized supplier bill — an open <strong>payable</strong> until paid, or settled now.
           </DialogDescription>

@@ -1557,7 +1557,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     {order.order_type === 'sales' && (
                       <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
                         <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
-                        <span className="flex flex-col"><span>Add expense</span><span className="text-[10px] text-muted-foreground">A cost against this sale.</span></span>
+                        <span className="flex flex-col"><span>Record expense</span><span className="text-[10px] text-muted-foreground">A cost against this sale.</span></span>
                       </DropdownMenuItem>
                     )}
                     {/* Settle from the customer's on-account credit — no new cash movement. */}

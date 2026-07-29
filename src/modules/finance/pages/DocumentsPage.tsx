@@ -116,10 +116,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [dispatchRefresh, setDispatchRefresh] = useState(0);
   const [newChequeOpen, setNewChequeOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
-  /** "Record expense" — the same Record Payment form opened on its money-out branch, with the
-   *  expense still to be chosen inside. Separate state so the two directions can't share a
-   *  half-filled form. */
-  const [payExpenseOpen, setPayExpenseOpen] = useState(false);
   // The expense whose payments are open — set from either side of the link (an Inbox row or an
   // open bill), both of which resolve to the same supplier_bill id.
   const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
@@ -289,7 +285,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       )}
       {type === 'expenses' && canOperateFinance && (
         <Button size="sm" onClick={() => setNewExpenseOpen(true)} title="Record a business expense (rent, utilities, fees…)">
-          <Plus className="h-3.5 w-3.5 mr-1" /> Add expense
+          <Plus className="h-3.5 w-3.5 mr-1" /> Record expense
         </Button>
       )}
       {(type === 'invoices' || type === 'receipts') && !isAccountant && (
@@ -305,9 +301,14 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         <Button size="sm" onClick={() => setNewChequeOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
       )}
       {type === 'payments' && canOperateFinance && (
-        // Two directions of money, named up front. Paying a supplier used to be a third entry in
-        // the dialog's Type list, where it sat next to "Received from customer" and could be
-        // picked by accident — the two are opposite sides of the trade.
+        // Two directions of money, one action each: money in is a payment, money out is an
+        // expense. "Record expense" opens the SAME dialog as the Expenses tab — it books the
+        // cost and (Paid now, on by default) the cash going out in one step. It used to open
+        // the payment form on a settle-only branch, which could pay an expense but never
+        // record one, so the label described something the form could not do — and it
+        // dead-ended ("nothing to pay") for the ordinary case where the bill doesn't exist
+        // yet. Settling a bill you already have belongs on that bill's own row, where you can
+        // see what is owed: Expenses / Payables / the Inbox all carry "Record payment".
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {/* The chevron is the only thing telling you this opens a choice rather than the
@@ -321,7 +322,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             <DropdownMenuItem onClick={() => setRecordPaymentOpen(true)}>
               <Wallet className="h-4 w-4 mr-2" /> Record payment
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setPayExpenseOpen(true)}>
+            <DropdownMenuItem onClick={() => setNewExpenseOpen(true)}>
               <Receipt className="h-4 w-4 mr-2" /> Record expense
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -453,15 +454,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           open={recordPaymentOpen}
           onOpenChange={setRecordPaymentOpen}
           onSaved={() => { setRecordPaymentOpen(false); load(); }}
-        />
-      )}
-      {activeWorkspaceId && (
-        <RecordPaymentDialog
-          workspaceId={activeWorkspaceId}
-          payExpense
-          open={payExpenseOpen}
-          onOpenChange={setPayExpenseOpen}
-          onSaved={() => { setPayExpenseOpen(false); load(); }}
         />
       )}
       {activeWorkspaceId && (

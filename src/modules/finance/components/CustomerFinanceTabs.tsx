@@ -383,7 +383,7 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
             {/* Money OUT to this party (pay a supplier) is a cost → the expense flow (bill + payment). */}
             {showSupplierActions && (
               <Button size="sm" variant="outline" onClick={() => setExpenseOpen(true)}>
-                <ShoppingBag className="h-3.5 w-3.5 mr-1" /> Add expense
+                <ShoppingBag className="h-3.5 w-3.5 mr-1" /> Record expense
               </Button>
             )}
             {/* Money IN from a customer — hidden on a pure supplier where it doesn't apply. */}

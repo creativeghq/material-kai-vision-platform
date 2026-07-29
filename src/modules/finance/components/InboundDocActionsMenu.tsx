@@ -185,7 +185,8 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={onReceiveStock} disabled={!canReceive}>
-            <PackagePlus className="h-4 w-4 mr-2" /> Add products to warehouse
+            {/* Same act as the order menu's entry — one name for it, the goods-receipt term. */}
+            <PackagePlus className="h-4 w-4 mr-2" /> Receive into warehouse
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />

@@ -57,9 +57,6 @@ export const RecordPaymentDialog: React.FC<{
   /** Same, for an Inbox document that is NOT an expense yet (an `inbound_documents` id). It is
    *  converted on SAVE — opening this dialog must never create a payable on its own. */
   presetInboxDocId?: string;
-  /** Open on the money-out branch with NO expense chosen yet — the "Record expense" action.
-   *  The operator picks which expense (or Inbox document) inside. */
-  payExpense?: boolean;
   /** When set (order-attached, received, no invoice yet), the fiscal document can be issued in the
    *  same step. `fiscalDocKind` is the kind the SHARED buyer rule resolved — this dialog never
    *  re-derives it — and `onIssueDoc` runs after the payment is recorded. */
@@ -72,7 +69,7 @@ export const RecordPaymentDialog: React.FC<{
   /** Open supplier bills this payment may settle — only meaningful with side='supplier'. Passed in
    *  by the caller that already loaded them rather than re-fetched here. */
   payableBills?: Array<{ id: string; supplier_bill_number: string | null; amount_due: number; currency: string }>;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, presetInboxDocId, payExpense, fiscalDocKind, fiscalDocReason, onIssueDoc, side = 'customer', payableBills = [] }) => {
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, presetInboxDocId, fiscalDocKind, fiscalDocReason, onIssueDoc, side = 'customer', payableBills = [] }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -128,13 +125,14 @@ export const RecordPaymentDialog: React.FC<{
   const showOrderPicker = kind === 'received' && !orderId;
   const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
   /**
-   * The money-OUT-to-a-supplier mode. Entered by the caller — "Record expense" with no target
-   * (pick one here), or opened straight onto one via presetExpenseId / presetInboxDocId. It is
-   * NOT selectable from the Type list: paying a supplier is the opposite side of the trade from
+   * Settling a cost that ALREADY exists — entered only from that cost's own row (an expense in
+   * Payables, a document in the Inbox), which is why it always arrives with a target. It is NOT
+   * selectable from the Type list: paying a supplier is the opposite side of the trade from
    * collecting from a customer, and offering it as a third option there invited picking the
-   * wrong direction. Everything below still shares this one form.
+   * wrong direction. Recording a NEW cost is a different act and lives in NewExpenseDialog,
+   * which books the bill and the cash together — this form can only pay what is already booked.
    */
-  const payingExpense = payExpense || !!presetExpenseId || !!presetInboxDocId;
+  const payingExpense = !!presetExpenseId || !!presetInboxDocId;
   // The expense picker only makes sense in the general context. Opened for a specific order /
   // invoice the dialog is customer-scoped, and mixing a supplier cost into that flow would
   // attach it to the wrong side of the trade.
@@ -428,7 +426,7 @@ export const RecordPaymentDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{payingExpense ? 'Record Expense' : 'Record Payment'}</DialogTitle>
+          <DialogTitle>Record Payment</DialogTitle>
           <DialogDescription className="sr-only">
             {payingExpense ? 'Settle an existing expense or a received myDATA document.' : 'Record a customer payment or a refund.'}
           </DialogDescription>
@@ -437,7 +435,7 @@ export const RecordPaymentDialog: React.FC<{
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Paying an expense is money OUT to a supplier — the other side of the trade, not a
                 third flavour of "record a payment from a customer". It is entered from the
-                "Record expense" action instead of hiding as an option in this list, so the two
+                cost's own row instead of hiding as an option in this list, so the two
                 directions can't be picked by accident. When that action opened this dialog the
                 Type is fixed, so the control is a label rather than a select that can only
                 un-choose itself. */}
@@ -560,7 +558,7 @@ export const RecordPaymentDialog: React.FC<{
               )}
               {expenseOptions.length === 0 && expenseSource === 'all' && (
                 <p className="text-[11px] text-muted-foreground">
-                  Nothing to pay. A new cost is recorded with “Add expense”; received documents arrive under Documents → Expenses (Inbox).
+                  Nothing to pay. A new cost is booked with “Record expense”; received documents arrive under Documents → Expenses (Inbox).
                 </p>
               )}
             </div>
