@@ -426,7 +426,17 @@ export const CompanyDetailPage: React.FC = () => {
     let snapshot: Company | null = null;
     setCompany((prev) => { snapshot = prev; return prev ? { ...prev, ...updates } : prev; });
     try {
-      await companiesAPI.updateCompany(id, updates);
+      const saved = await companiesAPI.updateCompany(id, updates);
+      // The DB normalizes country/country_code/state on write (crm_normalize_country) — typing
+      // "Greece" fills the VAT country as EL. Merge those three back so the Tax & VAT tab shows
+      // the derived value immediately instead of only after a reload. Deliberately NOT a whole-row
+      // overwrite: another field may have been edited optimistically while this request was in flight.
+      const row = (saved as { data?: Partial<Company> } | undefined)?.data;
+      if (row && ('country' in updates || 'country_code' in updates || 'state' in updates)) {
+        setCompany((prev) => prev
+          ? { ...prev, country: row.country ?? null, country_code: row.country_code ?? null, state: row.state ?? null }
+          : prev);
+      }
     } catch (error) {
       console.error('Inline patch failed:', error);
       if (snapshot) setCompany(snapshot);

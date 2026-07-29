@@ -6,7 +6,16 @@
  *
  * Covers EU + EEA + UK + CH + the handful of non-EU countries we see on the
  * platform. Shared by every Tax & VAT surface (Business profile, CRM contact,
- * CRM company) so the option set + the Greece `EL≠GR` rule live in one place. */
+ * CRM company) so the option set + the Greece `EL≠GR` rule live in one place.
+ *
+ * This list is the DROPDOWN source. The country-name → code DERIVATION lives in
+ * SQL (`public.country_ref()`, applied by the `crm_normalize_country` BEFORE-write
+ * trigger on crm_companies / crm_contacts / crm_address_units) so that the
+ * XML importer, ΑΑΔΕ / VIES writers and the agent tools — which never load this
+ * file — get the same answer. Deliberately not duplicated here: a second copy of
+ * the mapping is a drift surface, and `crm.country_code_mismatch` in the
+ * data-integrity registry watches for country/code disagreement.
+ * **Adding a country means editing BOTH this list and `public.country_ref()`.** */
 export interface VatCountryOption {
   /** VAT prefix letters (alpha-2, but `EL` for Greece). */
   code: string;
