@@ -1723,14 +1723,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </>
             ) : (
               <div className="rounded-md border border-border/60">
-                <div className="grid grid-cols-[1fr_52px_60px_80px_80px_84px_24px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
-                  <span>Product</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Price</span><span className="text-right">Cost</span><span className="text-right">VAT</span><span />
+                {/* A PURCHASE order's price IS its cost — the two are the same figure, and saving
+                    writes unit_price into both. Showing a separate editable Cost column here meant
+                    typing into a box whose value was silently overwritten on save. Sales orders
+                    keep both, because there the sell price and what we paid genuinely differ. */}
+                <div className={`grid ${order.order_type === 'sales' ? 'grid-cols-[1fr_52px_60px_80px_80px_84px_24px]' : 'grid-cols-[1fr_52px_60px_80px_84px_24px]'} gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground`}>
+                  <span>Product</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">{order.order_type === 'sales' ? 'Price' : 'Cost/unit'}</span>{order.order_type === 'sales' && <span className="text-right">Cost</span>}<span className="text-right">VAT</span><span />
                 </div>
                 {editItems.map((l, i) => {
                   const short = order.order_type === 'sales' && l.product_id && l.available != null && (Number(l.quantity) || 0) > l.available;
                   return (
                   <React.Fragment key={i}>
-                  <div className="grid grid-cols-[1fr_52px_60px_80px_80px_84px_24px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
+                  <div className={`grid ${order.order_type === 'sales' ? 'grid-cols-[1fr_52px_60px_80px_80px_84px_24px]' : 'grid-cols-[1fr_52px_60px_80px_84px_24px]'} items-center gap-2 border-t border-border/40 px-2 py-1.5`}>
                     <Input className="h-8 text-sm" value={l.description} onChange={(e) => setEditItem(i, { description: e.target.value, product_id: null })} placeholder="Product…" />
                     <MoneyInput className="h-8 text-right text-sm px-1" displayDecimals={null} value={l.quantity} onValueChange={(v) => setEditItem(i, { quantity: v ?? 0 })} />
                     <Select value={l.unit_code} onValueChange={(v) => setEditItem(i, { unit_code: v })}>
@@ -1738,7 +1742,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       <SelectContent>{UNIT_OPTIONS.map((u) => <SelectItem key={u.code} value={u.code}>{u.label}</SelectItem>)}</SelectContent>
                     </Select>
                     <MoneyInput className="h-8 text-right text-sm px-1" value={l.unit_price} onValueChange={(v) => setEditItem(i, { unit_price: v ?? 0 })} />
-                    <MoneyInput className="h-8 text-right text-sm px-1" placeholder="—" value={l.unit_cost} onValueChange={(v) => setEditItem(i, { unit_cost: v })} />
+                    {order.order_type === 'sales' && (
+                      <MoneyInput className="h-8 text-right text-sm px-1" placeholder="—" value={l.unit_cost} onValueChange={(v) => setEditItem(i, { unit_cost: v })} />
+                    )}
                     <Select value={l.vat_code} onValueChange={(v) => setEditItem(i, { vat_code: v })}>
                       <SelectTrigger className="h-8 text-xs px-1.5"><SelectValue /></SelectTrigger>
                       <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
@@ -2069,20 +2075,26 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         onCreated={() => { setExpenseOpen(false); void load(order.id); onChanged(); }}
       />
     )}
-    {/* Money IN from the customer — the standard Record Payment modal, attached to the order (settles
-        its open invoice, or records order-tagged customer credit). Money out is NOT here (see above). */}
+    {/* Recording money ON the order. Which side depends on what KIND of order it is: a sales order
+        is settled by the customer paying us, a purchase order by us paying the supplier. The dialog
+        used to be hard-wired to the customer side, so "Record payment" on a purchase order offered
+        "Received from customer" — the opposite side of the trade. */}
     {order && (
       <RecordPaymentDialog
         workspaceId={order.workspace_id}
         open={!!payInOpen}
         onOpenChange={(o) => { if (!o) setPayInOpen(null); }}
         orderId={order.id}
-        initialCounterparty={{ companyId: order.customer_company_id, contactId: order.customer_contact_id }}
+        side={order.order_type === 'purchase' ? 'supplier' : 'customer'}
+        initialCounterparty={order.order_type === 'purchase'
+          ? { companyId: order.supplier_company_id, contactId: order.supplier_contact_id }
+          : { companyId: order.customer_company_id, contactId: order.customer_contact_id }}
+        payableBills={(fin?.supplierBills ?? []).filter((b) => Number(b.amount_due) > 0)}
         defaultAmount={payInOpen?.amount}
-        presetInvoiceId={(fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id}
-        // Offered only while the order has no sales document yet — once one exists, issuing a
-        // second from a payment would duplicate the filing.
-        fiscalDocKind={(fin?.invoices.length ?? 0) === 0 ? salesDocKind : undefined}
+        presetInvoiceId={order.order_type === 'sales' ? (fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id : undefined}
+        // Offered only while a SALES order has no sales document yet — once one exists, issuing a
+        // second from a payment would duplicate the filing. A purchase order issues nothing.
+        fiscalDocKind={order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 ? salesDocKind : undefined}
         fiscalDocReason={salesDocumentKindReason(buyerIdentity)}
         onIssueDoc={createInvoice}
         onSaved={() => { setPayInOpen(null); void load(order.id); onChanged(); }}

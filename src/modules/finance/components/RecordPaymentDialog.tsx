@@ -33,7 +33,10 @@ import { inboundService, type InboundDocument } from '@/modules/finance/services
 import { salesDocumentKindLabel, type SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
 import { parseDecimal } from '@/utils/decimal';
 
-type Kind = 'received' | 'refund' | 'expense';
+// 'supplier' = money OUT to the counterparty of a PURCHASE order. Without it, opening this dialog
+// from a purchase order offered "Received from customer" — the wrong side of the trade entirely,
+// since a purchase order is settled by paying the supplier from one of our own accounts.
+type Kind = 'received' | 'refund' | 'expense' | 'supplier';
 
 export const RecordPaymentDialog: React.FC<{
   workspaceId: string;
@@ -63,7 +66,13 @@ export const RecordPaymentDialog: React.FC<{
   fiscalDocKind?: SalesDocumentKind;
   fiscalDocReason?: string;
   onIssueDoc?: () => Promise<void>;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, presetInboxDocId, payExpense, fiscalDocKind, fiscalDocReason, onIssueDoc }) => {
+  /** Which side of the trade this payment is. 'supplier' = money OUT to the party we're buying
+   *  from (a purchase order). Defaults to 'customer' — money in from whoever we sold to. */
+  side?: 'customer' | 'supplier';
+  /** Open supplier bills this payment may settle — only meaningful with side='supplier'. Passed in
+   *  by the caller that already loaded them rather than re-fetched here. */
+  payableBills?: Array<{ id: string; supplier_bill_number: string | null; amount_due: number; currency: string }>;
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, presetInboxDocId, payExpense, fiscalDocKind, fiscalDocReason, onIssueDoc, side = 'customer', payableBills = [] }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -113,6 +122,9 @@ export const RecordPaymentDialog: React.FC<{
   const [expenseId, setExpenseId] = useState<string>('');
   const [expenseSource, setExpenseSource] = useState<'all' | 'inbox'>('all');
   const [busy, setBusy] = useState(false);
+  /** Which of the order's open supplier bills this money settles (side='supplier'). */
+  const [billId, setBillId] = useState('');
+  const selectedBill = payableBills.find((b) => b.id === billId) ?? null;
   const showOrderPicker = kind === 'received' && !orderId;
   const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
   /**
@@ -130,7 +142,8 @@ export const RecordPaymentDialog: React.FC<{
 
   useEffect(() => {
     if (!open) return;
-    setKind(payingExpense ? 'expense' : 'received');
+    setKind(payingExpense ? 'expense' : side === 'supplier' ? 'supplier' : 'received');
+    setBillId('');
     // Paying a bill is a bank transfer far more often than cash; the general flow starts on cash
     // because it is a counter-side collection.
     setAmount(defaultAmount != null && defaultAmount > 0 ? String(defaultAmount) : ''); setMethod(payingExpense ? 'bank_transfer' : 'cash'); setPaidAt(new Date().toISOString().slice(0, 10));
@@ -342,7 +355,7 @@ export const RecordPaymentDialog: React.FC<{
       const direction = kind === 'received' ? 'in' : 'out';
 
       // Build the allocation + resolve the counterparty from the chosen invoice.
-      let allocations: Array<{ target_id: string; target_type: 'invoice'; amount: number; amount_doc?: number; fx_rate?: number }> = [];
+      let allocations: Array<{ target_id: string; target_type: 'invoice' | 'supplier_bill'; amount: number; amount_doc?: number; fx_rate?: number }> = [];
       let counterpartyCompanyId: string | null = null;
       let counterpartyContactId: string | null = null;
       if (kind === 'refund') {
@@ -357,6 +370,10 @@ export const RecordPaymentDialog: React.FC<{
         allocations = [{ target_id: selectedTarget.id, target_type: 'invoice', amount: applied, amount_doc: amt, fx_rate: rate }];
         counterpartyCompanyId = selectedTarget.customer_company_id ?? null;
         counterpartyContactId = selectedTarget.customer_contact_id ?? null;
+      } else if (kind === 'supplier' && selectedBill) {
+        // Never over-allocate: a bill takes at most what it still owes, the rest stays as
+        // order-tagged money out (the same rule the money-in branch follows).
+        allocations = [{ target_id: selectedBill.id, target_type: 'supplier_bill', amount: Math.min(amt, Number(selectedBill.amount_due)) }];
       }
 
       // No target chosen (unallocated / on-account) → tie it to the party the
@@ -429,6 +446,12 @@ export const RecordPaymentDialog: React.FC<{
               {payingExpense ? (
                 <div className="flex h-10 items-center rounded-md border border-border/60 bg-muted/40 px-3 text-sm">
                   Paying an expense
+                </div>
+              ) : side === 'supplier' ? (
+                // A purchase order can only be settled one way: we pay the supplier. Offering
+                // "Received from customer" here was offering the opposite side of the trade.
+                <div className="flex h-10 items-center rounded-md border border-border/60 bg-muted/40 px-3 text-sm">
+                  Paid to supplier
                 </div>
               ) : (
                 <Select value={kind} onValueChange={(v: any) => { setKind(v); setTargetInvoiceId(''); setInvoiceId(''); setExpenseId(''); }}>
@@ -540,6 +563,29 @@ export const RecordPaymentDialog: React.FC<{
                   Nothing to pay. A new cost is recorded with “Add expense”; received documents arrive under Documents → Expenses (Inbox).
                 </p>
               )}
+            </div>
+          )}
+
+          {kind === 'supplier' && (
+            <div className="space-y-1">
+              <Label>For (optional)</Label>
+              <Select value={billId} onValueChange={setBillId}>
+                <SelectTrigger><SelectValue placeholder="None — just money paid on this order" /></SelectTrigger>
+                <SelectContent>
+                  {payableBills.length === 0
+                    ? <div className="px-2 py-1 text-xs text-muted-foreground">No open supplier bill on this order</div>
+                    : payableBills.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.supplier_bill_number ?? b.id.slice(0, 8)} — {formatMoney(Number(b.amount_due), b.currency)} due
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {selectedBill
+                  ? 'Settling this bill will mark it paid when fully covered.'
+                  : 'Leave empty to log the money against the order without settling a specific bill.'}
+              </p>
             </div>
           )}
 
