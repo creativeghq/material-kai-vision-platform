@@ -460,6 +460,12 @@ export interface AgingRow {
   status: string;
   age_bucket: AgeBucket;
   days_overdue: number;
+  /** The date the row actually ages against. Same as `due_at` for invoices/bills; for an
+   *  un-invoiced order it falls back to order date + the workspace's default payment terms, so
+   *  real overdue money can't hide in the "no due date" bucket. */
+  effective_due_at?: string | null;
+  /** True when `effective_due_at` came from payment terms rather than an operator-set date. */
+  due_from_terms?: boolean;
   /** 'invoice' = real invoice/supplier bill; 'manual' = un-invoiced receivable/payable;
    *  'order' = a confirmed order not yet invoiced (synthesised client-side, not from the view);
    *  'credit' = customer money held on account (a NEGATIVE receivable — synthesised client-side

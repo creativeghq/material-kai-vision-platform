@@ -293,12 +293,20 @@ export const ordersService = {
    * An order is included when: status is not draft/cancelled, it has no invoice AND no supplier
    * bill yet, and its outstanding (total − settled payments) is > 0. Once invoiced, the invoice/
    * bill becomes the AR/AP row and the order drops out here — no double counting.
+   *
+   * Each row also carries the DERIVED due date the money ages against (`due_date`): the operator's
+   * `expected_payment_date` when set, otherwise the order date + the workspace's default payment
+   * terms — the same fallback `mark_invoice_issued` applies to an invoice with no explicit due
+   * date. Without it, an un-invoiced order could never age: real overdue money sat in the
+   * "no due date" bucket forever and every aging card read €0 (the silent-zero shape).
+   * `due_from_terms` flags the derived case so callers can label it and keep the operator-set
+   * field itself empty (editing a due date must never persist one nobody typed).
    */
   async listUninvoicedOutstanding(opts: {
     workspaceId: string;
     companyId?: string;
     contactId?: string;
-  }): Promise<Array<{ id: string; order_number: string | null; order_type: OrderType; party_name: string | null; total: number; settled: number; outstanding: number; currency: string; status: OrderStatus; created_at: string; category_id: string | null; category_name: string | null; expected_payment_date: string | null }>> {
+  }): Promise<Array<{ id: string; order_number: string | null; order_type: OrderType; party_name: string | null; total: number; settled: number; outstanding: number; currency: string; status: OrderStatus; created_at: string; category_id: string | null; category_name: string | null; expected_payment_date: string | null; due_date: string | null; due_from_terms: boolean }>> {
     const list = await this.list({ workspaceId: opts.workspaceId, companyId: opts.companyId, contactId: opts.contactId });
     // Candidates = every non-cancelled order. We include a draft/pre-order only once it has moved
     // real cash (a deposit received / paid) — empty drafts stay hidden, but a pre-order with a
@@ -311,10 +319,11 @@ export const ordersService = {
     // invoice/bill plus the canonical settlement position — not the full getOrderFinance payload.
     // Settlement comes from `orderBalances` (the shared SQL definition), NOT from re-summing
     // allocations here; this used to be its own hand-rolled direction split.
-    const [inv, bills, balances] = await Promise.all([
+    const [inv, bills, balances, settings] = await Promise.all([
       supabase.from('invoices').select('order_id').in('order_id', ids),
       supabase.from('supplier_bills').select('order_id').in('order_id', ids),
       this.orderBalances(ids),
+      supabase.from('finance_settings').select('default_payment_terms_days').eq('workspace_id', opts.workspaceId).maybeSingle(),
     ]);
     const invoiced = new Set<string>((inv.data ?? []).map((r: any) => r.order_id));
     (bills.data ?? []).forEach((r: any) => invoiced.add(r.order_id));
@@ -326,6 +335,16 @@ export const ordersService = {
       const { data: cats } = await supabase.from('finance_categories').select('id, name').in('id', catIds);
       for (const c of (cats ?? []) as Array<{ id: string; name: string }>) catNames.set(c.id, c.name);
     }
+    // Terms fallback for orders with no operator-set expected payment date. Dates are computed in
+    // UTC calendar days to match the invoice aging view, which does `CURRENT_DATE - due_at` in the
+    // DB session timezone (UTC on Supabase) — mixing local time would shift a bucket by a day.
+    const termsDays = Number((settings.data as { default_payment_terms_days?: number } | null)?.default_payment_terms_days ?? 30);
+    const dueFromTerms = (createdAt: string): string | null => {
+      const t = Date.parse(createdAt);
+      if (Number.isNaN(t)) return null;
+      return new Date(t + termsDays * 86_400_000).toISOString().slice(0, 10);
+    };
+
     // A draft/pre-order only counts as real once cash has actually moved on it, either way.
     const hasCash = (id: string) => {
       const b = balances.get(id);
@@ -352,6 +371,8 @@ export const ordersService = {
           category_id: o.category_id ?? null,
           category_name: o.category_id ? (catNames.get(o.category_id) ?? null) : null,
           expected_payment_date: o.expected_payment_date ?? null,
+          due_date: o.expected_payment_date ?? dueFromTerms(o.created_at),
+          due_from_terms: !o.expected_payment_date,
         };
       })
       .filter((r) => r.outstanding > 0.005);

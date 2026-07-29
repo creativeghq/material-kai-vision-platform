@@ -268,9 +268,10 @@ const FinancePage: React.FC = () => {
       let apWithOrders = apRows.filter((r) => r.entry_kind !== 'manual');
       try {
         const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId: wsId });
-        // An un-invoiced order has no invoice due date, so it ages against its EXPECTED payment
-        // date (operator-set). No expected date yet → it can't age → 'no_due_date' (shows as
-        // "expected" money, not in a bucket). Buckets mirror vw_ar_aging exactly.
+        // An un-invoiced order has no invoice due date, so it ages against `due_date` — the
+        // operator's expected payment date when set, else order date + the workspace's default
+        // payment terms (see ordersService.listUninvoicedOutstanding). Only an order whose date
+        // can't be derived at all stays 'no_due_date'. Buckets mirror vw_ar_aging exactly.
         // NOTE: the invoice aging view computes `CURRENT_DATE - due_at` in the DB session timezone
         // (UTC on Supabase). We MUST match that reference or an order and an invoice with the same
         // date can disagree by a day near midnight — so both "today" and the due date are compared
@@ -291,10 +292,14 @@ const FinancePage: React.FC = () => {
           total: o.total,
           amount_paid: o.settled,
           amount_due: o.outstanding,
+          // `due_at` stays the operator-set date (often null) so the inline editor below opens
+          // empty and never persists a date nobody typed; the derived one drives aging + display.
           due_at: o.expected_payment_date,
+          effective_due_at: o.due_date,
+          due_from_terms: o.due_from_terms,
           issued_at: o.created_at,
           status: o.status,
-          ...agingFromExpected(o.expected_payment_date),
+          ...agingFromExpected(o.due_date),
           entry_kind: 'order',
           description: `Order ${o.order_number ?? o.id.slice(0, 8)}`,
           party_name: o.party_name,
@@ -386,9 +391,13 @@ const FinancePage: React.FC = () => {
     return { arOutstanding, apOutstanding, overdueTotal, monthRevenue, monthMargin, monthMarginPct, dso };
   }, [ar, ap, pnl]);
 
-  // Uninvoiced-order money (expected) shown alongside the invoiced aging buckets, per side.
-  const arExpected = useMemo(() => ar.filter((r) => r.entry_kind === 'order').reduce((a, r) => a + (r.amount_due || 0), 0), [ar]);
-  const apExpected = useMemo(() => ap.filter((r) => r.entry_kind === 'order').reduce((a, r) => a + (r.amount_due || 0), 0), [ap]);
+  // Uninvoiced-order money that still can't age, shown as a separate "expected" line under the
+  // buckets. Orders WITH a due date (operator-set or terms-derived) age into the buckets above —
+  // counting them here too would double them in the summary's net line.
+  const unagedOrders = (rows: AgingRow[]) =>
+    rows.filter((r) => r.entry_kind === 'order' && r.age_bucket === 'no_due_date').reduce((a, r) => a + (r.amount_due || 0), 0);
+  const arExpected = useMemo(() => unagedOrders(ar), [ar]);
+  const apExpected = useMemo(() => unagedOrders(ap), [ap]);
 
   const arBuckets = useMemo(() => bucketize(ar), [ar]);
   const apBuckets = useMemo(() => bucketize(ap), [ap]);
@@ -863,7 +872,9 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
                             <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
-                              {r.due_at ?? <span className="text-primary">Set date</span>}
+                              {r.due_at ?? (r.effective_due_at
+                                ? <span className="text-muted-foreground" title="No date set — aging against the workspace's default payment terms. Click to set an explicit date.">{r.effective_due_at} · terms</span>
+                                : <span className="text-primary">Set date</span>)}
                             </OrderAgingInlineEditor>
                           ) : (r.due_at ?? '—')}
                         </td>
@@ -983,7 +994,9 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
                             <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={expenseCats} onSaved={() => loadAll(workspaceId)}>
-                              {r.due_at ?? <span className="text-primary">Set date</span>}
+                              {r.due_at ?? (r.effective_due_at
+                                ? <span className="text-muted-foreground" title="No date set — aging against the workspace's default payment terms. Click to set an explicit date.">{r.effective_due_at} · terms</span>
+                                : <span className="text-primary">Set date</span>)}
                             </OrderAgingInlineEditor>
                           ) : (r.due_at ?? '—')}
                         </td>
