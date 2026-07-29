@@ -1506,11 +1506,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         : <ArrowDownLeft className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />}
                       <span className="flex flex-col"><span>Record payment</span><span className="text-[10px] text-muted-foreground">{order.order_type === 'purchase' ? 'Money paid to the supplier.' : 'Money received from the customer.'}</span></span>
                     </DropdownMenuItem>
-                    {/* Money OUT — a supplier bill (Payables &amp; P&amp;L), attached to this order + "Order" category. */}
-                    <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
-                      <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
-                      <span className="flex flex-col"><span>Add expense</span><span className="text-[10px] text-muted-foreground">Money out — pay a supplier / any cost for this order.</span></span>
-                    </DropdownMenuItem>
+                    {/* SALES only. This creates a supplier_bills row by hand — the cost side of a
+                        sale (goods bought in, transport) that is not the order itself. On a PURCHASE
+                        order it produced the SAME record as "Record supplier bill" below, which
+                        generates it from the order's own lines, so offering both was two doors to
+                        one payable and an invitation to enter the cost twice. */}
+                    {order.order_type === 'sales' && (
+                      <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
+                        <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
+                        <span className="flex flex-col"><span>Add expense</span><span className="text-[10px] text-muted-foreground">Money out — a cost against this sale.</span></span>
+                      </DropdownMenuItem>
+                    )}
                     {/* Settle from the customer's on-account credit — no new cash movement. */}
                     {order.order_type === 'sales' && creditToApply > 0.005 && (
                       <DropdownMenuItem className="items-start" onClick={applyCredit}>
