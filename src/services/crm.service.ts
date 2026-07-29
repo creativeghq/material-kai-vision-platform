@@ -825,3 +825,97 @@ export const crmBankAccountsAPI = {
     if (error) throw new Error(error.message || 'Failed to delete bank account');
   },
 };
+
+// -------- CRM phone numbers (additional named numbers for a party) --------
+
+export type CrmPhoneType = 'mobile' | 'landline' | 'work' | 'home' | 'fax' | 'whatsapp' | 'other';
+
+export const CRM_PHONE_TYPES: { value: CrmPhoneType; label: string }[] = [
+  { value: 'mobile', label: 'Mobile' },
+  { value: 'landline', label: 'Landline' },
+  { value: 'work', label: 'Work' },
+  { value: 'home', label: 'Home' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'fax', label: 'Fax' },
+  { value: 'other', label: 'Other' },
+];
+
+export interface CrmPhone {
+  id: string;
+  workspace_id: string;
+  company_id: string | null;
+  contact_id: string | null;
+  label: string;
+  phone: string;
+  /** Generated in the DB (digits + '+' only) — read-only, used for inbound-channel matching. */
+  phone_normalized: string;
+  phone_type: CrmPhoneType;
+  is_primary: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CrmPhoneInput = Partial<
+  Pick<CrmPhone, 'label' | 'phone' | 'phone_type' | 'is_primary' | 'notes'>
+>;
+
+/**
+ * Additional named phone numbers belonging to a CRM company OR contact (Reception, Warehouse,
+ * Accounts, After-hours…). The party's MAIN number stays inline on `crm_companies.phone` /
+ * `crm_contacts.phone|mobile` — that is what invoices, PDFs and the fiscal party builder read.
+ * Reads + writes go through the supabase client; table RLS = is_workspace_member(workspace_id).
+ * Trust fields (workspace_id / company_id / contact_id) are set here from the verified parent,
+ * never spread from a caller body (mass-assignment invariant #8).
+ */
+export const crmPhonesAPI = {
+  async list(parent: { companyId?: string; contactId?: string }): Promise<CrmPhone[]> {
+    let query = (supabase as any).from('crm_phones').select('*');
+    if (parent.companyId) query = query.eq('company_id', parent.companyId);
+    else if (parent.contactId) query = query.eq('contact_id', parent.contactId);
+    else return [];
+    const { data, error } = await query
+      .order('is_primary', { ascending: false })
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(error.message || 'Failed to fetch phone numbers');
+    return (data ?? []) as CrmPhone[];
+  },
+
+  async create(
+    parent: { workspaceId: string; companyId?: string; contactId?: string },
+    input: CrmPhoneInput,
+  ): Promise<CrmPhone> {
+    const payload = {
+      workspace_id: parent.workspaceId,
+      company_id: parent.companyId ?? null,
+      contact_id: parent.companyId ? null : (parent.contactId ?? null),
+      label: (input.label ?? '').trim(),
+      phone: (input.phone ?? '').trim(),
+      phone_type: input.phone_type || 'other',
+      is_primary: input.is_primary ?? false,
+      notes: input.notes?.trim() || null,
+    };
+    if (!payload.label) throw new Error('Name is required');
+    if (!payload.phone) throw new Error('Phone number is required');
+    const { data, error } = await (supabase as any).from('crm_phones').insert(payload).select('*').single();
+    if (error) throw new Error(error.message || 'Failed to add phone number');
+    return data as CrmPhone;
+  },
+
+  async update(id: string, input: CrmPhoneInput): Promise<CrmPhone> {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (input.label !== undefined) patch.label = (input.label ?? '').trim();
+    if (input.phone !== undefined) patch.phone = (input.phone ?? '').trim();
+    if (input.phone_type !== undefined) patch.phone_type = input.phone_type || 'other';
+    if (input.is_primary !== undefined) patch.is_primary = input.is_primary;
+    if (input.notes !== undefined) patch.notes = input.notes?.trim() || null;
+    const { data, error } = await (supabase as any).from('crm_phones').update(patch).eq('id', id).select('*').single();
+    if (error) throw new Error(error.message || 'Failed to update phone number');
+    return data as CrmPhone;
+  },
+
+  async remove(id: string): Promise<void> {
+    const { error } = await (supabase as any).from('crm_phones').delete().eq('id', id);
+    if (error) throw new Error(error.message || 'Failed to delete phone number');
+  },
+};

@@ -24,6 +24,8 @@ import { CollapsibleCard } from '@/components/business/crm/CollapsibleCard';
 import { crmActivitiesService } from '@/services/crmActivitiesService';
 import { ContactTaxVatCard } from '@/components/business/crm/ContactTaxVatCard';
 import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
+import { CrmPhonesCard } from '@/components/business/crm/CrmPhonesCard';
+import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
 import { Switch } from '@/components/core/ui/switch';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import {
@@ -797,7 +799,7 @@ export const ContactDetailPage: React.FC = () => {
                 <Tabs defaultValue="lead" orientation="vertical" className="flex flex-col gap-6 sm:flex-row sm:items-start">
                   <TabsList className="h-auto w-full shrink-0 flex-row flex-wrap justify-start gap-1 bg-transparent p-0 sm:w-52 sm:flex-col sm:flex-nowrap">
                     <TabsTrigger value="lead" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FileText className="h-4 w-4 mr-2" />Lead</TabsTrigger>
-                    <TabsTrigger value="address" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><MapPin className="h-4 w-4 mr-2" />Address</TabsTrigger>
+                    <TabsTrigger value="address" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><MapPin className="h-4 w-4 mr-2" />Address &amp; Phone</TabsTrigger>
                     {contact.id && (
                       <TabsTrigger value="categories" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Tags className="h-4 w-4 mr-2" />Categories</TabsTrigger>
                     )}
@@ -870,8 +872,9 @@ export const ContactDetailPage: React.FC = () => {
                       </CardContent></Card>
                     </TabsContent>
 
-                    <TabsContent value="address" className="mt-0">
+                    <TabsContent value="address" className="mt-0 space-y-4">
                       <Card><CardContent className="p-4">
+                        <div className="mb-3 text-xs font-medium text-muted-foreground">Main address</div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                           <div className="sm:col-span-2">
                             <InlineText alwaysEdit={isNew} label="Street Address" value={contact.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
@@ -882,6 +885,10 @@ export const ContactDetailPage: React.FC = () => {
                           <InlineText alwaysEdit={isNew} label="Country" value={contact.country} onSave={(v) => patchInline({ country: v })} placeholder="United Kingdom" />
                         </div>
                       </CardContent></Card>
+                      <AddressUnitsManager contactId={isNew ? undefined : contact.id} />
+                      {activeWorkspaceId && (
+                        <CrmPhonesCard workspaceId={activeWorkspaceId} contactId={isNew ? undefined : contact.id} />
+                      )}
                     </TabsContent>
 
                     {contact.id && (

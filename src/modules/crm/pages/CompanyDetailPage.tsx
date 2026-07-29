@@ -37,6 +37,7 @@ import { CompanyMarketTab } from '@/modules/crm/components/market/CompanyMarketT
 import { type TimelinePerson } from '@/components/business/crm/CrmActivityTimeline';
 import { CrmRecordActivity, type CrmRecordActivityHandle } from '@/components/business/crm/CrmRecordActivity';
 import { CrmBankAccountsCard } from '@/components/business/crm/CrmBankAccountsCard';
+import { CrmPhonesCard } from '@/components/business/crm/CrmPhonesCard';
 import { AddressUnitsManager } from '@/modules/crm/components/AddressUnitsManager';
 import { FactoryLinkCard } from '@/modules/crm/components/FactoryLinkCard';
 import { IndustrySelect } from '@/components/business/crm/IndustrySelect';
@@ -743,7 +744,7 @@ export const CompanyDetailPage: React.FC = () => {
               <TabsContent value="details">
                 <Tabs defaultValue="address" orientation="vertical" className="flex flex-col gap-6 sm:flex-row sm:items-start">
                   <TabsList className="h-auto w-full shrink-0 flex-row flex-wrap justify-start gap-1 bg-transparent p-0 sm:w-52 sm:flex-col sm:flex-nowrap">
-                    <TabsTrigger value="address" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><MapPin className="h-4 w-4 mr-2"/>Address</TabsTrigger>
+                    <TabsTrigger value="address" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><MapPin className="h-4 w-4 mr-2"/>Address &amp; Phone</TabsTrigger>
                     <TabsTrigger value="tax" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><ShieldCheck className="h-4 w-4 mr-2"/>Tax &amp; VAT</TabsTrigger>
                     {showCommercial && (
                       <TabsTrigger value="commercial" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Receipt className="h-4 w-4 mr-2"/>Commercial &amp; VAT</TabsTrigger>
@@ -759,6 +760,7 @@ export const CompanyDetailPage: React.FC = () => {
                   <div className="min-w-0 w-full flex-1 space-y-4">
                     <TabsContent value="address" className="mt-0 space-y-4">
                       <Card><CardContent className="p-4">
+                        <div className="mb-3 text-xs font-medium text-muted-foreground">Main address</div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                           <InlineText alwaysEdit={isNew} label="Street Address" value={company.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
                           <InlineText alwaysEdit={isNew} label="City" value={company.city} onSave={(v) => patchInline({ city: v })} placeholder="San Francisco" />
@@ -768,6 +770,9 @@ export const CompanyDetailPage: React.FC = () => {
                         </div>
                       </CardContent></Card>
                       <AddressUnitsManager companyId={isNew ? undefined : id} />
+                      {activeWorkspaceId && (
+                        <CrmPhonesCard workspaceId={activeWorkspaceId} companyId={isNew ? undefined : id} />
+                      )}
                     </TabsContent>
 
                     <TabsContent value="tax" className="mt-0 space-y-4">

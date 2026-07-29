@@ -136,12 +136,12 @@ export const NewDeliveryNoteDialog: React.FC<{
                 <SelectTrigger><SelectValue placeholder="Select company…" /></SelectTrigger>
                 <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
-              {/* Deliver to a specific sub-unit of the customer (prefills the address below). */}
+              {/* Deliver to one of the customer's additional addresses (prefills the address below). */}
               {customer && (
                 <AddressUnitSelect
                   companyId={customer}
                   value={toUnitId}
-                  label="Deliver to (sub-unit)"
+                  label="Deliver to"
                   onChange={(id, unit) => {
                     setToUnitId(id);
                     if (unit) {

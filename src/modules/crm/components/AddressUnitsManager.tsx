@@ -74,7 +74,7 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
 
   const save = async () => {
     if (!form.label || form.label.trim() === '') {
-      toast({ title: 'Label required', description: 'Give the sub-unit a name (e.g. "Warehouse").', variant: 'destructive' });
+      toast({ title: 'Name required', description: 'Give this address a name (e.g. "Warehouse").', variant: 'destructive' });
       return;
     }
     setSaving(true);
@@ -86,7 +86,7 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
       }
       setDialogOpen(false);
       await load();
-      toast({ title: 'Saved', description: 'Sub-unit address saved.' });
+      toast({ title: 'Saved', description: 'Address saved.' });
     } catch (e) {
       toast({ title: 'Error', description: (e as Error).message, variant: 'destructive' });
     } finally {
@@ -95,7 +95,7 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
   };
 
   const remove = async (u: AddressUnit) => {
-    if (!confirm(`Delete sub-unit "${u.label}"?`)) return;
+    if (!confirm(`Delete address "${u.label}"?`)) return;
     try {
       await addressUnitsAPI.remove(u.id);
       await load();
@@ -110,23 +110,25 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
-          <MapPin className="h-4 w-4" /> Sub Units
+          <MapPin className="h-4 w-4" /> Additional Addresses
           {units.length > 0 && <Badge variant="secondary">{units.length}</Badge>}
         </CardTitle>
         {!readOnly && hasParent && (
           <Button size="sm" variant="outline" onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-2" /> Add sub-unit
+            <Plus className="h-4 w-4 mr-2" /> Add address
           </Button>
         )}
       </CardHeader>
       <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground -mt-1">
+          Extra addresses beyond the main one — each with its own name (Warehouse, Branch A, Site office…).
+          A quote, invoice, project or delivery note can be addressed to any of them.
+        </p>
         {!hasParent && (
-          <p className="text-sm text-muted-foreground">Save this record first to add sub-units.</p>
+          <p className="text-sm text-muted-foreground">Save this record first to add addresses.</p>
         )}
         {hasParent && !loading && units.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            No sub-units. Add a branch, warehouse, or establishment address to use on documents instead of the main address.
-          </p>
+          <p className="text-sm text-muted-foreground">No additional addresses yet.</p>
         )}
         {units.map((u) => (
           <div key={u.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
@@ -146,10 +148,10 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
             </div>
             {!readOnly && (
               <div className="flex shrink-0 gap-1">
-                <Button size="icon" variant="ghost" onClick={() => openEdit(u)} aria-label="Edit sub-unit">
+                <Button size="icon" variant="ghost" onClick={() => openEdit(u)} aria-label="Edit address">
                   <Pencil className="h-4 w-4" />
                 </Button>
-                <Button size="icon" variant="ghost" onClick={() => remove(u)} aria-label="Delete sub-unit">
+                <Button size="icon" variant="ghost" onClick={() => remove(u)} aria-label="Delete address">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -161,7 +163,7 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit sub-unit' : 'Add sub-unit'}</DialogTitle>
+            <DialogTitle className="font-display">{editingId ? 'Edit address' : 'Add address'}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-2">
             <div className="space-y-2 md:col-span-2">
@@ -203,7 +205,7 @@ export const AddressUnitsManager: React.FC<Props> = ({ companyId, contactId, rea
             </div>
             <div className="flex items-center gap-2 md:col-span-2">
               <Switch id="su-default" checked={!!form.is_default} onCheckedChange={(v) => setField('is_default', v)} />
-              <Label htmlFor="su-default">Pre-select this unit on new documents for this party</Label>
+              <Label htmlFor="su-default">Pre-select this address on new documents for this party</Label>
             </div>
           </div>
           <DialogFooter>

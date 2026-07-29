@@ -142,6 +142,14 @@ async function matchOrCreateContact(
     .from('crm_contacts').select('id')
     .eq('workspace_id', workspaceId).or(`phone.eq.${safePhone},mobile.eq.${safePhone}`).limit(1).maybeSingle();
   if (existing?.id) return existing.id;
+  // A contact's ADDITIONAL named numbers (crm_phones) count too — someone replying from the
+  // number saved as "Warehouse" is the same contact, not a new lead. Matched on the generated
+  // `phone_normalized` column so "+30 210 123 4567" resolves against an E.164 payload.
+  const { data: byExtraPhone } = await supabase
+    .from('crm_phones').select('contact_id')
+    .eq('workspace_id', workspaceId).eq('phone_normalized', safePhone)
+    .not('contact_id', 'is', null).limit(1).maybeSingle();
+  if (byExtraPhone?.contact_id) return byExtraPhone.contact_id;
   // crm_contacts.created_by is NOT NULL — fall back to the workspace owner.
   const owner = createdBy || (await resolveWorkspaceOwner(supabase, workspaceId));
   if (!owner) return null;
