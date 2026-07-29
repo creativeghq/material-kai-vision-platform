@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Copy, RotateCcw, PackagePlus } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -400,7 +400,9 @@ export const NewOrderModal: React.FC<{
   prefill?: {
     currency?: string | null;
     notes?: string | null;
-    lines?: Array<Partial<Line> & { description: string }>;
+    /** `original_unit_price`/`original_unit_cost` (set when re-ordering) let the form offer the
+     *  source order's figures back — the one thing the old separate "Duplicate order" action did. */
+    lines?: Array<Partial<Line> & { description: string; original_unit_price?: number; original_unit_cost?: number | null }>;
     /** Lock the figures to the source document (see above). */
     fromDocument?: boolean;
     /** Source myDATA document — its AI line→stock matches pre-select the product pickers. */
@@ -437,6 +439,24 @@ export const NewOrderModal: React.FC<{
 
   // Seeded from a supplier's document: its figures are evidence, so they are shown, not edited.
   const locked = !!prefill?.fromDocument;
+  /** Re-order pricing: today's resolved prices (default) or the ones the source order carried.
+   *  This is what used to be a second "Duplicate order" menu item. */
+  const [pricingMode, setPricingMode] = useState<'today' | 'original'>('today');
+  const repricedLines = useMemo(
+    () => (prefill?.lines ?? []).filter((l) => l.original_unit_price != null && Math.abs(Number(l.unit_price ?? 0) - Number(l.original_unit_price)) > 0.005),
+    [prefill?.lines],
+  );
+  const applyPricingMode = (mode: 'today' | 'original') => {
+    setPricingMode(mode);
+    const src = prefill?.lines ?? [];
+    setItems((ls) => ls.map((l, i) => {
+      const s = src[i];
+      if (!s || s.original_unit_price == null) return l;
+      return mode === 'original'
+        ? { ...l, unit_price: Number(s.original_unit_price), unit_cost: s.original_unit_cost ?? l.unit_cost }
+        : { ...l, unit_price: Number(s.unit_price ?? l.unit_price), unit_cost: s.unit_cost ?? l.unit_cost };
+    }));
+  };
   /** Locked mode searches the catalog from its own box, since the description is no longer typed. */
   const [linkSearch, setLinkSearch] = useState('');
   /** Catalog name per linked line — the line keeps the SUPPLIER's wording, so the match is shown
@@ -463,6 +483,7 @@ export const NewOrderModal: React.FC<{
     setItems(prefill?.lines?.length
       ? prefill.lines.map((l) => ({ ...blankLine(), ...l }))
       : [blankLine()]);
+    setPricingMode('today');
     setLinkSearch(''); setLinkedNames({}); setReceiveNow(true); setWarehouseId('');
 
     // Where the goods land. Only purchase orders stock anything, so don't ask on a sales order.
@@ -815,6 +836,24 @@ export const NewOrderModal: React.FC<{
               )}
             </div>
           </div>
+
+          {/* Ordering again: the copy carries today's prices by default, and this puts the source
+              order's prices one click away. Shown only when the two actually differ — an unchanged
+              catalog would otherwise offer a choice with no difference behind it. */}
+          {repricedLines.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+              <span className="text-xs font-medium">Prices</span>
+              <div className="flex items-center gap-1">
+                <Button type="button" size="sm" variant={pricingMode === 'today' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => applyPricingMode('today')}>Today’s</Button>
+                <Button type="button" size="sm" variant={pricingMode === 'original' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => applyPricingMode('original')}>As originally ordered</Button>
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                {repricedLines.length} line(s) priced differently today
+                {repricedLines.slice(0, 2).map((l) => ` · ${l.description}: ${formatMoney(Number(l.original_unit_price), currency)} → ${formatMoney(Number(l.unit_price ?? 0), currency)}`).join('')}
+                {repricedLines.length > 2 ? ` · +${repricedLines.length - 2} more` : ''}
+              </span>
+            </div>
+          )}
 
           <div className="space-y-1">
             <div className="flex items-center justify-between">
@@ -1336,12 +1375,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     try {
       const pre = await ordersService.reorderPrefill(order.id);
       setReorder(pre);
+      // The form itself now shows which lines moved and offers the original prices back, so the
+      // toast only needs to say that re-pricing happened at all.
       if (pre.changes.length > 0) {
         toast({
           title: "Re-priced at today's prices",
-          description: pre.changes.slice(0, 3)
-            .map((c) => `${c.description}: ${formatMoney(c.was, order.currency)} → ${formatMoney(c.now, order.currency)}`)
-            .join(' · ') + (pre.changes.length > 3 ? ` · +${pre.changes.length - 3} more` : ''),
+          description: `${pre.changes.length} line(s) changed — switch back to the original prices in the form if you'd rather.`,
         });
       }
     } catch (err: any) { toast({ title: 'Could not re-order', description: err?.message, variant: 'destructive' }); }
@@ -1374,18 +1413,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       }
       onChanged();
     } catch (err: any) { toast({ title: 'Could not raise the order', description: err?.message, variant: 'destructive' }); }
-    finally { setSaving(false); }
-  };
-
-  const duplicate = async () => {
-    if (!order) return;
-    setSaving(true);
-    try {
-      const newId = await ordersService.duplicate(order.id);
-      onChanged();
-      toast({ title: 'Order duplicated', description: 'A draft copy was created — edit and confirm it.' });
-      if (onOpenOrder) onOpenOrder(newId); else onClose();
-    } catch (err: any) { toast({ title: 'Could not duplicate', description: err?.message, variant: 'destructive' }); }
     finally { setSaving(false); }
   };
 
@@ -1522,18 +1549,16 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         </span>
                       </DropdownMenuItem>
                     )}
+                    {/* One action, not two. "Re-order" and "Duplicate order" differed only in which
+                        prices the copy carried — same items, same party, same everything else — so
+                        the choice belongs inside the form as a toggle, not as two menu entries the
+                        operator has to tell apart. It also no longer writes a draft just to show
+                        you one: nothing is saved until you save. */}
                     <DropdownMenuItem className="items-start" onClick={startReorder}>
                       <RotateCcw className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
                       <span className="flex flex-col">
-                        <span>Re-order</span>
-                        <span className="text-[10px] text-muted-foreground">Same items at today’s prices and stock.</span>
-                      </span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="items-start" onClick={duplicate}>
-                      <Copy className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
-                      <span className="flex flex-col">
-                        <span>Duplicate order</span>
-                        <span className="text-[10px] text-muted-foreground">Exact copy as a draft, original prices kept.</span>
+                        <span>Order again</span>
+                        <span className="text-[10px] text-muted-foreground">Same items and party — choose today’s prices or the original ones.</span>
                       </span>
                     </DropdownMenuItem>
                     {order.order_type === 'sales' && (
@@ -1619,11 +1644,16 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     <div key={it.id} className="grid grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[1040px]">
                       <span className="min-w-0">
                         <span className="block truncate">{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
-                        {/* #6/#7 — who supplies this line (and therefore who we owe). Any line, catalog or ad-hoc. */}
+                        {/* #6/#7 — who supplies this line (and therefore who we owe). Only a SALES
+                            order mixes suppliers across lines; on a PURCHASE order every line comes
+                            from the order's own supplier, already chosen when the order was raised,
+                            so asking again per line is work with no possible second answer. */}
                         <span className="inline-flex items-center gap-2">
-                          <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ itemId: it.id, productId: it.product_id ?? null, label: it.description, currentId: it.supplier_company_id ?? null })}>
-                            {supName ? <><Building2 className="h-2.5 w-2.5" /> {supName}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
-                          </button>
+                          {order.order_type === 'sales' && (
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ itemId: it.id, productId: it.product_id ?? null, label: it.description, currentId: it.supplier_company_id ?? null })}>
+                              {supName ? <><Building2 className="h-2.5 w-2.5" /> {supName}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
+                            </button>
+                          )}
                           {/* Mark this line's cost as paid → records a supplier bill + payment on the order.
                               Hidden once the line's supplier is fully settled (owed ≤ 0 in the rollup). */}
                           {lineCost != null && lineCost > 0.005 && order.order_type === 'sales'

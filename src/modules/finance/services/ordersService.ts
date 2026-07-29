@@ -483,6 +483,11 @@ export const ordersService = {
     if (error) throw error;
     const orderId = order.id as string;
     if (lines.length) {
+      // On a PURCHASE order every line is bought from the order's supplier — that is what makes
+      // it a purchase order. Stamping it here is what stops the detail panel asking for a
+      // per-line supplier that was already chosen when the order was raised. Only a SALES order
+      // mixes suppliers across lines (that's what "Cover shortfall from suppliers" produces).
+      const defaultSupplier = input.orderType === 'purchase' ? (input.supplierCompanyId ?? null) : null;
       const itemRows = lines.map((l, i) => ({
         order_id: orderId,
         workspace_id: input.workspaceId,
@@ -491,7 +496,7 @@ export const ordersService = {
         quantity: l.it.quantity,
         unit_price: l.it.unit_price,
         unit_cost: l.it.unit_cost ?? null,
-        supplier_company_id: l.it.supplier_company_id ?? null,
+        supplier_company_id: l.it.supplier_company_id ?? defaultSupplier,
         measurement_unit_code: l.it.measurement_unit_code ?? null,
         vat_percent: l.pct,
         vat_category: l.it.vat_category ?? null,
@@ -580,6 +585,7 @@ export const ordersService = {
       product_id: string | null; description: string; quantity: number; unit_price: number;
       unit_cost: number | null; unit_code: string; vat_code: string; supplier_company_id: string | null;
       available: number | null;
+      original_unit_price: number; original_unit_cost: number | null;
     }>;
     changes: Array<{ description: string; was: number; now: number }>;
   }> {
@@ -630,6 +636,11 @@ export const ordersService = {
           : (VAT_CATEGORIES.find((v) => v.pct === Number(it.vat_percent ?? 0))?.code ?? '1'),
         supplier_company_id: supplier,
         available,
+        // What this line cost/sold for on the ORIGINAL order, so the form can offer "keep the
+        // original prices" without a second round trip. This is what the old separate "Duplicate
+        // order" action did, now a toggle instead of a whole parallel flow.
+        original_unit_price: wasPrice,
+        original_unit_cost: it.unit_cost != null ? Number(it.unit_cost) : null,
       };
     }));
 
@@ -642,56 +653,6 @@ export const ordersService = {
       lines,
       changes,
     };
-  },
-
-  async duplicate(orderId: string): Promise<string> {
-    const { data: o, error } = await supabase.from('orders')
-      .select('workspace_id, order_type, customer_company_id, customer_contact_id, supplier_company_id, supplier_contact_id, project_id, currency, subtotal_net, vat_amount, total, discount_type, discount_value, notes, category_id')
-      .eq('id', orderId).single();
-    if (error) throw error;
-    const { data: items, error: iErr } = await supabase.from('order_items')
-      .select('product_id, description, quantity, unit_price, unit_cost, supplier_company_id, measurement_unit_code, vat_percent, vat_category, net_value, vat_amount, line_total, discount_pct, update_warehouse, sort_order')
-      .eq('order_id', orderId).order('sort_order', { ascending: true });
-    if (iErr) throw iErr;
-
-    const { data: created, error: cErr } = await supabase.from('orders').insert({
-      workspace_id: o.workspace_id, order_type: o.order_type, status: 'draft',
-      customer_company_id: o.customer_company_id, customer_contact_id: o.customer_contact_id,
-      supplier_company_id: o.supplier_company_id, supplier_contact_id: o.supplier_contact_id,
-      project_id: o.project_id, currency: o.currency,
-      subtotal_net: o.subtotal_net, vat_amount: o.vat_amount, total: o.total,
-      discount_type: o.discount_type, discount_value: o.discount_value,
-      notes: o.notes, category_id: o.category_id,
-    }).select('id, order_number').single();
-    if (cErr) throw cErr;
-    const newId = created.id as string;
-
-    if (items?.length) {
-      const rows = (items as any[]).map((it, i) => ({
-        order_id: newId, workspace_id: o.workspace_id,
-        product_id: it.product_id ?? null, description: it.description,
-        quantity: it.quantity, unit_price: it.unit_price, unit_cost: it.unit_cost ?? null,
-        supplier_company_id: it.supplier_company_id ?? null,
-        measurement_unit_code: it.measurement_unit_code ?? null,
-        vat_percent: it.vat_percent ?? null, vat_category: it.vat_category ?? null,
-        net_value: it.net_value ?? 0, vat_amount: it.vat_amount ?? 0, line_total: it.line_total ?? 0,
-        discount_pct: it.discount_pct ?? 0, update_warehouse: it.update_warehouse ?? true, sort_order: it.sort_order ?? i,
-      }));
-      const { error: insErr } = await supabase.from('order_items').insert(rows);
-      if (insErr) throw insErr;
-    }
-
-    flowEventService.emitToWorkspaceRoles(o.workspace_id, ['owner', 'admin'], 'order_created',
-      (recipientUserId) => ({
-        user_id: recipientUserId, type: 'order_created', workspace_id: o.workspace_id,
-        order_id: newId, order_number: (created as any).order_number ?? null, order_type: o.order_type, status: 'draft',
-        total: o.total, currency: o.currency,
-        customer_company_id: o.customer_company_id, supplier_company_id: o.supplier_company_id, project_id: o.project_id,
-        title: `${o.order_type === 'purchase' ? 'Purchase' : 'Sales'} order duplicated${(created as any).order_number ? ` #${(created as any).order_number}` : ''}`,
-        body: `A draft copy was created (${Number(o.total).toFixed(2)} ${o.currency}).`,
-        action_url: '/finance?tab=orders',
-      }));
-    return newId;
   },
 
   async getOrderFinance(orderId: string): Promise<{
@@ -953,12 +914,15 @@ export const ordersService = {
   ): Promise<void> {
     const disc = { type: discount?.type ?? null, value: Number(discount?.value) || 0 };
     const { lines, subtotal, vatTotal, total } = computeOrderLines(items, disc);
+    // Same rule as create(): a purchase order's lines belong to that order's supplier.
+    const { data: own } = await supabase.from('orders').select('order_type, supplier_company_id').eq('id', orderId).maybeSingle();
+    const defaultSupplier = own?.order_type === 'purchase' ? ((own.supplier_company_id as string | null) ?? null) : null;
     await supabase.from('order_items').delete().eq('order_id', orderId);
     if (lines.length) {
       const { error: itErr } = await supabase.from('order_items').insert(lines.map((l, i) => ({
         order_id: orderId, workspace_id: workspaceId, product_id: l.it.product_id ?? null,
         description: l.it.description, quantity: l.it.quantity, unit_price: l.it.unit_price, unit_cost: l.it.unit_cost ?? null,
-        supplier_company_id: l.it.supplier_company_id ?? null,
+        supplier_company_id: l.it.supplier_company_id ?? defaultSupplier,
         measurement_unit_code: l.it.measurement_unit_code ?? null,
         vat_percent: l.pct, vat_category: l.it.vat_category ?? null,
         net_value: l.net, vat_amount: l.vat, line_total: l.net, discount_pct: l.discountPct,
