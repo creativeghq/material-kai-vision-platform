@@ -171,7 +171,7 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
               Single
             </TabsTrigger>
             <TabsTrigger value="bulk" className="flex items-center gap-2">
-              Bulk paste
+              Bulk Paste
             </TabsTrigger>
           </TabsList>
           <TabsContent value="single">

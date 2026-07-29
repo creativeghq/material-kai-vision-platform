@@ -137,7 +137,7 @@ export const MyDocumentsTab: React.FC = () => {
       {/* ── Invoices & receipts ── */}
       {totals.invoices > 0 && (
         <div className="space-y-2">
-          <h3 className="text-base font-semibold">Invoices &amp; receipts</h3>
+          <h3 className="text-base font-semibold">Invoices &amp; Receipts</h3>
           <div className="space-y-2">
             {invoices.map((d) => (
               <Card key={d.id} className="dashboard-card p-3 flex items-center gap-3">
@@ -167,7 +167,7 @@ export const MyDocumentsTab: React.FC = () => {
       {/* ── Payment receipts ── */}
       {totals.receipts > 0 && (
         <div className="space-y-2">
-          <h3 className="text-base font-semibold">Payment receipts</h3>
+          <h3 className="text-base font-semibold">Payment Receipts</h3>
           <div className="space-y-2">
             {receipts.map((r) => (
               <Card key={r.id} className="dashboard-card p-3 flex items-center gap-3">

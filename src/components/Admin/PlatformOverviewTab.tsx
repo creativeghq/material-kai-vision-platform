@@ -1173,7 +1173,7 @@ export function PlatformOverviewTab() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
-          <CardHeader><CardTitle>3D Jobs & Segments Generated (weekly)</CardTitle></CardHeader>
+          <CardHeader><CardTitle>3D Jobs & Segments Generated (Weekly)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={gen3dTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>

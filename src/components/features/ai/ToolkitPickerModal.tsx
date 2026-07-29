@@ -159,7 +159,7 @@ export const ToolkitPickerModal: React.FC<Props> = ({
               <Sparkles className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-medium leading-tight">Agent toolkits</h2>
+              <h2 className="text-lg font-medium leading-tight">Agent Toolkits</h2>
               <p className="text-xs text-muted-foreground mt-0.5 max-w-md">
                 Enable whole clusters of tools at once. The agent has Core always loaded and can call <code className="text-[10px] px-1 py-0.5 rounded bg-muted">load_toolkit</code> mid-conversation when it needs more.
               </p>

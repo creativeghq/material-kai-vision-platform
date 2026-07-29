@@ -63,7 +63,7 @@ export default function StockPage() {
             <TabsTrigger value="inbound" className="w-full justify-start"><Ship className="h-4 w-4 mr-2" /> Inbound</TabsTrigger>
             <TabsTrigger value="dispatch" className="w-full justify-start"><Truck className="h-4 w-4 mr-2" /> Dispatch</TabsTrigger>
             <TabsTrigger value="movements" className="w-full justify-start"><ArrowLeftRight className="h-4 w-4 mr-2" /> Movements</TabsTrigger>
-            <TabsTrigger value="counts" className="w-full justify-start"><ClipboardList className="h-4 w-4 mr-2" /> Stock counts</TabsTrigger>
+            <TabsTrigger value="counts" className="w-full justify-start"><ClipboardList className="h-4 w-4 mr-2" /> Stock Counts</TabsTrigger>
           </TabsList>
 
           <div className="min-w-0 flex-1 space-y-4">

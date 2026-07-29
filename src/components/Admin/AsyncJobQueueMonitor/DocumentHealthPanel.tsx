@@ -308,7 +308,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
         <CardHeader className="pb-3">
           <CardTitle className="font-semibold flex items-center gap-2">
             <Package className="h-4 w-4 text-blue-600" />
-            Products by coverage bucket
+            Products by Coverage Bucket
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -347,7 +347,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
           <CardHeader className="pb-3">
             <CardTitle className="font-semibold flex items-center gap-2">
               <Eye className="h-4 w-4 text-blue-600" />
-              Per-product extraction detail
+              Per-Product Extraction Detail
               <Badge variant="outline" className="ml-2 text-[10px]">
                 showing {data.products_sample.length} of {data.total_products}
               </Badge>

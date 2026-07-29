@@ -544,7 +544,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Get price from Knowledge Base
+            Get Price from Knowledge Base
           </SheetTitle>
           <SheetDescription>
             {productName}
@@ -761,7 +761,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
           <Separator />
 
           <div className="space-y-3">
-            <h3 className="font-semibold text-sm">Commit price</h3>
+            <h3 className="font-semibold text-sm">Commit Price</h3>
             <p className="text-xs text-muted-foreground">
               Review the proposal and sources above, then enter the final values. Nothing is saved until you click
               "Use this price".

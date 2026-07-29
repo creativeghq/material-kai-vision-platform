@@ -112,7 +112,7 @@ export const PriceLookupsCard: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recent lookups</h4>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recent Lookups</h4>
               <div className="divide-y">
                 {rows.slice(0, 15).map((r) => {
                   const args = r.tool_args || {};

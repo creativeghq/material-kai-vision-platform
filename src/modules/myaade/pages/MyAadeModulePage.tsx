@@ -51,7 +51,7 @@ const MyAadeModulePage: React.FC = () => {
         subtitle="AADE RgWsPublic2 (TAXISnet). Looks up Greek businesses by VAT number and auto-fills the Business profile."
         actions={
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm" className="gap-2" title="Module Settings (API credentials)">
+            <Button asChild variant="ghost" size="sm" className="gap-2" title="Module Settings (API Credentials)">
               <Link to="/admin/modules/myaade/settings"><KeyRound className="h-4 w-4" />Keys</Link>
             </Button>
             <Button asChild variant="ghost" size="sm" className="gap-2">

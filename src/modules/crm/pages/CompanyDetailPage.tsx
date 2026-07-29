@@ -763,7 +763,7 @@ export const CompanyDetailPage: React.FC = () => {
                       <TabsTrigger value="categories" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Tags className="h-4 w-4 mr-2"/>Categories</TabsTrigger>
                     )}
                     {showSupplierFeatures && (
-                      <TabsTrigger value="factory" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Factory link</TabsTrigger>
+                      <TabsTrigger value="factory" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Factory Link</TabsTrigger>
                     )}
                   </TabsList>
 
@@ -1145,8 +1145,8 @@ export const CompanyDetailPage: React.FC = () => {
             {/* Existing vs New toggle */}
             <Tabs value={contactMode} onValueChange={(v) => setContactMode(v as 'existing' | 'new')}>
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="existing">Existing contact</TabsTrigger>
-                <TabsTrigger value="new">New contact</TabsTrigger>
+                <TabsTrigger value="existing">Existing Contact</TabsTrigger>
+                <TabsTrigger value="new">New Contact</TabsTrigger>
               </TabsList>
               <TabsContent value="existing" className="mt-4 space-y-2">
                 <Label>Contact *</Label>

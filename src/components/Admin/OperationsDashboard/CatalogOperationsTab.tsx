@@ -171,9 +171,9 @@ export const CatalogOperationsTab: React.FC = () => {
 
       <Tabs defaultValue="catalogs">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="catalogs" className="flex items-center gap-2">By catalog ({summary.length})</TabsTrigger>
+          <TabsTrigger value="catalogs" className="flex items-center gap-2">By Catalog ({summary.length})</TabsTrigger>
           <TabsTrigger value="events" className="flex items-center gap-2">Events ({visibleEvents.length})</TabsTrigger>
-          <TabsTrigger value="gate" className="flex items-center gap-2">Email-gate ({visibleGateLog.length})</TabsTrigger>
+          <TabsTrigger value="gate" className="flex items-center gap-2">Email-Gate ({visibleGateLog.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="catalogs" className="mt-4">

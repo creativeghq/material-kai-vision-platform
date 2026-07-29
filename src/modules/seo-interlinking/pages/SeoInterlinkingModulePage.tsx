@@ -271,7 +271,7 @@ export const SeoInterlinkingPanel: React.FC = () => {
             <CardHeader>
               <CardTitle className="text-red-500 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
-                Sites with errors
+                Sites with Errors
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">

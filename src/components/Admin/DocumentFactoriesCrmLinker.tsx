@@ -226,7 +226,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
-            Businesses in this document
+            Businesses in This Document
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -249,7 +249,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
         <div>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
-            Businesses in this document
+            Businesses in This Document
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
             {factories.length} distinct brand name{factories.length === 1 ? '' : 's'} found. One-click promotion to the CRM.

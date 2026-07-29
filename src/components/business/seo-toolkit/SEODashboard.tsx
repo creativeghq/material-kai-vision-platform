@@ -124,7 +124,7 @@ export const SEODashboardPanel: React.FC = () => {
             <Target className="h-3.5 w-3.5" /> Competitive Intel
           </TabsTrigger>
           <TabsTrigger value="interlinking" className="flex items-center gap-2">
-            <Waypoints className="h-3.5 w-3.5" /> Inter-linking
+            <Waypoints className="h-3.5 w-3.5" /> Inter-Linking
           </TabsTrigger>
         </TabsList>
 

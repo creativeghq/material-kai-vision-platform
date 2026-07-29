@@ -112,7 +112,7 @@ export const SupplierProductsTab: React.FC<SupplierProductsTabProps> = ({
         <div>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-4 w-4" />
-            Products from this supplier
+            Products from This Supplier
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
             Products attributed to this company as their brand or manufacturer — matched when a

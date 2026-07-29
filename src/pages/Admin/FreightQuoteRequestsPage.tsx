@@ -48,7 +48,7 @@ export default function FreightQuoteRequestsPage() {
 
   return (
     <div className="min-h-screen">
-      <PageHeader icon={Ship} title="Freight quote requests" subtitle="Tenant requests without their own SeaRates key — fulfil and send back" />
+      <PageHeader icon={Ship} title="Freight Quote Requests" subtitle="Tenant requests without their own SeaRates key — fulfil and send back" />
       <div className="p-3 sm:p-6">
         <Card>
           <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Pending Requests</CardTitle></CardHeader>

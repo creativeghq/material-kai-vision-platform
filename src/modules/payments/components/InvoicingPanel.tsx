@@ -230,7 +230,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
         <CardHeader>
           <CardTitle className="font-light flex items-center gap-2">
             <Hash className="h-4 w-4 text-primary" />
-            Invoice numbering
+            Invoice Numbering
           </CardTitle>
           <CardDescription>
             How the built-in provider numbers invoices. The sequence is atomic — every
@@ -317,7 +317,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
         <CardHeader>
           <CardTitle className="font-light flex items-center gap-2">
             <ImageIcon className="h-4 w-4 text-primary" />
-            Invoice design
+            Invoice Design
           </CardTitle>
           <CardDescription>
             Cover + footer images printed on every PDF invoice. PNG or JPG, recommended

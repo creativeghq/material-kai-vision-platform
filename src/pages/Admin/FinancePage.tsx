@@ -86,12 +86,12 @@ const DOC_TABS: { value: string; type: any; label: string; icon: React.Component
   { value: 'doc_orders', type: 'orders', label: 'Orders', icon: ShoppingCart },
   { value: 'doc_invoices', type: 'invoices', label: 'Invoices', icon: FileText },
   { value: 'doc_receipts', type: 'receipts', label: 'Receipts', icon: Receipt },
-  { value: 'doc_credit_notes', type: 'credit_notes', label: 'Credit notes', icon: FileMinus },
+  { value: 'doc_credit_notes', type: 'credit_notes', label: 'Credit Notes', icon: FileMinus },
   { value: 'doc_payments', type: 'payments', label: 'Payments', icon: Banknote },
   { value: 'doc_expenses', type: 'expenses', label: 'Expenses', icon: ArrowUpCircle },
   // Dispatch board lives in the Warehouse module (it's a loading/fulfilment surface, not a
   // finance document). Reachable from the WH shortcut at the top of this sidebar.
-  { value: 'doc_delivery', type: 'delivery_notes', label: 'Delivery notes', icon: Truck },
+  { value: 'doc_delivery', type: 'delivery_notes', label: 'Delivery Notes', icon: Truck },
   { value: 'doc_cheques', type: 'cheques', label: 'Cheques', icon: FileSignature },
 ];
 
@@ -532,14 +532,14 @@ const FinancePage: React.FC = () => {
               <CalendarClock className="h-4 w-4 mr-2" /> Planning
             </TabsTrigger>
             <TabsTrigger value="trip_cards" className="w-full justify-start">
-              <Plane className="h-4 w-4 mr-2" /> Expense cards
+              <Plane className="h-4 w-4 mr-2" /> Expense Cards
             </TabsTrigger>
             <TabsTrigger value="assets" className="w-full justify-start">
               <Boxes className="h-4 w-4 mr-2" /> Assets
             </TabsTrigger>
             {!isAccountant && (
               <TabsTrigger value="time" className="w-full justify-start">
-                <Clock className="h-4 w-4 mr-2" /> Time &amp; billing
+                <Clock className="h-4 w-4 mr-2" /> Time &amp; Billing
               </TabsTrigger>
             )}
             <TabsTrigger value="reports" className="w-full justify-start">
@@ -549,7 +549,7 @@ const FinancePage: React.FC = () => {
               <Users className="h-4 w-4 mr-2" /> Customers &amp; Suppliers
             </TabsTrigger>
             <TabsTrigger value="followups" className="w-full justify-start">
-              <Bell className="h-4 w-4 mr-2" /> Follow-ups ({followUps.length})
+              <Bell className="h-4 w-4 mr-2" /> Follow-Ups ({followUps.length})
             </TabsTrigger>
             {!isAccountant && (
               <TabsTrigger value="sourcing" className="w-full justify-start">

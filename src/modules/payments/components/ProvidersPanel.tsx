@@ -35,7 +35,7 @@ export const ProvidersPanel: React.FC<Props> = (_props) => {
         <CardHeader>
           <CardTitle className="font-light flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-primary" />
-            Active payment providers
+            Active Payment Providers
           </CardTitle>
           <CardDescription>
             Every module that declares <code>provides: {'{'} payments: true {'}'}</code> in its

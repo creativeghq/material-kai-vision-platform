@@ -232,7 +232,7 @@ export const MessagingManagement: React.FC = () => {
             </TabsTrigger>
             <TabsTrigger value="optouts">
               <Users className="h-4 w-4 mr-2" />
-              Opt-outs
+              Opt-Outs
             </TabsTrigger>
             <TabsTrigger value="push">
               <Bell className="h-4 w-4 mr-2" />

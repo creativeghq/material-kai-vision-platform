@@ -255,7 +255,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-4 w-4 shrink-0" />
-            Send email
+            Send Email
           </DialogTitle>
           {recipientLabel && (
             <p className="text-sm font-medium text-foreground">{recipientLabel}</p>
@@ -297,10 +297,10 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
         <Tabs value={mode} onValueChange={(v) => setMode(v as 'template' | 'custom')}>
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="template">
-              <FileText className="h-4 w-4 mr-1.5" /> From template
+              <FileText className="h-4 w-4 mr-1.5" /> From Template
             </TabsTrigger>
             <TabsTrigger value="custom">
-              <Mail className="h-4 w-4 mr-1.5" /> Custom email
+              <Mail className="h-4 w-4 mr-1.5" /> Custom Email
             </TabsTrigger>
           </TabsList>
 

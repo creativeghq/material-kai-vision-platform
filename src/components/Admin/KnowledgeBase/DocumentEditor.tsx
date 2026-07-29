@@ -629,7 +629,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   {(document.metadata as Record<string, unknown> | undefined)?.doc_kind === 'job_research_sites' && (
                     <TabsTrigger value="manage">
                       <Settings2 className="h-4 w-4 mr-2" />
-                      Manage resources
+                      Manage Resources
                     </TabsTrigger>
                   )}
                 </TabsList>

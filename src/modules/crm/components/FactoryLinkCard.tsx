@@ -76,7 +76,7 @@ export const FactoryLinkCard: React.FC<{
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Factory className="h-4 w-4" />
-          Linked brand
+          Linked Brand
         </CardTitle>
         <p className="text-xs text-muted-foreground mt-1">
           Pin this supplier to the maker name(s) on ingested products. This is what ties

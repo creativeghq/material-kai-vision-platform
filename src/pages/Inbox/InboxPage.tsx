@@ -700,7 +700,7 @@ const InboxPage: React.FC = () => {
                 <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as InboxThreadStatus)}>
                   <TabsList className="h-auto gap-1.5 bg-transparent p-0">
                     <TabsTrigger value="open" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Open</TabsTrigger>
-                    <TabsTrigger value="snoozed" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Follow-up</TabsTrigger>
+                    <TabsTrigger value="snoozed" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Follow-Up</TabsTrigger>
                     <TabsTrigger value="closed" className={`text-xs px-3 py-1 ${ACTIVE_TAB}`}>Done</TabsTrigger>
                   </TabsList>
                 </Tabs>

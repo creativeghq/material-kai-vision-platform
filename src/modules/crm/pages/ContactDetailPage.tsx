@@ -813,7 +813,7 @@ export const ContactDetailPage: React.FC = () => {
                     {contact.id && (
                       <TabsTrigger value="categories" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Tags className="h-4 w-4 mr-2" />Categories</TabsTrigger>
                     )}
-                    <TabsTrigger value="linked" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><LinkIcon className="h-4 w-4 mr-2" />Linked account</TabsTrigger>
+                    <TabsTrigger value="linked" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><LinkIcon className="h-4 w-4 mr-2" />Linked Account</TabsTrigger>
                     {!hasCompany && (
                       <TabsTrigger value="commercial" className="w-full justify-start data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Receipt className="h-4 w-4 mr-2" />Commercial &amp; VAT</TabsTrigger>
                     )}

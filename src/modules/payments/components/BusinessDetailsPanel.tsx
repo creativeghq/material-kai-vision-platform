@@ -117,7 +117,7 @@ export const BusinessDetailsPanel: React.FC<Props> = (_props) => {
       <CardHeader>
         <CardTitle className="font-light flex items-center gap-2">
           <Building2 className="h-4 w-4 text-primary" />
-          Business details
+          Business Details
         </CardTitle>
         <CardDescription>
           The legal entity that processes payments. Shown on invoices, used as the Stripe

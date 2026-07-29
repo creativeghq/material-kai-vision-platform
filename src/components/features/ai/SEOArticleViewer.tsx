@@ -2047,7 +2047,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                   {article.interlinking_data && (
                     <TabsTrigger value="interlink" className="gap-1">
                       <Link2 className="w-3.5 h-3.5" />
-                      Inter-linking
+                      Inter-Linking
                     </TabsTrigger>
                   )}
                 </TabsList>

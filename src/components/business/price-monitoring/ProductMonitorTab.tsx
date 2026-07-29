@@ -851,7 +851,7 @@ const SimilarProductsSection: React.FC<{
         >
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-yellow-500" />
-            Similar Products in this series
+            Similar Products in This Series
             <Badge variant="outline" className="text-[10px]">
               {rows.length}
             </Badge>

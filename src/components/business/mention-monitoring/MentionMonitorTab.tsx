@@ -389,7 +389,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
             <TabsContent value="llm" className="mt-4 space-y-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
                 <div className="min-w-0">
-                  <h4 className="text-sm font-medium">LLM visibility</h4>
+                  <h4 className="text-sm font-medium">LLM Visibility</h4>
                   <p className="text-xs text-muted-foreground">
                     How this product appears in AI answers across cheap-tier models.
                   </p>
