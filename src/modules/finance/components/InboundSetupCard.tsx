@@ -26,6 +26,11 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
    * Payables says you owe, so it is the operator's call, not a default we make for them.
    */
   const [autoConvert, setAutoConvert] = useState(false);
+  /**
+   * Whether the sync may ask ΑΑΔΕ for the supplier names ΓΕΜΗ has no record of. Off by default:
+   * each lookup notifies that supplier's TAXISnet inbox, which is the operator's call to make.
+   */
+  const [aadeNames, setAadeNames] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -40,8 +45,10 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       setHasKey(!!c?.has_key);
       setEnabled(c?.enabled ?? true);
       const { data: fin } = await supabase.from('finance_settings')
-        .select('auto_convert_inbound_expenses').eq('workspace_id', workspaceId).maybeSingle();
+        .select('auto_convert_inbound_expenses, resolve_issuer_names_via_aade')
+        .eq('workspace_id', workspaceId).maybeSingle();
       setAutoConvert(!!(fin as any)?.auto_convert_inbound_expenses);
+      setAadeNames(!!(fin as any)?.resolve_issuer_names_via_aade);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -54,7 +61,8 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
       // Base URL is always production (myDATA RequestDocs) — the poller defaults to it.
       await inboundService.saveCreds(workspaceId, { aadeUserId: userId, subscriptionKey: key.trim() || undefined, enabled });
       const { error: finErr } = await supabase.from('finance_settings')
-        .update({ auto_convert_inbound_expenses: autoConvert }).eq('workspace_id', workspaceId);
+        .update({ auto_convert_inbound_expenses: autoConvert, resolve_issuer_names_via_aade: aadeNames })
+        .eq('workspace_id', workspaceId);
       if (finErr) throw finErr;
       if (key.trim()) setHasKey(true);
       setKey('');
@@ -103,6 +111,20 @@ export const InboundSetupCard: React.FC<{ workspaceId: string }> = ({ workspaceI
             </p>
           </div>
           <Switch checked={autoConvert} onCheckedChange={setAutoConvert} />
+        </div>
+        <div className="flex items-start justify-between gap-3 rounded-md border border-border/60 p-3">
+          <div className="min-w-0 text-sm">
+            Ask ΑΑΔΕ for the supplier names ΓΕΜΗ doesn't have
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              myDATA sends only the ΑΦΜ, so supplier names are looked up in the free ΓΕΜΗ registry —
+              which covers registered companies only. Sole traders aren't in it and stay nameless
+              forever. ΑΑΔΕ can name them, but <strong>every lookup puts an audit entry in that
+              supplier's own TAXISnet inbox</strong> and spends this workspace's monthly quota, so
+              it's your call. Only ever asked about a supplier who invoiced you, only after ΓΕΜΗ
+              has said no, at most 5 per sync, and never the same ΑΦΜ twice.
+            </p>
+          </div>
+          <Switch checked={aadeNames} onCheckedChange={setAadeNames} />
         </div>
         <div>
           <Button size="sm" onClick={save} disabled={saving} className="rounded-full">

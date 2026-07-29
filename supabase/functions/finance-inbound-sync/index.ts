@@ -134,7 +134,8 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       }
     }
 
-    const { data: fs } = await supabase.from('finance_settings').select('inbound_last_mark').eq('workspace_id', workspaceId).maybeSingle();
+    const { data: fs } = await supabase.from('finance_settings')
+      .select('inbound_last_mark, resolve_issuer_names_via_aade').eq('workspace_id', workspaceId).maybeSingle();
     const watermark = fs?.inbound_last_mark || '0';
 
     // Default landing category for synced expenses: the workspace's locked "myAADE" system
@@ -446,11 +447,15 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     // ── Resolve the issuer names AADE omits ──────────────────────────────────────────
     // RequestDocs identifies the issuer by ΑΦΜ only — there is no <name> in the feed — so
     // ~2/3 of received documents would otherwise show a bare VAT number. Resolved from the
-    // ΓΕΜΗ public registry (see resolve-issuer-names.ts for why not ΑΑΔΕ). Best-effort:
-    // never fails the sync, and each run also chips away at pre-existing name-less rows.
+    // ΓΕΜΗ public registry, then — only for the ΑΦΜ ΓΕΜΗ has no record of, and only when the
+    // workspace opted in — from ΑΑΔΕ, which notifies the looked-up business (see
+    // resolve-issuer-names.ts). Best-effort: never fails the sync, and each run also chips
+    // away at pre-existing name-less rows.
     let issuers: unknown = null;
     try {
-      issuers = await resolveInboundIssuerNames(supabase, workspaceId, gemiApiKey);
+      issuers = await resolveInboundIssuerNames(supabase, workspaceId, gemiApiKey, {
+        aadeFallback: !!(fs as any)?.resolve_issuer_names_via_aade,
+      });
     } catch (e) { console.error('[inbound-sync] issuer name resolution failed', String(e)); }
 
     summary.push({

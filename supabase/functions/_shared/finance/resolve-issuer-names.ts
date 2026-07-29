@@ -11,13 +11,26 @@
  *   2. `crm_companies` for this workspace — the operator may already know the supplier.
  *   3. ΓΕΜΗ OpenData (`GEMI_API_KEY`) — public registry, one platform key, no per-tenant
  *      quota and no notification to the looked-up business.
+ *   4. ΑΑΔΕ RgWsPublic2 — LAST, opt-in per workspace, and only for the ΑΦΜ ΓΕΜΗ has
+ *      definitively answered "no such company" about.
  *
- * ΓΕΜΗ and NOT ΑΑΔΕ RgWsPublic2 on purpose: every RgWsPublic2 lookup writes an audit entry
- * into the looked-up ΑΦΜ's TAXISnet inbox under the caller's identity and burns their monthly
- * quota. That is correct for "verify my own business", and completely wrong for bulk
- * resolution of 166 suppliers who never asked to hear from us.
+ * ΓΕΜΗ first and ΑΑΔΕ last on purpose: every RgWsPublic2 lookup writes an audit entry into the
+ * looked-up ΑΦΜ's TAXISnet inbox under the caller's identity and burns their monthly quota.
+ * That is fine for "verify my own business" and completely wrong as the way to resolve 166
+ * suppliers, so ΓΕΜΗ answers the overwhelming majority for free and in silence.
+ *
+ * But ΓΕΜΗ only carries ΓΕΜΗ-REGISTERED companies. A sole trader who invoices you is not in it
+ * (measured: 3 issuers, 8 documents, 404 on every run forever), and no free source will ever
+ * name them — ΑΑΔΕ is the only registry that can. So step 4 exists, bounded hard: opt-in per
+ * workspace, capped per run, only about a business that filed a document against THIS workspace,
+ * only after ΓΕΜΗ has said no, and never asked twice (an ΑΑΔΕ miss is cached as `source='aade'`
+ * so a second run cannot re-notify the same business).
  */
 // deno-lint-ignore-file no-explicit-any
+import { resolveAadeCredentials, buildSoapEnvelope, postSoap, summarizeAadeError } from '../aade/soap.ts';
+import {
+  RGWSPUBLIC2_ENDPOINT, buildRgWsPublic2Body, parseBasicRec, displayNameFromBasicRec,
+} from '../aade/rgwspublic2.ts';
 
 const GEMI_BASE = 'https://opendata-api.businessportal.gr/api/opendata/v1';
 
@@ -29,10 +42,31 @@ export interface ResolveIssuerResult {
   from_cache: number;
   from_crm: number;
   from_gemi: number;
+  /** Named by the opt-in ΑΑΔΕ step — the ones ΓΕΜΗ structurally cannot answer. */
+  from_aade: number;
+  /** Live RgWsPublic2 calls made — i.e. businesses notified. Surfaced so the sync summary
+   *  states the outward-facing cost rather than hiding it in a name count. */
+  aade_calls: number;
+  /** Why the ΑΑΔΕ step did nothing: not opted in, no codes configured, or nothing to ask. */
+  aade_skipped: 'disabled' | 'not_configured' | 'nothing_to_ask' | null;
   not_found: number;
   docs_updated: number;
   /** The run stopped early on ΓΕΜΗ's per-minute budget; the rest resume next run. */
   throttled: boolean;
+}
+
+export interface ResolveIssuerOptions {
+  /**
+   * Hard ceiling on live ΓΕΜΗ calls per run. Defaults to ΓΕΜΗ's whole per-minute budget (8),
+   * so one run costs ~1 minute of wall clock and a backlog drains across runs. Raising it does
+   * not resolve more names — the limit is the limit — it only makes the function sit there
+   * sleeping.
+   */
+  maxLookups?: number;
+  /** Opt in to the ΑΑΔΕ step (see the file header for why this is a decision, not a default). */
+  aadeFallback?: boolean;
+  /** Ceiling on ΑΑΔΕ lookups per run — i.e. on businesses notified per run. */
+  maxAadeLookups?: number;
 }
 
 const digits = (s: unknown) => String(s ?? '').replace(/\D/g, '');
@@ -104,20 +138,17 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /**
  * Resolve issuer names for a workspace's name-less inbound documents and write them back.
  * Best-effort throughout: a registry outage leaves the rows as they were.
- *
- * @param maxLookups hard ceiling on live ΓΕΜΗ calls per run. Defaults to ΓΕΜΗ's whole
- *        per-minute budget (8), so one run costs ~1 minute of wall clock and a backlog
- *        drains across runs. Raising it does not resolve more names — the limit is the
- *        limit — it only makes the function sit there sleeping.
  */
 export async function resolveInboundIssuerNames(
   admin: any,
   workspaceId: string,
   gemiApiKey: string | null,
-  maxLookups = 8,
+  opts: ResolveIssuerOptions = {},
 ): Promise<ResolveIssuerResult> {
+  const { maxLookups = 8, aadeFallback = false, maxAadeLookups = 5 } = opts;
   const out: ResolveIssuerResult = {
-    candidates: 0, from_cache: 0, from_crm: 0, from_gemi: 0, not_found: 0, docs_updated: 0,
+    candidates: 0, from_cache: 0, from_crm: 0, from_gemi: 0, from_aade: 0, aade_calls: 0,
+    aade_skipped: aadeFallback ? null : 'disabled', not_found: 0, docs_updated: 0,
     throttled: false,
   };
 
@@ -129,7 +160,9 @@ export async function resolveInboundIssuerNames(
     .not('issuer_vat', 'is', null)
     .limit(2000);
 
-  const afms = [...new Set((unnamed ?? []).map((r: any) => digits(r.issuer_vat)).filter((v: string) => v.length >= 9))];
+  // Annotated because `admin` is untyped: without it the Set widens to `unknown` and every
+  // downstream use of an ΑΦΜ stops type-checking.
+  const afms: string[] = [...new Set<string>((unnamed ?? []).map((r: any) => digits(r.issuer_vat)).filter((v: string) => v.length >= 9))];
   out.candidates = afms.length;
   if (afms.length === 0) return out;
 
@@ -220,6 +253,85 @@ export async function resolveInboundIssuerNames(
       // Budget exhausted for this minute — stop rather than spend the run sleeping.
       if (remaining != null && remaining <= 0) { out.throttled = true; break; }
       if (i + 1 < toLookUp.length) await sleep(PACE_MS);
+    }
+  }
+
+  // 4 — ΑΑΔΕ, for the ΑΦΜ the public registry structurally cannot answer. See the file header:
+  // this notifies the looked-up business, so it is opt-in, capped, and never asked twice.
+  if (aadeFallback) {
+    const unresolved = afms.filter((a) => !resolved.has(a) && a.length === 9);
+    // The gate is a RECORDED ΓΕΜΗ miss, not merely "still unnamed". An ΑΦΜ ΓΕΜΗ has not been
+    // asked about yet — or that failed transiently — must go through the free registry first;
+    // otherwise a ΓΕΜΗ outage would silently convert the whole backlog into ΑΑΔΕ notifications.
+    const { data: misses } = unresolved.length > 0
+      ? await admin.from('greek_registry_companies')
+          .select('afm, source').in('afm', unresolved).eq('not_found', true)
+      : { data: [] as any[] };
+    // `source='aade'` means ΑΑΔΕ has already answered "no" about this ΑΦΜ. Asking again would
+    // put a second audit entry in that business's inbox to learn the same thing.
+    const targets = ((misses ?? []) as any[])
+      .filter((r) => r.source !== 'aade')
+      .map((r) => r.afm as string)
+      .slice(0, maxAadeLookups);
+
+    if (targets.length === 0) {
+      out.aade_skipped = 'nothing_to_ask';
+    } else {
+      // Per-workspace Special Access Codes; only the operator's root workspace falls back to the
+      // platform default. A tenant with no codes simply skips — it must never spend the
+      // operator's quota or notify a business under the operator's identity.
+      const creds = await resolveAadeCredentials(admin, workspaceId);
+      if (!creds.username || !creds.password) {
+        out.aade_skipped = 'not_configured';
+      } else {
+        for (const afm of targets) {
+          const envelope = buildSoapEnvelope(creds, buildRgWsPublic2Body(creds.afmCalledBy, afm));
+          const { ok, xml, err } = await postSoap(RGWSPUBLIC2_ENDPOINT, envelope);
+          // A transport failure never reached ΑΑΔΕ: nothing was notified, nothing is known, so
+          // record nothing and stop — the rest of the batch would fail the same way.
+          if (err) break;
+          out.aade_calls++;
+
+          const aadeErr = summarizeAadeError(xml);
+          const rec = aadeErr ? null : parseBasicRec(xml);
+          const name = displayNameFromBasicRec(rec);
+          if (!ok || aadeErr || !name) {
+            // ΑΑΔΕ answered, and the answer is "nothing usable". Cache it as an ΑΑΔΕ-sourced
+            // miss so this ΑΦΜ is never looked up — never re-notified — again.
+            await admin.from('greek_registry_companies').upsert(
+              [{ afm, name: null, not_found: true, source: 'aade', resolved_at: new Date().toISOString() }],
+              { onConflict: 'afm' },
+            );
+            out.not_found++;
+          } else {
+            await admin.from('greek_registry_companies').upsert([{
+              afm, name,
+              legal_form: rec?.legal_status_descr ?? null,
+              status: rec?.deactivation_flag_descr ?? null,
+              city: rec?.postal_area_description ?? null,
+              not_found: false,
+              source: 'aade',
+              resolved_at: new Date().toISOString(),
+              raw: rec,
+            }], { onConflict: 'afm' });
+            resolved.set(afm, name);
+            out.from_aade++;
+          }
+
+          // Our own record of who/when/why/which ΑΦΜ. `requested_by` is null because no human
+          // asked for this one — the workspace's standing opt-in did. Never blocks the sync.
+          try {
+            await admin.from('aade_lookup_log').insert({
+              looked_up_afm: afm,
+              workspace_id: workspaceId,
+              requested_by: null,
+              reason: 'invoice_counterparty',
+              source: 'aade',
+              valid_afm: rec?.deactivation_flag === '1' ? true : (rec?.deactivation_flag === '2' ? false : null),
+            });
+          } catch (logErr) { console.error('[resolve-issuer-names] audit log failed', String(logErr)); }
+        }
+      }
     }
   }
 
