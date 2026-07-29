@@ -101,6 +101,29 @@ export const inboundService = {
     return (data ?? []) as InboundDocument[];
   },
 
+  /**
+   * Every received document issued by one ΑΦΜ — the supplier's documents on their CRM record.
+   *
+   * The link is a LIVE match on the VAT number: `inbound_documents` stores no company id, so a
+   * CRM company created today instantly claims documents polled months ago, and nothing ever
+   * needs backfilling. Matched on the raw string, the digits-only form and the EL-prefixed form,
+   * because myDATA sends '099430615' where a CRM row may hold 'EL099430615'.
+   */
+  async listForIssuerVat(workspaceId: string, vat: string, limit = 200): Promise<InboundDocument[]> {
+    const digits = (vat ?? '').replace(/\D/g, '');
+    if (!digits) return [];
+    const forms = Array.from(new Set([vat.trim(), digits, `EL${digits}`].filter(Boolean)));
+    const { data, error } = await supabase
+      .from('inbound_documents')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .in('issuer_vat', forms)
+      .order('issue_date', { ascending: false, nullsFirst: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []) as InboundDocument[];
+  },
+
   async toSupplierBill(docId: string): Promise<string> {
     const { data, error } = await supabase.rpc('inbound_doc_to_supplier_bill', { p_doc_id: docId });
     if (error) throw error;
