@@ -18,7 +18,6 @@ import { humanizeLabel } from '@/utils/humanize';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
-import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
@@ -97,9 +96,22 @@ export const PartyAccountSummary: React.FC<{
     { tone: netTone, title: 'Net invoiced position: what they owe us on issued invoices minus what we owe them as a supplier. Separate from un-invoiced order cash (Owed on orders).' },
   );
   const showCredit = heldCredit > 0.005;
-  const showTopStrip = !!orders || showCredit || (!!meta && meta.length > 0);
-  const balanceInCustomer = !showTopStrip && !!customer;
-  const balanceInSupplier = !showTopStrip && !customer && !!supplier;
+  /**
+   * Two rows ("As customer" / "As supplier") only earn their keep when the party IS both and the
+   * sides net off. With one role the split labels a distinction that doesn't exist, and the top
+   * strip ends up restating the role row: Balance == that role's outstanding, and `Ordered`
+   * appears in both. So: one role → one row, and the duplicated tiles are dropped rather than
+   * repeated (Balance survives only when it says something the role row doesn't).
+   */
+  const bothRoles = !!customer && !!supplier;
+  const showBalance = bothRoles || showCredit;
+  const showTopStrip = !!orders || showBalance || (!!meta && meta.length > 0);
+  const balanceInCustomer = showBalance && !showTopStrip && !!customer;
+  const balanceInSupplier = showBalance && !showTopStrip && !customer && !!supplier;
+  /** The orders roll-up already shows what we ordered — don't print it again per role. */
+  const showRoleOrdered = !orders;
+  const gridCols: Record<number, string> = { 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4', 5: 'md:grid-cols-5' };
+  const supplierCols = 3 + (balanceInSupplier ? 1 : 0) + (showRoleOrdered ? 1 : 0);
   // Profitability is earned on orders as well as invoices, so it must render even for a party
   // with no invoices at all (where `customer` is null) — it used to be nested inside that block.
   const showProfit = !!profitability && profitability.revenue_net > 0;
@@ -119,7 +131,7 @@ export const PartyAccountSummary: React.FC<{
             formatMoney(heldCredit),
             { tone: 'text-amber-500', title: 'Money of theirs we hold that is not settled against any order, invoice or bill yet. Apply it to an order, or refund it.' },
           )}
-          {balanceStat}
+          {showBalance && balanceStat}
           {meta && meta.length > 0 && (
             <Card className="dashboard-card border-0">
               <CardContent className="p-3">
@@ -140,7 +152,7 @@ export const PartyAccountSummary: React.FC<{
 
       {customer && (
         <div className="space-y-1.5">
-          <div className="text-[11px] font-medium text-muted-foreground">As customer</div>
+          {bothRoles && <div className="text-[11px] font-medium text-muted-foreground">As customer</div>}
           <div className={`grid gap-3 ${balanceInCustomer ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-3'}`}>
             {balanceInCustomer && balanceStat}
             {cell('Invoiced', formatMoney(customer.invoiced))}
@@ -191,13 +203,13 @@ export const PartyAccountSummary: React.FC<{
 
       {supplier && (
         <div className="space-y-1.5">
-          <div className="text-[11px] font-medium text-muted-foreground">As supplier</div>
-          <div className={`grid gap-3 grid-cols-2 ${balanceInSupplier ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
+          {bothRoles && <div className="text-[11px] font-medium text-muted-foreground">As supplier</div>}
+          <div className={`grid gap-3 grid-cols-2 ${gridCols[supplierCols] ?? 'md:grid-cols-4'}`}>
             {balanceInSupplier && balanceStat}
             {cell('Billed to us', formatMoney(supplier.billed))}
             {cell('Paid to them', formatMoney(supplier.paid))}
             {cell('We owe', formatMoney(supplier.outstanding), supplier.outstanding > 0)}
-            {cell('Ordered', formatMoney(supplier.ordered ?? 0))}
+            {showRoleOrdered && cell('Ordered', formatMoney(supplier.ordered ?? 0))}
           </div>
         </div>
       )}
@@ -335,7 +347,6 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
   const [rows, setRows] = useState<PaymentWithAllocation[]>([]);
   const [payOpen, setPayOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
-  const [billOpen, setBillOpen] = useState(false);
   const [page, setPage] = useState(1);
   // Money IN from a customer only makes sense for a customer; money OUT (expense / bill) for a
   // supplier. With no role info (unknown) show both, preserving prior behavior.
@@ -371,14 +382,9 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
           <div className="flex items-center gap-2">
             {/* Money OUT to this party (pay a supplier) is a cost → the expense flow (bill + payment). */}
             {showSupplierActions && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => setBillOpen(true)}>
-                  <FileText className="h-3.5 w-3.5 mr-1" /> Record bill
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setExpenseOpen(true)}>
-                  <ShoppingBag className="h-3.5 w-3.5 mr-1" /> Add expense
-                </Button>
-              </>
+              <Button size="sm" variant="outline" onClick={() => setExpenseOpen(true)}>
+                <ShoppingBag className="h-3.5 w-3.5 mr-1" /> Add expense
+              </Button>
             )}
             {/* Money IN from a customer — hidden on a pure supplier where it doesn't apply. */}
             {showCustomerActions && (
@@ -456,15 +462,6 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
           onOpenChange={setExpenseOpen}
           prefill={{ supplier: { companyId: companyId ?? null, contactId: companyId ? null : (contactId ?? null), name: customerName ?? null } }}
           onCreated={() => { setExpenseOpen(false); void reload(); }}
-        />
-      )}
-      {activeWorkspaceId && (
-        <NewSupplierBillDialog
-          workspaceId={activeWorkspaceId}
-          open={billOpen}
-          onOpenChange={setBillOpen}
-          prefill={{ supplier: { companyId: companyId ?? null, contactId: companyId ? null : (contactId ?? null), name: customerName ?? null } }}
-          onCreated={() => { setBillOpen(false); void reload(); }}
         />
       )}
     </Card>

@@ -1548,7 +1548,7 @@ const _financeServiceCore = {
    * Settle an EXISTING open supplier bill — books a money-out payment allocated to the bill so it
    * drops out of Payables. This is the money-out mirror of settling an invoice with the "For" picker
    * in RecordPaymentDialog. DISTINCT from `createExpense` (which creates a NEW bill and pays it): use
-   * this to pay a bill that already exists (from NewSupplierBillDialog, an unpaid expense, the
+   * this to pay a bill that already exists (an unpaid expense, the
    * recurring-expense cron, or the agent), so paying it never duplicates the payable.
    */
   async paySupplierBill(input: {

@@ -60,7 +60,6 @@ import {
 } from '@/modules/finance/services/ordersService';
 import { OrderAgingInlineEditor } from '@/modules/finance/components/OrderAgingInlineEditor';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
-import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
@@ -183,7 +182,6 @@ const FinancePage: React.FC = () => {
   const [insightsLoading, setInsightsLoading] = useState(false);
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
-  const [newBillOpen, setNewBillOpen] = useState(false);
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
 
   // #251 App Launcher deep-link: /finance?new=invoice opens the New Invoice modal.
@@ -916,8 +914,7 @@ const FinancePage: React.FC = () => {
                     title="Filter payables"
                   />
                   {!isAccountant && <Button size="sm" variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
-                  {!isAccountant && <Button size="sm" variant="outline" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>}
-                  {!isAccountant && <Button size="sm" onClick={() => setNewBillOpen(true)}><Plus className="h-4 w-4 mr-1" /> New supplier bill</Button>}
+                  {!isAccountant && <Button size="sm" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>}
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -1146,12 +1143,6 @@ const FinancePage: React.FC = () => {
         open={newInvoiceOpen}
         onOpenChange={setNewInvoiceOpen}
         onCreated={(invoiceId) => { setNewInvoiceOpen(false); navigate(`${financeBase}/invoices/${invoiceId}`); }}
-      />
-      <NewSupplierBillDialog
-        workspaceId={workspaceId}
-        open={newBillOpen}
-        onOpenChange={setNewBillOpen}
-        onCreated={async () => { setNewBillOpen(false); if (workspaceId) await loadAll(workspaceId); }}
       />
       <NewExpenseDialog
         workspaceId={workspaceId}
