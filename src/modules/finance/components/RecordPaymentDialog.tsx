@@ -26,6 +26,7 @@ import { ordersService, type OrderListRow } from '@/modules/finance/services/ord
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
+import { salesDocumentKindLabel, type SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
 import { parseDecimal } from '@/utils/decimal';
 
 type Kind = 'received' | 'refund' | 'expense';
@@ -43,11 +44,13 @@ export const RecordPaymentDialog: React.FC<{
   orderId?: string;
   defaultAmount?: number;
   presetInvoiceId?: string;
-  /** When set (order-attached, received, no invoice yet), offers a checkbox to also issue the order's
-   *  receipt/invoice in the same step. `onIssueDoc` runs after the payment is recorded. */
-  issueDocLabel?: string;
+  /** When set (order-attached, received, no invoice yet), the fiscal document can be issued in the
+   *  same step. `fiscalDocKind` is the kind the SHARED buyer rule resolved — this dialog never
+   *  re-derives it — and `onIssueDoc` runs after the payment is recorded. */
+  fiscalDocKind?: SalesDocumentKind;
+  fiscalDocReason?: string;
   onIssueDoc?: () => Promise<void>;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, issueDocLabel, onIssueDoc }) => {
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, fiscalDocKind, fiscalDocReason, onIssueDoc }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -60,8 +63,17 @@ export const RecordPaymentDialog: React.FC<{
   const [invoiceId, setInvoiceId] = useState<string>(''); // refund target
   const [targetInvoiceId, setTargetInvoiceId] = useState<string>(''); // received allocation target
   const [issueCreditNote, setIssueCreditNote] = useState(true);
-  const [sendReceipt, setSendReceipt] = useState(true);
-  const [issueDoc, setIssueDoc] = useState(false);  // order-attached: also create the receipt/invoice
+  /**
+   * ONE decision about what document this payment produces. Recording money and issuing a
+   * document are separate acts — a deposit taken before delivery, or a part-payment against an
+   * already-issued invoice, should often produce nothing at all. Previously this was two
+   * independent switches ("Send receipt" + "Also issue a …") whose combination was ambiguous.
+   *  - `none`            — record the money only.
+   *  - `payment_receipt` — email a payment receipt (απόδειξη είσπραξης). NOT sent to myDATA.
+   *  - `fiscal`          — issue the myDATA sales document (τιμολόγιο / ΑΛΠ), kind decided by the
+   *                        shared buyer rule, offered only when the caller says it's possible.
+   */
+  const [issueChoice, setIssueChoice] = useState<'none' | 'payment_receipt' | 'fiscal'>('payment_receipt');
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccountBalance[]>([]);
@@ -97,8 +109,7 @@ export const RecordPaymentDialog: React.FC<{
     setTargetInvoiceId(presetInvoiceId ?? '');
     setInvoiceId('');
     setIssueCreditNote(true);
-    setSendReceipt(true);
-    setIssueDoc(false);
+    setIssueChoice('payment_receipt');
     setPickedOrderId('');
     setExpenseId(''); setExpenseSource('all');
     (async () => {
@@ -308,11 +319,11 @@ export const RecordPaymentDialog: React.FC<{
         allocations,
         bankAccountId: bankAccountId || null,
         orderId: effectiveOrderId ?? null,
-        sendReceipt: kind === 'received' ? sendReceipt : false,
+        sendReceipt: kind === 'received' && issueChoice === 'payment_receipt',
       });
       // Order-attached: also create the order's receipt/invoice when asked (best-effort — the
       // payment is already recorded; a doc-issue hiccup shouldn't roll it back).
-      if (issueDoc && onIssueDoc) { try { await onIssueDoc(); } catch { /* issue separately from Actions */ } }
+      if (issueChoice === 'fiscal' && onIssueDoc) { try { await onIssueDoc(); } catch { /* issue separately from Actions */ } }
       if (creditNoteFiscalError) {
         // Cash-out logged + credit note created, but myDATA transmission failed —
         // don't pretend it's filed. Operator must retransmit from the credit-note list.
@@ -446,18 +457,28 @@ export const RecordPaymentDialog: React.FC<{
           )}
 
           {kind === 'received' && (
-            <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 cursor-pointer">
-              <span className="text-xs">Send receipt to customer <span className="text-muted-foreground">— emails the payment receipt &amp; notifies them. Off = record it silently.</span></span>
-              <Switch checked={sendReceipt} onCheckedChange={setSendReceipt} />
-            </label>
-          )}
-
-          {/* Order-attached only: record the payment AND create the order's receipt/invoice in one step. */}
-          {kind === 'received' && issueDocLabel && (
-            <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 cursor-pointer">
-              <span className="text-xs">{issueDocLabel}</span>
-              <Switch checked={issueDoc} onCheckedChange={setIssueDoc} />
-            </label>
+            <div className="space-y-1 rounded-md border border-border/60 p-3">
+              <Label>Document to issue</Label>
+              <Select value={issueChoice} onValueChange={(v: any) => setIssueChoice(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No document — just record the money</SelectItem>
+                  <SelectItem value="payment_receipt">Payment receipt — email only, not sent to myDATA</SelectItem>
+                  {fiscalDocKind && (
+                    <SelectItem value="fiscal">
+                      Issue {salesDocumentKindLabel(fiscalDocKind)} to myDATA
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {issueChoice === 'fiscal'
+                  ? <><strong>{salesDocumentKindLabel(fiscalDocKind!)}</strong> is transmitted to myDATA and cannot be deleted — correcting it needs a credit note.{fiscalDocReason ? ` ${fiscalDocReason}` : ''}</>
+                  : issueChoice === 'payment_receipt'
+                    ? 'Proof the money was received. Not a sales document — nothing is filed with AADE.'
+                    : 'Nothing is issued or emailed. Use this for a deposit you will invoice later, or a part-payment on an invoice that already exists.'}
+              </p>
+            </div>
           )}
 
           {kind === 'refund' && (

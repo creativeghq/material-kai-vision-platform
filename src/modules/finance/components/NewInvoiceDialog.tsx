@@ -26,6 +26,7 @@ import { formatAddressLine } from '@/services/crm.service';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeService, formatMoney, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
+import { buyerIsConsumer as isConsumerBuyer } from '@/modules/finance/utils/salesDocumentKind';
 import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
 import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
@@ -631,9 +632,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (customer.type === 'company') return false;
     if (!customerAddr) return false; // contact row not loaded yet — don't restrict prematurely
     const a = customerAddr as any;
-    const hasVat = !!(a?.vat_number && String(a.vat_number).trim());
-    if (hasVat || a?.contact_type === 'company') return false;
-    return true;
+    // Shared rule — the same one the order flow and the payment dialog use. Do not re-derive.
+    return isConsumerBuyer({ isCompany: false, vatNumber: a?.vat_number, contactType: a?.contact_type });
   }, [customer, customerAddr]);
 
   // A consumer can only be issued retail receipts (11.x) or movement docs (9.x).

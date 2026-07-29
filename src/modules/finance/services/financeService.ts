@@ -15,6 +15,7 @@ import { round2, extractNet, vatCategory } from '@/modules/finance/lib/vatMath';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
+import type { BuyerIdentity } from '@/modules/finance/utils/salesDocumentKind';
 
 // ─── Finance flow events (fire-and-forget) ───────────────────────────────────
 // Emitted when a document is issued or a payment is received, so seeded
@@ -356,6 +357,8 @@ export interface AttachablePayment {
   counterparty_company_id: string | null;
   counterparty_contact_id: string | null;
 }
+
+export type { BuyerIdentity, SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
 
 export type RecurringCadence = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
@@ -1655,6 +1658,24 @@ const _financeServiceCore = {
       inbox: inboxByBill.get(r.id) ?? null,
     }));
     return opts.inboxOnly ? out.filter((e) => e.inbox) : out;
+  },
+
+  /**
+   * Resolve a buyer's VAT identity so `salesDocumentKindFor` can classify them. The single fetch
+   * behind that rule — surfaces exist that hold only `customer_company_id` / `customer_contact_id`
+   * (an order row), which is exactly why the order flow used to guess from the company link alone.
+   */
+  async getBuyerIdentity(ref: { companyId?: string | null; contactId?: string | null }): Promise<BuyerIdentity | null> {
+    if (ref.companyId) {
+      const { data } = await supabase.from('crm_companies').select('vat_number').eq('id', ref.companyId).maybeSingle();
+      return { isCompany: true, vatNumber: (data as any)?.vat_number ?? null, contactType: null };
+    }
+    if (ref.contactId) {
+      const { data } = await supabase.from('crm_contacts').select('vat_number, contact_type').eq('id', ref.contactId).maybeSingle();
+      if (!data) return null;
+      return { isCompany: false, vatNumber: (data as any).vat_number ?? null, contactType: (data as any).contact_type ?? null };
+    }
+    return null;
   },
 
   /** One expense in the same enriched shape, settled or not. */

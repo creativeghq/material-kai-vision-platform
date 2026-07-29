@@ -17,6 +17,10 @@ import {
   formatMoney, financeService, VAT_CATEGORIES, paymentMethodLabel,
   type PaymentWithAllocation,
 } from '@/modules/finance/services/financeService';
+import {
+  salesDocumentKindFor, salesDocumentKindLabel, salesDocumentKindReason,
+  type BuyerIdentity, type SalesDocumentKind,
+} from '@/modules/finance/utils/salesDocumentKind';
 import { statusTone } from '@/modules/finance/utils/statusTone';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
@@ -829,6 +833,9 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
+  // The buyer's VAT identity — an order row carries only the company/contact id, which is not
+  // enough to tell a sole trader from a consumer. Feeds the shared sales-document rule.
+  const [buyerIdentity, setBuyerIdentity] = useState<BuyerIdentity | null>(null);
   const [fin, setFin] = useState<Awaited<ReturnType<typeof ordersService.getOrderFinance>> | null>(null);
   const [saving, setSaving] = useState(false);
   // Bank accounts — used to label a payment row with the account name it moved through.
@@ -863,16 +870,19 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
       const res = await ordersService.get(id);
       const productIds = res.items.map((it) => it.product_id).filter(Boolean) as string[];
       const supplierIds = res.items.map((it) => it.supplier_company_id).filter(Boolean) as string[];
-      const [finance, lp, names, exposure, accounts, audit] = await Promise.all([
+      const [finance, lp, names, exposure, accounts, audit, buyer] = await Promise.all([
         ordersService.getOrderFinance(id),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
         ordersService.getCompanyNames(supplierIds).catch(() => new Map<string, string>()),
         ordersService.getOrderSupplierExposure(id).catch(() => []),
         financeService.listBankAccounts(res.order.workspace_id).catch(() => []),
         ordersService.listOrderPaymentAudit(id).catch(() => []),
+        financeService.getBuyerIdentity({
+          companyId: res.order.customer_company_id, contactId: res.order.customer_contact_id,
+        }).catch(() => null),
       ]);
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
-      setBankAccounts(accounts); setPayAudit(audit);
+      setBankAccounts(accounts); setPayAudit(audit); setBuyerIdentity(buyer);
       setMatch(res.order.order_type === 'purchase'
         ? await ordersService.getThreeWayMatch(id).catch(() => null)
         : null);
@@ -1143,9 +1153,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     : 0;
   const outstanding = order ? Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100) : 0;
   const creditToApply = Math.min(applicableCredit, outstanding);
-  // A sales order to a company (B2B) issues an invoice; to a bare contact (retail) a receipt.
-  // myDATA finalises the exact document type at issue; this just labels the action correctly.
-  const salesDocKind: 'invoice' | 'receipt' = order?.customer_company_id ? 'invoice' : 'receipt';
+  // B2B issues an invoice, a consumer a retail receipt. Derived from the buyer's VAT identity via
+  // the SHARED rule — this used to be `order?.customer_company_id ? 'invoice' : 'receipt'`, which
+  // called a sole trader (a contact carrying an ΑΦΜ) retail and proposed an ΑΛΠ to a business.
+  const salesDocKind: SalesDocumentKind = salesDocumentKindFor(buyerIdentity);
   // Remaining owed per supplier (from the what-we-owe rollup) → drives per-line "Mark paid" visibility:
   // once a line's supplier is fully settled, its "Mark paid" button hides (nothing left to pay).
   const supplierOwedById = new Map(supExposure.map((s) => [s.supplier_company_id, s.owed]));
@@ -1701,7 +1712,10 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         initialCounterparty={{ companyId: order.customer_company_id, contactId: order.customer_contact_id }}
         defaultAmount={payInOpen?.amount}
         presetInvoiceId={(fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id}
-        issueDocLabel={(fin?.invoices.length ?? 0) === 0 ? `Also issue a ${salesDocKind} for this order` : undefined}
+        // Offered only while the order has no sales document yet — once one exists, issuing a
+        // second from a payment would duplicate the filing.
+        fiscalDocKind={(fin?.invoices.length ?? 0) === 0 ? salesDocKind : undefined}
+        fiscalDocReason={salesDocumentKindReason(buyerIdentity)}
         onIssueDoc={createInvoice}
         onSaved={() => { setPayInOpen(null); void load(order.id); onChanged(); }}
       />
