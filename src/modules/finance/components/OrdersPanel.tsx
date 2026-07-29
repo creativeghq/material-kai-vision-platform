@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -233,8 +233,10 @@ export const OrdersPanel: React.FC<{
     return () => clearTimeout(t);
   }, [search]);
 
-  // A different party/project scope is a different result set — start it at the first page.
-  useEffect(() => { setPage(1); }, [companyId, contactId, projectId]);
+  // A different party/project scope is a different result set — start it at the first page, and
+  // drop any open order with it (this panel is embedded in the CRM party pages, so following the
+  // detail modal's party link swaps the scope underneath an otherwise still-open modal).
+  useEffect(() => { setPage(1); setOpenId(null); }, [companyId, contactId, projectId]);
 
   // The modal's live count comes from the server too (one row, exact total) — a client-side count
   // would only ever see the current page.
@@ -1079,6 +1081,24 @@ const MATCH_META: Record<ThreeWayMatchStatus, { label: string; cls: string }> = 
   variance:         { label: 'Variance',         cls: 'text-destructive border-destructive/40' },
 };
 
+/**
+ * Who the order is WITH, as a CRM record: the customer on a sale, the supplier on a purchase.
+ * One derivation — the header link, the name fetch and any future consumer read the same ref,
+ * so the party shown can never disagree with the party linked to.
+ */
+export const orderPartyRef = (o: Pick<Order, 'order_type' | 'customer_company_id' | 'customer_contact_id' | 'supplier_company_id' | 'supplier_contact_id'>):
+  { kind: 'company' | 'contact'; id: string; role: 'customer' | 'supplier' } | null => {
+  const isSales = o.order_type === 'sales';
+  // Prefer the side the order type implies, but fall back to the other — an order created from
+  // the wrong entry point still has exactly one party, and linking to it beats showing nothing.
+  const companyId = (isSales ? o.customer_company_id : o.supplier_company_id) ?? o.customer_company_id ?? o.supplier_company_id;
+  const contactId = (isSales ? o.customer_contact_id : o.supplier_contact_id) ?? o.customer_contact_id ?? o.supplier_contact_id;
+  const role: 'customer' | 'supplier' = isSales ? 'customer' : 'supplier';
+  if (companyId) return { kind: 'company', id: companyId, role };
+  if (contactId) return { kind: 'contact', id: contactId, role };
+  return null;
+};
+
 /** Exported so the dedicated order page (`/finance/orders/:orderId`) renders the SAME detail
  *  surface as the list's row click — one order form, two entry points, no second copy. */
 export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceCategory[]; open: boolean; onClose: () => void; onChanged: () => void; onOpenOrder?: (id: string) => void }> = ({ orderId, categories, open, onClose, onChanged, onOpenOrder }) => {
@@ -1118,6 +1138,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const [match, setMatch] = useState<ThreeWayMatch | null>(null);
   // Customer's on-account credit that could settle this sales order without new cash (#credit-apply).
   const [applicableCredit, setApplicableCredit] = useState(0);
+  // The order's own party (customer / supplier) name — the order row carries only the id, and the
+  // header has to say WHO this order is with before it can offer to open their CRM record.
+  const [partyName, setPartyName] = useState<string | null>(null);
 
   const load = async (id: string) => {
     try {
@@ -1125,7 +1148,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       const res = await ordersService.get(id);
       const productIds = res.items.map((it) => it.product_id).filter(Boolean) as string[];
       const supplierIds = res.items.map((it) => it.supplier_company_id).filter(Boolean) as string[];
-      const [finance, lp, names, exposure, accounts, audit, buyer] = await Promise.all([
+      const partyRef = orderPartyRef(res.order);
+      const [finance, lp, names, exposure, accounts, audit, buyer, party] = await Promise.all([
         ordersService.getOrderFinance(id),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
         ordersService.getCompanyNames(supplierIds).catch(() => new Map<string, string>()),
@@ -1135,9 +1159,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         financeService.getBuyerIdentity({
           companyId: res.order.customer_company_id, contactId: res.order.customer_contact_id,
         }).catch(() => null),
+        !partyRef ? Promise.resolve(null)
+          : (partyRef.kind === 'company' ? ordersService.getCompanyNames([partyRef.id]) : ordersService.getContactNames([partyRef.id]))
+              .then((m) => m.get(partyRef.id) ?? null).catch(() => null),
       ]);
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
-      setBankAccounts(accounts); setPayAudit(audit); setBuyerIdentity(buyer);
+      setBankAccounts(accounts); setPayAudit(audit); setBuyerIdentity(buyer); setPartyName(party);
       setMatch(res.order.order_type === 'purchase'
         ? await ordersService.getThreeWayMatch(id).catch(() => null)
         : null);
@@ -1151,7 +1178,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setApplicableCredit(0); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setApplicableCredit(0); setPartyName(null); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -1466,11 +1493,30 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // once a line's supplier is fully settled, its "Mark paid" button hides (nothing left to pay).
   const supplierOwedById = new Map(supExposure.map((s) => [s.supplier_company_id, s.owed]));
 
+  // The CRM record this order is with — same derivation the name fetch used.
+  const party = order ? orderPartyRef(order) : null;
+
   return (
     <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-[1400px] w-[95vw] max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Order {order?.order_number ?? order?.id.slice(0, 8)}</DialogTitle><DialogDescription className="sr-only">Order form.</DialogDescription></DialogHeader>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Order {order?.order_number ?? order?.id.slice(0, 8)}</DialogTitle>
+          <DialogDescription className="sr-only">Order form.</DialogDescription>
+          {/* Who the order is with, one click from their CRM record — the order header named a
+              number and nothing else, so answering "who is this for?" meant leaving the order. */}
+          {party && (
+            <p className="text-xs text-muted-foreground">
+              {party.role === 'customer' ? 'Customer' : 'Supplier'}{' · '}
+              <Link
+                to={`/crm/${party.kind === 'company' ? 'companies' : 'contacts'}/${party.id}`}
+                className="font-medium text-primary hover:underline"
+              >
+                {partyName ?? 'Open CRM record'}
+              </Link>
+            </p>
+          )}
+        </DialogHeader>
         {loading || !order ? (
           <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : (
