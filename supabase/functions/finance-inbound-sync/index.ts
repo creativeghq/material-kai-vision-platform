@@ -292,6 +292,9 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     let extracted = 0;
     try {
       const EXTRACT_CREDIT_COST = 1;
+      /** Same billing test as `mustBill` for the sync itself — root / owner-less workspaces
+       *  extract for free rather than being blocked by a debit that can never succeed. */
+      const mustBillExtraction = !!meta && !meta.is_root && !!meta.created_by;
       const r2 = (n: number) => Math.round(n * 100) / 100;
       const { data: docs } = await supabase
         .from('inbound_documents')
@@ -308,14 +311,22 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           .select('id', { count: 'exact', head: true }).eq('inbound_document_id', d.id);
         if ((count ?? 0) > 0) continue; // already extracted
 
-        const { data: debit } = await supabase.rpc('debit_credits', {
-          p_user_id: meta?.created_by, p_amount: EXTRACT_CREDIT_COST,
-          p_operation_type: 'expense_product_extraction',
-          p_description: `AI product extraction (inbound doc ${d.id})`,
-          p_workspace_id: workspaceId ?? null,
-        });
-        const drow = Array.isArray(debit) ? debit[0] : debit;
-        if (!drow?.success) break; // out of credits — stop extracting for this workspace
+        // Bill on exactly the same terms as the sync above (`mustBill`): a tenant workspace with
+        // an owner pays; the operator's ROOT workspace does not. Extraction used to debit
+        // unconditionally, and root carries `created_by = NULL`, so `debit_credits` answered
+        // "User credits record not found" → `break` on the FIRST document of every run. Result:
+        // 1,731 documents with parsed lines and ZERO pending items, ever — the queue looked
+        // simply "empty" rather than broken, and stock intake from myDATA has never once run.
+        if (mustBillExtraction) {
+          const { data: debit } = await supabase.rpc('debit_credits', {
+            p_user_id: meta!.created_by, p_amount: EXTRACT_CREDIT_COST,
+            p_operation_type: 'expense_product_extraction',
+            p_description: `AI product extraction (inbound doc ${d.id})`,
+            p_workspace_id: workspaceId ?? null,
+          });
+          const drow = Array.isArray(debit) ? debit[0] : debit;
+          if (!drow?.success) break; // genuinely out of credits — stop extracting for this workspace
+        }
 
         // Per-doc isolation: a single doc's extraction failure must (a) refund THAT
         // doc's credit and (b) not abort the whole batch (audit #217 H14). Previously
@@ -341,15 +352,18 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           extracted += pendingRows.length;
         } catch (docErr) {
           console.error('[inbound-sync] extraction failed for doc', d.id, String(docErr));
-          // Refund the credit for this doc — nothing was queued.
-          try {
-            await supabase.rpc('refund_credits', {
-              p_user_id: meta?.created_by, p_amount: EXTRACT_CREDIT_COST,
-              p_operation_type: 'expense_product_extraction.refund',
-              p_description: `Refund: extraction failed (inbound doc ${d.id})`,
-              p_workspace_id: workspaceId ?? null,
-            });
-          } catch (refundErr) { console.error('[inbound-sync] refund failed (non-fatal)', String(refundErr)); }
+          // Refund the credit for this doc — nothing was queued. Only when one was actually
+          // taken: refunding an un-billed root extraction would mint credit from nothing.
+          if (mustBillExtraction) {
+            try {
+              await supabase.rpc('refund_credits', {
+                p_user_id: meta!.created_by, p_amount: EXTRACT_CREDIT_COST,
+                p_operation_type: 'expense_product_extraction.refund',
+                p_description: `Refund: extraction failed (inbound doc ${d.id})`,
+                p_workspace_id: workspaceId ?? null,
+              });
+            } catch (refundErr) { console.error('[inbound-sync] refund failed (non-fatal)', String(refundErr)); }
+          }
           // continue with the next doc
         }
       }
