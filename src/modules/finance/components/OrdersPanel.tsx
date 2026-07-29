@@ -1318,18 +1318,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     } finally { setSaving(false); }
   };
 
-  // #5 — purchase order: record the supplier bill + receive goods into the warehouse.
-  const recordBill = async () => {
-    if (!order) return;
-    setSaving(true);
-    try {
-      const { error } = await supabase.rpc('generate_supplier_bill_from_order', { p_order: order.id });
-      if (error) throw error;
-      await load(order.id); onChanged();
-      toast({ title: 'Supplier bill recorded' });
-    } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
-    finally { setSaving(false); }
-  };
   const receiveWarehouse = async () => {
     if (!order) return;
     setSaving(true);
@@ -1542,11 +1530,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     {order.order_type === 'purchase' && (
                       <DropdownMenuItem onClick={sendToSupplier}>
                         <Send className="h-3.5 w-3.5 mr-2" /> Send to supplier
-                      </DropdownMenuItem>
-                    )}
-                    {order.order_type === 'purchase' && (fin?.supplierBills.length ?? 0) === 0 && (
-                      <DropdownMenuItem onClick={recordBill}>
-                        <Receipt className="h-3.5 w-3.5 mr-2" /> Record supplier bill
                       </DropdownMenuItem>
                     )}
                     {order.order_type === 'purchase' && order.status !== 'fulfilled' && order.status !== 'cancelled' && (
@@ -2001,8 +1984,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 <p className="text-[11px] text-muted-foreground">
                   The safety check before you pay this supplier: what you <strong>ordered</strong>, what actually{' '}
                   <strong>arrived</strong>, and what they <strong>billed</strong> you should all say the same thing.
-                  It reads <em>Matched</em> only when they do — anything else is flagged below, so you never pay for
-                  goods that never turned up or at a price you did not agree.
+                  The order is what you owe — the billed figure only differs once the supplier's own invoice
+                  arrives in the Expenses Inbox and is linked here, which is the whole point of comparing them.
                 </p>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div className="rounded bg-muted/40 p-2">
@@ -2036,9 +2019,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   {match.match_status === 'awaiting_receipt'
                     ? 'Nothing delivered yet. Mark the lines delivered above as the goods arrive.'
                     : match.match_status === 'awaiting_bill'
-                      ? 'Goods received — record the supplier bill against this order to complete the check.'
+                      ? "Goods received. Nothing more to do here unless the supplier's invoice arrives in the Expenses Inbox — link it to this order and it gets checked against these figures."
                       : match.match_status === 'variance'
-                        ? 'The three do not agree. Fix whatever is wrong above — or take it up with the supplier — before paying.'
+                        ? 'These do not agree. Fix whatever is wrong above — or take it up with the supplier — before paying.'
                         : 'Ordered, received and billed all agree. Safe to pay.'}
                 </p>
               </div>
