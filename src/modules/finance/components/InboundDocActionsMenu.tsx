@@ -171,9 +171,11 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           <DropdownMenuSeparator />
           <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Add to platform</DropdownMenuLabel>
           {inCrm ? (
-            // Not disabled-and-silent: say it is already there, and make the row the way in.
-            <DropdownMenuItem onClick={() => navigate(`/crm/companies/${crmCompanyId}`)}>
-              <Building2 className="h-4 w-4 mr-2" /> Issuer in CRM — open
+            // State, not an action. This menu is "things you can do to this document"; opening a
+            // CRM record is neither, and navigating away mid-triage loses the operator's place.
+            // The issuer name in the row is already the link into CRM.
+            <DropdownMenuItem disabled>
+              <Building2 className="h-4 w-4 mr-2" /> Issuer in CRM
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem onClick={openCrm} disabled={!hasIssuer}>
