@@ -87,11 +87,8 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
               {/* Material Image */}
               <div className="aspect-square bg-muted rounded-lg mb-3 overflow-hidden">
                 <img
-                  src={
-                    (result as any).metadata?.legacy?.imageUrl ||
-                    '/placeholder-image.jpg'
-                  }
-                  alt={(result as any).metadata?.detectedName || 'Material'}
+                  src={result.imageUrl || '/placeholder-image.jpg'}
+                  alt={result.materialType || 'Material'}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -99,7 +96,7 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
               {/* Material Info */}
               <div className="space-y-2">
                 <h4 className="font-medium text-sm">
-                  {(result as any).metadata?.detectedName || 'Unknown Material'}
+                  {result.materialType || 'Unknown Material'}
                 </h4>
 
                 {/* Confidence Score */}
