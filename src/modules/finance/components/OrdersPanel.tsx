@@ -1150,7 +1150,7 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
       setReorder(pre);
       if (pre.changes.length > 0) {
         toast({
-          title: `Re-priced at today's prices`,
+          title: "Re-priced at today's prices",
           description: pre.changes.slice(0, 3)
             .map((c) => `${c.description}: ${formatMoney(c.was, order.currency)} → ${formatMoney(c.now, order.currency)}`)
             .join(' · ') + (pre.changes.length > 3 ? ` · +${pre.changes.length - 3} more` : ''),
