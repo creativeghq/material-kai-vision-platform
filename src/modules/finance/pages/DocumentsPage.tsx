@@ -320,11 +320,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setRecordPaymentOpen(true)}>
               <Wallet className="h-4 w-4 mr-2" /> Record payment
-              <span className="ml-2 text-[10px] text-muted-foreground">money in</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setPayExpenseOpen(true)}>
               <Receipt className="h-4 w-4 mr-2" /> Pay an expense
-              <span className="ml-2 text-[10px] text-muted-foreground">money out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
