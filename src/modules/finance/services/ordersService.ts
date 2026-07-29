@@ -529,6 +529,26 @@ export const ordersService = {
    * `changes` reports what moved since the original, so a re-order at a new price is a visible
    * decision instead of a silent one.
    */
+  /**
+   * Raise the purchase order(s) this confirmed sales order needs but stock cannot cover.
+   *
+   * Shortfall is (ordered − delivered − reserved) per line, grouped into ONE draft purchase order
+   * per supplier and linked back via `orders.covers_order_id`. Draft, not placed: it commits
+   * money. Idempotent — quantities already on an open cover order are subtracted, so pressing it
+   * twice does not buy the same units twice.
+   */
+  async raiseCoverPurchaseOrders(orderId: string): Promise<{
+    ok: boolean;
+    reason?: string;
+    message?: string;
+    created?: Array<{ order_id: string; order_number: string | null; supplier_name: string | null; currency: string; total: number; lines: number }>;
+    uncovered?: Array<{ order_item_id: string; description: string; quantity: number; reason: string }>;
+  }> {
+    const { data, error } = await supabase.rpc('raise_cover_purchase_orders', { p_order_id: orderId });
+    if (error) throw error;
+    return (data ?? { ok: false }) as any;
+  },
+
   async reorderPrefill(orderId: string): Promise<{
     orderType: OrderType;
     lockedCompanyId?: string;

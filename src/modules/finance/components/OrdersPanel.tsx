@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Copy, RotateCcw } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Copy, RotateCcw, PackagePlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -1160,6 +1160,35 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     finally { setSaving(false); }
   };
 
+  /**
+   * Cover the shortfall: raise the purchase order(s) for whatever this confirmed sale promised
+   * and stock cannot supply. Draft orders, one per supplier — placing them stays a decision.
+   */
+  const coverShortfall = async () => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      const res = await ordersService.raiseCoverPurchaseOrders(order.id);
+      if (!res.ok) {
+        toast({ title: 'Nothing raised', description: res.message ?? res.reason, variant: 'destructive' });
+        return;
+      }
+      const made = res.created ?? [];
+      const short = res.uncovered ?? [];
+      if (made.length === 0) {
+        toast({ title: 'Nothing to order', description: res.message });
+      } else {
+        toast({
+          title: made.length === 1 ? 'Purchase order drafted' : `${made.length} purchase orders drafted`,
+          description: made.map((c) => `${c.supplier_name ?? 'Supplier'} · ${formatMoney(c.total, c.currency)}`).join(' · ')
+            + (short.length > 0 ? ` — ${short.length} line(s) have no supplier and were left out.` : ''),
+        });
+      }
+      onChanged();
+    } catch (err: any) { toast({ title: 'Could not raise the order', description: err?.message, variant: 'destructive' }); }
+    finally { setSaving(false); }
+  };
+
   const duplicate = async () => {
     if (!order) return;
     setSaving(true);
@@ -1294,6 +1323,15 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                     {editable && !editing && (
                       <DropdownMenuItem onClick={startEdit}>
                         <Pencil className="h-3.5 w-3.5 mr-2" /> Edit items
+                      </DropdownMenuItem>
+                    )}
+                    {order.order_type === 'sales' && (order.status === 'confirmed' || order.status === 'partially_fulfilled') && (
+                      <DropdownMenuItem className="items-start" onClick={coverShortfall}>
+                        <PackagePlus className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-amber-500" />
+                        <span className="flex flex-col">
+                          <span>Cover shortfall from suppliers</span>
+                          <span className="text-[10px] text-muted-foreground">Drafts a purchase order per supplier for whatever stock can’t cover.</span>
+                        </span>
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem className="items-start" onClick={startReorder}>
