@@ -116,7 +116,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [dispatchRefresh, setDispatchRefresh] = useState(0);
   const [newChequeOpen, setNewChequeOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
-  /** "Pay an expense" — the same Record Payment form opened on its money-out branch, with the
+  /** "Record expense" — the same Record Payment form opened on its money-out branch, with the
    *  expense still to be chosen inside. Separate state so the two directions can't share a
    *  half-filled form. */
   const [payExpenseOpen, setPayExpenseOpen] = useState(false);
@@ -322,7 +322,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
               <Wallet className="h-4 w-4 mr-2" /> Record payment
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setPayExpenseOpen(true)}>
-              <Receipt className="h-4 w-4 mr-2" /> Pay an expense
+              <Receipt className="h-4 w-4 mr-2" /> Record expense
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

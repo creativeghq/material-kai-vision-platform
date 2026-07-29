@@ -57,7 +57,7 @@ export const RecordPaymentDialog: React.FC<{
   /** Same, for an Inbox document that is NOT an expense yet (an `inbound_documents` id). It is
    *  converted on SAVE — opening this dialog must never create a payable on its own. */
   presetInboxDocId?: string;
-  /** Open on the money-out branch with NO expense chosen yet — the "Pay an expense" action.
+  /** Open on the money-out branch with NO expense chosen yet — the "Record expense" action.
    *  The operator picks which expense (or Inbox document) inside. */
   payExpense?: boolean;
   /** When set (order-attached, received, no invoice yet), the fiscal document can be issued in the
@@ -128,7 +128,7 @@ export const RecordPaymentDialog: React.FC<{
   const showOrderPicker = kind === 'received' && !orderId;
   const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
   /**
-   * The money-OUT-to-a-supplier mode. Entered by the caller — "Pay an expense" with no target
+   * The money-OUT-to-a-supplier mode. Entered by the caller — "Record expense" with no target
    * (pick one here), or opened straight onto one via presetExpenseId / presetInboxDocId. It is
    * NOT selectable from the Type list: paying a supplier is the opposite side of the trade from
    * collecting from a customer, and offering it as a third option there invited picking the
@@ -428,7 +428,7 @@ export const RecordPaymentDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{payingExpense ? 'Pay an Expense' : 'Record Payment'}</DialogTitle>
+          <DialogTitle>{payingExpense ? 'Record Expense' : 'Record Payment'}</DialogTitle>
           <DialogDescription className="sr-only">
             {payingExpense ? 'Settle an existing expense or a received myDATA document.' : 'Record a customer payment or a refund.'}
           </DialogDescription>
@@ -437,7 +437,7 @@ export const RecordPaymentDialog: React.FC<{
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Paying an expense is money OUT to a supplier — the other side of the trade, not a
                 third flavour of "record a payment from a customer". It is entered from the
-                "Pay an expense" action instead of hiding as an option in this list, so the two
+                "Record expense" action instead of hiding as an option in this list, so the two
                 directions can't be picked by accident. When that action opened this dialog the
                 Type is fixed, so the control is a label rather than a select that can only
                 un-choose itself. */}
