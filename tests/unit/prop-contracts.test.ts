@@ -26,7 +26,8 @@ const WATCHED: Array<{ file: string; name: string; allowUnwired?: string[] }> = 
   { file: 'modules/finance/components/RecordPaymentDialog.tsx', name: 'RecordPaymentDialog' },
   { file: 'modules/finance/components/NewSupplierBillDialog.tsx', name: 'NewSupplierBillDialog' },
   { file: 'modules/finance/components/NewExpenseDialog.tsx', name: 'NewExpenseDialog' },
-  { file: 'modules/finance/components/PaySupplierBillDialog.tsx', name: 'PaySupplierBillDialog' },
+  // PaySupplierBillDialog was folded into RecordPaymentDialog's expense branch and deleted —
+  // there is one Record Payment form now, so there is nothing separate left to guard here.
   { file: 'modules/finance/components/NewChequeDialog.tsx', name: 'NewChequeDialog' },
   { file: 'modules/finance/components/CustomerFinanceTabs.tsx', name: 'PartyPaymentsCard' },
 ];
@@ -128,7 +129,16 @@ describe('prop-contract guard · wiring-sensitive components', () => {
 
   for (const w of WATCHED) {
     it(`${w.name}: every optional prop is passed by at least one caller`, () => {
-      const sf = parse(path.join(SRC, w.file));
+      // A watched component that has been deleted or moved must say so. Previously this fell
+      // through to readFileSync and the whole suite died on a raw ENOENT — which skipped
+      // deploy-functions in CI, so a stale entry here silently stopped shipping edge functions.
+      const abs = path.join(SRC, w.file);
+      expect(
+        fs.existsSync(abs),
+        `${w.name} is on the watch list but ${w.file} does not exist. If it was deleted or ` +
+          `folded into another component, remove its entry from WATCHED; if it moved, update the path.`,
+      ).toBe(true);
+      const sf = parse(abs);
       const locals = collectLocalTypes(sf);
       const propsType = propsTypeForComponent(sf, w.name);
       expect(propsType, `could not resolve ${w.name}'s props type`).toBeTruthy();
