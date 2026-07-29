@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Copy } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, Copy, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -1135,6 +1135,31 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
     finally { setSaving(false); }
   };
 
+  /**
+   * Re-order — buy/sell this again, at TODAY's prices and against today's stock. It opens the
+   * ordinary New order form pre-filled, so the operator sees what changed and the normal create
+   * path runs (numbering, reservation, three-way match, notifications). Duplicate, below, is the
+   * other thing: an exact frozen-price copy for fixing paperwork.
+   */
+  const [reorder, setReorder] = useState<Awaited<ReturnType<typeof ordersService.reorderPrefill>> | null>(null);
+  const startReorder = async () => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      const pre = await ordersService.reorderPrefill(order.id);
+      setReorder(pre);
+      if (pre.changes.length > 0) {
+        toast({
+          title: `Re-priced at today's prices`,
+          description: pre.changes.slice(0, 3)
+            .map((c) => `${c.description}: ${formatMoney(c.was, order.currency)} → ${formatMoney(c.now, order.currency)}`)
+            .join(' · ') + (pre.changes.length > 3 ? ` · +${pre.changes.length - 3} more` : ''),
+        });
+      }
+    } catch (err: any) { toast({ title: 'Could not re-order', description: err?.message, variant: 'destructive' }); }
+    finally { setSaving(false); }
+  };
+
   const duplicate = async () => {
     if (!order) return;
     setSaving(true);
@@ -1271,8 +1296,19 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
                         <Pencil className="h-3.5 w-3.5 mr-2" /> Edit items
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem onClick={duplicate}>
-                      <Copy className="h-3.5 w-3.5 mr-2" /> Duplicate order
+                    <DropdownMenuItem className="items-start" onClick={startReorder}>
+                      <RotateCcw className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
+                      <span className="flex flex-col">
+                        <span>Re-order</span>
+                        <span className="text-[10px] text-muted-foreground">Same items at today’s prices and stock.</span>
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="items-start" onClick={duplicate}>
+                      <Copy className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
+                      <span className="flex flex-col">
+                        <span>Duplicate order</span>
+                        <span className="text-[10px] text-muted-foreground">Exact copy as a draft, original prices kept.</span>
+                      </span>
                     </DropdownMenuItem>
                     {order.order_type === 'sales' && (
                       <DropdownMenuItem onClick={() => navigate('/finance?tab=doc_dispatch')}>
@@ -1727,6 +1763,26 @@ const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceC
         />
       )}
     </Dialog>
+    {/* Re-order → the ordinary New order form, pre-filled and re-priced. Saving here runs the
+        normal create path, which is what makes numbering, reservation, three-way match and the
+        order-created notification fire — an insert behind the scenes fires none of them. */}
+    {reorder && order && (
+      <NewOrderModal
+        workspaceId={order.workspace_id}
+        lockedCompanyId={reorder.lockedCompanyId}
+        lockedContactId={reorder.lockedContactId}
+        preset={{ orderType: reorder.orderType, draft: false }}
+        prefill={{ currency: reorder.currency, notes: reorder.notes, lines: reorder.lines }}
+        categories={categories}
+        open
+        onOpenChange={(v) => { if (!v) setReorder(null); }}
+        onCreated={(newId) => {
+          setReorder(null);
+          onChanged();
+          if (onOpenOrder) onOpenOrder(newId); else onClose();
+        }}
+      />
+    )}
     {/* All money-OUT on the order — supplier payment / cost — is a supplier bill (Payables & P&L),
         linked to this order + defaulted to the "Order" category. Opened blank (Record expense) or
         pre-filled from a line ("Mark as paid") / the what-we-owe rollup ("Pay"). */}
