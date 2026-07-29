@@ -558,7 +558,7 @@ export const RecordPaymentDialog: React.FC<{
               )}
               {expenseOptions.length === 0 && expenseSource === 'all' && (
                 <p className="text-[11px] text-muted-foreground">
-                  Nothing to pay. A new cost is booked with “Record expense”; received documents arrive under Documents → Expenses (Inbox).
+                  Nothing to pay. A new cost is booked with “Add expense”; received documents arrive under Documents → Expenses (Inbox).
                 </p>
               )}
             </div>

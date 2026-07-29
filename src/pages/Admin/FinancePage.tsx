@@ -153,7 +153,7 @@ const FinancePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Seed the standard income/expense category set once per workspace when finance is first
-  // used with an empty list (so "Record expense" etc. have Rent/Utilities/… out of the box).
+  // used with an empty list (so "Add expense" etc. have Rent/Utilities/… out of the box).
   const seededWorkspaces = useRef<Set<string>>(new Set());
 
   const [ar, setAr] = useState<AgingRow[]>([]);
@@ -963,7 +963,7 @@ const FinancePage: React.FC = () => {
                     title="Filter payables"
                   />
                   {!isAccountant && <Button size="sm" variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
-                  {!isAccountant && <Button size="sm" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Record expense</Button>}
+                  {!isAccountant && <Button size="sm" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>}
                 </div>
               </CardHeader>
               <CardContent className="p-0">

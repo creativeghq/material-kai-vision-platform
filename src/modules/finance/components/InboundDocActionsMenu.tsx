@@ -55,7 +55,11 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const canReceive = doc.status === 'new' || doc.status === 'classified';
+  // ONE goods receipt per purchase. Receiving the document and receiving the purchase order it
+  // became are the same arrival counted from two rows — nothing links them, so doing both added
+  // the stock twice. Once the order exists it owns the receipt (it knows the catalog products,
+  // the per-line delivered quantities and the customer allocations waiting on them).
+  const canReceive = (doc.status === 'new' || doc.status === 'classified') && !hasOrder;
   const canDismiss = doc.status === 'new';
   // Paying is offered on anything not dismissed: either the expense exists (→ its payments) or
   // the document is converted when the payment is actually saved.
@@ -184,9 +188,14 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
               <Building2 className="h-4 w-4 mr-2" /> Add issuer to CRM
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={onReceiveStock} disabled={!canReceive}>
+          <DropdownMenuItem onClick={onReceiveStock} disabled={!canReceive} className="flex-col items-start gap-0.5">
             {/* Same act as the order menu's entry — one name for it, the goods-receipt term. */}
-            <PackagePlus className="h-4 w-4 mr-2" /> Receive into warehouse
+            <span className="flex items-center"><PackagePlus className="h-4 w-4 mr-2" /> Receive into warehouse</span>
+            <span className="pl-6 text-[10px] text-muted-foreground">
+              {hasOrder
+                ? 'Receive it on the purchase order — that is where the delivered quantities live.'
+                : 'Puts the goods into stock. Nothing else here does — booking or paying the document leaves the warehouse untouched.'}
+            </span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
@@ -200,14 +209,16 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             <span className="flex items-center"><ShoppingCart className="h-4 w-4 mr-2" /> {hasOrder ? 'Already in Expenses' : 'Add to Expenses'}</span>
             {!hasOrder && (
               <span className="pl-6 text-[10px] text-muted-foreground">
-                Creates the unpaid purchase order from its lines and the expense against it — shows in Payables until you pay.
+                Creates the unpaid purchase order from its lines and the expense against it — shows in Payables until you pay. Stock is untouched until you receive it.
               </span>
             )}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay} className="flex-col items-start gap-0.5">
             <span className="flex items-center"><Wallet className="h-4 w-4 mr-2" /> Record payment</span>
             <span className="pl-6 text-[10px] text-muted-foreground">
-              {doc.created_supplier_bill_id ? 'Settles the expense this document became.' : 'Adds it to Expenses and settles it in one step.'}
+              {doc.created_supplier_bill_id
+                ? 'Settles the expense this document became. Stock is untouched.'
+                : 'Adds it to Expenses and settles it in one step. Stock is untouched.'}
             </span>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onDismiss} disabled={!canDismiss}>

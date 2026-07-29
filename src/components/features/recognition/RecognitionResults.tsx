@@ -7,6 +7,18 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { RecognitionResult } from '@/types/materials';
 
+/**
+ * Shape we read out of `RecognitionResult.properties` (typed `Record<string, unknown>`
+ * because MIVAA decides the keys). Declared so the reads below are checked rather than
+ * cast to `any` — casting is what let this block address `propertiesDetected`, a field
+ * that never existed on the result, so it silently rendered nothing.
+ */
+type DetectedProperties = {
+  density?: number | string;
+  yieldStrength?: number | string;
+  customProperties?: unknown;
+};
+
 interface RecognitionResultsProps {
   results: RecognitionResult[];
   isLoading?: boolean;
@@ -104,45 +116,42 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
                     {Math.round(result.confidence * 100)}% match
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {(result as any).processingTimeMs
-                      ? ((result as any).processingTimeMs / 1000).toFixed(1)
-                      : '0.0'}
-                    s
+                    {result.processingTime ? result.processingTime.toFixed(1) : '0.0'}s
                   </span>
                 </div>
 
                 {/* Material Properties */}
-                {(result as any).propertiesDetected && (
+                {result.properties && (
                   <div className="space-y-1">
-                    {(result as any).propertiesDetected.density && (
+                    {(result.properties as DetectedProperties).density && (
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">Density:</span>
                         <span>
-                          {(result as any).propertiesDetected.density} g/cm³
+                          {(result.properties as DetectedProperties).density} g/cm³
                         </span>
                       </div>
                     )}
-                    {(result as any).propertiesDetected.yieldStrength && (
+                    {(result.properties as DetectedProperties).yieldStrength && (
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">
                           Yield Strength:
                         </span>
                         <span>
-                          {(result as any).propertiesDetected.yieldStrength} MPa
+                          {(result.properties as DetectedProperties).yieldStrength} MPa
                         </span>
                       </div>
                     )}
-                    {(result as any).materialId && (
+                    {result.materialId && (
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">Material:</span>
-                        <span>{(result as any).materialId}</span>
+                        <span>{result.materialId}</span>
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Enhanced Material Properties */}
-                {(result as any).propertiesDetected?.customProperties && (
+                {(result.properties as DetectedProperties)?.customProperties && (
                   <div className="text-xs text-muted-foreground mb-2">
                     <span className="font-medium">
                       Additional Properties Available
@@ -150,7 +159,7 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
                   </div>
                 )}
 
-                {(result as any).materialId && (
+                {result.materialId && (
                   <div className="text-xs text-success mb-2">
                     <span className="font-medium">Material Data Available</span>
                   </div>
@@ -162,7 +171,7 @@ export const RecognitionResults: React.FC<RecognitionResultsProps> = ({
                     <Button
                       className="hover:bg-accent hover:text-accent-foreground h-7 w-7 p-0"
                       title="Download material data"
-                      disabled={!(result as any).materialId}
+                      disabled={!result.materialId}
                     >
                       <Download className="w-3 h-3" />
                     </Button>

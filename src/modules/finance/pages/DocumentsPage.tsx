@@ -285,7 +285,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       )}
       {type === 'expenses' && canOperateFinance && (
         <Button size="sm" onClick={() => setNewExpenseOpen(true)} title="Record a business expense (rent, utilities, fees…)">
-          <Plus className="h-3.5 w-3.5 mr-1" /> Record expense
+          <Plus className="h-3.5 w-3.5 mr-1" /> Add expense
         </Button>
       )}
       {(type === 'invoices' || type === 'receipts') && !isAccountant && (
@@ -302,7 +302,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       )}
       {type === 'payments' && canOperateFinance && (
         // Two directions of money, one action each: money in is a payment, money out is an
-        // expense. "Record expense" opens the SAME dialog as the Expenses tab — it books the
+        // expense. "Add expense" opens the SAME dialog as the Expenses tab — it books the
         // cost and (Paid now, on by default) the cash going out in one step. It used to open
         // the payment form on a settle-only branch, which could pay an expense but never
         // record one, so the label described something the form could not do — and it
@@ -323,7 +323,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
               <Wallet className="h-4 w-4 mr-2" /> Record payment
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setNewExpenseOpen(true)}>
-              <Receipt className="h-4 w-4 mr-2" /> Record expense
+              <Receipt className="h-4 w-4 mr-2" /> Add expense
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
