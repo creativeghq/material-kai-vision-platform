@@ -32,7 +32,7 @@ import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog'
 import { MydataSyncDialog } from '@/modules/finance/components/MydataSyncDialog';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { useMydataTypeLabels } from '@/modules/finance/components/mydataTypes';
-import { INBOUND_OUTCOME } from '@/modules/finance/components/inboundStatus';
+import { inboundOutcomes } from '@/modules/finance/components/inboundStatus';
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -840,7 +840,16 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
                 <span className="block text-[10px] font-normal text-muted-foreground">{p.credit_number} · {formatMoney(onAccount, p.currency)} on account</span>
               )}
             </td>
-            <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(allocated, p.currency)}</td>
+            <td className="px-4 py-2 text-right text-muted-foreground">
+              {formatMoney(allocated, p.currency)}
+              {/* Name what the money actually settled — an amount alone doesn't say whether
+                  this paid an expense, an invoice or sat against an order. */}
+              {(p.settled ?? []).length > 0 && (
+                <span className="block text-[10px] font-normal text-muted-foreground/80">
+                  {(p.settled ?? []).map((s: any) => s.label).join(' · ')}
+                </span>
+              )}
+            </td>
             <td className="px-4 py-2 text-right"><PaymentReceiptActions paymentId={p.id} direction={p.direction} /></td>
           </tr>
         );
@@ -959,7 +968,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
       <tbody>
         {rows.map((d) => {
           const cat = d.id in localCat ? localCat[d.id] : (d.category_id ?? null);
-          const outcome = INBOUND_OUTCOME[d.status];
+          const outcomes = inboundOutcomes(d);
           return (
           <tr key={d.id} className={`border-b border-border/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}>
             <td className="px-4 py-2">{d.issue_date ? new Date(d.issue_date).toLocaleDateString() : '—'}</td>
@@ -980,8 +989,15 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
             <td className="px-4 py-2 text-right text-muted-foreground">{formatMoney(d.total_vat ?? 0, d.currency)}</td>
             <td className="px-4 py-2 text-right font-medium">{formatMoney(d.total_gross ?? 0, d.currency)}</td>
             <td className="px-4 py-2 text-center">
-              {outcome
-                ? <span className={`text-[10px] ${outcome.tone}`}>{outcome.label}</span>
+              {outcomes.length > 0
+                ? <span className="text-[10px]">
+                    {outcomes.map((o, i) => (
+                      <React.Fragment key={o.label}>
+                        {i > 0 && <span className="text-muted-foreground/50"> · </span>}
+                        <span className={o.tone}>{o.label}</span>
+                      </React.Fragment>
+                    ))}
+                  </span>
                 : <span className="text-[10px] text-muted-foreground/50">—</span>}
             </td>
             <td className="px-4 py-2 text-right">

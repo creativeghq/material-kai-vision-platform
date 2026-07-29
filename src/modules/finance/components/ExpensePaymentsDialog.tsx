@@ -8,7 +8,7 @@
  * this dialog only ever reads/writes allocations — what is still due is never recomputed here,
  * it comes from the bill row the triggers maintain.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -46,15 +46,13 @@ export const ExpensePaymentsDialog: React.FC<{
     if (!expenseId) return;
     setLoading(true);
     try {
-      // The expense is read back from the payable list so `inbox` + party name resolve the same
-      // way they do everywhere else. A fully-settled expense drops out of that list, so fall
-      // back to a direct read — otherwise paying it in full would blank the dialog.
-      const [openList, paid] = await Promise.all([
-        financeService.listPayableExpenses(workspaceId),
+      // `getPayableExpense` returns the enriched shape (payee + Inbox origin) whether or not the
+      // expense is still open, so paying it in full doesn't blank the dialog.
+      const [row, paid] = await Promise.all([
+        financeService.getPayableExpense(expenseId),
         financeService.listExpensePayments(expenseId),
       ]);
-      const found = openList.find((e) => e.id === expenseId) ?? null;
-      setExpense(found ?? (await financeService.getPayableExpense(expenseId)));
+      setExpense(row);
       setPayments(paid);
       setPickedPaymentId('');
       setAttachAmount('');
@@ -113,9 +111,14 @@ export const ExpensePaymentsDialog: React.FC<{
     } finally { setBusy(false); }
   };
 
-  const billRef: PayableBillRef | null = expense
-    ? { id: expense.id, supplier_bill_number: expense.supplier_bill_number, party_name: expense.party_name, amount_due: expense.amount_due, currency: expense.currency }
-    : null;
+  // Memoised: PaySupplierBillDialog re-seeds its form whenever this object's identity changes,
+  // so a fresh literal on every render would wipe what the operator had typed the moment
+  // anything in this dialog re-rendered.
+  const billRef = useMemo<PayableBillRef | null>(
+    () => (expense
+      ? { id: expense.id, supplier_bill_number: expense.supplier_bill_number, party_name: expense.party_name, amount_due: expense.amount_due, currency: expense.currency }
+      : null),
+    [expense]);
 
   return (
     <>

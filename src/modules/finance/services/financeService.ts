@@ -241,6 +241,14 @@ export interface PaymentWithAllocation extends Payment {
   // Enriched by listPayments for the Payments list (party label + order number for the row).
   party_name?: string | null;
   order_number?: string | null;
+  /** What this payment settled, one entry per allocation — so the money ledger says which
+   *  invoice / expense / order it went against, not just how much was allocated. */
+  settled?: Array<{
+    kind: 'invoice' | 'expense' | 'order' | 'credit';
+    id: string;
+    label: string;
+    amount: number;
+  }>;
 }
 
 export type SupplierBillStatus =
@@ -1217,8 +1225,9 @@ const _financeServiceCore = {
     let q = supabase
       .from('payments')
       // Join the order (provenance) so the list can show its number, and the allocations so the
-      // row can show what's settled vs still on-account. Party name is resolved in a 2nd batch.
-      .select('*, allocations:payment_allocations(*), order:orders(order_number)')
+      // row can show what's settled vs still on-account. The allocation targets come along so
+      // the row can name WHAT was settled. Party name is resolved in a 2nd batch.
+      .select('*, allocations:payment_allocations(*, invoice:invoices(internal_number), supplier_bill:supplier_bills(supplier_bill_number, supplier_name), allocated_order:orders(order_number)), order:orders(order_number)')
       .order('paid_at', { ascending: false });
     if (opts.workspaceId) q = q.eq('workspace_id', opts.workspaceId);
     if (opts.direction) q = q.eq('direction', opts.direction);
@@ -1245,6 +1254,26 @@ const _financeServiceCore = {
       party_name: r.counterparty_company_id
         ? (companyName.get(r.counterparty_company_id) ?? null)
         : (r.counterparty_contact_id ? (contactName.get(r.counterparty_contact_id) ?? null) : null),
+      settled: (r.allocations ?? []).map((a: any) => {
+        if (a.invoice_id) {
+          return { kind: 'invoice' as const, id: a.invoice_id, amount: Number(a.amount ?? 0), label: a.invoice?.internal_number ?? 'Invoice' };
+        }
+        if (a.supplier_bill_id) {
+          return {
+            kind: 'expense' as const, id: a.supplier_bill_id, amount: Number(a.amount ?? 0),
+            label: a.supplier_bill?.supplier_bill_number || a.supplier_bill?.supplier_name || 'Expense',
+          };
+        }
+        if (a.order_id) {
+          return { kind: 'order' as const, id: a.order_id, amount: Number(a.amount ?? 0), label: a.allocated_order?.order_number ?? 'Order' };
+        }
+        // The 4th allowed target. Named rather than dropped — an unlabelled allocation would
+        // still count toward the row's "Allocated" total and read as a missing number.
+        if (a.supplier_credit_note_id) {
+          return { kind: 'credit' as const, id: a.supplier_credit_note_id, amount: Number(a.amount ?? 0), label: 'Supplier credit note' };
+        }
+        return null;
+      }).filter(Boolean) as PaymentWithAllocation['settled'],
     })) as PaymentWithAllocation[];
   },
 
