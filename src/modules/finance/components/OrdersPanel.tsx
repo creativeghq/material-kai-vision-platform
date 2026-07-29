@@ -1263,7 +1263,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   };
 
   // #3 — edit the order's line items (only while it has no invoice yet).
-  const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled' && (fin?.invoices.length ?? 0) === 0;
+  // Lines are frozen once a document has been derived FROM them. This checked invoices only —
+  // the sales side — so a purchase order stayed editable after "Record supplier bill" had already
+  // copied its lines into a supplier_bills row. Editing then silently left the bill holding the
+  // old figures, which is exactly the €420 gap the 3-way match had to catch after the fact.
+  const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled'
+    && (fin?.invoices.length ?? 0) === 0 && (fin?.supplierBills.length ?? 0) === 0;
   const startEdit = () => {
     setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, unit_code: it.measurement_unit_code || DEFAULT_UNIT, vat_code: vatCodeOf(it.vat_percent), supplier_company_id: it.supplier_company_id, available: null })));
     setEditing(true);
@@ -1442,6 +1447,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     finally { setSaving(false); }
   };
 
+  // Margin, cost columns and the cash strip are SALES concepts. A purchase order has no margin
+  // (its price is its cost) and no money-in half, so everything derived from those is hidden
+  // rather than rendered as a permanent zero.
+  const isSalesOrder = order?.order_type === 'sales';
   // Order margin = Σ (unit_price − unit_cost) × qty over lines that carry a cost. null = no cost yet.
   const anyCost = items.some((it) => it.unit_cost != null);
   const orderMargin = order && anyCost
@@ -1639,8 +1648,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             {!editing ? (
               <>
                 <div className="rounded-md border border-border/60 overflow-x-auto">
-                  <div className="grid grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px] gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[1040px]">
-                    <span>Item</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Delivered</span><span className="text-right" title="Sell price per unit (excl. VAT)">Price</span><span className="text-right" title="Net = price × qty (excl. VAT)">Net</span><span className="text-right" title="Cost per unit — what this costs us">Cost</span><span className="text-right" title="Cost total = cost/unit × qty">Cost total</span><span className="text-right" title="Profit = net − cost total (excl. VAT)">Profit</span><span className="text-right" title="VAT amount on this line">VAT</span><span className="text-right" title="Total = net + VAT">Total</span>
+                  {/* On a PURCHASE order the price paid IS the cost, so Cost and Cost total repeat
+                      Price and Net verbatim and Profit is 0 by construction — three columns that
+                      can only ever restate the two beside them. Margin belongs to a sale. */}
+                  <div className={`grid ${isSalesOrder ? 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px]' : 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_96px]'} gap-2 bg-muted/40 px-3 py-1.5 text-[11px] font-medium text-muted-foreground ${isSalesOrder ? 'min-w-[1040px]' : 'min-w-[760px]'}`}>
+                    <span>Item</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">Delivered</span><span className="text-right" title={isSalesOrder ? 'Sell price per unit (excl. VAT)' : 'Cost per unit — what we pay the supplier (excl. VAT)'}>{isSalesOrder ? 'Price' : 'Cost/unit'}</span><span className="text-right" title="Net = price × qty (excl. VAT)">Net</span>{isSalesOrder && <><span className="text-right" title="Cost per unit — what this costs us">Cost</span><span className="text-right" title="Cost total = cost/unit × qty">Cost total</span><span className="text-right" title="Profit = net − cost total (excl. VAT)">Profit</span></>}<span className="text-right" title="VAT amount on this line">VAT</span><span className="text-right" title="Total = net + VAT">Total</span>
                   </div>
                   {items.map((it) => {
                     const gross = Number(it.net_value) + Number(it.vat_amount);
@@ -1651,7 +1663,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     const del = Number(it.quantity_delivered); const q = Number(it.quantity);
                     const delTone = del >= q && q > 0 ? 'text-emerald-600' : del > 0 ? 'text-amber-600' : 'text-muted-foreground';
                     return (
-                    <div key={it.id} className="grid grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px] gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center min-w-[1040px]">
+                    <div key={it.id} className={`grid ${isSalesOrder ? 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px]' : 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_96px]'} gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center ${isSalesOrder ? 'min-w-[1040px]' : 'min-w-[760px]'}`}>
                       <span className="min-w-0">
                         <span className="block truncate">{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
                         {/* #6/#7 — who supplies this line (and therefore who we owe). Only a SALES
@@ -1699,14 +1711,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                           : formatMoney(Number(it.unit_price), order.currency)}
                       </span>
                       <span className="text-right tabular-nums" title="Net = price × qty (excl. VAT, after discount)">{formatMoney(Number(it.net_value), order.currency)}</span>
-                      <span className="text-right tabular-nums text-muted-foreground" title="Cost per unit">{it.unit_cost != null ? formatMoney(Number(it.unit_cost), order.currency) : '—'}</span>
-                      <span className="text-right tabular-nums text-muted-foreground" title="Cost total (cost/unit × qty) — what this line costs us">{lineCost != null ? formatMoney(lineCost, order.currency) : '—'}</span>
-                      <span className={`text-right tabular-nums ${lineProfit == null ? 'text-muted-foreground' : lineProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`} title="Profit on this line (excl. VAT) + margin % of net">
-                        {lineProfit != null ? formatMoney(lineProfit, order.currency) : '—'}
-                        {lineProfit != null && Number(it.net_value) > 0 && (
-                          <span className="block text-[9px] text-muted-foreground">{Math.round((lineProfit / Number(it.net_value)) * 100)}%</span>
-                        )}
-                      </span>
+                      {isSalesOrder && (
+                        <>
+                          <span className="text-right tabular-nums text-muted-foreground" title="Cost per unit">{it.unit_cost != null ? formatMoney(Number(it.unit_cost), order.currency) : '—'}</span>
+                          <span className="text-right tabular-nums text-muted-foreground" title="Cost total (cost/unit × qty) — what this line costs us">{lineCost != null ? formatMoney(lineCost, order.currency) : '—'}</span>
+                          <span className={`text-right tabular-nums ${lineProfit == null ? 'text-muted-foreground' : lineProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`} title="Profit on this line (excl. VAT) + margin % of net">
+                            {lineProfit != null ? formatMoney(lineProfit, order.currency) : '—'}
+                            {lineProfit != null && Number(it.net_value) > 0 && (
+                              <span className="block text-[9px] text-muted-foreground">{Math.round((lineProfit / Number(it.net_value)) * 100)}%</span>
+                            )}
+                          </span>
+                        </>
+                      )}
                       <span className="text-right tabular-nums text-muted-foreground" title={`VAT ${Number(it.vat_percent ?? 0)}%`}>{formatMoney(Number(it.vat_amount), order.currency)}</span>
                       <span className="text-right tabular-nums font-medium" title="Line total incl. VAT (price × qty + VAT)">{formatMoney(gross, order.currency)}</span>
                     </div>
@@ -1725,7 +1741,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">Net (excl. VAT)</span><span className="tabular-nums">{formatMoney(Number(order.subtotal_net), order.currency)}</span></div>
                   <div className="flex justify-between gap-8 w-60"><span className="text-muted-foreground">VAT</span><span className="tabular-nums">{formatMoney(Number(order.vat_amount), order.currency)}</span></div>
                   <div className="flex justify-between gap-8 w-60 font-semibold border-t border-border/60 pt-0.5"><span>Total (incl. VAT)</span><span className="tabular-nums">{formatMoney(Number(order.total), order.currency)}</span></div>
-                  {orderMargin != null && (
+                  {isSalesOrder && orderMargin != null && (
                     <div className="flex justify-between gap-8 w-60 font-medium"><span className="text-muted-foreground">Profit (excl. VAT)</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}{Number(order.subtotal_net) > 0 && <span className="ml-1.5 text-[10px] text-muted-foreground">{Math.round((orderMargin / Number(order.subtotal_net)) * 100)}%</span>}</span></div>
                   )}
                 </div>
@@ -1782,27 +1798,31 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             {/* Realised cash on the order — money actually received minus money actually paid out.
                 (Distinct from the order's Profit-margin above, which is revenue − cost on the lines.) */}
             {fin && (
-              // A purchase order has no money-in side: you pay a supplier, you are not paid by one.
-              // The card is dropped there rather than shown at a permanent zero — EXCEPT when cash
-              // in was somehow already recorded against the order, which must never be hidden.
-              <div className={`grid gap-2 ${order.order_type === 'purchase' && fin.received <= 0.005 ? 'grid-cols-2' : 'grid-cols-3'}`}>
-                {(order.order_type === 'sales' || fin.received > 0.005) && (
+              // A purchase order has ONE cash fact: what we have paid the supplier so far. There is
+              // no money-in half to show and therefore nothing to net it against — "Received" and
+              // "Net cash (in − out)" were two more permanent zeros restating the same figure.
+              // The money-in card still appears if cash in somehow exists on the order, because a
+              // figure that is really there must not be hidden by a label decision.
+              <div className={`grid gap-2 ${isSalesOrder ? 'grid-cols-3' : fin.received > 0.005 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {(isSalesOrder || fin.received > 0.005) && (
                   <div className="rounded-md border border-border/60 p-2">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{order.order_type === 'purchase' ? 'Money back' : 'Received'}</div>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{isSalesOrder ? 'Received' : 'Money back'}</div>
                     <div className="text-sm font-semibold text-emerald-500">{formatMoney(fin.received, order.currency)}</div>
                   </div>
                 )}
                 <div className="rounded-md border border-border/60 p-2">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{order.order_type === 'purchase' ? 'Paid to supplier' : 'Paid to suppliers'}</div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{isSalesOrder ? 'Paid to suppliers' : 'Paid to supplier'}</div>
                   <div className="text-sm font-semibold text-red-400">{formatMoney(fin.paid_out, order.currency)}</div>
                 </div>
-                <div className="rounded-md border border-border/60 p-2">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                    {order.order_type === 'purchase' ? 'Cash paid out' : 'Net cash (in − out)'}
-                    <span title="Cash in the bank now. It differs from Profit because part of the profit is still unpaid (customer / suppliers) and because VAT you've collected sits here until you remit it to the tax office.">ⓘ</span>
+                {isSalesOrder && (
+                  <div className="rounded-md border border-border/60 p-2">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                      Net cash (in − out)
+                      <span title="Cash in the bank now. It differs from Profit because part of the profit is still unpaid (customer / suppliers) and because VAT you've collected sits here until you remit it to the tax office.">ⓘ</span>
+                    </div>
+                    <div className={`text-sm font-semibold ${fin.profit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.profit, order.currency)}</div>
                   </div>
-                  <div className={`text-sm font-semibold ${fin.profit >= 0 ? 'text-emerald-500' : 'text-destructive'}`}>{formatMoney(fin.profit, order.currency)}</div>
-                </div>
+                )}
               </div>
             )}
 
