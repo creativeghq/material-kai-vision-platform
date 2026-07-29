@@ -9,6 +9,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -114,6 +117,10 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [dispatchRefresh, setDispatchRefresh] = useState(0);
   const [newChequeOpen, setNewChequeOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
+  /** "Pay an expense" — the same Record Payment form opened on its money-out branch, with the
+   *  expense still to be chosen inside. Separate state so the two directions can't share a
+   *  half-filled form. */
+  const [payExpenseOpen, setPayExpenseOpen] = useState(false);
   // The expense whose payments are open — set from either side of the link (an Inbox row or an
   // open bill), both of which resolve to the same supplier_bill id.
   const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
@@ -294,7 +301,24 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         <Button size="sm" onClick={() => setNewChequeOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
       )}
       {type === 'payments' && canOperateFinance && (
-        <Button size="sm" onClick={() => setRecordPaymentOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Record payment</Button>
+        // Two directions of money, named up front. Paying a supplier used to be a third entry in
+        // the dialog's Type list, where it sat next to "Received from customer" and could be
+        // picked by accident — the two are opposite sides of the trade.
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm"><Plus className="h-3.5 w-3.5 mr-1" /> Record payment</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setRecordPaymentOpen(true)}>
+              <Wallet className="h-4 w-4 mr-2" /> Record payment
+              <span className="ml-2 text-[10px] text-muted-foreground">money in</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setPayExpenseOpen(true)}>
+              <Receipt className="h-4 w-4 mr-2" /> Pay an expense
+              <span className="ml-2 text-[10px] text-muted-foreground">money out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
       {type === 'credit_notes' && !isAccountant && (
         <Button size="sm" onClick={() => setNewCreditNoteOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New</Button>
@@ -430,6 +454,15 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           open={recordPaymentOpen}
           onOpenChange={setRecordPaymentOpen}
           onSaved={() => { setRecordPaymentOpen(false); load(); }}
+        />
+      )}
+      {activeWorkspaceId && (
+        <RecordPaymentDialog
+          workspaceId={activeWorkspaceId}
+          payExpense
+          open={payExpenseOpen}
+          onOpenChange={setPayExpenseOpen}
+          onSaved={() => { setPayExpenseOpen(false); load(); }}
         />
       )}
       {activeWorkspaceId && (
