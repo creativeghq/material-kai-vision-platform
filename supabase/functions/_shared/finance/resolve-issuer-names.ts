@@ -81,6 +81,12 @@ async function gemiLookup(afm: string, apiKey: string): Promise<GemiResult> {
       ?? res.headers.get('ratelimit-remaining');
     const remaining = rawRemaining != null && rawRemaining !== '' ? Number(rawRemaining) : null;
 
+    // 404 is ΓΕΜΗ's "no such company" — a DEFINITIVE miss, and the only way it ever says so.
+    // It has to be reported as a miss (`null`), not an error, or the ΑΦΜ is never cached and is
+    // re-asked on every single run, forever. Measured on live data: the `200 + empty
+    // searchResults` shape this used to rely on never occurs — 163 cached rows, ZERO recorded
+    // misses — while three issuers (all non-ΓΕΜΗ ΑΦΜ) 404'd on every run and stayed name-less.
+    if (res.status === 404) return { hit: null, remaining, throttled: false };
     // 503 is ΓΕΜΗ's routine maintenance window; 429 an explicit throttle. Both transient.
     if (!res.ok) return { hit: 'error', remaining, throttled: res.status === 429 };
     const body = await res.json().catch(() => null);
