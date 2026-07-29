@@ -2,13 +2,14 @@
  * The expense side of the payment ↔ expense link: everything paid against ONE expense, plus the
  * two ways to add to it —
  *   • Attach a payment that was already recorded (money went out earlier, unallocated).
- *   • Record a new payment for it (delegates to PaySupplierBillDialog).
+ *   • Record a new payment for it — the SAME RecordPaymentDialog used everywhere else, opened with
+ *     this expense preset. There is deliberately no bespoke "pay this bill" form here.
  *
  * An expense IS a `supplier_bills` row and `payment_allocations` is its settlement ledger, so
  * this dialog only ever reads/writes allocations — what is still due is never recomputed here,
  * it comes from the bill row the triggers maintain.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -24,7 +25,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/core/ui/alert-dialog';
-import { PaySupplierBillDialog, type PayableBillRef } from '@/modules/finance/components/PaySupplierBillDialog';
+import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { parseDecimal } from '@/utils/decimal';
 
 export const ExpensePaymentsDialog: React.FC<{
@@ -118,15 +119,6 @@ export const ExpensePaymentsDialog: React.FC<{
       toast({ title: 'Could not detach', description: err?.message, variant: 'destructive' });
     } finally { setBusy(false); }
   };
-
-  // Memoised: PaySupplierBillDialog re-seeds its form whenever this object's identity changes,
-  // so a fresh literal on every render would wipe what the operator had typed the moment
-  // anything in this dialog re-rendered.
-  const billRef = useMemo<PayableBillRef | null>(
-    () => (expense
-      ? { id: expense.id, supplier_bill_number: expense.supplier_bill_number, party_name: expense.party_name, amount_due: expense.amount_due, currency: expense.currency }
-      : null),
-    [expense]);
 
   return (
     <>
@@ -277,14 +269,17 @@ export const ExpensePaymentsDialog: React.FC<{
         </DialogContent>
       </Dialog>
 
-      {/* New money-out payment for this expense — same single settlement path. */}
-      <PaySupplierBillDialog
-        workspaceId={workspaceId}
-        bill={billRef}
-        open={payOpen}
-        onOpenChange={setPayOpen}
-        onSaved={() => { void load(); onChanged?.(); }}
-      />
+      {/* New money-out payment for this expense — the platform's one Record Payment form, with
+          this expense preset, so there is a single settlement path and a single form to learn. */}
+      {expense && (
+        <RecordPaymentDialog
+          workspaceId={workspaceId}
+          presetExpenseId={expense.id}
+          open={payOpen}
+          onOpenChange={setPayOpen}
+          onSaved={() => { void load(); onChanged?.(); }}
+        />
+      )}
 
       {/* Detaching moves money on the books — it reopens a payable and can flip an expense out
           of "paid". Spell out both consequences rather than doing it on a single click. */}

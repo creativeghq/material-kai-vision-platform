@@ -62,7 +62,7 @@ import { OrderAgingInlineEditor } from '@/modules/finance/components/OrderAgingI
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { NewSupplierBillDialog } from '@/modules/finance/components/NewSupplierBillDialog';
 import { NewSupplierCreditNoteDialog } from '@/modules/finance/components/NewSupplierCreditNoteDialog';
-import { PaySupplierBillDialog, type PayableBillRef } from '@/modules/finance/components/PaySupplierBillDialog';
+import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { PlanningTab } from '@/modules/finance/tabs/PlanningTab';
@@ -198,7 +198,8 @@ const FinancePage: React.FC = () => {
   }, [searchParams, setSearchParams, isAccountant]);
   const [scnOpen, setScnOpen] = useState(false);
   const [scnBillId, setScnBillId] = useState<string | undefined>(undefined);
-  const [payBill, setPayBill] = useState<PayableBillRef | null>(null);
+  /** Expense being paid from Payables — settled through the shared Record Payment dialog. */
+  const [payExpenseId, setPayExpenseId] = useState<string | null>(null);
   /** Expense whose payment history is open (from the Bill # link in Payables). */
   const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
@@ -998,7 +999,7 @@ const FinancePage: React.FC = () => {
                               </Button>
                             ) : (
                               <span className="inline-flex items-center gap-1">
-                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPayBill({ id: r.id, supplier_bill_number: r.supplier_bill_number, party_name: r.party_name, amount_due: r.amount_due })} title="Record a payment against this bill (settles it)">
+                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPayExpenseId(r.id)} title="Record a payment against this bill (settles it)">
                                   <Banknote className="h-3.5 w-3.5 mr-1" /> Pay
                                 </Button>
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
@@ -1165,13 +1166,15 @@ const FinancePage: React.FC = () => {
         supplierBillId={scnBillId}
         onCreated={async () => { setScnOpen(false); if (workspaceId) await loadAll(workspaceId); }}
       />
-      <PaySupplierBillDialog
-        workspaceId={workspaceId}
-        bill={payBill}
-        open={!!payBill}
-        onOpenChange={(v) => { if (!v) setPayBill(null); }}
-        onSaved={async () => { setPayBill(null); if (workspaceId) await loadAll(workspaceId); }}
-      />
+      {payExpenseId && (
+        <RecordPaymentDialog
+          workspaceId={workspaceId}
+          presetExpenseId={payExpenseId}
+          open
+          onOpenChange={(v) => { if (!v) setPayExpenseId(null); }}
+          onSaved={async () => { setPayExpenseId(null); if (workspaceId) await loadAll(workspaceId); }}
+        />
+      )}
       <ExpensePaymentsDialog
         workspaceId={workspaceId}
         expenseId={paymentsExpenseId}
