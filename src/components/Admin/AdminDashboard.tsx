@@ -36,6 +36,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ResetPlatformDialog } from './ResetPlatformDialog';
 import { AdminStatCard } from './AdminStatCard';
 import { useAdminDashboardCards } from '@/modules/_core';
+import { dataIntegrityService } from '@/services/dataIntegrityService';
 
 // Types for our data structures
 type SystemMetrics = {
@@ -207,6 +208,13 @@ const adminSections = {
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const moduleCards = useAdminDashboardCards();
+  // Open data-integrity findings — rendered as a red count on the Data Health tile (#293).
+  const [openFindings, setOpenFindings] = useState(0);
+  useEffect(() => {
+    void dataIntegrityService.listFindings({ status: 'open' })
+      .then((f) => setOpenFindings(f.length))
+      .catch(() => setOpenFindings(0));   // best-effort: the tile still renders without the count
+  }, []);
   const [systemMetrics, setSystemMetrics] = useState<SystemMetrics>({
     processedDocuments: 0,
     knowledgeEntries: 0,
@@ -438,8 +446,16 @@ const AdminDashboard: React.FC = () => {
                             </p>
                           </div>
                           <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                            <span className="text-sm text-muted-foreground">
-                              {section.count}
+                            {/* #293 Layer 1 — a nightly probe nobody can see is a probe nobody acts
+                                on. Open integrity findings surface as a red count on the tile so a
+                                live problem is visible from the admin landing page, not only to
+                                whoever thinks to open Data Health. */}
+                            <span className={`text-sm ${section.path === '/admin/data-health' && openFindings > 0 ? 'font-semibold text-destructive' : 'text-muted-foreground'}`}>
+                              {section.path === '/admin/data-health'
+                                ? (openFindings > 0
+                                    ? `${openFindings} open finding${openFindings === 1 ? '' : 's'}`
+                                    : 'All checks clean')
+                                : section.count}
                             </span>
                             <Button
                               asChild
