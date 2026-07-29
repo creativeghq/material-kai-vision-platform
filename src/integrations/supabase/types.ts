@@ -32751,8 +32751,8 @@ export type Database = {
         Returns: number
       }
       receive_order_into_warehouse: {
-        Args: { p_order: string }
-        Returns: number
+        Args: { p_order: string; p_warehouse?: string }
+        Returns: Json
       }
       recompute_job_cost: {
         Args: { p_tracked_job_id: string }

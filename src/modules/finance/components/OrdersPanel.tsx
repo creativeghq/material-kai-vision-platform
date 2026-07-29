@@ -1116,15 +1116,26 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     try {
       const { data, error } = await supabase.rpc('receive_order_into_warehouse', { p_order: order.id });
       if (error) throw error;
+      const res = (data ?? {}) as { received?: number; skipped?: number; skipped_lines?: string[] };
+      const received = Number(res.received ?? 0);
+      const skipped = Number(res.skipped ?? 0);
       await load(order.id); onChanged();
-      toast({ title: 'Received', description: `${data ?? 0} warehouse line(s) updated` });
+      // A line with no catalog product cannot become stock. Say which ones, loudly — reporting
+      // a flat "0 lines updated" as success is exactly how goods go missing from the warehouse.
+      toast({
+        title: skipped > 0 ? (received > 0 ? 'Partly received' : 'Nothing received') : 'Received',
+        description: skipped > 0
+          ? `${received} line(s) stocked · ${skipped} skipped with no catalog product: ${(res.skipped_lines ?? []).join(', ')}. Link them to a product, then receive again.`
+          : `${received} warehouse line(s) updated`,
+        variant: received === 0 && skipped > 0 ? 'destructive' : undefined,
+      });
       // #237 — notify via Flows that the PO arrived (allocations flipped to reserved).
       if (order.order_type === 'purchase') {
         const { data: u } = await supabase.auth.getUser();
         void flowEventService.emit('purchase_order.received', {
           user_id: u?.user?.id ?? null,
           title: `Purchase order ${order.order_number ?? order.id.slice(0, 8)} received`,
-          body: `${data ?? 0} warehouse line(s) updated`,
+          body: `${received} warehouse line(s) updated${skipped > 0 ? ` · ${skipped} skipped (no catalog product)` : ''}`,
           action_url: `/finance/orders/${order.id}`,
           order_id: order.id,
           order_number: order.order_number,
