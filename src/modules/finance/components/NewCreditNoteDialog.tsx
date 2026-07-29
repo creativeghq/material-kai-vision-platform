@@ -30,7 +30,10 @@ const pctOfCat = (cat: number | null) => VAT_CATEGORIES.find((v) => v.code === S
 
 export const NewCreditNoteDialog: React.FC<{
   workspaceId: string; open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void;
-}> = ({ workspaceId, open, onOpenChange, onCreated }) => {
+  /** Credit THIS invoice: opened from the invoice itself, so its picker starts on it and its
+   *  lines are loaded straight away. A prefill — the invoice can still be changed. */
+  presetInvoiceId?: string;
+}> = ({ workspaceId, open, onOpenChange, onCreated, presetInvoiceId }) => {
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invoiceId, setInvoiceId] = useState('');
@@ -46,8 +49,11 @@ export const NewCreditNoteDialog: React.FC<{
     if (!open) return;
     setInvoiceId(''); setAmount(''); setReason(''); setSubmitFiscal(false); setItems([]); setLineState({});
     financeService.listInvoices({ workspaceId, status: ['issued', 'partially_paid', 'paid', 'overdue'], limit: 300 })
-      .then(setInvoices).catch(() => setInvoices([]));
-  }, [open, workspaceId]);
+      .then((rows) => { setInvoices(rows); return rows; })
+      .catch(() => { setInvoices([]); return [] as Invoice[]; })
+      // Opened from an invoice → select it once its row is in hand, which also loads its lines.
+      .then((rows) => { if (presetInvoiceId && rows.some((i) => i.id === presetInvoiceId)) void pick(presetInvoiceId); });
+  }, [open, workspaceId, presetInvoiceId]);
 
   const invoice = useMemo(() => invoices.find((i) => i.id === invoiceId), [invoices, invoiceId]);
 

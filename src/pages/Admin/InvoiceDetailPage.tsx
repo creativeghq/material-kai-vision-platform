@@ -34,6 +34,7 @@ import {
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
+import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 
@@ -539,11 +540,14 @@ const InvoiceDetailPage: React.FC = () => {
         invoice={invoice}
         onSaved={async () => { setPaymentDialogOpen(false); await load(); }}
       />
-      <CreditNoteDialog
+      {/* The platform's one credit-note form, preset to this invoice — it credits per LINE with
+          exact VAT, which the bespoke copy that used to live here could not do at all. */}
+      <NewCreditNoteDialog
+        workspaceId={invoice.workspace_id}
+        presetInvoiceId={invoice.id}
         open={creditNoteDialogOpen}
         onOpenChange={setCreditNoteDialogOpen}
-        invoice={invoice}
-        onSaved={async () => { setCreditNoteDialogOpen(false); await load(); }}
+        onCreated={async () => { setCreditNoteDialogOpen(false); await load(); }}
       />
       <InvoicePreviewModal
         invoiceId={invoice.id}
@@ -738,96 +742,5 @@ const RecordPaymentDialog: React.FC<{
   );
 };
 
-// ============================================================================
-// Credit note dialog
-// ============================================================================
-
-const CreditNoteDialog: React.FC<{
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  invoice: InvoiceWithItems;
-  onSaved: () => void;
-}> = ({ open, onOpenChange, invoice, onSaved }) => {
-  const { toast } = useToast();
-  const [amount, setAmount] = useState<string>('');
-  const [reason, setReason] = useState<string>('');
-  const [submitFiscal, setSubmitFiscal] = useState(true);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setAmount(String(invoice.total));
-      setReason('');
-      setSubmitFiscal(!!(invoice as any).fiscal_mark); // only meaningful if the invoice was transmitted
-    }
-  }, [open, invoice.total]);
-
-  const handleSave = async () => {
-    const num = parseFloat(amount);
-    if (!Number.isFinite(num) || num <= 0) {
-      toast({ title: 'Invalid amount', variant: 'destructive' });
-      return;
-    }
-    if (!reason.trim()) {
-      toast({ title: 'Reason required', variant: 'destructive' });
-      return;
-    }
-    try {
-      setBusy(true);
-      await financeService.createCreditNote({
-        invoiceId: invoice.id,
-        amount: num,
-        currency: invoice.currency,
-        reason: reason.trim(),
-        correlated: !!(invoice as any).fiscal_mark, // 5.1 if the invoice has a MARK, else 5.2
-        submitFiscal,
-      });
-      toast({ title: 'Credit note issued' });
-      onSaved();
-    } catch (err: any) {
-      toast({ title: 'Failed', description: err.message, variant: 'destructive' });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Issue Credit Note</DialogTitle><DialogDescription className="sr-only">Issue a credit note against this invoice.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label>Amount</Label>
-            <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-            <p className="text-xs text-muted-foreground">
-              A credit note ≥ invoice total ({formatMoney(invoice.total, invoice.currency)}) will flip the invoice to <code>credit_noted</code>.
-            </p>
-          </div>
-          <div className="space-y-1">
-            <Label>Reason</Label>
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Customer return — chipped tile" />
-          </div>
-          {(invoice as any).fiscal_mark && (
-            <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
-              <div>
-                <div className="text-sm font-medium">Transmit to myDATA (5.1)</div>
-                <p className="text-xs text-muted-foreground">Correlated credit note referencing the invoice MARK.</p>
-              </div>
-              <Switch checked={submitFiscal} onCheckedChange={setSubmitFiscal} />
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={handleSave} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Issue credit note'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 export default InvoiceDetailPage;

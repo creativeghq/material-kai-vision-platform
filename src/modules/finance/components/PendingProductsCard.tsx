@@ -107,7 +107,31 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
             const autoPrice = e.sales_price === '' && cost > 0 && margin != null && margin > 0 ? Math.round(cost * (1 + margin / 100) * 100) / 100 : null;
             return (
               <div key={it.id} className="space-y-2 px-4 py-3">
-                {it.raw_description && <div className="text-[11px] text-muted-foreground truncate">From invoice: {it.raw_description}</div>}
+                {/* WHO invoiced this and under which document — the queue is "what my partners
+                    sent me", so a bare description string isn't enough to act on. */}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+                  {it.inbound_document?.issuer_name && (
+                    <span className="font-medium text-foreground/80">{it.inbound_document.issuer_name}</span>
+                  )}
+                  {(it.inbound_document?.series || it.inbound_document?.aa) && (
+                    <span className="text-muted-foreground">
+                      {[it.inbound_document.series, it.inbound_document.aa].filter(Boolean).join(' ')}
+                    </span>
+                  )}
+                  {it.inbound_document?.issue_date && (
+                    <span className="text-muted-foreground">{new Date(it.inbound_document.issue_date).toLocaleDateString()}</span>
+                  )}
+                  {/* What approving will actually DO — top up existing stock, or create a product. */}
+                  {it.match_score != null && (
+                    <span className={it.match_score >= 1
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : it.match_score >= 0.5 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
+                      {it.match_score >= 0.5 ? 'Tops up existing stock' : 'Creates a new product'}
+                      {it.match_reason ? ` · ${it.match_reason}` : ''}
+                    </span>
+                  )}
+                </div>
+                {it.raw_description && <div className="text-[11px] text-muted-foreground truncate">Invoice line: {it.raw_description}</div>}
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_110px_70px_80px]">
                   <Input className="h-8 text-sm" value={e.name} onChange={(ev) => setEdit(it.id, { name: ev.target.value })} placeholder="Product name" />
                   <Input className="h-8 text-sm" value={e.sku} onChange={(ev) => setEdit(it.id, { sku: ev.target.value })} placeholder="SKU" />

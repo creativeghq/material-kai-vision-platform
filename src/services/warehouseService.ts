@@ -488,9 +488,12 @@ export const warehouseService = {
   },
 
   // ── Pending products (AI-extracted from inbound expenses → ✓ add / ✗ dismiss) ──
+  /** Queued supplier lines awaiting ✓/✗. Carries WHERE each line came from (issuer + document)
+   *  so the queue reads as "what my partners invoiced me", not a list of anonymous strings. */
   async listPending(workspaceId: string): Promise<PendingProduct[]> {
     const { data, error } = await supabase.from('warehouse_pending_items')
-      .select('*').eq('workspace_id', workspaceId).eq('status', 'pending')
+      .select('*, inbound_document:inbound_documents(issuer_name, issuer_vat, series, aa, issue_date, total_gross, currency)')
+      .eq('workspace_id', workspaceId).eq('status', 'pending')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data ?? []) as PendingProduct[];
@@ -512,4 +515,16 @@ export interface PendingProduct {
   quantity: number; unit_cost: number | null; currency: string;
   suggested_sales_price: number | null; sales_price: number | null; category_id: string | null;
   matched_product_id: string | null; add_to_catalog: boolean; target_warehouse_id: string | null;
+  /** Set server-side by `match_pending_items_for_document`. 1.0 = the supplier's own item code
+   *  identifies stock we already carry, so approving TOPS UP that item instead of creating a
+   *  second product. Below 0.5 nothing matched and approving creates a new product. */
+  matched_warehouse_item_id?: string | null;
+  match_score?: number | null;
+  match_reason?: string | null;
+  /** The myDATA document this line came from — who invoiced it and under which number. */
+  inbound_document?: {
+    issuer_name: string | null; issuer_vat: string | null;
+    series: string | null; aa: string | null;
+    issue_date: string | null; total_gross: number | null; currency: string | null;
+  } | null;
 }
