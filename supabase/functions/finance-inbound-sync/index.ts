@@ -346,11 +346,21 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       // loop — so the window was fixed BEFORE the skip and never advanced: once the 30 newest were
       // done, every later run re-read those same 30, skipped them all, and never reached the
       // 31st. The backlog would not have drained slowly; it would never have drained at all.
-      const { data: docs } = autosyncMode === 'off'
-        ? { data: [] as any[] }
+      const sel = autosyncMode === 'off'
+        ? { data: [] as any[], error: null }
         : await supabase.rpc('inbound_docs_needing_extraction', {
             p_workspace_id: workspaceId, p_limit: EXTRACT_BATCH_SIZE,
           });
+      // Surface a failed selection instead of treating it as "nothing to do". Destructuring only
+      // `data` here meant any failure (missing grant, stale PostgREST schema cache, signature
+      // drift) produced null -> empty loop -> extracted = 0, reported as success. That is the
+      // silent-zero shape this whole feature kept dying of; it does not get to hide in the one
+      // place that decides whether ANY work happens.
+      if (sel.error) {
+        console.error('[inbound-sync] could not select documents to extract', sel.error.message);
+        summary.push({ workspaceId, extraction_error: sel.error.message });
+      }
+      const docs = sel.data;
       for (const d of (docs ?? []) as any[]) {
         const all = Array.isArray(d.lines) ? d.lines : [];
         const usable = all.filter((l: any) => String(l?.item_description ?? '').trim());
@@ -398,17 +408,21 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
               quantity: qty, unit_cost: unitCost, currency: d.currency ?? 'EUR',
             };
           });
-          await supabase.from('warehouse_pending_items').upsert(pendingRows, { onConflict: 'inbound_document_id,line_index', ignoreDuplicates: true });
+          const { error: upErr } = await supabase.from('warehouse_pending_items')
+            .upsert(pendingRows, { onConflict: 'inbound_document_id,line_index', ignoreDuplicates: true });
+          if (upErr) throw new Error(`queueing ${pendingRows.length} line(s) failed: ${upErr.message}`);
           extracted += pendingRows.length;
 
           // Match each queued line against stock the workspace already carries, so approving it
           // TOPS UP the existing product instead of creating a near-duplicate. Server-side on
           // purpose: the equivalent rule used to live only in ReceiveToWarehouseDialog, so it ran
           // only when a human opened that dialog, and everything queued here arrived unmatched.
-          await supabase.rpc('match_pending_items_for_document', { p_doc_id: d.id });
+          const { error: matchErr } = await supabase.rpc('match_pending_items_for_document', { p_doc_id: d.id });
+          if (matchErr) console.error('[inbound-sync] match failed for doc', d.id, matchErr.message);
           // Then, only when the workspace opted into `auto`, add the certain matches (score 1.0 —
           // the supplier's own item code identifies existing stock). Everything else stays queued.
-          const { data: autoAdded } = await supabase.rpc('autoapprove_pending_items_for_document', { p_doc_id: d.id });
+          const { data: autoAdded, error: autoErr } = await supabase.rpc('autoapprove_pending_items_for_document', { p_doc_id: d.id });
+          if (autoErr) console.error('[inbound-sync] auto-add failed for doc', d.id, autoErr.message);
           if (autoAdded) autoStocked += Number(autoAdded) || 0;
         } catch (docErr) {
           console.error('[inbound-sync] extraction failed for doc', d.id, String(docErr));
@@ -440,7 +454,9 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     } catch (e) { console.error('[inbound-sync] issuer name resolution failed', String(e)); }
 
     summary.push({
-      workspaceId, found: blocks.length, upserted, auto_billed: autoBilled, extracted, auto_stocked: autoStocked, new_watermark: maxMark, issuers,
+      workspaceId, found: blocks.length, upserted, auto_billed: autoBilled,
+      extraction_batch: (docs ?? []).length, extracted, auto_stocked: autoStocked,
+      new_watermark: maxMark, issuers,
       ...(dated ? { date_from: dateFrom, date_to: dateTo } : {}),
     });
   }
