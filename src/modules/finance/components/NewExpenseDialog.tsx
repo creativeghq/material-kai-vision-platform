@@ -26,8 +26,10 @@ import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service'
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimalOr } from '@/utils/decimal';
 
+// A payee is a CRM company, a CRM person, or a one-off name.
 // type 'adhoc' → a one-off payee not saved in CRM; `id` is null and `label` holds the typed name.
-interface Party { type: 'company' | 'contact' | 'adhoc'; id: string | null; label: string }
+// `isSupplier` only sorts the search results — it is NOT a filter (see the search effect).
+interface Party { type: 'company' | 'contact' | 'adhoc'; id: string | null; label: string; isSupplier?: boolean }
 
 interface Props {
   workspaceId: string;
@@ -72,6 +74,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [partySearch, setPartySearch] = useState('');
   const [partyOptions, setPartyOptions] = useState<Party[]>([]);
   const [creatingParty, setCreatingParty] = useState(false);
+  const [creatingContact, setCreatingContact] = useState(false);
   // The payee's own bank accounts — offered on a Bank Payment so you record which of THEIR banks
   // you paid to (managed on their CRM record → Tax & VAT → Bank Accounts).
   const [payeeBanks, setPayeeBanks] = useState<CrmBankAccount[]>([]);
@@ -228,27 +231,59 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     return () => { cancelled = true; };
   }, [open, orderId, party, workspaceId]);
 
-  // Optional supplier/payee search (suppliers only).
+  // Payee search — ANY CRM company OR person, not just records already flagged as suppliers.
+  // Plenty of costs are paid to a person (a freelancer, a landlord, an accountant) or to a
+  // company that was only ever tagged as a customer; requiring `is_supplier` up front made
+  // those payees unreachable and left the picker looking company-only. Supplier-flagged rows
+  // sort first so the common case still leads.
   useEffect(() => {
     if (!open) return;
     const term = partySearch.trim();
     if (term.length < 2) { setPartyOptions([]); return; }
     const t = setTimeout(async () => {
       const [companies, contacts] = await Promise.all([
-        supabase.from('crm_companies').select('id, name').eq('is_supplier', true).ilike('name', `%${term}%`).limit(8),
-        supabase.from('crm_contacts').select('id, name, first_name, last_name, email').eq('is_supplier', true)
+        supabase.from('crm_companies').select('id, name, is_supplier').ilike('name', `%${term}%`).limit(8),
+        supabase.from('crm_contacts').select('id, name, first_name, last_name, email, is_supplier')
           .or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`).limit(8),
       ]);
       const opts: Party[] = [];
-      for (const c of companies.data ?? []) opts.push({ type: 'company', id: c.id, label: `${c.name} (company)` });
+      for (const c of companies.data ?? []) {
+        opts.push({ type: 'company', id: c.id, label: `${c.name} (company)`, isSupplier: !!(c as any).is_supplier });
+      }
       for (const c of contacts.data ?? []) {
         const label = c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email || c.id;
-        opts.push({ type: 'contact', id: c.id, label });
+        opts.push({ type: 'contact', id: c.id, label: `${label} (person)`, isSupplier: !!(c as any).is_supplier });
       }
+      opts.sort((a, b) => Number(!!b.isSupplier) - Number(!!a.isSupplier));
       setPartyOptions(opts);
     }, 200);
     return () => clearTimeout(t);
   }, [partySearch, open]);
+
+  // Pick a payee. Business rollup (the platform-wide rule, same as invoices / orders / supplier
+  // credit notes): a PERSON attached to a company means the document belongs to that BUSINESS.
+  // Resolved HERE, at pick time, so the operator sees who the bill is actually against instead
+  // of it silently swapping on save. A standalone person stays the payee.
+  const pickParty = async (o: Party) => {
+    setPartySearch(''); setPartyOptions([]);
+    if (o.type === 'contact' && o.id) {
+      try {
+        const companyId = await financeService.resolvePrimaryCompanyId(o.id);
+        if (companyId) {
+          const { data: comp } = await supabase.from('crm_companies').select('id, name').eq('id', companyId).maybeSingle();
+          if (comp) {
+            setParty({ type: 'company', id: comp.id as string, label: `${comp.name} (company)`, isSupplier: true });
+            toast({
+              title: 'Recorded against the business',
+              description: `${o.label} is linked to ${comp.name} — the expense is booked to the business, not the person.`,
+            });
+            return;
+          }
+        }
+      } catch { /* fall back to paying the person directly */ }
+    }
+    setParty(o);
+  };
 
   // Quick-create a supplier from the typed name (supplier bills require a counterparty —
   // for myDATA / statements / spend-per-supplier). Find-or-create by name to avoid dupes.
@@ -270,12 +305,43 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         // Ensure it's flagged as a supplier so it shows in future searches.
         await supabase.from('crm_companies').update({ is_supplier: true } as any).eq('id', id);
       }
-      setParty({ type: 'company', id: id!, label: `${name} (company)` });
+      setParty({ type: 'company', id: id!, label: `${name} (company)`, isSupplier: true });
       setPartySearch(''); setPartyOptions([]);
     } catch (err: any) {
       toast({ title: 'Could not create supplier', description: err?.message, variant: 'destructive' });
     } finally {
       setCreatingParty(false);
+    }
+  };
+
+  // Quick-create a PERSON payee (freelancer, landlord, accountant…) — the counterpart of
+  // `createParty` for costs paid to someone who isn't a business. Find-or-create by name so a
+  // recurring cost reuses the same contact instead of spawning a duplicate every month. A fresh
+  // contact has no company link, so it stays the payee (no rollup).
+  const createContactParty = async () => {
+    const name = partySearch.trim();
+    if (name.length < 2) return;
+    setCreatingContact(true);
+    try {
+      const existing = await supabase.from('crm_contacts').select('id, name')
+        .eq('workspace_id', workspaceId).ilike('name', name).limit(1).maybeSingle();
+      let id = existing.data?.id as string | undefined;
+      if (!id) {
+        const ins = await supabase.from('crm_contacts')
+          .insert({ workspace_id: workspaceId, name, is_supplier: true } as any)
+          .select('id').single();
+        if (ins.error) throw ins.error;
+        id = ins.data.id;
+      } else {
+        // Ensure the person is flagged as a supplier so they lead future searches.
+        await supabase.from('crm_contacts').update({ is_supplier: true } as any).eq('id', id);
+      }
+      // Existing contacts can already belong to a company — run the same rollup as a picked one.
+      await pickParty({ type: 'contact', id: id!, label: `${name} (person)`, isSupplier: true });
+    } catch (err: any) {
+      toast({ title: 'Could not create contact', description: err?.message, variant: 'destructive' });
+    } finally {
+      setCreatingContact(false);
     }
   };
 
@@ -392,7 +458,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           </div>
 
           <div className="space-y-1">
-            <Label>Supplier / Payee *</Label>
+            <Label>Supplier / Payee * <span className="text-muted-foreground font-normal">(a company or a person)</span></Label>
             {party ? (
               <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                 <span className="text-sm">{party.label}{party.type === 'adhoc' && <span className="ml-1.5 text-[10px] text-muted-foreground">· one-off, not in CRM</span>}</span>
@@ -400,23 +466,29 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </div>
             ) : (
               <div className="relative">
-                <Input placeholder="Search a supplier, or type any payee name…" value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
+                <Input placeholder="Search a company or a person, or type any payee name…" value={partySearch} onChange={(e) => setPartySearch(e.target.value)} />
                 {partyOptions.length > 0 && (
                   <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md">
                     {partyOptions.map((o) => (
                       <button key={`${o.type}-${o.id}`} type="button"
-                        className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                        onClick={() => { setParty(o); setPartySearch(''); setPartyOptions([]); }}>
-                        {o.label}
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                        onClick={() => { void pickParty(o); }}>
+                        <span>{o.label}</span>
+                        {o.isSupplier && <span className="text-[10px] text-muted-foreground">supplier</span>}
                       </button>
                     ))}
                   </div>
                 )}
                 {partySearch.trim().length >= 2 && (
                   <div className="mt-1 flex flex-wrap gap-2">
-                    <Button type="button" size="sm" variant="outline" disabled={creatingParty} onClick={createParty}>
+                    <Button type="button" size="sm" variant="outline" disabled={creatingParty || creatingContact} onClick={createParty}>
                       {creatingParty ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
-                      Create supplier “{partySearch.trim()}”
+                      Create company “{partySearch.trim()}”
+                    </Button>
+                    {/* The payee is a person, not a business — books the bill against the contact. */}
+                    <Button type="button" size="sm" variant="outline" disabled={creatingParty || creatingContact} onClick={createContactParty}>
+                      {creatingContact ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+                      Create person “{partySearch.trim()}”
                     </Button>
                     {/* One-off payee: recorded as a free-text name on the bill, no CRM record. */}
                     <Button type="button" size="sm" variant="ghost"
