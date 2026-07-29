@@ -96,6 +96,5 @@ Every action is surfaced to the `kai` agent as a first-class tool, so the same w
 ## 7. Related
 
 - [docs/api/seo-api.md](api/seo-api.md) — endpoint reference
-- [docs/seo-toolkit-integration-plan.md](seo-toolkit-integration-plan.md) — original integration plan
 - [docs/seo-pipeline-mention-monitoring-integration.md](seo-pipeline-mention-monitoring-integration.md) — how SEO and mention monitoring share discovery
 - [docs/flows-notification-system.md](flows-notification-system.md) — where the movement alerts are delivered

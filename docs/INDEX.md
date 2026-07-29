@@ -553,6 +553,12 @@ Complete documentation for Material Kai Vision Platform.
 
 **[email-marketing.md](email-marketing.md)** - Email Marketing add-on ✨ NEW (2026-07) — tenant GrapesJS campaigns, Resend BYOK, workspace-scoped
 
+**[storage-buckets.md](storage-buckets.md)** - Storage buckets ✨ NEW (2026-07) — the 6-bucket map, path routing, privacy model, and GC-based cleanup wiring
+
+**[mention-monitoring-system.md](mention-monitoring-system.md)** - Mention monitoring ✨ NEW (2026-07) — news/blog/RSS/YouTube discovery + LLM visibility probes, classifier + cadence pipeline
+
+**[job-research-system.md](job-research-system.md)** - Job research ✨ NEW (2026-07) — job-discovery agent, consolidated digests, v0.1 → v0.3.5 history
+
 **[workspace-shared-credits.md](workspace-shared-credits.md)** - Workspace shared credits ✨ NEW (2026-07) — pooled credits (owner funds, members draw with optional per-member caps)
 
 **[trip-expense-cards.md](trip-expense-cards.md)** - Trip/expense cards & customer AR aging ✨ NEW (2026-06)
