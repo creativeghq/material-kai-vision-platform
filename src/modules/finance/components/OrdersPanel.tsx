@@ -1497,10 +1497,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
-                    {/* Money IN from the customer. */}
+                    {/* The order's own settlement: a sale is settled by the customer paying us, a
+                        purchase by us paying the supplier. Same action, opposite direction — the
+                        label followed the sales case on both and so read as a lie on a purchase. */}
                     <DropdownMenuItem className="items-start" onClick={() => setPayInOpen({ amount: outstanding > 0.005 ? outstanding : undefined })}>
-                      <ArrowDownLeft className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />
-                      <span className="flex flex-col"><span>Record payment</span><span className="text-[10px] text-muted-foreground">Money received from the customer.</span></span>
+                      {order.order_type === 'purchase'
+                        ? <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
+                        : <ArrowDownLeft className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />}
+                      <span className="flex flex-col"><span>Record payment</span><span className="text-[10px] text-muted-foreground">{order.order_type === 'purchase' ? 'Money paid to the supplier (or a refund back from them).' : 'Money received from the customer.'}</span></span>
                     </DropdownMenuItem>
                     {/* Money OUT — a supplier bill (Payables &amp; P&amp;L), attached to this order + "Order" category. */}
                     <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
@@ -1773,12 +1777,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 (Distinct from the order's Profit-margin above, which is revenue − cost on the lines.) */}
             {fin && (
               <div className="grid grid-cols-3 gap-2">
+                {/* Money in on a PURCHASE order is never settlement — you don't get paid by a
+                    supplier, you pay them. The only thing that lands here is money coming back
+                    (a refund / return), so it is named that rather than "Received". */}
                 <div className="rounded-md border border-border/60 p-2">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Received</div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{order.order_type === 'purchase' ? 'Refunded back' : 'Received'}</div>
                   <div className="text-sm font-semibold text-emerald-500">{formatMoney(fin.received, order.currency)}</div>
                 </div>
                 <div className="rounded-md border border-border/60 p-2">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Paid to suppliers</div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{order.order_type === 'purchase' ? 'Paid to supplier' : 'Paid to suppliers'}</div>
                   <div className="text-sm font-semibold text-red-400">{formatMoney(fin.paid_out, order.currency)}</div>
                 </div>
                 <div className="rounded-md border border-border/60 p-2">

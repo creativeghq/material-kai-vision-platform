@@ -36,7 +36,7 @@ import { parseDecimal } from '@/utils/decimal';
 // 'supplier' = money OUT to the counterparty of a PURCHASE order. Without it, opening this dialog
 // from a purchase order offered "Received from customer" — the wrong side of the trade entirely,
 // since a purchase order is settled by paying the supplier from one of our own accounts.
-type Kind = 'received' | 'refund' | 'expense' | 'supplier';
+type Kind = 'received' | 'refund' | 'expense' | 'supplier' | 'supplier_refund';
 
 export const RecordPaymentDialog: React.FC<{
   workspaceId: string;
@@ -352,7 +352,10 @@ export const RecordPaymentDialog: React.FC<{
         creditNoteFiscalError = cn.fiscal_error;
       }
 
-      const direction = kind === 'received' ? 'in' : 'out';
+      // A supplier refund is the ONE way money comes IN on a purchase order. It is not
+      // settlement — get_order_settlements keeps a purchase order's in-half separate precisely
+      // so a refund can never reduce what we still owe the supplier.
+      const direction = kind === 'received' || kind === 'supplier_refund' ? 'in' : 'out';
 
       // Build the allocation + resolve the counterparty from the chosen invoice.
       let allocations: Array<{ target_id: string; target_type: 'invoice' | 'supplier_bill'; amount: number; amount_doc?: number; fx_rate?: number }> = [];
@@ -448,11 +451,16 @@ export const RecordPaymentDialog: React.FC<{
                   Paying an expense
                 </div>
               ) : side === 'supplier' ? (
-                // A purchase order can only be settled one way: we pay the supplier. Offering
-                // "Received from customer" here was offering the opposite side of the trade.
-                <div className="flex h-10 items-center rounded-md border border-border/60 bg-muted/40 px-3 text-sm">
-                  Paid to supplier
-                </div>
+                // A purchase order is SETTLED one way only: we pay the supplier. Money in exists
+                // but is never settlement — a refund / returned goods / an overpayment coming back.
+                // Naming it as its own type keeps it recordable without it ever reading as payment.
+                <Select value={kind} onValueChange={(v: any) => { setKind(v); setBillId(''); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="supplier">Paid to supplier</SelectItem>
+                    <SelectItem value="supplier_refund">Refund from supplier (money back)</SelectItem>
+                  </SelectContent>
+                </Select>
               ) : (
                 <Select value={kind} onValueChange={(v: any) => { setKind(v); setTargetInvoiceId(''); setInvoiceId(''); setExpenseId(''); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -589,6 +597,16 @@ export const RecordPaymentDialog: React.FC<{
             </div>
           )}
 
+          {kind === 'supplier_refund' && (
+            <div className="space-y-1">
+              <p className="text-[11px] text-muted-foreground">
+                Money coming back from the supplier — returned goods, an overpayment, or a cancelled
+                line. It is recorded against this order but does <strong>not</strong> count as
+                settlement: what you still owe on the order is unchanged.
+              </p>
+            </div>
+          )}
+
           {kind === 'received' && (
             <div className="space-y-1">
               <Label>For (optional)</Label>
@@ -657,7 +675,7 @@ export const RecordPaymentDialog: React.FC<{
 
           <PaidFromSelect
             workspaceId={workspaceId}
-            label={kind === 'received' ? 'Deposit to account' : 'Pay from account'}
+            label={kind === 'received' || kind === 'supplier_refund' ? 'Deposit to account' : 'Pay from account'}
             value={bankAccountId}
             onChange={setBankAccountId}
             method={method}
