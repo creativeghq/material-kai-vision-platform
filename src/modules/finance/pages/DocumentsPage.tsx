@@ -1025,7 +1025,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           workspaceId={workspaceId}
           lockedCompanyId={orderDoc.issuer_vat ? crmByVat[orderDoc.issuer_vat.replace(/\D/g, '')] : undefined}
           preset={{ orderType: 'purchase', draft: false }}
-          prefill={{ currency: orderDoc.currency, notes: `From myDATA ${orderDoc.series ?? ''}${orderDoc.aa ? ` ${orderDoc.aa}` : ''} · MARK ${orderDoc.mark}`.trim(), lines: orderLinesFromDoc(orderDoc) }}
+          prefill={{ currency: orderDoc.currency, notes: `From myDATA ${orderDoc.series ?? ''}${orderDoc.aa ? ` ${orderDoc.aa}` : ''} · MARK ${orderDoc.mark}`.trim(), lines: orderLinesFromDoc(orderDoc), fromDocument: true, inboundDocumentId: orderDoc.id }}
           categories={categories}
           open
           onOpenChange={(v) => { if (!v) setOrderDoc(null); }}

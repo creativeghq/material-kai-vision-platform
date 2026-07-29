@@ -388,11 +388,24 @@ export const NewOrderModal: React.FC<{
   preset: { orderType: OrderType; draft: boolean };
   /**
    * Seed the form from a document that already describes the order — today a myDATA received
-   * document, whose lines ARE what the supplier says we bought. Everything stays editable; this
-   * is a prefill, so the order can still be corrected before it is saved (which is the point:
-   * the invoice and the order are allowed to disagree).
+   * document, whose lines ARE what the supplier says we bought.
+   *
+   * With `fromDocument`, the figures are the supplier's and the form stops pretending otherwise:
+   * quantity, price, unit and VAT are read-only and lines can be neither added nor removed —
+   * composing a different order here would just make the order disagree with the document that
+   * is its own evidence. The ONE edit that stays is linking a line to a catalog product, because
+   * `product_id` is what lets the goods reach the warehouse: `receive_order_into_warehouse`
+   * cannot stock a line without one.
    */
-  prefill?: { currency?: string | null; notes?: string | null; lines?: Array<Partial<Line> & { description: string }> };
+  prefill?: {
+    currency?: string | null;
+    notes?: string | null;
+    lines?: Array<Partial<Line> & { description: string }>;
+    /** Lock the figures to the source document (see above). */
+    fromDocument?: boolean;
+    /** Source myDATA document — its AI line→stock matches pre-select the product pickers. */
+    inboundDocumentId?: string;
+  };
   categories: FinanceCategory[];
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -422,6 +435,19 @@ export const NewOrderModal: React.FC<{
   const [discountType, setDiscountType] = useState<'percent' | 'amount'>('percent');
   const [discountValue, setDiscountValue] = useState('');
 
+  // Seeded from a supplier's document: its figures are evidence, so they are shown, not edited.
+  const locked = !!prefill?.fromDocument;
+  /** Locked mode searches the catalog from its own box, since the description is no longer typed. */
+  const [linkSearch, setLinkSearch] = useState('');
+  /** Catalog name per linked line — the line keeps the SUPPLIER's wording, so the match is shown
+   *  alongside it rather than replacing it. */
+  const [linkedNames, setLinkedNames] = useState<Record<number, string>>({});
+  // Goods on a received document have already arrived, so receiving is the default, not an
+  // afterthought — otherwise the order exists and the stock silently doesn't.
+  const [warehouses, setWarehouses] = useState<Array<{ id: string; name: string; is_default: boolean }>>([]);
+  const [warehouseId, setWarehouseId] = useState<string>('');
+  const [receiveNow, setReceiveNow] = useState(true);
+
   const isSales = orderType === 'sales';
   // Sales orders are income, purchase orders are expense — offer the matching category kinds.
   const catOptions = categories.filter((c) => c.kind === (isSales ? 'income' : 'expense') || c.kind === 'both');
@@ -437,6 +463,38 @@ export const NewOrderModal: React.FC<{
     setItems(prefill?.lines?.length
       ? prefill.lines.map((l) => ({ ...blankLine(), ...l }))
       : [blankLine()]);
+    setLinkSearch(''); setLinkedNames({}); setReceiveNow(true); setWarehouseId('');
+
+    // Where the goods land. Only purchase orders stock anything, so don't ask on a sales order.
+    if (!isSales) {
+      void supabase.from('warehouses').select('id, name, is_default')
+        .eq('workspace_id', workspaceId).order('is_default', { ascending: false }).order('name')
+        .then(({ data }) => {
+          const rows = (data ?? []) as Array<{ id: string; name: string; is_default: boolean }>;
+          setWarehouses(rows);
+          setWarehouseId(rows.find((w) => w.is_default)?.id ?? rows[0]?.id ?? '');
+        });
+    }
+
+    // Pre-link each supplier line to stock we already carry. This reuses the matches the inbound
+    // sync already produced (`warehouse_pending_items`, matched by `match_pending_items_for_document`)
+    // rather than running a second, differently-behaved matcher here.
+    const docId = prefill?.inboundDocumentId;
+    if (docId) {
+      void supabase.from('warehouse_pending_items')
+        .select('line_index, matched_product_id, name')
+        .eq('inbound_document_id', docId)
+        .not('matched_product_id', 'is', null)
+        .then(({ data }) => {
+          const rows = (data ?? []) as Array<{ line_index: number; matched_product_id: string; name: string | null }>;
+          if (rows.length === 0) return;
+          setItems((ls) => ls.map((l, i) => {
+            const m = rows.find((r) => r.line_index === i);
+            return m ? { ...l, product_id: m.matched_product_id } : l;
+          }));
+          setLinkedNames(Object.fromEntries(rows.map((r) => [r.line_index, r.name ?? 'Matched product'])));
+        });
+    }
     // Opened from inside a CRM party → that party IS the order's party (customer for a sales
     // order, supplier for a purchase order). Pre-select + lock it so the user isn't re-searching.
     if (lockedCompanyId) {
@@ -454,7 +512,7 @@ export const NewOrderModal: React.FC<{
             sub: [data.vat_number ? `VAT ${data.vat_number}` : null, data.email, 'Contact'].filter(Boolean).join(' · ') });
         });
     }
-  }, [open, lockedCompanyId, lockedContactId, prefill]);
+  }, [open, lockedCompanyId, lockedContactId, prefill, isSales, workspaceId]);
 
   // Project search (optional link — workspace-scoped).
   useEffect(() => {
@@ -492,7 +550,9 @@ export const NewOrderModal: React.FC<{
   // Per-line product lookup — typing in a line's Description searches the catalog.
   useEffect(() => {
     if (!open || activeLine === null) return;
-    const term = (items[activeLine]?.description ?? '').trim();
+    // Locked lines aren't typed into — the supplier's wording stays put — so the search term
+    // comes from the line's own "link a product" box instead of its description.
+    const term = (locked ? linkSearch : (items[activeLine]?.description ?? '')).trim();
     if (term.length < 2) { setLineProdOpts([]); return; }
     const t = setTimeout(async () => {
       // Scope to the party's OWN catalog when the order is for a company: `brand_company_id` is
@@ -533,12 +593,22 @@ export const NewOrderModal: React.FC<{
       setLineProdOpts(prods.map((p) => ({ ...p, free: isSales ? (freeByProduct.get(p.id) ?? 0) : null })));
     }, 200);
     return () => clearTimeout(t);
-  }, [activeLine, items, open, isSales, workspaceId, party?.type, party?.id]);
+  }, [activeLine, items, open, isSales, workspaceId, party?.type, party?.id, locked, linkSearch]);
 
   const setItem = (i: number, patch: Partial<Line>) => setItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
   const addLine = () => setItems((ls) => [...ls, blankLine()]);
   const removeLine = (i: number) => setItems((ls) => ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls);
   const pickProduct = async (i: number, p: { id: string; name: string }) => {
+    if (locked) {
+      // Link only. The document's description, quantity, price, unit and VAT are the supplier's
+      // statement of what we bought — resolving catalog pricing over them would make the order
+      // contradict its own evidence. All this needs to do is give the line a product_id so the
+      // goods can reach the warehouse.
+      setItem(i, { product_id: p.id });
+      setLinkedNames((m) => ({ ...m, [i]: p.name }));
+      setActiveLine(null); setLineProdOpts([]); setLinkSearch('');
+      return;
+    }
     setItem(i, { product_id: p.id, description: p.name });
     setActiveLine(null); setLineProdOpts([]);
     // Customer-aware pricing: the resolver applies this customer's level/discount off retail
@@ -631,7 +701,25 @@ export const NewOrderModal: React.FC<{
           vat_category: parseInt(it.vat_code, 10) || undefined,
         })),
       });
-      toast({ title: status === 'draft' ? 'Pre-order saved' : 'Order created' });
+      // The goods on a received document already arrived, so stock them as part of creating the
+      // order. Best-effort: a receipt failure must not lose the order that was just created —
+      // it stays receivable from the order itself.
+      let stockNote: string | undefined;
+      if (locked && !isSales && receiveNow && status !== 'draft') {
+        try {
+          const { data: rec, error: recErr } = await supabase.rpc('receive_order_into_warehouse', {
+            p_order: orderId, ...(warehouseId ? { p_warehouse: warehouseId } : {}),
+          });
+          if (recErr) throw recErr;
+          const r = (rec ?? {}) as { received?: number; skipped?: number };
+          stockNote = Number(r.skipped ?? 0) > 0
+            ? `${r.received ?? 0} line(s) stocked · ${r.skipped} skipped with no catalog product.`
+            : `${r.received ?? 0} line(s) added to stock.`;
+        } catch (recErr: any) {
+          stockNote = `Order saved, but receiving into the warehouse failed: ${recErr?.message ?? 'unknown error'}. Receive it from the order.`;
+        }
+      }
+      toast({ title: status === 'draft' ? 'Pre-order saved' : 'Order created', description: stockNote });
       onCreated(orderId);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -731,7 +819,11 @@ export const NewOrderModal: React.FC<{
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label>Items</Label>
-              <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" /> New Product</Button>
+              {/* No "add a product" when the document defines the order — anything typed in here
+                  was not on the supplier's document and does not belong on this order. */}
+              {!locked && (
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" /> New Product</Button>
+              )}
             </div>
             <div className="rounded-md border border-border/60 overflow-x-auto">
               {/* Sales shows a separate Cost column (for margin); a purchase order's price IS the cost. */}
@@ -745,10 +837,35 @@ export const NewOrderModal: React.FC<{
                 <React.Fragment key={i}>
                 <div className={`grid ${isSales ? 'grid-cols-[1fr_52px_62px_82px_82px_88px_84px_24px]' : 'grid-cols-[1fr_52px_62px_82px_88px_84px_24px]'} items-center gap-2 border-t border-border/40 px-2 py-1.5 min-w-[640px]`}>
                   <div className="relative">
+                    {locked ? (
+                      <div className="py-0.5">
+                        {/* The supplier's own wording — shown, never edited. */}
+                        <div className="truncate text-sm" title={l.description}>{l.description}</div>
+                        {l.product_id ? (
+                          <button type="button" className="text-[10px] text-emerald-600 hover:underline"
+                            onClick={() => { setItem(i, { product_id: null }); setLinkedNames((m) => { const n = { ...m }; delete n[i]; return n; }); }}>
+                            → {linkedNames[i] ?? 'linked to catalog'} · unlink
+                          </button>
+                        ) : activeLine === i ? (
+                          <Input autoFocus className="h-7 mt-0.5 text-xs" value={linkSearch}
+                            onChange={(e) => setLinkSearch(e.target.value)}
+                            onBlur={() => window.setTimeout(() => { setActiveLine((a) => (a === i ? null : a)); }, 150)}
+                            placeholder="Search the catalog…" />
+                        ) : (
+                          // Without a product this line cannot be stocked, so the gap is stated
+                          // here rather than discovered as a silent no-op at receiving time.
+                          <button type="button" className="text-[10px] text-amber-600 hover:underline"
+                            onClick={() => { setActiveLine(i); setLinkSearch(''); }}>
+                            not in catalog — link a product to stock it
+                          </button>
+                        )}
+                      </div>
+                    ) : (
                     <Input className="h-8 text-sm" value={l.description}
                       onChange={(e) => { setItem(i, { description: e.target.value, product_id: null }); setActiveLine(i); }}
                       onFocus={() => setActiveLine(i)}
                       placeholder="Search a product or type a new one…" />
+                    )}
                     {activeLine === i && lineProdOpts.length > 0 && (
                       <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
                         {lineProdOpts.map((p) => (
@@ -770,22 +887,35 @@ export const NewOrderModal: React.FC<{
                       </div>
                     )}
                   </div>
-                  <MoneyInput className="h-8 text-right text-sm px-1" displayDecimals={null} value={l.quantity} onValueChange={(v) => setItem(i, { quantity: v ?? 0 })} />
-                  <Select value={l.unit_code} onValueChange={(v) => setItem(i, { unit_code: v })}>
-                    <SelectTrigger className="h-8 text-xs px-1.5"><SelectValue /></SelectTrigger>
-                    <SelectContent>{UNIT_OPTIONS.map((u) => <SelectItem key={u.code} value={u.code}>{u.label}</SelectItem>)}</SelectContent>
-                  </Select>
+                  {/* Locked: the supplier stated these. Rendered as text so there is nothing to
+                      "correct" — an order that disagrees with the document it was created from
+                      is a discrepancy to raise with them, not a field to quietly retype. */}
+                  {locked ? <span className="text-right text-sm tabular-nums">{Number(l.quantity)}</span> : (
+                    <MoneyInput className="h-8 text-right text-sm px-1" displayDecimals={null} value={l.quantity} onValueChange={(v) => setItem(i, { quantity: v ?? 0 })} />
+                  )}
+                  {locked ? <span className="text-xs text-muted-foreground">{UNIT_OPTIONS.find((u) => u.code === l.unit_code)?.label ?? l.unit_code}</span> : (
+                    <Select value={l.unit_code} onValueChange={(v) => setItem(i, { unit_code: v })}>
+                      <SelectTrigger className="h-8 text-xs px-1.5"><SelectValue /></SelectTrigger>
+                      <SelectContent>{UNIT_OPTIONS.map((u) => <SelectItem key={u.code} value={u.code}>{u.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
                   {/* Sales: unit price. Purchase: this IS the cost (mirror into unit_cost on save). */}
-                  <MoneyInput className="h-8 text-right text-sm px-1" value={l.unit_price} onValueChange={(v) => setItem(i, { unit_price: v ?? 0 })} />
+                  {locked ? <span className="text-right text-sm tabular-nums">{formatMoney(l.unit_price)}</span> : (
+                    <MoneyInput className="h-8 text-right text-sm px-1" value={l.unit_price} onValueChange={(v) => setItem(i, { unit_price: v ?? 0 })} />
+                  )}
                   {isSales && (
                     <MoneyInput className="h-8 text-right text-sm px-1" placeholder="—" value={l.unit_cost} onValueChange={(v) => setItem(i, { unit_cost: v })} title="What this costs us — auto-filled from the catalog, editable" />
                   )}
-                  <Select value={l.vat_code} onValueChange={(v) => setItem(i, { vat_code: v })}>
-                    <SelectTrigger className="h-8 text-xs px-1.5"><SelectValue /></SelectTrigger>
-                    <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
-                  </Select>
+                  {locked ? <span className="text-right text-xs text-muted-foreground">{VAT_CATEGORIES.find((v) => v.code === l.vat_code)?.label ?? l.vat_code}</span> : (
+                    <Select value={l.vat_code} onValueChange={(v) => setItem(i, { vat_code: v })}>
+                      <SelectTrigger className="h-8 text-xs px-1.5"><SelectValue /></SelectTrigger>
+                      <SelectContent>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
                   <span className="text-right text-sm tabular-nums">{formatMoney(calc[i]?.gross ?? 0)}</span>
-                  <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => removeLine(i)}><Trash2 className="h-3.5 w-3.5" /></button>
+                  {locked ? <span /> : (
+                    <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => removeLine(i)}><Trash2 className="h-3.5 w-3.5" /></button>
+                  )}
                 </div>
                 {short && (
                   <div className="px-2 pb-1.5 -mt-0.5 text-[11px] text-amber-600 flex items-center gap-1 min-w-[640px]">
@@ -796,8 +926,54 @@ export const NewOrderModal: React.FC<{
                 );
               })}
             </div>
-            <p className="text-[11px] text-muted-foreground">{isSales ? 'Pick a catalog product to auto-fill the customer’s price, cost & unit (this customer’s discount is applied). Editable.' : 'A purchase order’s unit price is what we pay the supplier (= our cost). Pick a catalog product to auto-fill it.'} Catalog lines link to the warehouse — delivery moves stock.</p>
+            {locked ? (
+              <p className="text-[11px] text-muted-foreground">
+                These are the supplier&apos;s lines and figures, exactly as the document states them — they can&apos;t be
+                edited here. Link each one to a catalog product so the goods can enter the warehouse.
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">{isSales ? 'Pick a catalog product to auto-fill the customer’s price, cost & unit (this customer’s discount is applied). Editable.' : 'A purchase order’s unit price is what we pay the supplier (= our cost). Pick a catalog product to auto-fill it.'} Catalog lines link to the warehouse — delivery moves stock.</p>
+            )}
           </div>
+
+          {/* ── Into the warehouse ──────────────────────────────────────────────────────────
+              A received document means the goods ALREADY arrived (this is often a ΤΔΑ, a delivery
+              note), so stocking them is part of recording the order, not a later step someone has
+              to remember. Without this the order exists and the stock silently doesn't. */}
+          {!isSales && locked && (
+            <div className="space-y-2 rounded-md border border-border/60 p-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={receiveNow} onChange={(e) => setReceiveNow(e.target.checked)} />
+                <span className="font-medium">Receive these goods into the warehouse now</span>
+              </label>
+              {receiveNow && warehouses.length > 1 && (
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">Warehouse</Label>
+                  <Select value={warehouseId} onValueChange={setWarehouseId}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Pick a warehouse" /></SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((w) => (
+                        <SelectItem key={w.id} value={w.id}>{w.name}{w.is_default ? ' · default' : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {receiveNow && (() => {
+                const unlinked = items.filter((l) => !l.product_id).length;
+                return unlinked > 0 ? (
+                  <p className="text-[11px] text-amber-600">
+                    {unlinked} of {items.length} line(s) have no catalog product and will NOT be stocked. Link them above,
+                    or receive them later from the order.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    All {items.length} line(s) are linked and will be added to stock.
+                  </p>
+                );
+              })()}
+            </div>
+          )}
 
           <div className="space-y-1">
             <Label>Order note (optional)</Label>
@@ -1514,47 +1690,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   )}
                 </div>
 
-                {/* 3-way match — purchase orders only: PO cost × goods received × supplier bill. */}
-                {order.order_type === 'purchase' && match && match.match_status !== 'no_lines' && (
-                  <div className="mt-4 rounded-md border border-border/60 p-3 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold">3-way match</span>
-                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${MATCH_META[match.match_status].cls}`}>
-                        {MATCH_META[match.match_status].label}
-                      </span>
-                      <span className="ml-auto text-[10px] text-muted-foreground">PO cost × goods received × supplier bill</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div className="rounded bg-muted/40 p-2">
-                        <div className="text-muted-foreground">Ordered (PO net)</div>
-                        <div className="tabular-nums font-medium">{formatMoney(match.po_net, order.currency)}</div>
-                      </div>
-                      <div className="rounded bg-muted/40 p-2">
-                        <div className="text-muted-foreground">Received</div>
-                        <div className="tabular-nums font-medium">{match.received_qty} / {match.ordered_qty}</div>
-                      </div>
-                      <div className="rounded bg-muted/40 p-2">
-                        <div className="text-muted-foreground">Billed{match.bill_count > 0 ? ` (${match.bill_count})` : ''}</div>
-                        <div className="tabular-nums font-medium">{formatMoney(match.bill_net, order.currency)}</div>
-                      </div>
-                    </div>
-                    {match.variances.length > 0 && (
-                      <ul className="space-y-0.5 text-[11px] text-destructive">
-                        {match.variances.map((v, i) => (
-                          <li key={i} className="flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3 shrink-0" />
-                            {v.type === 'amount'
-                              ? `Bill net ${formatMoney(v.bill_net, order.currency)} vs PO ${formatMoney(v.po_net, order.currency)} (${v.delta >= 0 ? '+' : ''}${formatMoney(v.delta, order.currency)})`
-                              : `Received ${v.received} vs ordered ${v.ordered} (${v.delta >= 0 ? '+' : ''}${v.delta})`}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {match.match_status === 'awaiting_bill' && (
-                      <p className="text-[11px] text-muted-foreground">Goods received — record the supplier bill and match it to this PO to complete the check.</p>
-                    )}
-                  </div>
-                )}
               </>
             ) : (
               <div className="rounded-md border border-border/60">

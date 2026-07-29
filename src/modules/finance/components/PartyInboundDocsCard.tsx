@@ -189,7 +189,7 @@ export const PartyInboundDocsCard: React.FC<{
           workspaceId={workspaceId}
           lockedCompanyId={companyId}
           preset={{ orderType: 'purchase', draft: false }}
-          prefill={{ currency: orderDoc.currency, notes: `From myDATA ${orderDoc.series ?? ''}${orderDoc.aa ? ` ${orderDoc.aa}` : ''} · MARK ${orderDoc.mark}`.trim(), lines: orderLinesFromDoc(orderDoc) }}
+          prefill={{ currency: orderDoc.currency, notes: `From myDATA ${orderDoc.series ?? ''}${orderDoc.aa ? ` ${orderDoc.aa}` : ''} · MARK ${orderDoc.mark}`.trim(), lines: orderLinesFromDoc(orderDoc), fromDocument: true, inboundDocumentId: orderDoc.id }}
           categories={categories}
           open
           onOpenChange={(v) => { if (!v) setOrderDoc(null); }}
