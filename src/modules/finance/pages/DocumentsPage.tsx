@@ -16,7 +16,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation, type SupplierBill, type RecurringExpense } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation, type RecurringExpense } from '@/modules/finance/services/financeService';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
@@ -99,7 +99,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNote[]>([]);
   const [inbound, setInbound] = useState<InboundDocument[]>([]);
-  const [supplierBills, setSupplierBills] = useState<SupplierBill[]>([]);
   const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
   const [payments, setPayments] = useState<PaymentWithAllocation[]>([]);
@@ -152,7 +151,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
-      const [inv, cn, inb, pmts, dns, chq, cats, bills] = await Promise.all([
+      const [inv, cn, inb, pmts, dns, chq, cats] = await Promise.all([
         // Paged client-side below, so the fetch cap is a safety ceiling, not a page size —
         // 200 silently hid older documents once a workspace crossed it.
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 1000 }),
@@ -162,10 +161,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         deliveryNotesService.list(activeWorkspaceId).catch(() => []),
         chequesService.list(activeWorkspaceId).catch(() => []),
         financeCategoriesService.list(activeWorkspaceId).catch(() => [] as FinanceCategory[]),
-        // Only the Expenses tab renders the recorded-bill spend log — skip the query elsewhere.
-        type === 'expenses'
-          ? financeService.listSupplierBills({ workspaceId: activeWorkspaceId }).catch(() => [] as SupplierBill[])
-          : Promise.resolve([] as SupplierBill[]),
       ]);
       // Recurring templates — Expenses tab only.
       if (type === 'expenses') {
@@ -176,7 +171,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       setInvoices(inv);
       setCreditNotes(cn);
       setInbound(inb);
-      setSupplierBills(bills);
       setPayments(pmts);
       setDeliveryNotes(dns);
       setCheques(chq);
@@ -427,14 +421,6 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             {type === 'expenses' && !loading && recurring.length > 0 && (
               <RecurringExpensesCard rows={recurring} categoryName={categoryName} readOnly={!canOperateFinance} onChanged={load} />
             )}
-            {/* Only OPEN (unpaid) bills live here — once a bill is paid, its cash-out shows in the
-                Payments tab instead (the money ledger). Keeps Expenses = "what you still owe". */}
-            {type === 'expenses' && !loading && (() => {
-              const openBills = supplierBills.filter((b) => b.status !== 'paid' && Number(b.amount_due) > 0.005);
-              return openBills.length > 0
-                ? <RecordedExpensesCard rows={openBills} categoryName={categoryName} readOnly={!canOperateFinance} onOpenExpense={setPaymentsExpenseId} />
-                : null;
-            })()}
           </div>
         </div>
       </div>
@@ -596,57 +582,6 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
           </tbody>
         </table>
         <TablePagination page={page} total={rows.length} onPageChange={setPage} label="recurring expenses" />
-      </CardContent>
-    </Card>
-  );
-};
-
-/** Open (unpaid) supplier bills shown under the myDATA inbox on the Expenses tab — what you still
- *  owe. These `supplier_bills` also age in Payables (AP). Once paid, a bill drops off here and its
- *  cash-out appears in the Payments tab (the money ledger). */
-const RecordedExpensesCard: React.FC<{ rows: SupplierBill[]; categoryName: (id: any) => string; readOnly: boolean; onOpenExpense: (billId: string) => void }> = ({ rows, categoryName, readOnly, onOpenExpense }) => {
-  const [page, setPage] = useState(1);
-  useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
-  return (
-    <Card>
-      <div className="border-b border-border/60 px-4 py-2.5">
-        <div className="text-sm font-semibold">Open bills you owe</div>
-        <p className="text-[11px] text-muted-foreground">Unpaid supplier bills — these age in Payables (AP). Once paid, a bill moves to the Payments tab as a “Paid” cash-out.</p>
-      </div>
-      <CardContent className="p-0">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border/60 text-xs text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2 text-left">Reference</th>
-              <th className="px-4 py-2 text-left">Date</th>
-              <th className="px-4 py-2 text-left">Category</th>
-              <th className="px-4 py-2 text-right">Total</th>
-              <th className="px-4 py-2 text-right">Due</th>
-              <th className="px-4 py-2 text-center">Status</th>
-              {!readOnly && <th className="px-4 py-2 text-right" />}
-            </tr>
-          </thead>
-          <tbody>
-            {paginate(rows, page).map((b) => (
-              <tr key={b.id} className="border-b border-border/30 hover:bg-muted/30">
-                <td className="px-4 py-2 font-mono text-xs">{b.supplier_bill_number || <span className="text-muted-foreground">{b.notes ? b.notes.slice(0, 40) : '—'}</span>}</td>
-                <td className="px-4 py-2">{b.issued_at ? new Date(b.issued_at).toLocaleDateString() : '—'}</td>
-                <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName((b as any).category_id)}</td>
-                <td className="px-4 py-2 text-right">{formatMoney(b.total, b.currency)}</td>
-                <td className="px-4 py-2 text-right font-medium">{formatMoney(b.amount_due, b.currency)}</td>
-                <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(b.status)}`}>{humanizeLabel(b.status)}</span></td>
-                {!readOnly && (
-                  <td className="px-4 py-2 text-right">
-                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => onOpenExpense(b.id)}>
-                      Payments
-                    </Button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <TablePagination page={page} total={rows.length} onPageChange={setPage} label="bills" />
       </CardContent>
     </Card>
   );
