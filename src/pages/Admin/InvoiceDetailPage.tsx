@@ -35,6 +35,7 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
+import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 
@@ -534,10 +535,15 @@ const InvoiceDetailPage: React.FC = () => {
         );
       })()}
 
+      {/* The platform's one Record Payment form, preset to this invoice. Foreign-currency
+          settlement lives in it now, so this page no longer needs a copy of the form to have it. */}
       <RecordPaymentDialog
+        workspaceId={invoice.workspace_id}
+        presetInvoiceId={invoice.id}
+        defaultAmount={Number(invoice.amount_due) || undefined}
+        initialCounterparty={{ companyId: invoice.customer_company_id ?? null, contactId: invoice.customer_contact_id ?? null }}
         open={paymentDialogOpen}
         onOpenChange={setPaymentDialogOpen}
-        invoice={invoice}
         onSaved={async () => { setPaymentDialogOpen(false); await load(); }}
       />
       {/* The platform's one credit-note form, preset to this invoice — it credits per LINE with
@@ -559,188 +565,6 @@ const InvoiceDetailPage: React.FC = () => {
   );
 };
 
-// ============================================================================
-// Record payment dialog
-// ============================================================================
-
-const RecordPaymentDialog: React.FC<{
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  invoice: InvoiceWithItems;
-  onSaved: () => void;
-}> = ({ open, onOpenChange, invoice, onSaved }) => {
-  const { toast } = useToast();
-  const [amount, setAmount] = useState<string>('');
-  const [currency, setCurrency] = useState<string>(invoice.currency || 'EUR');
-  const [fxRate, setFxRate] = useState<string>('1');        // payment currency → invoice currency
-  const [fxRateToBase, setFxRateToBase] = useState<string>('1'); // payment currency → base (EUR)
-  const [method, setMethod] = useState<PaymentMethod>('bank_transfer');
-  const [reference, setReference] = useState('');
-  const [paidAt, setPaidAt] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState('');
-  // Capture cash location + P&L category + receipt, matching every other money-in path (these were
-  // silently dropped by this bespoke dialog).
-  const [bankAccounts, setBankAccounts] = useState<BankAccountBalance[]>([]);
-  const [bankAccountId, setBankAccountId] = useState<string>('');
-  const [categories, setCategories] = useState<FinanceCategory[]>([]);
-  const [categoryId, setCategoryId] = useState<string>('');
-  const [sendReceipt, setSendReceipt] = useState(true);
-  const [busy, setBusy] = useState(false);
-
-  const foreign = currency !== (invoice.currency || 'EUR');
-
-  useEffect(() => {
-    if (open) {
-      setAmount(invoice.amount_due ? String(invoice.amount_due) : '');
-      setCurrency(invoice.currency || 'EUR');
-      setFxRate('1');
-      setFxRateToBase('1');
-      setMethod('bank_transfer');
-      setReference('');
-      setPaidAt(new Date().toISOString().slice(0, 10));
-      setNotes('');
-      setCategoryId('');
-      setSendReceipt(true);
-      void (async () => {
-        const [banks, cats] = await Promise.all([
-          financeService.getBankAccountBalances(invoice.workspace_id).catch(() => [] as BankAccountBalance[]),
-          financeCategoriesService.list(invoice.workspace_id).catch(() => [] as FinanceCategory[]),
-        ]);
-        setBankAccounts(banks);
-        setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
-        setCategories(cats);
-      })();
-    }
-  }, [open, invoice.amount_due, invoice.currency, invoice.workspace_id]);
-
-  const handleSave = async () => {
-    const num = parseFloat(amount);
-    if (!Number.isFinite(num) || num <= 0) {
-      toast({ title: 'Invalid amount', variant: 'destructive' });
-      return;
-    }
-    const rate = foreign ? (parseFloat(fxRate) || 0) : 1;
-    if (foreign && rate <= 0) {
-      toast({ title: 'Enter a valid exchange rate', variant: 'destructive' });
-      return;
-    }
-    try {
-      setBusy(true);
-      // `num` is in the payment currency; the value applied to the invoice is num×rate
-      // (invoice currency). amount_doc/fx_rate let the RPC compute realized FX gain/loss.
-      const appliedToInvoice = Math.round(num * rate * 100) / 100;
-      await financeService.recordPayment({
-        workspaceId: invoice.workspace_id,
-        direction: 'in',
-        amount: num,
-        currency,
-        fxRateToBase: parseFloat(fxRateToBase) || 1,
-        method,
-        paidAt: new Date(paidAt).toISOString(),
-        counterpartyContactId: invoice.customer_contact_id ?? null,
-        counterpartyCompanyId: invoice.customer_company_id ?? null,
-        reference: reference || null,
-        notes: notes || null,
-        categoryId: categoryId || null,
-        bankAccountId: bankAccountId || null,
-        sendReceipt,
-        allocations: [{ target_id: invoice.id, target_type: 'invoice', amount: appliedToInvoice, amount_doc: num, fx_rate: rate }],
-      });
-      toast({ title: 'Payment recorded' });
-      onSaved();
-    } catch (err: any) {
-      toast({ title: 'Failed', description: err.message, variant: 'destructive' });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Record Payment</DialogTitle><DialogDescription className="sr-only">Record a payment against this invoice (supports foreign-currency settlement).</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1 col-span-2">
-              <Label>Amount</Label>
-              <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Currency</Label>
-              <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {['EUR', 'USD', 'GBP', 'CHF'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">Outstanding on this invoice: {formatMoney(invoice.amount_due, invoice.currency)}</p>
-          {foreign && (
-            <div className="grid grid-cols-2 gap-3 rounded-md border border-border/60 p-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Rate → {invoice.currency}</Label>
-                <Input type="number" step="0.0001" min="0" value={fxRate} onChange={(e) => setFxRate(e.target.value)} />
-                <p className="text-[10px] text-muted-foreground">1 {currency} = X {invoice.currency}</p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Rate → EUR (base)</Label>
-                <Input type="number" step="0.0001" min="0" value={fxRateToBase} onChange={(e) => setFxRateToBase(e.target.value)} />
-                <p className="text-[10px] text-muted-foreground">drives realized FX gain/loss</p>
-              </div>
-            </div>
-          )}
-          <PaidFromSelect
-            workspaceId={invoice.workspace_id}
-            label="Deposit to account"
-            value={bankAccountId}
-            onChange={setBankAccountId}
-            method={method}
-            onMethodChange={setMethod}
-            accounts={bankAccounts}
-            allowUnassigned
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Paid on</Label>
-              <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label>Category</Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                <SelectContent>
-                  {categories.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Add categories in Settings</div>
-                    : categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label>Reference</Label>
-            <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Bank ref / check no." />
-          </div>
-          <div className="space-y-1">
-            <Label>Notes</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
-          </div>
-          <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 cursor-pointer">
-            <span className="text-xs">Send receipt to customer <span className="text-muted-foreground">— emails the payment receipt. Off = record it silently.</span></span>
-            <Switch checked={sendReceipt} onCheckedChange={setSendReceipt} />
-          </label>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={handleSave} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save payment'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 
 export default InvoiceDetailPage;

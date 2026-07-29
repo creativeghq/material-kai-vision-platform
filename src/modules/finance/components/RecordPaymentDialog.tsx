@@ -54,16 +54,25 @@ export const RecordPaymentDialog: React.FC<{
   /** Same, for an Inbox document that is NOT an expense yet (an `inbound_documents` id). It is
    *  converted on SAVE — opening this dialog must never create a payable on its own. */
   presetInboxDocId?: string;
+  /** Open on the money-out branch with NO expense chosen yet — the "Pay an expense" action.
+   *  The operator picks which expense (or Inbox document) inside. */
+  payExpense?: boolean;
   /** When set (order-attached, received, no invoice yet), the fiscal document can be issued in the
    *  same step. `fiscalDocKind` is the kind the SHARED buyer rule resolved — this dialog never
    *  re-derives it — and `onIssueDoc` runs after the payment is recorded. */
   fiscalDocKind?: SalesDocumentKind;
   fiscalDocReason?: string;
   onIssueDoc?: () => Promise<void>;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, presetInboxDocId, fiscalDocKind, fiscalDocReason, onIssueDoc }) => {
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, presetInboxDocId, payExpense, fiscalDocKind, fiscalDocReason, onIssueDoc }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
+  // Foreign-currency settlement: the money can arrive in a currency the invoice isn't in.
+  // `fxRate` converts payment → invoice (what the allocation is worth), `fxRateToBase` converts
+  // payment → workspace base, which is what makes realized FX gain/loss computable.
+  const [currency, setCurrency] = useState('EUR');
+  const [fxRate, setFxRate] = useState('1');
+  const [fxRateToBase, setFxRateToBase] = useState('1');
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [categoryId, setCategoryId] = useState<string>('');
@@ -107,16 +116,17 @@ export const RecordPaymentDialog: React.FC<{
   const showOrderPicker = kind === 'received' && !orderId;
   const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
   /**
-   * Opened on one specific expense / Inbox document. This PRE-FILLS the form — it does not
-   * change its shape: same Type select, same expense picker, every control still editable. A
-   * stripped-down variant made the one Record Payment form look like a different feature
-   * depending on where it was opened from, which is the whole thing we were fixing.
+   * The money-OUT-to-a-supplier mode. Entered by the caller — "Pay an expense" with no target
+   * (pick one here), or opened straight onto one via presetExpenseId / presetInboxDocId. It is
+   * NOT selectable from the Type list: paying a supplier is the opposite side of the trade from
+   * collecting from a customer, and offering it as a third option there invited picking the
+   * wrong direction. Everything below still shares this one form.
    */
-  const payingExpense = !!presetExpenseId || !!presetInboxDocId;
-  // Settling an expense is only offered in the general "Record payment" context. Opened for a
-  // specific order / invoice the dialog is customer-scoped, and mixing a supplier cost into
-  // that flow would attach it to the wrong side of the trade.
-  const allowExpense = payingExpense || (!orderId && !presetInvoiceId);
+  const payingExpense = payExpense || !!presetExpenseId || !!presetInboxDocId;
+  // The expense picker only makes sense in the general context. Opened for a specific order /
+  // invoice the dialog is customer-scoped, and mixing a supplier cost into that flow would
+  // attach it to the wrong side of the trade.
+  const allowExpense = payingExpense && !orderId && !presetInvoiceId;
 
   useEffect(() => {
     if (!open) return;
@@ -125,6 +135,7 @@ export const RecordPaymentDialog: React.FC<{
     // because it is a counter-side collection.
     setAmount(defaultAmount != null && defaultAmount > 0 ? String(defaultAmount) : ''); setMethod(payingExpense ? 'bank_transfer' : 'cash'); setPaidAt(new Date().toISOString().slice(0, 10));
     setCategoryId(''); setReference(''); setNotes('');
+    setCurrency('EUR'); setFxRate('1'); setFxRateToBase('1');
     setTargetInvoiceId(presetInvoiceId ?? '');
     setInvoiceId('');
     setIssueCreditNote(true);
@@ -198,6 +209,9 @@ export const RecordPaymentDialog: React.FC<{
   }, [invoices, kind, initialCounterparty]);
   const selectedInvoice = useMemo(() => invoices.find((i) => i.id === invoiceId), [invoices, invoiceId]);
   const selectedTarget = useMemo(() => invoices.find((i) => i.id === targetInvoiceId) ?? null, [invoices, targetInvoiceId]);
+  /** What the money must end up in: the invoice being settled, else the workspace base. */
+  const settleCurrency = (kind === 'received' ? selectedTarget?.currency : null) ?? 'EUR';
+  const foreign = kind === 'received' && currency !== settleCurrency;
 
   const pickTarget = (id: string) => {
     setTargetInvoiceId(id);
@@ -328,14 +342,19 @@ export const RecordPaymentDialog: React.FC<{
       const direction = kind === 'received' ? 'in' : 'out';
 
       // Build the allocation + resolve the counterparty from the chosen invoice.
-      let allocations: Array<{ target_id: string; target_type: 'invoice'; amount: number }> = [];
+      let allocations: Array<{ target_id: string; target_type: 'invoice'; amount: number; amount_doc?: number; fx_rate?: number }> = [];
       let counterpartyCompanyId: string | null = null;
       let counterpartyContactId: string | null = null;
       if (kind === 'refund') {
         counterpartyCompanyId = selectedInvoice?.customer_company_id ?? null;
         counterpartyContactId = selectedInvoice?.customer_contact_id ?? null;
       } else if (kind === 'received' && selectedTarget) {
-        allocations = [{ target_id: selectedTarget.id, target_type: 'invoice', amount: amt }];
+        // `amt` is in the PAYMENT currency; what it settles on the invoice is amt × rate. Passing
+        // both lets the RPC compute realized FX gain/loss instead of silently assuming parity.
+        const rate = foreign ? (parseDecimal(fxRate) ?? 0) : 1;
+        if (foreign && rate <= 0) { toast({ title: 'Enter a valid exchange rate', variant: 'destructive' }); setBusy(false); return; }
+        const applied = Math.round(amt * rate * 100) / 100;
+        allocations = [{ target_id: selectedTarget.id, target_type: 'invoice', amount: applied, amount_doc: amt, fx_rate: rate }];
         counterpartyCompanyId = selectedTarget.customer_company_id ?? null;
         counterpartyContactId = selectedTarget.customer_contact_id ?? null;
       }
@@ -351,6 +370,8 @@ export const RecordPaymentDialog: React.FC<{
         workspaceId,
         direction,
         amount: amt,
+        currency,
+        fxRateToBase: parseDecimal(fxRateToBase) ?? 1,
         method,
         paidAt: new Date(paidAt).toISOString(),
         categoryId: categoryId || null,
@@ -389,25 +410,66 @@ export const RecordPaymentDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Record Payment</DialogTitle><DialogDescription className="sr-only">Record a customer payment or a refund.</DialogDescription></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{payingExpense ? 'Pay an Expense' : 'Record Payment'}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {payingExpense ? 'Settle an existing expense or a received myDATA document.' : 'Record a customer payment or a refund.'}
+          </DialogDescription>
+        </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Paying an expense is money OUT to a supplier — the other side of the trade, not a
+                third flavour of "record a payment from a customer". It is entered from the
+                "Pay an expense" action instead of hiding as an option in this list, so the two
+                directions can't be picked by accident. When that action opened this dialog the
+                Type is fixed, so the control is a label rather than a select that can only
+                un-choose itself. */}
             <div className="space-y-1">
               <Label>Type</Label>
-              <Select value={kind} onValueChange={(v: any) => { setKind(v); setTargetInvoiceId(''); setInvoiceId(''); setExpenseId(''); }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="received">Received from customer</SelectItem>
-                  <SelectItem value="refund">Refund / Return (to customer)</SelectItem>
-                  {allowExpense && <SelectItem value="expense">Paid an expense (supplier bill)</SelectItem>}
-                </SelectContent>
-              </Select>
+              {payingExpense ? (
+                <div className="flex h-10 items-center rounded-md border border-border/60 bg-muted/40 px-3 text-sm">
+                  Paying an expense
+                </div>
+              ) : (
+                <Select value={kind} onValueChange={(v: any) => { setKind(v); setTargetInvoiceId(''); setInvoiceId(''); setExpenseId(''); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="received">Received from customer</SelectItem>
+                    <SelectItem value="refund">Refund / Return (to customer)</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Amount</Label>
-              <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <div className="flex gap-2">
+                <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                {kind === 'received' && (
+                  <Select value={currency} onValueChange={setCurrency}>
+                    <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['EUR', 'USD', 'GBP', 'CHF'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </div>
           </div>
+
+          {foreign && (
+            <div className="grid grid-cols-1 gap-3 rounded-md border border-border/60 p-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Rate → {settleCurrency}</Label>
+                <Input type="text" inputMode="decimal" value={fxRate} onChange={(e) => setFxRate(e.target.value)} />
+                <p className="text-[10px] text-muted-foreground">1 {currency} = X {settleCurrency}{selectedTarget ? ' — what this settles on the invoice' : ''}</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Rate → EUR (base)</Label>
+                <Input type="text" inputMode="decimal" value={fxRateToBase} onChange={(e) => setFxRateToBase(e.target.value)} />
+                <p className="text-[10px] text-muted-foreground">drives realized FX gain/loss</p>
+              </div>
+            </div>
+          )}
 
           {showOrderPicker && orders.length > 0 && (
             <div className="space-y-1">
