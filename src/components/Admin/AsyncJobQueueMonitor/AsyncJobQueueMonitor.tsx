@@ -3132,7 +3132,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           onClick={() => handleContinueJob(selectedJob.id)}
                         >
                           <Play className="h-4 w-4 mr-2" />
-                          Continue Job
+                          Continue job
                         </Button>
                         <Button
                           size="sm"
@@ -3140,7 +3140,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           onClick={() => handleFailJob(selectedJob.id)}
                         >
                           <XCircle className="h-4 w-4 mr-2" />
-                          Mark as Failed
+                          Mark as failed
                         </Button>
                         <button
                           onClick={() => {

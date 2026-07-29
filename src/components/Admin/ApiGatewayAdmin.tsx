@@ -249,7 +249,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                     <CardDescription>Generate and manage API keys for external access</CardDescription>
                   </div>
                   <Button size="sm" onClick={() => setShowGenerateForm((v) => !v)}>
-                    <Plus className="h-4 w-4 mr-1.5" />Generate Key
+                    <Plus className="h-4 w-4 mr-1.5" />Generate key
                   </Button>
                 </div>
               </CardHeader>

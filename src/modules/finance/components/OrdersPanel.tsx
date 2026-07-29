@@ -863,7 +863,7 @@ export const NewOrderModal: React.FC<{
               {/* No "add a product" when the document defines the order — anything typed in here
                   was not on the supplier's document and does not belong on this order. */}
               {!locked && (
-                <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" /> New Product</Button>
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addLine}><Plus className="h-3.5 w-3.5 mr-1" /> New product</Button>
               )}
             </div>
             <div className="rounded-md border border-border/60 overflow-x-auto">
@@ -1557,7 +1557,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     {order.order_type === 'sales' && (
                       <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
                         <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
-                        <span className="flex flex-col"><span>Add expense</span><span className="text-[10px] text-muted-foreground">Money out — a cost against this sale.</span></span>
+                        <span className="flex flex-col"><span>Add expense</span><span className="text-[10px] text-muted-foreground">A cost against this sale.</span></span>
                       </DropdownMenuItem>
                     )}
                     {/* Settle from the customer's on-account credit — no new cash movement. */}
@@ -1815,7 +1815,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   );
                 })}
                 <div className="flex items-center justify-between px-2 py-1.5 border-t border-border/40">
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditItems((ls) => [...ls, blankLine()])}><Plus className="h-3.5 w-3.5 mr-1" /> New Product</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditItems((ls) => [...ls, blankLine()])}><Plus className="h-3.5 w-3.5 mr-1" /> New product</Button>
                   <div className="flex gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
                     <Button size="sm" onClick={saveItems} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save items'}</Button>

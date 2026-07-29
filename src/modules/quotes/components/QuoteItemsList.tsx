@@ -318,7 +318,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
             {showAddButton && onAddProducts && (
               <Button onClick={onAddProducts} size="sm" className="rounded-full gap-1.5">
                 <Plus className="h-3.5 w-3.5" />
-                Add Products
+                Add products
               </Button>
             )}
           </div>

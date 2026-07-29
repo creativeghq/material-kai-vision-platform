@@ -835,7 +835,7 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
             </div>
 
             <Button variant="outline" size="sm" disabled={!editorReady} onClick={() => setShowTestDialog(true)}>
-              <Send className="h-4 w-4 mr-1" />Send Test
+              <Send className="h-4 w-4 mr-1" />Send test
             </Button>
 
             <Button size="sm" disabled={saving || !editorReady} onClick={handleSave}>

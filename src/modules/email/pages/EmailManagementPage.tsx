@@ -76,11 +76,11 @@ export const EmailManagement: React.FC = () => {
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setShowSettingsDialog(true)}>
             <Settings className="mr-2 h-4 w-4" />
-            Email Settings
+            Email settings
           </Button>
           <Button onClick={() => setShowTestDialog(true)}>
             <TestTube className="mr-2 h-4 w-4" />
-            Send Test Email
+            Send test email
           </Button>
         </div>
 

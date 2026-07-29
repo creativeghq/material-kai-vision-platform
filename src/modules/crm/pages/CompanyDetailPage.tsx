@@ -958,7 +958,7 @@ export const CompanyDetailPage: React.FC = () => {
                 </div>
                 <Button onClick={() => setShowAddContactDialog(true)} size="sm">
                   <Plus className="h-4 w-4 mr-2"/>
-                  Add Contact
+                  Add contact
                 </Button>
               </CardHeader>
               <CardContent>
@@ -973,7 +973,7 @@ export const CompanyDetailPage: React.FC = () => {
                       onClick={() => setShowAddContactDialog(true)}
 >
                       <Plus className="h-4 w-4 mr-2"/>
-                      Add First Contact
+                      Add first contact
                     </Button>
                   </div>
                 ) : (

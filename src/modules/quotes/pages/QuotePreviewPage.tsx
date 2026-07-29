@@ -159,7 +159,7 @@ export function QuotePreviewPage() {
           size="sm"
         >
           <Printer className="h-4 w-4 mr-2" />
-          Print / Save as PDF
+          Print / save as PDF
         </Button>
       </div>
 

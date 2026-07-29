@@ -80,7 +80,7 @@ export const CatalogSourcesPage: React.FC = () => {
         icon={FileText}
         actions={
           <Button variant="outline" onClick={() => navigate('/admin/catalogs')}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Catalogs
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to catalogs
           </Button>
         }
       />

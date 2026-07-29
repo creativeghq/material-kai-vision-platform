@@ -159,7 +159,7 @@ export const MoodboardProductSearchModal: React.FC<MoodboardProductSearchModalPr
             title="Search with the KAI agent — added products return to this moodboard"
           >
             <Sparkles className="h-4 w-4" />
-            Advanced Search
+            Advanced search
           </Button>
         </div>
 
@@ -179,7 +179,7 @@ export const MoodboardProductSearchModal: React.FC<MoodboardProductSearchModalPr
               <p className="text-sm mb-3">No products found for "{query}"</p>
               <Button variant="outline" className="rounded-full gap-1.5" onClick={handleAdvancedSearch}>
                 <Sparkles className="h-4 w-4" />
-                Try Advanced Search
+                Try advanced search
               </Button>
             </div>
           ) : (

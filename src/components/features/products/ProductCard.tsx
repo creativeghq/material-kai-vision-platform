@@ -236,7 +236,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 title="View material in AR"
               >
                 <Smartphone className="h-3.5 w-3.5" />
-                AR View
+                AR view
               </Button>
             </div>
 

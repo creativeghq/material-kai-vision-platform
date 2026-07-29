@@ -142,7 +142,7 @@ export function NodeConfigPanel() {
           }}
         >
           <Trash2 className="h-4 w-4" />
-          Delete Node
+          Delete node
         </Button>
       </div>
     </div>

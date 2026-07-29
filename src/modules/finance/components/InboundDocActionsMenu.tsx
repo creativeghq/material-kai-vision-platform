@@ -185,7 +185,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={onReceiveStock} disabled={!canReceive}>
-            <PackagePlus className="h-4 w-4 mr-2" /> Add Products to Warehouse
+            <PackagePlus className="h-4 w-4 mr-2" /> Add products to warehouse
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />

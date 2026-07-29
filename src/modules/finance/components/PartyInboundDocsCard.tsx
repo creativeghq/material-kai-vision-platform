@@ -97,7 +97,7 @@ export const PartyInboundDocsCard: React.FC<{
           {/* Carry the supplier through, so the Inbox opens on THEIR documents rather than
               everyone's and the operator has to re-find them. */}
           <Link to={vatNumber ? `${inboxHref}${inboxHref.includes('?') ? '&' : '?'}issuer_vat=${encodeURIComponent(vatNumber)}` : inboxHref}>
-            <Button size="sm" variant="ghost"><ExternalLink className="h-3.5 w-3.5 mr-2" /> Open Inbox</Button>
+            <Button size="sm" variant="ghost"><ExternalLink className="h-3.5 w-3.5 mr-2" /> Open inbox</Button>
           </Link>
         </CardHeader>
         <CardContent className="p-0">

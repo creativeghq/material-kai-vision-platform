@@ -339,7 +339,7 @@ export function LogViewer() {
                   disabled={logs.length === 0}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Clear All
+                  Clear all
                 </Button>
               </div>
             </div>

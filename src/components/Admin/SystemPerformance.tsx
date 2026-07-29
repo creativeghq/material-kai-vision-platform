@@ -486,7 +486,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
             disabled={loading}
           >
             <Activity className="h-4 w-4 mr-2" />
-            Refresh Data
+            Refresh data
           </Button>
         </div>
 

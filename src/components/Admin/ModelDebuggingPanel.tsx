@@ -411,7 +411,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
             <RefreshCw
               className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
             />
-            Test All Models
+            Test all models
           </Button>
         </div>
 
@@ -608,7 +608,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
                               <RefreshCw
                                 className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`}
                               />
-                              Test Model
+                              Test model
                             </Button>
                             <Button
                               className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-1"
@@ -618,7 +618,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
                               }
                             >
                               <Copy className="h-3 w-3" />
-                              Copy Name
+                              Copy name
                             </Button>
                           </div>
                         </div>
@@ -671,7 +671,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
                                         aria-label={`View generated image for ${log.model}`}
                                       >
                                         <ExternalLink className="h-3 w-3" />
-                                        View Result
+                                        View result
                                       </Button>
                                     </div>
                                   )}

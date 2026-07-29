@@ -73,7 +73,7 @@ export const QuoteEmailButton: React.FC<Props> = ({ quoteId, defaultEmail, onSen
     <>
       <Button variant="outline" size="sm" className="rounded-full gap-2" onClick={() => setOpen(true)}>
         <Mail className="h-4 w-4" />
-        Email Quote
+        Email quote
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

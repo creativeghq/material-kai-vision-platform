@@ -197,7 +197,7 @@ export const XMLImportJobCard: React.FC<XMLImportJobCardProps> = ({
               className="flex-1"
             >
               <Eye className="h-4 w-4 mr-2" />
-              View Details
+              View details
             </Button>
           )}
 

@@ -195,7 +195,7 @@ export const MoodBoardPage = () => {
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Create Your First MoodBoard
+              Create your first moodboard
             </Button>
           </CardContent>
         </Card>

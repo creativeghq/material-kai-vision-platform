@@ -308,7 +308,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
         subtitle="Bundle sheets from any of this project's moodboards into one client-ready PDF + online presentation."
         actions={!editorOpen && (
           <Button onClick={openCreate} className="rounded-full">
-            <Plus className="h-4 w-4 mr-1" /> New Client View
+            <Plus className="h-4 w-4 mr-1" /> New client view
           </Button>
         )}
       />

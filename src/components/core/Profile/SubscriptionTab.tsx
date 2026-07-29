@@ -334,7 +334,7 @@ export const SubscriptionTab: React.FC = () => {
             <CardTitle className="flex items-center gap-2"><Key className="h-4 w-4 text-primary" />API Keys</CardTitle>
             {hasSubscription && (
               <Button size="sm" variant="outline" onClick={() => setShowNewKeyForm((v) => !v)}>
-                <Plus className="h-3.5 w-3.5 mr-1.5" />Generate Key
+                <Plus className="h-3.5 w-3.5 mr-1.5" />Generate key
               </Button>
             )}
           </div>

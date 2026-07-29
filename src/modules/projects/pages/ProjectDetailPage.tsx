@@ -182,7 +182,7 @@ export const ProjectDetailPage: React.FC = () => {
             {isOwner && (
               <Button variant="outline" size="sm" onClick={() => navigate('/projects')}>
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                All Projects
+                All projects
               </Button>
             )}
             {isOwner && (

@@ -596,7 +596,7 @@ export const AIModelPricingTab: React.FC = () => {
                 className="rounded-full"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                Sync Now
+                Sync now
               </Button>
               <Button
                 variant="outline"

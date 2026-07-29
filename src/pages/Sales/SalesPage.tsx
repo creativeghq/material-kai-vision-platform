@@ -104,7 +104,7 @@ export const SalesPage: React.FC = () => {
         actions={
           <Button onClick={() => setDialogOpen(true)} variant="outline" size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            New Order
+            New order
           </Button>
         }
       />
@@ -145,7 +145,7 @@ export const SalesPage: React.FC = () => {
                 <p className="text-sm mb-4">No orders yet. Create one for a customer to get started.</p>
                 <Button onClick={() => setDialogOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Your First Order
+                  Create your first order
                 </Button>
               </div>
             ) : (

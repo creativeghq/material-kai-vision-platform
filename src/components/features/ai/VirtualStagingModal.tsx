@@ -205,7 +205,7 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
                 disabled={!selectedRoom}
                 className="w-full rounded-full"
               >
-                Next — Choose Style
+                Next — choose style
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </div>

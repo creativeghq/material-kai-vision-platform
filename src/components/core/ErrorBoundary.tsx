@@ -243,7 +243,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 variant="outline"
               >
                 <Home className="w-4 h-4 mr-2" />
-                Go Home
+                Go home
               </Button>
             )}
 
@@ -257,7 +257,7 @@ export class ErrorBoundary extends Component<Props, State> {
               variant="outline"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
-              Reload Page
+              Reload page
             </Button>
           </div>
 

@@ -2363,7 +2363,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     onClick={() => { onUseIn3DScene(currentImage.url, product.name); onClose(); }}
                   >
                     <Box className="h-3.5 w-3.5" />
-                    Use in 3D Scene
+                    Use in 3D scene
                   </Button>
                 )}
                 {onGenerateVR && (
@@ -2386,7 +2386,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     onClick={() => { onGenerateVideo(currentImage.url); onClose(); }}
                   >
                     <Video className="h-3.5 w-3.5" />
-                    Generate Video
+                    Generate video
                   </Button>
                 )}
               </div>

@@ -201,7 +201,7 @@ function AppointmentDetailDrawer({
               disabled={saving}
             >
               <CheckCircle2 className="h-4 w-4 text-green-600" />
-              Mark as Completed
+              Mark as completed
             </Button>
           )}
 
@@ -212,7 +212,7 @@ function AppointmentDetailDrawer({
             onClick={openInbox}
           >
             <Inbox className="h-4 w-4" />
-            Open Inbox
+            Open inbox
           </Button>
 
           {/* Private notes */}
@@ -234,7 +234,7 @@ function AppointmentDetailDrawer({
               onClick={saveNotes}
               disabled={saving}
             >
-              Save Notes
+              Save notes
             </Button>
           </div>
         </div>

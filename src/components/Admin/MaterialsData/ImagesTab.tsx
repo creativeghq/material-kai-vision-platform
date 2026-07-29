@@ -1054,7 +1054,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                   </Button>
                   <Button variant="outline" size="sm" className="w-full" disabled>
                     <FileText className="h-4 w-4 mr-2" />
-                    Edit Manually
+                    Edit manually
                   </Button>
                   <Button variant="outline" size="sm" className="w-full" onClick={() => {
                     console.log('Full image data:', selectedImage);
@@ -1064,7 +1064,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                     });
                   }}>
                     <Globe className="h-4 w-4 mr-2" />
-                    View Full Metadata
+                    View full metadata
                   </Button>
                 </div>
                   </TabsContent>

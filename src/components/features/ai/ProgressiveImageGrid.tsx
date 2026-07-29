@@ -1635,7 +1635,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
               }}
             >
               <Paintbrush className="w-3.5 h-3.5 mr-1.5" />
-              Pick Material →
+              Pick material →
             </Button>
           </div>
         </DialogContent>

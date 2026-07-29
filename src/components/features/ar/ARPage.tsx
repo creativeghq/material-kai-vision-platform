@@ -143,7 +143,7 @@ const ARPage: React.FC = () => {
             onClick={() => navigate('/')}
           >
             <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Go Home
+            Go home
           </Button>
         </div>
       </div>

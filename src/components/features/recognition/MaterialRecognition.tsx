@@ -162,7 +162,7 @@ export const MaterialRecognition: React.FC = () => {
                   or click to select files (JPEG, PNG, WebP)
                 </p>
                 <Button className="border border-input bg-background hover:bg-accent hover:text-accent-foreground">
-                  Select Images
+                  Select images
                 </Button>
               </div>
             )}

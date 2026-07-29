@@ -62,7 +62,7 @@ export const AdminGuard: React.FC<AdminGuardProps> = ({
               variant="outline"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Return to Dashboard
+              Return to dashboard
             </Button>
           </CardContent>
         </Card>

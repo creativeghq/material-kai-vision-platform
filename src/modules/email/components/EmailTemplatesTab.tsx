@@ -215,7 +215,7 @@ export const EmailTemplatesTab: React.FC = () => {
           >
             <Button onClick={() => setShowCreateModal(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              Create Template
+              Create template
             </Button>
           </FilterBar>
         }

@@ -166,7 +166,7 @@ export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded
             size="sm"
           >
             <Plus className="h-4 w-4 mr-2" />
-            New Template
+            New template
           </Button>
         </div>
 

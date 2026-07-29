@@ -348,21 +348,21 @@ export const QuoteRequestsAdmin: React.FC = () => {
                 onClick={() => setShowTimelinePanel(true)}
               >
                 <ListChecks className="h-4 w-4 mr-2" />
-                Global Timeline Elements
+                Global timeline elements
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowUpsellsPanel(true)}
               >
                 <Gift className="h-4 w-4 mr-2" />
-                Global Upsells Elements
+                Global upsells elements
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowSettingsPanel(true)}
               >
                 <Settings className="h-4 w-4 mr-2" />
-                Quote Settings
+                Quote settings
               </Button>
               <Button
                 onClick={() => setShowCreateModal(true)}
@@ -373,7 +373,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
                 className="hover:opacity-90"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
-                Create Quote for User
+                Create quote for user
               </Button>
             </>
           }

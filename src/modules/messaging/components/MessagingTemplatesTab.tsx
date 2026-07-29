@@ -126,7 +126,7 @@ export const MessagingTemplatesTab: React.FC = () => {
         actions={
           <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Create Template
+            Create template
           </Button>
         }
       />
@@ -142,7 +142,7 @@ export const MessagingTemplatesTab: React.FC = () => {
             </p>
             <Button onClick={() => setShowCreateModal(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Create Template
+              Create template
             </Button>
           </div>
         </div>

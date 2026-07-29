@@ -286,7 +286,7 @@ export const ExpensePaymentsDialog: React.FC<{
       <AlertDialog open={!!detaching} onOpenChange={(v) => { if (!v) setDetaching(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Detach this payment from the expense?</AlertDialogTitle>
+            <AlertDialogTitle>Detach Payment</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>

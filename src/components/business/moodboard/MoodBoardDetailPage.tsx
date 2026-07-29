@@ -304,7 +304,7 @@ export const MoodBoardDetailPage: React.FC = () => {
               onClick={() => navigate('/moodboard')}
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Moodboards
+              Back to moodboards
             </Button>
           }
         />
@@ -327,7 +327,7 @@ export const MoodBoardDetailPage: React.FC = () => {
             onClick={() => navigate('/moodboard')}
           >
             <ArrowLeft className="h-4 w-4" />
-            All Moodboards
+            All moodboards
           </Button>
         }
       />
@@ -538,7 +538,7 @@ export const MoodBoardDetailPage: React.FC = () => {
             <p className="text-muted-foreground mb-4">No products in this moodboard yet</p>
             <Button onClick={() => setShowProductSearch(true)} className="rounded-full">
               <Search className="h-4 w-4 mr-2" />
-              Find Products
+              Find products
             </Button>
           </div>
         ) : (

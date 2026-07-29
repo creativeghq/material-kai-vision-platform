@@ -406,7 +406,7 @@ function ServiceForm({
       <div className="flex gap-2 justify-end pt-1">
         <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
         <Button size="sm" onClick={() => onSave(form)} disabled={!form.name.trim()}>
-          <Save className="h-3.5 w-3.5 mr-1.5" /> Save Service
+          <Save className="h-3.5 w-3.5 mr-1.5" /> Save service
         </Button>
       </div>
     </div>
@@ -1045,7 +1045,7 @@ export const ProfileTab: React.FC = () => {
               <Briefcase className="h-4 w-4 text-primary" />Services
             </CardTitle>
             <Button size="sm" variant="outline" onClick={() => { setAddingService(true); setEditingServiceId(null); }}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" />Add Service
+              <Plus className="h-3.5 w-3.5 mr-1.5" />Add service
             </Button>
           </div>
         </CardHeader>
@@ -1086,7 +1086,7 @@ export const ProfileTab: React.FC = () => {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2"><Tag className="h-4 w-4 text-primary" />Skills & Expertise</CardTitle>
             <Button size="sm" variant="outline" onClick={() => setAddingSkill((v) => !v)}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" />Add Skill
+              <Plus className="h-3.5 w-3.5 mr-1.5" />Add skill
             </Button>
           </div>
         </CardHeader>
@@ -1118,7 +1118,7 @@ export const ProfileTab: React.FC = () => {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Preferred Brands</CardTitle>
             <Button size="sm" variant="outline" onClick={() => setAddingFactory((v) => !v)}>
-              <Plus className="h-3.5 w-3.5 mr-1.5" />Add Brand
+              <Plus className="h-3.5 w-3.5 mr-1.5" />Add brand
             </Button>
           </div>
         </CardHeader>
@@ -1161,7 +1161,7 @@ export const ProfileTab: React.FC = () => {
               )}
               <div className="flex gap-2 justify-end">
                 <Button size="sm" variant="ghost" onClick={() => { setAddingFactory(false); setSelectedFactoryName(''); }}>Cancel</Button>
-                <Button size="sm" onClick={addFactory} disabled={!selectedFactoryName}>Add Brand</Button>
+                <Button size="sm" onClick={addFactory} disabled={!selectedFactoryName}>Add brand</Button>
               </div>
             </div>
           )}
@@ -1275,7 +1275,7 @@ export const ProfileTab: React.FC = () => {
                     setShowRegForm(true);
                   }}
                 >
-                  <Building2 className="h-3.5 w-3.5 mr-1.5" />Register as Verified Supplier
+                  <Building2 className="h-3.5 w-3.5 mr-1.5" />Register as verified supplier
                 </Button>
               </div>
             )}

@@ -482,7 +482,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
             <div className="ml-auto">
               <Button variant="secondary" size="sm" className="rounded-full gap-1.5" onClick={() => navigate('/')}>
                 <LayoutDashboard className="h-3.5 w-3.5" />
-                Back to Platform
+                Back to platform
               </Button>
             </div>
           </div>
@@ -694,7 +694,7 @@ export const PublicKnowledgeBasePage: React.FC = () => {
             onClick={() => navigate('/')}
           >
             <LayoutDashboard className="h-3.5 w-3.5" />
-            Back to Platform
+            Back to platform
           </Button>
         </div>
       </section>

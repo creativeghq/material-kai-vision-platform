@@ -350,7 +350,7 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
           </p>
           <Button onClick={handleOpenCreate} size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Add Step
+            Add step
           </Button>
         </div>
 
@@ -448,7 +448,7 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Create Step
+              Create step
             </Button>
           }
         />

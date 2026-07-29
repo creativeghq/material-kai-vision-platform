@@ -166,7 +166,7 @@ export const QuoteRequestsPage: React.FC = () => {
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Plus className="h-4 w-4 mr-2" />
-              New Quote Request
+              New quote request
             </Button>
           </div>
         </div>
@@ -180,7 +180,7 @@ export const QuoteRequestsPage: React.FC = () => {
             <p className="text-sm text-muted-foreground mb-4">No quote requests yet</p>
             <Button onClick={() => setShowCreateModal(true)} className="rounded-full gap-1.5">
               <Plus className="h-4 w-4" />
-              Create Your First Quote Request
+              Create your first quote request
             </Button>
           </div>
         ) : (

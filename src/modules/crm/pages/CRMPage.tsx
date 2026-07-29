@@ -564,7 +564,7 @@ export const CRMManagement: React.FC = () => {
                     title="Filter users" searchPlaceholder="Search by email…" className="flex-1"
                   />
                   <Button size="sm" onClick={handleAddUser}>
-                    <Plus className="h-4 w-4 mr-2" /> Add User
+                    <Plus className="h-4 w-4 mr-2" /> Add user
                   </Button>
                 </div>
                 {selUsers.size > 0 && (
@@ -649,7 +649,7 @@ export const CRMManagement: React.FC = () => {
                     title="Filter contacts" searchPlaceholder="Search contacts…" className="flex-1"
                   />
                   <Button size="sm" onClick={() => navigate('/admin/crm/contacts/new')}>
-                    <Plus className="h-4 w-4 mr-2" /> Add Contact
+                    <Plus className="h-4 w-4 mr-2" /> Add contact
                   </Button>
                 </div>
                 {selContacts.size > 0 && (
@@ -731,7 +731,7 @@ export const CRMManagement: React.FC = () => {
                     title="Filter companies" searchPlaceholder="Search companies…" className="flex-1"
                   />
                   <Button size="sm" onClick={() => setShowAddCompany(true)}>
-                    <Plus className="h-4 w-4 mr-2" /> Add Company
+                    <Plus className="h-4 w-4 mr-2" /> Add company
                   </Button>
                 </div>
                 {selCompanies.size > 0 && (

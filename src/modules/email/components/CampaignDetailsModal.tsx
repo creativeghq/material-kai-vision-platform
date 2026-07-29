@@ -285,11 +285,11 @@ export const CampaignDetailsModal: React.FC<CampaignDetailsModalProps> = ({
             <>
               <Button onClick={handleStartCampaign} disabled={actionLoading}>
                 <Play className="h-4 w-4 mr-2" />
-                Start Campaign
+                Start campaign
               </Button>
               <Button variant="outline" onClick={() => setShowTestDialog(true)} disabled={actionLoading}>
                 <Mail className="h-4 w-4 mr-2" />
-                Send Test
+                Send test
               </Button>
             </>
           )}
@@ -311,7 +311,7 @@ export const CampaignDetailsModal: React.FC<CampaignDetailsModalProps> = ({
           {['draft', 'scheduled', 'sending', 'paused'].includes(campaign.status) && (
             <Button variant="destructive" onClick={handleCancelCampaign} disabled={actionLoading}>
               <Trash2 className="h-4 w-4 mr-2" />
-              Cancel Campaign
+              Cancel campaign
             </Button>
           )}
         </div>

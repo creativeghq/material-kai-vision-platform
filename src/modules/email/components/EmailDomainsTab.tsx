@@ -123,7 +123,7 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
-                Add Domain
+                Add domain
               </Button>
             </DialogTrigger>
             <DialogContent>

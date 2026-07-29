@@ -207,7 +207,7 @@ export default function MaterialComparePage() {
               <PopoverTrigger asChild>
                 <Button variant="outline" className="rounded-full gap-2">
                   <Plus className="h-4 w-4" />
-                  Add Material
+                  Add material
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-80 p-0" align="end">
@@ -255,7 +255,7 @@ export default function MaterialComparePage() {
             <PopoverTrigger asChild>
               <Button className="rounded-full">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Material
+                Add material
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0">

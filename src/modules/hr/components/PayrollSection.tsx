@@ -163,7 +163,7 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
           <div className="flex items-center gap-2">
             {run.status === 'draft' && <Button size="sm" className="rounded-full" disabled={busy} onClick={() => setStatus('approved')}><CheckCircle2 className="h-4 w-4 mr-1" />Approve</Button>}
             {run.status === 'approved' && <Button size="sm" className="rounded-full" disabled={busy} onClick={() => setStatus('paid')}><Banknote className="h-4 w-4 mr-1" />Mark paid</Button>}
-            {run.status !== 'draft' && !run.posted_finance_ref && <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={postFinance}><ArrowUpRight className="h-4 w-4 mr-1" />Post to Finance</Button>}
+            {run.status !== 'draft' && !run.posted_finance_ref && <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={postFinance}><ArrowUpRight className="h-4 w-4 mr-1" />Post to finance</Button>}
             {run.posted_finance_ref && <Badge variant="outline" className="gap-1"><ArrowUpRight className="h-3 w-3" />In Finance</Badge>}
             {run.status !== 'draft' && <Button size="sm" variant="outline" className="rounded-full" disabled={busy} onClick={makePayslips}><FileText className="h-4 w-4 mr-1" />Payslips</Button>}
           </div>

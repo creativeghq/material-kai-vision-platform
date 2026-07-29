@@ -250,7 +250,7 @@ export const ProductAttachments: React.FC = () => {
             <CardTitle>Product Attachments</CardTitle>
             <Button onClick={handleCreate} className="rounded-full">
               <Plus className="h-4 w-4 mr-2" />
-              Link Document to Product
+              Link document to product
             </Button>
           </div>
         </CardHeader>
@@ -391,7 +391,7 @@ export const ProductAttachments: React.FC = () => {
               <Button variant="outline" className="rounded-full" onClick={() => setShowEditor(false)}>
                 Cancel
               </Button>
-              <Button className="rounded-full" onClick={handleSave}>Create Link</Button>
+              <Button className="rounded-full" onClick={handleSave}>Create link</Button>
             </div>
           </div>
         </DialogContent>

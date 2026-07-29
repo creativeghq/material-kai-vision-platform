@@ -515,7 +515,7 @@ export const UserDetailPage: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={handleResetPassword}>
               <Key className="h-4 w-4 mr-2" />
-              Reset Password
+              Reset password
             </Button>
             {editing ? (
               <>
@@ -536,7 +536,7 @@ export const UserDetailPage: React.FC = () => {
             ) : (
               <Button onClick={() => setEditing(true)}>
                 <Edit2 className="h-4 w-4 mr-2" />
-                Edit User
+                Edit user
               </Button>
             )}
           </div>

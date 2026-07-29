@@ -142,7 +142,7 @@ export const QuotesPage: React.FC = () => {
           activeTab === 'quotes' ? (
             <Button onClick={() => setShowCreateModal(true)} variant="outline" size="sm">
               <Plus className="h-4 w-4 mr-2" />
-              New Quote
+              New quote
             </Button>
           ) : undefined
         }
@@ -249,7 +249,7 @@ export const QuotesPage: React.FC = () => {
                     <p className="text-sm mb-4">No quotes yet. Create your first quote to get started.</p>
                     <Button onClick={() => setShowCreateModal(true)}>
                       <Plus className="h-4 w-4 mr-2" />
-                      Create Your First Quote
+                      Create your first quote
                     </Button>
                   </div>
                 ) : (

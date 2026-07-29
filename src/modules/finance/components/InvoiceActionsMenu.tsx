@@ -215,7 +215,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
       <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem onClick={() => go()}><Eye className="h-4 w-4 mr-2" /> View</DropdownMenuItem>
         {canOperateFinance && <DropdownMenuItem onClick={() => go()}><CreditCard className="h-4 w-4 mr-2" /> Record payment</DropdownMenuItem>}
-        <DropdownMenuItem onClick={() => go()}><FileText className="h-4 w-4 mr-2" /> View / Print</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => go()}><FileText className="h-4 w-4 mr-2" /> View / print</DropdownMenuItem>
         <DropdownMenuItem onClick={downloadPdf}><Download className="h-4 w-4 mr-2" /> Download PDF</DropdownMenuItem>
 
         <DropdownMenuSeparator />

@@ -338,7 +338,7 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
               onClick={handleDownload}
             >
               <Download className="mr-1.5 h-4 w-4" />
-              Download Texture
+              Download texture
             </Button>
             <Button
               variant="default"

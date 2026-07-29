@@ -353,7 +353,7 @@ export const MaterialCategoriesTab: React.FC = () => {
           </div>
           <Button onClick={() => openCreate()} className="rounded-full shrink-0">
             <Plus className="h-4 w-4 mr-2" />
-            New Category
+            New category
           </Button>
         </div>
       </CardHeader>

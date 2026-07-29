@@ -191,7 +191,7 @@ export const CategoriesPanel: React.FC = () => {
             Resync auto
           </Button>
           <Button size="sm" onClick={() => setShowCreate(true)}>
-            <Plus className="mr-2 h-4 w-4" /> New Category
+            <Plus className="mr-2 h-4 w-4" /> New category
           </Button>
         </div>
       </div>

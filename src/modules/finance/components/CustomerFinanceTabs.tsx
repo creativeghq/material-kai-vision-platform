@@ -303,7 +303,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         title="Account Overview"
         actions={<>
           {ledgerHref && (
-            <Link to={ledgerHref}><Button size="sm" variant="ghost"><FileText className="h-3.5 w-3.5 mr-2" /> View ledger in Finance</Button></Link>
+            <Link to={ledgerHref}><Button size="sm" variant="ghost"><FileText className="h-3.5 w-3.5 mr-2" /> View ledger in finance</Button></Link>
           )}
           {partyId && (
             <StatementActions

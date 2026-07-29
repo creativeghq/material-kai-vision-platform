@@ -171,7 +171,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
             title="Re-run Layer 1 (layout) + Layer 2 (legends) against this document"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${rerunning ? 'animate-spin' : ''}`} />
-            Re-run Catalog Knowledge
+            Re-run catalog knowledge
           </Button>
         </div>
       </div>

@@ -228,7 +228,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
           </div>
           <Button onClick={openAdd} className="rounded-full" size="sm">
             <Plus className="w-4 h-4 mr-1" />
-            Add Website
+            Add website
           </Button>
         </CardHeader>
         <CardContent>
@@ -542,7 +542,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
               disabled={!previewResult?.result.ok}
             >
               <RefreshCw className="w-4 h-4 mr-1" />
-              Proceed with Full Crawl
+              Proceed with full crawl
             </Button>
           </DialogFooter>
         </DialogContent>

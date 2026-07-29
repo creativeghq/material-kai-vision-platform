@@ -316,11 +316,11 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button variant="outline" onClick={onEdit}>
               <Edit className="h-4 w-4 mr-2" />
-              Edit Mappings
+              Edit mappings
             </Button>
             <Button onClick={onConfirm} disabled={!hasAllRequiredFields}>
               <Upload className="h-4 w-4 mr-2" />
-              Start Import
+              Start import
             </Button>
           </div>
         </div>

@@ -270,7 +270,7 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Create First Moodboard
+                Create first moodboard
               </Button>
             </div>
           ) : (

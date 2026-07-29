@@ -216,7 +216,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
               onClick={() => setBulkMode(false)}
             >
               <Link2 className="h-3.5 w-3.5 mr-1.5" />
-              Single Pin
+              Single pin
             </Button>
             <Button
               variant={bulkMode ? 'default' : 'outline'}
@@ -225,7 +225,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
               onClick={() => setBulkMode(true)}
             >
               <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Bulk Import
+              Bulk import
             </Button>
           </div>
 
@@ -448,7 +448,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
               </p>
               <Button variant="outline" size="sm" className="rounded-full" onClick={handleConnectPinterest}>
                 <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                Connect Pinterest Account
+                Connect Pinterest account
               </Button>
             </div>
           )}

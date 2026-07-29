@@ -274,7 +274,7 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
           <DropdownMenuTrigger asChild>
             <Button className="rounded-full gap-2">
               <Plus className="h-4 w-4" />
-              New Tool
+              New tool
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent

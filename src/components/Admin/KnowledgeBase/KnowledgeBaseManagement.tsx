@@ -198,7 +198,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
               onClick={() => window.open('/knowledge-base', '_blank')}
             >
               <ExternalLink className="h-4 w-4" />
-              View Public KB
+              View public KB
             </Button>
           </div>
 

@@ -143,7 +143,7 @@ export const CatalogOperationsTab: React.FC = () => {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('/admin/catalogs')}>
-            <BookOpen className="mr-2 h-4 w-4" /> Open Catalogs
+            <BookOpen className="mr-2 h-4 w-4" /> Open catalogs
           </Button>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}

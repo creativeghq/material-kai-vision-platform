@@ -79,7 +79,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
           >
             <RefreshCw className="h-4 w-4" />
-            Reset Platform
+            Reset platform
           </Button>
         )}
       </AlertDialogTrigger>

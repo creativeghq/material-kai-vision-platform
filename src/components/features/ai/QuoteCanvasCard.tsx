@@ -156,7 +156,7 @@ export function QuoteCanvasCard({ data }: { data: QuoteCanvasData }) {
           onClick={() => window.open(buildPageUrl('quote', quote_id) ?? `/quotes/${quote_id}`, '_blank')}
         >
           <ClipboardList className="h-4 w-4" />
-          Open in Quotes
+          Open in quotes
         </Button>
       </div>
     </Card>

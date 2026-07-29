@@ -300,7 +300,7 @@ const XMLImportTab: React.FC = () => {
                 {!selectedFile && (
                   <Button variant="outline" className="mt-2">
                     <Upload className="h-4 w-4 mr-2" />
-                    Select File
+                    Select file
                   </Button>
                 )}
               </label>

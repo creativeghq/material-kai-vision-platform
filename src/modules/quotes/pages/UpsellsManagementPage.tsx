@@ -283,7 +283,7 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
           </p>
           <Button onClick={handleOpenCreate} size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Add Upsell
+            Add upsell
           </Button>
         </div>
 
@@ -432,7 +432,7 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Create Upsell
+              Create upsell
             </Button>
           }
         />

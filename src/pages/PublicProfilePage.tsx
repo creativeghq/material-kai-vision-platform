@@ -447,7 +447,7 @@ export const PublicProfilePage: React.FC = () => {
               />
               <Button className="rounded-full gap-2 px-5" onClick={() => openHireModal()}>
                 <Mail className="h-4 w-4" />
-                Hire Me
+                Hire me
               </Button>
             </div>
           </div>

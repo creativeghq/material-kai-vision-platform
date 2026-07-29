@@ -149,7 +149,7 @@ export default function FlowsPage() {
       <div className="min-h-screen">
         <PageHeader
           icon={Workflow}
-          title="Edit automation"
+          title="Edit Automation"
           subtitle="Drag triggers and actions onto the canvas, connect them, then Save"
           actions={
             <Button variant="outline" onClick={closeBuilder} className="gap-2">

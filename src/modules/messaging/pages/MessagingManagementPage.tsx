@@ -102,7 +102,7 @@ export const MessagingManagement: React.FC = () => {
         <div className="flex justify-end gap-2">
           <Button onClick={handleTestMessage}>
             <TestTube className="mr-2 h-4 w-4" />
-            Send Test Message
+            Send test message
           </Button>
         </div>
 

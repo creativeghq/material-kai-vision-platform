@@ -369,7 +369,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 <GitBranch className="h-4 w-4 mr-2" />
-                View Timeline
+                View timeline
               </Button>
             )}
             {quote.status !== 'accepted' && quote.status !== 'rejected' && (

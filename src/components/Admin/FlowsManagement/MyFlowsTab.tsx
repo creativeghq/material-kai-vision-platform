@@ -473,7 +473,7 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
         </p>
         <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
           <Plus className="h-4 w-4" />
-          Create Flow
+          Create flow
         </Button>
       </div>
 
@@ -488,7 +488,7 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
             </p>
             <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
               <Plus className="h-4 w-4" />
-              Create Flow
+              Create flow
             </Button>
           </CardContent>
         </Card>

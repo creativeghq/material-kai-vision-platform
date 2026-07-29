@@ -118,7 +118,7 @@ export const ProjectsListPage: React.FC = () => {
             </Button>
             <Button size="sm" onClick={() => setShowCreate(true)} className="rounded-full">
               <Plus className="h-4 w-4 mr-2" />
-              New Project
+              New project
             </Button>
           </>
         }

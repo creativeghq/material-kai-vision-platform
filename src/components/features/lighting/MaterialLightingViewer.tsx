@@ -550,7 +550,7 @@ export default function MaterialLightingViewer({
               onClick={handleResetTuning}
             >
               <RotateCcw className="mr-1 h-3 w-3" />
-              Reset to Defaults
+              Reset to defaults
             </Button>
           </CollapsibleContent>
         </Collapsible>

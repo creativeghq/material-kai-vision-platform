@@ -111,7 +111,7 @@ export function InspirationUrlModal({ onSubmit, onClose }: InspirationUrlModalPr
             disabled={!url.trim()}
             className="gap-2 rounded-full"
           >
-            Find Materials
+            Find materials
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>

@@ -559,7 +559,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
             )}
             <Button onClick={onCreate}>
               <Plus className="h-4 w-4 mr-2" />
-              New Document
+              New document
             </Button>
           </div>
         </div>

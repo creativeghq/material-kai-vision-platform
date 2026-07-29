@@ -168,7 +168,7 @@ export const EmailActionsTab: React.FC = () => {
                         onClick={() => handleAssignTemplate(action)}
                       >
                         <Settings className="h-4 w-4 mr-1" />
-                        Assign Template
+                        Assign template
                       </Button>
                       <Button
                         variant="outline"

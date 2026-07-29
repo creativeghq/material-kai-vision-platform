@@ -143,7 +143,7 @@ export function VirtualStagingViewer({
         )}
         {onAnalyzeQuality && (
           <Button variant="outline" size="sm" className="gap-2" onClick={onAnalyzeQuality}>
-            Analyze Quality
+            Analyze quality
           </Button>
         )}
       </div>

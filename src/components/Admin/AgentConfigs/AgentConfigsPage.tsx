@@ -530,7 +530,7 @@ export const AgentConfigsPage: React.FC = () => {
                                   className="flex-1"
                                 >
                                   <Edit className="h-4 w-4 mr-2" />
-                                  Edit Prompt
+                                  Edit prompt
                                 </Button>
                                 <Button
                                   onClick={() => handleViewHistory(prompt)}

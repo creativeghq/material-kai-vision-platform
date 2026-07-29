@@ -611,7 +611,7 @@ export const QuoteDetailPage: React.FC = () => {
         <div className="p-3 sm:p-6">
           <Button onClick={() => navigate('/admin/quote-requests')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Quotes
+            Back to quotes
           </Button>
         </div>
       </div>
@@ -649,7 +649,7 @@ export const QuoteDetailPage: React.FC = () => {
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={() => navigate('/admin/quote-requests')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Quotes
+            Back to quotes
           </Button>
 
           <div className="flex items-center gap-3">
@@ -709,7 +709,7 @@ export const QuoteDetailPage: React.FC = () => {
                 className="rounded-full"
               >
                 <FilePlus2 className="h-4 w-4 mr-1" />
-                Issue Revision
+                Issue revision
               </Button>
             )}
 

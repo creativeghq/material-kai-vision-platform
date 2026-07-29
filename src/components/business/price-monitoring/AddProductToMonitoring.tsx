@@ -141,7 +141,7 @@ export const AddProductToMonitoring: React.FC<AddProductToMonitoringProps> = ({
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
-          Add Product
+          Add product
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
