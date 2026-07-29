@@ -290,19 +290,30 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     // turn raw supplier lines into clean products and queue them for the operator's ✓/✗.
     // Entitlement was already checked above; each doc costs EXTRACT_CREDIT_COST credits.
     let extracted = 0;
+    let autoStocked = 0;
     try {
       const EXTRACT_CREDIT_COST = 1;
       /** Same billing test as `mustBill` for the sync itself — root / owner-less workspaces
        *  extract for free rather than being blocked by a debit that can never succeed. */
       const mustBillExtraction = !!meta && !meta.is_root && !!meta.created_by;
+
+      // `off` opts the workspace out of reading supplier lines at all — no AI call, no credits,
+      // no queue. `suggest` (default) and `auto` both extract; they differ only in whether a
+      // certain match is added to stock without a human.
+      const { data: wsFin } = await supabase.from('finance_settings')
+        .select('warehouse_autosync_mode').eq('workspace_id', workspaceId).maybeSingle();
+      const autosyncMode = (wsFin as any)?.warehouse_autosync_mode ?? 'suggest';
       const r2 = (n: number) => Math.round(n * 100) / 100;
-      const { data: docs } = await supabase
-        .from('inbound_documents')
-        .select('id, currency, lines')
-        .eq('workspace_id', workspaceId)
-        .neq('status', 'dismissed')
-        .order('created_at', { ascending: false })
-        .limit(30);
+      // `off` means don't read supplier lines at all: no AI call, no credits, no queue.
+      const { data: docs } = autosyncMode === 'off'
+        ? { data: [] as any[] }
+        : await supabase
+            .from('inbound_documents')
+            .select('id, currency, lines')
+            .eq('workspace_id', workspaceId)
+            .neq('status', 'dismissed')
+            .order('created_at', { ascending: false })
+            .limit(30);
       for (const d of (docs ?? []) as any[]) {
         const all = Array.isArray(d.lines) ? d.lines : [];
         const usable = all.filter((l: any) => String(l?.item_description ?? '').trim());
@@ -350,6 +361,16 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
           });
           await supabase.from('warehouse_pending_items').upsert(pendingRows, { onConflict: 'inbound_document_id,line_index', ignoreDuplicates: true });
           extracted += pendingRows.length;
+
+          // Match each queued line against stock the workspace already carries, so approving it
+          // TOPS UP the existing product instead of creating a near-duplicate. Server-side on
+          // purpose: the equivalent rule used to live only in ReceiveToWarehouseDialog, so it ran
+          // only when a human opened that dialog, and everything queued here arrived unmatched.
+          await supabase.rpc('match_pending_items_for_document', { p_doc_id: d.id });
+          // Then, only when the workspace opted into `auto`, add the certain matches (score 1.0 —
+          // the supplier's own item code identifies existing stock). Everything else stays queued.
+          const { data: autoAdded } = await supabase.rpc('autoapprove_pending_items_for_document', { p_doc_id: d.id });
+          if (autoAdded) autoStocked += Number(autoAdded) || 0;
         } catch (docErr) {
           console.error('[inbound-sync] extraction failed for doc', d.id, String(docErr));
           // Refund the credit for this doc — nothing was queued. Only when one was actually
@@ -380,7 +401,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     } catch (e) { console.error('[inbound-sync] issuer name resolution failed', String(e)); }
 
     summary.push({
-      workspaceId, found: blocks.length, upserted, extracted, new_watermark: maxMark, issuers,
+      workspaceId, found: blocks.length, upserted, extracted, auto_stocked: autoStocked, new_watermark: maxMark, issuers,
       ...(dated ? { date_from: dateFrom, date_to: dateTo } : {}),
     });
   }
