@@ -526,6 +526,18 @@ export const ReceiveToWarehouseDialog: React.FC<{
       }
 
       const n = await inboundService.receiveToWarehouse(doc.id, mappings);
+
+      // The nightly AI pass queues these same lines in `warehouse_pending_items`, and that
+      // queue is a second, independent way to turn them into stock. Without settling them
+      // here the operator could receive the same supplier line twice — once from this modal
+      // and once from the pending card. Best-effort: failing to settle must not undo a
+      // receipt that already committed.
+      try {
+        await inboundService.settlePendingForDocument(
+          doc.id,
+          active.map(({ i }) => String(lines[i]?.item_description ?? '').trim()).filter(Boolean),
+        );
+      } catch { /* the receipt stands; the queue entry is cosmetic by comparison */ }
       toast({
         title: `Received ${n} line${n === 1 ? '' : 's'}`,
         description: [

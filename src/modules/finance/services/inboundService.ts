@@ -109,6 +109,16 @@ export const inboundService = {
     return (data as number) ?? 0;
   },
 
+  /** Mark the AI-extracted pending rows for this document as handled, so the pending queue
+   *  and the intake modal cannot both receive the same supplier line. */
+  async settlePendingForDocument(docId: string, descriptions: string[]): Promise<number> {
+    const { data, error } = await supabase.rpc('settle_pending_items_for_document', {
+      p_document_id: docId, p_descriptions: descriptions,
+    });
+    if (error) throw error;
+    return (data as number) ?? 0;
+  },
+
   async dismiss(docId: string): Promise<void> {
     const { error } = await supabase.from('inbound_documents').update({ status: 'dismissed', updated_at: new Date().toISOString() }).eq('id', docId);
     if (error) throw error;

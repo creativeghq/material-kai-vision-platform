@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { warehouseService, type OperatorCatalogMatch } from '@/services/warehouseService';
+import { catalogGrantsService } from '@/services/catalogGrantsService';
 import {
   dealerProductsService, COMMON_FACET_KEYS, type CategoryField, type ManualImageRef,
 } from '@/services/dealerProductsService';
@@ -57,6 +58,20 @@ export const AddDealerProductDialog: React.FC<{
   // stock, with none of our identity, images or embeddings behind it.
   const [dupes, setDupes] = useState<OperatorCatalogMatch[]>([]);
   const [dupeDismissed, setDupeDismissed] = useState(false);
+  const [requested, setRequested] = useState<string | null>(null);
+
+  /** Ask the operator for this factory. RLS only lets a dealer insert status='requested',
+   *  so this cannot self-grant — the operator approves. */
+  const requestAccess = async (factory: string | null) => {
+    if (!activeWorkspaceId) return;
+    try {
+      await catalogGrantsService.request(activeWorkspaceId, factory);
+      setRequested(factory ?? '*');
+      toast({ title: 'Access requested', description: factory ? `Asked for ${factory}.` : 'Asked for the full catalog.' });
+    } catch (err: any) {
+      toast({ title: 'Could not send the request', description: err?.message, variant: 'destructive' });
+    }
+  };
   useEffect(() => {
     if (!open || !activeWorkspaceId || dupeDismissed) { setDupes([]); return; }
     const q = name.trim();
@@ -182,14 +197,25 @@ export const AddDealerProductDialog: React.FC<{
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-xs font-medium">
                       {dupes[0].hasCatalogAccess
-                        ? 'This is already in the catalog you sell from — add it from there instead of creating a copy.'
-                        : 'The operator already carries this product. Ask them for catalog access rather than creating a duplicate.'}
+                        ? 'This is already in the catalog you sell from — add it from there instead of creating a copy. You get their images and specs, and their updates.'
+                        : 'The operator already carries this product. Request access instead of creating a duplicate.'}
                     </p>
                     <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground"
                       onClick={() => { setDupeDismissed(true); setDupes([]); }}>
                       It&apos;s different
                     </button>
                   </div>
+                  {!dupes[0].hasCatalogAccess && (
+                    <Button type="button" size="sm" variant="outline" className="rounded-full h-7"
+                      disabled={requested === (dupes[0].factoryName ?? '*')}
+                      onClick={() => requestAccess(dupes[0].factoryName)}>
+                      <span className="text-xs">
+                        {requested === (dupes[0].factoryName ?? '*')
+                          ? 'Request sent'
+                          : `Request access${dupes[0].factoryName ? ` to ${dupes[0].factoryName}` : ''}`}
+                      </span>
+                    </Button>
+                  )}
                   {dupes.slice(0, 3).map((d) => (
                     <div key={d.id} className="flex items-center gap-2">
                       {d.image_url
