@@ -24,7 +24,8 @@ const SRC = path.resolve(__dirname, '../../src');
 // while still catching NEW unwired props.
 const WATCHED: Array<{ file: string; name: string; allowUnwired?: string[] }> = [
   { file: 'modules/finance/components/RecordPaymentDialog.tsx', name: 'RecordPaymentDialog' },
-  { file: 'modules/finance/components/NewSupplierBillDialog.tsx', name: 'NewSupplierBillDialog' },
+  // NewSupplierBillDialog was folded into NewExpenseDialog and deleted — an expense IS a
+  // supplier bill, so there was never a second form to keep.
   { file: 'modules/finance/components/NewExpenseDialog.tsx', name: 'NewExpenseDialog' },
   // PaySupplierBillDialog was folded into RecordPaymentDialog's expense branch and deleted —
   // there is one Record Payment form now, so there is nothing separate left to guard here.
