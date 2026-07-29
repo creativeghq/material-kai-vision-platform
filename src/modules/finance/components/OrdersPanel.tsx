@@ -409,7 +409,7 @@ export const NewOrderModal: React.FC<{
   const [items, setItems] = useState<Line[]>([blankLine()]);
   // Per-line product lookup — the Description field IS a catalog search.
   const [activeLine, setActiveLine] = useState<number | null>(null);
-  const [lineProdOpts, setLineProdOpts] = useState<Array<{ id: string; name: string; free?: number | null }>>([]);
+  const [lineProdOpts, setLineProdOpts] = useState<Array<{ id: string; name: string; free?: number | null; outsideCatalog?: boolean }>>([]);
   const [project, setProject] = useState<{ id: string; name: string } | null>(null);
   const [projectSearch, setProjectSearch] = useState('');
   const [projectOpts, setProjectOpts] = useState<Array<{ id: string; name: string }>>([]);
@@ -496,8 +496,29 @@ export const NewOrderModal: React.FC<{
     const term = (items[activeLine]?.description ?? '').trim();
     if (term.length < 2) { setLineProdOpts([]); return; }
     const t = setTimeout(async () => {
-      const { data } = await supabase.from('products').select('id, name').ilike('name', `%${term}%`).limit(8);
-      const prods = (data ?? []) as Array<{ id: string; name: string }>;
+      // Scope to the party's OWN catalog when the order is for a company: `brand_company_id` is
+      // the single source of truth for "this company supplies this product" (ingestion stamps it
+      // via resolve_brand_company; it is what the supplier's Products tab lists). Ordering from a
+      // supplier should search what THEY supply, not the whole catalog.
+      // Also workspace-scoped — this query had no workspace filter at all and leaned entirely on
+      // RLS to avoid offering another tenant's products.
+      let q = supabase.from('products').select('id, name')
+        .eq('workspace_id', workspaceId)
+        .ilike('name', `%${term}%`)
+        .limit(8);
+      if (party?.type === 'company') q = q.eq('brand_company_id', party.id);
+      let { data } = await q;
+      let outsideCatalog = false;
+      // If they have nothing marked under them, don't strand the operator with an empty box —
+      // widen to the workspace catalog and SAY the result isn't theirs. Scoping should focus the
+      // search, not make a line impossible to add for a supplier whose catalog isn't stamped yet.
+      if (party?.type === 'company' && (data ?? []).length === 0) {
+        const wide = await supabase.from('products').select('id, name')
+          .eq('workspace_id', workspaceId).ilike('name', `%${term}%`).limit(8);
+        data = wide.data;
+        outsideCatalog = (data ?? []).length > 0;
+      }
+      const prods = (data ?? []).map((p: any) => ({ ...p, outsideCatalog })) as Array<{ id: string; name: string; outsideCatalog?: boolean }>;
       // Surface free stock (on-hand − reserved) per result so availability is visible before picking.
       let freeByProduct = new Map<string, number>();
       if (isSales && prods.length) {
@@ -513,7 +534,7 @@ export const NewOrderModal: React.FC<{
       setLineProdOpts(prods.map((p) => ({ ...p, free: isSales ? (freeByProduct.get(p.id) ?? 0) : null })));
     }, 200);
     return () => clearTimeout(t);
-  }, [activeLine, items, open, isSales, workspaceId]);
+  }, [activeLine, items, open, isSales, workspaceId, party?.type, party?.id]);
 
   const setItem = (i: number, patch: Partial<Line>) => setItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
   const addLine = () => setItems((ls) => [...ls, blankLine()]);
@@ -733,7 +754,13 @@ export const NewOrderModal: React.FC<{
                       <div className="absolute z-20 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
                         {lineProdOpts.map((p) => (
                           <button key={p.id} type="button" className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => pickProduct(i, p)}>
-                            <span className="truncate">{p.name}</span>
+                            <span className="truncate">
+                              {p.name}
+                              {/* Widened past this party's own catalog because they had no match. */}
+                              {p.outsideCatalog && (
+                                <span className="ml-2 text-[10px] text-muted-foreground">not in their catalog</span>
+                              )}
+                            </span>
                             {p.free != null && (
                               <span className={`shrink-0 text-[11px] tabular-nums ${p.free > 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
                                 {p.free > 0 ? `${p.free} free` : 'out of stock'}

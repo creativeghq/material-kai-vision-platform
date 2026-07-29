@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
 
 export type OrderType = 'sales' | 'purchase';
 export type OrderStatus = 'draft' | 'confirmed' | 'partially_fulfilled' | 'fulfilled' | 'cancelled';
@@ -510,6 +511,98 @@ export const ordersService = {
    * can repeat business without re-entering everything. Delivered/paid state is NOT carried (a fresh
    * order starts undelivered, unpaid); reservation re-pins on confirm. Returns the new order id.
    */
+  /**
+   * Re-order: the same items, bought/sold AGAIN, at TODAY's prices and against today's stock.
+   *
+   * Distinct from `duplicate`, which is an exact copy of a past order — frozen unit prices, frozen
+   * costs, straight into `draft`. That is right for "I typed this wrong, give me another go at the
+   * same paperwork" and wrong for "order this again": a copy re-books last year's price as if it
+   * were current, and silently mis-states margin from the first line.
+   *
+   * So this returns a PREFILL rather than a row. It re-resolves each product line through
+   * `resolveLinePricing` — the same customer-aware resolver a hand-picked line uses — and hands the
+   * result to the ordinary New order form, where the operator sees today's numbers and availability
+   * before committing. Saving then runs the normal create path, so order numbering, stock
+   * reservation, three-way match and notifications all fire exactly as for any other order. A copy
+   * inserted behind the scenes fires none of them.
+   *
+   * `changes` reports what moved since the original, so a re-order at a new price is a visible
+   * decision instead of a silent one.
+   */
+  async reorderPrefill(orderId: string): Promise<{
+    orderType: OrderType;
+    lockedCompanyId?: string;
+    lockedContactId?: string;
+    currency: string;
+    notes: string;
+    lines: Array<{
+      product_id: string | null; description: string; quantity: number; unit_price: number;
+      unit_cost: number | null; unit_code: string; vat_code: string; supplier_company_id: string | null;
+      available: number | null;
+    }>;
+    changes: Array<{ description: string; was: number; now: number }>;
+  }> {
+    const { data: o, error } = await supabase.from('orders')
+      .select('workspace_id, order_type, order_number, currency, customer_company_id, customer_contact_id, supplier_company_id, supplier_contact_id')
+      .eq('id', orderId).single();
+    if (error) throw error;
+    const { data: items, error: iErr } = await supabase.from('order_items')
+      .select('product_id, description, quantity, unit_price, unit_cost, measurement_unit_code, vat_percent, vat_category, supplier_company_id, update_warehouse, sort_order')
+      .eq('order_id', orderId).order('sort_order', { ascending: true });
+    if (iErr) throw iErr;
+
+    const isSales = o.order_type === 'sales';
+    const companyId = (isSales ? o.customer_company_id : o.supplier_company_id) as string | null;
+    const contactId = (isSales ? o.customer_contact_id : o.supplier_contact_id) as string | null;
+
+    const changes: Array<{ description: string; was: number; now: number }> = [];
+    const lines = await Promise.all(((items ?? []) as any[]).map(async (it) => {
+      const wasPrice = Number(it.unit_price) || 0;
+      let price = wasPrice;
+      let cost = it.unit_cost != null ? Number(it.unit_cost) : null;
+      let supplier = (it.supplier_company_id as string | null) ?? null;
+      let available: number | null = null;
+      // Only catalog-linked lines can be re-priced; a free-text line has no price to look up, so
+      // it carries its original figure forward rather than being blanked.
+      if (it.product_id) {
+        const pr = await this.resolveLinePricing({
+          workspaceId: o.workspace_id, productId: it.product_id, orderType: o.order_type as OrderType,
+          companyId, contactId,
+        }).catch(() => null);
+        if (pr) {
+          if (pr.unit_price != null) price = pr.unit_price;
+          if (pr.unit_cost != null) cost = pr.unit_cost;
+          if (pr.supplier_company_id) supplier = pr.supplier_company_id;
+          available = pr.available;
+        }
+      }
+      if (Math.abs(price - wasPrice) > 0.005) changes.push({ description: it.description, was: wasPrice, now: price });
+      return {
+        product_id: (it.product_id as string | null) ?? null,
+        description: it.description as string,
+        quantity: Number(it.quantity) || 1,
+        unit_price: price,
+        unit_cost: cost,
+        unit_code: (it.measurement_unit_code as string | null) || 'pcs',
+        vat_code: it.vat_category != null
+          ? String(it.vat_category)
+          : (VAT_CATEGORIES.find((v) => v.pct === Number(it.vat_percent ?? 0))?.code ?? '1'),
+        supplier_company_id: supplier,
+        available,
+      };
+    }));
+
+    return {
+      orderType: o.order_type as OrderType,
+      lockedCompanyId: companyId ?? undefined,
+      lockedContactId: companyId ? undefined : (contactId ?? undefined),
+      currency: o.currency as string,
+      notes: `Re-order of ${o.order_number ?? orderId.slice(0, 8)}`,
+      lines,
+      changes,
+    };
+  },
+
   async duplicate(orderId: string): Promise<string> {
     const { data: o, error } = await supabase.from('orders')
       .select('workspace_id, order_type, customer_company_id, customer_contact_id, supplier_company_id, supplier_contact_id, project_id, currency, subtotal_net, vat_amount, total, discount_type, discount_value, notes, category_id')
