@@ -1,4 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
@@ -75,7 +76,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
 // the treasury accounts flagged "Show on invoice" (finance_bank_accounts). Mirrors
 // finance-invoice-pdf so statements and invoices always agree. One line per account.
 async function loadInvoiceBankAccounts(
-  supabase: SupabaseClient, workspaceId: string,
+  supabase: DbClient, workspaceId: string,
 ): Promise<Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>> {
   const { data } = await supabase.from('finance_bank_accounts')
     .select('name, kind, iban, account_ref')
@@ -138,7 +139,7 @@ interface LedgerData { opening: number; rows: LedgerEntry[]; currency: string }
 // carried forward from before `from`. Runs under the service role (RLS bypassed),
 // scoped explicitly by workspace_id + party so there is no cross-tenant leak.
 async function loadLedger(
-  supabase: SupabaseClient, workspaceId: string, side: Side, partyType: 'company' | 'contact', partyId: string,
+  supabase: DbClient, workspaceId: string, side: Side, partyType: 'company' | 'contact', partyId: string,
   from: string, to: string, baseCurrency: string,
 ): Promise<LedgerData> {
   const all: LedgerEntry[] = [];
@@ -210,7 +211,7 @@ async function loadLedger(
   return { opening, rows, currency };
 }
 
-async function fetchPartyDetails(supabase: SupabaseClient, partyType: 'company' | 'contact', partyId: string): Promise<any> {
+async function fetchPartyDetails(supabase: DbClient, partyType: 'company' | 'contact', partyId: string): Promise<any> {
   const table = partyType === 'company' ? 'crm_companies' : 'crm_contacts';
   const { data } = await supabase.from(table).select('*').eq('id', partyId).maybeSingle();
   return data ?? {};
@@ -219,7 +220,7 @@ async function fetchPartyDetails(supabase: SupabaseClient, partyType: 'company' 
 interface BuildOpts { party: any; details: any; settings: any; ledger: LedgerData; side: Side; from: string; to: string; lang: Lang; backdrop: any; logo?: Uint8Array | null; footer?: Uint8Array | null; payment?: string[] }
 
 // Load the workspace's finance logo (generation-images bucket, public) → bytes.
-async function loadLogo(supabase: SupabaseClient, path: string | null | undefined): Promise<Uint8Array | null> {
+async function loadLogo(supabase: DbClient, path: string | null | undefined): Promise<Uint8Array | null> {
   if (!path) return null;
   try {
     const { data } = supabase.storage.from('generation-images').getPublicUrl(path);
@@ -438,7 +439,7 @@ async function buildStatementPdf(opts: BuildOpts): Promise<{ bytes: Uint8Array; 
 
 // Mint (or reuse) public pay tokens for a customer's open invoices so the email
 // body can link directly to card payment. Customer side only.
-async function buildPayLinks(supabase: SupabaseClient, workspaceId: string, partyType: 'company' | 'contact', partyId: string, publicAppUrl: string) {
+async function buildPayLinks(supabase: DbClient, workspaceId: string, partyType: 'company' | 'contact', partyId: string, publicAppUrl: string) {
   const q = supabase.from('invoices')
     .select('id, internal_number, amount_due, currency, status, pay_token, pay_token_expires_at')
     .eq('workspace_id', workspaceId)
@@ -462,7 +463,7 @@ interface SendResult { ok: boolean; email_sent_to: string | null; pdf_url: strin
 
 // Render + (optionally) email one party's statement. Shared by single + cron modes.
 async function sendOneStatement(
-  supabase: SupabaseClient, party: any, settings: any,
+  supabase: DbClient, party: any, settings: any,
   opts: { side: Side; from: string; to: string; lang: Lang; email?: string; dryRun?: boolean; publicAppUrl: string },
 ): Promise<SendResult> {
   const partyType = party.party_type as 'company' | 'contact';
@@ -606,7 +607,7 @@ function isScheduleDue(settings: any, now: Date): boolean {
   return now.getUTCDate() === Math.min(dom, lastDay);
 }
 
-async function runCronBatch(supabase: SupabaseClient, publicAppUrl: string): Promise<any> {
+async function runCronBatch(supabase: DbClient, publicAppUrl: string): Promise<any> {
   const now = new Date();
   const { data: wsSettings } = await supabase.from('finance_settings')
     .select('*').eq('auto_statement_enabled', true).eq('statements_enabled', true);
@@ -662,7 +663,7 @@ async function runCronBatch(supabase: SupabaseClient, publicAppUrl: string): Pro
 // metadata so the webhook allocates it oldest-invoice-first. Cached on the share row
 // while the amount is unchanged. Returns null when no balance / no Stripe / on error.
 async function ensureBalancePaymentLink(
-  supabase: SupabaseClient, workspaceId: string, partyType: 'company' | 'contact', partyId: string,
+  supabase: DbClient, workspaceId: string, partyType: 'company' | 'contact', partyId: string,
   outstanding: number, currency: string, share: any | null, redirectUrl: string,
 ): Promise<string | null> {
   if (!(outstanding > 0)) return null;
@@ -720,7 +721,7 @@ const digitsOnly = (v: unknown) => String(v ?? '').replace(/\D/g, '');
 const normEmail = (v: unknown) => String(v ?? '').trim().toLowerCase();
 
 // Find-or-create the active share row for a party (full row).
-async function getOrCreateShareRow(supabase: SupabaseClient, party: any, side: Side, userId: string | null): Promise<any> {
+async function getOrCreateShareRow(supabase: DbClient, party: any, side: Side, userId: string | null): Promise<any> {
   const sel = () => supabase.from('finance_statement_shares').select('*')
     .eq('workspace_id', party.workspace_id).eq('party_type', party.party_type)
     .eq('party_id', party.party_id).eq('is_active', true).maybeSingle();
@@ -738,7 +739,7 @@ async function getOrCreateShareRow(supabase: SupabaseClient, party: any, side: S
 
 // Mint (or reuse) the active share row for a party. Auth already verified by caller.
 async function mintShare(
-  supabase: SupabaseClient, party: any, side: Side, userId: string | null, publicAppUrl: string,
+  supabase: DbClient, party: any, side: Side, userId: string | null, publicAppUrl: string,
 ) {
   const row = await getOrCreateShareRow(supabase, party, side, userId);
   return { token: row.token as string, url: `${publicAppUrl}/statement/${row.token}` };
@@ -747,7 +748,7 @@ async function mintShare(
 // Resolve a share token + VAT/email → the recipient's ledger. Generic errors so a
 // wrong VAT/email can't be distinguished from a bad token (no enumeration).
 async function resolveShareView(
-  supabase: SupabaseClient, body: any, publicAppUrl: string,
+  supabase: DbClient, body: any, publicAppUrl: string,
 ): Promise<{ status: number; payload: any }> {
   const token = String(body.token ?? '');
   const GENERIC = { status: 401, payload: { ok: false, error: 'The VAT number or email does not match our records.' } };

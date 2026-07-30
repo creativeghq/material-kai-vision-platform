@@ -12,6 +12,7 @@
 // Frontend re-reads the shared MIVAA quota after a successful estimate; this fn
 // enforces the IP limit itself and logs a success row so the counts stay consistent.
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -41,7 +42,7 @@ async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
   return !!out.success;
 }
 
-async function quotaUsed(supabase: SupabaseClient, ip: string): Promise<number> {
+async function quotaUsed(supabase: DbClient, ip: string): Promise<number> {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const { count } = await supabase
     .from('public_lookup_log')

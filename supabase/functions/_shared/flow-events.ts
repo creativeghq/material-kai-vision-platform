@@ -13,13 +13,14 @@
  *   emitFlowEvent('vr_world_created', { world_id: '...' }); // no await
  */
 
+import type { DbClient } from './supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 // Module-level singleton — reused across calls within the same isolate
-let _supabase: ReturnType<typeof createClient> | null = null;
+let _supabase: DbClient | null = null;
 function getSupabase() {
   if (!_supabase && supabaseUrl && supabaseServiceKey) {
     _supabase = createClient(supabaseUrl, supabaseServiceKey);

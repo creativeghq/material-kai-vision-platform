@@ -15,6 +15,7 @@
  * Requires: GOOGLE_GENERATIVE_AI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -399,7 +400,7 @@ async function fetchImageBuffer(url: string): Promise<Uint8Array> {
 
 /** Upload base64 image to Supabase Storage, return permanent public URL */
 async function uploadToStorage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   base64: string,
   mimeType: string,
   jobId: string,
@@ -422,7 +423,7 @@ async function uploadToStorage(
 
 /** Delete a file from Supabase Storage by its storage path (e.g. "gemini/job123-intermediate.webp") */
 async function deleteFromStorage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   path: string,
 ): Promise<void> {
   const { error } = await supabase.storage.from('generation-images').remove([path]);
@@ -438,7 +439,7 @@ function storagePathFromUrl(publicUrl: string): string {
 
 /** Check user has enough credits before starting generation (fail fast, no wasted API calls) */
 async function checkCredits(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   userId: string,
   required: number,
   workspaceId?: string | null,
@@ -458,7 +459,7 @@ async function checkCredits(
 
 /** Deduct credits — from the workspace pool when funded (with per-member cap), else personal. */
 async function deductCredits(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   userId: string,
   credits: number,
   description: string,
@@ -478,7 +479,7 @@ async function deductCredits(
 
 /** Refund a prior debit — to the same wallet the debit came from (refund_credits mirrors the decision). */
 async function refundCredits(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   userId: string,
   credits: number,
   description: string,

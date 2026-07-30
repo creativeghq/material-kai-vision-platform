@@ -1,8 +1,9 @@
+import type { DbClient } from '../_shared/supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ProductChip, FfeItem, MoodboardRow, SheetRow } from './types.ts';
 
 export async function fetchSheet(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   sheetId: string,
 ): Promise<SheetRow> {
   const { data, error } = await supabase
@@ -15,7 +16,7 @@ export async function fetchSheet(
 }
 
 export async function fetchMoodboard(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   moodboardId: string,
 ): Promise<MoodboardRow> {
   const { data, error } = await supabase
@@ -33,7 +34,7 @@ export async function fetchMoodboard(
  * matches the quotes/catalogs rendered by the shared PDF module. Null when unset.
  */
 export async function fetchWorkspaceCoverBytes(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   workspaceId: string | null | undefined,
 ): Promise<Uint8Array | null> {
   if (!workspaceId) return null;
@@ -61,7 +62,7 @@ export async function fetchWorkspaceCoverBytes(
  * for anyone who belongs to more than one workspace.
  */
 export async function resolveBrandingWorkspaceId(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string | null | undefined,
   userId: string | null | undefined,
 ): Promise<string | undefined> {
@@ -95,7 +96,7 @@ export interface OwnerBranding {
 }
 
 export async function fetchClientName(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
 ): Promise<string | undefined> {
   const branding = await fetchOwnerBranding(supabase, userId);
@@ -110,7 +111,7 @@ export async function fetchClientName(
  * comes from the profile.
  */
 export async function fetchOwnerBranding(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   workspaceId?: string,
 ): Promise<OwnerBranding | undefined> {
@@ -159,7 +160,7 @@ export async function fetchOwnerBranding(
 
 /** Fetch product chips with thumbnails + descriptions. */
 export async function fetchProductChips(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   productIds: string[],
   scopeWorkspaceIds?: string[] | null,
 ): Promise<ProductChip[]> {
@@ -205,7 +206,7 @@ export async function fetchProductChips(
 
 /** Pull FF&E items off a quote. */
 export async function fetchQuoteFfeItems(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   quoteId: string,
   scope?: { userId: string; workspaceIds: string[] } | null,
 ): Promise<FfeItem[]> {
@@ -246,7 +247,7 @@ export async function fetchQuoteFfeItems(
 
 /** Fetch sub-sheets to assemble the full deck. */
 export async function fetchSheets(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   sheetIds: string[],
   scopeUserId?: string | null,
 ): Promise<SheetRow[]> {

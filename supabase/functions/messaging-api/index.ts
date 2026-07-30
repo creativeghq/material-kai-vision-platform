@@ -13,7 +13,7 @@
  * Authentication: secret key (apikey header) = admin; user JWT = user-scoped.
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess, listUserWorkspaceIds } from '../_shared/auth.ts';
@@ -55,7 +55,7 @@ function normalizePhoneNumber(phone: string): string {
 
 /** Best-effort refund of a pre-charged WhatsApp credit when the send fails (invariant #10). */
 async function refundWhatsAppCredits(
-  supabaseClient: ReturnType<typeof createClient>,
+  supabaseClient: SupabaseClient<any, 'public', 'public', any, any>,
   userId: string,
   credits: number,
   to: string,

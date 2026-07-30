@@ -33,6 +33,7 @@
  * Caps each bucket pass at 5000 deletes to bound blast radius.
  */
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -66,7 +67,7 @@ const PER_BUCKET_LIMIT = 5000;
 const REMOVE_CHUNK     = 100;
 
 async function batchRemove(
-  sb: SupabaseClient,
+  sb: DbClient,
   bucket: string,
   paths: string[],
 ): Promise<{ removed: number; skipped_raced: number }> {
@@ -130,7 +131,7 @@ async function batchRemove(
 }
 
 async function logRun(
-  sb: SupabaseClient,
+  sb: DbClient,
   source: string,
   bucket: string,
   scanned: number,
@@ -155,7 +156,7 @@ async function logRun(
 }
 
 async function cleanBucket(
-  sb: SupabaseClient,
+  sb: DbClient,
   source: string,
   bucket: string,
   graceSeconds: number,

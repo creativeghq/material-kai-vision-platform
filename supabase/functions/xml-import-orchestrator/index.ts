@@ -1,3 +1,4 @@
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { captureException } from '../_shared/sentry.ts';
 import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.5.0';
@@ -338,7 +339,7 @@ function detectXMLFields(xmlContent: string): {
 async function suggestFieldMappings(
   fieldSamples: Map<string, FieldDetection>,
   anthropicApiKey: string,
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string | null,
   workspaceId: string | null,
 ): Promise<Map<string, MappingSuggestion>> {

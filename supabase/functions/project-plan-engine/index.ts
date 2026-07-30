@@ -13,6 +13,7 @@
 // Auth: user JWT (or service role). Every write is bound to the caller's workspace via
 // userCanAccessWorkspace — the service-role client bypasses RLS, so we re-check membership.
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -51,7 +52,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 // Resolve rates for service_id/product_id from product_prices (latest confirmed list_price).
-async function buildRateMap(supabase: SupabaseClient, items: ItemRow[]) {
+async function buildRateMap(supabase: DbClient, items: ItemRow[]) {
   const ids = new Set<string>();
   for (const it of items) { if (it.service_id) ids.add(it.service_id); if (it.product_id) ids.add(it.product_id); }
   const map: Record<string, number> = {};
@@ -95,7 +96,7 @@ function resolveItem(it: ItemRow, dims: Record<string, number>, rates: Record<st
 // Load a blueprint's items, expanding sub_blueprint_id nodes into nested sections.
 // Depth-guarded + cycle-guarded. Returns a flat list with remapped parent ids.
 async function loadBlueprintTree(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   blueprintId: string,
   parentId: string | null,
   depth: number,
@@ -144,7 +145,7 @@ function applyOptionDefaults(items: ItemRow[]) {
 }
 
 // Persist resolved items for a plan (replace-all) and return the stored rows + subtotal.
-async function writePlanItems(supabase: SupabaseClient, planId: string, items: ItemRow[], dims: Record<string, number>) {
+async function writePlanItems(supabase: DbClient, planId: string, items: ItemRow[], dims: Record<string, number>) {
   const rates = await buildRateMap(supabase, items);
   let subtotal = 0;
   const rows = items.map((it) => {
@@ -236,7 +237,7 @@ function buildQuoteItems(quoteId: string, items: ItemRow[]) {
   return { rows, subtotal };
 }
 
-async function loadPlan(supabase: SupabaseClient, planId: string) {
+async function loadPlan(supabase: DbClient, planId: string) {
   const { data, error } = await supabase.from('project_plans').select('*').eq('id', planId).maybeSingle();
   if (error) throw new HttpError(400, error.message);
   if (!data) throw new HttpError(404, 'Plan not found');
@@ -245,7 +246,7 @@ async function loadPlan(supabase: SupabaseClient, planId: string) {
 
 /** Resolve the project's client so a plan-generated quote carries the customer (pricing / email /
  *  invoicing) — CreateQuoteModal does this from the project too, so the paths agree. */
-async function projectCustomer(supabase: SupabaseClient, projectId: string | null): Promise<{ customer_company_id: string | null; customer_contact_id: string | null }> {
+async function projectCustomer(supabase: DbClient, projectId: string | null): Promise<{ customer_company_id: string | null; customer_contact_id: string | null }> {
   if (!projectId) return { customer_company_id: null, customer_contact_id: null };
   const { data } = await supabase.from('projects').select('client_company_id, client_contact_id').eq('id', projectId).maybeSingle();
   return {
@@ -254,13 +255,13 @@ async function projectCustomer(supabase: SupabaseClient, projectId: string | nul
   };
 }
 
-async function loadPlanItems(supabase: SupabaseClient, planId: string): Promise<ItemRow[]> {
+async function loadPlanItems(supabase: DbClient, planId: string): Promise<ItemRow[]> {
   const { data, error } = await supabase.from('project_plan_items').select('*').eq('plan_id', planId).order('sort_order');
   if (error) throw new HttpError(400, error.message);
   return (data ?? []) as ItemRow[];
 }
 
-async function requireWorkspace(supabase: SupabaseClient, userId: string | null, workspaceId: string, isService: boolean) {
+async function requireWorkspace(supabase: DbClient, userId: string | null, workspaceId: string, isService: boolean) {
   if (isService) return;
   const ok = await userCanAccessWorkspace(supabase, userId, workspaceId);
   if (!ok) throw new HttpError(403, 'Not a member of this workspace');

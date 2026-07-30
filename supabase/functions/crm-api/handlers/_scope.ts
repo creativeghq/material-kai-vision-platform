@@ -9,6 +9,7 @@
 // sees CRM rows across the workspaces they are an ACTIVE member of. Global platform
 // operators (secret key, or global role admin/super_admin) act across all workspaces.
 
+import type { DbClient } from '../../_shared/supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AuthResult } from '../../_shared/auth.ts';
 
@@ -32,7 +33,7 @@ export interface CrmScope {
 /** Is a crm_contacts / crm_companies row reachable by the caller's workspace scope? The SINGLE
  *  implementation behind the per-handler contactInScope/companyInScope wrappers (was copy-pasted). */
 export async function rowInScope(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   table: 'crm_contacts' | 'crm_companies',
   id: string,
   scope: CrmScope,
@@ -52,7 +53,7 @@ export function isUuid(v: unknown): v is string {
 }
 
 export async function getCrmScope(
-  adminClient: SupabaseClient,
+  adminClient: DbClient,
   auth: AuthResult,
 ): Promise<CrmScope> {
   // Server-to-server secret key → full admin access (no user context).

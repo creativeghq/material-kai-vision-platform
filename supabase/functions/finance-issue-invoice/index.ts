@@ -1,4 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -299,7 +300,7 @@ async function emitDocumentIssued(supabase: any, invoiceId: string): Promise<voi
  * resolve membership + global role by the authenticated user id directly.
  */
 async function isFinanceManagerForQuote(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   quoteId: string,
   userId: string,
 ): Promise<boolean> {

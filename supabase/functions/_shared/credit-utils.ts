@@ -11,6 +11,7 @@
  * Uses the shared debit_credits/refund_credits router (workspace pool → personal) and ai_usage_logs.
  */
 
+import type { DbClient } from './supabase-client.ts';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER } from './pricing-constants.ts';
 
@@ -49,7 +50,7 @@ const FALLBACK_PRICING: Record<string, ServicePricing> = {
   'zernio-publish':       { cost_per_unit: 0.0,    unit: 'post',        markup_multiplier: MARKUP_MULTIPLIER },
 };
 
-async function fetchPricingFromDB(supabase: SupabaseClient): Promise<Record<string, ServicePricing>> {
+async function fetchPricingFromDB(supabase: DbClient): Promise<Record<string, ServicePricing>> {
   const { data, error } = await supabase
     .from('ai_model_pricing')
     .select('model_key, cost_per_unit, unit_label, markup_multiplier')
@@ -78,7 +79,7 @@ async function fetchPricingFromDB(supabase: SupabaseClient): Promise<Record<stri
   return map;
 }
 
-async function getPricingMap(supabase: SupabaseClient): Promise<Record<string, ServicePricing>> {
+async function getPricingMap(supabase: DbClient): Promise<Record<string, ServicePricing>> {
   const now = Date.now();
   if (_pricingCache && _pricingCache.expiresAt > now) {
     return _pricingCache.data;
@@ -117,7 +118,7 @@ export interface CreditDebitResult {
  * 5. Inserts a row into ai_usage_logs for tracking
  */
 export async function debitExternalServiceCredits(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   serviceName: string,
   operationType: string,
@@ -216,7 +217,7 @@ export async function debitExternalServiceCredits(
  * DB-backed and cached for 5 minutes.
  */
 export async function getServicePricing(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   serviceName: string,
 ): Promise<{ cost_per_unit: number; unit: string; markup_multiplier: number } | null> {
   const pricingMap = await getPricingMap(supabase);
@@ -227,7 +228,7 @@ export async function getServicePricing(
  * Pre-check if user has enough credits for an operation BEFORE making API calls.
  */
 export async function checkCreditBalance(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   serviceName: string,
   units: number = 1,
@@ -258,7 +259,7 @@ export async function checkCreditBalance(
 /**
  * List all configured external service names.
  */
-export async function getExternalServiceNames(supabase: SupabaseClient): Promise<string[]> {
+export async function getExternalServiceNames(supabase: DbClient): Promise<string[]> {
   const pricingMap = await getPricingMap(supabase);
   return Object.keys(pricingMap);
 }
@@ -298,7 +299,7 @@ export interface AgentTurnDebitResult {
  * that case.
  */
 export async function debitAgentChatTurn(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   agentId: string,
   metadata: Record<string, unknown> = {},
@@ -369,7 +370,7 @@ export async function debitAgentChatTurn(
  * has started — by then the spend is irrecoverable.
  */
 export async function refundAgentChatTurn(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   agentId: string,
   reason: string,

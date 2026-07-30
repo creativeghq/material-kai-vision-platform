@@ -8,6 +8,7 @@
  * - trigger-event: Auto-dispatch from DB triggers (Phase 4)
  */
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isCronAuthorized, userCanAccessWorkspace, type AuthResult } from '../_shared/auth.ts';
@@ -84,7 +85,7 @@ const FLOW_RUN_BASE_CREDITS = 20;
  */
 /** Does this workspace have a usable BYOK Resend sender? (enabled + api key + from_email).
  *  Mirrors resolveWorkspaceEmailSender's `source==='workspace'` condition. */
-async function workspaceHasByok(supabase: SupabaseClient, workspaceId: string): Promise<boolean> {
+async function workspaceHasByok(supabase: DbClient, workspaceId: string): Promise<boolean> {
   const { data: cfg } = await supabase
     .from('workspace_email_config')
     .select('resend_api_key, from_email, enabled')
@@ -95,7 +96,7 @@ async function workspaceHasByok(supabase: SupabaseClient, workspaceId: string): 
 }
 
 /** Global platform admin/super_admin — allowed to run operator (is_global) flows on demand. */
-async function isPlatformAdmin(supabase: SupabaseClient, userId: string): Promise<boolean> {
+async function isPlatformAdmin(supabase: DbClient, userId: string): Promise<boolean> {
   const { data } = await supabase
     .from('user_profiles')
     .select('roles!user_profiles_role_id_fkey(name)')
@@ -114,7 +115,7 @@ const FLOW_WEB_SEARCH_COST = 8;
 // owner BEFORE the paid upstream call. Operator/global flows resolve to null → not gated.
 // Returns an error string when the caller can't afford `serviceName`, else null.
 async function assertFlowCanAfford(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string | undefined,
   scope: FlowScope | undefined,
   serviceName: string,
@@ -309,7 +310,7 @@ const PRODUCT_UPDATABLE = [
 ];
 
 async function executeAction(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   node: FlowNode,
   context: ExecutionContext,
   isTestRun: boolean,
@@ -1261,7 +1262,7 @@ async function executeAction(
 // =====================================================
 
 async function executeFlowGraph(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   graph: FlowGraph,
   runId: string,
   triggerData: Record<string, unknown>,
@@ -1489,7 +1490,7 @@ async function executeFlowGraph(
 const MAX_FLOW_RUNS_PER_MINUTE = 120;
 
 async function handleExecuteFlow(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   body: { flow_id: string; trigger_data?: Record<string, unknown> },
   isTestRun: boolean,
   initiatedBy: string,
@@ -1700,7 +1701,7 @@ const SERVER_ONLY_EVENTS = new Set<string>([
 ]);
 
 async function handleTriggerEvent(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   body: { event_type: string; data: Record<string, unknown> },
   auth: AuthResult,
   req: Request,

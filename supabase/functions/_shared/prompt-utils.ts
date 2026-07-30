@@ -7,6 +7,7 @@
  * queries for prompts that rarely change. The Deno isolate keeps the
  * cache alive across requests until cold-start.
  */
+import type { DbClient } from './supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ── Prompt cache (module-level, survives across requests in same isolate) ──
@@ -47,7 +48,7 @@ export function renderPromptTemplate(
  * prompt_type = 'agent', category = agentType
  */
 export async function getAgentSystemPrompt(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   agentType: string,
 ): Promise<string> {
   const cacheKey = `agent:${agentType}`;
@@ -77,7 +78,7 @@ export async function getAgentSystemPrompt(
  * prompt_type = 'tool', category = toolName
  */
 export async function getToolPrompt(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   toolName: string,
 ): Promise<string> {
   const cacheKey = `tool:${toolName}`;
@@ -108,7 +109,7 @@ export async function getToolPrompt(
  * Never throws — returns fallback if DB row is missing.
  */
 export async function getGenerationPrompt(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   promptName: string,
   fallback: string,
 ): Promise<string> {

@@ -1,3 +1,4 @@
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { QuoteData, QuoteItemData, ClientData, TemplateConfig } from './types.ts';
 import { HttpError } from '../_shared/api-logger.ts';
@@ -6,7 +7,7 @@ import { HttpError } from '../_shared/api-logger.ts';
  * Fetch complete quote data including items with product details
  */
 export async function fetchQuoteData(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   quoteId: string
 ): Promise<QuoteData> {
   // Fetch quote record
@@ -165,7 +166,7 @@ export async function fetchQuoteData(
  * If neither is set, the PDF renders with empty client details.
  */
 async function fetchClientData(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   customerCompanyId?: string | null,
   customerContactId?: string | null,
 ): Promise<ClientData> {
@@ -227,7 +228,7 @@ async function fetchClientData(
  * Fetch a file from Supabase Storage as Uint8Array
  */
 export async function fetchStorageFile(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   bucket: string,
   path: string
 ): Promise<Uint8Array | null> {

@@ -12,6 +12,7 @@
  * Extracted verbatim from generate-quote-pdf's data-fetcher so quotes and catalogs
  * share one branding path. Template images live in the `quote-templates` bucket.
  */
+import type { DbClient } from '../supabase-client.ts';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 export interface BrandingConfig {
@@ -47,7 +48,7 @@ interface WpsTemplateRow {
 }
 
 /** The workspace's own PDF template, falling back per-slot to the operator root's. */
-async function fetchWorkspaceTemplate(supabase: SupabaseClient, workspaceId?: string | null): Promise<WpsTemplateRow> {
+async function fetchWorkspaceTemplate(supabase: DbClient, workspaceId?: string | null): Promise<WpsTemplateRow> {
   const cols = 'cover_path, intro_path, background_path, backcover_path, cover_width, cover_height';
   const empty: WpsTemplateRow = { cover_path: null, intro_path: null, background_path: null, backcover_path: null, cover_width: null, cover_height: null };
   let row: WpsTemplateRow | null = null;
@@ -81,7 +82,7 @@ async function fetchWorkspaceTemplate(supabase: SupabaseClient, workspaceId?: st
  * PDF template vault (workspace → operator root), company identity from finance_settings.
  */
 export async function fetchBrandingConfig(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   workspaceId?: string | null,
 ): Promise<BrandingConfig> {
   // Company identity default (legacy operator-wide setting).
@@ -118,7 +119,7 @@ export async function fetchBrandingConfig(
  * business_name; otherwise the global template identity stands.
  */
 export async function applyWorkspaceBranding(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   config: BrandingConfig,
   workspaceId: string | null | undefined,
 ): Promise<BrandingConfig> {
@@ -152,7 +153,7 @@ export async function applyWorkspaceBranding(
 
 /** Download a branded template image from the `quote-templates` bucket (optional — null on miss). */
 export async function fetchTemplateImage(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   path: string | null | undefined,
 ): Promise<Uint8Array | null> {
   if (!path) return null;

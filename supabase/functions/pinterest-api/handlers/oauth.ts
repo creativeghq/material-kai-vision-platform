@@ -11,6 +11,7 @@
  *   disconnect     - Remove Pinterest connection
  */
 
+import type { DbClient } from '../../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
@@ -42,7 +43,7 @@ function getBasicAuthHeader(): string {
  * Refresh an expired Pinterest access token
  */
 async function refreshAccessToken(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   userId: string,
   refreshToken: string,
 ): Promise<string> {
@@ -84,7 +85,7 @@ async function refreshAccessToken(
  * Get a valid access token for the user, refreshing if needed
  */
 async function getValidAccessToken(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   userId: string,
 ): Promise<string> {
   const { data: account, error } = await supabase

@@ -9,6 +9,7 @@
  * - Request/response data storage
  */
 
+import type { DbClient } from './supabase-client.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // AI Pricing Configuration (synced with ai_model_pricing DB table)
@@ -43,7 +44,7 @@ const DB_PRICE_TTL_MS = 5 * 60 * 1000;
 let _dbPriceCache: { data: Record<string, TokenPrice>; expiresAt: number } | null = null;
 let _dbPriceFetch: Promise<Record<string, TokenPrice>> | null = null;
 
-async function getDbTokenPricing(supabase: SupabaseClient): Promise<Record<string, TokenPrice>> {
+async function getDbTokenPricing(supabase: DbClient): Promise<Record<string, TokenPrice>> {
   const now = Date.now();
   if (_dbPriceCache && _dbPriceCache.expiresAt > now) return _dbPriceCache.data;
   if (!_dbPriceFetch) {
@@ -97,7 +98,7 @@ interface AICallLogData {
 }
 
 export class AICallLogger {
-  private supabase: SupabaseClient;
+  private supabase: DbClient;
 
   constructor(supabaseUrl: string, supabaseKey: string) {
     this.supabase = createClient(supabaseUrl, supabaseKey);

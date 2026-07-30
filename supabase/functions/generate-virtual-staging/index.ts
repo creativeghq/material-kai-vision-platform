@@ -10,6 +10,7 @@
  * Requires: REPLICATE_API_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -42,7 +43,7 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 async function uploadToStorage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   imageUrl: string,
   jobId: string,
   ctx: Partial<SessionPathCtx> = {},
@@ -178,7 +179,7 @@ Deno.serve(withApiLogging('generate-virtual-staging', async (req) => {
 }));
 
 async function handleRequest(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   body: VirtualStagingRequest,
   userId: string,
 ): Promise<Response> {

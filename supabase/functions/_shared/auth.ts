@@ -1,3 +1,4 @@
+import type { DbClient } from './supabase-client.ts';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { bootstrapSecretsFromDb } from './secrets-bootstrap.ts';
 
@@ -26,7 +27,7 @@ export interface AuthResult {
   user: User | null;
   userId: string | null;
   error: string | null;
-  supabase: SupabaseClient;
+  supabase: DbClient;
   apiKey?: ApiKeyContext | null;
 }
 
@@ -197,7 +198,7 @@ export async function authenticate(
  * Validate a user JWT token
  */
 async function validateUserToken(
-  adminClient: SupabaseClient,
+  adminClient: DbClient,
   token: string,
   allowedRoles?: string[]
 ): Promise<AuthResult> {
@@ -273,7 +274,7 @@ async function validateUserToken(
  * for route-level enforcement (e.g. agent-chat checks its own path).
  */
 async function validatePartnerApiKey(
-  adminClient: SupabaseClient,
+  adminClient: DbClient,
   token: string,
 ): Promise<AuthResult> {
   try {
@@ -448,7 +449,7 @@ export function getUserId(auth: AuthResult): string | null {
  * resolve membership + global role by `userId` directly.
  */
 export async function userCanAccessWorkspace(
-  adminClient: SupabaseClient,
+  adminClient: DbClient,
   userId: string | null,
   workspaceId: string | null | undefined,
 ): Promise<boolean> {
@@ -478,7 +479,7 @@ export async function userCanAccessWorkspace(
  * manual/JWT-triggered run to the caller's own tenants.
  */
 export async function listUserWorkspaceIds(
-  adminClient: SupabaseClient,
+  adminClient: DbClient,
   userId: string | null,
 ): Promise<string[]> {
   if (!userId) return [];

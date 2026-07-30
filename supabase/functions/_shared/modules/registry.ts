@@ -33,6 +33,7 @@
  * enabled-module contributions with the platform-default set.
  */
 
+import type { DbClient } from '../supabase-client.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AgentRunner } from '../agents/types.ts';
 
@@ -68,7 +69,7 @@ const enabledCache: Map<string, { enabled: boolean; expiresAt: number }> = new M
  * Query `public.modules` for enabled rows. Cached for `ENABLED_TTL_MS`.
  * Falls back to `false` on any failure — fail-closed posture.
  */
-export async function isModuleEnabled(supabase: SupabaseClient, slug: string): Promise<boolean> {
+export async function isModuleEnabled(supabase: DbClient, slug: string): Promise<boolean> {
   const cached = enabledCache.get(slug);
   const now = Date.now();
   if (cached && cached.expiresAt > now) return cached.enabled;

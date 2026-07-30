@@ -1,3 +1,4 @@
+import type { DbClient } from './supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
 import { getToolPrompt } from './prompt-utils.ts';
@@ -350,7 +351,7 @@ export function validateEmbedding(embedding: number[]): boolean {
 export async function generateSemanticAnalysis(
   imageData: string,
   analysisType: string = 'material_identification',
-  supabase?: SupabaseClient,
+  supabase?: DbClient,
 ): Promise<string> {
   if (!MIVAA_CONFIG.apiKey) {
     throw new Error('MIVAA_API_KEY environment variable is required');

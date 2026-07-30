@@ -15,6 +15,7 @@
  * frontend polling (same pattern as 3D generation).
  */
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { generateVideoWithVeo, generateVideoWithKling } from '../_shared/ai-client.ts';
@@ -61,7 +62,7 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 async function uploadVideoToStorage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   videoData: string | ArrayBuffer,
   jobId: string,
   isBase64 = false,

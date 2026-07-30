@@ -18,6 +18,7 @@
 //     stripe-webhooks handler. Here we only grant the FREE (plan-covered) path,
 //     after verifying owner + that the plan tier already covers the module.
 
+import type { DbClient } from '../../_shared/supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate, isAdminAccess, userCanAccessWorkspace, type AuthResult } from '../../_shared/auth.ts';
@@ -40,7 +41,7 @@ function json(body: unknown, status = 200): Response {
 
 /** True when the user is the OWNER of this exact workspace, or the platform operator. */
 async function isOwnerOrOperator(
-  service: SupabaseClient,
+  service: DbClient,
   userId: string | null,
   workspaceId: string | null | undefined,
 ): Promise<boolean> {
@@ -57,7 +58,7 @@ async function isOwnerOrOperator(
 }
 
 /** Platform operator = owner/admin of a root workspace. */
-async function isOperator(service: SupabaseClient, userId: string | null): Promise<boolean> {
+async function isOperator(service: DbClient, userId: string | null): Promise<boolean> {
   if (!userId) return false;
   const { data } = await service
     .from('workspace_members')

@@ -9,6 +9,7 @@
  * They are re-exported here so existing agent imports keep working.
  */
 
+import type { DbClient } from '../supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { LogLevel } from './types.ts';
 import { CancelledError } from './types.ts';
@@ -19,7 +20,7 @@ export { runLangGraphAgent, buildLLM, extractTextContent } from '../langgraph-co
 
 // ── Log helper factory ────────────────────────────────────────────────────────
 
-export function createLogHelper(supabase: SupabaseClient, runId: string) {
+export function createLogHelper(supabase: DbClient, runId: string) {
   return async function log(
     level: LogLevel,
     message: string,
@@ -63,7 +64,7 @@ const MODEL_USD_PER_M_TOKENS: Record<string, { input: number; output: number }> 
 };
 
 export async function logAgentAiUsage(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   args: {
     runId:            string;
     agentId:          string;
@@ -118,7 +119,7 @@ export async function logAgentAiUsage(
 
 // ── Heartbeat helper factory ──────────────────────────────────────────────────
 
-export function createHeartbeatHelper(supabase: SupabaseClient, runId: string) {
+export function createHeartbeatHelper(supabase: DbClient, runId: string) {
   return async function heartbeat(): Promise<{ ok: boolean }> {
     try {
       // Combined update+read: bump heartbeat and read status in one round-trip.

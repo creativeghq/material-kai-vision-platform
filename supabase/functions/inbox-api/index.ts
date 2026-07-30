@@ -13,6 +13,7 @@
 // Channel send-router: an `internal` thread stores only; a `whatsapp` thread stores AND
 // relays via Zernio (Meta 24h service window applies — freeform in-window).
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
@@ -60,7 +61,7 @@ const ACTIVE_MEMBER = (s: string | null | undefined) => !s || s === 'active';
 const BUSINESS_ROLES = new Set(['owner', 'admin', 'member', 'staff', 'sales']);
 
 /** Global platform operator: admin/super_admin global role OR owner/admin of the root workspace. */
-async function isOperator(db: SupabaseClient, userId: string): Promise<boolean> {
+async function isOperator(db: DbClient, userId: string): Promise<boolean> {
   const { data: prof } = await db
     .from('user_profiles')
     .select('roles!user_profiles_role_id_fkey(name)')
@@ -81,7 +82,7 @@ async function isOperator(db: SupabaseClient, userId: string): Promise<boolean> 
 
 /** The caller's role string in a workspace, or null when not an active member. */
 async function callerRoleInWorkspace(
-  db: SupabaseClient,
+  db: DbClient,
   userId: string,
   workspaceId: string,
 ): Promise<string | null> {
@@ -96,7 +97,7 @@ async function callerRoleInWorkspace(
   return m.role ?? null;
 }
 
-async function parentWorkspaceId(db: SupabaseClient, workspaceId: string): Promise<string | null> {
+async function parentWorkspaceId(db: DbClient, workspaceId: string): Promise<string | null> {
   const { data } = await db
     .from('workspaces')
     .select('parent_workspace_id')
@@ -106,7 +107,7 @@ async function parentWorkspaceId(db: SupabaseClient, workspaceId: string): Promi
 }
 
 /** The caller's active participant row in a thread (any participant type), or null. */
-async function callerParticipant(db: SupabaseClient, threadId: string, userId: string) {
+async function callerParticipant(db: DbClient, threadId: string, userId: string) {
   const { data } = await db
     .from('inbox_participants')
     .select('id, participant_type, thread_role, status')
@@ -127,7 +128,7 @@ async function callerParticipant(db: SupabaseClient, threadId: string, userId: s
  * private team DMs. `isMember` controls private-note visibility + member-only controls.
  */
 async function resolveThreadAccess(
-  db: SupabaseClient,
+  db: DbClient,
   userId: string,
   thread: Record<string, unknown>,
   operator: boolean,
@@ -151,7 +152,7 @@ async function resolveThreadAccess(
 
 /** Get-or-create the caller's member participant row (sales jump-in becomes a real participant). */
 async function ensureMemberParticipant(
-  db: SupabaseClient,
+  db: DbClient,
   thread: Record<string, unknown>,
   userId: string,
 ): Promise<string | null> {
@@ -177,7 +178,7 @@ async function ensureMemberParticipant(
  * only an approved template may be sent. Inbound messages carry metadata.direction='incoming'.
  */
 async function whatsappWindow(
-  db: SupabaseClient,
+  db: DbClient,
   threadId: string,
 ): Promise<{ open: boolean; last_inbound_at: string | null; expires_at: string | null }> {
   const { data } = await db
@@ -194,7 +195,7 @@ async function whatsappWindow(
   return { open: expires > new Date(), last_inbound_at: last, expires_at: expires.toISOString() };
 }
 
-async function getThreadOrThrow(db: SupabaseClient, threadId: string) {
+async function getThreadOrThrow(db: DbClient, threadId: string) {
   const { data } = await db
     .from('inbox_threads')
     .select('*')
@@ -205,7 +206,7 @@ async function getThreadOrThrow(db: SupabaseClient, threadId: string) {
 }
 
 /** First active owner/admin of a workspace — the billing user for agent replies. */
-async function workspaceOwner(db: SupabaseClient, workspaceId: string): Promise<string | null> {
+async function workspaceOwner(db: DbClient, workspaceId: string): Promise<string | null> {
   const { data } = await db
     .from('workspace_members').select('user_id')
     .eq('workspace_id', workspaceId).in('role', ['owner', 'admin']).limit(1).maybeSingle();
@@ -220,7 +221,7 @@ type InboxAgentSettings = { autoRespond: boolean; allowAccountData: boolean };
  * customer threads, `allow_account_data` lets it answer the customer's OWN account/billing
  * questions. A workspace opts out by setting either to `false`.
  */
-async function inboxAgentSettings(db: SupabaseClient, workspaceId: string): Promise<InboxAgentSettings> {
+async function inboxAgentSettings(db: DbClient, workspaceId: string): Promise<InboxAgentSettings> {
   const { data } = await db.from('workspaces').select('settings').eq('id', workspaceId).maybeSingle();
   const root = ((data as { settings?: Record<string, unknown> } | null)?.settings || {}) as Record<string, unknown>;
   const cfg = (root.inbox_agent || {}) as Record<string, unknown>;
@@ -232,7 +233,7 @@ async function inboxAgentSettings(db: SupabaseClient, workspaceId: string): Prom
 
 /** The customer this thread is about: the active customer participant's CRM contact + their company. */
 async function resolveThreadCustomerScope(
-  db: SupabaseClient,
+  db: DbClient,
   threadId: string,
 ): Promise<{ contactId: string | null; companyId: string | null }> {
   const { data: custP } = await db
@@ -254,7 +255,7 @@ async function resolveThreadCustomerScope(
  * message — so the customer can only ever read their own records and cannot widen scope by prompt
  * injection. The tools intentionally take no scoping parameters.
  */
-function buildCustomerSupportTools(db: SupabaseClient, scope: { workspaceId: string; contactId: string }) {
+function buildCustomerSupportTools(db: DbClient, scope: { workspaceId: string; contactId: string }) {
   return {
     get_account_statement: tool({
       description:
@@ -340,7 +341,7 @@ const FALLBACK_INBOX_PERSONA =
   'member will follow up shortly and do not make commitments on the business’s behalf.';
 
 /** Editable inbox-agent persona/policy (prompts row), with an inline fallback. */
-async function loadInboxAgentPersona(db: SupabaseClient): Promise<string> {
+async function loadInboxAgentPersona(db: DbClient): Promise<string> {
   const { data } = await db.from('prompts').select('system_prompt')
     .eq('prompt_type', 'agent').eq('category', 'inbox').eq('is_active', true)
     .order('updated_at', { ascending: false }).limit(1).maybeSingle();
@@ -356,7 +357,7 @@ async function loadInboxAgentPersona(db: SupabaseClient): Promise<string> {
  * owner can't pay. Only fires on a fresh inbound CUSTOMER message (loop/takeover guard below).
  * Best-effort — any failure leaves the thread for a human, never throws.
  */
-async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise<void> {
+async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void> {
   try {
     const thread = await getThreadOrThrow(db, threadId);
     if (thread.agent_state !== 'active') return;
@@ -452,7 +453,7 @@ async function maybeRunAgentReply(db: SupabaseClient, threadId: string): Promise
  * Pure: reads the transcript + (injection-proof, thread-scoped) account tools and returns the text.
  * Does NOT post, bill, or guard — the callers own that.
  */
-async function buildAgentDraft(db: SupabaseClient, thread: Record<string, unknown>): Promise<string> {
+async function buildAgentDraft(db: DbClient, thread: Record<string, unknown>): Promise<string> {
   const threadId = String(thread.id);
   const workspaceId = String(thread.workspace_id);
   const { data: history } = await db
@@ -496,7 +497,7 @@ async function buildAgentDraft(db: SupabaseClient, thread: Record<string, unknow
  * hand to a customer who has no account yet. Reuses an unclaimed token if one already exists.
  */
 async function getOrCreateShareLink(
-  db: SupabaseClient,
+  db: DbClient,
   threadId: string,
   contactId: string | null,
 ): Promise<string> {
@@ -526,7 +527,7 @@ async function getOrCreateShareLink(
  * `callerRole` is the caller's role in thread.workspace_id (null if not a member).
  */
 async function assertCanAddParticipant(
-  db: SupabaseClient,
+  db: DbClient,
   opts: {
     operator: boolean;
     callerRole: string | null;
@@ -605,7 +606,7 @@ async function assertCanAddParticipant(
 
 /** Upload a base64 attachment to the private inbox prefix; returns the stored reference. */
 async function uploadAttachment(
-  db: SupabaseClient,
+  db: DbClient,
   threadId: string,
   att: { filename?: string; content_type?: string; data_base64?: string } & Partial<Attachment>,
 ): Promise<Attachment> {
@@ -637,7 +638,7 @@ async function uploadAttachment(
 }
 
 async function normalizeAttachments(
-  db: SupabaseClient,
+  db: DbClient,
   threadId: string,
   raw: unknown,
 ): Promise<Attachment[]> {
@@ -649,7 +650,7 @@ async function normalizeAttachments(
 
 /** Persist a message, bump the thread, fan out the channel relay + the in-app bell. */
 async function insertMessageAndNotify(
-  db: SupabaseClient,
+  db: DbClient,
   opts: {
     thread: Record<string, unknown>;
     senderParticipantId: string | null;
@@ -753,7 +754,7 @@ async function insertMessageAndNotify(
 // ──────────────────────────────────────────────────────────────────────────
 
 async function handleJwtAction(
-  db: SupabaseClient,
+  db: DbClient,
   userId: string,
   action: string,
   payload: Json,
@@ -1763,7 +1764,7 @@ async function handleJwtAction(
 // Token actions (service-role, unauthenticated customer)
 // ──────────────────────────────────────────────────────────────────────────
 
-async function resolveToken(db: SupabaseClient, token: string) {
+async function resolveToken(db: DbClient, token: string) {
   if (!token) throw new HttpError(400, 'token is required');
   const { data: tok } = await db
     .from('inbox_thread_tokens')
@@ -1778,7 +1779,7 @@ async function resolveToken(db: SupabaseClient, token: string) {
   return t;
 }
 
-async function handleTokenAction(db: SupabaseClient, action: string, payload: Json): Promise<Response> {
+async function handleTokenAction(db: DbClient, action: string, payload: Json): Promise<Response> {
   const token = String(payload.token || '');
 
   switch (action) {
@@ -1905,7 +1906,7 @@ function clientIp(req: Request): string {
   return (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || '0.0.0.0';
 }
 
-async function verifyTurnstile(db: SupabaseClient, token: string, ip: string): Promise<boolean> {
+async function verifyTurnstile(db: DbClient, token: string, ip: string): Promise<boolean> {
   // Resolve through resolveSecret (env-first, then platform_secrets) — NOT Deno.env.get.
   // bootstrapForFunction() is supposed to copy platform_secrets into env, but it does that via
   // Deno.env.set, which this runtime denies (the bootstrap swallows the throw by design). Verified
@@ -1920,7 +1921,7 @@ async function verifyTurnstile(db: SupabaseClient, token: string, ip: string): P
   return !!(await r.json().catch(() => ({ success: false }))).success;
 }
 
-async function handleProfileContact(db: SupabaseClient, req: Request, payload: Json): Promise<Response> {
+async function handleProfileContact(db: DbClient, req: Request, payload: Json): Promise<Response> {
   const toUserId = String((payload as Record<string, unknown>).to_user_id ?? '').trim();
   const name = String((payload as Record<string, unknown>).from_name ?? '').trim().slice(0, 200);
   const email = String((payload as Record<string, unknown>).from_email ?? '').trim().slice(0, 200);

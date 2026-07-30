@@ -18,6 +18,7 @@
  * Credits: 20 per call (Grok inpainting with mask)
  */
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { editImageWithGrok } from '../_shared/ai-client.ts';
@@ -69,7 +70,7 @@ function decodeDataUrl(dataUrl: string): Uint8Array {
 
 /** Upload base64 image to Supabase Storage, return permanent public URL */
 async function uploadResult(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   base64: string,
   mimeType: string,
   jobId: string,

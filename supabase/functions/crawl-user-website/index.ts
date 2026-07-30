@@ -8,6 +8,7 @@
  *   mode="full"    — (default) full crawl bounded by website.max_pages.
  */
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -221,7 +222,7 @@ function sampleEvenly<T>(arr: T[], n: number): T[] {
 }
 
 async function previewWebsite(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   website: { id: string; user_id: string; url: string; sitemap_url: string | null },
 ): Promise<{
   ok: boolean;
@@ -266,7 +267,7 @@ async function previewWebsite(
 }
 
 async function crawlOneWebsite(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   website: { id: string; user_id: string; url: string; sitemap_url: string | null; max_pages: number },
 ): Promise<{ ok: boolean; pages_indexed: number; pages_discovered: number; error?: string }> {
   const { id: websiteId, user_id: userId, url: siteUrl, max_pages } = website;

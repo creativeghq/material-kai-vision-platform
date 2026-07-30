@@ -15,6 +15,7 @@
  * Authorization: Bearer, then the service role is used internally to bypass RLS.
  */
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -37,7 +38,7 @@ const corsHeaders = {
  * Best-effort: if regeneration fails the page still renders its non-PDF content.
  */
 async function ensureDeliverablePdf(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   regenBody: Record<string, unknown>,
   table: 'project_client_views' | 'moodboard_presentation_sheets',
   id: string,

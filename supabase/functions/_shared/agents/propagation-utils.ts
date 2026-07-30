@@ -9,6 +9,7 @@
  *   - products.metadata['factory_name'] / ['factory_group_name'] — backward-compat flat fields
  */
 
+import type { DbClient } from '../supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // ── Factory object shape ──────────────────────────────────────────────────────
@@ -69,7 +70,7 @@ type ScopeColumn = 'source_document_id' | 'scrape_session_id' | 'workspace_id';
  * in a given scope (e.g. all products from the same PDF document).
  */
 async function findBestFactoryInScope(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   scopeColumn: ScopeColumn,
   scopeValue: string,
 ): Promise<FactoryObject | null> {
@@ -104,7 +105,7 @@ async function findBestFactoryInScope(
  * @returns number of products updated
  */
 export async function propagateFactoryFieldsInScope(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   scopeColumn: ScopeColumn,
   scopeValue: string,
 ): Promise<number> {
@@ -154,7 +155,7 @@ export async function propagateFactoryFieldsInScope(
  * Safe to call with a partial object — only non-empty values are written.
  */
 export async function writeFactoryToProduct(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   productId: string,
   factory: FactoryObject,
 ): Promise<void> {

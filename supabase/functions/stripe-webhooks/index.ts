@@ -1,3 +1,4 @@
+import type { DbClient } from '../_shared/supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -16,7 +17,7 @@ import { recordInvoicePayment, recordStatementPayment } from '../_shared/payment
 // successful request, the factories return the same singleton — these
 // references just stay in scope.
 let stripe!: Stripe;
-let supabase!: SupabaseClient;
+let supabase!: DbClient;
 // #200 — true when THIS event was signed by the dedicated platform-billing account (verified
 // with STRIPE_BILLING_WEBHOOK_SECRET). Drives which customer-id column we persist/lookup.
 let eventIsBilling = false;

@@ -21,6 +21,7 @@
  *     - Flips the request to rejected.
  *     - Emails the user (template role_upgrade_request.rejected).
  */
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -148,7 +149,7 @@ async function authedUser(req: Request) {
   return user;
 }
 
-async function isAdmin(supabase: ReturnType<typeof createClient>, userId: string): Promise<boolean> {
+async function isAdmin(supabase: DbClient, userId: string): Promise<boolean> {
   const { data } = await supabase
     .from('user_profiles')
     .select('roles!user_profiles_role_id_fkey(name)')
@@ -160,7 +161,7 @@ async function isAdmin(supabase: ReturnType<typeof createClient>, userId: string
 }
 
 async function sendEmail(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   to: string,
   subject: string,
   templateSlug: string,

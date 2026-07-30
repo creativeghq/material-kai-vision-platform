@@ -11,6 +11,7 @@
 // existing render block (so there's one renderer); interactive types return for
 // the canvas. Refund-on-render-failure is handled by the handler.
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 
 export type SheetType =
@@ -25,7 +26,7 @@ export type SheetType =
   | 'area_breakdown'
   | 'full_deck';
 
-type SupabaseClient = ReturnType<typeof createClient>;
+type SupabaseClient = DbClient;
 
 // Keep aligned with SHEET_TYPE_CREDITS (frontend) and the storage-cost trend.
 export const SHEET_CREDITS: Record<SheetType, number> = {
@@ -77,7 +78,7 @@ export type CreateSheetResult =
  * whether it's interactive) — the caller renders passive types.
  */
 export async function createSheet(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   params: CreateSheetParams,
 ): Promise<CreateSheetResult> {
   const { userId, moodboard_id, sheet_type, title } = params;
@@ -182,7 +183,7 @@ export async function createSheet(
 
 /** Refund a create-mode credit charge when the subsequent render fails. */
 export async function refundSheetCredits(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   sheet_type: string,
   creditCost: number,
@@ -209,7 +210,7 @@ export async function refundSheetCredits(
  * binning over a crude byte-stream pixel scan — no image decoder needed.
  */
 async function autoExtractPalette(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   moodboardId: string,
   maxSwatches = 8,
 ): Promise<{ hex: string; name: string }[]> {
@@ -268,7 +269,7 @@ function namedFromHex(r: number, g: number, b: number): string {
 
 /** Auto-detect up to 6 callouts on an annotated_render backdrop via Claude Vision. */
 async function autoDetectCallouts(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   moodboardId: string,
   imageUrl: string,

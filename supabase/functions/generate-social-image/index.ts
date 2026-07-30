@@ -10,6 +10,7 @@
  * Stores result in Supabase Storage and updates social_posts.
  */
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
@@ -164,7 +165,7 @@ async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promi
 
 // ── Upload image URL/base64 to Supabase Storage ───────────────────────────────
 async function storeImage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   imageData: string,
   filename: string,
 ): Promise<string> {

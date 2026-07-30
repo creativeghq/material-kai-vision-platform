@@ -10,6 +10,7 @@
  *   import_pins_bulk - Import multiple pins into a moodboard
  */
 
+import type { DbClient } from '../../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
@@ -86,7 +87,7 @@ async function downloadImage(imageUrl: string): Promise<Uint8Array> {
  * only barrier between an authenticated user and someone else's moodboard.
  */
 async function assertMoodboardOwner(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   moodboardId: string,
   userId: string,
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
@@ -105,7 +106,7 @@ async function assertMoodboardOwner(
  * Import a single pin into a moodboard
  */
 async function importSinglePin(
-  supabase: ReturnType<typeof createClient>,
+  supabase: DbClient,
   userId: string,
   pinUrl: string,
   moodboardId: string,
