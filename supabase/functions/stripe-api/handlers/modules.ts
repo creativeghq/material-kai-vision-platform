@@ -76,7 +76,7 @@ export async function handleModuleAction(req: Request, body: Record<string, unkn
   const action = String(body.action);
   switch (action) {
     case 'activate-module':
-      return activateModule(auth, body);
+      return activateModule(req, auth, body);
     case 'deactivate-module':
       return deactivateModule(auth, body);
     case 'request-module':
@@ -90,7 +90,13 @@ export async function handleModuleAction(req: Request, body: Record<string, unkn
   }
 }
 
-async function activateModule(auth: AuthResult, body: Record<string, unknown>): Promise<Response> {
+/**
+ * `req` is needed for the Origin header used to build the Stripe return URLs. It used to be
+ * absent from this signature while the body below referenced `req` anyway, so whenever the
+ * client omitted successUrl/cancelUrl the checkout threw ReferenceError — i.e. the add-on
+ * could not be purchased. See #272.
+ */
+async function activateModule(req: Request, auth: AuthResult, body: Record<string, unknown>): Promise<Response> {
   const service = auth.supabase;
   const userId = auth.userId;
   const workspaceId = typeof body.workspace_id === 'string' ? body.workspace_id : null;

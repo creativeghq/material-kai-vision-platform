@@ -4,6 +4,16 @@ import { isCronAuthorized } from '../_shared/auth.ts';
 import { isModuleEnabled, moduleSupabaseClient } from '../_shared/modules/registry.ts';
 
 /**
+ * Secret forwarded to the MIVAA cron endpoints (they authenticate by `x-cron-secret`).
+ *
+ * Lazy getter, not a module-load capture, so a value bootstrapped into Deno.env inside the
+ * handler is picked up. Reinstated after the switch to the shared `isCronAuthorized(req)`
+ * gate removed the local `expectedSecret` binding but left its use in the fetch below —
+ * every dispatch threw ReferenceError there, so this cron never reached MIVAA at all.
+ */
+const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
+
+/**
  * Unified monitoring cron dispatcher.
  *
  * Replaces the 5 near-identical monitoring cron functions (price-monitoring-cron,
@@ -75,7 +85,7 @@ Deno.serve(withApiLogging('monitoring-cron', async (req) => {
   try {
     const resp = await fetch(`${base}${spec.path()}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-cron-secret': expectedSecret },
+      headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET() },
     });
     if (!resp.ok) {
       const detail = (await resp.text()).slice(0, 300);

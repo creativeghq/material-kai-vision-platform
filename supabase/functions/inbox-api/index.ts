@@ -408,7 +408,10 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
       p_description: 'Refund — agent auto-reply produced no message',
       p_metadata: { thread_id: threadId },
       p_workspace_id: workspaceId,
-    }).catch(() => {});
+      // A PostgREST builder is PromiseLike: it implements `then` but NOT `catch`, so
+      // `.catch(...)` threw a synchronous TypeError and the refund never issued. `then`'s
+      // second argument is the supported way to swallow the failure.
+    }).then(() => {}, () => {});
 
     let replyText: string;
     try {
@@ -1725,8 +1728,9 @@ async function handleJwtAction(
           p_user_id: userId, p_amount: INBOX_AGENT_REPLY_COST,
           p_operation_type: 'inbox_agent_suggest_refund',
           p_description: 'Refund — AI draft produced no text',
+          // See the note on refundReply above: a PostgREST builder has no `catch`.
           p_metadata: { thread_id: threadId }, p_workspace_id: workspaceId,
-        }).catch(() => {});
+        }).then(() => {}, () => {});
         throw new HttpError(502, 'The assistant could not draft a reply — try again.');
       }
       return json({ draft });

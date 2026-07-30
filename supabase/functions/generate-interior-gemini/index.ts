@@ -34,6 +34,7 @@ import {
 } from '../_shared/interior-prompt-builder.ts';
 import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';

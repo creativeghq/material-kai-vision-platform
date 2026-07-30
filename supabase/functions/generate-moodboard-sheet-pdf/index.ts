@@ -64,11 +64,13 @@ import {
   sheetLabel,
 } from './builders.ts';
 import { loadFonts } from './layout.ts';
+// TitleBlockData is declared in layout.ts, not types.ts — it was imported from types.ts,
+// which does not export it (builders.ts already takes it from layout.ts).
+import type { TitleBlockData } from './layout.ts';
 import type {
   AnnotationData,
   SheetPdfRequest,
   SheetPdfResponse,
-  TitleBlockData,
 } from './types.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { createSheet, refundSheetCredits, type SheetType } from './create-sheet.ts';

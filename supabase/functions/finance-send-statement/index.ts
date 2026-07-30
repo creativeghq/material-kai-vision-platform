@@ -2,7 +2,12 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
+// @pdf-lib/fontkit's published types declare no default export, so `import fontkit from`
+// failed to typecheck (TS1192) even though esm.sh's interop makes it work at runtime.
+// Resolve the namespace and prefer its default if present — correct either way, and it
+// does not change which object reaches registerFontkit.
+import * as fontkitNs from '@pdf-lib/fontkit';
+const fontkit = (fontkitNs as unknown as { default?: unknown }).default ?? fontkitNs;
 import { encodeBase64 as base64Encode } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { escapeHtml } from '../_shared/html.ts';

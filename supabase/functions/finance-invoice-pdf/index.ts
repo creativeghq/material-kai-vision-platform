@@ -10,7 +10,12 @@
 // glyphs (and Greek customer names/addresses, regardless of language) render correctly.
 import { createClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage, type RGB } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
+// @pdf-lib/fontkit's published types declare no default export, so `import fontkit from`
+// failed to typecheck (TS1192) even though esm.sh's interop makes it work at runtime.
+// Resolve the namespace and prefer its default if present — correct either way, and it
+// does not change which object reaches registerFontkit.
+import * as fontkitNs from '@pdf-lib/fontkit';
+const fontkit = (fontkitNs as unknown as { default?: unknown }).default ?? fontkitNs;
 import qrcode from 'qrcode-generator';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
