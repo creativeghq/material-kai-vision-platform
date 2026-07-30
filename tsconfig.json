@@ -48,11 +48,6 @@
     "coverage",
     ".ruru",
     "scripts",
-    "supabase/**",
-    "src/pages/PDFProcessing.tsx",
-    "src/debug/**",
-    "src/api/agents.ts",
-    "src/api/routes.ts",
-    "src/api/controllers/visualSearchController.ts"
+    "supabase/**"
   ]
 }
