@@ -64,6 +64,13 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     return jsonResponse({ success: false, error: 'user_id is required' }, 400);
   }
 
+  // Track fix credits actually debited so the failure path can refund them too
+  // (the catch previously refunded only the analysis credit — audit #217 H15).
+  // MUST be declared outside the try: the catch below reads it, and a `let` inside
+  // the try block is not in scope there — it threw ReferenceError inside the error
+  // handler, so no refund ever happened.
+  let fixCreditsDebited = 0;
+
   try {
 
     if (!body.content_markdown || !body.article_plan) {
@@ -95,9 +102,6 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     const maxIterations = body.max_iterations || DEFAULT_MAX_ITERATIONS;
     let content = body.content_markdown;
     let fixIterations = 0;
-    // Track fix credits actually debited so the failure path can refund them too
-    // (the catch previously refunded only the analysis credit — audit #217 H15).
-    let fixCreditsDebited = 0;
 
     console.log(`[seo-analyze] Analyzing "${body.article_plan.title}" (auto_fix: ${autoFix}, max: ${maxIterations})`);
 

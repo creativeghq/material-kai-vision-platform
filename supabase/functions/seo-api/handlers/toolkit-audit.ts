@@ -23,7 +23,7 @@
  *               SUPABASE_SERVICE_ROLE_KEY.
  */
 
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;

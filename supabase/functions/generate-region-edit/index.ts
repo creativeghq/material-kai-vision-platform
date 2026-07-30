@@ -18,7 +18,7 @@
  * Credits: 20 per call (Grok inpainting with mask)
  */
 
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { editImageWithGrok } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';

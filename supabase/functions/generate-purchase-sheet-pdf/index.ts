@@ -18,7 +18,7 @@
  *   project-purchase/{project_id}/purchase-{ts}.pdf
  * and returned as a 7-day signed URL.
  */
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { escapeHtml } from '../_shared/html.ts';

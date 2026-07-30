@@ -47,7 +47,7 @@
  *   }));
  */
 
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from './cors.ts';
 import { captureException, captureMessage } from './sentry.ts';
 

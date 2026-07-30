@@ -16,7 +16,7 @@
  *               SUPABASE_SERVICE_ROLE_KEY.
  */
 
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
 

@@ -33,7 +33,7 @@
  * enabled-module contributions with the platform-default set.
  */
 
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { AgentRunner } from '../agents/types.ts';
 
 /** A constructable AgentRunner — `new Foo()`. */

@@ -15,7 +15,7 @@
  * is only visible to its owner or a workspace finance manager. Uploads additionally
  * require the caller to be the owner while the card is draft, or a finance manager.
  */
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';

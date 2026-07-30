@@ -15,7 +15,7 @@
  * frontend polling (same pattern as 3D generation).
  */
 
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { generateVideoWithVeo, generateVideoWithKling } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
