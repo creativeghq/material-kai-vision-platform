@@ -73,7 +73,10 @@ export function orderLinesFromDoc(doc: InboundDocument): PrefillLine[] {
  * (if it isn't one yet) and that expense carries `order_id`. The link lives on the bill because
  * that is where 3-way match already reads it from — no new column, no second source of truth.
  */
-export async function linkOrderToDocument(doc: InboundDocument, orderId: string): Promise<string> {
+export async function linkOrderToDocument(
+  doc: Pick<InboundDocument, 'id'> & { created_supplier_bill_id?: string | null },
+  orderId: string,
+): Promise<string> {
   const billId = doc.created_supplier_bill_id ?? await inboundService.toSupplierBill(doc.id);
   await financeService.setSupplierBillOrder(billId, orderId);
   return billId;

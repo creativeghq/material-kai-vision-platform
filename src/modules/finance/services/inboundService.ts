@@ -112,22 +112,6 @@ export const inboundService = {
     return (data ?? []) as InboundDocument[];
   },
 
-  /** Received documents not yet turned into an expense — the ones a payment can still be
-   *  recorded against directly (the conversion happens on the way). Bounded: the inbox runs to
-   *  thousands of rows and this feeds a picker. */
-  async listUnbilled(workspaceId: string, limit = 100): Promise<InboundDocument[]> {
-    const { data, error } = await supabase
-      .from('inbound_documents')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .eq('status', 'new')
-      .is('created_supplier_bill_id', null)
-      .gt('total_gross', 0)
-      .order('issue_date', { ascending: false, nullsFirst: false })
-      .limit(limit);
-    if (error) throw error;
-    return (data ?? []) as InboundDocument[];
-  },
 
   /**
    * Every received document issued by one ΑΦΜ — the supplier's documents on their CRM record.

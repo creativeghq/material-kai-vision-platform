@@ -62,9 +62,12 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   // the per-line delivered quantities and the customer allocations waiting on them).
   const canReceive = (doc.status === 'new' || doc.status === 'classified') && !hasOrder;
   const canDismiss = doc.status === 'new';
-  // Paying is offered on anything not dismissed: either the expense exists (→ its payments) or
-  // the document is converted when the payment is actually saved.
-  const canPay = doc.status !== 'dismissed';
+  // Paying settles an expense that EXISTS. A document that hasn't been booked yet is settled by
+  // booking it — "Add to Expenses" carries a "Mark as paid" tick — so there is one way in and it
+  // always leaves an order behind the money. This item used to convert the document itself on
+  // save, which produced a paid bill with no order to match it against: the exact shape the
+  // Money section was reorganised to prevent.
+  const canPay = doc.status !== 'dismissed' && !!doc.created_supplier_bill_id;
   const hasIssuer = !!(doc.issuer_vat || doc.issuer_name);
   /** Already a CRM company — adding again would only make a duplicate to merge later. */
   const inCrm = !!crmCompanyId;
@@ -210,7 +213,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             <span className="flex items-center"><ShoppingCart className="h-4 w-4 mr-2" /> {hasOrder ? 'Already in Expenses' : 'Add to Expenses'}</span>
             {!hasOrder && (
               <span className="pl-6 text-[10px] text-muted-foreground">
-                Creates the unpaid purchase order from its lines and the expense against it — shows in Payables until you pay. The goods go into the warehouse in the same step, unless you untick that in the form.
+                The whole purchase in one step: the order, the expense against it, the goods into the warehouse, and the payment if you tick “Mark as paid”. Each is a tick you can turn off.
               </span>
             )}
           </DropdownMenuItem>
@@ -219,7 +222,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             <span className="pl-6 text-[10px] text-muted-foreground">
               {doc.created_supplier_bill_id
                 ? 'Settles the expense this document became. Stock is untouched.'
-                : 'Adds it to Expenses and settles it in one step. Stock is untouched.'}
+                : 'Add it to Expenses first — that form settles it too, with “Mark as paid”.'}
             </span>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onDismiss} disabled={!canDismiss}>

@@ -30,7 +30,7 @@ import { NewChequeDialog } from '@/modules/finance/components/NewChequeDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
 import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
-import { orderLinesFromDoc, linkOrderToDocument, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
+import { orderLinesFromDoc, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { QuickCategoryDialog } from '@/modules/finance/components/QuickCategoryDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
@@ -1019,13 +1019,9 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           categories={categories}
           open
           onOpenChange={(v) => { if (!v) setOrderDoc(null); }}
-          onCreated={async (orderId) => {
-            const d = orderDoc;
-            setOrderDoc(null);
-            try { await linkOrderToDocument(d, orderId); }
-            catch (err: any) { toast({ title: 'Order created, but not linked', description: err?.message, variant: 'destructive' }); }
-            onChanged();
-          }}
+          // The modal owns the document → order → expense → payment chain (and reports its own
+          // failures), so there is nothing left to do here but refresh.
+          onCreated={() => { setOrderDoc(null); onChanged(); }}
         />
       )}
       {payDoc && workspaceId && (
@@ -1034,7 +1030,6 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           // Same form either way — it settles the expense if this document already became one,
           // and converts it on save if it hasn't.
           presetExpenseId={payDoc.created_supplier_bill_id ?? undefined}
-          presetInboxDocId={payDoc.created_supplier_bill_id ? undefined : payDoc.id}
           open
           onOpenChange={(v) => { if (!v) setPayDoc(null); }}
           onSaved={() => { setPayDoc(null); onChanged(); }}

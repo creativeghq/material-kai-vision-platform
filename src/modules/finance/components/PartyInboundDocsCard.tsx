@@ -23,7 +23,7 @@ import { InboundDocActionsMenu } from '@/modules/finance/components/InboundDocAc
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
-import { orderLinesFromDoc, linkOrderToDocument, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
+import { orderLinesFromDoc, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 
@@ -193,20 +193,13 @@ export const PartyInboundDocsCard: React.FC<{
           categories={categories}
           open
           onOpenChange={(v) => { if (!v) setOrderDoc(null); }}
-          onCreated={async (orderId) => {
-            const d = orderDoc;
-            setOrderDoc(null);
-            try { await linkOrderToDocument(d, orderId); }
-            catch (err: any) { toast({ title: 'Order created, but not linked', description: err?.message, variant: 'destructive' }); }
-            void load();
-          }}
+          onCreated={() => { setOrderDoc(null); void load(); }}
         />
       )}
       {payDoc && (
         <RecordPaymentDialog
           workspaceId={workspaceId}
           presetExpenseId={payDoc.created_supplier_bill_id ?? undefined}
-          presetInboxDocId={payDoc.created_supplier_bill_id ? undefined : payDoc.id}
           open
           onOpenChange={(v) => { if (!v) setPayDoc(null); }}
           onSaved={() => { setPayDoc(null); void load(); }}

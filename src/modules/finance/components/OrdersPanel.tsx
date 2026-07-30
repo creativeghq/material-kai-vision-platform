@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import {
   formatMoney, financeService, VAT_CATEGORIES, paymentMethodLabel,
-  type PaymentWithAllocation,
+  type PaymentWithAllocation, type PaymentMethod,
 } from '@/modules/finance/services/financeService';
 import {
   salesDocumentKindFor, salesDocumentKindLabel, salesDocumentKindReason,
@@ -26,6 +26,8 @@ import { statusTone } from '@/modules/finance/utils/statusTone';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
+import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
+import { linkOrderToDocument } from '@/modules/finance/utils/inboundToOrder';
 import { parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
 import { edgeErrorMessage } from '@/utils/edgeError';
@@ -470,6 +472,12 @@ export const NewOrderModal: React.FC<{
   const [warehouses, setWarehouses] = useState<Array<{ id: string; name: string; is_default: boolean }>>([]);
   const [warehouseId, setWarehouseId] = useState<string>('');
   const [receiveNow, setReceiveNow] = useState(true);
+  // A supplier's document is often already paid by the time it reaches the Inbox, so settling it
+  // is a tick on the form that books it — not a second trip through a second dialog. Same shape
+  // as NewExpenseDialog's "Paid now": OFF leaves an open payable in AP.
+  const [paidNow, setPaidNow] = useState(false);
+  const [payBankAccountId, setPayBankAccountId] = useState<string>('');
+  const [payMethod, setPayMethod] = useState<PaymentMethod>('bank_transfer');
 
   const isSales = orderType === 'sales';
   // Sales orders are income, purchase orders are expense — offer the matching category kinds.
@@ -488,6 +496,7 @@ export const NewOrderModal: React.FC<{
       : [blankLine()]);
     setPricingMode('today');
     setLinkSearch(''); setLinkedNames({}); setReceiveNow(true); setWarehouseId('');
+    setPaidNow(false); setPayBankAccountId(''); setPayMethod('bank_transfer');
 
     // Where the goods land. Only purchase orders stock anything, so don't ask on a sales order.
     if (!isSales) {
@@ -743,7 +752,36 @@ export const NewOrderModal: React.FC<{
           stockNote = `Order saved, but receiving into the warehouse failed: ${recErr?.message ?? 'unknown error'}. Receive it from the order.`;
         }
       }
-      toast({ title: status === 'draft' ? 'Pre-order saved' : 'Order created', description: stockNote });
+      // A document-seeded purchase is one act with three consequences: the ORDER records what was
+      // bought, the EXPENSE records what is owed for it, and — if it is already settled — the
+      // PAYMENT records the cash. Linking used to be copy-pasted into each caller after the fact
+      // and paying was a separate trip through the payment dialog, which is how a document could
+      // end up paid with no order behind it. All three happen here now, in that order.
+      let moneyNote: string | undefined;
+      if (prefill?.inboundDocumentId) {
+        try {
+          // Idempotent: an existing bill for the document is returned rather than duplicated.
+          const billId = await linkOrderToDocument({ id: prefill.inboundDocumentId }, orderId);
+          if (paidNow && status !== 'draft') {
+            await financeService.paySupplierBill({
+              workspaceId,
+              supplierBillId: billId,
+              amount: grossTotal,
+              method: payMethod,
+              paidAt: new Date().toISOString(),
+              bankAccountId: payBankAccountId || null,
+              categoryId: categoryId === 'none' ? null : categoryId,
+            });
+            moneyNote = 'Expense settled.';
+          }
+        } catch (linkErr: any) {
+          moneyNote = `Order created, but the expense step failed: ${linkErr?.message ?? 'unknown error'}.`;
+        }
+      }
+      toast({
+        title: status === 'draft' ? 'Pre-order saved' : 'Order created',
+        description: [stockNote, moneyNote].filter(Boolean).join(' ') || undefined,
+      });
       onCreated(orderId);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -1014,6 +1052,35 @@ export const NewOrderModal: React.FC<{
                   </p>
                 );
               })()}
+            </div>
+          )}
+
+          {/* ── Already paid? ───────────────────────────────────────────────────────────────
+              The other half of the same act. A supplier's document usually reaches the Inbox
+              after the money has gone, so settling it is a tick here rather than a second trip
+              through the payment dialog — that second trip is what used to produce a paid
+              expense with no order behind it. OFF leaves an open payable in AP, which is what
+              "Record payment" on the expense is then for. */}
+          {!isSales && locked && prefill?.inboundDocumentId && (
+            <div className="space-y-2 rounded-md border border-border/60 p-3">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox className="h-3.5 w-3.5 rounded" checked={paidNow} onCheckedChange={(v) => setPaidNow(v === true)} />
+                <span className="font-medium">Mark as paid</span>
+              </label>
+              <p className="text-[11px] text-muted-foreground">
+                {paidNow
+                  ? `Books ${formatMoney(grossTotal, currency)} out of the account below and settles the expense.`
+                  : 'Leaves it as an open payable in AP until you record the payment.'}
+              </p>
+              {paidNow && (
+                <PaidFromSelect
+                  workspaceId={workspaceId}
+                  value={payBankAccountId}
+                  onChange={setPayBankAccountId}
+                  method={payMethod}
+                  onMethodChange={setPayMethod}
+                />
+              )}
             </div>
           )}
 

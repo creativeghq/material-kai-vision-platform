@@ -5,15 +5,19 @@
  *  - Refund/Return: money out to a customer (e.g. against a credit note).
  *  - Paid an expense: money out settling an EXISTING expense (supplier bill), including the ones
  *    that came from the Expenses Inbox (myDATA received documents).
+ *
+ * It settles; it never books. A received document that is not an expense yet is booked by
+ * "Add to Expenses", whose form carries a "Mark as paid" tick — so the money always has an order
+ * behind it. Converting a document HERE produced a paid bill with nothing to 3-way match.
  * Carries a finance category + method + back-datable date.
  *
  * The expense option settles a bill that already exists — it never creates one. Creating a NEW
  * cost is still NewExpenseDialog; going through here instead would double-count the payable.
  * The reverse direction (open an expense, see/attach its payments) is ExpensePaymentsDialog.
  *
- * `presetExpenseId` / `presetInboxDocId` PRE-FILL it (Payables → Pay, the Expenses Inbox row,
- * "Record a payment" inside ExpensePaymentsDialog): same form, same controls, the target simply
- * starts selected and still changeable. This is the ONLY money-out-against-a-bill form.
+ * `presetExpenseId` PRE-FILLS it (Payables → Pay, the Expenses Inbox row, "Record a payment"
+ * inside ExpensePaymentsDialog): same form, same controls, the target simply starts selected and
+ * still changeable. This is the ONLY money-out-against-a-bill form.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
@@ -29,7 +33,6 @@ import { financeService, formatMoney, type Invoice, type PaymentMethod, type Ban
 import { ordersService, type OrderListRow } from '@/modules/finance/services/ordersService';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
-import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { salesDocumentKindLabel, type SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
 import { parseDecimal } from '@/utils/decimal';
 
@@ -54,9 +57,6 @@ export const RecordPaymentDialog: React.FC<{
   /** Settle THIS expense (a `supplier_bills` id): opens on the money-out branch with the expense
    *  already selected in the picker. Prefill, not a lock — it can be changed like any other. */
   presetExpenseId?: string;
-  /** Same, for an Inbox document that is NOT an expense yet (an `inbound_documents` id). It is
-   *  converted on SAVE — opening this dialog must never create a payable on its own. */
-  presetInboxDocId?: string;
   /** When set (order-attached, received, no invoice yet), the fiscal document can be issued in the
    *  same step. `fiscalDocKind` is the kind the SHARED buyer rule resolved — this dialog never
    *  re-derives it — and `onIssueDoc` runs after the payment is recorded. */
@@ -69,7 +69,7 @@ export const RecordPaymentDialog: React.FC<{
   /** Open supplier bills this payment may settle — only meaningful with side='supplier'. Passed in
    *  by the caller that already loaded them rather than re-fetched here. */
   payableBills?: Array<{ id: string; supplier_bill_number: string | null; amount_due: number; currency: string }>;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, presetInboxDocId, fiscalDocKind, fiscalDocReason, onIssueDoc, side = 'customer', payableBills = [] }) => {
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, fiscalDocKind, fiscalDocReason, onIssueDoc, side = 'customer', payableBills = [] }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -108,16 +108,11 @@ export const RecordPaymentDialog: React.FC<{
   // from the party page / Documents → Payments, which previously had no way to do it.
   const [orders, setOrders] = useState<OrderListRow[]>([]);
   const [pickedOrderId, setPickedOrderId] = useState<string>('');
-  // Money-out against an existing expense (supplier bill). `expenseSource` filters the picker
-  // down to expenses that came from the myDATA Inbox, which is how most of them arrive.
+  // Money-out against an existing expense (supplier bill) — including the ones that came from
+  // the myDATA Inbox, which is how most of them arrive.
   const [expenses, setExpenses] = useState<PayableExpense[]>([]);
-  // Inbox documents not turned into an expense yet. They're payable from here too — the
-  // conversion runs on save — otherwise the whole unprocessed inbox would be unreachable
-  // from the payment flow, which is where most received documents actually sit.
-  const [inboxDocs, setInboxDocs] = useState<InboundDocument[]>([]);
-  /** `exp:<supplier_bill_id>` or `doc:<inbound_document_id>`. */
+  /** The `supplier_bills` id this payment settles. */
   const [expenseId, setExpenseId] = useState<string>('');
-  const [expenseSource, setExpenseSource] = useState<'all' | 'inbox'>('all');
   const [busy, setBusy] = useState(false);
   /** Which of the order's open supplier bills this money settles (side='supplier'). */
   const [billId, setBillId] = useState('');
@@ -132,7 +127,7 @@ export const RecordPaymentDialog: React.FC<{
    * wrong direction. Recording a NEW cost is a different act and lives in NewExpenseDialog,
    * which books the bill and the cash together — this form can only pay what is already booked.
    */
-  const payingExpense = !!presetExpenseId || !!presetInboxDocId;
+  const payingExpense = !!presetExpenseId;
   // The expense picker only makes sense in the general context. Opened for a specific order /
   // invoice the dialog is customer-scoped, and mixing a supplier cost into that flow would
   // attach it to the wrong side of the trade.
@@ -152,20 +147,15 @@ export const RecordPaymentDialog: React.FC<{
     setIssueCreditNote(true);
     setIssueChoice('payment_receipt');
     setPickedOrderId('');
-    setExpenseId(presetExpenseId ? `exp:${presetExpenseId}` : presetInboxDocId ? `doc:${presetInboxDocId}` : ''); setExpenseSource('all');
+    setExpenseId(presetExpenseId ?? '');
     (async () => {
       // Open expenses for the money-out branch. Scoped to the party when the dialog was opened
       // from one, same rule as the invoice picker.
       if (allowExpense) {
-        // The SAME two lists the picker always offers. A preset only decides which entry starts
+        // The SAME list the picker always offers. A preset only decides which entry starts
         // selected — it never narrows what you can pick instead.
         const partyScoped = !!(initialCounterparty?.companyId || initialCounterparty?.contactId);
-        const [billRows, docRows] = await Promise.all([
-          financeService.listPayableExpenses(workspaceId).catch(() => [] as PayableExpense[]),
-          // Party-scoped opens are about that party's own bills, so don't offer raw inbox
-          // documents there — they carry an issuer VAT, not a resolved CRM party.
-          partyScoped ? Promise.resolve([] as InboundDocument[]) : inboundService.listUnbilled(workspaceId).catch(() => [] as InboundDocument[]),
-        ]);
+        const billRows = await financeService.listPayableExpenses(workspaceId).catch(() => [] as PayableExpense[]);
         let bills = partyScoped
           ? billRows.filter((e) =>
               (initialCounterparty!.companyId && e.supplier_company_id === initialCounterparty!.companyId) ||
@@ -178,14 +168,7 @@ export const RecordPaymentDialog: React.FC<{
           if (one) bills = [one, ...bills];
         }
         setExpenses(bills);
-        let docs = docRows;
-        if (presetInboxDocId && !docs.some((d) => d.id === presetInboxDocId)) {
-          const wider = await inboundService.listUnbilled(workspaceId, 1000).catch(() => [] as InboundDocument[]);
-          const hit = wider.find((d) => d.id === presetInboxDocId);
-          if (hit) docs = [hit, ...docs];
-        }
-        setInboxDocs(docs);
-      } else { setExpenses([]); setInboxDocs([]); }
+      } else { setExpenses([]); }
       const [cats, invs, banks, ords] = await Promise.all([
         financeCategoriesService.list(workspaceId).catch(() => []),
         // Include paid invoices too — a refund is usually against an already-settled invoice.
@@ -205,7 +188,7 @@ export const RecordPaymentDialog: React.FC<{
       // Default to the workspace's default account so cash location is always captured.
       setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
     })();
-  }, [open, workspaceId, presetExpenseId, presetInboxDocId]);
+  }, [open, workspaceId, presetExpenseId]);
 
   // Received → open invoices. Refund → any issued invoice (usually paid).
   // When opened from a party page (initialCounterparty set) the picker is HARD-SCOPED to that
@@ -231,26 +214,14 @@ export const RecordPaymentDialog: React.FC<{
     if (inv) setAmount(String(inv.amount_due));
   };
 
-  /** One picker over both shapes: an existing expense, or an inbox document that becomes one. */
   type ExpenseOption = {
-    value: string; label: string; due: number; currency: string;
-    fromInbox: boolean; expense: PayableExpense | null; doc: InboundDocument | null;
+    value: string; label: string; due: number; currency: string; expense: PayableExpense;
   };
-  const expenseOptions = useMemo<ExpenseOption[]>(() => {
-    const fromBills: ExpenseOption[] = expenses.map((e) => ({
-      value: `exp:${e.id}`,
-      label: `${e.supplier_bill_number ?? 'Expense'}${e.party_name ? ` · ${e.party_name}` : ''}`,
-      due: e.amount_due, currency: e.currency, fromInbox: !!e.inbox, expense: e, doc: null,
-    }));
-    const fromInbox: ExpenseOption[] = inboxDocs.map((d) => ({
-      value: `doc:${d.id}`,
-      label: `${d.series ?? ''}${d.aa ? ` ${d.aa}` : ''}`.trim() || `MARK ${d.mark}`,
-      due: Number(d.total_gross ?? 0), currency: d.currency ?? 'EUR',
-      fromInbox: true, expense: null, doc: d,
-    }));
-    const all = [...fromBills, ...fromInbox];
-    return expenseSource === 'inbox' ? all.filter((o) => o.fromInbox) : all;
-  }, [expenses, inboxDocs, expenseSource]);
+  const expenseOptions = useMemo<ExpenseOption[]>(() => expenses.map((e) => ({
+    value: e.id,
+    label: `${e.supplier_bill_number ?? 'Expense'}${e.party_name ? ` · ${e.party_name}` : ''}`,
+    due: e.amount_due, currency: e.currency, expense: e,
+  })), [expenses]);
 
   const selectedOption = useMemo(
     () => expenseOptions.find((o) => o.value === expenseId) ?? null,
@@ -311,9 +282,7 @@ export const RecordPaymentDialog: React.FC<{
       // document becomes an expense first — the conversion RPC is idempotent, so this never
       // creates a second payable for the same document.
       if (kind === 'expense' && selectedOption) {
-        const billId = selectedOption.expense
-          ? selectedOption.expense.id
-          : await inboundService.toSupplierBill(selectedOption.doc!.id);
+        const billId = selectedOption.expense.id;
         await financeService.paySupplierBill({
           workspaceId,
           supplierBillId: billId,
@@ -511,34 +480,17 @@ export const RecordPaymentDialog: React.FC<{
 
           {kind === 'expense' && (
             <div className="space-y-2 rounded-md border border-border/60 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <Label>Expense being paid</Label>
-                <div className="flex items-center gap-1 text-[11px]">
-                  {(['all', 'inbox'] as const).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => { setExpenseSource(s); setExpenseId(''); }}
-                      className={`rounded-full px-2 py-0.5 transition-colors ${expenseSource === s ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}
-                    >
-                      {s === 'all' ? 'All' : 'From Inbox'}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <Label>Expense being paid</Label>
               <Select value={expenseId} onValueChange={pickExpense}>
                 <SelectTrigger><SelectValue placeholder="Pick the expense this payment settles…" /></SelectTrigger>
                 <SelectContent>
                   {expenseOptions.length === 0
-                    ? <div className="px-2 py-1 text-xs text-muted-foreground">
-                        {expenseSource === 'inbox' ? 'Nothing unpaid from the Inbox' : 'No unpaid expenses'}
-                      </div>
+                    ? <div className="px-2 py-1 text-xs text-muted-foreground">No unpaid expenses</div>
                     : expenseOptions.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         {o.label}
-                        {o.doc?.issuer_name ? ` · ${o.doc.issuer_name}` : ''}
                         {` — ${formatMoney(o.due, o.currency)} due`}
-                        {o.fromInbox ? ' · Inbox' : ''}
+                        {o.expense.inbox ? ' · Inbox' : ''}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -550,15 +502,9 @@ export const RecordPaymentDialog: React.FC<{
                   {formatMoney(selectedOption.expense.total, selectedOption.expense.currency)} total, {formatMoney(selectedOption.expense.amount_due, selectedOption.expense.currency)} still due.
                 </p>
               )}
-              {selectedOption?.doc && (
+              {expenseOptions.length === 0 && (
                 <p className="text-[11px] text-muted-foreground">
-                  Still in the Inbox — {selectedOption.doc.issuer_name ?? selectedOption.doc.issuer_vat ?? 'received document'}
-                  {' · '}<span className="font-mono">MARK {selectedOption.doc.mark}</span>. Saving turns it into an expense and settles it in one step.
-                </p>
-              )}
-              {expenseOptions.length === 0 && expenseSource === 'all' && (
-                <p className="text-[11px] text-muted-foreground">
-                  Nothing to pay. A new cost is booked with “Add expense”; received documents arrive under Documents → Expenses (Inbox).
+                  Nothing to pay. A new cost is booked with “Add expense”; a received document is booked from Documents → Expenses (Inbox) with “Add to Expenses”.
                 </p>
               )}
             </div>
