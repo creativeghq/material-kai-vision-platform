@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -984,7 +985,7 @@ export const NewOrderModal: React.FC<{
           {!isSales && locked && (
             <div className="space-y-2 rounded-md border border-border/60 p-3">
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={receiveNow} onChange={(e) => setReceiveNow(e.target.checked)} />
+                <Checkbox className="h-3.5 w-3.5 rounded" checked={receiveNow} onCheckedChange={(v) => setReceiveNow(v === true)} />
                 <span className="font-medium">Receive these goods into the warehouse now</span>
               </label>
               {receiveNow && warehouses.length > 1 && (

@@ -7,6 +7,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -213,7 +214,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                 </div>
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                    <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={e.add_to_catalog} onChange={(ev) => setEdit(it.id, { add_to_catalog: ev.target.checked })} />
+                    <Checkbox className="h-3.5 w-3.5 rounded" checked={e.add_to_catalog} onCheckedChange={(v) => setEdit(it.id, { add_to_catalog: v === true })} />
                     Add to sellable catalog
                   </label>
                   <div className="flex items-center gap-2">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock, LogIn, LogOut, Loader2, Settings, Copy, Check, Bell, Smartphone } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -193,7 +194,7 @@ function SettingsDialog({ workspaceId, settings, onSaved }: { workspaceId: strin
                 <div className="rounded-md border border-border/60 divide-y divide-border/40 max-h-40 overflow-y-auto">
                   {candidates.map((c) => (
                     <label key={c.user_id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer">
-                      <input type="checkbox" checked={s.notify_user_ids.includes(c.user_id)} onChange={() => toggleUser(c.user_id)} />
+                      <Checkbox checked={s.notify_user_ids.includes(c.user_id)} onCheckedChange={() => toggleUser(c.user_id)} />
                       <span>{c.name}</span>{c.role && <span className="ml-auto text-[10px] text-muted-foreground capitalize">{c.role}</span>}
                     </label>
                   ))}

@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2, FileSignature, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { contractsService } from '@/services/contractsService';
@@ -122,7 +123,7 @@ export default function PublicContractSignPage() {
         )}
 
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
+          <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} className="mt-0.5"  />
           <span>I have read and agree to the terms above, and I consent to signing this contract electronically.</span>
         </label>
 

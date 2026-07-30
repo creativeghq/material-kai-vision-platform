@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
@@ -774,11 +775,11 @@ const PosPage: React.FC = () => {
 
             <label className="flex cursor-pointer items-center justify-between text-xs text-muted-foreground">
               <span>Prices include VAT</span>
-              <input type="checkbox" checked={vatInclusive} onChange={(e) => setVatInclusive(e.target.checked)} />
+              <Checkbox checked={vatInclusive} onCheckedChange={(v) => setVatInclusive(v === true)} />
             </label>
             <label className="flex cursor-pointer items-center justify-between text-xs text-muted-foreground">
               <span>Constitutes a movement document</span>
-              <input type="checkbox" checked={movementDoc} onChange={(e) => setMovementDoc(e.target.checked)} />
+              <Checkbox checked={movementDoc} onCheckedChange={(v) => setMovementDoc(v === true)} />
             </label>
             {movementDoc && (
               <div className="grid grid-cols-2 gap-2">

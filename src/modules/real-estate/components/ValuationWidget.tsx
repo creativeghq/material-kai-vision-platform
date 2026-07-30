@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { TrendingUp, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
 import { realEstatePublic, type ValuationResult } from '../services/realEstateService';
 
@@ -69,7 +70,7 @@ export const ValuationWidget: React.FC<{ userId: string }> = ({ userId }) => {
           </select>
           <Input type="number" placeholder="Area (m²)" value={f.area} onChange={(e) => set('area', e.target.value)} />
           <label className="col-span-full flex items-start gap-2 text-xs text-muted-foreground">
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
+            <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} className="mt-0.5"  />
             I consent to being contacted about the valuation of my property.
           </label>
           {err && <p className="col-span-full text-xs text-destructive">{err}</p>}

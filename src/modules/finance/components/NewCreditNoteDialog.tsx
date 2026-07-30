@@ -7,6 +7,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -165,7 +166,7 @@ export const NewCreditNoteDialog: React.FC<{
                     const lineNet = round2(Number(it.net_value) * (st.include ? ratio : 0));
                     return (
                       <div key={it.id} className="grid grid-cols-[24px_1fr_70px_56px_84px_84px] items-center gap-2 border-t border-border/40 px-2 py-1.5 text-sm">
-                        <input type="checkbox" checked={st.include} onChange={(e) => setLine(it.id, { include: e.target.checked })} />
+                        <Checkbox checked={st.include} onCheckedChange={(v) => setLine(it.id, { include: v === true })} />
                         <span className="truncate">{it.description}</span>
                         <span className="text-right tabular-nums text-muted-foreground">{Number(it.quantity)}{it.unit ? ` ${it.unit}` : ''}</span>
                         <Input className="h-7 text-right text-xs" type="text" inputMode="decimal" value={st.creditQty} disabled={!st.include} onChange={(e) => setLine(it.id, { creditQty: e.target.value })} />

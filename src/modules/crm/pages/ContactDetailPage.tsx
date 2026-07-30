@@ -871,7 +871,7 @@ export const ContactDetailPage: React.FC = () => {
                         )}
                         {!isNew && (
                           <label className="mb-3 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                            <input type="checkbox" checked={!!contact.marketing_consent} onChange={(e) => patchInline({ marketing_consent: e.target.checked })} />
+                            <Checkbox checked={!!contact.marketing_consent} onCheckedChange={(v) => patchInline({ marketing_consent: v === true })} />
                             Marketing consent — may receive property/match alerts by email &amp; WhatsApp
                           </label>
                         )}

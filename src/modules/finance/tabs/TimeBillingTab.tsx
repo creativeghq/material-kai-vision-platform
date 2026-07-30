@@ -5,6 +5,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Trash2, Clock, Search, FilePlus2, CheckCircle2, BarChart3, Users, Contact } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -256,7 +257,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
               {mixedCustomers && <p className="px-4 py-1.5 text-[11px] text-amber-500">Selected entries span multiple customers — invoice one customer at a time.</p>}
               {paginate(unbilledView, unbilledPage).map((e) => (
                 <label key={e.id} className="flex cursor-pointer items-center gap-3 px-4 py-2 text-sm hover:bg-muted/30">
-                  <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} />
+                  <Checkbox checked={selected.has(e.id)} onCheckedChange={() => toggle(e.id)} />
                   <div className="w-20 text-xs text-muted-foreground">{e.work_date}</div>
                   <div className="min-w-0 flex-1 truncate">{e.description}</div>
                   <div className="w-28 truncate text-xs text-muted-foreground">{names[partyKey(e)] || (partyKey(e) ? '—' : 'No customer')}</div>

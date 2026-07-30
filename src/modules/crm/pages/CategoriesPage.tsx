@@ -4,6 +4,7 @@ import {
   Lock, Search, X,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -356,7 +357,7 @@ export const CategoriesPanel: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2 pt-2">
-                <input id="active" type="checkbox" checked={editActive} onChange={(e) => setEditActive(e.target.checked)} />
+                <Checkbox id="active" checked={editActive} onCheckedChange={(v) => setEditActive(v === true)} />
                 <Label htmlFor="active" className="cursor-pointer">Active</Label>
               </div>
               {AUTO_KINDS.includes(editing.kind) && (

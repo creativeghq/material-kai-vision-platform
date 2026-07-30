@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Upload, FileText, Loader2, Trash2, Plus, Sparkles, Wand2, Check, Library } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -272,12 +273,11 @@ export const CatalogSourcesPanel: React.FC<Props> = ({ catalog, onChanged }) => 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {candidates.map((c, i) => (
                     <label key={i} className={`border rounded p-2 flex gap-2 items-start cursor-pointer ${selected[i] ? 'border-primary' : ''}`}>
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={!!selected[i]}
-                        onChange={(e) => setSelected((prev) => ({ ...prev, [i]: e.target.checked }))}
+                        onCheckedChange={(v) => setSelected((prev) => ({ ...prev, [i]: v === true }))}
                         className="mt-1"
-                      />
+                       />
                       <div className="w-14 h-14 rounded bg-muted shrink-0 overflow-hidden">
                         {c.image_url
                           ? <img src={c.image_url} alt={c.name} className="w-full h-full object-cover" />

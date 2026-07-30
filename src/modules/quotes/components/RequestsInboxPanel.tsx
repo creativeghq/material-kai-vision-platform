@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Inbox, Loader2, ArrowRight, ArrowUpCircle, CheckCircle2, XCircle, Send, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -271,12 +272,11 @@ export const RequestsInboxPanel: React.FC = () => {
                       {(r.status === 'priced' || (linesById[r.id]?.some((l) => l.status === 'priced'))) && (
                         <>
                           <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               className="h-3 w-3 accent-primary"
                               checked={!!saveBack[r.id]}
-                              onChange={(e) => setSaveBack((s) => ({ ...s, [r.id]: e.target.checked }))}
-                            />
+                              onCheckedChange={(v) => setSaveBack((s) => ({ ...s, [r.id]: v === true }))}
+                             />
                             Save to catalog
                           </label>
                           <Button size="sm" disabled={busy === r.id} onClick={() => applyPrices(r)}>

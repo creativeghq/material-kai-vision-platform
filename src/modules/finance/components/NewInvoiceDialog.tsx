@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, ChevronLeft, Search, Package, MapPin, Eye } from 'lucide-react';
 import { ToastAction } from '@/components/core/ui/toast';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -1149,12 +1150,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">Items / Services</Label>
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
-                    <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={pricesIncludeVat} onChange={(e) => setPricesIncludeVat(e.target.checked)} />
+                    <Checkbox className="h-3.5 w-3.5 rounded" checked={pricesIncludeVat} onCheckedChange={(v) => setPricesIncludeVat(v === true)} />
                     Prices include VAT
                   </label>
                   {/* #227 — paid-upfront (cash) discount; disabled until a cash rule exists */}
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer" title={cashPct === 0 ? 'Set a Paid-upfront rule in Finance → Settings → Pricing' : `${cashPct}% off when paid upfront`}>
-                    <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={paidUpfront} disabled={cashPct === 0} onChange={(e) => setPaidUpfront(e.target.checked)} />
+                    <Checkbox className="h-3.5 w-3.5 rounded" checked={paidUpfront} disabled={cashPct === 0} onCheckedChange={(v) => setPaidUpfront(v === true)} />
                     Paid upfront{cashPct > 0 ? ` (−${cashPct}%)` : ''}
                   </label>
                   {/* Row defaults — apply measurement unit / VAT / income classification to every row */}
@@ -1376,11 +1377,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </div>
                 )}
                 <label className="flex items-center gap-2 self-end text-xs">
-                  <input type="checkbox" className="h-4 w-4 rounded" checked={vatSuspension} onChange={(e) => setVatSuspension(e.target.checked)} />
+                  <Checkbox className="h-4 w-4 rounded" checked={vatSuspension} onCheckedChange={(v) => setVatSuspension(v === true)} />
                   VAT payment suspension
                 </label>
                 <label className="flex items-center gap-2 self-end text-xs">
-                  <input type="checkbox" className="h-4 w-4 rounded" checked={selfPricing} onChange={(e) => setSelfPricing(e.target.checked)} />
+                  <Checkbox className="h-4 w-4 rounded" checked={selfPricing} onCheckedChange={(v) => setSelfPricing(v === true)} />
                   Self-pricing
                 </label>
               </div>
@@ -1398,7 +1399,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <section className="border-t border-border/40 pt-4 space-y-2">
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="text-xs uppercase tracking-wide text-muted-foreground">B2G — public-sector invoice</span>
-                  <input type="checkbox" className="h-4 w-4 rounded" checked={isB2g} onChange={(e) => setIsB2g(e.target.checked)} />
+                  <Checkbox className="h-4 w-4 rounded" checked={isB2g} onCheckedChange={(v) => setIsB2g(v === true)} />
                 </label>
                 {isB2g && (
                   <>
@@ -1420,12 +1421,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             <section className="border-t border-border/40 pt-4 space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Document &amp; delivery options</Label>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                <label className="flex items-center justify-between cursor-pointer"><span>Submit to myDATA on issue</span><input type="checkbox" className="h-4 w-4 rounded" checked={submitNow} onChange={(e) => setSubmitNow(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><input type="checkbox" className="h-4 w-4 rounded" checked={printOnlineCode} onChange={(e) => setPrintOnlineCode(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Include in MYF report</span><input type="checkbox" className="h-4 w-4 rounded" checked={includeInMyf} onChange={(e) => setIncludeInMyf(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Move stock on issue (decrement warehouse)</span><input type="checkbox" className="h-4 w-4 rounded" checked={moveStock} onChange={(e) => setMoveStock(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Print terms & comments</span><input type="checkbox" className="h-4 w-4 rounded" checked={printTerms} onChange={(e) => setPrintTerms(e.target.checked)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Send by email on create</span><input type="checkbox" className="h-4 w-4 rounded" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Submit to myDATA on issue</span><Checkbox className="h-4 w-4 rounded" checked={submitNow} onCheckedChange={(v) => setSubmitNow(v === true)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><Checkbox className="h-4 w-4 rounded" checked={printOnlineCode} onCheckedChange={(v) => setPrintOnlineCode(v === true)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Include in MYF report</span><Checkbox className="h-4 w-4 rounded" checked={includeInMyf} onCheckedChange={(v) => setIncludeInMyf(v === true)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Move stock on issue (decrement warehouse)</span><Checkbox className="h-4 w-4 rounded" checked={moveStock} onCheckedChange={(v) => setMoveStock(v === true)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Print terms & comments</span><Checkbox className="h-4 w-4 rounded" checked={printTerms} onCheckedChange={(v) => setPrintTerms(v === true)} /></label>
+                <label className="flex items-center justify-between cursor-pointer"><span>Send by email on create</span><Checkbox className="h-4 w-4 rounded" checked={sendEmail} onCheckedChange={(v) => setSendEmail(v === true)} /></label>
                 <div className="flex items-center justify-between"><span>Logo</span>
                   <Select value={logoMode} onValueChange={(v: any) => setLogoMode(v)}>
                     <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
@@ -1459,7 +1460,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
         <DialogFooter className="border-t border-border/60 px-5 py-3 shrink-0 sm:justify-start">
           <label className="mr-auto flex items-center gap-2 text-sm" title="Assigns the legal number + date on create">
-            <input type="checkbox" className="h-4 w-4 rounded" checked={issueNow} onChange={(e) => setIssueNow(e.target.checked)} />
+            <Checkbox className="h-4 w-4 rounded" checked={issueNow} onCheckedChange={(v) => setIssueNow(v === true)} />
             Issue now
           </label>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

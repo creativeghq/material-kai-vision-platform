@@ -3,6 +3,7 @@ import {
   Plus, Loader2, Trash2, Paperclip, Send, FileText, Check, X, ExternalLink, MapPin, UserPlus,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
@@ -720,7 +721,7 @@ const AddExpenseDialog: React.FC<{
           {/* Billable → rebill to a project's client later (Bill to client on the approved card). */}
           <label className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 cursor-pointer">
             <span className="text-xs">Billable to client <span className="text-muted-foreground">— on-charge this cost to a project's client</span></span>
-            <input type="checkbox" checked={billable} onChange={(e) => setBillable(e.target.checked)} className="h-4 w-4" />
+            <Checkbox checked={billable} onCheckedChange={(v) => setBillable(v === true)} className="h-4 w-4"  />
           </label>
           {billable && (
             <div className="space-y-1">

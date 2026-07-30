@@ -10,6 +10,7 @@ import { Home, Layers, AlertTriangle, Loader2, Infinity as InfinityIcon } from '
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -113,26 +114,33 @@ const PlansPage: React.FC = () => {
                     {modules.map((m) => {
                       const dep = MODULE_DEPENDENCIES[m.slug];
                       return (
-                        <tr key={m.slug} className="border-b border-border/30">
-                          <td className="px-4 py-2">
-                            <div className="font-medium">{m.name}</div>
-                            <div className="text-[11px] text-muted-foreground">
-                              {m.category}{!m.enabled ? ' · disabled' : ''}{dep ? ` · needs ${dep.join(', ')}` : ''}
-                            </div>
-                          </td>
-                          {PLAN_TIERS.map((t) => (
-                            <td key={t} className="px-4 py-2 text-center">
-                              <input
-                                type="radio"
-                                name={`tier-${m.slug}`}
-                                checked={m.price_tier === t}
-                                disabled={busy === `mod:${m.slug}`}
-                                onChange={() => setTier(m.slug, t)}
-                                aria-label={`${m.name} on ${t}`}
-                              />
+                        // The row IS the radio group (one tier per module), so the group renders
+                        // AS the <tr> — a wrapper div between tbody and td is not valid table markup.
+                        <RadioGroup
+                          asChild
+                          key={m.slug}
+                          value={m.price_tier ?? ''}
+                          onValueChange={(t) => setTier(m.slug, t as (typeof PLAN_TIERS)[number])}
+                        >
+                          <tr className="border-b border-border/30">
+                            <td className="px-4 py-2">
+                              <div className="font-medium">{m.name}</div>
+                              <div className="text-[11px] text-muted-foreground">
+                                {m.category}{!m.enabled ? ' · disabled' : ''}{dep ? ` · needs ${dep.join(', ')}` : ''}
+                              </div>
                             </td>
-                          ))}
-                        </tr>
+                            {PLAN_TIERS.map((t) => (
+                              <td key={t} className="px-4 py-2">
+                                <RadioGroupItem
+                                  value={t}
+                                  disabled={busy === `mod:${m.slug}`}
+                                  aria-label={`${m.name} on ${t}`}
+                                  className="mx-auto"
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        </RadioGroup>
                       );
                     })}
                   </tbody>

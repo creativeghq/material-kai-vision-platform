@@ -14,6 +14,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { marketingService, type CrmCategory, type MarketingTemplate, type AudienceRecipient } from '../services/marketingService';
 
@@ -231,23 +232,21 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
                 Configure your workspace Resend account in <strong>Setup</strong> before you can send. You can still save a draft.
               </div>
             )}
-            <div className="space-y-2">
+            <RadioGroup value={form.schedule} onValueChange={(v) => setForm({ ...form, schedule: v as any })}>
               {([
-                { v: 'draft', title: 'Save as Draft', sub: 'Create now, send manually later.' },
-                { v: 'now', title: 'Send Now', sub: 'Begin sending on the next processing tick (~8/min).' },
-                { v: 'later', title: 'Schedule for Later', sub: 'Pick a date & time.' },
+                { v: 'draft', title: 'Save as draft', sub: 'Create now, send manually later.' },
+                { v: 'now', title: 'Send now', sub: 'Begin sending on the next processing tick (~8/min).' },
+                { v: 'later', title: 'Schedule for later', sub: 'Pick a date & time.' },
               ] as const).map((o) => (
-                <label key={o.v} className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 ${o.v !== 'draft' && !byokReady ? 'opacity-60' : ''}`}>
-                  <input type="radio" name="schedule" value={o.v} checked={form.schedule === o.v}
-                    disabled={o.v !== 'draft' && !byokReady}
-                    onChange={(e) => setForm({ ...form, schedule: e.target.value as any })} />
+                <label key={o.v} htmlFor={`schedule-${o.v}`} className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 ${o.v !== 'draft' && !byokReady ? 'opacity-60' : ''}`}>
+                  <RadioGroupItem id={`schedule-${o.v}`} value={o.v} disabled={o.v !== 'draft' && !byokReady} />
                   <div>
                     <p className="font-medium">{o.title}</p>
                     <p className="text-xs text-muted-foreground">{o.sub}</p>
                   </div>
                 </label>
               ))}
-            </div>
+            </RadioGroup>
             {form.schedule === 'later' && (
               <div className="space-y-2">
                 <Label htmlFor="c-when">Send Date &amp; Time</Label>

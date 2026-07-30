@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { GripVertical, Save, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import {
@@ -213,12 +214,11 @@ export function DeckBuilderCanvas({ sheetId, moodboardId, initialData, onPdfRead
                   } ${draggingId === s.id ? 'opacity-50' : ''}`}
                 >
                   <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab flex-shrink-0" />
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selected.has(s.id)}
-                    onChange={() => toggleSelected(s.id)}
+                    onCheckedChange={() => toggleSelected(s.id)}
                     className="h-4 w-4 flex-shrink-0"
-                  />
+                   />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{s.title}</div>
                     <div className="text-[10px] text-muted-foreground">

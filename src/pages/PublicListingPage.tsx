@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Building2, MapPin, BedDouble, Bath, Ruler, Zap, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { realEstatePublic, type PublicListing } from '@/modules/real-estate/services/realEstateService';
@@ -119,7 +120,7 @@ const InquiryForm: React.FC<{ token: string }> = ({ token }) => {
       <Input placeholder="Phone (optional)" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
       <Textarea rows={3} placeholder="Message" value={f.message} onChange={(e) => setF({ ...f, message: e.target.value })} />
       <label className="flex items-start gap-2 text-xs text-muted-foreground">
-        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
+        <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} className="mt-0.5"  />
         I consent to my details being used to respond to this enquiry.
       </label>
       {err && <p className="text-xs text-destructive">{err}</p>}

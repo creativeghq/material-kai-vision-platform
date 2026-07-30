@@ -5,6 +5,7 @@ import { PipelineBoard } from '../components/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -203,7 +204,7 @@ const FeedCard: React.FC<{ ws: string | null }> = ({ ws }) => {
         <Rss className="h-4 w-4 text-primary" />
         <span className="text-sm font-semibold">Portal syndication feed</span>
         <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" checked={!!s?.feed_enabled} disabled={busy || !s} onChange={(e) => patch({ feed_enabled: e.target.checked })} /> Enabled
+          <Checkbox checked={!!s?.feed_enabled} disabled={busy || !s} onCheckedChange={(v) => patch({ feed_enabled: v === true })} /> Enabled
         </label>
       </div>
       <p className="mb-3 text-xs text-muted-foreground">Portals (Kyero network, OpenImmo-compatible, custom) pull this URL to import your live public listings. Only <span className="font-medium">active + public</span> listings are included.</p>

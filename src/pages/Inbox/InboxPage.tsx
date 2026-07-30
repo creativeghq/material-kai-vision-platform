@@ -14,6 +14,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
 import { Input } from '@/components/core/ui/input';
@@ -1712,8 +1713,8 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
                   <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border border-white/10 p-1.5">
                     {members.map((m) => (
                       <label key={m.user_id} className="flex items-center gap-2.5 text-sm px-2 py-1.5 rounded-lg hover:bg-accent cursor-pointer transition-colors">
-                        <input type="checkbox" checked={selected.includes(m.user_id)}
-                          onChange={(e) => setSelected((prev) => e.target.checked ? [...prev, m.user_id] : prev.filter((x) => x !== m.user_id))} />
+                        <Checkbox checked={selected.includes(m.user_id)}
+                          onCheckedChange={(v) => setSelected((prev) => v === true ? [...prev, m.user_id] : prev.filter((x) => x !== m.user_id))} />
                         <Avatar className="h-7 w-7"><AvatarFallback className={`text-[10px] ${avatarTint(m.label)}`}>{initials(m.label)}</AvatarFallback></Avatar>
                         {m.label}
                       </label>

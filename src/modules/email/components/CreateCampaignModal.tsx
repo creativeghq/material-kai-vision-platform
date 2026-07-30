@@ -15,6 +15,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
+
+/** The two radio lists, as data — six near-identical option blocks were copied out by hand,
+ *  which is how one of them ended up with no handler at all (the disabled "filtered" row). */
+const AUDIENCE_OPTIONS: Array<{ value: string; title: string; hint: string; disabled?: boolean }> = [
+  { value: 'all_users', title: 'All users', hint: 'Send to all registered users' },
+  { value: 'all_contacts', title: 'All contacts', hint: 'Send to all email contacts' },
+  { value: 'both', title: 'Users + contacts', hint: 'Send to both users and contacts' },
+  { value: 'selected', title: 'Select recipients', hint: 'Search and select specific users/contacts' },
+  { value: 'specific', title: 'Specific emails', hint: 'Enter email addresses manually' },
+  { value: 'filtered', title: 'Filtered audience (coming soon)', hint: 'Filter by role, subscription, tags, etc.', disabled: true },
+];
+
+const SCHEDULE_OPTIONS: Array<{ value: string; title: string; hint: string }> = [
+  { value: 'now', title: 'Save as draft', hint: 'Create campaign and send manually later' },
+  { value: 'later', title: 'Schedule for later', hint: 'Set a specific date and time' },
+];
 
 interface CreateCampaignModalProps {
   onClose: () => void;
@@ -505,91 +522,25 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
 
             {/* Audience Type Selection */}
             <div className="space-y-2">
-              <Label>Audience Type</Label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="radio"
-                    name="audience_type"
-                    value="all_users"
-                    checked={formData.audience_type === 'all_users'}
-                    onChange={(e) => setFormData({ ...formData, audience_type: e.target.value })}
-                  />
-                  <div>
-                    <p className="font-medium">All Users</p>
-                    <p className="text-xs text-muted-foreground">Send to all registered users</p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="radio"
-                    name="audience_type"
-                    value="all_contacts"
-                    checked={formData.audience_type === 'all_contacts'}
-                    onChange={(e) => setFormData({ ...formData, audience_type: e.target.value })}
-                  />
-                  <div>
-                    <p className="font-medium">All Contacts</p>
-                    <p className="text-xs text-muted-foreground">Send to all email contacts</p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="radio"
-                    name="audience_type"
-                    value="both"
-                    checked={formData.audience_type === 'both'}
-                    onChange={(e) => setFormData({ ...formData, audience_type: e.target.value })}
-                  />
-                  <div>
-                    <p className="font-medium">Users + Contacts</p>
-                    <p className="text-xs text-muted-foreground">Send to both users and contacts</p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="radio"
-                    name="audience_type"
-                    value="selected"
-                    checked={formData.audience_type === 'selected'}
-                    onChange={(e) => setFormData({ ...formData, audience_type: e.target.value })}
-                  />
-                  <div>
-                    <p className="font-medium">Select Recipients</p>
-                    <p className="text-xs text-muted-foreground">Search and select specific users/contacts</p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="radio"
-                    name="audience_type"
-                    value="specific"
-                    checked={formData.audience_type === 'specific'}
-                    onChange={(e) => setFormData({ ...formData, audience_type: e.target.value })}
-                  />
-                  <div>
-                    <p className="font-medium">Specific Emails</p>
-                    <p className="text-xs text-muted-foreground">Enter email addresses manually</p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 opacity-50">
-                  <input
-                    type="radio"
-                    name="audience_type"
-                    value="filtered"
-                    disabled
-                  />
-                  <div>
-                    <p className="font-medium">Filtered Audience (Coming Soon)</p>
-                    <p className="text-xs text-muted-foreground">Filter by role, subscription, tags, etc.</p>
-                  </div>
-                </label>
-              </div>
+              <Label>Audience type</Label>
+              <RadioGroup
+                value={formData.audience_type}
+                onValueChange={(v) => setFormData({ ...formData, audience_type: v })}
+              >
+                {AUDIENCE_OPTIONS.map((o) => (
+                  <label
+                    key={o.value}
+                    htmlFor={`audience-${o.value}`}
+                    className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50${o.disabled ? ' opacity-50' : ''}`}
+                  >
+                    <RadioGroupItem id={`audience-${o.value}`} value={o.value} disabled={o.disabled} />
+                    <div>
+                      <p className="font-medium">{o.title}</p>
+                      <p className="text-xs text-muted-foreground">{o.hint}</p>
+                    </div>
+                  </label>
+                ))}
+              </RadioGroup>
             </div>
 
             {/* Recipient Selector */}
@@ -700,36 +651,25 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
           <div className="space-y-4">
             {/* Schedule Type Selection */}
             <div className="space-y-2">
-              <Label>When to Send</Label>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="radio"
-                    name="schedule_type"
-                    value="now"
-                    checked={formData.schedule_type === 'now'}
-                    onChange={(e) => setFormData({ ...formData, schedule_type: e.target.value })}
-                  />
-                  <div>
-                    <p className="font-medium">Save as Draft</p>
-                    <p className="text-xs text-muted-foreground">Create campaign and send manually later</p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
-                  <input
-                    type="radio"
-                    name="schedule_type"
-                    value="later"
-                    checked={formData.schedule_type === 'later'}
-                    onChange={(e) => setFormData({ ...formData, schedule_type: e.target.value })}
-                  />
-                  <div>
-                    <p className="font-medium">Schedule for Later</p>
-                    <p className="text-xs text-muted-foreground">Set a specific date and time</p>
-                  </div>
-                </label>
-              </div>
+              <Label>When to send</Label>
+              <RadioGroup
+                value={formData.schedule_type}
+                onValueChange={(v) => setFormData({ ...formData, schedule_type: v })}
+              >
+                {SCHEDULE_OPTIONS.map((o) => (
+                  <label
+                    key={o.value}
+                    htmlFor={`schedule-${o.value}`}
+                    className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50"
+                  >
+                    <RadioGroupItem id={`schedule-${o.value}`} value={o.value} />
+                    <div>
+                      <p className="font-medium">{o.title}</p>
+                      <p className="text-xs text-muted-foreground">{o.hint}</p>
+                    </div>
+                  </label>
+                ))}
+              </RadioGroup>
             </div>
 
             {/* Schedule Date/Time Input */}

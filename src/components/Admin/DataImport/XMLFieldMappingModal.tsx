@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Badge } from '@/components/core/ui/badge';
 import {
   Select,
@@ -720,13 +721,12 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
         {/* Save as template */}
         <div className="space-y-3 bg-muted/50 p-4 rounded-lg border">
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="save-template"
               checked={saveAsTemplate}
-              onChange={(e) => setSaveAsTemplate(e.target.checked)}
+              onCheckedChange={(v) => setSaveAsTemplate(v === true)}
               className="rounded"
-            />
+             />
             <Label htmlFor="save-template" className="cursor-pointer">
               Save as mapping template for future imports
             </Label>

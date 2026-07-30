@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter , DialogDescription } from '@/components/core/ui/dialog';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -194,7 +195,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             <span className="pl-6 text-[10px] text-muted-foreground">
               {hasOrder
                 ? 'Receive it on the purchase order — that is where the delivered quantities live.'
-                : 'Puts the goods into stock. Nothing else here does — booking or paying the document leaves the warehouse untouched.'}
+                : 'Puts the goods into stock without creating an order — for a document you are not booking as a purchase. Recording a payment never moves stock.'}
             </span>
           </DropdownMenuItem>
 
@@ -209,7 +210,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             <span className="flex items-center"><ShoppingCart className="h-4 w-4 mr-2" /> {hasOrder ? 'Already in Expenses' : 'Add to Expenses'}</span>
             {!hasOrder && (
               <span className="pl-6 text-[10px] text-muted-foreground">
-                Creates the unpaid purchase order from its lines and the expense against it — shows in Payables until you pay. Stock is untouched until you receive it.
+                Creates the unpaid purchase order from its lines and the expense against it — shows in Payables until you pay. The goods go into the warehouse in the same step, unless you untick that in the form.
               </span>
             )}
           </DropdownMenuItem>
@@ -253,7 +254,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
                 <Input value={doc.issuer_vat ?? ''} disabled className="font-mono text-xs" />
               </div>
               <label className="flex items-start gap-2 cursor-pointer rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
-                <input type="checkbox" className="mt-0.5 h-3.5 w-3.5 rounded" checked={enrich} onChange={(e) => setEnrich(e.target.checked)} />
+                <Checkbox className="mt-0.5 h-3.5 w-3.5 rounded" checked={enrich} onCheckedChange={(v) => setEnrich(v === true)} />
                 <span>
                   <span className="flex items-center gap-1 font-medium">
                     <Sparkles className="h-3 w-3" />

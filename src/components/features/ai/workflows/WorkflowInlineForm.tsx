@@ -12,6 +12,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Send, ArrowDownToLine, X } from 'lucide-react';
 import { getErrorMessage } from '@/core/errors/utils';
 import { Button } from '@/components/core/ui/button';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -134,7 +135,7 @@ const FieldInput: React.FC<{
     case 'checkbox':
       return (
         <label className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
+          <Checkbox checked={!!value} onCheckedChange={(v) => onChange(v === true)} />
           <span className="text-xs">{field.placeholder}</span>
         </label>
       );

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Send, Mail, Users, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -238,12 +239,11 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
               </div>
 
               <div className="flex items-center gap-2 pt-1">
-                <input
+                <Checkbox
                   id="ensure-grants"
-                  type="checkbox"
                   checked={ensureGrants}
-                  onChange={(e) => setEnsureGrants(e.target.checked)}
-                />
+                  onCheckedChange={(v) => setEnsureGrants(v === true)}
+                 />
                 <Label htmlFor="ensure-grants" className="cursor-pointer text-xs">
                   Auto-grant gate access — every recipient gets a row in the email allowlist so the gate accepts them on first visit. Recommended.
                 </Label>

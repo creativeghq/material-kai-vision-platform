@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Loader2, Sparkles, Briefcase, ChevronLeft, UserPlus, GraduationCap, ExternalLink, FileUp, FileText, Wand2, Zap, Trash2, Lock, LockOpen, Pencil, Link as LinkIcon } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -510,8 +511,8 @@ function JobDialog({ workspaceId, departments, posting, onDone }: { workspaceId:
                   <Input value={r.currency} onChange={(e) => updComp(i, { currency: e.target.value.toUpperCase() })} placeholder="GBP" className="h-8" />
                 </div>
                 <div className="flex items-center gap-4 text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={r.equity} onChange={(e) => updComp(i, { equity: e.target.checked })} />Offers equity</label>
-                  <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={r.bonus} onChange={(e) => updComp(i, { bonus: e.target.checked })} />Offers bonus</label>
+                  <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={r.equity} onCheckedChange={(v) => updComp(i, { equity: v === true })} />Offers equity</label>
+                  <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={r.bonus} onCheckedChange={(v) => updComp(i, { bonus: v === true })} />Offers bonus</label>
                 </div>
               </div>
             ))}
@@ -531,7 +532,7 @@ function JobDialog({ workspaceId, departments, posting, onDone }: { workspaceId:
                 ['ask_cover_letter', 'Ask for a cover letter'],
               ] as const).map(([k, label]) => (
                 <label key={k} className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={f[k]} onChange={(e) => upd(k, e.target.checked)} />{label}
+                  <Checkbox checked={f[k]} onCheckedChange={(v) => upd(k, v === true)} />{label}
                 </label>
               ))}
             </div>
