@@ -16,7 +16,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
-import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, listUserWorkspaceIds } from '../_shared/auth.ts';
 import { isWorkspaceEntitled, notEntitledResponse } from '../_shared/entitlement.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
@@ -167,6 +167,41 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       return (await isWorkspaceEntitled(supabaseClient, wsId, 'messaging')) ? null : notEntitledResponse('messaging');
     };
 
+    // ── Caller workspace resolution ───────────────────────────────────────────
+    // AuthResult carries NO `workspace_id` field — every `auth.workspace_id` in this
+    // file read `undefined`, which silently disabled the #250 B6/C27 tenancy binding
+    // (channels inserted with a NULL workspace) and made the channels/logs/analytics
+    // reads return empty forever. Derive it from active membership instead.
+    let _callerWsIds: string[] | null = null;
+    const callerWorkspaceIds = async (): Promise<string[]> => {
+      if (!_callerWsIds) _callerWsIds = await listUserWorkspaceIds(supabaseClient, auth.userId);
+      return _callerWsIds;
+    };
+
+    /**
+     * The single workspace to bind/gate an action against.
+     *
+     * An explicit id must be one the caller is an ACTIVE member of — strict membership,
+     * NOT `userCanAccessWorkspace`, because that grants global admin/super_admin and would
+     * reopen exactly what #250 C27 closed (operator-of-A attaching an account to workspace-B).
+     * With no explicit id, only an unambiguous single membership is used; ambiguous (or none)
+     * returns null so the caller decides whether that is fatal.
+     */
+    const resolveTargetWorkspaceId = async (explicit?: string | null): Promise<string | null> => {
+      if (explicit) {
+        if (isAdminAccess(auth)) return explicit;
+        const ids = await callerWorkspaceIds();
+        if (!ids.includes(explicit)) throw new HttpError(403, 'Not a member of the target workspace');
+        return explicit;
+      }
+      const ids = await callerWorkspaceIds();
+      return ids.length === 1 ? ids[0] : null;
+    };
+
+    /** Workspace ids a read action may see: null = unrestricted (platform secret-key caller). */
+    const readScopeWorkspaceIds = async (): Promise<string[] | null> =>
+      isAdminAccess(auth) ? null : await callerWorkspaceIds();
+
     switch (action) {
       // ─────────────────────────────────────────────────────────────
       // Send single message (1+ recipients)
@@ -176,7 +211,8 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const channel = await resolveChannel(supabaseClient, body.from);
         if (!channel) throw new Error('No WhatsApp channel configured. Connect a WhatsApp number first.');
         if (!channel.zernio_account_id) throw new Error('Channel is not linked to a Zernio account.');
-        { const gate = await requireMessaging(channel.workspace_id ?? auth.workspace_id); if (gate) return gate; }
+        const tenantWsId = channel.workspace_id ?? (await resolveTargetWorkspaceId());
+        { const gate = await requireMessaging(tenantWsId); if (gate) return gate; }
 
         let template: any = null;
         if (body.templateId) {
@@ -229,7 +265,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           if (result.success) {
             await supabaseClient.from('messaging_logs').insert({
               created_by: billingUserId,
-              workspace_id: channel.workspace_id ?? auth.workspace_id, // #250 B6: tenant scope
+              workspace_id: tenantWsId, // #250 B6: tenant scope
               channel_id: channel.id,
               channel_type: 'whatsapp',
               template_id: template?.id ?? null,
@@ -261,7 +297,8 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const channel = await resolveChannel(supabaseClient, body.from);
         if (!channel) throw new Error('No WhatsApp channel configured');
         if (!channel.zernio_account_id) throw new Error('Channel is not linked to a Zernio account.');
-        { const gate = await requireMessaging(channel.workspace_id ?? auth.workspace_id); if (gate) return gate; }
+        const tenantWsId = channel.workspace_id ?? (await resolveTargetWorkspaceId());
+        { const gate = await requireMessaging(tenantWsId); if (gate) return gate; }
         // T2-5 — cumulative daily cap: count what the channel already sent TODAY, not just this request's
         // size, so many small requests can't blow past the quota.
         if (channel.daily_quota && channel.daily_quota > 0) {
@@ -323,7 +360,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           if (result.success) {
             await supabaseClient.from('messaging_logs').insert({
               created_by: billingUserId,
-              workspace_id: channel.workspace_id ?? auth.workspace_id, // #250 B6: tenant scope
+              workspace_id: tenantWsId, // #250 B6: tenant scope
               channel_id: channel.id,
               channel_type: 'whatsapp',
               template_id: template?.id ?? null,
@@ -355,18 +392,14 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           throw new Error('accessToken, wabaId and phoneNumberId are required (from Meta Business Suite)');
         }
 
-        const wsId = workspaceId || auth.workspace_id;
-        if (!wsId) throw new Error('No workspace context to attach the WhatsApp account to');
+        // #250 C27: operator roles are workspace-scoped — the caller must be an active member
+        // of the target workspace before attaching a WhatsApp account (else operator-of-A could
+        // connect an account to workspace-B by passing its id). resolveTargetWorkspaceId does
+        // that check (403 on non-member) and falls back to the caller's sole workspace when the
+        // body omits one. Platform-secret callers pass.
+        const wsId = await resolveTargetWorkspaceId(workspaceId);
+        if (!wsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
         { const gate = await requireMessaging(wsId); if (gate) return gate; }
-        // #250 C27: operator roles are workspace-scoped — verify the caller belongs to the
-        // target workspace before attaching a WhatsApp account (else operator-of-A could
-        // connect an account to workspace-B by passing its id). Platform-secret callers pass.
-        if (!isAdminAccess(auth)) {
-          const { data: _mem } = await supabaseClient.from('workspace_members')
-            .select('id').eq('user_id', auth.userId).eq('workspace_id', wsId)
-            .eq('status', 'active').limit(1).maybeSingle();
-          if (!_mem) return jsonResponse({ error: 'Not a member of the target workspace' }, 403);
-        }
         const profileId = await resolveWorkspaceProfile(supabaseClient, wsId);
 
         // Zernio: POST /v1/connect/whatsapp/credentials → { account: { accountId, username, displayName, selectedPhoneNumber } }
@@ -436,7 +469,12 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // Sync channels: pull connected WhatsApp accounts from Zernio
       // ─────────────────────────────────────────────────────────────
       case 'sync-channels': {
-        { const gate = await requireMessaging(auth.workspace_id); if (gate) return gate; }
+        // Channels pulled from Zernio are bound to the caller's workspace. Without a definite
+        // one we cannot bind them (a NULL workspace_id channel is visible to every tenant via
+        // resolveChannel), so require an explicit id rather than inserting unbound rows.
+        const syncWsId = await resolveTargetWorkspaceId(requestBody.workspaceId);
+        if (!syncWsId) throw new HttpError(400, 'workspaceId is required (you belong to more than one workspace)');
+        { const gate = await requireMessaging(syncWsId); if (gate) return gate; }
         const data = await zernioApi('GET', '/accounts?platform=whatsapp');
         const accounts = (data.accounts || data.data || []) as any[];
         const synced: any[] = [];
@@ -463,7 +501,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               .from('messaging_channels').select('*', { count: 'exact', head: true })
               .eq('channel_type', 'whatsapp');
             await supabaseClient.from('messaging_channels').insert({
-              workspace_id: auth.workspace_id, // #250 B6: bind to the caller's workspace
+              workspace_id: syncWsId, // #250 B6: bind to the caller's workspace
               channel_type: 'whatsapp',
               provider: 'zernio',
               sender_id: senderId,
@@ -506,12 +544,13 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         // Tenancy (#250 invariant #1): these read actions use the RLS-bypassing service-role client and
         // are NOT operator-gated, so they MUST filter by the caller's workspace or any authenticated user
         // could enumerate every tenant's WhatsApp channels (waba_id/phone_number_id). No workspace → none.
-        if (!auth.workspace_id) return jsonResponse({ channels: [] });
-        const { data, error } = await supabaseClient
+        const chScope = await readScopeWorkspaceIds();
+        if (chScope && chScope.length === 0) return jsonResponse({ channels: [] });
+        let chQuery = supabaseClient
           .from('messaging_channels').select('*')
-          .eq('channel_type', 'whatsapp')
-          .eq('workspace_id', auth.workspace_id)
-          .order('is_default', { ascending: false });
+          .eq('channel_type', 'whatsapp');
+        if (chScope) chQuery = chQuery.in('workspace_id', chScope);
+        const { data, error } = await chQuery.order('is_default', { ascending: false });
         if (error) throw error;
         return jsonResponse({ channels: data });
       }
@@ -528,14 +567,15 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       case 'logs': {
         // Tenancy: without a workspace filter any user could read every tenant's customer phone numbers
         // + message bodies. Scope to the caller's workspace.
-        if (!auth.workspace_id) return jsonResponse({ logs: [], total: 0 });
+        const logScope = await readScopeWorkspaceIds();
+        if (logScope && logScope.length === 0) return jsonResponse({ logs: [], total: 0 });
         const { limit = 50, offset = 0, status } = requestBody;
         let query = supabaseClient
           .from('messaging_logs').select('*', { count: 'exact' })
           .eq('channel_type', 'whatsapp')
-          .eq('workspace_id', auth.workspace_id)
           .order('created_at', { ascending: false })
           .range(offset, offset + limit - 1);
+        if (logScope) query = query.in('workspace_id', logScope);
         if (status) query = query.eq('status', status);
         const { data, count, error } = await query;
         if (error) throw error;
@@ -543,15 +583,17 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       }
 
       case 'analytics': {
-        if (!auth.workspace_id) return jsonResponse({ total: 0, totalSent: 0, totalDelivered: 0, totalRead: 0, totalFailed: 0, deliveryRate: 0, readRate: 0, failureRate: 0, byStatus: {}, dailyData: [] });
+        const anScope = await readScopeWorkspaceIds();
+        if (anScope && anScope.length === 0) return jsonResponse({ total: 0, totalSent: 0, totalDelivered: 0, totalRead: 0, totalFailed: 0, deliveryRate: 0, readRate: 0, failureRate: 0, byStatus: {}, dailyData: [] });
         const { startDate, endDate } = requestBody;
         const start = startDate || new Date(Date.now() - 30 * 86400000).toISOString();
         const end = endDate || new Date().toISOString();
-        const { data: logs } = await supabaseClient
+        let anQuery = supabaseClient
           .from('messaging_logs').select('status')
           .eq('channel_type', 'whatsapp')
-          .eq('workspace_id', auth.workspace_id)
           .gte('created_at', start).lte('created_at', end);
+        if (anScope) anQuery = anQuery.in('workspace_id', anScope);
+        const { data: logs } = await anQuery;
 
         const byStatus: Record<string, number> = {};
         for (const l of logs || []) byStatus[l.status] = (byStatus[l.status] || 0) + 1;
