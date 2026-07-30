@@ -209,7 +209,13 @@ export function filterNavItems(
   return items.filter((item) => {
     // Scoped invited roles see a focused subset only (overrides the gates below).
     if (ctx.isAccountant) return item.id === 'dashboard' || item.id === 'finance';
-    if (ctx.isSalesRep) return item.id === 'dashboard' || item.id === 'quotes';
+    // The Sales portal itself MUST be in this subset: `sales.portal` is held by no other persona,
+    // so omitting it here made the "Sales" entry unreachable for everyone — reps landed on /sales
+    // only via the Index redirect and had no way back to it.
+    // The Sales portal itself MUST be in this subset: `sales.portal` is held by no other persona,
+    // so omitting it here made the "Sales" entry unreachable for everyone — reps landed on /sales
+    // only via the Index redirect and had no way back to it.
+    if (ctx.isSalesRep) return item.id === 'dashboard' || item.id === 'sales' || item.id === 'quotes';
     // #249 — Estate Agent: Real Estate surface only (their own listings/leads + open-for-all).
     if (ctx.isRealEstateAgent) return item.id === 'dashboard' || item.id === 'real-estate';
     if (item.requirePlatform && !ctx.isPlatformOperator) return false;
