@@ -19,7 +19,7 @@
 - **MIVAA is a different repository** (`creativeghq/mivaa-pdf-extractor`, single-branch `main`). Backend changes get committed and pushed *there*, not here. Editing the submodule working copy without pushing to that repo ships nothing.
 - **Git**: commit and push straight to `origin/main`. No feature branches. Pushed = done.
 - **GitHub**: `gh` commands run without asking for permission. Repo: `creativeghq/material-kai-vision-platform`.
-- **Before done**: `npm run typecheck && npm test`. Both must pass.
+- **Before done**: `npm run typecheck && npm test`. Both must pass. `npm run typecheck` covers `src/` ONLY — `tsconfig.json` excludes `supabase/**`. Edge functions are checked by `npm run typecheck:edge` (`deno check`, gated in CI by `.github/workflows/edge-typecheck.yml`); run it when you touch one. It is baseline-relative — `.github/edge-typecheck-baseline.json` fails the build when a count rises, so ratchet the numbers down as you fix things rather than editing the baseline upward.
 - **Codebase search**: Grep/Glob for known targets; Agent `subagent_type=Explore` for broad sweeps.
 - **Plans and specs** go in a GitHub issue, never a file. `docs/` is for finalized reference only.
 
@@ -116,6 +116,19 @@ Adding a tool requires updating `SERVER_TOOLKITS` **and** the client `TOOLKITS` 
 stay in sync (guarded by [tests/unit/toolkitCoverage.test.ts](tests/unit/toolkitCoverage.test.ts)).
 Every new tool's `onChunk` type MUST be registered in `AGENT_RESULT_TITLES` in `AgentHub.tsx`, or the output is
 silently dropped.
+
+## Workspace roles — the vocabulary lives in four places at once
+`src/auth/workspaceRoles.ts` is the catalog (label + portal + description + module gate). A role must ALSO exist
+in `workspace_members_role_check`, `workspace_invites_role_check`, and the allowlists inside
+`create_workspace_invite` / `set_workspace_member_role`, plus get a `resolvePersona` branch. Skip one and it
+fails silently in a specific way: `sales`, `realestate_agent` and `employee` were invitable but not *storable*
+until 2026-07-30, so `redeem_workspace_invite` threw a CHECK violation on every one of those invites; a role
+with no `resolvePersona` branch instead falls through to `staff` and hands out finance/CRM/warehouse access.
+Guarded by [tests/unit/workspaceRoles.test.ts](tests/unit/workspaceRoles.test.ts).
+**Who someone *is* is never re-typed by hand.** "Who is an employee / a sales manager" is answered by
+`workspace_members.role` (access role → portal) and `hr_employees` (the HR roster); the `/admin/crm?tab=categories`
+lists of kind `role` / `employment` are DERIVED from those by `crm_resync_auto_category_members`. Never create a
+`manual` category that restates one of them.
 
 ## Embeddings & VECS — footguns
 **VECS is the single source of truth for image embeddings.** All vectors are halfvec.

@@ -229,7 +229,8 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
     }
   };
 
-  const showMargin = !(isSalesRep && !salesCanSeeCost);
+  // A sales MANAGER owns the team's numbers, so the per-rep cost blind is not theirs to wear.
+  const showMargin = can('sales.team.view') || !(isSalesRep && !salesCanSeeCost);
   // #227 — per-line margin (cost → price spread) is internal-only: pricing managers/admins,
   // and even then hidden from a sales rep who isn't cleared to see cost.
   const canSeeLineMargin = can('pricing.manage') && showMargin;

@@ -16,7 +16,7 @@ A rep sees only their own orders (RLS: `quotes.user_id = auth.uid()`), picks or 
 
 ### Persona & access
 - Workspace role `sales` resolves to persona `'sales'` (`resolvePersona`, checked **before** the member/staff fallback). Capabilities: `sales.portal`, `quotes.use`, `crm.view`, `marketplace.browse`, `agent.use` — see the [capability matrix](capabilities-and-tenancy.md#13-personacapability-matrix). `usePermissions()` also exposes `isSalesRep`.
-- **Onboarding**: workspace owner generates an invite via `TeamInviteCard` (roles `accountant | sales | member`); invitee signs up at `/auth?mode=signup&invite=CODE` and auto-joins as `sales`.
+- **Onboarding**: workspace owner invites from **Profile → Team** (or Finance → Settings → Team) via `TeamPanel` — by email (bound to that address) or by link. Roles come from `src/auth/workspaceRoles.ts` (`member | accountant | sales | sales_manager | employee | realestate_agent`); the invitee signs up at `/auth?mode=signup&invite=CODE` and auto-joins with that role. `sales_manager` gets the same portal as a rep but reads the whole team's quote book (RLS: `is_workspace_sales_manager`).
 
 ### Routes
 | Path | Guard | Component |

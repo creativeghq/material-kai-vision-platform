@@ -7,7 +7,7 @@ const Index = () => {
   const { loading, persona } = usePermissions();
   // #201 — invited sales reps land directly on their Sales portal, not the full dashboard.
   if (loading) return null;
-  if (persona === 'sales') return <Navigate to="/sales" replace />;
+  if (persona === 'sales' || persona === 'sales_manager') return <Navigate to="/sales" replace />;
   return (
     <Layout>
       <Dashboard />

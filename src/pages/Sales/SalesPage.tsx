@@ -17,6 +17,7 @@ import { QuoteStatusWord } from '@/lib/quoteStatus';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { quotesService, type QuoteWithItems } from '@/modules/quotes/services/QuotesService';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
@@ -27,6 +28,10 @@ export const SalesPage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
+  // Sales manager (#201): RLS (is_workspace_sales_manager) already returns the whole team's book,
+  // so this only decides whether to label + total it as a team view.
+  const { can } = usePermissions();
+  const canSeeTeam = can('sales.team.view');
 
   const [orders, setOrders] = useState<QuoteWithItems[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +39,8 @@ export const SalesPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   // Per-order customer label + CRM deep-link, resolved after load.
   const [customers, setCustomers] = useState<Record<string, { label: string; href: string }>>({});
+  // Sales manager only: which rep owns each row (RLS widens the read; this labels it).
+  const [reps, setReps] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
 
   // A reload can return fewer orders than the current page covers.
@@ -72,13 +79,26 @@ export const SalesPage: React.FC = () => {
         map[`company:${(co as any).id}`] = { label: (co as any).name, href: `/crm/companies/${(co as any).id}` };
       }
       setCustomers(map);
+
+      // A manager's list spans the team, so each row needs an owner. Reps get one row-owner
+      // (themselves) and don't need the lookup.
+      if (canSeeTeam) {
+        const repIds = [...new Set(data.map((q) => (q as any).user_id).filter(Boolean))] as string[];
+        if (repIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('user_profiles').select('user_id, full_name, email').in('user_id', repIds);
+          setReps(Object.fromEntries(
+            (profiles ?? []).map((p: any) => [p.user_id, p.full_name || p.email || '—']),
+          ));
+        }
+      }
     } catch (err) {
       console.error('Error loading sales orders:', err);
       toast({ title: 'Error', description: 'Failed to load your orders', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, canSeeTeam]);
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
 
@@ -136,7 +156,7 @@ export const SalesPage: React.FC = () => {
         <div className="dashboard-card rounded-2xl border-0 shadow-sm p-3 sm:p-6">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-4">
             <FileText className="h-4 w-4" />
-            My Orders
+            {canSeeTeam ? 'Team Orders' : 'My Orders'}
           </h3>
           <div className="overflow-hidden -mx-3 sm:-mx-6 -mb-6 mt-2">
             {orders.length === 0 ? (
@@ -156,6 +176,7 @@ export const SalesPage: React.FC = () => {
                     <tr className="text-xs font-semibold text-muted-foreground">
                       <th className="text-left px-6 py-2.5 font-medium">Order</th>
                       <th className="text-left px-3 py-2.5 font-medium">Customer</th>
+                      {canSeeTeam && <th className="text-left px-3 py-2.5 font-medium">Rep</th>}
                       <th className="text-left px-3 py-2.5 font-medium">Status</th>
                       <th className="text-left px-3 py-2.5 font-medium">Items</th>
                       <th className="text-left px-3 py-2.5 font-medium">Created</th>
@@ -183,6 +204,11 @@ export const SalesPage: React.FC = () => {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
+                        {canSeeTeam && (
+                          <td className="px-3 py-2.5 text-muted-foreground">
+                            {reps[(q as any).user_id as string] || '—'}
+                          </td>
+                        )}
                         <td className="px-3 py-2.5"><QuoteStatusWord status={q.status} /></td>
                         <td className="px-3 py-2.5 tabular-nums">{q.total_items || q.items?.length || 0}</td>
                         <td className="px-3 py-2.5 text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</td>

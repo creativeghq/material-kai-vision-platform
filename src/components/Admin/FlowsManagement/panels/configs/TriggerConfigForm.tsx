@@ -463,6 +463,7 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
     case 'stripe_payment_failed':
     case 'project_invitation_sent':
     case 'project_invitation_resent':
+    case 'workspace_invitation_sent':
       return (
         <div className="text-xs text-muted-foreground">
           Fires on this platform event. Standard payload under <code>trigger.data</code>:

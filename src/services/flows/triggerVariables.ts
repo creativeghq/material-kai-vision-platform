@@ -230,6 +230,18 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'project_name', label: 'Project name', note: 'The project name.' },
     { key: 'inviter_name', label: 'Inviter name', note: 'Who sent the invite.' },
   ],
+  workspace_invitation_sent: [
+    { key: 'to', label: 'Recipient email', note: 'Invitee email address.' },
+    { key: 'subject', label: 'Subject', note: 'Pre-built email subject.' },
+    { key: 'body', label: 'Body (HTML)', note: 'Pre-rendered invite email HTML.' },
+    { key: 'workspace_id', label: 'Workspace ID', note: 'The workspace they are joining.' },
+    { key: 'workspace_name', label: 'Workspace name', note: 'The team name.' },
+    { key: 'role', label: 'Role', note: 'Workspace role granted on acceptance (e.g. sales_manager).' },
+    { key: 'role_label', label: 'Role label', note: 'Human label for the role, e.g. "Sales Manager".' },
+    { key: 'portal', label: 'Portal', note: 'Which portal the invitee lands on.' },
+    { key: 'invite_url', label: 'Invite URL', note: 'Sign-up link carrying the invite code.' },
+    { key: 'inviter_name', label: 'Inviter name', note: 'Who sent the invite.' },
+  ],
   // Infrastructure triggers
   webhook: [
     { key: 'any field from the POST body', label: 'Webhook body', note: 'Whatever JSON the external caller POSTs becomes trigger.data.*' },
@@ -346,6 +358,7 @@ export const TRIGGER_TITLES: Record<string, string> = {
   stripe_payment_failed: 'Payment failed',
   project_invitation_sent: 'Project invite sent',
   project_invitation_resent: 'Project invite resent',
+  workspace_invitation_sent: 'Team invite sent',
   webhook: 'Webhook (external)',
   scheduled: 'Scheduled (cron)',
   'seo.ranking_movement': 'SEO Rankings Moved',

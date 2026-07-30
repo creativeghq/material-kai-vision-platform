@@ -26,12 +26,12 @@ import { LevelCategoryDiscountsCard } from '@/modules/finance/components/LevelCa
 import { CustomPricingRulesCard } from '@/modules/finance/components/CustomPricingRulesCard';
 import { PendingDiscountApprovalsCard } from '@/modules/finance/components/PendingDiscountApprovalsCard';
 import { ServicesCard } from '@/modules/finance/components/ServicesCard';
-import { TeamInviteCard } from '@/modules/finance/components/TeamInviteCard';
 import { CategoriesCard } from '@/modules/finance/components/CategoriesCard';
 import { BranchesCard } from '@/modules/finance/components/BranchesCard';
 import { PosTerminalsCard } from '@/modules/finance/components/PosTerminalsCard';
 import { StorefrontCard } from '@/modules/finance/components/StorefrontCard';
-import { MembersCard } from '@/modules/finance/components/MembersCard';
+import { TeamPanel } from '@/components/core/Team/TeamPanel';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { WorkspaceCreditsCard } from '@/modules/finance/components/WorkspaceCreditsCard';
 import { EInvoicingCard } from '@/modules/finance/components/EInvoicingCard';
 import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
@@ -67,6 +67,7 @@ const ProviderKeysNote: React.FC = () => (
 export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged }) => {
   const { toast } = useToast();
   const { isOperator } = usePermissions();
+  const { activeWorkspace } = useWorkspace();
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
   const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(true);
@@ -248,10 +249,9 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         </TabsContent>
 
         <TabsContent value="team" className="mt-0 space-y-4">
-          <MembersCard workspaceId={workspaceId} />
+          <TeamPanel workspaceId={workspaceId} workspaceName={activeWorkspace?.name} />
           {/* The operator/root workspace mints & sells credits — it doesn't buy into a pool. */}
           {!isOperator && <WorkspaceCreditsCard workspaceId={workspaceId} />}
-          <TeamInviteCard workspaceId={workspaceId} />
         </TabsContent>
 
         <TabsContent value="storefront" className="mt-0">

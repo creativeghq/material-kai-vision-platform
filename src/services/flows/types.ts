@@ -56,6 +56,7 @@ export type TriggerType =
   | 'stripe_payment_failed'
   | 'project_invitation_sent'
   | 'project_invitation_resent'
+  | 'workspace_invitation_sent'
   | 'inventory_low_stock'
   | 'freight_quote_requested'
   | 'order_dispatched'
@@ -295,6 +296,8 @@ export interface StripePaymentSucceededTriggerConfig {}
 export interface StripePaymentFailedTriggerConfig {}
 export interface ProjectInvitationSentTriggerConfig {}
 export interface ProjectInvitationResentTriggerConfig {}
+/** Team invitation into a workspace with a role/portal (owner/admin invites a colleague). */
+export interface WorkspaceInvitationSentTriggerConfig {}
 
 export type TriggerConfigMap = {
   manual: ManualTriggerConfig;
@@ -343,6 +346,7 @@ export type TriggerConfigMap = {
   stripe_payment_failed: StripePaymentFailedTriggerConfig;
   project_invitation_sent: ProjectInvitationSentTriggerConfig;
   project_invitation_resent: ProjectInvitationResentTriggerConfig;
+  workspace_invitation_sent: WorkspaceInvitationSentTriggerConfig;
   inventory_low_stock: InventoryLowStockTriggerConfig;
   freight_quote_requested: FreightQuoteRequestedTriggerConfig;
   order_dispatched: OrderDispatchedTriggerConfig;

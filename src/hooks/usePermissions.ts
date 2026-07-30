@@ -27,8 +27,10 @@ export interface PermissionsApi {
   //    live as explicit booleans rather than persona capabilities. ──
   /** Invited accountant (#202): Finance only — operate, never manage settings. */
   isAccountant: boolean;
-  /** Invited sales rep (#201): Sales portal only. */
+  /** On the Sales portal (rep OR manager) — drives the focused nav subset for both. */
   isSalesRep: boolean;
+  /** Sales manager: same portal, but the whole team's book (RLS: is_workspace_sales_manager). */
+  isSalesManager: boolean;
   /** Invited estate agent (#249): Real Estate surface only — own listings/leads + open-for-all. */
   isRealEstateAgent: boolean;
   /** Owner/admin of the ACTIVE workspace (vs. a plain member). */
@@ -59,7 +61,10 @@ export function usePermissions(): PermissionsApi {
     // isAccountant, so it keeps approval rights (server: is_workspace_finance_manager
     // already allows finance + owner/admin).
     const isAccountant = workspaceRole === 'accountant';
-    const isSalesRep = persona === 'sales';
+    // Both sales personas get the same focused nav subset; the manager differs only in SCOPE
+    // (team-wide rows + cost/margin), which is expressed by `sales.team.view`.
+    const isSalesManager = persona === 'sales_manager';
+    const isSalesRep = persona === 'sales' || isSalesManager;
     const isRealEstateAgent = persona === 'realestate_agent';
     const isBusinessNode = persona === 'operator' || persona === 'dealer' || persona === 'architect';
     // Manages THIS node: a workspace owner/admin, or any business-tier persona.
@@ -75,6 +80,7 @@ export function usePermissions(): PermissionsApi {
       isEndUser: persona === 'end_user',
       isAccountant,
       isSalesRep,
+      isSalesManager,
       isRealEstateAgent,
       isWorkspaceManager,
       canSupplyProducts,

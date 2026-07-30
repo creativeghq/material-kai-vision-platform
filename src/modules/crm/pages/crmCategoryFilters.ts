@@ -13,7 +13,8 @@ const KIND_OPTIONS: { value: CrmCategoryKind; label: string }[] = [
   { value: 'lead_status', label: 'Lead status' },
   { value: 'lead_source', label: 'Lead source' },
   { value: 'professional_type', label: 'Professional type' },
-  { value: 'role', label: 'Role' },
+  { value: 'role', label: 'Access role' },
+  { value: 'employment', label: 'Employment (HR)' },
 ];
 
 export const CRM_CATEGORY_FILTERS: FilterGroupDef[] = [

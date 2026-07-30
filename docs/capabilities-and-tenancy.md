@@ -25,12 +25,15 @@ Source of truth: `src/auth/capabilities.ts`, `src/hooks/usePermissions.ts`, `src
 | `architect` | Owner/admin of an architect node (sells to end-users with margin) |
 | `staff` | Team member of a business node (`member` workspace role) |
 | `accountant` | Invited external accountant — Finance surface only (#202) |
-| `sales` | Invited sales rep — Sales portal only (#201) |
+| `sales` | Invited sales rep — Sales portal only (#201); sees only their OWN quote book |
+| `sales_manager` | Sales lead — same portal across the WHOLE team's book, incl. cost/margin (`sales.team.view`) |
+| `employee` | Invited staff member — HR self-service only (#252) |
+| `realestate_agent` | Invited property agent — Real Estate portal only (#249) |
 | `end_user` | Project client / referral-joined member — restricted surface |
 
 ### 1.2 Capabilities (`Capability`)
 
-`platform.admin`, `catalog.import`, `network.manage`, `pricing.manage`, `finance.manage`, `invoice.issue`, `crm.view`, `warehouse.manage`, `downstream.view`, `marketplace.browse`, `quotes.use`, `sales.portal`, `projects.use`, `moodboards.use`, `agent.use`.
+`platform.admin`, `catalog.import`, `network.manage`, `pricing.manage`, `finance.manage`, `invoice.issue`, `crm.view`, `warehouse.manage`, `downstream.view`, `marketplace.browse`, `quotes.use`, `sales.portal`, `sales.team.view`, `projects.use`, `moodboards.use`, `agent.use`, `inbox.use`, `hr.*`, `marketing.email`, `realestate.*`.
 
 ### 1.3 Persona→capability matrix
 
@@ -61,13 +64,16 @@ Notes: `operator` differs from `dealer`/`architect` only in the three operator-e
 Inputs `{ isPlatformOperator, rank, workspaceRole }`:
 
 1. `isPlatformOperator` → `operator`
-2. `workspaceRole === 'client'` → `end_user`
-3. `workspaceRole === 'accountant'` → `accountant`
-4. `workspaceRole === 'sales'` → `sales` (must precede member/staff fallback)
-5. owner/admin + rank `dealer` → `dealer`
-6. owner/admin + rank `architect` → `architect`
-7. owner/admin + unknown rank → `dealer`
-8. else → `staff`
+2. `workspaceRole === 'sales_manager'` → `sales_manager` (checked FIRST, before the account-role
+   switch, so an invited manager whose account tier is `sales` is not downgraded to a rep)
+3. `workspaceRole === 'client'` → `end_user`
+4. `workspaceRole === 'accountant'` → `accountant`
+5. `workspaceRole === 'employee'` → `employee`; `'realestate_agent'` → `realestate_agent`
+6. `workspaceRole === 'sales'` → `sales` (must precede member/staff fallback)
+7. owner/admin + rank `dealer` → `dealer`
+8. owner/admin + rank `architect` → `architect`
+9. owner/admin + unknown rank → `dealer`
+10. else → `staff`
 
 `rank` is derived in `WorkspaceContext` from the active workspace node: `isRoot` → `operator`, `canSupplyProducts` → `dealer`, else → `architect`.
 
@@ -79,7 +85,9 @@ Inputs `{ isPlatformOperator, rank, workspaceRole }`:
 | `persona` | `resolvePersona(...)` |
 | `can(cap)` / `canAny(...caps)` | `personaCan(persona, cap)` |
 | `isOperator` / `isEndUser` | `persona === 'operator'` / `'end_user'` (derived from persona, #208) |
-| `isAccountant` / `isSalesRep` | `workspaceRole === 'accountant'` / `'sales'` |
+| `isAccountant` | `workspaceRole === 'accountant'` |
+| `isSalesRep` | on the Sales portal — persona `sales` **or** `sales_manager` (drives the focused nav subset for both) |
+| `isSalesManager` | `persona === 'sales_manager'` — team-wide scope, NOT extra administration |
 | `isWorkspaceManager` | `ADMIN_ROLES.includes(workspaceRole)` (`admin`/`super_admin`/`owner`) |
 | `canSupplyProducts` | rank is `operator` or `dealer` |
 | `canOperateFinance` | `isWorkspaceManager \|\| isAccountant` — day-to-day finance without settings |
@@ -123,7 +131,7 @@ Two paths: (1) **subscription** — owner holds an active Stripe plan whose `sub
 
 ### Tables
 - **`workspaces`**: `name`, `slug`, `is_root` (one row platform-wide), `parent_workspace_id` (hierarchy, cycle-protected by trigger `workspaces_reject_cycle`), `can_supply_products` (dealer flag), `catalog_access` (`operator_catalog`/`own_products_only`), `commission_pct`, `referral_code`/`referral_enabled`, `status`.
-- **`workspace_members`**: `workspace_id`, `user_id`, `role` (`owner`/`admin`/`member`/`client`/`accountant`/`sales`), `permissions` jsonb (**unused** by the capability system — dead state), `status`.
+- **`workspace_members`**: `workspace_id`, `user_id`, `role`, `permissions` jsonb (**unused** by the capability system — dead state), `status`. The role vocabulary lives in **`src/auth/workspaceRoles.ts`** and is mirrored by `workspace_members_role_check` / `workspace_invites_role_check` plus the allowlists in `create_workspace_invite` / `set_workspace_member_role`. Keeping those in sync is not optional: `sales`, `realestate_agent` and `employee` were invitable but *not* storable until 2026-07-30, so every one of those invites threw a CHECK violation on redemption. Guarded by [tests/unit/workspaceRoles.test.ts](../tests/unit/workspaceRoles.test.ts).
 
 ### Signup → own workspace (#194)
 Two `auth.users` INSERT triggers: `create_user_profile_on_signup` (creates `user_profiles` + `user_credits`) and `handle_new_user_workspace_assignment` (creates a child workspace of root named `<email-prefix>'s workspace`, slug `ws-<uid>`, with the new user as `owner`). Every signup gets their own personal workspace — they are **not** added to root.
@@ -139,7 +147,7 @@ Two `auth.users` INSERT triggers: `create_user_profile_on_signup` (creates `user
 - **`userCanAccessWorkspace(adminClient, userId, workspaceId)`** (TS, `_shared/auth.ts`) — edge equivalent.
 
 ### Hierarchy
-Exactly one `is_root=true` workspace; its owner/admins get `isPlatformOperator` and all modules free. All others are tenants linked by `parent_workspace_id`. `get_workspace_ancestors` / `get_workspace_descendants` walk the tree (cycle-protected). `create_child_workspace` (via `workspaceManagementService.createChild`): caller must be parent owner/admin; a child may only set `can_supply_products=true` if its parent can or is root; creator becomes `owner`. Invites (`workspace_invites`, roles `member`/`accountant`/`sales`, one-time, 30-day) vs referrals (always join as `member`). Active workspace is persisted per-user in localStorage.
+Exactly one `is_root=true` workspace; its owner/admins get `isPlatformOperator` and all modules free. All others are tenants linked by `parent_workspace_id`. `get_workspace_ancestors` / `get_workspace_descendants` walk the tree (cycle-protected). `create_child_workspace` (via `workspaceManagementService.createChild`): caller must be parent owner/admin; a child may only set `can_supply_products=true` if its parent can or is root; creator becomes `owner`. Invites (`workspace_invites`, one-time, 30-day, roles per `WORKSPACE_INVITE_ROLES`) vs referrals (always join as `member`). An invite may carry an `email`, which binds redemption to that address (a forwarded link is refused) and is what the `workspace_invitation_sent` flow emails; `revoked_at` takes an unclaimed invite back. Managed from **Profile → Team** / Finance → Settings → Team via `TeamPanel`. Active workspace is persisted per-user in localStorage.
 
 ### Gaps
 - `workspace_members.permissions` jsonb is unused.

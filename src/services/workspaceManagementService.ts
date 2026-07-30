@@ -1,4 +1,22 @@
 import { supabase } from '@/integrations/supabase/client';
+import { escapeHtml } from '@/utils/escapeHtml';
+import { flowEventService } from '@/services/flows/flowEventService';
+import { WORKSPACE_ROLE_META, type WorkspaceInviteRole, type WorkspaceMemberRole } from '@/auth/workspaceRoles';
+
+/** A claimable (or historical) team invitation. */
+export interface WorkspaceInvite {
+  id: string;
+  workspace_id: string;
+  code: string;
+  role: WorkspaceInviteRole;
+  /** Set when the invite was addressed to a person — binds redemption to that address. */
+  email: string | null;
+  invitee_name: string | null;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+}
 
 export interface CreateChildInput {
   name: string;
@@ -59,11 +77,108 @@ export const workspaceManagementService = {
     return data as any;
   },
 
-  /** Owner/admin mints a role-carrying invite (#201/#202); returns the code. */
-  async createInvite(workspaceId: string, role: 'member' | 'accountant' | 'sales' | 'realestate_agent'): Promise<string> {
-    const { data, error } = await supabase.rpc('create_workspace_invite', { p_workspace_id: workspaceId, p_role: role });
+  /** Owner/admin mints a role-carrying invite (#201/#202); returns the code.
+   *  Passing `email` binds the invite to that address — redeem_workspace_invite then refuses a
+   *  forwarded link claimed by anyone else, and the address is what the invite email goes to. */
+  async createInvite(
+    workspaceId: string,
+    role: WorkspaceInviteRole,
+    opts?: { email?: string; name?: string },
+  ): Promise<string> {
+    const { data, error } = await supabase.rpc('create_workspace_invite', {
+      p_workspace_id: workspaceId,
+      p_role: role,
+      p_email: opts?.email ?? null,
+      p_invitee_name: opts?.name ?? null,
+    });
     if (error) throw error;
     return data as string;
+  },
+
+  /**
+   * Mint an invite AND have it delivered by email. Returns the link too, so the inviter can still
+   * hand it over another way.
+   *
+   * Delivery goes through the `workspace_invitation_sent` flow event (a seeded, admin-editable
+   * default flow with a Send Email action) rather than a hardcoded email-api call, so an operator
+   * can retarget or pause team invites without a deploy.
+   */
+  async inviteByEmail(input: {
+    workspaceId: string;
+    workspaceName: string;
+    role: WorkspaceInviteRole;
+    email: string;
+    name?: string;
+  }): Promise<{ code: string; url: string }> {
+    const email = input.email.trim().toLowerCase();
+    const code = await this.createInvite(input.workspaceId, input.role, { email, name: input.name });
+    const appUrl = (import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
+    const url = `${appUrl}/auth?mode=signup&invite=${code}`;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const inviterName = (user?.user_metadata as any)?.full_name || user?.email || 'A colleague';
+    const meta = WORKSPACE_ROLE_META[input.role];
+
+    flowEventService.emit('workspace_invitation_sent', {
+      to: email,
+      subject: `${inviterName} invited you to join ${input.workspaceName} as ${meta.label}`,
+      body: renderTeamInviteEmailHtml({
+        workspaceName: input.workspaceName,
+        inviterName,
+        roleLabel: meta.label,
+        portal: meta.portal,
+        roleDescription: meta.description,
+        inviteUrl: url,
+      }),
+      workspace_id: input.workspaceId,
+      workspace_name: input.workspaceName,
+      role: input.role,
+      role_label: meta.label,
+      portal: meta.portal,
+      invite_url: url,
+      inviter_name: inviterName,
+    });
+
+    return { code, url };
+  },
+
+  /** Invites that are still claimable — not accepted, not revoked, not expired. */
+  async listPendingInvites(workspaceId: string): Promise<WorkspaceInvite[]> {
+    const { data, error } = await supabase
+      .from('workspace_invites')
+      .select('id, workspace_id, code, role, email, invitee_name, created_at, expires_at, accepted_at, revoked_at')
+      .eq('workspace_id', workspaceId)
+      .is('accepted_at', null)
+      .is('revoked_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as WorkspaceInvite[];
+  },
+
+  /** Owner/admin takes an unaccepted invite back. Returns false when not permitted / not found. */
+  async revokeInvite(inviteId: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('revoke_workspace_invite', { p_invite_id: inviteId });
+    if (error) throw error;
+    return data === true;
+  },
+
+  /** Owner/admin re-roles a member. The RPC refuses to strip a workspace's last owner. */
+  async setMemberRole(workspaceId: string, userId: string, role: WorkspaceMemberRole): Promise<boolean> {
+    const { data, error } = await supabase.rpc('set_workspace_member_role', {
+      p_workspace_id: workspaceId, p_user_id: userId, p_role: role,
+    });
+    if (error) throw error;
+    return data === true;
+  },
+
+  /** Owner/admin removes a member. The RPC refuses to remove a workspace's last owner. */
+  async removeMember(workspaceId: string, userId: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc('remove_workspace_member', {
+      p_workspace_id: workspaceId, p_user_id: userId,
+    });
+    if (error) throw error;
+    return data === true;
   },
 
   /** Signed-in user redeems an invite → joins the workspace with the invite's role. */
@@ -90,6 +205,32 @@ export const workspaceManagementService = {
     return Object.fromEntries((data ?? []).map((r: any) => [r.workspace_id, r.enabled]));
   },
 };
+
+/** Invite email body. All interpolation goes through the canonical `escapeHtml` (attribute-safe). */
+function renderTeamInviteEmailHtml(input: {
+  workspaceName: string;
+  inviterName: string;
+  roleLabel: string;
+  portal: string;
+  roleDescription: string;
+  inviteUrl: string;
+}): string {
+  const e = escapeHtml;
+  return `<!doctype html>
+<html><body style="font-family:'Open Sans',Arial,sans-serif;max-width:560px;margin:32px auto;padding:24px;color:#222;">
+  <h2 style="margin:0 0 16px;font-weight:300;">You've been invited to join the team</h2>
+  <p style="margin:0 0 12px;"><strong>${e(input.inviterName)}</strong> invited you to join <strong>${e(input.workspaceName)}</strong> as <strong>${e(input.roleLabel)}</strong>.</p>
+  <p style="margin:16px 0;padding:12px;background:#f5f5f5;border-left:3px solid #999;">
+    <strong>${e(input.portal)}</strong><br>
+    <span style="font-size:13px;color:#555;">${e(input.roleDescription)}</span>
+  </p>
+  <p style="margin:24px 0;">
+    <a href="${e(input.inviteUrl)}" style="display:inline-block;padding:12px 24px;background:#8a3a6b;color:#fff;text-decoration:none;border-radius:9999px;font-weight:500;">Accept invitation</a>
+  </p>
+  <p style="margin:24px 0 0;font-size:13px;color:#666;">This invitation is tied to your email address and expires in 30 days.</p>
+  <p style="margin:8px 0 0;font-size:12px;color:#999;word-break:break-all;">If the button doesn't work, paste this URL into your browser:<br>${e(input.inviteUrl)}</p>
+</body></html>`;
+}
 
 /** Stash a referral code seen in the URL (?ref=) until the user is authenticated. */
 export const REFERRAL_STORAGE_KEY = 'mk_pending_referral';

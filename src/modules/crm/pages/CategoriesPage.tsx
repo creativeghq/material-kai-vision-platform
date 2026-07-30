@@ -30,7 +30,8 @@ import { CRM_CATEGORY_FILTERS } from './crmCategoryFilters';
 
 const KIND_LABELS: Record<CrmCategoryKind, string> = {
   professional_type: 'Professional type',
-  role: 'Role',
+  role: 'Access role',
+  employment: 'Employment (HR)',
   manual: 'Custom',
   industry: 'Industry',
   lead_status: 'Lead status',
@@ -40,14 +41,27 @@ const KIND_LABELS: Record<CrmCategoryKind, string> = {
 const KIND_VARIANTS: Record<CrmCategoryKind, 'default' | 'secondary' | 'outline'> = {
   professional_type: 'secondary',
   role: 'outline',
+  employment: 'secondary',
   manual: 'default',
   industry: 'secondary',
   lead_status: 'outline',
   lead_source: 'outline',
 };
 
-/** Kinds an operator may create directly (the auto kinds are owned by resync). */
-const AUTO_KINDS: CrmCategoryKind[] = ['professional_type'];
+/** Kinds whose MEMBERS are derived by `crm_resync_auto_category_members`, not typed by hand.
+ *  Each one names the table that answers the question, so nobody re-invents the answer:
+ *    professional_type → user_profiles.professional_type
+ *    role             → workspace_members.role   ("who is a sales manager?")
+ *    employment       → hr_employees             ("who actually works here?")
+ *  An operator may still pin someone manually on top; manual rows survive resync. */
+const AUTO_KINDS: CrmCategoryKind[] = ['professional_type', 'role', 'employment'];
+
+/** What each auto kind derives FROM — shown next to the group heading. */
+const AUTO_SOURCE: Partial<Record<CrmCategoryKind, string>> = {
+  professional_type: 'user_profiles.professional_type',
+  role: 'workspace_members.role — the access role that decides which portal they land on',
+  employment: 'hr_employees — the HR module’s own roster, incl. departments and line managers',
+};
 
 /** Pick-one attribute vocabularies — stored as a string on the contact, not as
  * a membership list. They have no members, so the card opens Edit (not the
@@ -92,7 +106,7 @@ export const CategoriesPanel: React.FC = () => {
 
   const grouped = useMemo(() => {
     const out: Record<CrmCategoryKind, CrmCategorySummary[]> = {
-      professional_type: [], role: [], manual: [], industry: [], lead_status: [], lead_source: [],
+      professional_type: [], role: [], employment: [], manual: [], industry: [], lead_status: [], lead_source: [],
     };
     for (const c of filtered) out[c.kind].push(c);
     return out;
@@ -111,7 +125,7 @@ export const CategoriesPanel: React.FC = () => {
       const result = await crmCategoriesService.resyncAuto();
       const inserts = result.reduce((acc, r) => acc + r.out_inserts, 0);
       const deletes = result.reduce((acc, r) => acc + r.out_deletes, 0);
-      toast({ title: 'Resync complete', description: `+${inserts} added · −${deletes} removed across professional_type / role categories.` });
+      toast({ title: 'Resync complete', description: `+${inserts} added · −${deletes} removed across the derived (access role / employment / professional type) categories.` });
       load();
     } catch (err) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
@@ -165,7 +179,7 @@ export const CategoriesPanel: React.FC = () => {
 
   const handleDelete = async (c: CrmCategorySummary) => {
     const autoNote = AUTO_KINDS.includes(c.kind)
-      ? ` This is auto-built from ${c.kind === 'role' ? 'a role' : 'a professional type'}, so it will reappear on the next "Resync auto".`
+      ? ` This is derived from ${AUTO_SOURCE[c.kind]}, so it will reappear on the next "Resync auto".`
       : '';
     if (!window.confirm(`Delete "${c.name}"? Members are removed but the underlying users / contacts stay.${autoNote}`)) return;
     try {
@@ -183,7 +197,10 @@ export const CategoriesPanel: React.FC = () => {
         <div className="text-sm text-muted-foreground max-w-2xl space-y-1">
           <p>Group platform users + CRM contacts + companies into lists — used by "Send to Customers" and other outreach. Every category here is fully editable: rename, recolour, toggle active, add/remove members, or delete.</p>
           <p className="text-xs">
-            <b className="text-foreground">Professional type</b> categories are <i>auto-built</i> from each user's professional type and keep their members in sync — but you can still add anyone to them manually on top. <b className="text-foreground">Custom</b> lists are entirely yours. (Account role — Operator/Dealer/Brand — is a user permission, managed in the Users tab, not a CRM category.)
+            <b className="text-foreground">Access role</b>, <b className="text-foreground">Employment</b> and <b className="text-foreground">Professional type</b> lists are <i>derived</i> — their members come from
+            {' '}<code className="text-foreground">workspace_members.role</code>, <code className="text-foreground">hr_employees</code> and <code className="text-foreground">user_profiles.professional_type</code> respectively, and re-sync on "Resync auto".
+            That is how "who is a sales manager / an employee" is answered: you set it where it belongs (invite someone with that role, or hire them in HR) and the list follows.
+            You can still pin extra people onto a derived list by hand — manual rows survive resync. <b className="text-foreground">Custom</b> lists are entirely yours.
           </p>
         </div>
         <div className="flex gap-2">
@@ -219,7 +236,7 @@ export const CategoriesPanel: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {(['lead_status', 'lead_source', 'industry', 'manual', 'professional_type'] as CrmCategoryKind[]).map((kind) => {
+            {(['role', 'employment', 'lead_status', 'lead_source', 'industry', 'manual', 'professional_type'] as CrmCategoryKind[]).map((kind) => {
               const list = grouped[kind];
               if (list.length === 0) return null;
               return (
@@ -230,7 +247,7 @@ export const CategoriesPanel: React.FC = () => {
                     </h2>
                     <Badge variant={KIND_VARIANTS[kind]} className="text-[10px] py-0">{list.length}</Badge>
                     {AUTO_KINDS.includes(kind) && (
-                      <span className="text-xs text-muted-foreground">— synced from {kind === 'professional_type' ? 'user_profiles.professional_type' : 'roles.name'}</span>
+                      <span className="text-xs text-muted-foreground">— derived from {AUTO_SOURCE[kind]}</span>
                     )}
                     {VOCAB_KINDS.includes(kind) && (
                       <span className="text-xs text-muted-foreground">— pick-one options for the contact {kind === 'lead_status' ? 'Lead Status' : 'Lead Source'} dropdown</span>
@@ -362,7 +379,7 @@ export const CategoriesPanel: React.FC = () => {
               </div>
               {AUTO_KINDS.includes(editing.kind) && (
                 <p className="text-xs text-muted-foreground">
-                  Auto-built from {editing.kind === 'professional_type' ? 'professional type' : 'role'} "{editing.source_value}". You can rename, recolour, toggle Active, and add/remove members freely — auto members just re-sync on "Resync auto". (Only the slug/kind stay fixed so the sync keeps matching.)
+                  Derived from {AUTO_SOURCE[editing.kind]} — value "{editing.source_value}". You can rename, recolour, toggle Active, and add/remove members freely; auto members just re-sync on "Resync auto". (Only the slug/kind/source stay fixed so the sync keeps matching.)
                 </p>
               )}
             </div>

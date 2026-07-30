@@ -61,6 +61,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   stripe_payment_failed: XCircle,
   project_invitation_sent: Share2,
   project_invitation_resent: Share2,
+  workspace_invitation_sent: UserPlus,
   inventory_low_stock: Package,
   freight_quote_requested: Ship,
   order_dispatched: Truck,

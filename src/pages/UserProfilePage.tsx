@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, CalendarDays, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe } from 'lucide-react';
+import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, CalendarDays, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe, Users } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -14,6 +14,7 @@ import { SocialAccountsTab } from '@/modules/social-media/components/SocialAccou
 import { WebsitesTab } from '@/components/core/Profile/WebsitesTab';
 import { WorkspaceKeysTab } from '@/components/core/Profile/WorkspaceKeysTab';
 import { ModulesActivationTab } from '@/components/core/Profile/ModulesActivationTab';
+import { TeamPanel } from '@/components/core/Team/TeamPanel';
 import SupplierPortalPage from './SupplierPortalPage';
 import { AppointmentsPage } from './AppointmentsPage';
 import { ProfileMeetingsTab } from '@/components/core/Profile/ProfileMeetingsTab';
@@ -26,7 +27,10 @@ export const UserProfilePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { can } = usePermissions();
-  const { workspaceRole, isPlatformOperator } = useWorkspace();
+  const { workspaceRole, isPlatformOperator, activeWorkspaceId, activeWorkspace } = useWorkspace();
+  // Team & Portals: only the people who can actually invite (owner/admin of this workspace) —
+  // the write RPCs re-check the same thing server-side.
+  const showTeam = workspaceRole === 'owner' || workspaceRole === 'admin' || isPlatformOperator;
   // Modules tab is visible to every workspace member: owners activate/purchase; non-owners
   // see the catalog and can request activation from the owner (#251).
   const showModules = !!workspaceRole || isPlatformOperator;
@@ -106,6 +110,12 @@ export const UserProfilePage: React.FC = () => {
             <KeyRound className="h-4 w-4" />
             Keys
           </TabsTrigger>
+          {showTeam && (
+            <TabsTrigger value="team" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Team
+            </TabsTrigger>
+          )}
           {showModules && (
             <TabsTrigger value="modules" className="flex items-center gap-2">
               <LayoutGrid className="h-4 w-4" />
@@ -168,6 +178,17 @@ export const UserProfilePage: React.FC = () => {
         <TabsContent value="keys" className="space-y-6">
           <WorkspaceKeysTab />
         </TabsContent>
+
+        {showTeam && activeWorkspaceId && (
+          <TabsContent value="team" className="space-y-6">
+            <SectionHeader
+              icon={Users}
+              title="Team & Portals"
+              subtitle="Invite colleagues and decide which portal each of them lands on."
+            />
+            <TeamPanel workspaceId={activeWorkspaceId} workspaceName={activeWorkspace?.name} />
+          </TabsContent>
+        )}
 
         {showModules && (
           <TabsContent value="modules" className="space-y-6">

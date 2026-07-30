@@ -22,6 +22,7 @@ export type Persona =
   | 'staff'      // team member of a business node (member role)
   | 'accountant' // invited external accountant — Finance surface only (#202)
   | 'sales'      // invited sales rep — Sales portal only: build quotes/orders for customers (#201)
+  | 'sales_manager' // sales lead — same portal as a rep, but across the whole team's book
   | 'employee'   // invited staff member — HR self-service ONLY (#252): their own record, nothing else
   | 'realestate_agent' // invited property agent — Real Estate portal only (#249): manage listings +
                        // own leads/viewings (scoped via responsible_sales_user_ids / listing_agent_id)
@@ -41,6 +42,9 @@ export type Capability =
   | 'marketplace.browse'    // browse the upstream catalog to buy/quote
   | 'quotes.use'            // create + manage quotes
   | 'sales.portal'          // simplified Sales portal — reps build quotes/orders for customers (#201)
+  | 'sales.team.view'       // sales manager: the WHOLE team's quote book, not just own rows.
+                            // Backed server-side by is_workspace_sales_manager(workspace_id) in
+                            // consolidated_quotes_select_public — this flag only unhides the UI.
   | 'projects.use'          // projects + client views
   | 'moodboards.use'        // moodboards / design surfaces
   | 'agent.use'             // KAI agent / chat
@@ -100,6 +104,11 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // settings/issuing, pricing, network, or warehouse. Reps see only their OWN quotes (RLS on
   // user_id); customer financials are workspace-scoped reads.
   sales: ['sales.portal', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
+  // Sales manager: the rep surface plus `sales.team.view` — the whole team's quote book and
+  // cost/margin on it. Still NOT a workspace manager: no finance settings, pricing, network or
+  // warehouse. The team-wide read is enforced in RLS (is_workspace_sales_manager), so the extra
+  // capability only reveals UI the server would already answer.
+  sales_manager: ['sales.portal', 'sales.team.view', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
   // Invited employee (#252): HR self-service ONLY — their own profile, onboarding, time off and
   // documents. Deliberately NO crm.view / sales.portal / finance / anything else, so an employee
   // can never see another person's (e.g. a sales rep's) details. Data is further self-scoped in
@@ -137,6 +146,12 @@ export interface PersonaInputs {
  */
 export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accountRole }: PersonaInputs): Persona {
   if (isPlatformOperator) return 'operator';
+
+  // Sales manager is a workspace TEAM role with no account-role equivalent, and it must win over
+  // the account-role switch below — otherwise a user whose account tier is `sales` would be
+  // downgraded to a plain rep despite being invited as the manager. Safe to place first: the value
+  // is new, so no existing membership carries it.
+  if (workspaceRole === 'sales_manager') return 'sales_manager';
 
   // Account role drives the tenant tiers. 'admin'/'super_admin' here do NOT grant
   // operator (multi-tenancy) — only root-workspace ownership above does.
