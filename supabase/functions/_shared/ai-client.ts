@@ -132,7 +132,9 @@ async function _logTrackedCall(opts: {
 // Lazy: constructed on FIRST USE (not at module load) so that platform_secrets values
 // bootstrapped into Deno.env inside the request handler are reflected in apiKey.
 // Existing call sites (`google(modelId)`, `google.image(modelId)`, `anthropic(modelId)`,
-// `klingai(modelId)`) are unchanged — the Proxy makes lazy construction invisible.
+// `klingai.video(modelId)`) are unchanged — the Proxy makes lazy construction invisible.
+// NOTE: KlingAIProvider is an object, not a function — it must be reached through the
+// `get` trap (`.video()` / `.videoModel()`). The `apply` trap below would throw for it.
 
 let _google: ReturnType<typeof createGoogleGenerativeAI> | null = null;
 let _anthropic: ReturnType<typeof createAnthropic> | null = null;
@@ -156,8 +158,8 @@ function _ensureKlingai() {
   if (!_klingai) {
     _syncEnvIntoPolyfill();
     _klingai = createKlingAI({
-      accessKeyId: Deno.env.get('KLINGAI_ACCESS_KEY') || '',
-      secretAccessKey: Deno.env.get('KLINGAI_SECRET_KEY') || '',
+      accessKey: Deno.env.get('KLINGAI_ACCESS_KEY') || '',
+      secretKey: Deno.env.get('KLINGAI_SECRET_KEY') || '',
     });
   }
   return _klingai;
@@ -232,7 +234,7 @@ export async function generateWithGemini(
       system: config?.systemPrompt,
       prompt,
       temperature: config?.temperature ?? 0.7,
-      maxTokens: config?.maxTokens ?? 4096,
+      maxOutputTokens: config?.maxTokens ?? 4096,
       providerOptions: config?.thinkingLevel
         ? {
             google: {
@@ -245,8 +247,8 @@ export async function generateWithGemini(
     });
 
     const usage = await result.usage;
-    const inputTokens = usage?.promptTokens ?? 0;
-    const outputTokens = usage?.completionTokens ?? 0;
+    const inputTokens = usage?.inputTokens ?? 0;
+    const outputTokens = usage?.outputTokens ?? 0;
 
     // Auto-track every Gemini call (fire-and-forget)
     void _logTrackedCall({
@@ -295,7 +297,7 @@ export async function generateStructuredWithGemini<T>(
       system: config?.systemPrompt,
       prompt,
       temperature: config?.temperature ?? 0.3,
-      maxTokens: config?.maxTokens ?? 4096,
+      maxOutputTokens: config?.maxTokens ?? 4096,
       output: Output.object({ schema }),
       providerOptions: config?.thinkingLevel
         ? {
@@ -309,8 +311,8 @@ export async function generateStructuredWithGemini<T>(
     });
 
     const usage = await result.usage;
-    const inputTokens = usage?.promptTokens ?? 0;
-    const outputTokens = usage?.completionTokens ?? 0;
+    const inputTokens = usage?.inputTokens ?? 0;
+    const outputTokens = usage?.outputTokens ?? 0;
 
     void _logTrackedCall({
       task: config?.task ?? 'gemini_structured_generation',
@@ -357,12 +359,12 @@ export async function generateWithClaude(
       system: config?.systemPrompt,
       prompt,
       temperature: config?.temperature ?? 0.7,
-      maxTokens: config?.maxTokens ?? 4096,
+      maxOutputTokens: config?.maxTokens ?? 4096,
     });
 
     const usage = await result.usage;
-    const inputTokens = usage?.promptTokens ?? 0;
-    const outputTokens = usage?.completionTokens ?? 0;
+    const inputTokens = usage?.inputTokens ?? 0;
+    const outputTokens = usage?.outputTokens ?? 0;
 
     void _logTrackedCall({
       task: config?.task ?? 'claude_text_generation',
@@ -419,14 +421,14 @@ export async function generateWithClaudeTools(
       system: config.systemPrompt,
       prompt,
       temperature: config.temperature ?? 0.4,
-      maxTokens: config.maxTokens ?? 1024,
+      maxOutputTokens: config.maxTokens ?? 1024,
       tools: config.tools,
       stopWhen: stepCountIs(config.maxSteps ?? 6),
     });
 
     const usage = await result.usage;
-    const inputTokens = usage?.promptTokens ?? 0;
-    const outputTokens = usage?.completionTokens ?? 0;
+    const inputTokens = usage?.inputTokens ?? 0;
+    const outputTokens = usage?.outputTokens ?? 0;
 
     void _logTrackedCall({
       task: config.task ?? 'claude_tool_generation',
@@ -470,13 +472,13 @@ export async function generateStructuredWithClaude<T>(
       system: config?.systemPrompt,
       prompt,
       temperature: config?.temperature ?? 0.3,
-      maxTokens: config?.maxTokens ?? 4096,
+      maxOutputTokens: config?.maxTokens ?? 4096,
       output: Output.object({ schema }),
     });
 
     const usage = await result.usage;
-    const inputTokens = usage?.promptTokens ?? 0;
-    const outputTokens = usage?.completionTokens ?? 0;
+    const inputTokens = usage?.inputTokens ?? 0;
+    const outputTokens = usage?.outputTokens ?? 0;
 
     void _logTrackedCall({
       task: config?.task ?? 'claude_structured_generation',
@@ -547,7 +549,7 @@ export async function generateImageWithGemini(
 
   return {
     base64: image.base64,
-    mimeType: image.mimeType ?? 'image/png',
+    mimeType: image.mediaType ?? 'image/png',
     model: modelId,
   };
 }
@@ -830,7 +832,9 @@ export async function generateVideoWithKling(
     : prompt;
 
   const { video } = await generateVideo({
-    model: klingai(modelId),
+    // KlingAIProvider is NOT callable — it exposes video()/videoModel(). Calling it
+    // directly (klingai(modelId)) threw a TypeError on every invocation.
+    model: klingai.video(modelId),
     prompt: visionPrompt,
     durationSeconds: config?.durationSeconds ?? 5,
     aspectRatio: config?.aspectRatio ?? '16:9',
@@ -928,10 +932,10 @@ export async function editImageWithGrok(
   form.append('prompt', prompt);
   form.append('n', '1');
   form.append('response_format', 'b64_json');
-  form.append('image', new Blob([imageBytes], { type: mimeType }), 'image.jpg');
+  form.append('image', new Blob([imageBytes as unknown as BlobPart], { type: mimeType }), 'image.jpg');
 
   if (config?.maskBytes) {
-    form.append('mask', new Blob([config.maskBytes], { type: 'image/png' }), 'mask.png');
+    form.append('mask', new Blob([config.maskBytes as unknown as BlobPart], { type: 'image/png' }), 'mask.png');
   }
 
   const response = await fetch('https://api.x.ai/v1/images/edits', {
