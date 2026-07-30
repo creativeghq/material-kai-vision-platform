@@ -233,8 +233,11 @@ Deno.serve(withApiLogging('ai-pricing-updater', async (req) => {
             continue;
           }
 
-          // Log the price change for audit
-          await supabase.from('ai_pricing_update_logs').insert({
+          // Log the price change for audit. Non-critical: surface the error and carry on.
+          // NOTE: a PostgREST builder is PromiseLike — it implements `then` but NOT `catch`,
+          // so `.catch(...)` here threw a synchronous TypeError, which the per-model catch
+          // below turned into models_failed++ for every model we had just updated fine.
+          const { error: logError } = await supabase.from('ai_pricing_update_logs').insert({
             model_pricing_id: model.id,
             model_key: model.model_key,
             provider: model.provider,
@@ -244,10 +247,11 @@ Deno.serve(withApiLogging('ai-pricing-updater', async (req) => {
             new_output_price: modelPrices.output,
             update_source: 'auto_update',
             update_reason: 'Scheduled weekly price sync',
-          }).catch(err => {
-            // Log table might not exist yet - non-critical
-            console.warn('[AIPricingUpdater] Could not log price change:', err.message);
           });
+
+          if (logError) {
+            console.warn('[AIPricingUpdater] Could not log price change:', logError.message);
+          }
 
           stats.models_updated++;
         } else {

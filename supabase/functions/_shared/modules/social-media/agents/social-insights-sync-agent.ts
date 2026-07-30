@@ -8,7 +8,7 @@
  * Creates one row per social_account per day in social_account_insights.
  */
 
-import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
+import type { AgentRunner, AgentRunContext, AgentRunResult } from '../../../agents/types.ts';
 
 const ZERNIO_BASE_URL = 'https://zernio.com/api/v1';
 const zernioKey = () => Deno.env.get('ZERNIO_API_KEY') || Deno.env.get('LATE_API_KEY') || '';

@@ -13,7 +13,7 @@
  *   stale_after_hours  number   Re-sync if last synced > N hours ago (default 2)
  */
 
-import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
+import type { AgentRunner, AgentRunContext, AgentRunResult } from '../../../agents/types.ts';
 
 const ZERNIO_BASE_URL = 'https://zernio.com/api/v1';
 const zernioKey = () => Deno.env.get('ZERNIO_API_KEY') || Deno.env.get('LATE_API_KEY') || '';
