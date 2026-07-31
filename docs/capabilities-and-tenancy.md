@@ -27,6 +27,10 @@ Source of truth: `src/auth/capabilities.ts`, `src/hooks/usePermissions.ts`, `src
 | `accountant` | Invited external accountant — Finance surface only (#202) |
 | `sales` | Invited sales rep — Sales portal only (#201); sees only their OWN quote book |
 | `sales_manager` | Sales lead — same portal across the WHOLE team's book, incl. cost/margin (`sales.team.view`) |
+| `hr_staff` | HR officer — HR module read-only (`hr.view`) |
+| `hr_manager` | HR lead — full HR module (`hr.view` + `hr.manage`) |
+| `warehouse_staff` | Warehouse team — stock module only |
+| `marketing_staff` | Marketing team — email-marketing module only |
 | `employee` | Invited staff member — HR self-service only (#252) |
 | `realestate_agent` | Invited property agent — Real Estate portal only (#249) |
 | `end_user` | Project client / referral-joined member — restricted surface |

@@ -125,6 +125,12 @@ fails silently in a specific way: `sales`, `realestate_agent` and `employee` wer
 until 2026-07-30, so `redeem_workspace_invite` threw a CHECK violation on every one of those invites; a role
 with no `resolvePersona` branch instead falls through to `staff` and hands out finance/CRM/warehouse access.
 Guarded by [tests/unit/workspaceRoles.test.ts](tests/unit/workspaceRoles.test.ts).
+**Every business function gets a role; none of them gets workspace administration.** `sales`/`sales_manager`,
+`hr`/`hr_manager`, `warehouse`, `marketing`, `accountant`, `realestate_agent`. Each persona holds ONLY its own
+module capability + `agent.use` — never `platform.admin`/`network.manage`/`pricing.manage`/`catalog.import`
+(pinned by the test). Before these existed the only way to let someone run HR was making them an `admin`, which
+handed over finance, pricing and the team. A role whose portal is a paid module MUST set `requiresModule`, and
+that slug MUST be in `ROLE_MODULE_SLUGS` or the invite form has no `useModule` call and offers it regardless.
 **Who someone *is* is never re-typed by hand.** "Who is an employee / a sales manager" is answered by
 `workspace_members.role` (access role → portal) and `hr_employees` (the HR roster); the `/admin/crm?tab=categories`
 lists of kind `role` / `employment` are DERIVED from those by `crm_resync_auto_category_members`. Never create a

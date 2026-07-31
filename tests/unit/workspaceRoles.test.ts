@@ -11,8 +11,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  WORKSPACE_INVITE_ROLES, WORKSPACE_MEMBER_ROLES, WORKSPACE_ROLE_META, workspaceRoleLabel,
-  type WorkspaceMemberRole,
+  WORKSPACE_INVITE_ROLES, WORKSPACE_MEMBER_ROLES, WORKSPACE_ROLE_META, ROLE_MODULE_SLUGS,
+  workspaceRoleLabel, type WorkspaceMemberRole,
 } from '@/auth/workspaceRoles';
 import { resolvePersona, PERSONA_CAPABILITIES } from '@/auth/capabilities';
 import { ROLES } from '@/auth/roles';
@@ -26,10 +26,18 @@ const PERSONA_BY_ROLE: Record<WorkspaceMemberRole, string> = {
   accountant: 'accountant',
   sales: 'sales',
   sales_manager: 'sales_manager',
+  hr: 'hr_staff',
+  hr_manager: 'hr_manager',
+  warehouse: 'warehouse_staff',
+  marketing: 'marketing_staff',
   employee: 'employee',
   realestate_agent: 'realestate_agent',
   client: 'end_user',
 };
+
+/** Capabilities NO functional team role may hold — the ones that would make it a workspace manager
+ *  rather than a member of a team. Widening access levels later must not cross this line. */
+const NEVER_FOR_TEAM_ROLES = ['platform.admin', 'network.manage', 'pricing.manage', 'catalog.import'] as const;
 
 describe('workspace role catalog', () => {
   it('every invitable role is also a storable member role', () => {
@@ -69,6 +77,71 @@ describe('workspace role catalog', () => {
     })).toBe('sales_manager');
   });
 
+  it('every role whose portal is a paid module declares requiresModule, and the invite form knows that slug', () => {
+    // Without requiresModule the role is offered even when the workspace has not enabled the module,
+    // so the invitee lands on a surface that isn't there. Without the slug being in ROLE_MODULE_SLUGS
+    // the invite form has no useModule call for it and the filter silently passes it through.
+    const expected: Partial<Record<WorkspaceMemberRole, string>> = {
+      hr: 'hr', hr_manager: 'hr', employee: 'hr',
+      warehouse: 'stock', marketing: 'email-marketing', realestate_agent: 'real-estate',
+    };
+    for (const [role, slug] of Object.entries(expected)) {
+      expect(WORKSPACE_ROLE_META[role as WorkspaceMemberRole].requiresModule,
+        `"${role}" should be gated on the ${slug} module`).toBe(slug);
+    }
+    for (const role of WORKSPACE_MEMBER_ROLES) {
+      const slug = WORKSPACE_ROLE_META[role].requiresModule;
+      if (!slug) continue;
+      expect(ROLE_MODULE_SLUGS as readonly string[],
+        `"${role}" needs module "${slug}", which TeamPanel has no useModule call for`).toContain(slug);
+    }
+  });
+
+  it('functional team roles never hold workspace-management capabilities', () => {
+    const teamRoles: WorkspaceMemberRole[] = [
+      'sales', 'sales_manager', 'hr', 'hr_manager', 'warehouse', 'marketing',
+      'accountant', 'employee', 'realestate_agent',
+    ];
+    for (const role of teamRoles) {
+      const persona = resolvePersona({
+        isPlatformOperator: false, rank: null, workspaceRole: role, accountRole: null,
+      });
+      for (const cap of NEVER_FOR_TEAM_ROLES) {
+        expect(PERSONA_CAPABILITIES[persona],
+          `"${role}" (persona ${persona}) must not hold ${cap}`).not.toContain(cap);
+      }
+    }
+  });
+
+  it('each functional team role holds its own module capability and not its neighbours’', () => {
+    const owns: Array<[WorkspaceMemberRole, string, string[]]> = [
+      // role, must hold, must NOT hold
+      ['hr',         'hr.view',          ['hr.manage', 'warehouse.manage', 'marketing.email', 'sales.portal']],
+      ['hr_manager', 'hr.manage',        ['warehouse.manage', 'marketing.email', 'sales.portal']],
+      ['warehouse',  'warehouse.manage', ['hr.view', 'marketing.email', 'sales.portal']],
+      ['marketing',  'marketing.email',  ['hr.view', 'warehouse.manage', 'sales.portal']],
+    ];
+    for (const [role, must, mustNot] of owns) {
+      const persona = resolvePersona({
+        isPlatformOperator: false, rank: null, workspaceRole: role, accountRole: null,
+      });
+      expect(PERSONA_CAPABILITIES[persona], `"${role}" should hold ${must}`).toContain(must);
+      for (const cap of mustNot) {
+        expect(PERSONA_CAPABILITIES[persona], `"${role}" should NOT hold ${cap}`).not.toContain(cap);
+      }
+    }
+  });
+
+  it('a team role is not overridden by a broader account tier', () => {
+    // Being invited to run HR here is more specific than whatever global tier you carry.
+    expect(resolvePersona({
+      isPlatformOperator: false, rank: null, workspaceRole: 'hr_manager', accountRole: 'sales',
+    })).toBe('hr_manager');
+    expect(resolvePersona({
+      isPlatformOperator: false, rank: null, workspaceRole: 'warehouse', accountRole: 'architect',
+    })).toBe('warehouse_staff');
+  });
+
   it('a sales manager sees the team book; a rep does not', () => {
     expect(PERSONA_CAPABILITIES.sales_manager).toContain('sales.team.view');
     expect(PERSONA_CAPABILITIES.sales).not.toContain('sales.team.view');
@@ -105,6 +178,10 @@ describe('account-tier roles (public.roles)', () => {
     [ROLES.SALES]: 'sales',
     [ROLES.SALES_MANAGER]: 'sales_manager',
     [ROLES.FINANCE]: 'accountant',
+    [ROLES.HR]: 'hr_staff',
+    [ROLES.HR_MANAGER]: 'hr_manager',
+    [ROLES.WAREHOUSE]: 'warehouse_staff',
+    [ROLES.MARKETING]: 'marketing_staff',
   };
 
   it('every account tier with a dedicated persona is handled by resolvePersona', () => {

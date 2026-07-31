@@ -11,7 +11,7 @@ code as of this writing — where the model is *not* enforced, it says so explic
 ## 1. The two "role" concepts
 
 ### a) Account role — `roles` table (`user_profiles.role_id`)
-A global, per-user value — **the access tier**, set from `/admin/crm` → Users. Set: `user`(1) · `sales`(2) · `sales_manager`(3) · `supplier`(4) · `architect`(5) · `finance`(6) · `admin`(7). (Dealer+Factory merged into **supplier**; Super Admin merged into **admin**, 2026-06. `sales_manager` added 2026-07-31 — `sales` was already a tier, so the Users tab could make someone a rep but not a manager.) `level` is **display ordering only** — nothing compares it, so renumbering to slot a tier in is safe.
+A global, per-user value — **the access tier**, set from `/admin/crm` → Users. Set: `user`(1) · `warehouse`(2) · `marketing`(3) · `hr`(4) · `hr_manager`(5) · `sales`(6) · `sales_manager`(7) · `supplier`(8) · `architect`(9) · `finance`(10) · `admin`(11). (Dealer+Factory merged into **supplier**; Super Admin merged into **admin**, 2026-06. `sales_manager` added 2026-07-31 — `sales` was already a tier, so the Users tab could make someone a rep but not a manager.) `level` is **display ordering only** — nothing compares it, so renumbering to slot a tier in is safe.
 
 This is now the **primary driver of the persona** (see §2) — `resolvePersona()` maps the account role to a persona, falling back to the workspace-derived persona only for `user`/unset. So setting the Role under **Admin → CRM → Users** is what actually grants a user's capabilities.
 
@@ -20,7 +20,7 @@ Reserved-tier rule: **`admin` is granted operator (see-all) ONLY via root-worksp
 Managed in **Admin → CRM → Users** (inline Role dropdown).
 
 ### b) Workspace membership role — `workspace_members.role`
-Per workspace: `owner` · `admin` · `member` · `client` · `accountant` · `sales` · `sales_manager` · `employee` · `realestate_agent`. Catalogued in [`src/auth/workspaceRoles.ts`](../src/auth/workspaceRoles.ts) and mirrored by two CHECK constraints + two RPC allowlists. Combined with the workspace's **marketplace rank** (`operator` / `dealer` / `architect`) and the platform-operator flag, this resolves to a single **persona**, which is what gates features.
+Per workspace: `owner` · `admin` · `member` · `client` · `accountant` · `sales` · `sales_manager` · `hr` · `hr_manager` · `warehouse` · `marketing` · `employee` · `realestate_agent`. Catalogued in [`src/auth/workspaceRoles.ts`](../src/auth/workspaceRoles.ts) and mirrored by two CHECK constraints + two RPC allowlists. Combined with the workspace's **marketplace rank** (`operator` / `dealer` / `architect`) and the platform-operator flag, this resolves to a single **persona**, which is what gates features.
 
 Source of truth: [`src/auth/capabilities.ts`](../src/auth/capabilities.ts).
 
@@ -36,6 +36,10 @@ Source of truth: [`src/auth/capabilities.ts`](../src/auth/capabilities.ts).
 | **accountant** (Finance surface) | `finance` | Finance module; the `finance` role keeps **expense-approval** rights (it is NOT the restricted external accountant). |
 | **sales** | `sales` | Sales portal + own customers; sees only their OWN quote book. |
 | **sales_manager** | `sales_manager` | Sales portal across the WHOLE team's book, incl. cost/margin (`sales.team.view`, RLS `is_workspace_sales_manager`). NOT a workspace manager. |
+| **hr_staff** | `hr` | HR module read-only — roster, absences, documents (`hr.view`). |
+| **hr_manager** | `hr_manager` | HR module end to end incl. payroll (`hr.view` + `hr.manage`). Mirrors the Sales staff/manager pair. |
+| **warehouse_staff** | `warehouse` | Warehouse module only (`warehouse.manage`). |
+| **marketing_staff** | `marketing` | Email Marketing module only (`marketing.email`). |
 | **staff** / **end_user** | `user` / unset → workspace fallback | Team member / project client, resolved from the workspace role. |
 
 Resolution (`resolvePersona()`): `isPlatformOperator` → operator; then workspace role `sales_manager` → sales_manager (checked **before** the account-tier switch, so an invited manager whose tier is `sales` is not downgraded to a rep); else **account role** maps the tenant tier; else the workspace-derived persona (`client`→end_user, `accountant`→accountant, `employee`→employee, `realestate_agent`→realestate_agent, `sales`→sales, owner/admin by rank, member→staff). The sales pair is symmetric — either axis yields the same persona.
@@ -103,3 +107,22 @@ Notes:
 ---
 
 _Last verified against `src/auth/capabilities.ts`, `src/components/core/{AuthGuard,AdminGuard,CapabilityGuard}.tsx`, `supabase/functions/_shared/auth.ts`, and the live `roles` table. Update this file when `PERSONA_CAPABILITIES` or the guards change._
+
+
+## Functional team roles (added 2026-07-31)
+
+Sales was the only business function with real team roles. HR, Warehouse and Marketing each had a
+module, a portal and capabilities but **no role that granted them** — so the only way to let someone
+run HR was making them a workspace `admin`, which also handed over finance, pricing, the network and
+the team. `hr_departments.head_contact_id` is a label on a department row; it grants nothing.
+
+HR mirrors Sales exactly (a staff tier + a manager tier). Warehouse and Marketing get ONE role each
+for now: there is no second capability to split them on yet, and a manager tier behaving identically
+to its staff tier would be inert UI. The split lands with the access-level pass.
+
+These personas are deliberately **minimal** — each holds only its own module's capability plus
+`agent.use`. Widening them is the access-level work; [tests/unit/workspaceRoles.test.ts](../tests/unit/workspaceRoles.test.ts)
+pins the floor: no functional team role may ever hold `platform.admin`, `network.manage`,
+`pricing.manage` or `catalog.import`, and each must hold its own module capability and not its
+neighbours'. Module **entitlement** is still enforced separately, so holding the capability gets you
+nothing until the workspace owns the module.

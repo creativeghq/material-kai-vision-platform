@@ -30,7 +30,7 @@ import {
 } from '@/services/workspaceManagementService';
 import {
   WORKSPACE_INVITE_ROLES, WORKSPACE_ROLE_META, workspaceRoleLabel,
-  type WorkspaceInviteRole, type WorkspaceMemberRole,
+  type WorkspaceInviteRole, type WorkspaceMemberRole, type RoleModuleSlug,
 } from '@/auth/workspaceRoles';
 
 interface MemberRow {
@@ -48,8 +48,12 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
   workspaceId, workspaceName,
 }) => {
   const { toast } = useToast();
-  const { enabled: realEstateEnabled } = useModule('real-estate');
+  // One useModule per slug in ROLE_MODULE_SLUGS — hooks can't be called in a loop, and that list is
+  // what the guard test checks this call site against.
   const { enabled: hrEnabled } = useModule('hr');
+  const { enabled: stockEnabled } = useModule('stock');
+  const { enabled: emailMarketingEnabled } = useModule('email-marketing');
+  const { enabled: realEstateEnabled } = useModule('real-estate');
 
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
@@ -62,12 +66,17 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
 
   /** A role is offerable only if the module behind its portal is actually on — otherwise the
    *  invitee would land on a surface this workspace has not enabled. */
+  const moduleEnabled = useMemo<Record<RoleModuleSlug, boolean>>(() => ({
+    hr: hrEnabled,
+    stock: stockEnabled,
+    'email-marketing': emailMarketingEnabled,
+    'real-estate': realEstateEnabled,
+  }), [hrEnabled, stockEnabled, emailMarketingEnabled, realEstateEnabled]);
+
   const offerableRoles = useMemo(() => WORKSPACE_INVITE_ROLES.filter((r) => {
-    const slug = WORKSPACE_ROLE_META[r].requiresModule;
-    if (slug === 'real-estate') return realEstateEnabled;
-    if (slug === 'hr') return hrEnabled;
-    return true;
-  }), [realEstateEnabled, hrEnabled]);
+    const slug = WORKSPACE_ROLE_META[r].requiresModule as RoleModuleSlug | undefined;
+    return slug ? moduleEnabled[slug] : true;
+  }), [moduleEnabled]);
 
   const load = useCallback(async () => {
     if (!workspaceId) return;

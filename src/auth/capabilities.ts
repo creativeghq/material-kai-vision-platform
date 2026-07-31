@@ -23,6 +23,10 @@ export type Persona =
   | 'accountant' // invited external accountant — Finance surface only (#202)
   | 'sales'      // invited sales rep — Sales portal only: build quotes/orders for customers (#201)
   | 'sales_manager' // sales lead — same portal as a rep, but across the whole team's book
+  | 'hr_staff'      // HR officer — reads the HR module, changes nothing
+  | 'hr_manager'    // HR lead — runs the HR module end to end
+  | 'warehouse_staff' // warehouse team — the stock module only
+  | 'marketing_staff' // marketing team — the email-marketing module only
   | 'employee'   // invited staff member — HR self-service ONLY (#252): their own record, nothing else
   | 'realestate_agent' // invited property agent — Real Estate portal only (#249): manage listings +
                        // own leads/viewings (scoped via responsible_sales_user_ids / listing_agent_id)
@@ -109,6 +113,16 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // warehouse. The team-wide read is enforced in RLS (is_workspace_sales_manager), so the extra
   // capability only reveals UI the server would already answer.
   sales_manager: ['sales.portal', 'sales.team.view', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use'],
+  // ── Functional team roles. Deliberately MINIMAL: each holds only its own module's capability
+  //    plus agent.use, so a team member can never reach finance, pricing, the network or the team.
+  //    Widening these is the "access levels" pass — start narrow, because a role that falls through
+  //    to `staff` silently inherits finance/CRM/warehouse, which is the failure this model exists to
+  //    prevent. Module ENTITLEMENT is enforced separately (EntitlementGuard + assertEntitled), so
+  //    holding the capability still gets you nothing until the workspace owns the module.
+  hr_staff: ['hr.view', 'agent.use'],
+  hr_manager: ['hr.view', 'hr.manage', 'agent.use'],
+  warehouse_staff: ['warehouse.manage', 'agent.use'],
+  marketing_staff: ['marketing.email', 'agent.use'],
   // Invited employee (#252): HR self-service ONLY — their own profile, onboarding, time off and
   // documents. Deliberately NO crm.view / sales.portal / finance / anything else, so an employee
   // can never see another person's (e.g. a sales rep's) details. Data is further self-scoped in
@@ -139,6 +153,23 @@ export interface PersonaInputs {
 }
 
 /**
+ * Workspace TEAM roles → their scoped persona. One entry per functional role added after the
+ * account-tier model; checked ahead of the account tier in `resolvePersona`.
+ *
+ * The older scoped roles (`client`, `accountant`, `sales`, `employee`, `realestate_agent`) are
+ * deliberately NOT here: they resolve AFTER the account-tier switch and moving them would change
+ * who wins for existing users (e.g. account tier `finance` + workspace role `sales`). Their
+ * precedence is preserved as-is in the chain below.
+ */
+const TEAM_ROLE_PERSONA: Record<string, Persona> = {
+  sales_manager: 'sales_manager',
+  hr: 'hr_staff',
+  hr_manager: 'hr_manager',
+  warehouse: 'warehouse_staff',
+  marketing: 'marketing_staff',
+};
+
+/**
  * Resolve the single persona. The account role (set under Users) is the primary tier;
  * `operator` is granted ONLY by root-workspace ownership (never by account role) so a
  * tenant can never become a platform operator. Account role falls back to the legacy
@@ -147,11 +178,16 @@ export interface PersonaInputs {
 export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accountRole }: PersonaInputs): Persona {
   if (isPlatformOperator) return 'operator';
 
-  // Sales manager is a workspace TEAM role with no account-role equivalent, and it must win over
-  // the account-role switch below — otherwise a user whose account tier is `sales` would be
-  // downgraded to a plain rep despite being invited as the manager. Safe to place first: the value
-  // is new, so no existing membership carries it.
-  if (workspaceRole === 'sales_manager') return 'sales_manager';
+  // Functional TEAM roles. These win over the account-tier switch below: being invited to run HR in
+  // this workspace is more specific than whatever global tier you happen to carry, and without this
+  // a user whose tier is `sales` would be downgraded to a plain rep despite being invited as the
+  // manager. Safe to check first — every value here was introduced after the account-tier switch, so
+  // no existing membership carries one.
+  //
+  // Adding a role? Put it HERE, not in a new `if`. A workspace role with no branch falls through to
+  // `staff` and silently inherits finance/CRM/warehouse — the failure this whole model prevents.
+  const teamPersona = TEAM_ROLE_PERSONA[workspaceRole ?? ''];
+  if (teamPersona) return teamPersona;
 
   // Account role drives the tenant tiers. 'admin'/'super_admin' here do NOT grant
   // operator (multi-tenancy) — only root-workspace ownership above does.
@@ -164,6 +200,10 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accoun
     case 'sales_manager': return 'sales_manager';
     case 'sales': return 'sales';
     case 'finance': return 'accountant';
+    case 'hr_manager': return 'hr_manager';
+    case 'hr': return 'hr_staff';
+    case 'warehouse': return 'warehouse_staff';
+    case 'marketing': return 'marketing_staff';
   }
 
   const role = workspaceRole ?? '';

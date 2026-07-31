@@ -17,7 +17,11 @@
 
 /** Roles that can be handed out via an invite link / invite email. */
 export const WORKSPACE_INVITE_ROLES = [
-  'member', 'accountant', 'sales', 'sales_manager', 'employee', 'realestate_agent',
+  'member', 'accountant',
+  'sales', 'sales_manager',
+  'hr', 'hr_manager',
+  'warehouse', 'marketing',
+  'employee', 'realestate_agent',
 ] as const;
 export type WorkspaceInviteRole = typeof WORKSPACE_INVITE_ROLES[number];
 
@@ -70,6 +74,33 @@ export const WORKSPACE_ROLE_META: Record<WorkspaceMemberRole, WorkspaceRoleMeta>
     portal: 'Sales portal (team-wide)',
     description: 'Everything a rep can do, across the WHOLE team’s quote book, including cost and margin. Still no finance settings, pricing rules or team management.',
   },
+  // HR mirrors the Sales pair: a staff tier that reads, a manager tier that runs it. Before these
+  // existed the ONLY way to let someone run HR was making them a workspace admin — which also
+  // handed over finance, pricing, the network and the team itself.
+  hr: {
+    label: 'HR Officer',
+    portal: 'HR module (read-only)',
+    description: 'Reads the HR module: roster, absences, documents. No edits, no payroll, no salary changes. Nothing outside HR.',
+    requiresModule: 'hr',
+  },
+  hr_manager: {
+    label: 'HR Manager',
+    portal: 'HR module (full)',
+    description: 'Runs HR end to end: employees, absences, onboarding, payroll and documents. Still no finance settings, pricing or team management.',
+    requiresModule: 'hr',
+  },
+  warehouse: {
+    label: 'Warehouse Team',
+    portal: 'Warehouse module',
+    description: 'Inventory, dispatch, movements and stocktake. No finance, pricing, CRM or settings.',
+    requiresModule: 'stock',
+  },
+  marketing: {
+    label: 'Marketing Team',
+    portal: 'Email Marketing module',
+    description: 'Designs templates and sends bulk email campaigns. No finance, pricing, CRM or settings.',
+    requiresModule: 'email-marketing',
+  },
   employee: {
     label: 'Employee',
     portal: 'HR self-service',
@@ -88,6 +119,15 @@ export const WORKSPACE_ROLE_META: Record<WorkspaceMemberRole, WorkspaceRoleMeta>
     description: 'A project client or referral-joined user: their own projects, quotes and moodboards only.',
   },
 };
+
+/**
+ * Every module slug a role's portal depends on. React hooks can't be called in a loop, so the
+ * invite form has to call `useModule` once per slug — this list is what keeps that call site
+ * exhaustive. Guarded by tests/unit/workspaceRoles.test.ts: a role whose `requiresModule` is missing
+ * here would be offered for a module the workspace has not enabled.
+ */
+export const ROLE_MODULE_SLUGS = ['hr', 'stock', 'email-marketing', 'real-estate'] as const;
+export type RoleModuleSlug = typeof ROLE_MODULE_SLUGS[number];
 
 /** Display label for any stored role value, including legacy/unknown ones. */
 export function workspaceRoleLabel(role: string | null | undefined): string {
