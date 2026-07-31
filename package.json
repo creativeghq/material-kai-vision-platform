@@ -9,6 +9,7 @@
     "start": "vite preview",
     "lint": "eslint . --max-warnings 316",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:edge": "node scripts/check-edge-functions.mjs",
     "test": "vitest run tests/unit tests/security",
     "test:watch": "vitest tests/unit",
     "test:integration": "vitest run tests/integration",

@@ -1,0 +1,66 @@
+# Edge-function typecheck gate.
+#
+# `tsconfig.json` excludes `supabase/**`, so `npm run typecheck` has never looked at the
+# 107 edge functions. This closes that blind spot with `deno check`, which is what those
+# functions actually run under.
+#
+# The runner script asserts COVERAGE — it requires deno to report back a `Check <file>`
+# line for every entrypoint and fails if any are missing. That is deliberate: while this
+# was being built, three sweep attempts reported success without checking anything (one
+# exited 0 on an unresolved import, one OOM'd mid-batch, one used the wrong import maps).
+#
+# Do NOT add `|| true` or `continue-on-error` here. See .github/workflows/semgrep.yml —
+# that gate sat dead for months because a `|| true` swallowed an invalid config.
+#
+# The gate is baseline-relative: `.github/edge-typecheck-baseline.json` holds the current
+# per-function error count and the build fails when a count rises or a new file starts
+# erroring. It blocks new breakage without waiting on a full cleanup of the existing
+# strict-null findings. Ratchet the numbers down as they get fixed.
+name: 🧪 Edge Function Typecheck
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'scripts/check-edge-functions.mjs'
+      - '.github/edge-typecheck-baseline.json'
+      - '.github/workflows/edge-typecheck.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'scripts/check-edge-functions.mjs'
+      - '.github/edge-typecheck-baseline.json'
+      - '.github/workflows/edge-typecheck.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: edge-typecheck-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deno-check:
+    name: deno check (all functions)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache deno dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/deno
+          key: deno-${{ runner.os }}-${{ hashFiles('supabase/functions/**/deno.json') }}
+          restore-keys: deno-${{ runner.os }}-
+
+      - name: Typecheck edge functions
+        run: node scripts/check-edge-functions.mjs
