@@ -35,15 +35,19 @@ export function professionalTypeLabel(value?: string | null): string {
   return PROFESSIONAL_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
 }
 
-/** Friendly display labels for the account roles (the roles table `name`). */
+/**
+ * Friendly display labels for the GLOBAL ACCOUNT TIER (the `roles` table `name`) — what kind of
+ * account this is platform-wide. Team roles are NOT here: they are per-workspace and labelled by
+ * `WORKSPACE_ROLE_META` in `@/auth/workspaceRoles`, assigned from Profile → Team.
+ */
 export const ROLE_LABELS: Record<string, string> = {
   user: 'User',
-  sales: 'Sales',
   supplier: 'Supplier',
   architect: 'Architect',
-  finance: 'Finance',
   admin: 'Admin',
   // legacy aliases (rows removed from roles; keep labels resolvable for old data)
+  sales: 'Sales',      // removed as a tier 2026-07-31 — now a workspace role
+  finance: 'Finance',  // removed as a tier 2026-07-31 — now the `accountant` workspace role
   dealer: 'Supplier',
   factory: 'Supplier',
   super_admin: 'Admin',

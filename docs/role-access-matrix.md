@@ -11,7 +11,7 @@ code as of this writing — where the model is *not* enforced, it says so explic
 ## 1. The two "role" concepts
 
 ### a) Account role — `roles` table (`user_profiles.role_id`)
-A global, per-user value — **the access tier**, set from `/admin/crm` → Users. Set: `user`(1) · `sales`(2) · `supplier`(3) · `architect`(4) · `finance`(5) · `admin`(6). **Functional team roles do NOT belong here** — a tier is global, true in every workspace the user belongs to, so "runs HR" / "on the warehouse team" / "sales manager" live only in `workspace_members.role`. Five were briefly added and withdrawn on 2026-07-31; `roles_level_key` makes `level` UNIQUE, so renumbering needs a temporary offset. (Dealer+Factory merged into **supplier**; Super Admin merged into **admin**, 2026-06. `sales`/`finance` predate the team-role model and are kept for existing data.) `level` is **display ordering only** — nothing compares it — but it is UNIQUE, so intermediate states during a renumber must stay collision-free.
+A global, per-user value — **the access tier**, set from `/admin/crm` → Users. Set: `user`(1) · `supplier`(2) · `architect`(3) · `admin`(4) — the two tiers `role_upgrade_requests` accepts, the operator flag, and the baseline. **Nothing functional lives here.** A tier is global: true in every workspace the user belongs to. `sales` and `finance` were removed 2026-07-31 (zero users; both are workspace roles — `sales`, `accountant`). `level` is display ordering only, but it is UNIQUE (`roles_level_key`), so a renumber needs a parking pass (`SET level = level + 100`) before landing final values.
 
 This is now the **primary driver of the persona** (see §2) — `resolvePersona()` maps the account role to a persona, falling back to the workspace-derived persona only for `user`/unset. So setting the Role under **Admin → CRM → Users** is what actually grants a user's capabilities.
 
@@ -20,7 +20,7 @@ Reserved-tier rule: **`admin` is granted operator (see-all) ONLY via root-worksp
 Managed in **Admin → CRM → Users** (inline Role dropdown).
 
 ### b) Workspace membership role — `workspace_members.role`
-Per workspace: `owner` · `admin` · `member` · `client` · `accountant` · `sales` · `sales_manager` · `hr` · `hr_manager` · `warehouse` · `marketing` · `employee` · `realestate_agent`. Catalogued in [`src/auth/workspaceRoles.ts`](../src/auth/workspaceRoles.ts) and mirrored by two CHECK constraints + two RPC allowlists. Combined with the workspace's **marketplace rank** (`operator` / `dealer` / `architect`) and the platform-operator flag, this resolves to a single **persona**, which is what gates features.
+Per workspace: `owner` · `admin` · `member` · `client` · `accountant` · `sales` · `sales_manager` · `hr` · `hr_manager` · `warehouse` · `marketing` · `employee` · `realestate_agent`. (`finance` was dropped 2026-07-31 — a duplicate of `accountant` with no `resolvePersona` branch, so a member stored with it silently resolved to `staff`.) Catalogued in [`src/auth/workspaceRoles.ts`](../src/auth/workspaceRoles.ts) and mirrored by two CHECK constraints + two RPC allowlists. Combined with the workspace's **marketplace rank** (`operator` / `dealer` / `architect`) and the platform-operator flag, this resolves to a single **persona**, which is what gates features.
 
 Source of truth: [`src/auth/capabilities.ts`](../src/auth/capabilities.ts).
 

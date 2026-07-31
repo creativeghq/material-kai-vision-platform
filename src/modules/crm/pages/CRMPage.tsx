@@ -448,7 +448,8 @@ export const CRMManagement: React.FC = () => {
   };
 
   const userBulkActions: BulkSelectAction[] = [
-    { key: 'role', label: 'Assign role', placeholder: 'Pick a role', options: roleOptions },
+    // Account TIER — global, platform-wide. Team roles are per-workspace (Profile → Team).
+    { key: 'role', label: 'Set account tier', placeholder: 'Pick a tier', options: roleOptions },
     { key: 'status', label: 'Set status', placeholder: 'Pick a status', options: STATUS_OPTIONS },
     { key: 'profession', label: 'Professional type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
     { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: categoryOptions },
@@ -584,7 +585,11 @@ export const CRMManagement: React.FC = () => {
                             setSelUsers(v ? new Set(filteredUsers.map((u) => u.user_id)) : new Set())} aria-label="Select all" />
                         </TableHead>
                         <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
+                        {/* The GLOBAL account tier, not a team role. Team roles (Sales, HR,
+                            Warehouse, Marketing, Accountant…) are per-workspace and live in
+                            Profile → Team; setting one here would make it true in every workspace
+                            the user belongs to. */}
+                        <TableHead>Account tier</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Subscription</TableHead>
                         <TableHead>Credits</TableHead>

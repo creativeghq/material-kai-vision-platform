@@ -175,8 +175,6 @@ describe('account-tier roles (public.roles)', () => {
     [ROLES.DEALER]: 'dealer',   // legacy alias
     [ROLES.FACTORY]: 'dealer',  // legacy alias
     [ROLES.ARCHITECT]: 'architect',
-    [ROLES.SALES]: 'sales',
-    [ROLES.FINANCE]: 'accountant',
   };
 
   it('every account tier with a dedicated persona is handled by resolvePersona', () => {
@@ -198,7 +196,10 @@ describe('account-tier roles (public.roles)', () => {
     // public.roles is global: a tier is true in every workspace the user belongs to. "Runs HR" /
     // "on the warehouse team" / "sales manager" are per-workspace facts, so they must exist ONLY in
     // workspace_members.role. Five of them were briefly added here and withdrawn on 2026-07-31.
-    const TEAM_ONLY = ['sales_manager', 'hr', 'hr_manager', 'warehouse', 'marketing'] as const;
+    const TEAM_ONLY = [
+      'sales', 'sales_manager', 'hr', 'hr_manager', 'warehouse', 'marketing',
+      'accountant', 'employee', 'realestate_agent',
+    ] as const;
     for (const role of TEAM_ONLY) {
       expect(Object.values(ROLES) as string[],
         `"${role}" must not be an account tier — it is a workspace team role`).not.toContain(role);
@@ -207,5 +208,23 @@ describe('account-tier roles (public.roles)', () => {
         isPlatformOperator: false, rank: null, workspaceRole: role, accountRole: null,
       }), `"${role}" must still work as a workspace role`).not.toBe('staff');
     }
+  });
+
+  it('the account tier holds ONLY genuine platform tiers', () => {
+    // What is left after the cleanup: the two tiers role_upgrade_requests accepts, the operator
+    // flag, and the baseline. Anything else appearing here is a functional role in disguise.
+    // (OWNER / FACTORY / DEALER / SUPER_ADMIN are legacy or workspace values, not `roles` rows.)
+    const TIERS = new Set(['admin', 'super_admin', 'owner', 'supplier', 'architect', 'user', 'factory', 'dealer']);
+    for (const value of Object.values(ROLES)) {
+      expect(TIERS, `"${value}" is not a platform tier — did a functional role sneak back in?`).toContain(value);
+    }
+  });
+
+  it('`finance` is no longer a second name for the accountant workspace role', () => {
+    // workspace_members accepted BOTH 'finance' and 'accountant'. 'finance' was absent from this
+    // catalog and had no resolvePersona branch, so a member stored with it silently became `staff` —
+    // drift the DB allowed but the TypeScript side could not see. Dropped from the CHECK constraint.
+    expect(WORKSPACE_MEMBER_ROLES as readonly string[]).not.toContain('finance');
+    expect(WORKSPACE_MEMBER_ROLES as readonly string[]).toContain('accountant');
   });
 });

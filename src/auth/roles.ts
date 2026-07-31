@@ -10,9 +10,14 @@
  * Rule: ALL role literals + role checks must come from this file.
  * Never write `role === 'admin'` again — use `isAdmin(role)`.
  *
- * Mirrors the values in `public.roles`. Both `admin` and `super_admin`
- * are recognised as platform admins; workspace_members.role can also
- * hold `owner`, treated equivalently for admin checks.
+ * Mirrors the values in `public.roles` — after 2026-07-31 that is exactly `admin`, `supplier`,
+ * `architect` and `user`: the two tiers `role_upgrade_requests` accepts, plus the operator flag and
+ * the baseline. `sales` and `finance` used to sit here and were removed; they are workspace roles
+ * (`accountant`, `sales`, `sales_manager`) and only ever meant something within one workspace.
+ *
+ * Both `admin` and `super_admin` are recognised as platform admins; `workspace_members.role` can
+ * also hold `owner`, treated equivalently for admin checks. `OWNER`, `FACTORY` and `DEALER` below
+ * are not rows in `public.roles` — they are legacy/workspace values kept so old data resolves.
  */
 
 export const ROLES = {
@@ -21,8 +26,6 @@ export const ROLES = {
   OWNER: 'owner',
   SUPPLIER: 'supplier',
   ARCHITECT: 'architect',
-  FINANCE: 'finance',
-  SALES: 'sales',
   USER: 'user',
   // legacy account roles, merged into SUPPLIER (2026-06); kept so old rows resolve
   FACTORY: 'factory',
