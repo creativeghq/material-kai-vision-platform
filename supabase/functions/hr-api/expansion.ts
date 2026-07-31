@@ -8,7 +8,7 @@ import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
 import { emitApplicantStage } from '../_shared/hr/applicant-events.ts';
 import { callClaudeTool, meterHrAi, creditBalance, reserveHrCredits, refundHrCredits, base64FromBytes } from './ai-meter.ts';
-import { businessDaysInclusive, tagEmployee } from './hr-util.ts';
+import { businessDaysInclusive } from './hr-util.ts';
 // NOTE: payslip.ts (→ pdf-lib + fontkit, heavy) is imported LAZILY inside the generate-payslips
 // case so the common read paths (analytics, lists) don't pay its cold-start cost on every call.
 
@@ -582,7 +582,6 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
         .insert({ workspace_id: workspaceId, crm_contact_id: contact.id, status: 'active', start_date: (body?.start_date ?? new Date().toISOString().slice(0, 10)), department_id: body?.department_id ?? null })
         .select('id').single();
       if (eErr) throw new HttpError(400, eErr.message);
-      await tagEmployee(supabase, contact.id, userId);
       // 3) close application
       await supabase.from('hr_applications').update({ stage: 'hired', hired_employee_id: emp.id }).eq('id', id).eq('workspace_id', workspaceId);
       // 4) seed onboarding checklist

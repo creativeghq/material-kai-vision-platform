@@ -19,7 +19,7 @@ import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { handleExpansion, handleSelfService } from './expansion.ts';
 import { handleErgani } from './ergani.ts';
 import { handleAccounting } from './accounting.ts';
-import { businessDaysInclusive, tagEmployee } from './hr-util.ts';
+import { businessDaysInclusive } from './hr-util.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 function json(body: any, status = 200): Response {
@@ -229,7 +229,6 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
           if ((eErr as any).code === '23505') return json({ error: 'This contact is already an employee.' }, 409);
           throw new HttpError(400, eErr.message);
         }
-        await tagEmployee(supabase, contactId, userId);
         const [withSum] = await withSummaries(supabase, workspaceId, [emp]);
         // Flows — HR lifecycle. Best-effort; never block the create.
         try {

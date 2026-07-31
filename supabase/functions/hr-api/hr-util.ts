@@ -15,15 +15,9 @@ export function businessDaysInclusive(startISO: string, endISO: string): number 
   return days;
 }
 
-/** Ensure a contact is tagged with the global "Employee" category (idempotent). Non-fatal if the
- *  seeded category is missing. */
-export async function tagEmployee(supabase: any, contactId: string, userId: string): Promise<void> {
-  const { data: cat } = await supabase.from('crm_categories').select('id').eq('slug', 'employee').maybeSingle();
-  if (!cat?.id) return;
-  const { data: existing } = await supabase.from('crm_category_members').select('id')
-    .eq('category_id', cat.id).eq('crm_contact_id', contactId).maybeSingle();
-  if (existing) return;
-  await supabase.from('crm_category_members').insert({
-    category_id: cat.id, member_kind: 'crm_contact', crm_contact_id: contactId, source: 'manual', added_by: userId,
-  });
-}
+// `tagEmployee` lived here: it wrote a source='manual' row into the crm_categories list with
+// slug='employee'. That list was retired on 2026-07-30 when employment categories became DERIVED
+// from hr_employees, so the lookup returned nothing and the helper silently no-opped. Writing the
+// membership by hand is also what we removed: a manual row survives resync, so an employee who left
+// would stay on the list forever. `hr-employees-active` (plus the per-department lists) is now kept
+// correct by crm_resync_auto_category_members, run nightly by `crm-category-resync-daily`.
