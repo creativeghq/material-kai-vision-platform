@@ -10,7 +10,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess, userCanAccessWorkspace } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, userCanAccessWorkspace, listUserWorkspaceIds } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { resolveWorkspaceEmailSender, checkWorkspaceSendQuota } from '../_shared/email-sender.ts';
@@ -858,24 +858,82 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           }
         }
 
-        let query = supabaseClient.from('email_analytics').select('*');
-        if (fromDate) query = query.gte('date', fromDate);
-        if (toDate) query = query.lte('date', toDate);
+        // DERIVED FROM email_logs, not from the `email_analytics` table.
+        //
+        // `email_analytics` has ZERO writers — no code, no trigger, no cron (repo grep: the
+        // generated types, this read, and reset-platform's truncate; pg_trigger and
+        // pg_proc: nothing). So every rate here read 0% forever while email_logs actually
+        // held 134 `failed` / 2 `queued` / 1 `delivered`. An operator watching this
+        // dashboard would conclude email was healthy DURING A TOTAL OUTAGE — the exact
+        // silent-zero shape the platform has probes for.
+        //
+        // Deriving live rather than adding a writer, per the one-derivation rule: a cached
+        // copy is a second source that can drift, and email_logs already carries every
+        // metric as a timestamp column. (audit #306 finding 11)
+        //
+        // Also scoped to the caller's workspaces — this ran service-role and unfiltered,
+        // the same shape as the `logs` action that was removed for leaking cross-tenant.
+        let query = supabaseClient
+          .from('email_logs')
+          .select('created_at, sent_at, delivered_at, opened_at, clicked_at, bounced_at, complained_at');
+        if (!isAdminAccess(auth)) {
+          const wsIds = auth.userId ? await listUserWorkspaceIds(supabaseClient, auth.userId) : [];
+          if (wsIds.length === 0) {
+            return new Response(
+              JSON.stringify({
+                success: true, totalSent: 0, totalDelivered: 0, totalBounced: 0, totalComplained: 0,
+                totalOpened: 0, totalClicked: 0, deliveryRate: 0, bounceRate: 0, complaintRate: 0,
+                openRate: 0, clickRate: 0, dailyData: [],
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
+          query = query.in('workspace_id', wsIds);
+        }
+        if (fromDate) query = query.gte('created_at', fromDate);
+        if (toDate) query = query.lte('created_at', toDate);
 
-        const { data, error } = await query;
+        const { data, error } = await query.limit(50_000);
         if (error) throw new Error(`Failed to fetch analytics: ${error.message}`);
 
-        const totals = (data || []).reduce(
-          (acc, row) => ({
-            totalSent: acc.totalSent + (row.total_sent || 0),
-            totalDelivered: acc.totalDelivered + (row.total_delivered || 0),
-            totalBounced: acc.totalBounced + (row.total_bounced || 0),
-            totalComplained: acc.totalComplained + (row.total_complained || 0),
-            totalOpened: acc.totalOpened + (row.total_opened || 0),
-            totalClicked: acc.totalClicked + (row.total_clicked || 0),
+        type LogRow = {
+          created_at: string | null; sent_at: string | null; delivered_at: string | null;
+          opened_at: string | null; clicked_at: string | null; bounced_at: string | null;
+          complained_at: string | null;
+        };
+        const rows = (data || []) as LogRow[];
+
+        // A row that reached the provider counts as sent even if the send timestamp is
+        // missing — otherwise a failed send vanishes from the denominator and the bounce
+        // rate flatters itself.
+        const totals = rows.reduce(
+          (acc, r) => ({
+            totalSent: acc.totalSent + 1,
+            totalDelivered: acc.totalDelivered + (r.delivered_at ? 1 : 0),
+            totalBounced: acc.totalBounced + (r.bounced_at ? 1 : 0),
+            totalComplained: acc.totalComplained + (r.complained_at ? 1 : 0),
+            totalOpened: acc.totalOpened + (r.opened_at ? 1 : 0),
+            totalClicked: acc.totalClicked + (r.clicked_at ? 1 : 0),
           }),
           { totalSent: 0, totalDelivered: 0, totalBounced: 0, totalComplained: 0, totalOpened: 0, totalClicked: 0 }
         );
+
+        // Per-day series, same field names the previous `email_analytics` rows used so the
+        // dashboard's chart binding is unchanged.
+        const byDay = new Map<string, { date: string; total_sent: number; total_delivered: number; total_bounced: number; total_complained: number; total_opened: number; total_clicked: number }>();
+        for (const r of rows) {
+          const day = (r.created_at ?? '').slice(0, 10);
+          if (!day) continue;
+          const e = byDay.get(day) ?? { date: day, total_sent: 0, total_delivered: 0, total_bounced: 0, total_complained: 0, total_opened: 0, total_clicked: 0 };
+          e.total_sent += 1;
+          if (r.delivered_at) e.total_delivered += 1;
+          if (r.bounced_at) e.total_bounced += 1;
+          if (r.complained_at) e.total_complained += 1;
+          if (r.opened_at) e.total_opened += 1;
+          if (r.clicked_at) e.total_clicked += 1;
+          byDay.set(day, e);
+        }
+        const dailySeries = [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
 
         const deliveryRate = totals.totalSent > 0 ? (totals.totalDelivered / totals.totalSent) * 100 : 0;
         const bounceRate = totals.totalSent > 0 ? (totals.totalBounced / totals.totalSent) * 100 : 0;
@@ -897,7 +955,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             complaintRate: parseFloat(complaintRate.toFixed(2)),
             openRate: parseFloat(openRate.toFixed(2)),
             clickRate: parseFloat(clickRate.toFixed(2)),
-            dailyData: data,
+            dailyData: dailySeries,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
