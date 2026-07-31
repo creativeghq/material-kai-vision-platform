@@ -161,6 +161,7 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accoun
     case 'factory':  // legacy alias → supplier tier
       return 'dealer';
     case 'architect': return 'architect';
+    case 'sales_manager': return 'sales_manager';
     case 'sales': return 'sales';
     case 'finance': return 'accountant';
   }

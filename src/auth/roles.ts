@@ -17,6 +17,7 @@ export const ROLES = {
   ARCHITECT: 'architect',
   FINANCE: 'finance',
   SALES: 'sales',
+  SALES_MANAGER: 'sales_manager',
   USER: 'user',
   // legacy account roles, merged into SUPPLIER (2026-06); kept so old rows resolve
   FACTORY: 'factory',

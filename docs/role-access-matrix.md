@@ -11,7 +11,7 @@ code as of this writing — where the model is *not* enforced, it says so explic
 ## 1. The two "role" concepts
 
 ### a) Account role — `roles` table (`user_profiles.role_id`)
-A global, per-user value — **the access tier**. Set: `user`(1) · `sales`(2) · `supplier`(3) · `architect`(4) · `finance`(5) · `admin`(6). (Dealer+Factory merged into **supplier**; Super Admin merged into **admin**, 2026-06.)
+A global, per-user value — **the access tier**, set from `/admin/crm` → Users. Set: `user`(1) · `sales`(2) · `sales_manager`(3) · `supplier`(4) · `architect`(5) · `finance`(6) · `admin`(7). (Dealer+Factory merged into **supplier**; Super Admin merged into **admin**, 2026-06. `sales_manager` added 2026-07-31 — `sales` was already a tier, so the Users tab could make someone a rep but not a manager.) `level` is **display ordering only** — nothing compares it, so renumbering to slot a tier in is safe.
 
 This is now the **primary driver of the persona** (see §2) — `resolvePersona()` maps the account role to a persona, falling back to the workspace-derived persona only for `user`/unset. So setting the Role under **Admin → CRM → Users** is what actually grants a user's capabilities.
 
@@ -20,7 +20,7 @@ Reserved-tier rule: **`admin` is granted operator (see-all) ONLY via root-worksp
 Managed in **Admin → CRM → Users** (inline Role dropdown).
 
 ### b) Workspace membership role — `workspace_members.role`
-Per workspace: `owner` · `admin` · `member` · `client` · `accountant` · `sales`. Combined with the workspace's **marketplace rank** (`operator` / `dealer` / `architect`) and the platform-operator flag, this resolves to a single **persona**, which is what gates features.
+Per workspace: `owner` · `admin` · `member` · `client` · `accountant` · `sales` · `sales_manager` · `employee` · `realestate_agent`. Catalogued in [`src/auth/workspaceRoles.ts`](../src/auth/workspaceRoles.ts) and mirrored by two CHECK constraints + two RPC allowlists. Combined with the workspace's **marketplace rank** (`operator` / `dealer` / `architect`) and the platform-operator flag, this resolves to a single **persona**, which is what gates features.
 
 Source of truth: [`src/auth/capabilities.ts`](../src/auth/capabilities.ts).
 
@@ -34,10 +34,11 @@ Source of truth: [`src/auth/capabilities.ts`](../src/auth/capabilities.ts).
 | **dealer** (= Supplier tier) | `supplier` (or legacy `dealer`/`factory`) | Full business node + downstream. |
 | **architect** | `architect` | Sells to end clients; own downstream. |
 | **accountant** (Finance surface) | `finance` | Finance module; the `finance` role keeps **expense-approval** rights (it is NOT the restricted external accountant). |
-| **sales** | `sales` | Sales portal + own customers. |
+| **sales** | `sales` | Sales portal + own customers; sees only their OWN quote book. |
+| **sales_manager** | `sales_manager` | Sales portal across the WHOLE team's book, incl. cost/margin (`sales.team.view`, RLS `is_workspace_sales_manager`). NOT a workspace manager. |
 | **staff** / **end_user** | `user` / unset → workspace fallback | Team member / project client, resolved from the workspace role. |
 
-Resolution (`resolvePersona()`): `isPlatformOperator` → operator; else **account role** maps the tenant tier; else the legacy workspace-derived persona (`client`→end_user, `accountant`→accountant, `sales`→sales, owner/admin by rank, member→staff).
+Resolution (`resolvePersona()`): `isPlatformOperator` → operator; then workspace role `sales_manager` → sales_manager (checked **before** the account-tier switch, so an invited manager whose tier is `sales` is not downgraded to a rep); else **account role** maps the tenant tier; else the workspace-derived persona (`client`→end_user, `accountant`→accountant, `employee`→employee, `realestate_agent`→realestate_agent, `sales`→sales, owner/admin by rank, member→staff). The sales pair is symmetric — either axis yields the same persona.
 
 The **invited external accountant** (workspace role `accountant`, #202) still resolves to the accountant persona but is flagged `isAccountant` to *restrict* it (no expense approval / no settings) — distinct from the internal `finance` account role.
 
@@ -67,10 +68,10 @@ The **invited external accountant** (workspace role `accountant`, #202) still re
 | `inbox.use` | ✓ | ✓ | ✓ | ✓ | | ✓ | ✓ |
 
 Notes:
-- **operator** = everything **except** `sales.portal` (the Sales portal is the rep's surface only).
+- **operator** = everything **except** `sales.portal` (the Sales portal belongs to the two sales personas only — owners/admins work quotes via `/quotes`).
 - **dealer** and **architect** are identical today (full business set); they differ only in marketplace position (dealer sells downstream, architect sells to end users).
 - **accountant** is intentionally narrow — Finance surface only; within Finance, write-ops are further gated by `isWorkspaceManager` / `canOperateFinance`.
-- **sales** sees only their **own** quotes (RLS on `user_id`); customer financials are workspace-scoped reads.
+- **sales** sees only their **own** quotes (RLS on `user_id`); customer financials are workspace-scoped reads. **sales_manager** additionally passes `is_workspace_sales_manager(workspace_id)` in `consolidated_quotes_select_public`, so the team-wide read is enforced in the database, not just unhidden in the UI.
 
 ---
 

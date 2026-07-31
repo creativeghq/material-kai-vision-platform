@@ -15,6 +15,8 @@ import {
   type WorkspaceMemberRole,
 } from '@/auth/workspaceRoles';
 import { resolvePersona, PERSONA_CAPABILITIES } from '@/auth/capabilities';
+import { ROLES } from '@/auth/roles';
+import { roleLabel } from '@/modules/crm/crmConstants';
 
 /** Roles that intentionally resolve to a shared persona rather than one of their own. */
 const PERSONA_BY_ROLE: Record<WorkspaceMemberRole, string> = {
@@ -77,11 +79,57 @@ describe('workspace role catalog', () => {
   });
 
   it('labels never fall back to a raw snake_case value for a known role', () => {
+    // (see below for the account-tier half of the vocabulary)
     for (const role of WORKSPACE_MEMBER_ROLES) {
       expect(workspaceRoleLabel(role)).not.toContain('_');
     }
     // Unknown/legacy values still render something human rather than blank.
     expect(workspaceRoleLabel('some_legacy_role')).toBe('Some Legacy Role');
     expect(workspaceRoleLabel(null)).toBe('—');
+  });
+});
+
+/**
+ * The OTHER half of the vocabulary: the global account tier (`public.roles`, assigned from
+ * /admin/crm → Users). It is a separate axis from the workspace role, but the two overlap for the
+ * sales personas — and that overlap is where they drifted: `sales` existed as an account tier while
+ * `sales_manager` existed only as a workspace role, so the Users tab could make someone a rep but
+ * never a manager.
+ */
+describe('account-tier roles (public.roles)', () => {
+  const ACCOUNT_TIER_PERSONAS: Record<string, string> = {
+    [ROLES.SUPPLIER]: 'dealer',
+    [ROLES.DEALER]: 'dealer',   // legacy alias
+    [ROLES.FACTORY]: 'dealer',  // legacy alias
+    [ROLES.ARCHITECT]: 'architect',
+    [ROLES.SALES]: 'sales',
+    [ROLES.SALES_MANAGER]: 'sales_manager',
+    [ROLES.FINANCE]: 'accountant',
+  };
+
+  it('every account tier with a dedicated persona is handled by resolvePersona', () => {
+    for (const [accountRole, expected] of Object.entries(ACCOUNT_TIER_PERSONAS)) {
+      const persona = resolvePersona({
+        isPlatformOperator: false, rank: null, workspaceRole: null, accountRole,
+      });
+      expect(persona, `account tier "${accountRole}" fell through to "${persona}"`).toBe(expected);
+    }
+  });
+
+  it('both sales tiers have a human label — never a raw snake_case value', () => {
+    expect(roleLabel(ROLES.SALES)).toBe('Sales Rep');
+    expect(roleLabel(ROLES.SALES_MANAGER)).toBe('Sales Manager');
+    for (const name of Object.keys(ACCOUNT_TIER_PERSONAS)) {
+      expect(roleLabel(name), `"${name}" has no ROLE_LABELS entry`).not.toContain('_');
+    }
+  });
+
+  it('the sales pair is symmetric across both axes', () => {
+    // Set from Users (account tier) or from Profile → Team (workspace role) — same persona either
+    // way, so an admin is never told "you can be a rep here but a manager only over there".
+    for (const role of ['sales', 'sales_manager'] as const) {
+      expect(resolvePersona({ isPlatformOperator: false, rank: null, workspaceRole: null, accountRole: role }))
+        .toBe(resolvePersona({ isPlatformOperator: false, rank: null, workspaceRole: role, accountRole: null }));
+    }
   });
 });
