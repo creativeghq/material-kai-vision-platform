@@ -141,7 +141,17 @@ export const createManageStockTool = (
         const items = (res.data?.items ?? []).slice(0, 50).map((i: any) => ({
           id: i.id, name: i.name, sku: i.sku, unit: i.unit,
           qty_on_hand: i.qty_on_hand, qty_reserved: i.qty_reserved,
-          available: Number(i.qty_on_hand) - Number(i.qty_reserved), reorder_point: i.reorder_point, location: i.location,
+          // `available` is defined in SQL (forecast_demand: qty_on_hand - qty_reserved).
+          // Prefer the server's value and only fall back to computing it here, so the two
+          // cannot disagree the moment that definition changes — e.g. if reservations start
+          // excluding dispatched allocations. The old unconditional subtraction also produced
+          // NaN rather than null when either column arrived null. (audit #307 finding 14)
+          available: i.available ?? (
+            i.qty_on_hand == null || i.qty_reserved == null
+              ? null
+              : Number(i.qty_on_hand) - Number(i.qty_reserved)
+          ),
+          reorder_point: i.reorder_point, location: i.location,
         }));
         onChunk?.({ type: 'stock_items', items, query: item_query ?? null, timestamp: Date.now() });
         return JSON.stringify({ success: true, count: items.length, items });
@@ -212,7 +222,14 @@ export const createManageStockTool = (
         if (!res.ok) return JSON.stringify({ success: false, error: res.error });
         const cands = (res.data?.forecast?.candidates ?? []).slice(0, 20).map((c: any) => ({
           item: c.name, sku: c.sku, qty_on_hand: c.qty_on_hand, reorder_point: c.reorder_point,
-          days_of_cover: c.days_of_cover, avg_daily_usage: c.avg_daily_usage, warehouse_item_id: c.warehouse_item_id,
+          // forecast_demand emits `velocity_per_day`, not `avg_daily_usage`. Reading the wrong
+          // key made the property `undefined` on every candidate, and JSON.stringify drops
+          // undefined — so the free preview silently reported NO consumption rate at all,
+          // pushing users onto the 5-credit AI forecast for information this path already
+          // had. `trend` was dropped the same way. (audit #307 finding 15)
+          days_of_cover: c.days_of_cover, velocity_per_day: c.velocity_per_day,
+          trend: c.trend, below_reorder: c.below_reorder,
+          warehouse_item_id: c.warehouse_item_id,
         }));
         onChunk?.({ type: 'stock_forecast_preview', candidates: cands, timestamp: Date.now() });
         return JSON.stringify({ success: true, count: cands.length, candidates: cands, message: cands.length ? 'Free forecast preview (deterministic). Run "forecast" for the AI-ranked resupply plan (5 credits).' : 'Nothing is trending toward a stock-out.' });
