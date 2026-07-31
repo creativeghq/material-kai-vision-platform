@@ -9,7 +9,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -275,8 +275,9 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
         const wsId = (emailLog as any).workspace_id ?? null;
         const toEmail = (emailLog as any).to_email ?? (event.data.to?.[0] ?? null);
         const isBounce = event.type === 'email.bounced';
-        await emitFlowEvent(isBounce ? 'email_bounced' : 'email_complained', {
-          type: isBounce ? 'email_bounced' : 'email_complained',
+        const eventType = isBounce ? 'email_bounced' : 'email_complained';
+        const payload = {
+          type: eventType,
           workspace_id: wsId,
           email_log_id: (emailLog as any).id,
           email: toEmail,
@@ -288,7 +289,20 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
             ? `${toEmail ?? 'A recipient'} bounced${event.data.bounce?.message ? ` (${event.data.bounce.message})` : ''}.`
             : `${toEmail ?? 'A recipient'} marked a campaign email as spam.`,
           action_url: '/email-marketing?tab=campaigns',
-        });
+        };
+        // Fan out per owner/admin so each event carries a CONCRETE user_id. The seeded
+        // default flow ends in `create_notification`, which needs one — a workspace_id
+        // alone produces a notification addressed to nobody. This event previously had no
+        // flow at all, so a hard bounce or a spam complaint on an invoice/quote email
+        // notified nobody and the send looked successful forever. (audit #298)
+        if (wsId) {
+          await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], eventType,
+            (recipientUserId) => ({ ...payload, user_id: recipientUserId }));
+        } else {
+          // No workspace on the log (transactional send outside a tenant) — emit unaddressed
+          // so a custom flow can still filter on it.
+          await emitFlowEvent(eventType, payload);
+        }
       } catch { /* best-effort — never fail the webhook on a flow emit */ }
     }
 

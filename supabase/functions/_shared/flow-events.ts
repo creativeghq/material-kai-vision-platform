@@ -108,6 +108,39 @@ export async function emitFlowEventToWorkspaceRoles(
   }
 }
 
+/**
+ * Short-lived cache of trigger types that have at least one ACTIVE flow.
+ *
+ * Every emit used to cost an unconditional HTTP round-trip to `flow-engine`, even when no
+ * flow could possibly match. Two of the hottest paths in the platform emit into nothing:
+ * `search_executed` (every search, from agent-chat and unifiedSearchService) and
+ * `user_login` (every sign-in) — neither has a flow row, so each was a full function
+ * invocation whose only outcome was "matched 0 flows". (audit #298 finding 27)
+ *
+ * TTL is deliberately short: activating a flow in the builder takes effect within it.
+ */
+const TRIGGER_CACHE_TTL_MS = 30_000;
+let _triggerCache: { at: number; types: Set<string> } | null = null;
+
+async function activeTriggerTypes(): Promise<Set<string> | null> {
+  const now = Date.now();
+  if (_triggerCache && now - _triggerCache.at < TRIGGER_CACHE_TTL_MS) return _triggerCache.types;
+  try {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+    const { data, error } = await supabase
+      .from('flows')
+      .select('trigger_type')
+      .eq('status', 'active');
+    if (error) return null;
+    const types = new Set((data || []).map((r: { trigger_type: string }) => r.trigger_type));
+    _triggerCache = { at: now, types };
+    return types;
+  } catch {
+    return null;
+  }
+}
+
 export async function emitFlowEvent(
   eventType: string,
   data: Record<string, unknown>,
@@ -115,6 +148,15 @@ export async function emitFlowEvent(
   if (!supabaseUrl || !supabaseServiceKey) {
     console.warn('[flow-events] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY, skipping event emission');
     return null;
+  }
+
+  // Skip the round-trip when nothing is listening. NOTE this fails OPEN: a null cache
+  // (lookup failed, or secrets not ready) means we emit anyway. Suppressing a real event
+  // because a convenience lookup broke would be far worse than an extra invocation — the
+  // whole point of this path is that notifications must not go missing.
+  const listening = await activeTriggerTypes();
+  if (listening && !listening.has(eventType)) {
+    return { triggered: 0, succeeded: 0, failed: 0 };
   }
 
   try {
