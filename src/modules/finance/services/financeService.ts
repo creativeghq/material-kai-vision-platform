@@ -122,12 +122,19 @@ export interface InvoiceWithItems extends Invoice {
 }
 
 export type PaymentDirection = 'in' | 'out';
-export type PaymentMethod = 'bank_transfer' | 'cash' | 'card' | 'check' | 'other';
+/**
+ * Mirrors `payments_method_check`. `iris` was added 2026-07-31 (audit #307): the POS offers
+ * cash / card / IRIS and stamps the right AADE code (3 / 7 / 8) on the fiscal document, but
+ * the ledger had no IRIS member, so the register recorded it as `card` — making the ledger
+ * disagree with the filed document and collapsing IRIS into card in the Z-report breakdown.
+ */
+export type PaymentMethod = 'bank_transfer' | 'cash' | 'card' | 'iris' | 'check' | 'other';
 
 /** Human display labels for payment methods (Title Case). */
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   cash: 'Payment on Hands',
   card: 'Card',
+  iris: 'IRIS',
   bank_transfer: 'Bank Payment',
   check: 'Check Payment',
   other: 'Other',

@@ -64,6 +64,25 @@ const DOC_TYPES = {
   '11.2': { code: '11.2', label: 'ΑΠΟΔΕΙΞΗ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ', labelEn: 'Service receipt', shortEn: 'Service' },
 } as const;
 type DocType = keyof typeof DOC_TYPES;
+
+type PayMethod = 'cash' | 'card' | 'iris';
+
+/**
+ * The AADE / myDATA payment-method code for a register payment.
+ *
+ * ONE derivation. This was previously computed twice inside `issue()`, 45 lines apart and
+ * disagreeing: the invoice was stamped `method === 'cash' ? 3 : 7`, which collapses IRIS to
+ * the card code, while the terminal call correctly used `method === 'iris' ? 8 : 7`. The
+ * wrong one was the one persisted on the fiscal document, so **every IRIS receipt was
+ * declared to AADE as a card payment**, and the Z-report payment-method breakdown was wrong
+ * for that channel. (audit #307)
+ *
+ *   3 = cash · 7 = card / e-POS · 8 = IRIS
+ */
+const AADE_PAYMENT_CODE: Record<PayMethod, 3 | 7 | 8> = { cash: 3, card: 7, iris: 8 };
+
+/** The `payments.method` ledger value for a register payment — IRIS is not card. */
+const LEDGER_METHOD: Record<PayMethod, 'cash' | 'card' | 'iris'> = { cash: 'cash', card: 'card', iris: 'iris' };
 const VAT_RATES = [24, 13, 6, 0];
 
 // Compact label/value row for the X/Z report.
@@ -347,7 +366,9 @@ const PosPage: React.FC = () => {
           document_type: docType, // 11.1 ΑΛΠ or 11.2 ΑΠΥ
           customer_company_id: customer?.type === 'company' ? customer.id : null,
           customer_contact_id: customer?.type === 'contact' ? customer.id : null,
-          payment_method_code: method === 'cash' ? 3 : 7,
+          // ONE derivation — see AADE_PAYMENT_CODE. Was `method === 'cash' ? 3 : 7`, which
+          // declared every IRIS receipt to AADE as a card payment. (audit #307)
+          payment_method_code: AADE_PAYMENT_CODE[method],
           currency,
           subtotal_net: totals.net,
           vat_rate: vatRate,
@@ -392,7 +413,7 @@ const PosPage: React.FC = () => {
       // #185 Law 5155 — card/IRIS on a registered terminal must be SIGNED, charged, then finalized.
       if (method !== 'cash' && selectedTerminal) {
         const res = await fiscalConnectorService.submitInvoice(invoice.id, {
-          posPayment: { terminal_id: selectedTerminal.terminal_id, pos_nsp_id: selectedTerminal.pos_nsp_id, payment_type: method === 'iris' ? 8 : 7 },
+          posPayment: { terminal_id: selectedTerminal.terminal_id, pos_nsp_id: selectedTerminal.pos_nsp_id, payment_type: AADE_PAYMENT_CODE[method] },
         });
         if (res?.fiscal?.status === 'awaiting_payment') {
           const { data: sig } = await supabase
@@ -435,6 +456,12 @@ const PosPage: React.FC = () => {
     mark: string | null,
   ) => {
     if (!activeWorkspaceId) return;
+    // Whether the two side-effects that MUST happen actually did. A receipt handed to a
+    // customer while either of these silently failed is worse than a visible error, because
+    // nothing downstream ever reports the gap. (audit #307)
+    let paymentRecorded = true;
+    let paymentError: string | null = null;
+    let stockMoved = true;
     try {
       // Attribute the takings to the register's cash drawer (cash) / card acquirer account (card),
       // so end-of-day bank reconciliation can tie POS revenue to an account. Fall back to default.
@@ -444,11 +471,22 @@ const PosPage: React.FC = () => {
         ?? null;
       await financeService.recordPayment({
         workspaceId: activeWorkspaceId, direction: 'in', amount: snapshot.total, currency: snapshot.currency,
-        method: paidMethod === 'cash' ? 'cash' : 'card',
+        // IRIS is its own method — recording it as 'card' made the ledger disagree with the
+        // fiscal document and skewed the Z-report breakdown. (audit #307)
+        method: LEDGER_METHOD[paidMethod],
         bankAccountId: acct?.bank_account_id ?? null,
         allocations: [{ target_id: invoiceId, target_type: 'invoice', amount: snapshot.total }],
       });
-    } catch { /* non-fatal */ }
+    } catch (e) {
+      // NOT non-fatal. This is the only place a POS sale's takings are recorded. Swallowing
+      // it meant the customer walked out with a printed, myDATA-marked receipt while the
+      // invoice stayed amount_due = total forever — and the cashier's Z report reconciled
+      // expected cash against a `payments` row that does not exist, so the variance was
+      // wrong every time and nothing said so. (audit #307)
+      paymentRecorded = false;
+      paymentError = e instanceof Error ? e.message : String(e);
+      console.error('[pos] recordPayment failed', e);
+    }
     // The fiscal MARK/UID/QR are persisted on the invoice by finance-issue-invoice; re-read
     // them so the printed receipt carries the authoritative values (mark arg is a fast path).
     let uid: string | null = null; let qrUrl: string | null = null; let finalMark = mark;
@@ -458,10 +496,36 @@ const PosPage: React.FC = () => {
       if (inv) { finalMark = inv.fiscal_mark ?? mark; uid = inv.fiscal_uid ?? null; qrUrl = inv.fiscal_qr_url ?? null; }
     } catch { /* non-fatal — fall back to the passed mark */ }
     // Every POS sale becomes a (completed, paid, delivered) sales order — best-effort.
-    try { await supabase.rpc('generate_order_from_invoice', { p_invoice_id: invoiceId, p_mark_delivered: true }); } catch { /* non-fatal */ }
+    // This RPC is the ONLY stock-out path a POS sale has. mark_invoice_issued cannot
+    // compensate: it runs only on status='draft' invoices and this page inserts 'issued'
+    // directly, and invoices.move_stock defaults false and is never set here. Swallowing a
+    // failure left stock on hand high after the goods physically left the shop, which then
+    // feeds reorder points, the low-stock KPI and forecast_demand. (audit #307)
+    try {
+      const { error: orderErr } = await supabase.rpc('generate_order_from_invoice', { p_invoice_id: invoiceId, p_mark_delivered: true });
+      if (orderErr) throw new Error(orderErr.message);
+    } catch (e) {
+      stockMoved = false;
+      console.error('[pos] generate_order_from_invoice failed — stock not moved', e);
+    }
     setResult({ ...snapshot, invoiceId, mark: finalMark, uid, qrUrl, method: paidMethod, issuedAt: new Date().toLocaleString() });
     resetSale();
-    toast({ title: 'Receipt issued', description: finalMark ? `MARK ${finalMark}` : 'Saved (myDATA pending)' });
+
+    // The receipt is legally issued either way — never pretend otherwise — but say plainly
+    // when a side-effect did not land, while the cashier can still act on it.
+    if (!paymentRecorded || !stockMoved) {
+      const missing = [
+        !paymentRecorded ? 'the payment was NOT recorded — enter it manually in Finance → Payments' : null,
+        !stockMoved ? 'stock was NOT reduced for these items' : null,
+      ].filter(Boolean).join('; ');
+      toast({
+        title: 'Receipt issued — needs attention',
+        description: `${finalMark ? `MARK ${finalMark}. ` : ''}${missing}.${paymentError ? ` (${paymentError})` : ''}`,
+        variant: 'destructive',
+      });
+    } else {
+      toast({ title: 'Receipt issued', description: finalMark ? `MARK ${finalMark}` : 'Saved (myDATA pending)' });
+    }
   };
 
   const chargeAndComplete = async () => {
