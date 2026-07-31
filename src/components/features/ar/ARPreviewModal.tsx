@@ -15,6 +15,7 @@ import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import { TextureLoader, RepeatWrapping } from 'three';
 import { X, Download, RotateCcw, Smartphone, ZoomIn } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/core/ui/button';
 import { Slider } from '@/components/core/ui/slider';
 import {
@@ -211,6 +212,7 @@ class ThreeErrorBoundary extends React.Component<
 export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
   isOpen,
   onClose,
+  productId,
   productName,
   productImage,
   pbrMaps,
@@ -297,6 +299,21 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
             <div className="absolute left-4 top-4 max-w-xs rounded-lg bg-black/60 px-3 py-2 text-xs text-white backdrop-blur-sm">
               <Smartphone className="mb-1 inline h-3 w-3" /> For the full AR
               experience, use the latest Chrome on Android or Safari on iOS.
+            </div>
+          )}
+
+          {/* Desktop → phone handoff. Real AR needs a phone, and on desktop this modal
+              previously offered only the 3D turntable with no way to get there. The QR
+              points at /ar/:productId (App.tsx), the same route ARPage already serves.
+              This is the one behaviour the orphaned ViewInARButton had that the modal
+              did not — folded in here rather than left as a second, unreachable door.
+              (audit #304 finding 14) */}
+          {!isMobile && productId && (
+            <div className="absolute right-4 top-4 flex flex-col items-center gap-2 rounded-lg bg-background/90 p-3 shadow-lg backdrop-blur-sm">
+              <QRCodeSVG value={`${window.location.origin}/ar/${productId}`} size={96} />
+              <p className="max-w-[8rem] text-center text-[11px] leading-tight text-muted-foreground">
+                <Smartphone className="mb-0.5 inline h-3 w-3" /> Scan to view in AR on your phone
+              </p>
             </div>
           )}
 

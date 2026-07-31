@@ -115,25 +115,41 @@ export const AIPerformanceTab: React.FC = () => {
         modelUsageArray.sort((a, b) => b.total_cost - a.total_cost);
         setModelUsage(modelUsageArray);
 
-        // Interior Design generation stats
+        // Interior Design generation stats.
+        //
+        // Three separate reasons this panel read zero on every metric (audit #304 finding 9):
+        //
+        //  1. `generation_3d.total_cost` has no writer — generate-interior-gemini, the only
+        //     inserter, never sets it. `.not('total_cost','is',null)` therefore matched zero
+        //     rows FOREVER, so the generation count, image count and user count were zeroed
+        //     too, not just the cost. Filter dropped.
+        //  2. Cost is not generation_3d's to hold. `ai_usage_logs.billed_cost_usd` is the single
+        //     source for what a call cost (CLAUDE.md: one derivation per money quantity), and
+        //     `combinedLogs` is already loaded above — so it is summed from there rather than
+        //     re-derived into a second column that would then drift.
+        //  3. The image tally read `model.status === 'completed' && model.image_urls`. The
+        //     writer stores `{ mode, [modelLabel]: { success: true, image_url } }` — no
+        //     `status`, no `image_urls` array. It would have counted 0 even with rows present.
+        const INTERIOR_OPS = ['interior_design_generation', 'interior_design'];
+        const totalCost = combinedLogs
+          .filter((l) => INTERIOR_OPS.includes(l.operation_type))
+          .reduce((sum, l) => sum + Number(l.billed_cost_usd || 0), 0);
+
         const { data: generations } = await supabase
           .from('generation_3d')
-          .select('id, user_id, total_cost, models_results')
-          .eq('generation_status', 'completed')
-          .not('total_cost', 'is', null);
+          .select('id, user_id, models_results')
+          .eq('generation_status', 'completed');
 
         if (generations) {
-          const totalCost = generations.reduce((sum, g) => sum + (Number(g.total_cost) || 0), 0);
           const uniqueUsers = new Set(generations.map(g => g.user_id)).size;
           let totalImages = 0;
           generations.forEach(g => {
-            if (g.models_results) {
-              Object.values(g.models_results as Record<string, any>).forEach((model: any) => {
-                if (model.status === 'completed' && model.image_urls) {
-                  totalImages += model.image_urls.length;
-                }
-              });
-            }
+            // `mode` is a sibling string key, not a model result — skip non-objects.
+            Object.entries((g.models_results ?? {}) as Record<string, any>).forEach(([key, v]) => {
+              if (key === 'mode' || !v || typeof v !== 'object') return;
+              if (Array.isArray(v.image_urls)) totalImages += v.image_urls.length;
+              else if (v.image_url) totalImages += 1;
+            });
           });
           setInteriorDesignStats({
             total_generations: generations.length,
