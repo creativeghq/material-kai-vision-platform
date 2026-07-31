@@ -78,6 +78,7 @@ export type TriggerType =
   | 'invoice_issued'
   | 'receipt_issued'
   | 'payment_received'
+  | 'payment_reversed'
   | 'payment_sent'
   // Sourcing / purchase orders (#237)
   | 'purchase_order.sent'
@@ -192,6 +193,8 @@ export interface FinanceDocumentRequestedTriggerConfig {}
 export interface InvoiceIssuedTriggerConfig {}
 export interface ReceiptIssuedTriggerConfig {}
 export interface PaymentReceivedTriggerConfig {}
+/** Refund or chargeback. Emitted by stripe-webhooks. (audit #307) */
+export interface PaymentReversedTriggerConfig {}
 export interface PaymentSentTriggerConfig {}
 export interface PurchaseOrderSentTriggerConfig {}
 export interface PurchaseOrderReceivedTriggerConfig {}
@@ -362,6 +365,7 @@ export type TriggerConfigMap = {
   invoice_issued: InvoiceIssuedTriggerConfig;
   receipt_issued: ReceiptIssuedTriggerConfig;
   payment_received: PaymentReceivedTriggerConfig;
+  payment_reversed: PaymentReversedTriggerConfig;
   payment_sent: PaymentSentTriggerConfig;
   'purchase_order.sent': PurchaseOrderSentTriggerConfig;
   'purchase_order.received': PurchaseOrderReceivedTriggerConfig;

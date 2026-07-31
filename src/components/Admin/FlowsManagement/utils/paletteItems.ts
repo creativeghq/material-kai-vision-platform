@@ -214,6 +214,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'payment_received', group: 'Finance',
     label: 'Payment Received', description: 'A payment was received against an invoice or receivable', icon: 'CheckCircle2', color: 'emerald',
     defaultData: { label: 'Payment Received', category: 'trigger', triggerType: 'payment_received', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'payment_reversed', group: 'Finance',
+    label: 'Payment Reversed', description: 'A payment was refunded or charged back — the invoice still reads as paid until a credit note reverses it', icon: 'Undo2', color: 'red',
+    defaultData: { label: 'Payment Reversed', category: 'trigger', triggerType: 'payment_reversed', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'payment_sent', group: 'Finance',
     label: 'Payment Sent', description: 'A payment was recorded and sent to a supplier', icon: 'CheckCircle2', color: 'emerald',
     defaultData: { label: 'Payment Sent', category: 'trigger', triggerType: 'payment_sent', config: {} } as TriggerNodeData },
@@ -499,7 +502,7 @@ export const actionPaletteItems = paletteItems.filter(i => i.category === 'actio
  */
 export const TENANT_ALLOWED_SUBTYPES: ReadonlySet<string> = new Set<string>([
   // triggers
-  'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
+  'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent', 'payment_reversed',
   'inbox.message_received', 'appointment_booked', 'contract_signed',
   // actions (send_sms is the engine's WhatsApp alias)
   'send_email', 'send_sms', 'create_notification', 'send_agent_message',

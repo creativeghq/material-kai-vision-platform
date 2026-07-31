@@ -282,7 +282,24 @@ export async function recordStatementPayment(
   }
   if (allocations.length > 0) {
     const { error: allocErr } = await supabase.from('payment_allocations').insert(allocations);
-    if (allocErr) console.error('[payments] statement allocations insert failed', allocErr.message);
+    if (allocErr) {
+      // Was logged and ignored, then the function returned ok:true with a NON-ZERO
+      // `allocated` computed from the intended allocation array rather than from what the
+      // database accepted. So a customer could pay their whole account balance through
+      // Stripe/Viva, the `payments` row would land, NO payment_allocations rows would land,
+      // and the webhook reported success — leaving every invoice open and AR aging wrong,
+      // with the only trace an edge-function log line nobody reads.
+      //
+      // recordInvoicePayment treats the identical failure as fatal, with the comment "loud,
+      // because it needs a human". Same here. The payment row is already written, so the
+      // caller gets its id back and can retry allocation without double-recording. (#307)
+      console.error('[payments] statement allocations insert failed', allocErr.message);
+      return {
+        ok: false,
+        paymentId: paymentRow.id,
+        error: `Payment ${paymentRow.id} was recorded but could not be allocated to invoices: ${allocErr.message}`,
+      };
+    }
   }
 
   const { data: partyRow } = await supabase

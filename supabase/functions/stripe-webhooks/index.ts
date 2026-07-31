@@ -2,7 +2,7 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getStripe, getPlatformBillingStripe, getSupabase, stripeWebhookSecret, platformBillingWebhookSecret } from '../_shared/stripe-clients.ts';
 import { moduleTierRank } from '../_shared/module-tiers.ts';
@@ -151,6 +151,26 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
 
       case 'invoice.payment_failed':
         await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+        break;
+
+      // ============================================
+      // Reversals (audit #307 finding 10)
+      // ============================================
+      // These were entirely absent — `grep "refund\|dispute"` over this 715-line file
+      // returned ZERO matches — so they fell into `default:` and were logged as
+      // "Unhandled event type". A refunded or charged-back invoice therefore read `paid`
+      // forever: AR, revenue and the payment_allocations ledger all over-counted by the
+      // reversed amount.
+      //
+      // Because it is a MISSING branch rather than a failing one, no error rate, no Sentry
+      // event and no silent-zero probe could ever have surfaced it. That is what makes this
+      // class worth handling explicitly rather than relying on monitoring.
+      case 'charge.refunded':
+        await handleChargeReversed(event.data.object as Stripe.Charge, 'refund');
+        break;
+
+      case 'charge.dispute.created':
+        await handleDisputeOpened(event.data.object as Stripe.Dispute);
         break;
 
       default:
@@ -621,6 +641,74 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
     action_url: '/settings/billing',
     payment_intent_id: paymentIntent.id,
   }).catch(() => {});
+}
+
+/**
+ * A charge was refunded (fully or partially).
+ *
+ * Deliberately does NOT reverse the ledger automatically. Reversing money is a finance
+ * decision with a legal artefact attached — in this platform a refund is settled by a CREDIT
+ * NOTE, which carries its own numbering and myDATA obligations. Silently deleting
+ * payment_allocations rows would leave the books internally consistent and legally wrong.
+ *
+ * So this raises it to a human, loudly and with the numbers, and leaves the credit-note flow
+ * to do the reversal properly. That is the same conclusion viva-webhooks reached — the
+ * difference is that this makes the alarm reach someone instead of stopping at console.error.
+ */
+async function handleChargeReversed(charge: Stripe.Charge, kind: 'refund' | 'dispute') {
+  const amount = (charge.amount_refunded ?? 0) / 100;
+  const currency = (charge.currency ?? 'eur').toUpperCase();
+  console.warn(`[stripe] charge ${kind}: ${charge.id} — ${amount} ${currency}`);
+
+  // Find the payment we recorded for this charge, so the alert names the invoice.
+  const providerRef = charge.payment_intent
+    ? String(charge.payment_intent)
+    : charge.id;
+  const { data: pay } = await supabase
+    .from('payments')
+    .select('id, workspace_id, amount, currency')
+    .eq('provider', 'stripe')
+    .eq('provider_ref', providerRef)
+    .maybeSingle();
+
+  const wsId = (pay as { workspace_id?: string } | null)?.workspace_id ?? null;
+  const title = kind === 'refund'
+    ? `Refund received — ${amount} ${currency}`
+    : `Chargeback opened — ${amount} ${currency}`;
+  const body = kind === 'refund'
+    ? `Stripe refunded ${amount} ${currency}. The original payment is still allocated, so the invoice still reads as paid — issue a credit note to reverse it.`
+    : `A customer disputed ${amount} ${currency}. The payment is still allocated until the dispute resolves.`;
+
+  // Route to the workspace's owners/admins when we can tie it to one, so it reaches a person
+  // rather than an unaddressed event. Falls back to a plain emit.
+  const payload = {
+    type: 'payment_reversed',
+    reversal_kind: kind,
+    workspace_id: wsId,
+    payment_id: (pay as { id?: string } | null)?.id ?? null,
+    charge_id: charge.id,
+    amount: `${amount.toFixed(2)} ${currency}`,
+    currency,
+    title,
+    body,
+    action_url: '/finance?tab=doc_payments',
+  };
+  if (wsId) {
+    await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], 'payment_reversed',
+      (recipientUserId) => ({ ...payload, user_id: recipientUserId })).catch(() => {});
+  } else {
+    await emitFlowEvent('payment_reversed', payload).catch(() => {});
+  }
+}
+
+/** A customer opened a dispute. Same handling as a refund — flag it, do not reverse silently. */
+async function handleDisputeOpened(dispute: Stripe.Dispute) {
+  const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id;
+  if (!chargeId) return;
+  await handleChargeReversed(
+    { id: chargeId, amount_refunded: dispute.amount, currency: dispute.currency, payment_intent: dispute.payment_intent } as Stripe.Charge,
+    'dispute',
+  );
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {

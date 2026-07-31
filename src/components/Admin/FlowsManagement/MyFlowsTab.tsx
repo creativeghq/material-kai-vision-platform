@@ -53,6 +53,7 @@ import {
   Ship,
   Truck,
   Home,
+  Undo2,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -144,6 +145,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   invoice_issued: FileText,
   receipt_issued: FileCheck,
   payment_received: CheckCircle2,
+  payment_reversed: Undo2,
   payment_sent: CheckCircle2,
   'purchase_order.sent': Send,
   'purchase_order.received': Package,
@@ -249,6 +251,7 @@ const triggerLabels: Record<TriggerType, string> = {
   invoice_issued: 'Invoice Issued',
   receipt_issued: 'Receipt Issued',
   payment_received: 'Payment Received',
+  payment_reversed: 'Payment Reversed',
   payment_sent: 'Payment Sent',
   'purchase_order.sent': 'Purchase Order Sent',
   'purchase_order.received': 'Purchase Order Received',

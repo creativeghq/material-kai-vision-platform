@@ -11,6 +11,7 @@ import {
   Building2, MailOpen, MousePointerClick, TrendingDown, AtSign, Briefcase,
   Ship, Truck,
   Home,
+  Undo2,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -73,6 +74,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   invoice_issued: FileText,
   receipt_issued: FileCheck,
   payment_received: CheckCircle2,
+  payment_reversed: Undo2,
   payment_sent: CheckCircle2,
   'purchase_order.sent': Send,
   'purchase_order.received': Package,
