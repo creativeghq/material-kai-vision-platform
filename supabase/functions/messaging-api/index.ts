@@ -86,25 +86,50 @@ function orderedTemplateParams(template: any, variables: Record<string, string>)
   return names.map((name) => String(variables?.[name] ?? ''));
 }
 
-/** Resolve a WhatsApp channel by sender_id, else the default active one. */
-async function resolveChannel(supabase: any, from?: string) {
-  if (from) {
-    const { data } = await supabase
-      .from('messaging_channels')
-      .select('*')
-      .eq('sender_id', from)
-      .eq('channel_type', 'whatsapp')
-      .maybeSingle();
-    return data;
-  }
-  const { data } = await supabase
+/**
+ * Resolve a WhatsApp channel by sender_id, else the default active one — WITHIN the
+ * caller's workspaces.
+ *
+ * SECURITY (audit #294/#306): this had no workspace predicate at all. It runs on the
+ * service-role client, so RLS does not apply, and it returned the globally-first default
+ * channel — or, with `from`, ANY channel matching that sender_id. `send` then derived
+ * `tenantWsId` from the RESOLVED channel and gated entitlement on that, so the tenancy
+ * check validated the victim rather than the caller: a workspace-A operator could send
+ * from workspace B's WABA number, on B's Zernio quota and B's Meta reputation, with
+ * messaging_logs recording it under B.
+ *
+ * `workspaceIds` is REQUIRED and must be passed explicitly — `null` means "no scope"
+ * (admin/service access only). Making it a required parameter rather than an optional one
+ * is deliberate: the original bug was an omission, and an optional argument would let the
+ * next caller reintroduce it silently.
+ */
+async function resolveChannel(supabase: any, workspaceIds: string[] | null, from?: string) {
+  // Scoped caller with no workspaces: nothing is resolvable. Return null rather than
+  // falling through to an unscoped query.
+  if (workspaceIds && workspaceIds.length === 0) return null;
+
+  let query = supabase
     .from('messaging_channels')
     .select('*')
-    .eq('channel_type', 'whatsapp')
-    .eq('is_default', true)
-    .eq('is_active', true)
-    .maybeSingle();
-  return data;
+    .eq('channel_type', 'whatsapp');
+
+  if (from) {
+    query = query.eq('sender_id', from);
+  } else {
+    query = query.eq('is_default', true).eq('is_active', true);
+  }
+  if (workspaceIds) query = query.in('workspace_id', workspaceIds);
+
+  // `maybeSingle` ERRORS when more than one row matches (e.g. two channels both flagged
+  // default — nothing enforces one per type). Take the first deterministically instead, so
+  // a misconfiguration degrades to "picked one" rather than "no WhatsApp channel
+  // configured", which sends the admin looking for the opposite of the real problem.
+  const { data, error } = await query.order('created_at', { ascending: true }).limit(1);
+  if (error) {
+    console.error('[messaging-api] resolveChannel failed:', error.message);
+    return null;
+  }
+  return data?.[0] ?? null;
 }
 
 Deno.serve(withApiLogging('messaging-api', async (req) => {
@@ -209,7 +234,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // ─────────────────────────────────────────────────────────────
       case 'send': {
         const body: SendMessageRequest = requestBody;
-        const channel = await resolveChannel(supabaseClient, body.from);
+        const channel = await resolveChannel(supabaseClient, await readScopeWorkspaceIds(), body.from);
         if (!channel) throw new Error('No WhatsApp channel configured. Connect a WhatsApp number first.');
         if (!channel.zernio_account_id) throw new Error('Channel is not linked to a Zernio account.');
         const tenantWsId = channel.workspace_id ?? (await resolveTargetWorkspaceId());
@@ -295,7 +320,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         const body: SendBulkRequest = requestBody;
         if (!body.recipients?.length) throw new Error('Recipients are required');
 
-        const channel = await resolveChannel(supabaseClient, body.from);
+        const channel = await resolveChannel(supabaseClient, await readScopeWorkspaceIds(), body.from);
         if (!channel) throw new Error('No WhatsApp channel configured');
         if (!channel.zernio_account_id) throw new Error('Channel is not linked to a Zernio account.');
         const tenantWsId = channel.workspace_id ?? (await resolveTargetWorkspaceId());
@@ -534,7 +559,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // List Meta-approved templates for a channel's WABA
       // ─────────────────────────────────────────────────────────────
       case 'whatsapp-templates': {
-        const channel = await resolveChannel(supabaseClient, requestBody.from);
+        const channel = await resolveChannel(supabaseClient, await readScopeWorkspaceIds(), requestBody.from);
         if (!channel?.zernio_account_id) throw new Error('No connected WhatsApp account');
         const data = await zernioApi('GET', `/whatsapp/templates?accountId=${encodeURIComponent(channel.zernio_account_id)}`);
         return jsonResponse({ templates: data.templates || [] });
@@ -618,7 +643,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
 
       // Account health (replaces Twilio "balance"): quality rating + messaging tier.
       case 'account-info': {
-        const channel = await resolveChannel(supabaseClient, requestBody.from);
+        const channel = await resolveChannel(supabaseClient, await readScopeWorkspaceIds(), requestBody.from);
         if (!channel?.zernio_account_id) return jsonResponse({});
         try {
           const data = await zernioApi('GET', `/whatsapp/number-info?accountId=${encodeURIComponent(channel.zernio_account_id)}`);
