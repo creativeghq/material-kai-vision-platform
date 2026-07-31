@@ -363,12 +363,16 @@ export function PlatformOverviewTab() {
       ] = await Promise.all([
         supabase.from('quote_requests').select('id,status,created_at').gte('created_at', ago12.toISOString()),
         supabase.from('profiles').select('id,professional_type,created_at').gte('created_at', ago12.toISOString()),
-        supabase.from('quote_items').select('product_id,quote_request_id').gte('created_at', ago12.toISOString()).limit(3000),
+        // `quote_request_id` does not exist — the FK is `quote_id`. (audit #298)
+        supabase.from('quote_items').select('product_id,quote_id').gte('created_at', ago12.toISOString()).limit(3000),
         supabase.from('hire_me_requests').select('id,services,status,created_at').gte('created_at', ago12.toISOString()),
         supabase.from('agent_runs').select('created_at,status,execution_time_ms,credits_debited,background_agents(agent_type)').gte('created_at', ago12.toISOString()),
-        supabase.from('vr_worlds').select('created_at,status,quality_preset,credits_used').gte('created_at', ago12.toISOString()),
+        // vr_worlds has no `quality_preset` and no `credits_used` — the tier is `model` and
+        // the charge is `credits_charged`. moodboard_items timestamps on `added_at`, not
+        // `created_at` (both the projection AND the range filter). (audit #298)
+        supabase.from('vr_worlds').select('created_at,status,model,credits_charged').gte('created_at', ago12.toISOString()),
         supabase.from('moodboards').select('id,created_at').gte('created_at', ago12.toISOString()),
-        supabase.from('moodboard_items').select('created_at,material_id').gte('created_at', ago12.toISOString()).limit(3000),
+        supabase.from('moodboard_items').select('added_at,material_id').gte('added_at', ago12.toISOString()).limit(3000),
         supabase.from('projects').select('id,status,deadline,budget_amount,budget_currency,created_at,last_activity_at'),
         supabase.from('search_queries').select('query,created_at,result_count,strategy,execution_time_ms,agent_id,results_clicked').gte('created_at', ago12.toISOString()).limit(5000),
         supabase.from('search_feedback').select('rating,created_at').gte('created_at', ago12.toISOString()),
@@ -438,7 +442,7 @@ export function PlatformOverviewTab() {
       // Moodboard activity
       const mbMap = new Map<string, { boards: number; items: number }>(wks12.map(w => [w, { boards: 0, items: 0 }]));
       (moodboards ?? []).forEach((b: any) => { const l = weekLabel(new Date(b.created_at)); if (mbMap.has(l)) mbMap.get(l)!.boards++; });
-      (moodboardItems ?? []).forEach((i: any) => { const l = weekLabel(new Date(i.created_at)); if (mbMap.has(l)) mbMap.get(l)!.items++; });
+      (moodboardItems ?? []).forEach((i: any) => { const l = weekLabel(new Date(i.added_at)); if (mbMap.has(l)) mbMap.get(l)!.items++; });
       setMoodboardActivity(Array.from(mbMap.entries()).map(([week, d]) => ({ week, ...d })));
 
       // Project KPIs — Studio workflow signal. All-time counts (projects table is small).
@@ -463,10 +467,10 @@ export function PlatformOverviewTab() {
       (vrWorlds ?? []).forEach((v: any) => {
         const l = weekLabel(new Date(v.created_at));
         if (vrMap.has(l)) vrMap.set(l, (vrMap.get(l) ?? 0) + 1);
-        const q = v.quality_preset ?? ((v.credits_used ?? 0) >= 200 ? 'plus (200cr)' : 'mini (50cr)');
+        const q = v.model ?? ((v.credits_charged ?? 0) >= 200 ? 'plus (200cr)' : 'mini (50cr)');
         vrQMap.set(q, (vrQMap.get(q) ?? 0) + 1);
         if (vrStatusMap.has(l)) { v.status === 'completed' ? vrStatusMap.get(l)!.completed++ : v.status === 'failed' && vrStatusMap.get(l)!.failed++; }
-        vrCreditsTotal += v.credits_used ?? 0;
+        vrCreditsTotal += v.credits_charged ?? 0;
       });
       setVrTrend(Array.from(vrMap.entries()).map(([week, count]) => ({ week, count })));
       setVrQualitySplit(Array.from(vrQMap.entries()).map(([name, value]) => ({ name, value })));
@@ -550,8 +554,13 @@ export function PlatformOverviewTab() {
         ]),
         // 3D detailed
         Promise.all([
-          supabase.from('generation_3d').select('created_at,status,room_type,credits_used').gte('created_at', ago12.toISOString()),
-          supabase.from('generation_3d_segments').select('created_at,zone_name,detected_material,confidence').gte('created_at', ago12.toISOString()).limit(5000),
+          // generation_3d: the column is `generation_status`, not `status`; `credits_used`
+          // does not exist at all and was never consumed here, so it is dropped rather than
+          // aliased to `total_cost` (which has no writer — see #304).
+          // generation_3d_segments: `zone_name`/`detected_material` are `label`/`material_type`.
+          // (audit #298)
+          supabase.from('generation_3d').select('created_at,generation_status,room_type').gte('created_at', ago12.toISOString()),
+          supabase.from('generation_3d_segments').select('created_at,label,material_type,confidence').gte('created_at', ago12.toISOString()).limit(5000),
           supabase.from('svbrdf_extractions').select('created_at,status,confidence').gte('created_at', ago12.toISOString()),
         ]),
         // Credits
@@ -569,7 +578,9 @@ export function PlatformOverviewTab() {
         // Pipeline health
         Promise.all([
           supabase.from('pdf_batch_jobs').select('created_at,status').gte('created_at', ago12.toISOString()),
-          supabase.from('data_import_history').select('created_at,status,records_imported').gte('created_at', ago12.toISOString()),
+          // `status` is `processing_status`; `records_imported` does not exist — each row IS
+          // one imported product record, so the consumer counts rows. (audit #298)
+          supabase.from('data_import_history').select('created_at,processing_status').gte('created_at', ago12.toISOString()),
           supabase.from('product_processing_status').select('status').limit(5000),
         ]),
         // Factory engagement + pipeline
@@ -607,7 +618,7 @@ export function PlatformOverviewTab() {
           const r = (g.room_type ?? 'unknown').replace(/_/g, ' ');
           roomMap.set(r, (roomMap.get(r) ?? 0) + 1);
           const l = weekLabel(new Date(g.created_at));
-          if (g3dStatusMap.has(l)) { g.status === 'completed' ? g3dStatusMap.get(l)!.completed++ : g.status === 'failed' ? g3dStatusMap.get(l)!.failed++ : g3dStatusMap.get(l)!.pending++; }
+          if (g3dStatusMap.has(l)) { g.generation_status === 'completed' ? g3dStatusMap.get(l)!.completed++ : g.generation_status === 'failed' ? g3dStatusMap.get(l)!.failed++ : g3dStatusMap.get(l)!.pending++; }
           if (g3dMap.has(l)) g3dMap.get(l)!.jobs++;
         });
         setGen3dRoomTypes(Array.from(roomMap.entries()).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value })));
@@ -616,8 +627,8 @@ export function PlatformOverviewTab() {
         const matMap = new Map<string, number>();
         const confMap = new Map<string, { sum: number; count: number }>(wks12.map(w => [w, { sum: 0, count: 0 }]));
         (gen3dSegs ?? []).forEach((s: any) => {
-          if (s.zone_name) zoneMap.set(s.zone_name, (zoneMap.get(s.zone_name) ?? 0) + 1);
-          if (s.detected_material) matMap.set(s.detected_material, (matMap.get(s.detected_material) ?? 0) + 1);
+          if (s.label) zoneMap.set(s.label, (zoneMap.get(s.label) ?? 0) + 1);
+          if (s.material_type) matMap.set(s.material_type, (matMap.get(s.material_type) ?? 0) + 1);
           const l = weekLabel(new Date(s.created_at));
           if (g3dMap.has(l)) g3dMap.get(l)!.segments++;
           if (confMap.has(l) && s.confidence) { confMap.get(l)!.sum += s.confidence; confMap.get(l)!.count++; }
@@ -722,7 +733,7 @@ export function PlatformOverviewTab() {
         (pdfJobs ?? []).forEach((j: any) => { const l = weekLabel(new Date(j.created_at)); if (pdfMap.has(l)) { ['completed','success'].includes(j.status) ? pdfMap.get(l)!.success++ : j.status === 'failed' && pdfMap.get(l)!.failed++; } });
         setPdfJobTrend(Array.from(pdfMap.entries()).map(([week, d]) => ({ week, ...d })));
         const impMap = new Map<string, number>(wks12.map(w => [w, 0]));
-        (importHist ?? []).forEach((i: any) => { const l = weekLabel(new Date(i.created_at)); if (impMap.has(l)) impMap.set(l, (impMap.get(l) ?? 0) + (i.records_imported ?? 1)); });
+        (importHist ?? []).forEach((i: any) => { const l = weekLabel(new Date(i.created_at)); if (impMap.has(l)) impMap.set(l, (impMap.get(l) ?? 0) + 1); });
         setImportThroughput(Array.from(impMap.entries()).map(([week, records]) => ({ week, records })));
         const enrichMap = new Map<string, number>();
         (enrichStatus ?? []).forEach((e: any) => enrichMap.set(e.status, (enrichMap.get(e.status) ?? 0) + 1));
@@ -822,8 +833,14 @@ export function PlatformOverviewTab() {
       const MARKETPLACE_SOURCES = ['skroutz', 'bestprice', 'shopflix'];
 
       const [allHistory, marketplaceRows, moduleUsage, trackedActive] = await Promise.all([
-        supabase.from('tracked_query_price_history').select('source, created_at').gte('created_at', ago12.toISOString()).limit(10000),
-        supabase.from('tracked_query_price_history').select('source, created_at').in('source', MARKETPLACE_SOURCES).gte('created_at', ago12.toISOString()).limit(5000),
+        // tracked_query_price_history timestamps on `scraped_at` — there is no `created_at`.
+        // PostgREST rejects the WHOLE statement on one unknown column, so both of these
+        // returned null and every KPI, the 12-week trend AND the source-distribution pie on
+        // this tab read a permanent zero — which an admin reads as "the module is quiet"
+        // rather than "the query is broken". PriceHistoryChart.tsx:131 had it right.
+        // (audit #298 / #305)
+        supabase.from('tracked_query_price_history').select('source, scraped_at').gte('scraped_at', ago12.toISOString()).limit(10000),
+        supabase.from('tracked_query_price_history').select('source, scraped_at').in('source', MARKETPLACE_SOURCES).gte('scraped_at', ago12.toISOString()).limit(5000),
         supabase.from('ai_usage_logs').select('credits_debited, created_at').eq('module_slug', 'greek-marketplaces').gte('created_at', ago12.toISOString()).limit(5000),
         supabase.from('tracked_queries').select('id', { count: 'exact', head: true }).eq('is_active', true),
       ]);
@@ -846,13 +863,13 @@ export function PlatformOverviewTab() {
       const weekMap = new Map<string, { refreshes: number; marketplace: number }>(
         wks12.map(w => [w, { refreshes: 0, marketplace: 0 }]),
       );
-      (allHistory.data ?? []).forEach((r: { created_at: string }) => {
-        const l = weekLabel(new Date(r.created_at));
+      (allHistory.data ?? []).forEach((r: { scraped_at: string }) => {
+        const l = weekLabel(new Date(r.scraped_at));
         const entry = weekMap.get(l);
         if (entry) entry.refreshes += 1;
       });
-      (marketplaceRows.data ?? []).forEach((r: { created_at: string }) => {
-        const l = weekLabel(new Date(r.created_at));
+      (marketplaceRows.data ?? []).forEach((r: { scraped_at: string }) => {
+        const l = weekLabel(new Date(r.scraped_at));
         const entry = weekMap.get(l);
         if (entry) entry.marketplace += 1;
       });

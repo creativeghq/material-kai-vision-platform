@@ -19,7 +19,7 @@
  *   3. The debt list may only shrink.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = process.cwd();
@@ -40,10 +40,20 @@ interface EndpointEntry { name: string }
 
 const entries = (): EndpointEntry[] => JSON.parse(readFileSync(SPEC, 'utf8'));
 
-/** Real function dirs. `_shared` (and any _prefixed dir) is library code, not an endpoint. */
+/**
+ * Real function dirs. `_shared` (and any _prefixed dir) is library code, not an endpoint.
+ *
+ * An edge function is defined by having an `index.ts` entrypoint — NOT merely by being a
+ * directory. `npm run typecheck:edge` runs `deno check --node-modules-dir=auto`, which
+ * materialises `supabase/functions/node_modules/`; without this rule that directory is
+ * read as an undocumented edge function and `npm test` fails. Two documented commands
+ * that cannot both be run is a trap, so match `scripts/check-edge-functions.mjs`, which
+ * already filters on `existsSync(index.ts)`.
+ */
 const functionDirs = (): string[] =>
   readdirSync(FUNCTIONS_DIR, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && !d.name.startsWith('_'))
+    .filter((d) => d.isDirectory() && !d.name.startsWith('_') && !d.name.startsWith('.'))
+    .filter((d) => existsSync(join(FUNCTIONS_DIR, d.name, 'index.ts')))
     .map((d) => d.name);
 
 describe('edge endpoint ↔ OpenAPI parity', () => {
