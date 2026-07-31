@@ -39,6 +39,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { recordInvoicePayment } from '../_shared/payments/record-payment.ts';
 import { retrieveVivaTransaction, vivaHosts } from '../_shared/payments/viva-provider.ts';
+import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import type { PaymentProviderContext } from '../_shared/payments/types.ts';
 
 /** Viva event type ids we act on. */
@@ -219,12 +220,50 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     console.error(
       `[viva-webhooks] REVERSAL for merchant ${merchantId}, original transaction ${parentId}, amount ${data?.Amount} — needs a credit note`,
     );
+    // The intent update is REMOVED, not repointed. It filtered on
+    // `provider_order_code = rawOrderCode(rawBody)` — the REVERSAL message's own order code,
+    // not the original payment's — and matched `''` whenever that returned null, so it hit
+    // the wrong row or none at all.
+    //
+    // There is also no correct row to repoint it at: the reversal carries only `ParentId`
+    // (the original TransactionId) while intents are keyed by `provider_order_code`, and
+    // `invoice_payment_intents` has no provider_ref column to join on. Cancelling would be
+    // wrong regardless — the intent was genuinely fulfilled; the money came back afterwards.
+    // Reversing settled books is the credit note's job. (audit #307)
+    let paymentRow: { id: string; workspace_id: string | null } | null = null;
     if (parentId) {
-      await db
-        .from('invoice_payment_intents')
-        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      const { data: pay } = await db
+        .from('payments')
+        .select('id, workspace_id')
         .eq('provider', 'viva')
-        .eq('provider_order_code', rawOrderCode(rawBody) ?? '');
+        .eq('provider_ref', parentId)
+        .maybeSingle();
+      paymentRow = (pay as { id: string; workspace_id: string | null } | null) ?? null;
+    }
+
+    // "Flag it loudly for a human" was only ever a console.error — which reaches no human.
+    // Emit the same payment_reversed event the Stripe path now emits, so the seeded default
+    // flow puts it in front of the workspace's owners and admins. (audit #307)
+    const amount = Number(data?.Amount ?? 0);
+    const wsId = paymentRow?.workspace_id ?? null;
+    const payload = {
+      type: 'payment_reversed',
+      reversal_kind: 'refund' as const,
+      workspace_id: wsId,
+      payment_id: paymentRow?.id ?? null,
+      provider: 'viva',
+      parent_transaction_id: parentId || null,
+      amount: `${amount.toFixed(2)} EUR`,
+      currency: 'EUR',
+      title: `Refund received — ${amount.toFixed(2)} EUR`,
+      body: 'Viva reversed a payment. The original payment is still allocated, so the invoice still reads as paid — issue a credit note to reverse it.',
+      action_url: '/finance?tab=doc_payments',
+    };
+    if (wsId) {
+      await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], 'payment_reversed',
+        (recipientUserId) => ({ ...payload, user_id: recipientUserId })).catch(() => {});
+    } else {
+      await emitFlowEvent('payment_reversed', payload).catch(() => {});
     }
     return json({ ok: true, recorded: false, outcome: 'reversal_flagged' });
   }
