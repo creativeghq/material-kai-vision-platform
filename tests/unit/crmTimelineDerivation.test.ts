@@ -64,6 +64,10 @@ describe('the CRM record timeline has exactly one derivation', () => {
       'bill_received', 'bill_paid',
       'payment_received', 'payment_sent',
       'credit_note_issued', 'supplier_credit_note_received', 'shipment_created',
+      'project_created', 'project_event', 'moodboard_created', 'sheet_created',
+      'moodboard_quote_requested', 'client_view_shared', 'client_feedback', 'property_viewing',
+      'page_visit', 'catalog_access', 'quote_downloaded',
+      'email_opened', 'email_clicked', 'email_bounced',
     ];
     const found = derived.filter((t) => source.includes(`'${t}'`) || source.includes(`"${t}"`));
     expect(found, 'these are derived by crm_record_timeline — do not log them').toEqual([]);

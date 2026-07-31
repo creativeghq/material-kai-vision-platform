@@ -123,10 +123,26 @@ Contacts can be associated with quotes:
 ## The record Activity feed is derived, not logged
 
 `crm_record_timeline(target_kind, target_id, limit)` is the single source for the Activity tab on a
-contact or a company. Business events — quotes, orders, invoices, supplier bills, payments in and
-out, credit notes, inbound shipments — are **derived from the documents themselves**, joined to the
-party by company id or by any of the company's linked contacts. `crm_activities` / `crm_notes` /
-`crm_meetings` supply only the entries that have no document behind them.
+contact or a company. Everything is **derived from the source rows**, joined to the party by company
+id or by any of the company's linked contacts; `crm_activities` / `crm_notes` / `crm_meetings`
+supply only the entries that have no document behind them (notes, calls, emails sent, lead status,
+company attach/detach).
+
+| Group | Shows | Derived from |
+|---|---|---|
+| Trade | quote created/accepted, sales & purchase orders, invoices issued/paid, supplier bills received/paid, payments in and out, credit notes both directions, inbound shipments | `quotes`, `orders`, `invoices`, `supplier_bills`, `payments`, `credit_notes`, `supplier_credit_notes`, `inbound_shipments` |
+| Design | project created, project lifecycle events, moodboards, presentation sheets, client views shared, **client feedback left on a sheet**, quote requested from a moodboard | `projects` (+ `project_events`), `moodboards`, `moodboard_presentation_sheets`, `project_client_views`, `client_view_feedback`, `moodboard_quote_requests` — all reached through the project, which is the only row that names the client |
+| Real estate | property viewings booked with this party | `property_viewings.crm_contact_id` |
+| Page visits | shared catalogue opened (per catalogue per day, with the page count), catalogue access granted/denied, shared quote viewed/downloaded, account statement opened | `catalog_view_events` + `catalog_access_log` (which resolves the visitor's email to a CRM party), `quote_analytics_events` where `view_context='public'`, `finance_statement_shares` |
+| Email | opened, link clicked, bounced | `email_logs` matched on `to_email` against the party's addresses, **scoped to `workspace_id`** |
+
+Page-view sources are aggregated per document per day — a client paging through a 40-page catalogue
+is one line saying 40 pages, not 40 lines.
+
+Known gaps: `project_client_views.share_view_count` and `moodboard_presentation_sheets.share_view_count`
+keep a counter but no per-view rows, so those opens cannot be placed in time; `append_project_event`
+exists but has no caller, so `project_events` is empty; and `email_logs.workspace_id` is only stamped
+by senders that pass it (the CRM composer does), so older sends never match.
 
 It used to be a write-log fed by two triggers on `invoices` and `quotes`, which meant orders and
 payments never appeared at all and the rows it did write outlived the documents they described.

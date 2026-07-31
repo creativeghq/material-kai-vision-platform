@@ -10,6 +10,8 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   Activity, FileText, Mail, Building2, Tag, ScrollText, Receipt, CreditCard, Loader2, Unlink, Trash2, Phone, CalendarDays, Users,
   ShoppingCart, ArrowDownLeft, ArrowUpRight, CheckCircle2, ReceiptText, Undo2, Truck,
+  FolderKanban, Palette, Presentation, Share2, MessageSquare, Home, Eye, KeyRound, Download,
+  MailOpen, MousePointerClick, MailWarning,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -75,18 +77,53 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   supplier_credit_note_received: Undo2,
   shipment_created: Truck,
   registry_enrichment: Building2,
+  // Projects & design work
+  project_created: FolderKanban,
+  project_event: FolderKanban,
+  moodboard_created: Palette,
+  sheet_created: Presentation,
+  moodboard_quote_requested: ScrollText,
+  client_view_shared: Share2,
+  client_feedback: MessageSquare,
+  property_viewing: Home,
+  // Engagement — what they did with what we sent
+  page_visit: Eye,
+  catalog_access: KeyRound,
+  quote_downloaded: Download,
+  email_opened: MailOpen,
+  email_clicked: MousePointerClick,
+  email_bounced: MailWarning,
 };
 
-/** Money-in reads green, money-out amber — the same two directions the ledger uses. */
+/**
+ * Money-in reads green, money-out amber — the same two directions the ledger uses.
+ * Engagement (they looked, they replied) reads sky, so inbound signal stands out from
+ * the things we did ourselves.
+ */
 const TONES: Record<string, string> = {
   payment_received: 'bg-emerald-500/15 text-emerald-500',
   invoice_paid: 'bg-emerald-500/15 text-emerald-500',
   payment_sent: 'bg-amber-500/15 text-amber-500',
   bill_paid: 'bg-amber-500/15 text-amber-500',
+  page_visit: 'bg-sky-500/15 text-sky-500',
+  quote_downloaded: 'bg-sky-500/15 text-sky-500',
+  catalog_access: 'bg-sky-500/15 text-sky-500',
+  email_opened: 'bg-sky-500/15 text-sky-500',
+  email_clicked: 'bg-sky-500/15 text-sky-500',
+  client_feedback: 'bg-sky-500/15 text-sky-500',
+  moodboard_quote_requested: 'bg-sky-500/15 text-sky-500',
+  email_bounced: 'bg-destructive/15 text-destructive',
 };
 
-/** Documents that have a page of their own — the rest are read-only feed lines. */
-const ENTITY_ROUTES: Record<string, string> = { order: 'orders', invoice: 'invoices' };
+/** Entities that have a page of their own — the rest are read-only feed lines. */
+const hrefFor = (kind: string | null | undefined, id: string | null | undefined, financeBase: string): string | null => {
+  if (!kind || !id) return null;
+  if (kind === 'order') return `${financeBase}/orders/${id}`;
+  if (kind === 'invoice') return `${financeBase}/invoices/${id}`;
+  if (kind === 'project') return `/projects/${id}`;
+  if (kind === 'moodboard') return `/moodboard/${id}`;
+  return null;
+};
 
 const money = (amount: number, currency: string | null | undefined): string =>
   new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR' }).format(amount);
@@ -358,15 +395,15 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
           <p className="text-sm text-muted-foreground py-2">
             No activity yet. Notes, calls and meetings you log show up here, alongside everything
             this party does — quotes, orders, invoices, supplier bills, payments in and out,
-            credit notes and shipments.
+            credit notes, shipments, projects and moodboards, plus what they open: shared
+            quotes and catalogues, statements and your emails.
           </p>
         ) : (
           <div className="space-y-0">
             {items.map((a, i) => {
               const Icon = ICONS[a.activity_type] ?? Activity;
               const isNote = a.source === 'note';
-              const route = a.entity_kind ? ENTITY_ROUTES[a.entity_kind] : undefined;
-              const href = route && a.entity_id ? `${financeBase}/${route}/${a.entity_id}` : null;
+              const href = hrefFor(a.entity_kind, a.entity_id, financeBase);
               return (
                 <div key={a.id} className="flex gap-3">
                   <div className="flex flex-col items-center">
