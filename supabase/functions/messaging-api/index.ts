@@ -20,6 +20,7 @@ import { authenticate, isAdminAccess, listUserWorkspaceIds } from '../_shared/au
 import { isWorkspaceEntitled, notEntitledResponse } from '../_shared/entitlement.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
+import { sendDelayMs } from '../_shared/messaging-rate.ts';
 import {
   zernioApi,
   zernioKey,
@@ -352,7 +353,8 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           } catch (sendErr) {
             if (billingUserId && debit.credits_debited) await refundWhatsAppCredits(supabaseClient, billingUserId, debit.credits_debited, to);
             results.push({ to, success: false, error: sendErr instanceof Error ? sendErr.message : String(sendErr) });
-            await new Promise((res) => setTimeout(res, 50));
+            // Pace from the channel's configured rate, not a constant. (audit #306)
+          await new Promise((res) => setTimeout(res, sendDelayMs(channel.max_send_rate)));
             continue;
           }
           results.push({ to, ...result });
@@ -376,7 +378,8 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             // Soft failure — refund the pre-charged credit for this recipient.
             await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
           }
-          await new Promise((res) => setTimeout(res, 50));
+          // Pace from the channel's configured rate, not a constant. (audit #306)
+          await new Promise((res) => setTimeout(res, sendDelayMs(channel.max_send_rate)));
         }
 
         const sent = results.filter((r) => r.success).length;

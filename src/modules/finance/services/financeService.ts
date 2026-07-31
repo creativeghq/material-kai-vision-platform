@@ -11,6 +11,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
+import { normalizeIban } from '@/utils/iban';
 import { round2, extractNet, vatCategory } from '@/modules/finance/lib/vatMath';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { EmailSendError } from '@/modules/email/services/emailService';
@@ -1391,7 +1392,7 @@ const _financeServiceCore = {
       name: input.name.trim(),
       kind: input.kind ?? 'bank',
       currency: input.currency ?? 'EUR',
-      iban: input.iban ?? null,
+      iban: normalizeIban(input.iban) || null,
       account_ref: input.accountRef ?? null,
       opening_balance: input.openingBalance ?? 0,
       is_default: makeDefault,
@@ -1405,7 +1406,11 @@ const _financeServiceCore = {
   async updateBankAccount(id: string, patch: Partial<Pick<BankAccount,
     'name' | 'kind' | 'currency' | 'iban' | 'account_ref' | 'opening_balance' | 'is_active' | 'show_on_invoice' | 'sort_order' | 'notes'>>): Promise<void> {
     const { error } = await supabase.from('finance_bank_accounts')
-      .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
+      .update({
+        ...patch,
+        ...(patch.iban !== undefined ? { iban: normalizeIban(patch.iban) || null } : {}),
+        updated_at: new Date().toISOString(),
+      }).eq('id', id);
     if (error) throw error;
   },
 
@@ -2394,6 +2399,13 @@ export interface FinanceSettings {
   risk_block_unvalidated_vat: boolean;
   risk_warn_over_credit_limit: boolean;
   risk_block_over_credit_limit: boolean;
+  /**
+   * Quote governance. Both are enforced by QuoteDetailAdminPage but had no writer anywhere,
+   * so every workspace sat on the DB defaults ('warn' / true) with no way to change them.
+   * (audit #298)
+   */
+  negative_margin_policy: 'warn' | 'block';
+  sales_can_see_cost: boolean;
   /** Order rules: workspace defaults (overridable per-customer in CRM). */
   min_order_value: number | null;
   default_credit_limit: number | null;
@@ -2653,6 +2665,7 @@ const _financeServiceV2 = {
       'risk_block_inactive_vat','risk_block_unvalidated_vat',
       'risk_warn_over_credit_limit','risk_block_over_credit_limit',
       'min_order_value','default_credit_limit','risk_block_min_order','risk_block_unpaid_invoice',
+      'negative_margin_policy','sales_can_see_cost',
       'invoice_template_id','invoice_template_colors','default_invoice_notes',
       'invoice_show_pay_link','invoice_show_previous_balance',
       'trip_expense_reimbursement_mode',

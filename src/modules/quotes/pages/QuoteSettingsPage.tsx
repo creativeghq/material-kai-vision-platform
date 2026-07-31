@@ -35,11 +35,21 @@ const SLOT_TO_CONFIG_KEY: Record<TemplateSlot, keyof PDFTemplateConfig> = {
   backcover: 'last_page_path',
 };
 
-const SLOT_TO_FINANCE_COL: Record<TemplateSlot, string> = {
-  cover: 'quote_template_cover_path',
-  intro: 'quote_template_intro_path',
-  content: 'quote_template_content_path',
-  backcover: 'quote_template_backcover_path',
+/**
+ * Where each slot is stored: `workspace_pdf_templates`, which is what EVERY PDF generator
+ * actually resolves from (`_shared/pdf/branding.ts`, `generate-moodboard-sheet-pdf`).
+ *
+ * This used to write `finance_settings.quote_template_*_path` — a second, parallel vault
+ * that NOTHING reads (`grep quote_template supabase/functions/` → zero hits). Templates
+ * uploaded here therefore never appeared on a quote, and the natural response is to upload
+ * them again and blame the renderer. One store, one writer. (audit #298)
+ */
+const SLOT_TO_TEMPLATE_COL: Record<TemplateSlot, string> = {
+  cover: 'cover_path',
+  intro: 'intro_path',
+  // The "content" slot is the page BACKGROUND in the generator's vocabulary.
+  content: 'background_path',
+  backcover: 'backcover_path',
 };
 
 interface QuoteSettingsProps {
@@ -132,11 +142,13 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
   const loadPDFTemplateConfig = async () => {
     try {
-      // This workspace's own 4 template paths live on its finance_settings row.
+      // This workspace's 4 template paths live on `workspace_pdf_templates` — the store the
+      // PDF generators actually read. (Was finance_settings.quote_template_*, which has no
+      // reader anywhere; see SLOT_TO_TEMPLATE_COL.)
       if (!activeWorkspaceId) return;
       const { data, error } = await supabase
-        .from('finance_settings')
-        .select('quote_template_cover_path, quote_template_intro_path, quote_template_content_path, quote_template_backcover_path')
+        .from('workspace_pdf_templates')
+        .select('cover_path, intro_path, background_path, backcover_path')
         .eq('workspace_id', activeWorkspaceId)
         .maybeSingle();
 
@@ -144,10 +156,10 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
       const config: PDFTemplateConfig = {
         ...DEFAULT_PDF_CONFIG,
-        first_page_path: data?.quote_template_cover_path || '',
-        intro_page_path: data?.quote_template_intro_path || '',
-        content_page_path: data?.quote_template_content_path || '',
-        last_page_path: data?.quote_template_backcover_path || '',
+        first_page_path: data?.cover_path || '',
+        intro_page_path: data?.intro_path || '',
+        content_page_path: data?.background_path || '',
+        last_page_path: data?.backcover_path || '',
       };
       setPdfConfig(config);
 
@@ -239,20 +251,12 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
       setPdfConfig({ ...pdfConfig, [configKey]: targetPath });
 
-      // Persist the path onto this workspace's finance_settings column.
-      const col = SLOT_TO_FINANCE_COL[slot];
-      const { data: updated, error: updErr } = await supabase
-        .from('finance_settings')
-        .update({ [col]: targetPath })
-        .eq('workspace_id', activeWorkspaceId)
-        .select('workspace_id');
-      if (updErr) throw updErr;
-      if (!updated || updated.length === 0) {
-        const { error: upErr } = await supabase
-          .from('finance_settings')
-          .upsert({ workspace_id: activeWorkspaceId, [col]: targetPath }, { onConflict: 'workspace_id' });
-        if (upErr) throw upErr;
-      }
+      // Persist onto workspace_pdf_templates — the store every PDF generator reads.
+      const col = SLOT_TO_TEMPLATE_COL[slot];
+      const { error: upErr } = await supabase
+        .from('workspace_pdf_templates')
+        .upsert({ workspace_id: activeWorkspaceId, [col]: targetPath }, { onConflict: 'workspace_id' });
+      if (upErr) throw upErr;
 
       toast({ title: 'Image uploaded', description: `${targetPath} saved successfully.` });
     } catch (error) {
@@ -281,11 +285,12 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
 
       setPdfConfig({ ...pdfConfig, [configKey]: '' });
 
-      const col = SLOT_TO_FINANCE_COL[slot];
-      await supabase
-        .from('finance_settings')
+      const col = SLOT_TO_TEMPLATE_COL[slot];
+      const { error: clrErr } = await supabase
+        .from('workspace_pdf_templates')
         .update({ [col]: null })
         .eq('workspace_id', activeWorkspaceId);
+      if (clrErr) throw clrErr;
 
       toast({ title: 'Image deleted', description: `${storagePath} removed.` });
     } catch (error) {

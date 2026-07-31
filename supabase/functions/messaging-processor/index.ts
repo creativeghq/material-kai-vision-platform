@@ -18,6 +18,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { zernioKey, sendWhatsAppMessage } from '../_shared/zernio.ts';
+import { sendDelayMs } from '../_shared/messaging-rate.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 
@@ -253,7 +254,8 @@ serve(withApiLogging('messaging-processor', async (req) => {
           console.error(`Failed to send to ${recipient.phone_number}:`, errorMessage);
         }
 
-        await new Promise((res) => setTimeout(res, 100));
+        // Pace from the channel's configured rate, not a constant. (audit #306)
+        await new Promise((res) => setTimeout(res, sendDelayMs(channel.max_send_rate)));
       }
     }
 

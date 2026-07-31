@@ -142,6 +142,8 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         default_credit_limit: settings.default_credit_limit,
         risk_block_min_order: settings.risk_block_min_order,
         risk_block_unpaid_invoice: settings.risk_block_unpaid_invoice,
+        negative_margin_policy: settings.negative_margin_policy,
+        sales_can_see_cost: settings.sales_can_see_cost,
         trip_expense_reimbursement_mode: settings.trip_expense_reimbursement_mode,
       });
       setSettings(updated);
@@ -317,6 +319,31 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
               <span className="text-xs"><strong>Block</strong> (instead of warn) when over the credit limit</span>
               <Switch checked={settings.risk_block_over_credit_limit} onCheckedChange={(v) => set('risk_block_over_credit_limit', v)} />
             </label>
+
+            {/* Quote governance. Both of these were already ENFORCED — QuoteDetailAdminPage
+                reads them at :110-111 — but nothing anywhere wrote them, so every workspace
+                was silently pinned to the defaults ('warn' / cost visible). They belong here
+                with the other finance_settings policy flags. (audit #298) */}
+            <div className="pt-2 border-t border-border/60 space-y-3">
+              <p className="text-xs font-medium">Quote governance</p>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs">
+                  <strong>Block</strong> saving a quote line that sells below cost
+                  <span className="block text-[11px] text-muted-foreground">Off = warn only. The margin is still shown either way.</span>
+                </span>
+                <Switch
+                  checked={settings.negative_margin_policy === 'block'}
+                  onCheckedChange={(v) => set('negative_margin_policy', v ? 'block' : 'warn')}
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs">
+                  Sales reps can see <strong>cost and margin</strong> on quote lines
+                  <span className="block text-[11px] text-muted-foreground">Off hides per-line cost from anyone whose portal is Sales.</span>
+                </span>
+                <Switch checked={settings.sales_can_see_cost} onCheckedChange={(v) => set('sales_can_see_cost', v)} />
+              </label>
+            </div>
 
             <div className="pt-2 border-t border-border/60 space-y-3">
               <p className="text-xs font-medium">Order rules <span className="text-muted-foreground font-normal">— defaults; each customer can override these in CRM</span></p>
