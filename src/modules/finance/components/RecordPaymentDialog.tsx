@@ -1,7 +1,8 @@
 /**
  * Standalone "Record payment".
- *  - Received: money in from a customer — optionally "for" an open invoice → marks it (partly) settled;
- *    with no invoice it records as on-account customer credit.
+ *  - Received: money in from a customer — optionally "for" an open invoice (marks it partly/fully
+ *    settled) or an open order (a deposit / a payment on something not invoiced yet); with neither
+ *    it records as on-account customer credit. One picker, because those are one question.
  *  - Refund/Return: money out to a customer (e.g. against a credit note).
  *  - Paid an expense: money out settling an EXISTING expense (supplier bill), including the ones
  *    that came from the Expenses Inbox (myDATA received documents).
@@ -25,12 +26,12 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, type Invoice, type PaymentMethod, type BankAccountBalance, type PayableExpense } from '@/modules/finance/services/financeService';
-import { ordersService, type OrderListRow } from '@/modules/finance/services/ordersService';
+import { ordersService, type OrderBalance, type OrderListRow } from '@/modules/finance/services/ordersService';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { salesDocumentKindLabel, type SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
@@ -103,11 +104,13 @@ export const RecordPaymentDialog: React.FC<{
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccountBalance[]>([]);
   const [bankAccountId, setBankAccountId] = useState<string>('');
-  // Order to attach the payment to (drives orders.payment_status). Only shown when the caller
-  // didn't already fix an order (OrdersPanel passes `orderId`); lets a payment be tied to an order
-  // from the party page / Documents → Payments, which previously had no way to do it.
+  // Order to attach the payment to (drives orders.payment_status). Offered inside the same
+  // "For" picker as the invoices, and only when the caller didn't already fix an order
+  // (OrdersPanel passes `orderId`).
   const [orders, setOrders] = useState<OrderListRow[]>([]);
   const [pickedOrderId, setPickedOrderId] = useState<string>('');
+  /** Canonical settlement position per listed order — `get_order_settlements`, never re-derived. */
+  const [orderBalances, setOrderBalances] = useState<Map<string, OrderBalance>>(new Map());
   // Money-out against an existing expense (supplier bill) — including the ones that came from
   // the myDATA Inbox, which is how most of them arrive.
   const [expenses, setExpenses] = useState<PayableExpense[]>([]);
@@ -147,6 +150,7 @@ export const RecordPaymentDialog: React.FC<{
     setIssueCreditNote(true);
     setIssueChoice('payment_receipt');
     setPickedOrderId('');
+    setOrderBalances(new Map());
     setExpenseId(presetExpenseId ?? '');
     (async () => {
       // Open expenses for the money-out branch. Scoped to the party when the dialog was opened
@@ -184,7 +188,13 @@ export const RecordPaymentDialog: React.FC<{
       setInvoices(invs);
       setBankAccounts(banks);
       // Attachable = not cancelled and not already fully paid.
-      setOrders(ords.filter((o) => o.status !== 'cancelled' && o.payment_status !== 'paid'));
+      const attachable = ords.filter((o) => o.status !== 'cancelled' && o.payment_status !== 'paid');
+      setOrders(attachable);
+      // What each one still owes comes from the shared SQL derivation — the picker must never
+      // offer `total` as "what's left" on a part-paid order.
+      setOrderBalances(attachable.length
+        ? await ordersService.orderBalances(attachable.map((o) => o.id)).catch(() => new Map<string, OrderBalance>())
+        : new Map<string, OrderBalance>());
       // Default to the workspace's default account so cash location is always captured.
       setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
     })();
@@ -207,11 +217,34 @@ export const RecordPaymentDialog: React.FC<{
   const settleCurrency = (kind === 'received' ? selectedTarget?.currency : null) ?? 'EUR';
   const foreign = kind === 'received' && currency !== settleCurrency;
 
-  const pickTarget = (id: string) => {
-    setTargetInvoiceId(id);
-    if (amount) return;
-    const inv = invoices.find((i) => i.id === id);
-    if (inv) setAmount(String(inv.amount_due));
+  /**
+   * ONE "For" control. What money-in can be applied to is an invoice OR an order OR nothing —
+   * three options on the same axis, so they belong in one list. They used to be two adjacent
+   * selects ("On order" + "For"), which read as two unrelated questions and let a payment be
+   * pointed at an order and a different customer's invoice at the same time. Picking one now
+   * clears the other. `none` is the explicit un-pick (on-account credit); Radix cannot carry ''
+   * as an item value, hence the sentinel.
+   */
+  const forValue = targetInvoiceId ? `inv:${targetInvoiceId}` : pickedOrderId ? `ord:${pickedOrderId}` : 'none';
+
+  const pickFor = (v: string) => {
+    if (v === 'none') { setTargetInvoiceId(''); setPickedOrderId(''); return; }
+    const id = v.slice(4);
+    if (v.startsWith('inv:')) {
+      setPickedOrderId('');
+      setTargetInvoiceId(id);
+      if (amount) return;
+      const inv = invoices.find((i) => i.id === id);
+      if (inv) setAmount(String(inv.amount_due));
+    } else {
+      setTargetInvoiceId('');
+      setPickedOrderId(id);
+      if (amount) return;
+      // Seed with what the order still owes, not its total — the derived number, never a
+      // locally recomputed one.
+      const b = orderBalances.get(id);
+      if (b) setAmount(String(b.outstanding));
+    }
   };
 
   type ExpenseOption = {
@@ -241,13 +274,6 @@ export const RecordPaymentDialog: React.FC<{
     // Always re-seed to what this one still owes — a stale amount carried over from a
     // previously selected expense is exactly how the wrong number gets paid.
     if (o) setAmount(String(o.due));
-  };
-
-  const pickOrder = (id: string) => {
-    setPickedOrderId(id);
-    if (amount) return;
-    const o = orders.find((x) => x.id === id);
-    if (o) setAmount(String(Number(o.total)));
   };
 
   const pickRefundInvoice = (id: string) => {
@@ -461,23 +487,6 @@ export const RecordPaymentDialog: React.FC<{
             </div>
           )}
 
-          {showOrderPicker && orders.length > 0 && (
-            <div className="space-y-1">
-              <Label>On order (optional)</Label>
-              <Select value={pickedOrderId} onValueChange={pickOrder}>
-                <SelectTrigger><SelectValue placeholder="None — not tied to an order" /></SelectTrigger>
-                <SelectContent>
-                  {orders.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.order_number ?? o.id.slice(0, 8)}{o.party_name ? ` · ${o.party_name}` : ''} — {Number(o.total).toFixed(2)}{o.payment_status === 'partial' ? ' · part-paid' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">Attaches the payment to this order and updates its paid status. Use this for a deposit or a payment on an order not yet invoiced.</p>
-            </div>
-          )}
-
           {kind === 'expense' && (
             <div className="space-y-2 rounded-md border border-border/60 p-3">
               <Label>Expense being paid</Label>
@@ -536,17 +545,48 @@ export const RecordPaymentDialog: React.FC<{
           {kind === 'received' && (
             <div className="space-y-1">
               <Label>For (optional)</Label>
-              <Select value={targetInvoiceId} onValueChange={pickTarget}>
+              <Select value={forValue} onValueChange={pickFor}>
                 <SelectTrigger><SelectValue placeholder="None — unallocated credit" /></SelectTrigger>
                 <SelectContent>
-                  {pickableInvoices.length === 0
-                    ? <div className="px-2 py-1 text-xs text-muted-foreground">No open invoices</div>
-                    : pickableInvoices.map((i) => (
-                      <SelectItem key={i.id} value={i.id}>{i.internal_number} — due {Number(i.amount_due).toFixed(2)}</SelectItem>
-                    ))}
+                  <SelectItem value="none">None — unallocated credit</SelectItem>
+                  {pickableInvoices.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Invoices</SelectLabel>
+                      {pickableInvoices.map((i) => (
+                        <SelectItem key={i.id} value={`inv:${i.id}`}>{i.internal_number} — due {Number(i.amount_due).toFixed(2)}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+                  {/* Orders are the SAME question as invoices — what is this money for — so they
+                      share the list. `orders` is already party-scoped when the dialog was opened
+                      from a customer, so this shows that customer's orders only. */}
+                  {showOrderPicker && orders.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Orders</SelectLabel>
+                      {orders.map((o) => {
+                        const b = orderBalances.get(o.id);
+                        return (
+                          <SelectItem key={o.id} value={`ord:${o.id}`}>
+                            {o.order_number ?? o.id.slice(0, 8)}{o.party_name ? ` · ${o.party_name}` : ''}
+                            {b ? ` — ${formatMoney(b.outstanding, b.currency)} outstanding` : ` — ${formatMoney(Number(o.total), o.currency)}`}
+                            {o.payment_status === 'partial' ? ' · part-paid' : ''}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectGroup>
+                  )}
+                  {pickableInvoices.length === 0 && !(showOrderPicker && orders.length > 0) && (
+                    <div className="px-2 py-1 text-xs text-muted-foreground">No open invoices or orders</div>
+                  )}
                 </SelectContent>
               </Select>
-              {selectedTarget && <p className="text-[11px] text-muted-foreground">Settling this invoice will mark it paid when fully covered.</p>}
+              <p className="text-[11px] text-muted-foreground">
+                {selectedTarget
+                  ? 'Settling this invoice will mark it paid when fully covered.'
+                  : pickedOrderId
+                    ? 'Attaches the payment to this order and updates its paid status. Use this for a deposit or a payment on an order not yet invoiced.'
+                    : 'Leave as None to hold the money as on-account customer credit.'}
+              </p>
             </div>
           )}
 
