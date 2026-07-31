@@ -679,21 +679,31 @@ export const createGenerationStatusTool = () => {
     async ({ jobId }) => {
       try {
 
+        // `generation_3d` has NO `metadata` column — models_results is a TOP-LEVEL column.
+        // Naming the phantom column made PostgREST reject the whole select, so `error` was
+        // always truthy and this tool answered "Job not found" for EVERY job that exists,
+        // telling users their in-flight generation had vanished. (audit #304 finding 5)
         const { data, error } = await supabase
           .from('generation_3d')
-          .select('generation_status, progress_percentage, metadata, created_at')
+          .select('generation_status, progress_percentage, models_results, created_at')
           .eq('id', jobId)
-          .single();
+          .maybeSingle();
 
-        if (error || !data) {
-          return JSON.stringify({
-            success: false,
-            error: 'Job not found'
-          });
+        if (error) {
+          return JSON.stringify({ success: false, error: `Could not read job status: ${error.message}` });
+        }
+        if (!data) {
+          return JSON.stringify({ success: false, error: 'Job not found' });
         }
 
-        const metadata = data.metadata as any;
-        const modelsResults = metadata?.models_results || [];
+        // models_results is a jsonb OBJECT keyed by model label, not an array — normalise so
+        // the counting below works either way.
+        const rawResults = (data as { models_results?: unknown }).models_results;
+        const modelsResults: any[] = Array.isArray(rawResults)
+          ? rawResults
+          : rawResults && typeof rawResults === 'object'
+            ? Object.values(rawResults as Record<string, unknown>).filter((v) => v && typeof v === 'object')
+            : [];
 
         const completedCount = modelsResults.filter(
           (m: any) => m.status === 'completed'

@@ -940,8 +940,37 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
       metadata: { mode, model },
     }).then(() => {}, () => {});
 
-    // Persist to generation_3d
-    await supabase.from('generation_3d').insert({
+    // Persist to generation_3d.
+    //
+    // `request_type` is CHECK-constrained to exactly 'text_to_image' | 'image_to_image' |
+    // 'hybrid'. This used to write the raw `mode` — 'text-to-image', 'image-edit',
+    // 'product-shot', or 'materials_selection_board_<board_mode>' — none of which satisfy it.
+    // The insert therefore failed EVERY time, its result was never destructured, and the
+    // function still returned success:true. So the user was charged 6-20 credits, got their
+    // image, and the generation never appeared in history, in ProgressiveImageGrid's job
+    // poll, in MarketTrends, or in the admin cost card; job-cleanup-cron's "unsaved renders"
+    // reaper and moodboardAPI.markGenerationSaved() both operated on a row that did not
+    // exist. Corroborating: ai_usage_logs held interior_design_generation rows while
+    // generation_3d held zero.
+    //
+    // MIVAA's writer already gets this right and says so — interior_design_routes.py:698
+    // carries the comment "use underscores to match DB constraint".
+    //
+    // The specific mode is NOT lost: it is preserved in models_results below.
+    const REQUEST_TYPE_BY_MODE: Record<string, 'text_to_image' | 'image_to_image' | 'hybrid'> = {
+      'text-to-image': 'text_to_image',
+      'floor-plan-text': 'text_to_image',
+      'image-edit': 'image_to_image',
+      'redesign': 'image_to_image',
+      'copy-style': 'image_to_image',
+      'floor-plan-render': 'image_to_image',
+      'product-shot': 'image_to_image',
+      // A reference image plus a prompt-driven board layout — neither pure branch fits.
+      'materials-selection-board': 'hybrid',
+    };
+    const requestType = REQUEST_TYPE_BY_MODE[mode] ?? 'hybrid';
+
+    const { error: genErr } = await supabase.from('generation_3d').insert({
       id: jobId,
       user_id: resolvedUserId,
       workspace_id: body.workspace_id,
@@ -950,16 +979,24 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
       style: body.style,
       generation_status: 'completed',
       progress_percentage: 100,
-      request_type: mode === 'materials-selection-board' ? `materials_selection_board_${body.board_mode ?? 'selection-board'}` : mode,
+      request_type: requestType,
       models_queue: (mode === 'redesign' || mode === 'copy-style')
         ? [{ id: 'flux-depth-pro', name: 'Flux Depth Pro', provider: 'replicate' }]
         : [{ id: model, name: `Gemini ${model}`, provider: 'google' }],
       models_results: {
+        // `mode` is kept here because request_type can only hold one of three coarse values —
+        // this is where the specific generation mode survives.
+        mode,
         [modelLabel]: { success: true, image_url: imageUrl, board_mode: body.board_mode },
       },
       workflow_status: 'completed',
       completed_at: new Date().toISOString(),
     });
+    if (genErr) {
+      // Loud. The credits are already spent and the image already delivered; a history row
+      // that silently fails to write is how this went unnoticed in the first place.
+      console.error('[generate-interior-gemini] generation_3d insert failed:', genErr.message, 'mode:', mode);
+    }
 
     return jsonResponse({
       success: true,
