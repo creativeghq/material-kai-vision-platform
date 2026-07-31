@@ -224,23 +224,30 @@ export async function fetchQuoteFfeItems(
     );
     if (!ownsQuote) return [];
   }
+  // quote_items has NO `name`, NO `qty` and NO `position`. The real columns are
+  // `custom_product_name` (or the linked product's name), `quantity` and `added_at`.
+  // Three unknown columns meant PostgREST rejected the whole statement, so every
+  // client-facing sheet printed an EMPTY FF&E schedule — and the designer sent it
+  // without knowing, because the error was only console.warn'd. (audit #298)
   const { data, error } = await supabase
     .from('quote_items')
-    .select('room, name, dimensions, installation_requirements, delivery_date, qty, unit_price')
+    .select('room, custom_product_name, dimensions, installation_requirements, delivery_date, quantity, unit_price, products(name)')
     .eq('quote_id', quoteId)
-    .order('position', { ascending: true });
+    .order('added_at', { ascending: true });
 
   if (error) {
-    console.warn('fetchQuoteFfeItems error', error);
+    // Loud: an empty schedule on a document handed to a client is worse than no document.
+    console.error('fetchQuoteFfeItems failed — FF&E schedule will print empty:', error.message);
     return [];
   }
   return (data || []).map((row: any) => ({
     room: row.room ?? null,
-    name: row.name || 'Item',
+    // Prefer the free-text override, fall back to the catalog product's name.
+    name: row.custom_product_name || row.products?.name || 'Item',
     dimensions: row.dimensions ?? null,
     install: row.installation_requirements ?? null,
     delivery: row.delivery_date ?? null,
-    qty: row.qty ?? 1,
+    qty: row.quantity ?? 1,
     price: row.unit_price ?? null,
   }));
 }

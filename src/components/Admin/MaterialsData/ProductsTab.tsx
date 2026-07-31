@@ -39,10 +39,12 @@ interface Product {
 interface ProductsTabProps {
   workspaceId: string;
   jobIdFilter?: string;
+  /** `?productId=` deep link — narrows to a single product. See MaterialsDataPage. */
+  productIdFilter?: string;
   onStatsUpdate: () => void;
 }
 
-export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilter, onStatsUpdate }) => {
+export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilter, productIdFilter, onStatsUpdate }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -77,8 +79,15 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
     if (values.has_embedding === true) query = query.not('text_embedding_1024', 'is', null);
     else if (values.has_embedding === false) query = query.is('text_embedding_1024', null);
 
+    // `?productId=` deep link. Composed here for the same reason as has_embedding: it is a
+    // direct identity predicate, not one of the declared filter groups. Callers
+    // (AsyncJobQueueMonitor's "open this product", the mention dashboard's "Open") used to
+    // pass this param to a page that never read it, so it silently showed ALL products.
+    // (audit #298 / #305)
+    if (productIdFilter?.trim()) query = query.eq('id', productIdFilter.trim());
+
     return query;
-  }, [workspaceId, groups]);
+  }, [workspaceId, groups, productIdFilter]);
 
   const loadProducts = useCallback(async (page: number) => {
     try {

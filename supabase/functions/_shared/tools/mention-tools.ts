@@ -145,7 +145,11 @@ async function getProductRow(productId: string) {
   const sb = svcClient();
   const { data } = await sb
     .from('products')
-    .select('id, name, manufacturer, metadata')
+    // `products.manufacturer` does not exist — brand is the `brand_company_id` FK. It was
+    // selected here and never read, but its presence made PostgREST reject the whole
+    // statement, so this returned null and the tool told the user their product does not
+    // exist. Dropped rather than embedded, since nothing consumes it. (audit #298)
+    .select('id, name, metadata')
     .eq('id', productId)
     .maybeSingle();
   return data;

@@ -141,7 +141,7 @@ const MentionMonitoringDashboard: React.FC = () => {
                     </div>
                     {r.product_id && (
                       <a
-                        href={`/admin/mention-monitoring/products/${r.product_id}`}
+                        href={`/admin/materials-data?productId=${r.product_id}`}
                         className="text-xs text-primary hover:underline flex items-center gap-1 whitespace-nowrap"
                       >
                         Open <ExternalLink className="h-3 w-3" />

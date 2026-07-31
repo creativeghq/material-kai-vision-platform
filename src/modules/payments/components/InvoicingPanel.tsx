@@ -218,7 +218,9 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline" size="sm">
-              <Link to={`/admin/modules/${provider.slug}`}>
+              {/* Registered routes are `/admin/modules` and `/admin/modules/:slug/settings`
+                  — there is no bare `/admin/modules/:slug`, so this 404'd. (audit #298) */}
+              <Link to={`/admin/modules/${provider.slug}/settings`}>
                 Open {provider.name} settings <ExternalLink className="h-3 w-3 ml-1" />
               </Link>
             </Button>

@@ -4213,7 +4213,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
           )}
           <a
-            href={`/admin/mention-monitoring/products/${message.mentionSummaryData.product_id}`}
+            href={`/admin/materials-data?productId=${message.mentionSummaryData.product_id}`}
             className="text-xs text-primary hover:underline mt-3 inline-block"
           >Open Mentions tab →</a>
         </div>

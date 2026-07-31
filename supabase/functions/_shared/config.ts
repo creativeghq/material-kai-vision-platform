@@ -336,14 +336,19 @@ export class AuthUtils {
           return { success: false, error: 'API key has expired' };
         }
 
-        // Update last used timestamp
-        await supabase
+        // Update last used timestamp.
+        // Was also writing `usage_count: supabase.raw('usage_count + 1')` — two bugs in one
+        // line: `api_keys` has no `usage_count` column, and `supabase.raw()` does not exist
+        // in supabase-js v2. The statement was rejected outright, so `last_used_at` never
+        // landed either and there was no way to tell a dead partner key from a busy one.
+        // (audit #298)
+        const { error: touchErr } = await supabase
           .from('api_keys')
-          .update({
-            last_used_at: new Date().toISOString(),
-            usage_count: supabase.raw('usage_count + 1'),
-          })
+          .update({ last_used_at: new Date().toISOString() })
           .eq('id', apiKeyData.id);
+        if (touchErr) {
+          console.error('[config] failed to stamp api_keys.last_used_at:', touchErr.message);
+        }
 
         return {
           success: true,
