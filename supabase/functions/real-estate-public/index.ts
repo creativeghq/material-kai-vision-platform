@@ -180,6 +180,30 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
       workspaceId = owned?.workspace_id ?? '';
     }
     if (!workspaceId) return json({ error: 'workspace_id or user_id is required' }, 400);
+
+    // SECURITY (audit #294/#303): workspace_id/user_id arrive in the BODY, and everything below
+    // writes with the service-role client — a crm_contacts row plus a crm_contact_created flow
+    // event to that workspace's owners/admins. Without this gate any unauthenticated caller who
+    // knew (or enumerated) a workspace uuid could inject attacker-controlled contacts into a
+    // stranger's CRM and push a bell + email to their owners: a spam/phishing channel into
+    // another tenant, no account required.
+    //
+    // The rest of this function derives everything from an opaque token; this action cannot,
+    // because the valuation widget is rendered before any listing is chosen. So instead we require
+    // the target workspace to actually BE a public agency — it must expose at least one public
+    // listing. That is precisely the population that can legitimately host the widget, and it
+    // makes a bare uuid useless against any workspace with no public presence.
+    const { count: publicListings } = await supabase
+      .from('properties')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('is_public', true)
+      .eq('listing_status', 'active');
+    if (!publicListings) {
+      // 404, not 403 — do not confirm whether the workspace exists (id-enumeration).
+      return json({ error: 'Not found' }, 404);
+    }
+
     const name = String(body?.name ?? '').trim();
     const email = String(body?.email ?? '').trim();
     if (!name || !email) return json({ error: 'name and email are required' }, 400);

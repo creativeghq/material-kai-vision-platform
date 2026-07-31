@@ -835,30 +835,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         );
       }
 
-      case 'logs': {
-        if (req.method !== 'GET' && req.method !== 'POST') throw new Error('Method not allowed');
-
-        const status = url.searchParams.get('status');
-        const emailType = url.searchParams.get('emailType');
-        const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50', 10), 1), 1000);
-
-        let query = supabaseClient
-          .from('email_logs')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(limit);
-
-        if (status) query = query.eq('status', status);
-        if (emailType) query = query.eq('email_type', emailType);
-
-        const { data, error } = await query;
-        if (error) throw new Error(`Failed to fetch logs: ${error.message}`);
-
-        return new Response(
-          JSON.stringify({ success: true, logs: data }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      // NOTE: the 'logs' action was removed (audit #294/#306). It ran
+      // `select('*')` on email_logs with the SERVICE-ROLE client, no workspace
+      // filter and no admin gate, so any signed-in user could read every
+      // tenant's rendered email bodies (html_body, text_body, to_email,
+      // bcc_emails, variables). It had no caller: the frontend reads email_logs
+      // directly via emailService.getEmailLogs(), under RLS, which is correct.
+      // Do not reintroduce it without `.in('workspace_id', await listUserWorkspaceIds(...))`.
 
       case 'analytics': {
         let fromDate: string | null = null;
