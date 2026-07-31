@@ -470,7 +470,14 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       // re-segment next time (no error surfaced to the user).
       if (enriched.length > 0) {
         const rows = enriched.map((s) => ({
-          generation_id: jobId ?? null,
+          // `|| null`, not `?? null`. AgentHub renders this component with jobId="" for the
+          // Gemini single-image modal, and `??` only catches null/undefined — so an empty
+          // string reached a uuid column and PostgREST rejected the WHOLE multi-row insert
+          // (22P02). The failure was only console.warn'd, so the cache never persisted and
+          // every open of the Products tab re-ran the full MIVAA segment call plus one
+          // /api/rag/search per zone: real backend spend and ~80s of wait, forever, with no
+          // cache hit possible. (audit #304 finding 2)
+          generation_id: jobId || null,
           model_id: s.model_id,
           source_image_url: s.source_image_url,
           segment_index: s.segment_index,

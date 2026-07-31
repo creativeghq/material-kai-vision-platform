@@ -258,6 +258,11 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
   const debitResult = await debitExternalServiceCredits(
     supabase, userId, serviceKey, 'social_image_generation', 1,
     { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id },
+    // 7th arg. Omitting it sent p_workspace_id: null, so the debit ALWAYS hit the caller's
+    // personal wallet — a workspace with a funded shared pool still drained individual
+    // members' credits, and the per-member monthly cap never applied. Every other generator
+    // in this family passes it. (audit #304 finding 12)
+    workspace_id ?? null,
   );
   if (!debitResult.success) {
     return jsonResponse({ success: false, error: debitResult.error || 'Insufficient credits', required: creditCost }, 402);
@@ -339,7 +344,9 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
         p_operation_type: 'social_image_generation_refund',
         p_description: 'Refund: social image generation failed',
         p_metadata: { model: resolvedModel, error: String(err) },
-        p_workspace_id: null,
+        // Refund to the SAME wallet the debit came from, or the money lands in the wrong
+        // place on failure.
+        p_workspace_id: workspace_id ?? null,
       }).then(() => {}, () => {});
     }
     return jsonResponse({ success: false, error: String(err) }, 500);

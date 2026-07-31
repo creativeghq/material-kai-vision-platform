@@ -9,12 +9,51 @@
  * Uses async polling pattern: returns prediction_id if generation exceeds 50s.
  */
 
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { checkCreditBalance } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { MARKUP_MULTIPLIER } from '../_shared/pricing-constants.ts';
+
+/**
+ * Download a finished Replicate video into our own bucket and return the public URL.
+ *
+ * The success path used to write `pollResult.output` straight onto social_posts.video_url.
+ * Replicate's output URLs expire within about an hour, so the user paid 15-20 credits, saw
+ * the video once, and the stored link 404'd by the time the post was scheduled or published.
+ * generate-interior-video-v2 already downloads before persisting; this path did not.
+ * (audit #304 finding 11)
+ *
+ * Returns null on failure so the caller can refuse to persist an expiring URL rather than
+ * silently storing one — the mistake generate-social-image's storeImage() still makes by
+ * returning the upstream URL when the upload errors.
+ */
+async function storeVideo(
+  supabase: DbClient,
+  videoUrl: string,
+  filename: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(videoUrl);
+    if (!res.ok) return null;
+    const arrayBuffer = await res.arrayBuffer();
+    const { data, error } = await supabase.storage
+      .from('generation-images')
+      .upload(`social/${filename}`, arrayBuffer, { contentType: 'video/mp4', upsert: true });
+    if (error) {
+      console.error('[generate-social-video] storage upload failed:', error.message);
+      return null;
+    }
+    const { data: urlData } = supabase.storage.from('generation-images').getPublicUrl(data.path);
+    return urlData.publicUrl;
+  } catch (e) {
+    console.error('[generate-social-video] could not download the Replicate output:', e);
+    return null;
+  }
+}
+
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -198,7 +237,10 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     }
 
     // ① Pre-flight check (kling only — veo-2 handled above)
-    const { sufficient, balance } = await checkCreditBalance(supabase, userId, 'kling-3.0', 1, workspace_id ?? null);
+    const { sufficient, balance } = await checkCreditBalance(supabase, userId, model, 1, workspace_id ?? null);
+    // Was hardcoded 'kling-3.0' regardless of the model actually requested, so a user
+    // with 15-19 credits passed the preflight and then got a 402 from the debit for a
+    // 20- or 30-credit model. Check the model being bought. (audit #304 finding 12)
     if (!sufficient) {
       return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
     }
@@ -236,7 +278,11 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     const pollResult = await pollReplicate(predictionId, 50_000);
 
     if (pollResult.status === 'succeeded') {
-      const videoUrl = Array.isArray(pollResult.output) ? pollResult.output[0] : pollResult.output;
+      const rawVideoUrl = Array.isArray(pollResult.output) ? pollResult.output[0] : pollResult.output;
+      // Persist OUR copy, never Replicate's expiring URL. (audit #304 finding 11)
+      const videoUrl = rawVideoUrl
+        ? await storeVideo(supabase, rawVideoUrl, `video-${Date.now()}.mp4`)
+        : null;
 
       if (post_id && videoUrl) {
         const { data: existingPost } = await supabase
