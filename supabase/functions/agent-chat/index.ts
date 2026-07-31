@@ -1283,7 +1283,7 @@ async function executeAgent(
       tool_ids: ['generate_presentation_sheet'],
     },
     'generation': {
-      tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world'],
+      tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video'],
     },
     'seo-research': {
       tool_ids: [
@@ -1545,7 +1545,7 @@ async function executeAgent(
     'seo_ai_overview', 'seo_google_maps', 'seo_gbp_info',
   ];
   const needsSeoAgent = config.tools.some((t: string) => SEO_AGENT_TOOL_NAMES.includes(t));
-  const needsBg = config.tools.includes('dispatch_background_task');
+  const needsBg = config.tools.includes('dispatch_background_task') || config.tools.includes('generate_video');
   const needsPrice = config.tools.includes('price_lookup') && isAdmin;
   const needsPresentation = config.tools.includes('generate_presentation_sheet');
   const needsMention = config.tools.some((t: string) => ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'].includes(t));
@@ -1702,6 +1702,7 @@ async function executeAgent(
   const createSEOGoogleMapsTool = seoAgentMod?.createSEOGoogleMapsTool;
   const createSEOGbpInfoTool = seoAgentMod?.createSEOGbpInfoTool;
   const createDispatchBackgroundTaskTool = bgMod?.createDispatchBackgroundTaskTool;
+  const createInteriorVideoV2Tool = bgMod?.createInteriorVideoV2Tool;
   const createPriceLookupTool = priceMod?.createPriceLookupTool;
   const createPresentationSheetTool = presentationMod?.createPresentationSheetTool;
   const createTrackProductMentionsTool = mentionMod?.createTrackProductMentionsTool;
@@ -2262,6 +2263,15 @@ async function executeAgent(
   // VR world generation — turn a room image into an explorable 3D Gaussian Splat
   if (config.tools.includes('generate_vr_world') && createGenerateVRWorldTool) {
     tools.push(createGenerateVRWorldTool(userId, workspaceId, conversationImages, onChunk));
+  }
+
+  // Interior video — animate a room image. createInteriorVideoV2Tool has existed since
+  // the generator shipped but was never pushed onto any agent, so `generate_video` was
+  // unreachable and AgentHub's `video_generated` chunk handler had nothing that could
+  // ever emit it. Deliberately NOT inside the isAdmin block below: this is a Generation
+  // cluster tool like generate_3d, not an operator tool. (audit #304 finding 15)
+  if (config.tools.includes('generate_video') && createInteriorVideoV2Tool) {
+    tools.push(createInteriorVideoV2Tool(userId, workspaceId, onChunk));
   }
 
   // --- Admin-only tools (gated by RBAC) ---

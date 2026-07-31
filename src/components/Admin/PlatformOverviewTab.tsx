@@ -98,14 +98,16 @@ export function PlatformOverviewTab() {
 
   // ── 3D Generation ─────────────────────────────────────────────
   const [gen3dTrend, setGen3dTrend] = useState<{ week: string; jobs: number; segments: number }[]>([]);
-  const [svbrdfTrend, setSvbrdfTrend] = useState<{ week: string; count: number }[]>([]);
-  const [canvasKpis, setCanvasKpis] = useState({ gen3dJobs: 0, gen3dSegments: 0, svbrdfExtractions: 0 });
+  // SVBRDF state removed 2026-07-31: `svbrdf_extractions` is not a table in this
+  // database and no SVBRDF producer exists (no MIVAA route, no svbrdf-extractor edge
+  // function, generate-pbr-maps deleted). The KPIs read a permanent 0 / '—'.
+  // (audit #304 finding 8)
+  const [canvasKpis, setCanvasKpis] = useState({ gen3dJobs: 0, gen3dSegments: 0 });
   const [gen3dRoomTypes, setGen3dRoomTypes] = useState<{ name: string; value: number }[]>([]);
   const [gen3dStatusTrend, setGen3dStatusTrend] = useState<{ week: string; completed: number; failed: number; pending: number }[]>([]);
   const [segmentZones, setSegmentZones] = useState<{ zone: string; count: number }[]>([]);
   const [topDetectedMaterials, setTopDetectedMaterials] = useState<{ material: string; count: number }[]>([]);
   const [avgConfidenceTrend, setAvgConfidenceTrend] = useState<{ week: string; confidence: number }[]>([]);
-  const [svbrdfKpis, setSvbrdfKpis] = useState({ successRate: '—', avgConfidence: '—' });
 
   // ── AI Agents ─────────────────────────────────────────────────
   const [agentsByType, setAgentsByType] = useState<{ week: string; [key: string]: number | string }[]>([]);
@@ -255,10 +257,8 @@ export function PlatformOverviewTab() {
     // 3D Generation
     const jobB=[4,7,6,10,9,13,11,16,14,18,15,20];
     const segB=[12,22,18,32,28,40,35,50,44,56,48,62];
-    const svB=[6,9,8,14,12,17,15,20,18,24,21,28];
     setGen3dTrend(wks.map((week,i) => ({ week, jobs:jobB[i], segments:segB[i] })));
-    setSvbrdfTrend(wks.map((week,i) => ({ week, count:svB[i] })));
-    setCanvasKpis({ gen3dJobs:152, gen3dSegments:468, svbrdfExtractions:192 });
+    setCanvasKpis({ gen3dJobs:152, gen3dSegments:468 });
     setGen3dRoomTypes([
       {name:'living room',value:42},{name:'bedroom',value:38},{name:'kitchen',value:32},
       {name:'bathroom',value:24},{name:'home office',value:16},
@@ -276,7 +276,6 @@ export function PlatformOverviewTab() {
       {material:'paint',count:72},{material:'stone',count:58},
     ]);
     setAvgConfidenceTrend(wks.map((week,i) => ({ week, confidence: +(0.72+i*0.015).toFixed(2) })));
-    setSvbrdfKpis({ successRate:'89%', avgConfidence:'0.81' });
 
     // AI Agents
     const arB=[8,12,10,15,14,18,16,21,19,24,22,27];
@@ -561,7 +560,6 @@ export function PlatformOverviewTab() {
           // (audit #298)
           supabase.from('generation_3d').select('created_at,generation_status,room_type').gte('created_at', ago12.toISOString()),
           supabase.from('generation_3d_segments').select('created_at,label,material_type,confidence').gte('created_at', ago12.toISOString()).limit(5000),
-          supabase.from('svbrdf_extractions').select('created_at,status,confidence').gte('created_at', ago12.toISOString()),
         ]),
         // Credits
         Promise.all([
@@ -610,7 +608,7 @@ export function PlatformOverviewTab() {
 
       // Process 3D
       if (threeDRes.status === 'fulfilled') {
-        const [{ data: gen3d }, { data: gen3dSegs }, { data: svbrdf }] = threeDRes.value;
+        const [{ data: gen3d }, { data: gen3dSegs }] = threeDRes.value;
         const roomMap = new Map<string, number>();
         const g3dStatusMap = new Map<string, { completed: number; failed: number; pending: number }>(wks12.map(w => [w, { completed: 0, failed: 0, pending: 0 }]));
         const g3dMap = new Map<string, { jobs: number; segments: number }>(wks12.map(w => [w, { jobs: 0, segments: 0 }]));
@@ -637,14 +635,7 @@ export function PlatformOverviewTab() {
         setSegmentZones(Array.from(zoneMap.entries()).sort((a, b) => b[1] - a[1]).map(([zone, count]) => ({ zone, count })));
         setTopDetectedMaterials(Array.from(matMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([material, count]) => ({ material, count })));
         setAvgConfidenceTrend(Array.from(confMap.entries()).map(([week, d]) => ({ week, confidence: d.count > 0 ? +(d.sum / d.count).toFixed(2) : 0 })));
-        const svMap = new Map<string, number>(wks12.map(w => [w, 0]));
-        const svTotal = (svbrdf ?? []).length;
-        const svSuccess = (svbrdf ?? []).filter((s: any) => s.status === 'completed').length;
-        const svConfArr = (svbrdf ?? []).filter((s: any) => s.confidence).map((s: any) => s.confidence);
-        (svbrdf ?? []).forEach((s: any) => { const l = weekLabel(new Date(s.created_at)); if (svMap.has(l)) svMap.set(l, (svMap.get(l) ?? 0) + 1); });
-        setSvbrdfTrend(Array.from(svMap.entries()).map(([week, count]) => ({ week, count })));
-        setSvbrdfKpis({ successRate: svTotal > 0 ? `${Math.round((svSuccess / svTotal) * 100)}%` : '—', avgConfidence: svConfArr.length > 0 ? (svConfArr.reduce((a: number, b: number) => a + b, 0) / svConfArr.length).toFixed(2) : '—' });
-        setCanvasKpis({ gen3dJobs: (gen3d ?? []).length, gen3dSegments: (gen3dSegs ?? []).length, svbrdfExtractions: svTotal });
+        setCanvasKpis({ gen3dJobs: (gen3d ?? []).length, gen3dSegments: (gen3dSegs ?? []).length });
       }
 
       // Process credits
@@ -1122,14 +1113,12 @@ export function PlatformOverviewTab() {
       </div>
 
       {/* ─── 4. VR Worlds & 3D Generation ───────────────────────── */}
-      <SectionHeader title="VR Worlds & 3D Generation" desc="WorldLabs VR world generation, Design Canvas 3D jobs, segment analysis, and SVBRDF material extraction" icon={Layers} />
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+      <SectionHeader title="VR Worlds & 3D Generation" desc="WorldLabs VR world generation, Design Canvas 3D jobs, and segment analysis" icon={Layers} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiCard label="VR Worlds (12w)" value={featureKpis.vrWorldsGenerated} icon={Eye} color="text-violet-600" />
         <KpiCard label="VR Credits Used" value={vrTotalCredits.toLocaleString()} icon={DollarSign} color="text-amber-500" />
         <KpiCard label="3D Jobs (12w)" value={canvasKpis.gen3dJobs} icon={Layers} color="text-cyan-600" />
         <KpiCard label="Segments (12w)" value={canvasKpis.gen3dSegments} icon={Target} color="text-green-600" />
-        <KpiCard label="SVBRDF (12w)" value={canvasKpis.svbrdfExtractions} icon={Package} color="text-primary" />
-        <KpiCard label="SVBRDF Success" value={svbrdfKpis.successRate} icon={Star} color="text-green-600" sub={`avg conf ${svbrdfKpis.avgConfidence}`} />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
@@ -1199,18 +1188,6 @@ export function PlatformOverviewTab() {
                 <Tooltip /><Legend />
                 <Bar dataKey="jobs" name="3D Jobs" fill={COLORS[5]} radius={[4, 4, 0, 0]} />
                 <Bar dataKey="segments" name="Segments" fill={COLORS[6]} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        <Card className="rounded-2xl">
-          <CardHeader><CardTitle>SVBRDF Extractions (Weekly)</CardTitle></CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={svbrdfTrend} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="week" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip /><Bar dataKey="count" name="Extractions" fill={COLORS[7]} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

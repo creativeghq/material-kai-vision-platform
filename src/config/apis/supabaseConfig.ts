@@ -129,38 +129,6 @@ const ocrProcessingOutputSchema = z.union([
   }),
 ]);
 
-// SVBRDF Extractor function schema - UX validation only
-const svbrdfExtractorInputSchema = z.object({
-  image_url: z.string().url('Please enter a valid image URL'),
-  output_format: z.string().optional(),
-  resolution: z.number().optional(),
-  enhance_quality: z.boolean().optional(),
-});
-
-const svbrdfExtractorOutputSchema = z.union([
-  z.object({
-    success: z.literal(true),
-    maps: z.object({
-      diffuse: z.string().url(),
-      normal: z.string().url(),
-      roughness: z.string().url(),
-      metallic: z.string().url(),
-      height: z.string().url().optional(),
-      ambient_occlusion: z.string().url().optional(),
-    }),
-    metadata: z.object({
-      resolution: z.number(),
-      format: z.string(),
-      processing_time: z.number(),
-    }),
-  }),
-  z.object({
-    success: z.literal(false),
-    error: z.string(),
-    details: z.string().optional(),
-  }),
-]);
-
 // Create the Supabase API configuration
 export const supabaseConfig: SupabaseApiConfig = {
   name: 'supabase',
@@ -193,12 +161,6 @@ export const supabaseConfig: SupabaseApiConfig = {
       inputSchema: ocrProcessingInputSchema,
       outputSchema: ocrProcessingOutputSchema,
       timeout: 45000, // 45 seconds for OCR
-    },
-
-    'svbrdf-extractor': {
-      inputSchema: svbrdfExtractorInputSchema,
-      outputSchema: svbrdfExtractorOutputSchema,
-      timeout: 120000, // 2 minutes for SVBRDF extraction
     },
 
   },

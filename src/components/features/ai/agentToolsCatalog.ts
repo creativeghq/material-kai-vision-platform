@@ -900,6 +900,15 @@ const INTERIOR_DESIGNER_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'generate_video', name: 'Interior Video', category: 'Generation',
+    imageRequired: true, credits: 20,
+    desc: 'Animate a room image into a video — walkthrough, product spotlight, before/after, floorplan flythrough or a 9:16 social reel. 12–40 credits depending on model.',
+    examples: [
+      'Make a walkthrough video from this render',
+      'Turn this into a 9:16 social reel',
+    ],
+  },
+  {
     id: 'generate_presentation_sheet', name: 'Presentation Sheet', category: 'Generation',
     desc: 'Build A3 moodboard sheets (material board / color palette / concept board / lighting plan / annotated render / etc.).',
     examples: [
@@ -1858,7 +1867,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'Design a room, test a material on your photo, stage, re-light, render a floor plan, build a VR world — each is a guided process, not a blank prompt.',
     icon: 'Sparkles',
     tool_ids: [
-      'generate_3d', 'apply_lighting_preset', 'generate_vr_world',
+      'generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video',
     ],
     quick_starts: [
       // Every image-required interior flow captures its inputs (photo first, then

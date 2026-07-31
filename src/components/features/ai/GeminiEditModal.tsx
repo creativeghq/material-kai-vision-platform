@@ -46,7 +46,11 @@ const EDIT_CATEGORIES = [
   { id: 'plants',    label: 'Plants & Decor',   icon: TreePine,   description: 'Greenery & decorative items' },
   { id: 'style',     label: 'Overall Style',    icon: Sparkles,   description: 'Retheme the whole design' },
   { id: 'furniture', label: 'Furniture',        icon: Sofa,       description: 'Add, swap or remove pieces' },
-  { id: 'region',    label: 'Region Edit',      icon: Crop,       description: 'Draw on image & change that area' },
+  // Region Edit skips steps 2+3, so the user never reaches the 6/15/15 model-tier
+  // picker — it goes straight to generate-region-edit, which is a fixed 20-credit
+  // inpaint. Say so on the card; the price was previously invisible until the
+  // failure toast quoted it. (audit #304 finding 6)
+  { id: 'region',    label: 'Region Edit',      icon: Crop,       description: 'Draw on image & change that area — 20 credits' },
   { id: 'custom',    label: 'Custom Edit',      icon: PencilLine, description: 'Describe anything freely' },
 ] as const;
 
@@ -305,7 +309,12 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
   }, [category, selected, selectedSub, custom, wallZone, roomContext]);
 
   const handleCategorySelect = (id: EditCategoryId) => {
-    // Region edit bypasses steps 2+3 — goes straight to canvas mode
+    // Region edit bypasses steps 2+3 — goes straight to canvas mode. `modelTier` is
+    // therefore always the untouched 'fast' default here (the picker lives on step 3),
+    // and AgentHub's regionEdit branch discards it: generate-region-edit is a fixed
+    // 20-credit inpaint with no tier. Passed only to satisfy the shared onApply
+    // contract — do not add a tier UI to this path without also plumbing it through
+    // generate-region-edit's CREDITS_REQUIRED. (audit #304 finding 6)
     if (id === 'region') {
       onClose();
       onApply({ prompt: '', modelTier, regionEdit: true });

@@ -73,7 +73,6 @@ import {
   JobFindingsInspector, SourcingInspector, OrderInspector, MentionSummaryInspector, MentionFeedInspector,
   LlmVisibilityInspector, CatalogInspector, QuoteInspector,
 } from './ArtifactInspector';
-import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
 import { TechRadarFindingsCard, type TechRadarFindingsData } from './TechRadarFindingsCard';
 import { TechRadarReviewModal, type TechRadarFormState } from './TechRadarReviewModal';
@@ -1346,14 +1345,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   }, []);
 
   // Material Modal State
-  const [showMaterialModal, setShowMaterialModal] = useState(false);
-  const [selectedMaterialsData, setSelectedMaterialsData] = useState<{
-    materials: any[];
-    spatialAnalysis?: any;
-    roomType?: string;
-    style?: string;
-  } | null>(null);
-
   // Image Lightbox State (full-size view of a generated image)
   const [lightboxImage, setLightboxImage] = useState<{ url: string; name?: string } | null>(null);
 
@@ -6509,51 +6500,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
               // Success — close canvas and emit result into chat
               setRegionEditImageUrl(null);
+              const regionGeminiImageData = {
+                image_url: data.image_url,
+                mode: 'image-edit',
+                model: data.model,
+                job_id: data.job_id,
+                credits_used: data.credits_used,
+              };
+              const regionContent = 'Region edit applied.';
               setMessages((prev) => [
                 ...prev,
                 {
                   id: `msg-${Date.now()}`,
                   role: 'assistant' as const,
-                  content: 'Region edit applied.',
+                  content: regionContent,
                   timestamp: new Date(),
-                  geminiImageData: {
-                    image_url: data.image_url,
-                    mode: 'image-edit',
-                    model: data.model,
-                    job_id: data.job_id,
-                    credits_used: data.credits_used,
-                  },
+                  geminiImageData: regionGeminiImageData,
                 },
               ]);
+              // Persist it. This branch talks to generate-region-edit directly rather
+              // than going through the agent stream, so it never hit the saveMessage
+              // calls in the chunk handlers — the result lived in local state only and
+              // a 20-credit edit vanished on reload. (audit #304 finding 13)
+              const regionConversationId = conversationIdRef.current;
+              if (regionConversationId) {
+                await agentChatHistoryService.saveMessage({
+                  conversationId: regionConversationId,
+                  role: 'assistant',
+                  content: regionContent,
+                  metadata: { agentId: selectedAgent, model: selectedModel, geminiImageData: regionGeminiImageData },
+                });
+              }
             } catch (err) {
               toast({ title: 'Region edit failed', description: String(err), variant: 'destructive' });
             }
-          }}
-        />
-      )}
-
-      {/* Material Matching Modal */}
-      {showMaterialModal && selectedMaterialsData && (
-        <MaterialMatchingModal
-          materials={selectedMaterialsData.materials}
-          spatialAnalysis={selectedMaterialsData.spatialAnalysis}
-          roomType={selectedMaterialsData.roomType}
-          style={selectedMaterialsData.style}
-          onClose={() => {
-            setShowMaterialModal(false);
-            setSelectedMaterialsData(null);
-          }}
-          onExportToMoodboard={(materials) => {
-            toast({
-              title: 'Materials Exported',
-              description: `${materials.length} materials added to moodboard`,
-            });
-          }}
-          onEstimateCost={(_materialIds) => {
-            toast({
-              title: 'Cost Estimation',
-              description: 'Calculating cost estimate...',
-            });
           }}
         />
       )}

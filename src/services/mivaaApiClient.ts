@@ -519,19 +519,11 @@ export class MivaaApiClient {
     });
   }
 
-  /**
-   * SVBRDF extraction
-   * Replaces: svbrdf-extractor Edge Function
-   */
-  async extractSvbrdf(payload: {
-    image_url?: string;
-    image_data?: string;
-  }): Promise<MivaaApiResponse> {
-    return this.request('/api/svbrdf/extract', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  }
+  // extractSvbrdf() removed 2026-07-31 (audit #304 finding 8). Nothing in the platform
+  // could produce PBR maps: MIVAA registers no /api/svbrdf router, the svbrdf-extractor
+  // edge function it claimed to replace does not exist, generate-pbr-maps was deleted,
+  // and this method had zero callers. `metadata.pbr_maps` is never written — the same
+  // silent-zero shape CLAUDE.md calls out. Do not re-add a client before the route does.
 
   // ==================== VOICE ====================
 
