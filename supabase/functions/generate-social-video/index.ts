@@ -11,7 +11,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { checkCreditBalance } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { MARKUP_MULTIPLIER } from '../_shared/pricing-constants.ts';
@@ -101,6 +101,35 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     workspace_id,
     post_id,
   } = body;
+
+  // SECURITY (audit #294/#306 finding 3): `workspace_id` and `post_id` arrive in the request
+  // BODY and everything below runs on the service-role client. Unguarded, a user in
+  // workspace A could spend workspace B's pooled credits (the debit is routed by this very
+  // id), plant drafts in B's queue, and overwrite the caption/hashtags/images of any of B's
+  // existing posts by id. zernio-api/handlers/publish.ts does this check correctly one
+  // directory away.
+  if (workspace_id && !(await userCanAccessWorkspace(supabase, userId, workspace_id))) {
+    // 404, not 403 — do not confirm that a workspace id exists (id enumeration).
+    return jsonResponse({ success: false, error: 'Not found' }, 404);
+  }
+
+  // Same for an existing post: verify it lives in a workspace the caller belongs to before
+  // any update touches it.
+  if (post_id) {
+    const { data: existingPost, error: postErr } = await supabase
+      .from('social_posts')
+      .select('workspace_id')
+      .eq('id', post_id)
+      .maybeSingle();
+    if (postErr) {
+      return jsonResponse({ success: false, error: 'Could not verify post' }, 500);
+    }
+    if (!existingPost
+      || !(await userCanAccessWorkspace(supabase, userId, (existingPost as { workspace_id: string }).workspace_id))) {
+      return jsonResponse({ success: false, error: 'Not found' }, 404);
+    }
+  }
+
 
   if (!source_image_url) return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
 
