@@ -176,12 +176,7 @@ describe('account-tier roles (public.roles)', () => {
     [ROLES.FACTORY]: 'dealer',  // legacy alias
     [ROLES.ARCHITECT]: 'architect',
     [ROLES.SALES]: 'sales',
-    [ROLES.SALES_MANAGER]: 'sales_manager',
     [ROLES.FINANCE]: 'accountant',
-    [ROLES.HR]: 'hr_staff',
-    [ROLES.HR_MANAGER]: 'hr_manager',
-    [ROLES.WAREHOUSE]: 'warehouse_staff',
-    [ROLES.MARKETING]: 'marketing_staff',
   };
 
   it('every account tier with a dedicated persona is handled by resolvePersona', () => {
@@ -193,20 +188,24 @@ describe('account-tier roles (public.roles)', () => {
     }
   });
 
-  it('both sales tiers have a human label — never a raw snake_case value', () => {
-    expect(roleLabel(ROLES.SALES)).toBe('Sales Rep');
-    expect(roleLabel(ROLES.SALES_MANAGER)).toBe('Sales Manager');
+  it('every account tier has a human label — never a raw snake_case value', () => {
     for (const name of Object.keys(ACCOUNT_TIER_PERSONAS)) {
       expect(roleLabel(name), `"${name}" has no ROLE_LABELS entry`).not.toContain('_');
     }
   });
 
-  it('the sales pair is symmetric across both axes', () => {
-    // Set from Users (account tier) or from Profile → Team (workspace role) — same persona either
-    // way, so an admin is never told "you can be a rep here but a manager only over there".
-    for (const role of ['sales', 'sales_manager'] as const) {
-      expect(resolvePersona({ isPlatformOperator: false, rank: null, workspaceRole: null, accountRole: role }))
-        .toBe(resolvePersona({ isPlatformOperator: false, rank: null, workspaceRole: role, accountRole: null }));
+  it('NO functional team role is assignable as a global account tier', () => {
+    // public.roles is global: a tier is true in every workspace the user belongs to. "Runs HR" /
+    // "on the warehouse team" / "sales manager" are per-workspace facts, so they must exist ONLY in
+    // workspace_members.role. Five of them were briefly added here and withdrawn on 2026-07-31.
+    const TEAM_ONLY = ['sales_manager', 'hr', 'hr_manager', 'warehouse', 'marketing'] as const;
+    for (const role of TEAM_ONLY) {
+      expect(Object.values(ROLES) as string[],
+        `"${role}" must not be an account tier — it is a workspace team role`).not.toContain(role);
+      // …but it must still resolve correctly as a WORKSPACE role.
+      expect(resolvePersona({
+        isPlatformOperator: false, rank: null, workspaceRole: role, accountRole: null,
+      }), `"${role}" must still work as a workspace role`).not.toBe('staff');
     }
   });
 });

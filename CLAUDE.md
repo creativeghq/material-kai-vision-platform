@@ -125,6 +125,11 @@ fails silently in a specific way: `sales`, `realestate_agent` and `employee` wer
 until 2026-07-30, so `redeem_workspace_invite` threw a CHECK violation on every one of those invites; a role
 with no `resolvePersona` branch instead falls through to `staff` and hands out finance/CRM/warehouse access.
 Guarded by [tests/unit/workspaceRoles.test.ts](tests/unit/workspaceRoles.test.ts).
+**Functional roles are WORKSPACE roles, never account tiers.** `public.roles` (`/admin/crm` → Users) is the
+global account tier — supplier/architect/admin — and a value there is true in EVERY workspace the user belongs
+to. "Runs HR", "warehouse team", "sales manager" are per-workspace facts: they live only in
+`workspace_members.role`, assigned from Profile → Team. Five were briefly added to `roles` and withdrawn
+(2026-07-31); the guard test now fails if any reappears.
 **Every business function gets a role; none of them gets workspace administration.** `sales`/`sales_manager`,
 `hr`/`hr_manager`, `warehouse`, `marketing`, `accountant`, `realestate_agent`. Each persona holds ONLY its own
 module capability + `agent.use` — never `platform.admin`/`network.manage`/`pricing.manage`/`catalog.import`

@@ -11,7 +11,7 @@ code as of this writing — where the model is *not* enforced, it says so explic
 ## 1. The two "role" concepts
 
 ### a) Account role — `roles` table (`user_profiles.role_id`)
-A global, per-user value — **the access tier**, set from `/admin/crm` → Users. Set: `user`(1) · `warehouse`(2) · `marketing`(3) · `hr`(4) · `hr_manager`(5) · `sales`(6) · `sales_manager`(7) · `supplier`(8) · `architect`(9) · `finance`(10) · `admin`(11). (Dealer+Factory merged into **supplier**; Super Admin merged into **admin**, 2026-06. `sales_manager` added 2026-07-31 — `sales` was already a tier, so the Users tab could make someone a rep but not a manager.) `level` is **display ordering only** — nothing compares it, so renumbering to slot a tier in is safe.
+A global, per-user value — **the access tier**, set from `/admin/crm` → Users. Set: `user`(1) · `sales`(2) · `supplier`(3) · `architect`(4) · `finance`(5) · `admin`(6). **Functional team roles do NOT belong here** — a tier is global, true in every workspace the user belongs to, so "runs HR" / "on the warehouse team" / "sales manager" live only in `workspace_members.role`. Five were briefly added and withdrawn on 2026-07-31; `roles_level_key` makes `level` UNIQUE, so renumbering needs a temporary offset. (Dealer+Factory merged into **supplier**; Super Admin merged into **admin**, 2026-06. `sales`/`finance` predate the team-role model and are kept for existing data.) `level` is **display ordering only** — nothing compares it — but it is UNIQUE, so intermediate states during a renumber must stay collision-free.
 
 This is now the **primary driver of the persona** (see §2) — `resolvePersona()` maps the account role to a persona, falling back to the workspace-derived persona only for `user`/unset. So setting the Role under **Admin → CRM → Users** is what actually grants a user's capabilities.
 
@@ -42,7 +42,7 @@ Source of truth: [`src/auth/capabilities.ts`](../src/auth/capabilities.ts).
 | **marketing_staff** | `marketing` | Email Marketing module only (`marketing.email`). |
 | **staff** / **end_user** | `user` / unset → workspace fallback | Team member / project client, resolved from the workspace role. |
 
-Resolution (`resolvePersona()`): `isPlatformOperator` → operator; then workspace role `sales_manager` → sales_manager (checked **before** the account-tier switch, so an invited manager whose tier is `sales` is not downgraded to a rep); else **account role** maps the tenant tier; else the workspace-derived persona (`client`→end_user, `accountant`→accountant, `employee`→employee, `realestate_agent`→realestate_agent, `sales`→sales, owner/admin by rank, member→staff). The sales pair is symmetric — either axis yields the same persona.
+Resolution (`resolvePersona()`): `isPlatformOperator` → operator; then the workspace **team roles** via `TEAM_ROLE_PERSONA` (`sales_manager`, `hr`, `hr_manager`, `warehouse`, `marketing`) — checked **before** the account-tier switch, so a per-workspace team role is never overridden by a broader global tier; else **account role** maps the tenant tier; else the workspace-derived persona (`client`→end_user, `accountant`→accountant, `employee`→employee, `realestate_agent`→realestate_agent, `sales`→sales, owner/admin by rank, member→staff). The sales pair is symmetric — either axis yields the same persona.
 
 The **invited external accountant** (workspace role `accountant`, #202) still resolves to the accountant persona but is flagged `isAccountant` to *restrict* it (no expense approval / no settings) — distinct from the internal `finance` account role.
 
@@ -126,3 +126,14 @@ pins the floor: no functional team role may ever hold `platform.admin`, `network
 `pricing.manage` or `catalog.import`, and each must hold its own module capability and not its
 neighbours'. Module **entitlement** is still enforced separately, so holding the capability gets you
 nothing until the workspace owns the module.
+
+
+### Which axis owns what
+
+`public.roles` (account tier, `/admin/crm` → Users) answers **what kind of account this is**,
+platform-wide: operator, supplier, architect. `role_upgrade_requests` only ever accepts
+`supplier` | `architect`, which is the clearest statement of that table's intent.
+
+`workspace_members.role` (Profile → Team) answers **what this person does in THIS workspace**. Every
+functional team role belongs here and nowhere else — putting one in `public.roles` would make it
+true in every workspace the user belongs to, which is never what "invite someone to run HR" means.

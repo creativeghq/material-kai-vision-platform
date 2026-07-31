@@ -38,12 +38,7 @@ export function professionalTypeLabel(value?: string | null): string {
 /** Friendly display labels for the account roles (the roles table `name`). */
 export const ROLE_LABELS: Record<string, string> = {
   user: 'User',
-  sales: 'Sales Rep',
-  sales_manager: 'Sales Manager',
-  hr: 'HR Officer',
-  hr_manager: 'HR Manager',
-  warehouse: 'Warehouse Team',
-  marketing: 'Marketing Team',
+  sales: 'Sales',
   supplier: 'Supplier',
   architect: 'Architect',
   finance: 'Finance',

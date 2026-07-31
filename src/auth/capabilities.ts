@@ -197,13 +197,13 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accoun
     case 'factory':  // legacy alias → supplier tier
       return 'dealer';
     case 'architect': return 'architect';
-    case 'sales_manager': return 'sales_manager';
     case 'sales': return 'sales';
     case 'finance': return 'accountant';
-    case 'hr_manager': return 'hr_manager';
-    case 'hr': return 'hr_staff';
-    case 'warehouse': return 'warehouse_staff';
-    case 'marketing': return 'marketing_staff';
+    // No functional team role belongs here. `roles` is the GLOBAL account tier — a value set once by
+    // a platform operator and true in every workspace the user belongs to. "Runs HR", "on the
+    // warehouse team", "sales manager" are per-workspace facts and live ONLY in
+    // workspace_members.role (see TEAM_ROLE_PERSONA above), set from Profile → Team.
+    // `sales`/`finance` above predate that rule and are kept for existing data.
   }
 
   const role = workspaceRole ?? '';

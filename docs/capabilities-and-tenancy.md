@@ -68,8 +68,9 @@ Notes: `operator` differs from `dealer`/`architect` only in the three operator-e
 Inputs `{ isPlatformOperator, rank, workspaceRole }`:
 
 1. `isPlatformOperator` → `operator`
-2. `workspaceRole === 'sales_manager'` → `sales_manager` (checked FIRST, before the account-role
-   switch, so an invited manager whose account tier is `sales` is not downgraded to a rep)
+2. workspace **team roles** via `TEAM_ROLE_PERSONA` (`sales_manager`, `hr`, `hr_manager`, `warehouse`,
+   `marketing`) → their scoped persona, checked FIRST so a per-workspace team role is never overridden
+   by a broader global account tier. These exist ONLY as workspace roles — never as account tiers.
 3. `workspaceRole === 'client'` → `end_user`
 4. `workspaceRole === 'accountant'` → `accountant`
 5. `workspaceRole === 'employee'` → `employee`; `'realestate_agent'` → `realestate_agent`
