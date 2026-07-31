@@ -499,24 +499,40 @@ async function buildAgentDraft(db: DbClient, thread: Record<string, unknown>): P
  * Get-or-create a public share token for a customer thread → the `/i/:token` link a member can
  * hand to a customer who has no account yet. Reuses an unclaimed token if one already exists.
  */
+/**
+ * Lifetime of a customer share link. A conversation link is an invitation, not a standing
+ * credential — it exists so one customer can reach one thread while it is being handled.
+ */
+const SHARE_LINK_TTL_DAYS = 30;
+
 async function getOrCreateShareLink(
   db: DbClient,
   threadId: string,
   contactId: string | null,
 ): Promise<string> {
+  // Only reuse a token that is still within its lifetime — otherwise "get or create" would
+  // keep handing back an expired one forever.
+  const nowIso = new Date().toISOString();
   const { data: existing } = await db
     .from('inbox_thread_tokens')
     .select('token')
     .eq('thread_id', threadId)
     .is('claimed_by_user_id', null)
+    .gt('expires_at', nowIso)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   let token = (existing as { token?: string } | null)?.token;
   if (!token) {
+    // SECURITY (audit #294/#306 finding 6): `expires_at` was NEVER written by any code path.
+    // The column is nullable, so `t.expires_at` was always NULL and resolveToken's expiry
+    // guard — and the "This link has expired" copy — were unreachable decoration. One
+    // forwarded /i/:token URL was a permanent, unauthenticated read+write handle on a
+    // tenant's customer conversation.
+    const expiresAt = new Date(Date.now() + SHARE_LINK_TTL_DAYS * 86_400_000).toISOString();
     const { data: ins, error } = await db
       .from('inbox_thread_tokens')
-      .insert({ thread_id: threadId, contact_id: contactId })
+      .insert({ thread_id: threadId, contact_id: contactId, expires_at: expiresAt })
       .select('token')
       .single();
     if (error) throw new HttpError(500, `Failed to create share link: ${error.message}`);
@@ -1770,7 +1786,11 @@ async function handleJwtAction(
 // Token actions (service-role, unauthenticated customer)
 // ──────────────────────────────────────────────────────────────────────────
 
-async function resolveToken(db: DbClient, token: string) {
+/**
+ * @param allowClaimed pass `true` ONLY for `token_claim`, which must resolve a token in order
+ *   to claim it. Every other token action rejects an already-claimed link.
+ */
+async function resolveToken(db: DbClient, token: string, allowClaimed = false) {
   if (!token) throw new HttpError(400, 'token is required');
   const { data: tok } = await db
     .from('inbox_thread_tokens')
@@ -1781,6 +1801,13 @@ async function resolveToken(db: DbClient, token: string) {
   const t = tok as Record<string, unknown>;
   if (t.expires_at && new Date(String(t.expires_at)) < new Date()) {
     throw new HttpError(403, 'This link has expired');
+  }
+  // SECURITY (audit #294/#306 finding 6): `claimed_by_user_id` was checked ONLY inside
+  // token_claim. token_get_thread and token_send_message ignored it entirely, so a link
+  // stayed live after the intended customer had claimed it and converted to an account —
+  // anyone still holding the URL kept full read+write access to that conversation.
+  if (!allowClaimed && t.claimed_by_user_id) {
+    throw new HttpError(403, 'This link has already been used. Please sign in to continue.');
   }
   return t;
 }
@@ -1846,7 +1873,9 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
       // `client` member of the dealer's workspace.
       const userId = String(payload.user_id || '');
       if (!userId) throw new HttpError(400, 'user_id is required');
-      const tok = await resolveToken(db, token);
+      // allowClaimed: this action OWNS the claim check below (it must tolerate the same user
+      // re-claiming, e.g. a retried request), so it resolves the token itself.
+      const tok = await resolveToken(db, token, true);
       if (tok.claimed_by_user_id && tok.claimed_by_user_id !== userId) {
         throw new HttpError(409, 'This invite was already claimed');
       }

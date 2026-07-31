@@ -424,7 +424,11 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const photoId = String(body.photo_id ?? '');
         if (!photoId) return json({ error: 'photo_id is required' }, 400);
-        const { data: photo } = await supabase.from('property_photos').select('storage_path').eq('id', photoId).eq('workspace_id', workspaceId).maybeSingle();
+        // Resolve the parent property and prove agent ownership before deleting — workspace
+        // scope alone does not separate two agents. (audit #294/#303)
+        const { data: photo } = await supabase.from('property_photos').select('storage_path, property_id').eq('id', photoId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!photo) return json({ error: 'not found' }, 404);
+        await loadEditable(String((photo as any).property_id));
         if (photo?.storage_path) await supabase.storage.from('property-media').remove([photo.storage_path]);
         const { error } = await supabase.from('property_photos').delete().eq('id', photoId).eq('workspace_id', workspaceId);
         if (error) throw new HttpError(400, error.message);
@@ -436,6 +440,12 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const photoId = String(body.photo_id ?? '');
         const id = String(body.property_id ?? '');
         if (!photoId || !id) return json({ error: 'photo_id and property_id are required' }, 400);
+        // SECURITY (audit #294/#303): scoping by workspace_id alone is not enough. requireManage()
+        // is true for `realestate_agent`, so agent-ownership is the ONLY thing separating agents —
+        // and without this, agent B could re-cover agent A's listing, including listings A has not
+        // flagged open_for_all (ones B cannot even read via get-property). Every other photo action
+        // (add-photo, delete-photo, analyze-photos, photo-upload-url) already does this.
+        await loadEditable(id);
         await supabase.from('property_photos').update({ is_cover: false }).eq('property_id', id).eq('workspace_id', workspaceId);
         const { error } = await supabase.from('property_photos').update({ is_cover: true }).eq('id', photoId).eq('workspace_id', workspaceId);
         if (error) throw new HttpError(400, error.message);
@@ -445,6 +455,21 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       case 'reorder-photos': {
         requireManage();
         const orderedIds: string[] = Array.isArray(body.photo_ids) ? body.photo_ids : [];
+        if (orderedIds.length === 0) return json({ ok: true });
+        // SECURITY (audit #294/#303): same gap as set-cover — workspace scope alone let one agent
+        // reorder another's gallery. The photo ids are caller-supplied, so resolve them to their
+        // parent properties and prove ownership of each before writing.
+        const { data: owning, error: ownErr } = await supabase
+          .from('property_photos')
+          .select('property_id')
+          .in('id', orderedIds)
+          .eq('workspace_id', workspaceId);
+        if (ownErr) throw new HttpError(400, ownErr.message);
+        const propertyIds = [...new Set((owning ?? []).map((r: any) => r.property_id).filter(Boolean))];
+        // Any id that is not in this workspace simply did not come back — refuse rather than
+        // silently reordering the subset that did.
+        if ((owning ?? []).length !== orderedIds.length) return json({ error: 'not found' }, 404);
+        for (const pid of propertyIds) await loadEditable(String(pid));
         for (let i = 0; i < orderedIds.length; i++) {
           await supabase.from('property_photos').update({ sort_order: i }).eq('id', orderedIds[i]).eq('workspace_id', workspaceId);
         }
@@ -467,6 +492,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'convert-inquiry': {
+        // SECURITY (audit #294/#303): this is a WRITE — inserts a crm_contacts row. It had no
+        // guard at all, so the documented read-only Member persona could reach it. RLS
+        // cannot help: this function runs service-role.
+        requireManage();
         // Turn an anonymous inquiry into a trackable CRM lead (D9: the lead IS a crm_contact),
         // link it to the inquiry + property, and assign it to the caller (responsible_sales_user_ids).
         const inqId = String(body.inquiry_id ?? '');
@@ -491,6 +520,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'update-inquiry': {
+        // SECURITY (audit #294/#303): this is a WRITE — edits buyer PII. It had no
+        // guard at all, so the documented read-only Member persona could reach it. RLS
+        // cannot help: this function runs service-role.
+        requireManage();
         // Edit a lead: status and/or its contact fields (name/email/phone/message).
         const inqId = String(body.inquiry_id ?? '');
         if (!inqId) return json({ error: 'inquiry_id is required' }, 400);
@@ -510,6 +543,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'create-inquiry': {
+        // SECURITY (audit #294/#303): this is a WRITE — inserts a crm_contacts row. It had no
+        // guard at all, so the documented read-only Member persona could reach it. RLS
+        // cannot help: this function runs service-role.
+        requireManage();
         // Manually record a lead (someone who contacted the agency off-web). property_inquiries
         // requires a property, so a lead is always property-scoped. The lead IS a crm_contact (D9):
         // create/link the contact + a property_interest immediately, mirroring convert-inquiry.
@@ -604,6 +641,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'create-viewing': {
+        // SECURITY (audit #294/#303): this is a WRITE — inserts a crm_meetings row. It had no
+        // guard at all, so the documented read-only Member persona could reach it. RLS
+        // cannot help: this function runs service-role.
+        requireManage();
         const id = String(body.property_id ?? '');
         const scheduledAt = String(body.scheduled_at ?? '');
         if (!id || !scheduledAt) return json({ error: 'property_id and scheduled_at are required' }, 400);
@@ -630,6 +671,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'update-viewing': {
+        // SECURITY (audit #294/#303): this is a WRITE — reschedules/cancels a viewing. It had no
+        // guard at all, so the documented read-only Member persona could reach it. RLS
+        // cannot help: this function runs service-role.
+        requireManage();
         const vId = String(body.viewing_id ?? '');
         if (!vId) return json({ error: 'viewing_id is required' }, 400);
         const patch: Record<string, unknown> = {};
@@ -654,6 +699,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
       // ── Interests (contact ↔ property) ─────────────────────────────────
       case 'add-interest': {
+        // SECURITY (audit #294/#303): this is a WRITE — writes property_interests. It had no
+        // guard at all, so the documented read-only Member persona could reach it. RLS
+        // cannot help: this function runs service-role.
+        requireManage();
         const id = String(body.property_id ?? '');
         const contactId = String(body.crm_contact_id ?? '');
         const interestType = INTEREST_TYPES.includes(body.interest_type) ? body.interest_type : 'interested';
@@ -909,6 +958,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'upsert-contact-ext': {
+        // SECURITY (audit #294/#303): this is a WRITE — writes buyer/seller contact extension. It had no
+        // guard at all, so the documented read-only Member persona could reach it. RLS
+        // cannot help: this function runs service-role.
+        requireManage();
         const contactId = String(body.crm_contact_id ?? '');
         if (!contactId) return json({ error: 'crm_contact_id is required' }, 400);
         const EXT_WRITABLE = ['contact_role', 'pre_approval_status', 'pre_approval_amount', 'lender', 'budget_min', 'budget_max', 'owned_property_value', 'owned_property_address', 'owned_property_equity'];
