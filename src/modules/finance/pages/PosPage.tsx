@@ -114,6 +114,7 @@ const PosPage: React.FC = () => {
   const [awaiting, setAwaiting] = useState<{
     posSignatureId: string; invoiceId: string; number: string; total: number; currency: string;
     net: number; vat: number; method: 'card' | 'iris'; vatRate: number; docType: DocType; customerName: string | null;
+    vatBreakdown?: { rate: number; net: number; vat: number; gross: number }[];
     lines: { name: string; qty: number; unit_price: number; line_vat: number }[];
   } | null>(null);
   const [txnId, setTxnId] = useState('');
@@ -131,6 +132,7 @@ const PosPage: React.FC = () => {
     number: string; total: number; currency: string; mark: string | null;
     uid: string | null; qrUrl: string | null;
     net: number; vat: number; method: 'cash' | 'card' | 'iris'; issuedAt: string;
+    vatBreakdown?: { rate: number; net: number; vat: number; gross: number }[];
     vatRate: number; docType: DocType; customerName: string | null;
     lines: { name: string; qty: number; unit_price: number; line_vat: number }[];
   } | null>(null);
@@ -208,14 +210,48 @@ const PosPage: React.FC = () => {
   }, [items, search]);
 
   const currency = cart[0]?.currency ?? items[0]?.currency ?? 'EUR';
+  /**
+   * Totals, computed PER LINE at that line's own VAT rate.
+   *
+   * Each cart line already snapshots `line_vat` at the moment it was added, the line-item
+   * table renders it, and the thermal receipt prints it per row — but nothing used it for
+   * arithmetic. Every rate in the basket was taxed at whatever `vatRate` the keypad happened
+   * to be showing at the end. So ringing up a 24% item and then switching to 6% printed
+   * "24%" beside line 1 while the ΑΝΑΛΥΣΗ ΦΠΑ block below declared the whole sale at 6% —
+   * wrong VAT remitted, on a document that contradicts itself in print. (audit #307)
+   *
+   * `byRate` also gives the receipt a real per-rate VAT analysis, which is what a mixed-rate
+   * Greek retail receipt is required to show.
+   */
   const totals = useMemo(() => {
-    const sum = round2(cart.reduce((s, l) => s + l.unit_price * l.qty, 0));
-    if (vatInclusive) {
-      const net = round2(extractNet(sum, vatRate));
-      return { net, vat: round2(sum - net), total: sum };
+    const byRate = new Map<number, { net: number; vat: number; gross: number }>();
+    for (const l of cart) {
+      const rate = Number.isFinite(l.line_vat) ? l.line_vat : vatRate;
+      const lineSum = l.unit_price * l.qty;
+      const net = vatInclusive ? extractNet(lineSum, rate) : lineSum;
+      const vat = vatInclusive ? lineSum - net : net * rate / 100;
+      const e = byRate.get(rate) ?? { net: 0, vat: 0, gross: 0 };
+      e.net += net; e.vat += vat; e.gross += net + vat;
+      byRate.set(rate, e);
     }
-    const vat = round2(sum * vatRate / 100);
-    return { net: sum, vat, total: round2(sum + vat) };
+    // Round once per rate bucket, not per line — rounding each line then summing drifts
+    // against the printed per-rate subtotals.
+    const buckets = [...byRate.entries()]
+      .map(([rate, v]) => ({ rate, net: round2(v.net), vat: round2(v.vat), gross: round2(v.gross) }))
+      .sort((a, b) => b.rate - a.rate);
+    // `invoices.vat_rate` is a single NOT NULL column, so a mixed basket has no truthful
+    // value for it. The dominant rate by net is the least-wrong summary; the authoritative
+    // per-rate figures live on invoice_items (net_value / vat_amount), which this page now
+    // populates.
+    const dominant = buckets.reduce<{ rate: number; net: number } | null>(
+      (best, b) => (!best || b.net > best.net ? { rate: b.rate, net: b.net } : best), null);
+    return {
+      net: round2(buckets.reduce((s, b) => s + b.net, 0)),
+      vat: round2(buckets.reduce((s, b) => s + b.vat, 0)),
+      total: round2(buckets.reduce((s, b) => s + b.gross, 0)),
+      byRate: buckets,
+      dominantRate: dominant?.rate ?? vatRate,
+    };
   }, [cart, vatRate, vatInclusive]);
 
   // ── Cloud vPOS shift ──────────────────────────────────────────────────────
@@ -371,7 +407,9 @@ const PosPage: React.FC = () => {
           payment_method_code: AADE_PAYMENT_CODE[method],
           currency,
           subtotal_net: totals.net,
-          vat_rate: vatRate,
+          // Dominant rate by net — a mixed basket has no single truthful rate, and this
+          // column is NOT NULL. Per-rate truth is on invoice_items. (audit #307)
+          vat_rate: totals.dominantRate,
           vat_amount: totals.vat,
           total: totals.total,
           issued_at: new Date().toISOString(),
@@ -385,14 +423,21 @@ const PosPage: React.FC = () => {
       if (insErr) throw insErr;
 
       const itemsPayload = cart.map((l) => {
-        const unitNet = vatInclusive ? round2(extractNet(l.unit_price, vatRate)) : l.unit_price;
+        // Net is extracted at the LINE's own rate, not the register's current one — see the
+        // note on `totals`. Also persists net_value and vat_amount, which exist on
+        // invoice_items and were previously left null by this page. (audit #307)
+        const lineRate = Number.isFinite(l.line_vat) ? l.line_vat : vatRate;
+        const unitNet = vatInclusive ? round2(extractNet(l.unit_price, lineRate)) : l.unit_price;
+        const lineNet = round2(unitNet * l.qty);
         return {
           invoice_id: invoice.id,
           product_id: l.id.startsWith('manual-') ? null : l.id,
           description: l.name,
           quantity: l.qty,
           unit_price: unitNet,
-          line_total: round2(unitNet * l.qty),
+          line_total: lineNet,
+          net_value: lineNet,
+          vat_amount: round2(lineNet * lineRate / 100),
           vat_category: l.vat_category,
           income_classification_type: l.inc_type,
           income_classification_category: l.inc_cat,
@@ -405,6 +450,9 @@ const PosPage: React.FC = () => {
         invoiceId: invoice.id,
         number: num?.formatted as string, total: totals.total, currency,
         net: totals.net, vat: totals.vat, vatRate, docType, customerName: customer?.name ?? null,
+        // Per-rate buckets so the receipt can print a real ΑΝΑΛΥΣΗ ΦΠΑ for a mixed basket
+        // instead of one row at whatever rate the keypad last showed. (audit #307)
+        vatBreakdown: totals.byRate,
         lines: cart.map((l) => ({ name: l.name, qty: l.qty, unit_price: l.unit_price, line_vat: l.line_vat })),
       };
 
@@ -450,6 +498,7 @@ const PosPage: React.FC = () => {
     snapshot: {
       number: string; total: number; currency: string; net: number; vat: number;
       vatRate: number; docType: DocType; customerName: string | null;
+      vatBreakdown?: { rate: number; net: number; vat: number; gross: number }[];
       lines: { name: string; qty: number; unit_price: number; line_vat: number }[];
     },
     paidMethod: 'cash' | 'card' | 'iris',
@@ -798,7 +847,18 @@ const PosPage: React.FC = () => {
           <div className="space-y-3">
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground"><span>Net</span><span>{formatMoney(totals.net, currency)}</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>VAT ({vatRate}%)</span><span>{formatMoney(totals.vat, currency)}</span></div>
+              {/* Label the actual rate(s) in the basket, not the keypad's current setting —
+                  a mixed basket used to read "VAT (6%)" over a figure that was not 6%. */}
+              <div className="flex justify-between text-muted-foreground">
+                <span>VAT ({totals.byRate.length > 1 ? 'mixed' : `${totals.byRate[0]?.rate ?? vatRate}%`})</span>
+                <span>{formatMoney(totals.vat, currency)}</span>
+              </div>
+              {totals.byRate.length > 1 && totals.byRate.map((b) => (
+                <div key={b.rate} className="flex justify-between text-xs text-muted-foreground pl-3">
+                  <span>· {b.rate}% on {formatMoney(b.net, currency)}</span>
+                  <span>{formatMoney(b.vat, currency)}</span>
+                </div>
+              ))}
               <div className="flex justify-between text-base font-semibold"><span>Total</span><span>{formatMoney(totals.total, currency)}</span></div>
             </div>
 
@@ -1036,9 +1096,23 @@ const PosPage: React.FC = () => {
             <div className="r-row" style={{ fontSize: printSize === '58' ? 9 : 11 }}>
               <span>ΚΑΘΑΡΗ €</span><span>ΦΠΑ %</span><span>ΠΟΣΟ ΦΠΑ €</span><span>ΤΕΛΙΚΗ €</span>
             </div>
-            <div className="r-row">
-              <span>{num2(result.net)}</span><span>{num2(result.vatRate)}</span><span>{num2(result.vat)}</span><span>{num2(result.total)}</span>
-            </div>
+            {/* One row PER RATE. A mixed-rate basket previously printed a single row at
+                whatever rate the keypad last showed, contradicting the per-line VAT% printed
+                above it. Falls back to the single-rate row for receipts issued before this
+                change, whose snapshot has no breakdown. (audit #307) */}
+            {(result.vatBreakdown?.length
+              ? result.vatBreakdown
+              : [{ rate: result.vatRate, net: result.net, vat: result.vat, gross: result.total }]
+            ).map((b) => (
+              <div className="r-row" key={b.rate}>
+                <span>{num2(b.net)}</span><span>{num2(b.rate)}</span><span>{num2(b.vat)}</span><span>{num2(b.gross)}</span>
+              </div>
+            ))}
+            {(result.vatBreakdown?.length ?? 0) > 1 && (
+              <div className="r-row r-b">
+                <span>{num2(result.net)}</span><span>ΣΥΝ.</span><span>{num2(result.vat)}</span><span>{num2(result.total)}</span>
+              </div>
+            )}
 
             <div className="r-c r-b" style={{ marginTop: 6 }}>ΕΥΧΑΡΙΣΤΟΥΜΕ</div>
 
