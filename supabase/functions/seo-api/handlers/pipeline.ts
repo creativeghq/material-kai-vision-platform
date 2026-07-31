@@ -111,13 +111,33 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     const autoFix = body.auto_fix !== false;
     const maxFixIterations = body.max_fix_iterations || 3;
 
-    // Get workspace ID
-    const { data: memberData } = await supabase
+    // Get workspace ID.
+    // Was `.single()`, which ERRORS (PGRST116, "multiple rows returned") for any user who
+    // belongs to more than one workspace — and the error was not destructured, so
+    // workspaceId silently became null. The article then failed the
+    // `seo_articles_ws_select` RLS predicate (is_workspace_member(workspace_id)), so no
+    // colleague could see it, and resolveWebsite(null) could not pick the workspace's
+    // default site either. Prefer an explicit body.workspace_id reconciled against
+    // membership; otherwise take the caller's most recent active membership. (audit #306)
+    const requestedWs = typeof body.workspace_id === 'string' ? body.workspace_id : null;
+    let memberQuery = supabase
       .from('workspace_members')
       .select('workspace_id')
       .eq('user_id', userId)
-      .single();
-    const workspaceId = memberData?.workspace_id || null;
+      .eq('status', 'active');
+    if (requestedWs) memberQuery = memberQuery.eq('workspace_id', requestedWs);
+    // NB: workspace_members has no `created_at` — the timestamp column is `joined_at`.
+    const { data: memberRows, error: memberErr } = await memberQuery
+      .order('joined_at', { ascending: false })
+      .limit(1);
+    if (memberErr) {
+      return jsonResponse({ success: false, error: `Could not resolve workspace: ${memberErr.message}` }, 400);
+    }
+    const workspaceId = memberRows?.[0]?.workspace_id ?? null;
+    if (requestedWs && !workspaceId) {
+      // Asked for a workspace they are not a member of — 404, not 403 (no id enumeration).
+      return jsonResponse({ success: false, error: 'Not found' }, 404);
+    }
 
     // Resolve the connected website this article belongs to — explicit body.website_id
     // when the agent picked one, else the workspace's default site. Also feeds the
@@ -358,7 +378,10 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     // Query existing platform articles for interlinking
     const { data: existingArticlesRaw } = await supabase
       .from('seo_articles')
-      .select('id, title, slug, target_keyword, overall_score')
+      // `overall_score` is not a column and was never read from this result anyway — its
+      // presence alone got the select rejected, so existingArticlesRaw was always null and
+      // interlinking never found a single existing article. (audit #298/#306)
+      .select('id, title, slug, target_keyword')
       .eq('user_id', userId)
       .eq('status', 'completed')
       .neq('id', articleId)
@@ -402,7 +425,9 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
         .eq('user_id', userId)
         .eq('status', 'completed')
         .neq('id', articleId)
-        .order('overall_score', { ascending: false })
+        // was `overall_score` (not a column) — the real one is `seo_score`, which the final
+        // update writes from the same analysis.overallScore value.
+        .order('seo_score', { ascending: false })
         .limit(40);
       const relatedMatches: typeof existingArticles = [];
       for (const term of relatedSearches.slice(0, 12)) {
@@ -457,42 +482,47 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     // Calculate processing time and credits
     const processingTimeMs = Date.now() - startTime;
 
-    // Final update with all data
-    await supabase
-      .from('seo_articles')
-      .update({
-        markdown_content: finalMarkdown,
-        html_content: htmlContent,
-        word_count: finalWordCount,
-        reading_time_minutes: Math.ceil(finalWordCount / 200),
-        content_analysis: analysis,
-        overall_score: analysis.overallScore,
-        seo_score: analysis.overallScore,
-        readability_score: analysis.readabilityScore,
-        keyword_density: analysis.keywordDensity,
-        schema_markup: schemaMarkup,
-        faq_schema: faqSchema,
-        optimize_data: optimizeData,
-        brief_data: briefData,
-        gaps_gains_data: gapsGains,
-        research_tab_data: researchTabData,
-        interlinking_data: interlinkingData,
-        fix_iterations: fixIterations,
-        geo_score: analysis.geoScore?.overall || null,
-        credits_used: totalCredits,
-        processing_time_ms: processingTimeMs,
-        status: 'completed',
-        progress_percentage: 100,
-        current_stage: 'done',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', articleId);
+    // Final update. Routed through updateArticle so the column allowlist applies: the real
+    // columns are written, and the 15 non-columns this used to name (html_content,
+    // reading_time_minutes, content_analysis, overall_score, keyword_density, schema_markup,
+    // faq_schema, optimize_data, brief_data, gaps_gains_data, research_tab_data,
+    // fix_iterations, geo_score, credits_used, processing_time_ms) are preserved in
+    // stages_data.extra instead of taking the whole statement down with them. (audit #298/#306)
+    await updateArticle(supabase, articleId, {
+      markdown_content: finalMarkdown,
+      html_content: htmlContent,
+      word_count: finalWordCount,
+      reading_time_minutes: Math.ceil(finalWordCount / 200),
+      content_analysis: analysis,
+      overall_score: analysis.overallScore,
+      seo_score: analysis.overallScore,
+      readability_score: analysis.readabilityScore,
+      keyword_density: analysis.keywordDensity,
+      schema_markup: schemaMarkup,
+      faq_schema: faqSchema,
+      optimize_data: optimizeData,
+      brief_data: briefData,
+      gaps_gains_data: gapsGains,
+      research_tab_data: researchTabData,
+      interlinking_data: interlinkingData,
+      fix_iterations: fixIterations,
+      geo_score: analysis.geoScore?.overall || null,
+      credits_used: totalCredits,
+      processing_time_ms: processingTimeMs,
+      status: 'completed',
+      progress_percentage: 100,
+      current_stage: 'done',
+      completed_at: new Date().toISOString(),
+    }, `Pipeline complete: score ${analysis.overallScore}/100, ${finalWordCount} words`);
 
     console.log(`[seo-pipeline] Complete! Article ${articleId}: score ${analysis.overallScore}/100, ${finalWordCount} words, ${processingTimeMs}ms`);
 
     // Build full ArticleOutput
     const articleOutput: ArticleOutput = {
-      id: articleId,
+      // `articleRow` is narrowed non-null by the `if (insertError || !articleRow) throw`
+      // guard above, so this needs no assertion — unlike `articleId`, which stays
+      // `string | null` for the catch block.
+      id: articleRow.id,
       topic: body.topic,
       targetKeyword: body.target_keyword,
       title: plan.title,
@@ -526,15 +556,22 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
 
     // Update article with failure status
     if (articleId) {
-      await supabase
+      // `processing_time_ms` is NOT a column — including it here got the FAILURE write
+      // rejected too, so a failed article was indistinguishable from a running one and
+      // spun at its last current_stage forever. Written directly (not via updateArticle)
+      // because this is the error path: it must not throw, and it must not depend on the
+      // read-modify-write that updateArticle performs. (audit #298/#306)
+      const { error: failErr } = await supabase
         .from('seo_articles')
         .update({
           status: 'failed',
-          error_message: error.message,
-          processing_time_ms: Date.now() - startTime,
+          error_message: String(error?.message ?? error).slice(0, 2000),
           updated_at: new Date().toISOString(),
         })
         .eq('id', articleId);
+      if (failErr) {
+        console.error(`[seo-pipeline] could not mark article ${articleId} failed:`, failErr.message);
+      }
     }
 
     return jsonResponse({
@@ -549,12 +586,58 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
 // HELPERS
 // ════════════════════════════════════════════════════════════════
 
+/**
+ * The REAL columns on `seo_articles` (verified against information_schema).
+ * `id`, `user_id`, `workspace_id` and `created_at` are deliberately excluded — identity
+ * is never rewritten by the pipeline.
+ *
+ * This exists because the pipeline was writing 15+ fields that are not columns
+ * (`html_content`, `meta_title`, `article_plan`, `overall_score`, `credits_used`,
+ * `processing_time_ms`, `keyword_research_id`, …). PostgREST rejects the WHOLE statement
+ * when any one column is unknown, so those updates landed nothing — and took the REAL
+ * columns in the same payload down with them. That is why finished articles had
+ * `title = NULL`, `slug = NULL`, no markdown and a status stuck mid-pipeline, while the
+ * endpoint returned `{success: true}` and the credits were already spent. (audit #298/#306)
+ */
+const ARTICLE_COLUMNS = new Set([
+  'target_keyword', 'content_type', 'content_brief', 'status', 'progress_percentage',
+  'current_stage', 'pipeline_log', 'stages_data', 'markdown_content', 'title',
+  'meta_description', 'slug', 'seo_score', 'readability_score', 'word_count',
+  'interlinking_data', 'error_message', 'updated_at', 'completed_at', 'website_id',
+]);
+
+/**
+ * Split a payload into real columns and everything else. The remainder is not discarded —
+ * it is folded into `stages_data.extra`, which is jsonb and exists precisely for this.
+ * Nothing the pipeline computes is lost; it just stops being written to columns that
+ * were never created.
+ */
+function splitByColumn(updates: Record<string, any>): { cols: Record<string, any>; extra: Record<string, any> } {
+  const cols: Record<string, any> = {};
+  const extra: Record<string, any> = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (ARTICLE_COLUMNS.has(k)) cols[k] = v;
+    else if (v !== undefined) extra[k] = v;
+  }
+  return { cols, extra };
+}
+
 async function updateArticle(
   supabase: any,
-  articleId: string,
-  updates: Record<string, any>,
+  // `string | null` because the caller's `articleId` is nullable until the row is created.
+  // Accepting the nullable type here (and no-opping on null) is what lets all 12 call
+  // sites typecheck without sprinkling non-null assertions through the pipeline.
+  articleId: string | null,
+  rawUpdates: Record<string, any>,
   logMessage: string,
 ) {
+  if (!articleId) return;
+  const { cols, extra } = splitByColumn(rawUpdates);
+  const updates: Record<string, any> = cols;
+  if (Object.keys(extra).length > 0) {
+    updates.stages_data = { ...(updates.stages_data || {}), extra: { ...extra } };
+  }
+
   // Merge stages_data instead of overwriting
   if (updates.stages_data) {
     const { data: current } = await supabase
@@ -566,6 +649,11 @@ async function updateArticle(
     updates.stages_data = {
       ...(current?.stages_data || {}),
       ...updates.stages_data,
+      // `extra` accumulates across stages — a shallow spread would let each stage's
+      // extras replace the previous stage's instead of adding to them.
+      ...(updates.stages_data.extra || current?.stages_data?.extra
+        ? { extra: { ...(current?.stages_data?.extra || {}), ...(updates.stages_data.extra || {}) } }
+        : {}),
     };
 
     updates.pipeline_log = [
@@ -594,7 +682,12 @@ async function updateArticle(
     .eq('id', articleId);
 
   if (error) {
-    console.warn(`[seo-pipeline] Failed to update article ${articleId}:`, error.message);
+    // Was `console.warn` and carry on. That is how a pipeline could burn credits through
+    // every stage, return {success:true}, and persist nothing — the only trace was a log
+    // line nobody read. If the article cannot be written, the run is already worthless;
+    // fail loudly so the catch block records `status='failed'` and the caller sees a 500.
+    console.error(`[seo-pipeline] Failed to update article ${articleId}:`, error.message, 'keys:', Object.keys(updates).join(','));
+    throw new Error(`Failed to persist article progress: ${error.message}`);
   }
 }
 
