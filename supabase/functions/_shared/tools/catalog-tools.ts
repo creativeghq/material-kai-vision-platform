@@ -697,19 +697,24 @@ export const createAddMaterialToCatalogTool = (userId: string, onChunk: ChunkSin
           }
         }
         if (input.material.image_source === 'catalog_product' && input.material.image_source_ref && !imageUrl) {
-          const { data: prodImg } = await supabase
-            .from('document_images')
-            .select('storage_path')
+          // `document_images` has neither `product_id` nor `storage_path` — the product→image
+          // link is `image_product_associations`, and the image carries a ready `image_url`
+          // (pdf-tiles is public-read, so no signing). The old query named both missing
+          // columns, so PostgREST rejected it and catalog materials never picked up their
+          // product photo. The workspace filter is kept, applied through the embed. (audit #298)
+          const { data: prodImg, error: prodImgErr } = await supabase
+            .from('image_product_associations')
+            .select('overall_score, document_images!inner(image_url, workspace_id)')
             .eq('product_id', input.material.image_source_ref)
-            .eq('workspace_id', catalog.workspace_id)
-            .order('created_at', { ascending: true })
+            .eq('document_images.workspace_id', catalog.workspace_id)
+            .order('overall_score', { ascending: false })
             .limit(1)
             .maybeSingle();
-          if (prodImg?.storage_path) {
-            const { data: signed } = await supabase.storage
-              .from('pdf-tiles')
-              .createSignedUrl(prodImg.storage_path, 60 * 60 * 24 * 30);
-            if (signed?.signedUrl) imageUrl = signed.signedUrl;
+          if (prodImgErr) {
+            console.error('[catalog-tools] product→image lookup failed:', prodImgErr.message);
+          } else {
+            const found = (prodImg as { document_images?: { image_url?: string } } | null)?.document_images?.image_url;
+            if (found) imageUrl = found;
           }
         }
 

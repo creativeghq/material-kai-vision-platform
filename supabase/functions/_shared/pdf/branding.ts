@@ -125,11 +125,23 @@ export async function applyWorkspaceBranding(
 ): Promise<BrandingConfig> {
   if (!workspaceId) return config;
   try {
-    const { data: fs } = await supabase
+    // NOTE the column is `default_vat_rate`, NOT `vat_rate_default` (the name of the
+    // BrandingConfig field it feeds). Getting this backwards made PostgREST reject the
+    // WHOLE select, so `fs` came back null and the `if (!fs)` below returned the
+    // OPERATOR's identity — every tenant's quote/catalog/proforma PDF carried our
+    // company name, address and VAT number instead of their own. (audit #298)
+    const { data: fs, error } = await supabase
       .from('finance_settings')
-      .select('business_name, business_address, business_street_number, business_city, business_postal_code, business_phone, business_email, business_vat, contact_phone, contact_email, vat_rate_default')
+      .select('business_name, business_address, business_street_number, business_city, business_postal_code, business_phone, business_email, business_vat, contact_phone, contact_email, default_vat_rate')
       .eq('workspace_id', workspaceId)
       .maybeSingle();
+    // Distinguish "this workspace has no finance_settings row" (fine — fall back to the
+    // template identity) from "the query is broken" (never fine — it silently mis-brands
+    // every document). The latter must be loud.
+    if (error) {
+      console.error('[branding] finance_settings lookup failed — PDFs would carry the operator identity:', error.message);
+      return config;
+    }
     if (!fs) return config;
 
     const addressLine = [
@@ -144,7 +156,7 @@ export async function applyWorkspaceBranding(
       company_phone: fs.business_phone || fs.contact_phone || config.company_phone,
       company_email: fs.business_email || fs.contact_email || config.company_email,
       company_vat: fs.business_vat || config.company_vat,
-      vat_rate_default: fs.vat_rate_default ?? config.vat_rate_default,
+      vat_rate_default: fs.default_vat_rate ?? config.vat_rate_default,
     };
   } catch {
     return config;

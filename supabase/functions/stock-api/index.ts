@@ -27,10 +27,17 @@ function json(body: any, status = 200): Response {
 const DIRECTIONS = ['in', 'out', 'adjust'];
 
 /** Item fields a client may write on create/update (allowlist — no mass assignment). */
+// Only columns that actually exist on `warehouse_items`. The list previously also carried
+// `barcode`, `cpv_code`, `taric_code`, `mydata_classification_type` and
+// `mydata_classification_category` — none of which are on this table. Because PostgREST
+// rejects the WHOLE statement on one unknown column, `create-item` failed 100% of the time
+// and `update-item` failed for any client that sent one of them. Fiscal identity belongs on
+// the PRODUCT (see warehouseService.updateProductFiscal), not on the stock row — the two
+// were conflated here. (audit #298 / #307)
 const ITEM_WRITABLE = [
-  'name', 'sku', 'unit', 'reorder_point', 'location',
-  'barcode', 'serial_number', 'cpv_code', 'taric_code',
-  'mydata_classification_type', 'mydata_classification_category',
+  'name', 'sku', 'unit', 'reorder_point', 'location', 'serial_number',
+  'width_mm', 'length_mm', 'thickness_mm', 'weight_kg',
+  'manufacturer', 'supplier_product_code', 'image_urls', 'is_active',
 ] as const;
 
 function pick(body: any, cols: readonly string[]): Record<string, unknown> {

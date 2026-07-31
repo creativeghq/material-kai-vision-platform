@@ -673,7 +673,11 @@ async function executeAction(
           .from('agent_chat_conversations')
           .insert({
             user_id: resolved.target_user_id,
-            agent_type: resolved.agent_type || 'kai',
+            // column is `agent_id` (text), not `agent_type` — the wrong name made this
+            // insert fail, and since the block then throws, the very fallback written to
+            // stop a missing conversation from killing the flow was itself killing it.
+            // (audit #298)
+            agent_id: resolved.agent_type || 'kai',
             title: 'Flow-initiated conversation',
             last_message_at: new Date().toISOString(),
           })
@@ -725,7 +729,10 @@ async function executeAction(
 
       const { error } = await supabase.from('moodboard_items').insert({
         moodboard_id: resolved.moodboard_id,
-        product_id: resolved.product_id,
+        // moodboard_items keys products as `material_id`, not `product_id` — the wrong
+        // name made every add_to_moodboard node throw and take the rest of the flow
+        // run down with it. (audit #298)
+        material_id: resolved.product_id,
         notes: resolved.notes || '',
         position: nextPosition,
       });

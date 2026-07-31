@@ -160,24 +160,30 @@ async function searchPlatformDb(supabase: any, query: string, limit: number): Pr
       const productId = p.id || p.product_id;
       if (!productId) continue;
 
-      const { data: img } = await supabase
-        .from('document_images')
-        .select('storage_path')
+      // `document_images` has NEITHER `product_id` NOR `storage_path`. The product→image
+      // link is the `image_product_associations` join table, and the image already carries
+      // a usable `image_url` (pdf-tiles is a public-read bucket — no signing needed).
+      // The previous query named BOTH missing columns, so PostgREST rejected it outright
+      // and this internal path returned nothing 100% of the time — meaning every image
+      // search silently escalated to the billed provider. (audit #298)
+      const { data: assoc, error: assocErr } = await supabase
+        .from('image_product_associations')
+        .select('overall_score, document_images!inner(image_url)')
         .eq('product_id', productId)
-        .order('created_at', { ascending: true })
+        .order('overall_score', { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!img?.storage_path) continue;
-
-      const { data: signed } = await supabase.storage
-        .from('pdf-tiles')
-        .createSignedUrl(img.storage_path, 60 * 60 * 24 * 7);
-      if (!signed?.signedUrl) continue;
+      if (assocErr) {
+        console.error('[catalog-image-search] product→image lookup failed:', assocErr.message);
+        continue;
+      }
+      const imageUrl = (assoc as { document_images?: { image_url?: string } } | null)?.document_images?.image_url;
+      if (!imageUrl) continue;
 
       out.push({
         source: 'db',
-        thumb_url: signed.signedUrl,
-        full_url: signed.signedUrl,
+        thumb_url: imageUrl,
+        full_url: imageUrl,
         title: p.name || p.title || null,
         source_metadata: { product_id: productId, score: p.score ?? null },
       });

@@ -82,7 +82,12 @@ export const createManageFinanceTool = (
         // Load + validate the draft in-workspace (RLS via the user client).
         const { data: inv } = await sb
           .from('invoices')
-          .select('id, invoice_number, status, total, currency')
+          // There is no `invoice_number` column. `internal_number` is NOT NULL and always
+          // present; `legal_number` is assigned only once the invoice is issued to ΑΑΔΕ.
+          // Naming the phantom column made PostgREST reject the whole select, so `inv` was
+          // null and this tool answered "invoice not found in this workspace" for EVERY
+          // invoice — blaming the user's data for a query bug. (audit #298)
+          .select('id, legal_number, internal_number, status, total, currency')
           .eq('id', invoice_id).eq('workspace_id', workspaceId).maybeSingle();
         if (!inv) return JSON.stringify({ success: false, error: 'invoice not found in this workspace' });
         if (inv.status !== 'draft') return JSON.stringify({ success: false, error: `only draft invoices can be issued (this one is "${inv.status}")` });
@@ -94,7 +99,7 @@ export const createManageFinanceTool = (
             tool: 'manage_finance',
             input: { action: 'issue_invoice', invoice_id },
             title: 'Issue this invoice?',
-            summary: `Issue invoice ${inv.invoice_number || '(draft)'} for ${inv.total ?? '—'} ${inv.currency || ''} and transmit it to ΑΑΔΕ / myDATA. This is a legal fiscal action and cannot be undone.`,
+            summary: `Issue invoice ${inv.legal_number || inv.internal_number || '(draft)'} for ${inv.total ?? '—'} ${inv.currency || ''} and transmit it to ΑΑΔΕ / myDATA. This is a legal fiscal action and cannot be undone.`,
             danger: true,
             toolkit_id: 'finance',
             timestamp: Date.now(),
@@ -117,7 +122,9 @@ export const createManageFinanceTool = (
           company = await resolveCompany(sb, workspaceId, customer_company_id, customer_name);
           if (!company) return JSON.stringify({ success: false, error: 'customer not found in this workspace' });
         }
-        let q = sb.from('invoices').select('id, invoice_number, status, total, currency, issued_at, due_at, customer_company_id, customer_contact_id')
+        // `invoice_number` does not exist — see the note in issue_invoice above. This select
+        // was rejected outright, so list_invoices returned an error for every call.
+        let q = sb.from('invoices').select('id, legal_number, internal_number, status, total, currency, issued_at, due_at, customer_company_id, customer_contact_id')
           .eq('workspace_id', workspaceId)
           .order('issued_at', { ascending: false, nullsFirst: false })
           .limit(Math.min(limit, 50));
