@@ -199,14 +199,10 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
               <Building2 className="h-4 w-4 mr-2" /> Add issuer to CRM
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={onReceiveStock} disabled={!canReceive} className="flex-col items-start gap-0.5">
-            {/* Same act as the order menu's entry — one name for it, the goods-receipt term. */}
-            <span className="flex items-center"><PackagePlus className="h-4 w-4 mr-2" /> Receive into warehouse</span>
-            <span className="pl-6 text-[10px] text-muted-foreground">
-              {hasOrder
-                ? 'Receive it on the purchase order — that is where the delivered quantities live.'
-                : 'Puts the goods into stock without creating an order — for a document you are not booking as a purchase. Recording a payment never moves stock.'}
-            </span>
+          {/* Same act as the order menu's entry — one name for it, the goods-receipt term. Once an
+              order exists it owns the receipt, so this is disabled rather than explained. */}
+          <DropdownMenuItem onClick={onReceiveStock} disabled={!canReceive}>
+            <PackagePlus className="h-4 w-4 mr-2" /> Receive into warehouse
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
@@ -216,22 +212,11 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
               to be two items ("Add to Expenses — not paid" wrote a bare bill; "Create the order
               for this" wrote order + bill), and the bill-only one produced a payable with nothing
               to match it against, which is precisely what 3-way match exists to prevent. */}
-          <DropdownMenuItem onClick={onCreateOrder} disabled={hasOrder || doc.status === 'dismissed' || !onCreateOrder} className="flex-col items-start gap-0.5">
-            <span className="flex items-center"><ShoppingCart className="h-4 w-4 mr-2" /> {hasOrder ? 'Already in Expenses' : 'Add to Expenses'}</span>
-            {!hasOrder && (
-              <span className="pl-6 text-[10px] text-muted-foreground">
-                The whole purchase in one step: the order, the expense against it, the goods into the warehouse, and the payment if you tick “Mark as paid”. Each is a tick you can turn off.
-                Riding along with a purchase you already have — freight, customs, an installer? Name that order in “What is this for?” and no second one is created.
-              </span>
-            )}
+          <DropdownMenuItem onClick={onCreateOrder} disabled={hasOrder || doc.status === 'dismissed' || !onCreateOrder}>
+            <ShoppingCart className="h-4 w-4 mr-2" /> {hasOrder ? 'Already in Expenses' : 'Add to Expenses'}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay} className="flex-col items-start gap-0.5">
-            <span className="flex items-center"><Wallet className="h-4 w-4 mr-2" /> Record payment</span>
-            <span className="pl-6 text-[10px] text-muted-foreground">
-              {doc.created_supplier_bill_id
-                ? 'Settles the expense this document became. Stock is untouched.'
-                : 'Add it to Expenses first — that form settles it too, with “Mark as paid”.'}
-            </span>
+          <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay}>
+            <Wallet className="h-4 w-4 mr-2" /> Record payment
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onDismiss} disabled={!canDismiss}>
             <Trash2 className="h-4 w-4 mr-2" /> Dismiss
