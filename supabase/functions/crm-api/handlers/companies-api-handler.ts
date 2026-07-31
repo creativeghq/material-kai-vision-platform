@@ -287,6 +287,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
               name,
               email,
               phone,
+              position,
               company
             )
           )
@@ -303,12 +304,19 @@ export async function handleCompanies(req: Request): Promise<Response> {
 
       // Flatten the contact attachments (crm_company_contacts) into the `contacts`
       // shape the company detail page reads — { relationship_id, contact_id,
-      // contact_name, contact_email, contact_phone, role, is_primary, notes }.
+      // contact_name, contact_email, contact_phone, contact_position, role,
+      // is_primary, notes }.
       // Mirrors the inverse flatten in contacts-api-handler's GET /contacts/{id}.
+      // `role` is the OPTIONAL per-attachment role; `contact_position` is the person's
+      // own job title from their profile. Most attachments never state a role, so the
+      // page falls back to the title rather than rendering an empty column.
       const attachments = (data as { crm_company_contacts?: Array<{
         id: string; contact_id: string; role: string | null; is_primary: boolean;
         notes: string | null; created_at: string;
-        crm_contacts?: { id: string; name: string; email: string | null; phone: string | null } | null;
+        crm_contacts?: {
+          id: string; name: string; email: string | null; phone: string | null;
+          position?: string | null;
+        } | null;
       }> }).crm_company_contacts ?? [];
       const contacts = attachments.map((a) => ({
         relationship_id: a.id,
@@ -316,6 +324,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
         contact_name: a.crm_contacts?.name ?? null,
         contact_email: a.crm_contacts?.email ?? null,
         contact_phone: a.crm_contacts?.phone ?? null,
+        contact_position: a.crm_contacts?.position ?? null,
         role: a.role,
         is_primary: a.is_primary,
         notes: a.notes,

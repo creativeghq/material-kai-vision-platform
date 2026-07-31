@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, FileText, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban } from 'lucide-react';
 import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
@@ -949,11 +949,11 @@ export const CompanyDetailPage: React.FC = () => {
           {/* Contacts Tab */}
           <TabsContent value="contacts" className="space-y-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
                 <div>
-                  <CardTitle>Attached Contacts</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Contacts associated with this company
+                  <CardTitle className="flex items-center gap-2"><Users className="h-4 w-4"/> Attached Contacts</CardTitle>
+                  <p className="text-xs text-muted-foreground pt-1">
+                    People at this company. Role falls back to the person&apos;s own title when the attachment does not state one.
                   </p>
                 </div>
                 <Button onClick={() => setShowAddContactDialog(true)} size="sm">
@@ -961,23 +961,26 @@ export const CompanyDetailPage: React.FC = () => {
                   Add contact
                 </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 {!company.contacts || company.contacts.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="h-12 w-12 mx-auto mb-2 opacity-50"/>
-                    <p>No contacts attached to this company yet</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-4"
-                      onClick={() => setShowAddContactDialog(true)}
+                  <div className="p-12 text-center text-sm text-muted-foreground">
+                    No contacts attached to this company yet.
+                    <div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                        onClick={() => setShowAddContactDialog(true)}
 >
-                      <Plus className="h-4 w-4 mr-2"/>
-                      Add first contact
-                    </Button>
+                        <Plus className="h-4 w-4 mr-2"/>
+                        Add first contact
+                      </Button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  // The shared <Table> already carries the house styling (sticky muted header,
+                  // text-xs heads, p-3 cells, hover) and its own overflow wrapper — no local
+                  // overflow div, no per-column widths.
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -985,7 +988,6 @@ export const CompanyDetailPage: React.FC = () => {
                         <TableHead>Role</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
-                        <TableHead>Primary</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -995,55 +997,55 @@ export const CompanyDetailPage: React.FC = () => {
                           <TableCell className="font-medium">
                             <button
                               onClick={() => navigate(`/admin/crm/contacts/${contact.contact_id}`)}
-                              className="text-primary hover:underline"
+                              className="text-primary hover:underline text-left"
 >
-                              {contact.contact_name}
+                              {contact.contact_name || '—'}
                             </button>
+                            {/* Primary reads as a plain coloured word, never a pill. */}
+                            {contact.is_primary && (
+                              <span className="ml-2 text-[10px] text-emerald-600 dark:text-emerald-400">Primary</span>
+                            )}
                           </TableCell>
-                          <TableCell>{contact.role || '-'}</TableCell>
+                          {/* The attachment role is optional and usually unset; the person's own
+                              job title is the same fact seen from the other side of the
+                              relationship, so fall back to it instead of an empty column. */}
+                          <TableCell>
+                            {contact.role || contact.contact_position || <span className="text-muted-foreground">—</span>}
+                          </TableCell>
                           <TableCell>
                             {contact.contact_email ? (
-                              <a
-                                href={`mailto:${contact.contact_email}`}
-                                className="text-primary hover:underline"
->
+                              <a href={`mailto:${contact.contact_email}`} className="text-primary hover:underline">
                                 {contact.contact_email}
                               </a>
                             ) : (
-                              '-'
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
                           <TableCell>
                             {contact.contact_phone ? (
-                              <a
-                                href={`tel:${contact.contact_phone}`}
-                                className="text-primary hover:underline"
->
+                              <a href={`tel:${contact.contact_phone}`} className="text-primary hover:underline">
                                 {contact.contact_phone}
                               </a>
                             ) : (
-                              '-'
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {contact.is_primary && (
-                              <span className="text-xs text-muted-foreground capitalize">Primary</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="h-7 w-7"
+                              title="Detach contact"
+                              aria-label="Detach contact"
                               onClick={() => handleDetachContact(contact.relationship_id)}
 >
-                              <Trash2 className="h-4 w-4 text-red-500"/>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive"/>
                             </Button>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  </div>
                 )}
               </CardContent>
             </Card>
