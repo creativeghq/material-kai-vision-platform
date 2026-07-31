@@ -60,7 +60,9 @@ async function resolveSupplier(workspaceId: string, name: string): Promise<{ id:
     .select('id, name').eq('workspace_id', workspaceId).ilike('name', name.trim()).limit(1).maybeSingle();
   if (found.data?.id) return { id: found.data.id, name: found.data.name };
   const ins = await sb.from('crm_companies')
-    .insert({ workspace_id: workspaceId, name: name.trim(), is_supplier: true }).select('id, name').single();
+    // is_customer explicitly false — the column DEFAULTS TO TRUE, so a lessor created here
+    // silently landed in the customer lists too.
+    .insert({ workspace_id: workspaceId, name: name.trim(), is_supplier: true, is_customer: false }).select('id, name').single();
   if (ins.error) throw ins.error;
   return { id: ins.data.id, name: ins.data.name };
 }

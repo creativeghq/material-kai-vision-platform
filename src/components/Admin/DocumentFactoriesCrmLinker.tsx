@@ -194,6 +194,9 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
         website: dialog.website.trim() || undefined,
         description: dialog.description.trim() || undefined,
         is_supplier: dialog.markAsSupplier,
+        // A factory read off a PDF catalog is someone we buy from, never someone we sell to.
+        // is_customer DEFAULTS TO TRUE, so leaving it out filed every factory as a customer.
+        is_customer: false,
       });
       const created = response?.data ?? response;
       const newMatch: CompanyMatch = {

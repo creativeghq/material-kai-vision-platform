@@ -53,7 +53,9 @@ async function resolvePayee(workspaceId: string, name: string): Promise<{ id: st
     return { id: found.data.id, name: found.data.name };
   }
   const ins = await sb.from('crm_companies')
-    .insert({ workspace_id: workspaceId, name: name.trim(), is_supplier: true }).select('id, name').single();
+    // is_customer explicitly false — the column DEFAULTS TO TRUE, so a payee created here
+    // silently landed in the customer lists too.
+    .insert({ workspace_id: workspaceId, name: name.trim(), is_supplier: true, is_customer: false }).select('id, name').single();
   if (ins.error) throw ins.error;
   return { id: ins.data.id, name: ins.data.name };
 }

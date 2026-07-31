@@ -1035,6 +1035,10 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
             country: company.country,
             linkedin: company.linkedin,
             description: company.description,
+            // Explicit: is_customer no longer defaults to true at the column (that default
+            // filed every supplier as a customer too). B2B research prospects a party we want
+            // to SELL to, so the customer role is the intended one here.
+            is_customer: true,
             created_by: userId,
           })
           .select('id')

@@ -155,10 +155,21 @@ export async function handleCompanies(req: Request): Promise<Response> {
         );
       }
 
+      // Commercial role: stated, or customer. `crm_companies.is_customer` used to DEFAULT TO
+      // TRUE at the column, which meant every caller that set only `is_supplier` also got a
+      // customer — a supplier added from the expenses inbox showed up in customer pickers and
+      // the receivables aging. The column now defaults to false and the "said nothing -> it's a
+      // customer" convention lives here instead, because only a request can be inspected for
+      // whether it stated a role at all. A caller that names either flag is taken at its word.
+      const companyFields = pickCompanyFields(body);
+      if (companyFields.is_customer === undefined && companyFields.is_supplier === undefined) {
+        companyFields.is_customer = true;
+      }
+
       const { data, error } = await supabase
         .from('crm_companies')
         .insert({
-          ...pickCompanyFields(body),
+          ...companyFields,
           workspace_id: targetWs,
           created_by: user.id,
         })

@@ -297,7 +297,9 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       let id = existing.data?.id as string | undefined;
       if (!id) {
         const ins = await supabase.from('crm_companies')
-          .insert({ workspace_id: workspaceId, name, is_supplier: true } as any)
+          // is_customer explicitly false — the column DEFAULTS TO TRUE, so a supplier created
+          // here silently became a customer too (see InboundDocActionsMenu).
+          .insert({ workspace_id: workspaceId, name, is_supplier: true, is_customer: false } as any)
           .select('id').single();
         if (ins.error) throw ins.error;
         id = ins.data.id;
@@ -328,7 +330,9 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       let id = existing.data?.id as string | undefined;
       if (!id) {
         const ins = await supabase.from('crm_contacts')
-          .insert({ workspace_id: workspaceId, name, is_supplier: true } as any)
+          // is_client explicitly false — that column DEFAULTS TO TRUE, so a payee created here
+          // silently became a client too.
+          .insert({ workspace_id: workspaceId, name, is_supplier: true, is_client: false } as any)
           .select('id').single();
         if (ins.error) throw ins.error;
         id = ins.data.id;

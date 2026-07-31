@@ -130,6 +130,11 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
         name: typedName || vat,
         vat_number: vat,
         is_supplier: true,
+        // MUST be explicit: crm_companies.is_customer DEFAULTS TO TRUE, so omitting it here
+        // filed every issuer as a customer as well — a company we only ever buy from showed up
+        // in customer pickers, AR statements and the receivables aging. The document is an
+        // expense we RECEIVED; its issuer sells to us and nothing more.
+        is_customer: false,
         workspace_id: workspaceId,
       };
       if (doResearch) {
@@ -261,7 +266,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
                 <span>
                   <span className="flex items-center gap-1 font-medium">
                     <Sparkles className="h-3 w-3" />
-                    {isGreekVat(doc.issuer_vat) ? 'Research: ΑΑΔΕ + ΓΕΜΗ + business info' : 'Research business info'}
+                    {isGreekVat(doc.issuer_vat) ? 'Research: ΑΑΔΕ + ΓΕΜΗ + Business Info' : 'Research business info'}
                   </span>
                   <span className="text-muted-foreground">
                     {isGreekVat(doc.issuer_vat)

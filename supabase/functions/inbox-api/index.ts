@@ -1375,7 +1375,9 @@ async function handleJwtAction(
         supplierCompanyId = (existingSup as Record<string, any>).id;
       } else {
         const { data: newSup, error: supErr } = await db.from('crm_companies')
-          .insert({ workspace_id: buyerWs, name: sellerName, is_supplier: true, vat_number: sellerVat, country_code: sellerCountry })
+          // is_customer explicitly false — the column DEFAULTS TO TRUE, so the seller landed in
+          // the buyer's customer lists as well as their supplier lists.
+          .insert({ workspace_id: buyerWs, name: sellerName, is_supplier: true, is_customer: false, vat_number: sellerVat, country_code: sellerCountry })
           .select('id').single();
         if (supErr) throw new HttpError(500, `Failed to create supplier: ${supErr.message}`);
         supplierCompanyId = (newSup as Record<string, any>).id;

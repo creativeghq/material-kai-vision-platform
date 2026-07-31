@@ -532,6 +532,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (!newClient.name.trim()) { toast({ title: 'Client name required', variant: 'destructive' }); return; }
     const { data, error } = await supabase.from('crm_companies').insert({
       workspace_id: workspaceId, name: newClient.name.trim(), vat_number: newClient.vat || null, email: newClient.email || null,
+      // Explicit: is_customer no longer defaults to true at the column (it used to file every
+      // supplier as a customer as well). We are invoicing this party — they are the customer.
+      is_customer: true,
     }).select('id, name').single();
     if (error) { if (!handleQuotaError(error)) toast({ title: 'Failed to add client', description: error.message, variant: 'destructive' }); return; }
     setCustomer({ type: 'company', id: data.id, label: `${data.name} (company)` });
