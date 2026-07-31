@@ -93,14 +93,15 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // you paid to (managed on their CRM record → Tax & VAT → Bank Accounts).
   const [payeeBanks, setPayeeBanks] = useState<CrmBankAccount[]>([]);
   const [counterpartyBankId, setCounterpartyBankId] = useState<string>('');
-  // Optional purchase-order link when NOT opened from an order — lets a cost booked from the
-  // supplier page / Finance page be attached to one of that supplier's POs (2.7).
-  const [poOptions, setPoOptions] = useState<Array<{ id: string; order_number: string | null; total: number }>>([]);
-  const [pickedOrderId, setPickedOrderId] = useState<string>('');
-  const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
-  // What the cost is FOR — a project, or a customer whose order it was incurred against. Separate
-  // from the purchase-order link above, which says which PO this bill invoices (3-way match).
+  // What the cost is FOR — a project, a customer whose order it was incurred against, or a
+  // purchase order this cost belongs to. That last one used to be a SECOND control ("On purchase
+  // order", listing only the payee's own POs), which asked the same question twice and could not
+  // express the common case at all: freight and customs are billed by someone other than the
+  // supplier whose order they belong to. One field, one answer.
   const [link, setLink] = useState<OrderLinkTarget>({ kind: 'none' });
+  // `supplier_bills.order_id` — the 3-way-match link. Either the order we were opened from, or the
+  // one picked above. NOT `covers_order_id`, which is the demand side (see the picker's own note).
+  const effectiveOrderId = orderId ?? (link.kind === 'cost_of_order' ? link.orderId : undefined);
 
   // A supplier passed in from the party page — used so the shared draft can't clobber the prefill.
   const prefillParty: Party | null = prefill?.supplier?.companyId
@@ -230,26 +231,6 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payeeBanks, method]);
-
-  // 2.7 — load the chosen supplier's purchase orders so a general expense can be attached to one.
-  // Skipped in order mode (the order is already fixed) and for one-off payees (no CRM record).
-  useEffect(() => {
-    setPickedOrderId('');
-    setPoOptions([]);
-    if (!open || orderId || !party || !party.id) return;
-    let cancelled = false;
-    (async () => {
-      const companyId = party.type === 'company'
-        ? party.id
-        : await financeService.resolvePrimaryCompanyId(party.id!).catch(() => null);
-      if (!companyId || cancelled) return;
-      try {
-        const pos = await ordersService.listPurchaseOrdersForSupplier(workspaceId, companyId);
-        if (!cancelled) setPoOptions(pos.map((p) => ({ id: p.id, order_number: p.order_number, total: p.total })));
-      } catch { /* non-fatal — matching stays optional */ }
-    })();
-    return () => { cancelled = true; };
-  }, [open, orderId, party, workspaceId]);
 
   // Payee search — ANY CRM company OR person, not just records already flagged as suppliers.
   // Plenty of costs are paid to a person (a freelancer, a landlord, an accountant) or to a
@@ -407,9 +388,11 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         });
         linkNote = `Draft order raised for ${link.party.name ?? 'the customer'} — add what they are buying.`;
       }
+      // A cost booked ON an order is reported under that order's job — same inheritance a linked
+      // sales order gets, so the expense doesn't float unattributed while its order has a project.
       const linkProjectId = link.kind === 'project'
         ? link.projectId
-        : (link.kind === 'sales_order' ? link.projectId : null);
+        : (link.kind === 'sales_order' || link.kind === 'cost_of_order' ? link.projectId : null);
 
       const created = await financeService.createExpense({
         workspaceId,
@@ -555,29 +538,18 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             )}
           </div>
 
-          {!orderId && poOptions.length > 0 && (
-            <div className="space-y-1">
-              <Label>On purchase order <span className="text-muted-foreground font-normal">(optional — attaches the cost to a PO)</span></Label>
-              <Select value={pickedOrderId || '__none__'} onValueChange={(v) => setPickedOrderId(v === '__none__' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="— No purchase order —" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— No purchase order —</SelectItem>
-                  {poOptions.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.order_number || p.id.slice(0, 8)} · {p.total.toFixed(2)} {currency}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           {/* An expense has no line items, so there is nothing to MERGE — this only ever attributes
-              the cost: to a project, or to the customer order it was incurred against. */}
+              the cost: to a project, to the customer order it was incurred against, or to the
+              purchase order it belongs to (freight, customs, an installer), which then carries it
+              as one of its expenses. Not offered when we were opened FROM an order: that order is
+              already the answer. */}
           <OrderLinkPicker
             workspaceId={workspaceId}
             value={link}
             onChange={setLink}
             currency={currency}
             allowMerge={false}
+            allowCostOf={!orderId}
             label="What is this for? (optional)"
           />
 

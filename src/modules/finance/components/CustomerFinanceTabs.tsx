@@ -28,6 +28,22 @@ import { SectionHeader } from '@/components/shared/SectionHeader';
 // create dialogs; the ids are what actually scope the created records.
 type Target = { contactId?: string; companyId?: string; customerName?: string };
 
+/**
+ * Column counts for the account top strip, keyed by how many tiles actually render.
+ *
+ * Spelled out rather than interpolated because Tailwind only ships classes it can see as literal
+ * strings — a computed `lg:grid-cols-${n}` compiles to nothing and the grid silently collapses to
+ * one column.
+ */
+const TOP_STRIP_SM: Record<number, string> = {
+  1: 'sm:grid-cols-1', 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3',
+  4: 'sm:grid-cols-2', 5: 'sm:grid-cols-3', 6: 'sm:grid-cols-3',
+};
+const TOP_STRIP_LG: Record<number, string> = {
+  1: 'lg:grid-cols-1', 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3',
+  4: 'lg:grid-cols-4', 5: 'lg:grid-cols-5', 6: 'lg:grid-cols-6',
+};
+
 
 /**
  * Shared presentational account summary — the single source of layout for a party's money
@@ -126,6 +142,15 @@ export const PartyAccountSummary: React.FC<{
     supplierOutstanding: supplier?.outstanding ?? 0,
   }) > 1;
   const showTopStrip = !!orders || showBalance || (!!meta && meta.length > 0);
+  /**
+   * How many tiles the strip will ACTUALLY render. The column count used to be a guess
+   * (`showCredit ? 6 : 5`) while the contents are four independent conditions — orders contributes
+   * three tiles, balance / credit / meta one each — so any party that didn't happen to match the
+   * guess got a hole at the end of the row. Counting what is about to render instead means the
+   * strip fills its width at 3, 4, 5 or 6 tiles, and there is no "missing last one" case left.
+   */
+  const topTiles = (orders ? 3 : 0) + (showCredit ? 1 : 0) + (showBalance ? 1 : 0)
+    + (meta && meta.length > 0 ? 1 : 0);
   const balanceInCustomer = showBalance && !showTopStrip && !!customer;
   const balanceInSupplier = showBalance && !showTopStrip && !customer && !!supplier;
   /** The orders roll-up already shows what we ordered — don't print it again per role. */
@@ -142,7 +167,7 @@ export const PartyAccountSummary: React.FC<{
           icon columns in one row. Rendered only when there's an orders roll-up or account meta;
           in the compact drill-down the Balance moves into the role row below (see below). */}
       {showTopStrip && (
-        <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 ${showCredit ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
+        <div className={`grid grid-cols-2 gap-3 ${TOP_STRIP_SM[topTiles]} ${TOP_STRIP_LG[topTiles]}`}>
           {orders && stat(<ShoppingCart className="h-3.5 w-3.5" />, 'Orders', orders.count, { title: 'Active (non-cancelled) orders for this party' })}
           {orders && stat(<Banknote className="h-3.5 w-3.5" />, 'Ordered', formatMoney(orders.ordered), { title: 'Total value of those orders (incl. VAT)' })}
           {orders && stat(<AlertCircle className="h-3.5 w-3.5" />, 'Owed on orders', formatMoney(orders.owedUninvoiced), { danger: orders.owedUninvoiced > 0, title: 'Cash still owed on orders that have NOT been invoiced yet (order total − payments). Once invoiced, it moves into the Balance below.' })}
@@ -156,7 +181,7 @@ export const PartyAccountSummary: React.FC<{
                 {onReleaseCredit && (
                   <button type="button" onClick={onReleaseCredit}
                     className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
-                    <Coins className="h-3 w-3" /> Release to income
+                    <Coins className="h-3 w-3" /> Release to Income
                   </button>
                 )}
               </CardContent>

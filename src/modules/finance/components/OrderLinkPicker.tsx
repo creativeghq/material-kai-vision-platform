@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, ChevronRight, ChevronDown, Plus, FolderOpen, Building2, User, GitMerge, Loader2 } from 'lucide-react';
+import { Search, ChevronRight, ChevronDown, Plus, FolderOpen, Building2, User, GitMerge, Link2, Loader2 } from 'lucide-react';
 
 import { Label } from '@/components/core/ui/label';
 import { Input } from '@/components/core/ui/input';
@@ -7,17 +7,21 @@ import { Button } from '@/components/core/ui/button';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import {
   ordersService, type OrderLinkTarget, type LinkTargetSearch, type LinkOrderSummary, type OrderType,
+  type OrderListRow,
 } from '@/modules/finance/services/ordersService';
 
 /**
  * "What is this for?" — one field answering the question a cost always has an answer to, whether
  * that answer is a project, a customer, or an order that already exists.
  *
- * The grouping is load-bearing, not decorative. Two rows here look almost identical — an existing
- * PURCHASE order and an existing SALES order — and they do opposite things:
+ * The grouping is load-bearing, not decorative. Three rows here look almost identical — an existing
+ * PURCHASE order to merge into, an existing SALES order, and a purchase order this cost merely
+ * rides along with — and they do three different things:
  *
- *   • a purchase order shares our supplier and our direction (money OUT), so the lines MERGE into it
+ *   • a purchase order for the SAME supplier shares our direction (money OUT), so the lines MERGE into it
  *   • a sales order settles on money IN, so it is only ever LINKED (`covers_order_id`)
+ *   • any other purchase order gets this cost as an EXPENSE on it (`supplier_bills.order_id`) —
+ *     freight, customs, an installer: costs OF a purchase, not purchases of their own
  *
  * Appending purchase lines to a customer's sales order would bill the customer what we paid our
  * supplier. `search_order_link_targets` is what decides which orders may be merged into, so the
@@ -44,19 +48,36 @@ export const OrderLinkPicker: React.FC<{
   allowRaiseCustomerOrder?: boolean;
   /** Offer merging into an existing order. */
   allowMerge?: boolean;
+  /**
+   * Offer "this is a cost OF an existing purchase order". Unlike merging, the target is NOT
+   * restricted to this party or to orders with no bill yet — the freight invoice that belongs to
+   * a purchase comes from the forwarder, not the supplier, and arrives after that purchase was
+   * billed. A caller that turns this on MUST handle `kind: 'cost_of_order'` by writing the
+   * expense's `order_id`, or the row does nothing.
+   */
+  allowCostOf?: boolean;
+  /**
+   * Inline mode: no stacked <Label>, control sized to sit in a toolbar row beside Status. Used on
+   * the order detail header, where "which project" is one more attribute of the order rather than
+   * a form field deserving its own block.
+   */
+  compact?: boolean;
   label?: string;
   disabled?: boolean;
   /** Rendered under the field when set — used to warn about lines that could not be priced. */
   hint?: React.ReactNode;
 }> = ({
   workspaceId, value, onChange, orderType, partyCompanyId, partyContactId, currency,
-  allowCustomer = true, allowRaiseCustomerOrder = true, allowMerge = true,
-  label = 'What is this for?', disabled, hint,
+  allowCustomer = true, allowRaiseCustomerOrder = true, allowMerge = true, allowCostOf = false,
+  compact = false, label = 'What is this for?', disabled, hint,
 }) => {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<LinkTargetSearch>({ projects: [], customers: [], merge_targets: [] });
+  /** Purchase orders this cost can ride along with — a plain order search, since "may I book an
+   *  expense on this order?" has no constraint beyond the workspace, which RLS already applies. */
+  const [costTargets, setCostTargets] = useState<OrderListRow[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
 
@@ -68,23 +89,27 @@ export const OrderLinkPicker: React.FC<{
     let cancelled = false;
     setBusy(true);
     const t = setTimeout(async () => {
-      try {
-        const r = await ordersService.searchLinkTargets({
+      const [targets, costs] = await Promise.all([
+        ordersService.searchLinkTargets({
           workspaceId, query,
           orderType: allowMerge ? orderType ?? null : null,
           partyCompanyId: allowMerge ? partyCompanyId ?? null : null,
           partyContactId: allowMerge ? partyContactId ?? null : null,
           currency: currency ?? null,
-        });
-        if (!cancelled) setRes(r);
-      } catch {
-        if (!cancelled) setRes({ projects: [], customers: [], merge_targets: [] });
-      } finally {
-        if (!cancelled) setBusy(false);
-      }
+        }).catch(() => ({ projects: [], customers: [], merge_targets: [] } as LinkTargetSearch)),
+        allowCostOf
+          ? ordersService.search({ workspaceId, orderType: 'purchase', search: query.trim() || undefined, limit: 8 })
+              .then((r) => r.rows.filter((o) => o.status !== 'cancelled'))
+              .catch(() => [] as OrderListRow[])
+          : Promise.resolve([] as OrderListRow[]),
+      ]);
+      if (cancelled) return;
+      setRes(targets);
+      setCostTargets(costs);
+      setBusy(false);
     }, 200);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [query, open, disabled, workspaceId, orderType, partyCompanyId, partyContactId, currency, allowMerge]);
+  }, [query, open, disabled, workspaceId, orderType, partyCompanyId, partyContactId, currency, allowMerge, allowCostOf]);
 
   useEffect(() => {
     if (!open) return;
@@ -104,7 +129,12 @@ export const OrderLinkPicker: React.FC<{
 
   const customers = allowCustomer ? res.customers : [];
   const mergeTargets = allowMerge ? res.merge_targets : [];
-  const empty = res.projects.length === 0 && customers.length === 0 && mergeTargets.length === 0;
+  // An order that may be MERGED into is offered as a merge and nothing else — the same row under
+  // two headings, doing two different things to the same order, is how the wrong one gets picked.
+  const costOfTargets = allowCostOf
+    ? costTargets.filter((o) => !mergeTargets.some((m) => m.id === o.id))
+    : [];
+  const empty = res.projects.length === 0 && customers.length === 0 && mergeTargets.length === 0 && costOfTargets.length === 0;
 
   const orderLine = (o: LinkOrderSummary) => (
     <>
@@ -117,14 +147,17 @@ export const OrderLinkPicker: React.FC<{
 
   if (value.kind !== 'none') {
     return (
-      <div className="space-y-1">
-        <Label>{label}</Label>
-        <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
-          <span className="text-sm">
-            <LinkKindWord kind={value.kind} />
-            <span className="ml-1.5">{value.label}</span>
+      <div className={compact ? '' : 'space-y-1'} ref={boxRef}>
+        {!compact && <Label>{label}</Label>}
+        <div className={`flex items-center justify-between rounded-md border border-border/60 ${compact ? 'h-8 gap-1 pl-2 pr-1 text-xs' : 'px-3 py-2'}`}>
+          <span className={compact ? 'truncate text-xs' : 'text-sm'}>
+            {!compact && <LinkKindWord kind={value.kind} />}
+            <span className={compact ? '' : 'ml-1.5'}>{value.label}</span>
           </span>
-          {!disabled && <Button size="sm" variant="ghost" onClick={() => onChange({ kind: 'none' })}>Change</Button>}
+          {!disabled && (
+            <Button size="sm" variant="ghost" className={compact ? 'h-6 px-1.5 text-[11px]' : ''}
+              onClick={() => onChange({ kind: 'none' })}>Change</Button>
+          )}
         </div>
         {hint}
       </div>
@@ -132,13 +165,13 @@ export const OrderLinkPicker: React.FC<{
   }
 
   return (
-    <div className="space-y-1" ref={boxRef}>
-      <Label>{label}</Label>
+    <div className={compact ? 'relative' : 'space-y-1'} ref={boxRef}>
+      {!compact && <Label>{label}</Label>}
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Search className={`absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground ${compact ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
         <Input
-          className="pl-7"
-          placeholder="Project, customer, or an order to add this to…"
+          className={compact ? 'h-8 w-48 pl-6 text-xs' : 'pl-7'}
+          placeholder={compact ? 'Link a project…' : 'Project, customer, or an order to add this to…'}
           value={query}
           disabled={disabled}
           onFocus={() => setOpen(true)}
@@ -260,6 +293,29 @@ export const OrderLinkPicker: React.FC<{
                 </div>
               </button>
             ))}
+
+            {costOfTargets.length > 0 && (
+              <GroupHeading icon={<Link2 className="h-3 w-3" />} text="A cost of an existing order" />
+            )}
+            {costOfTargets.map((o) => (
+              <button
+                key={`cost:${o.id}`}
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                onClick={() => pick({
+                  kind: 'cost_of_order', orderId: o.id, projectId: o.project_id ?? null,
+                  label: `${o.order_number ?? o.id.slice(0, 8)}${o.party_name ? ` · ${o.party_name}` : ''}`,
+                })}
+              >
+                <span className="font-medium">{o.order_number ?? o.id.slice(0, 8)}</span>
+                <span className="text-muted-foreground"> · {o.status}</span>
+                <span className="tabular-nums text-muted-foreground"> · {formatMoney(Number(o.total), o.currency)}</span>
+                {o.party_name && <span className="text-muted-foreground"> · {o.party_name}</span>}
+                <div className="text-[10px] text-muted-foreground">
+                  booked as an expense on this order · no second order, and its own lines are untouched
+                </div>
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -280,5 +336,6 @@ const LinkKindWord: React.FC<{ kind: OrderLinkTarget['kind'] }> = ({ kind }) => 
   if (kind === 'customer') return <span className="text-xs font-medium text-muted-foreground">New customer order</span>;
   if (kind === 'sales_order') return <span className="text-xs font-medium text-muted-foreground">For customer order</span>;
   if (kind === 'merge_order') return <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Merging into</span>;
+  if (kind === 'cost_of_order') return <span className="text-xs font-medium text-muted-foreground">A cost of</span>;
   return null;
 };

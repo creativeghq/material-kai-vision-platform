@@ -8,6 +8,7 @@ import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
@@ -487,6 +488,13 @@ export const NewOrderModal: React.FC<{
   // Sales orders are income, purchase orders are expense — offer the matching category kinds.
   const catOptions = categories.filter((c) => c.kind === (isSales ? 'income' : 'expense') || c.kind === 'both');
 
+  // A received document is not always a purchase of its own: freight, customs and an installer are
+  // costs OF a purchase already recorded. Those get booked ON that order — one field decides which
+  // it is, instead of a second menu entry the operator has to know about before opening this form.
+  // Only offered where the answer can actually be written: the expense lives on the document.
+  const costOfPossible = locked && !isSales && !!prefill?.inboundDocumentId;
+  const attachingToOrder = link.kind === 'cost_of_order';
+
   // A merge target was found FOR a specific party and currency. Change either and it is no longer a
   // legal target — the RPC would reject it on save, but silently keeping a stale chip on screen
   // would make that look like a bug rather than the consequence of the edit.
@@ -693,6 +701,38 @@ export const NewOrderModal: React.FC<{
 
   // status: 'draft' = pre-order (not yet committed); 'confirmed' = a live order.
   const save = async (status: OrderStatus) => {
+    // ── A cost OF an order that already exists ───────────────────────────────────────────────
+    // Nothing is created here: the document becomes an expense (or reuses the one it already
+    // became) and that expense carries `order_id`. Handled before every other check because none
+    // of them apply — no order is raised, so it needs no party, no lines and no stock. Raising one
+    // anyway would invent a second purchase for a cost that already has one and double-count it.
+    if (link.kind === 'cost_of_order' && prefill?.inboundDocumentId) {
+      setBusy(true);
+      try {
+        const billId = await linkOrderToDocument({ id: prefill.inboundDocumentId }, link.orderId);
+        let moneyNote: string | undefined;
+        if (paidNow) {
+          await financeService.paySupplierBill({
+            workspaceId,
+            supplierBillId: billId,
+            amount: grossTotal,
+            method: payMethod,
+            paidAt: new Date().toISOString(),
+            bankAccountId: payBankAccountId || null,
+            categoryId: categoryId === 'none' ? null : categoryId,
+          });
+          moneyNote = 'Expense settled.';
+        }
+        toast({
+          title: `Added to ${link.label}`,
+          description: ['This cost now counts on that order.', moneyNote].filter(Boolean).join(' '),
+        });
+        onCreated(link.orderId);
+      } catch (err: any) {
+        toast({ title: 'Could not add it to the order', description: err?.message, variant: 'destructive' });
+      } finally { setBusy(false); }
+      return;
+    }
     if (!party) { toast({ title: isSales ? 'Pick a customer' : 'Pick a supplier', variant: 'destructive' }); return; }
     const clean = items.filter((it) => it.description.trim() && (Number(it.quantity) || 0) > 0);
     if (clean.length === 0) { toast({ title: 'Add at least one product', variant: 'destructive' }); return; }
@@ -874,10 +914,13 @@ export const NewOrderModal: React.FC<{
 
           <div className="grid grid-cols-2 gap-3">
             {/* One field for "what is this for?". A project, a customer (raising or attaching their
-                order), or an existing order of the same kind to merge these lines into. Merge
-                candidates need the counterparty, so they only appear once a party is chosen; a
-                document-seeded order is never a merge source, because its lines are evidence for
-                the document that produced it and must stay on their own order. */}
+                order), an existing order of the same kind to merge these lines into, or — for a
+                document-seeded cost that RIDES ALONG with a purchase already recorded (freight,
+                customs, an installer) — that order, which then gains this as an expense instead of
+                a second order being invented for it. Merge candidates need the counterparty, so
+                they only appear once a party is chosen; a document-seeded order is never a merge
+                source, because its lines are evidence for the document that produced it and must
+                stay on their own order. */}
             <OrderLinkPicker
               workspaceId={workspaceId}
               value={link}
@@ -888,7 +931,14 @@ export const NewOrderModal: React.FC<{
               currency={currency}
               allowCustomer={!isSales}
               allowMerge={!locked && !!party}
+              allowCostOf={costOfPossible}
               label="What is this for? (optional)"
+              hint={attachingToOrder ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Nothing new is created: this document becomes an expense on that order. Its own
+                  lines and totals stay exactly as the supplier stated them.
+                </p>
+              ) : undefined}
             />
             <div className="space-y-1">
               <Label>Currency</Label>
@@ -1068,8 +1118,10 @@ export const NewOrderModal: React.FC<{
           {/* ── Into the warehouse ──────────────────────────────────────────────────────────
               A received document means the goods ALREADY arrived (this is often a ΤΔΑ, a delivery
               note), so stocking them is part of recording the order, not a later step someone has
-              to remember. Without this the order exists and the stock silently doesn't. */}
-          {!isSales && locked && (
+              to remember. Without this the order exists and the stock silently doesn't.
+              Hidden when the document is a cost OF another order — freight, customs and an
+              installer bring no goods, and that order's own stock arrived with its own document. */}
+          {!isSales && locked && !attachingToOrder && (
             <div className="space-y-2 rounded-md border border-border/60 p-3">
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox className="h-3.5 w-3.5 rounded" checked={receiveNow} onCheckedChange={(v) => setReceiveNow(v === true)} />
@@ -1177,9 +1229,11 @@ export const NewOrderModal: React.FC<{
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          {/* The kind was chosen in the New-order dropdown: draft → pre-order, else a live order. */}
+          {/* The kind was chosen in the New-order dropdown: draft → pre-order, else a live order.
+              Unless this is a cost of an order that already exists — then the button must not
+              promise an order it is deliberately not going to create. */}
           <Button onClick={() => save(preset.draft ? 'draft' : 'confirmed')} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} {preset.draft ? 'Save pre-order' : 'Create order'}
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} {attachingToOrder ? 'Add to the order' : preset.draft ? 'Save pre-order' : 'Create order'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1261,8 +1315,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const [showPayAudit, setShowPayAudit] = useState(false);
   // Purchase-order 3-way match (PO × goods received × supplier bill).
   const [match, setMatch] = useState<ThreeWayMatch | null>(null);
-  // Customer's on-account credit that could settle this sales order without new cash (#credit-apply).
-  const [applicableCredit, setApplicableCredit] = useState(0);
   // The order's own party (customer / supplier) name — the order row carries only the id, and the
   // header has to say WHO this order is with before it can offer to open their CRM record.
   const [partyName, setPartyName] = useState<string | null>(null);
@@ -1274,7 +1326,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       const productIds = res.items.map((it) => it.product_id).filter(Boolean) as string[];
       const supplierIds = res.items.map((it) => it.supplier_company_id).filter(Boolean) as string[];
       const partyRef = orderPartyRef(res.order);
-      const [finance, lp, names, exposure, accounts, audit, buyer, party, prodNames] = await Promise.all([
+      // Everything the panel needs, in ONE wave. `getThreeWayMatch` used to be awaited after this
+      // block and `getApplicableCredit` after that, so opening an order cost three sequential
+      // round-trips where one would do — the two stragglers depended on nothing in here.
+      const [finance, lp, names, exposure, accounts, audit, buyer, party, prodNames, threeWay] = await Promise.all([
         ordersService.getOrderFinance(id),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
         ordersService.getCompanyNames(supplierIds).catch(() => new Map<string, string>()),
@@ -1288,24 +1343,21 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
           : (partyRef.kind === 'company' ? ordersService.getCompanyNames([partyRef.id]) : ordersService.getContactNames([partyRef.id]))
               .then((m) => m.get(partyRef.id) ?? null).catch(() => null),
         ordersService.getProductNames(productIds).catch(() => new Map<string, string>()),
+        res.order.order_type === 'purchase'
+          ? ordersService.getThreeWayMatch(id).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setProductNames(prodNames);
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
       setBankAccounts(accounts); setPayAudit(audit); setBuyerIdentity(buyer); setPartyName(party);
-      setMatch(res.order.order_type === 'purchase'
-        ? await ordersService.getThreeWayMatch(id).catch(() => null)
-        : null);
-      // How much on-account credit could be applied to this sales order (drives the "apply credit" banner).
-      setApplicableCredit(res.order.order_type === 'sales'
-        ? await ordersService.getApplicableCredit(id, res.order.workspace_id).catch(() => 0)
-        : 0);
+      setMatch(threeWay);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setApplicableCredit(0); setPartyName(null); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setPartyName(null); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -1347,39 +1399,43 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   };
 
   /**
-   * Turn the order's stored link back into a picker value. Both halves are plain FK columns with no
-   * display name on them, so the label is resolved here rather than stored — a denormalized copy
-   * would be one more thing to keep in step with a rename.
+   * The inline Project control's value. `project_id` is a plain FK with no display name on it, so
+   * the label is resolved here rather than stored — a denormalized copy would be one more thing to
+   * keep in step with a rename.
+   *
+   * Project ONLY. An earlier version fed this control the order's full link, which resolved
+   * `covers_order_id` first and so printed a customer's order number underneath the word "Project".
+   * The covers link is shown by the "Covered by" block instead, from the side that reads naturally.
    */
-  const [linkValue, setLinkValue] = useState<OrderLinkTarget>({ kind: 'none' });
+  const [projectValue, setProjectValue] = useState<OrderLinkTarget>({ kind: 'none' });
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!order) { setLinkValue({ kind: 'none' }); return; }
-      if (order.covers_order_id) {
-        const { data } = await supabase.from('orders')
-          .select('id, order_number, project_id').eq('id', order.covers_order_id).maybeSingle();
-        if (cancelled) return;
-        setLinkValue({
-          kind: 'sales_order', orderId: order.covers_order_id,
-          projectId: (data?.project_id as string | null) ?? null,
-          label: (data?.order_number as string | null) ?? order.covers_order_id.slice(0, 8),
-        });
-        return;
-      }
-      if (order.project_id) {
-        const { data } = await supabase.from('projects').select('id, name').eq('id', order.project_id).maybeSingle();
-        if (cancelled) return;
-        setLinkValue({
-          kind: 'project', projectId: order.project_id,
-          label: (data?.name as string | null) ?? 'Project',
-        });
-        return;
-      }
-      setLinkValue({ kind: 'none' });
+      if (!order?.project_id) { setProjectValue({ kind: 'none' }); return; }
+      const { data } = await supabase.from('projects').select('id, name').eq('id', order.project_id).maybeSingle();
+      if (cancelled) return;
+      setProjectValue({
+        kind: 'project', projectId: order.project_id,
+        label: (data?.name as string | null) ?? 'Project',
+      });
     })();
     return () => { cancelled = true; };
-  }, [order?.id, order?.project_id, order?.covers_order_id]);
+  }, [order?.id, order?.project_id]);
+  /**
+   * Which reference tabs this order actually has content for, in reading order. Derived from the
+   * SAME conditions the panels themselves use, so a tab can never be offered with nothing behind
+   * it — and `orderTabs[0]` gives the default without hardcoding a tab that may not exist.
+   */
+  const orderTabs = useMemo(() => {
+    if (!order) return [] as string[];
+    const t: string[] = [];
+    if (supExposure.length > 0) t.push('suppliers');
+    if (fin && fin.invoices.length > 0) t.push('invoices');
+    if (fin) t.push('expenses');
+    if (fin && (fin.payments.length > 0 || fin.creditApplied.length > 0)) t.push('payments');
+    if (order.order_type === 'purchase' && match && match.match_status !== 'no_lines') t.push('match');
+    return t;
+  }, [order, supExposure, fin, match]);
 
   /**
    * The reverse view: purchase orders raised to cover THIS sale. `raise_cover_purchase_orders` has
@@ -1485,25 +1541,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // sales→in / purchase→out rule here; that duplication is what produced the €945 bug.
   const orderSettled = () => fin?.settled ?? 0;
 
-  // Settle this sales order from the customer's on-account credit — no new cash. Re-homes existing
-  // "money in" onto the order (server-side, split-safe); the order flips to paid/partial via trigger.
-  const applyCredit = async () => {
-    if (!order) return;
-    const outstanding = Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100);
-    const willApply = Math.min(applicableCredit, outstanding);
-    if (willApply <= 0.005) return;
-    if (!window.confirm(`Apply ${formatMoney(willApply, order.currency)} of ${order.customer_company_id || order.customer_contact_id ? 'this customer’s' : 'the'} account credit to this order? This settles the order from money the customer already paid — no cash moves. To record the cost of the goods, add an expense.`)) return;
-    setSaving(true);
-    try {
-      const applied = await ordersService.applyCreditToOrder(order.id, order.workspace_id, willApply);
-      await load(order.id);
-      onChanged();
-      toast({ title: applied > 0 ? `Applied ${formatMoney(applied, order.currency)} from credit` : 'Nothing to apply' });
-    } catch (err: any) {
-      toast({ title: 'Failed to apply credit', description: err?.message, variant: 'destructive' });
-    } finally { setSaving(false); }
-  };
-
   /**
    * Spending the customer's money on the customer's job draws their held balance down.
    *
@@ -1589,18 +1626,26 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     try {
       const { data, error } = await supabase.rpc('receive_order_into_warehouse', { p_order: order.id });
       if (error) throw error;
-      const res = (data ?? {}) as { received?: number; skipped?: number; skipped_lines?: string[] };
+      const res = (data ?? {}) as { received?: number; skipped?: number; skipped_lines?: string[]; services?: number };
       const received = Number(res.received ?? 0);
       const skipped = Number(res.skipped ?? 0);
+      // Lines deliberately marked off-warehouse: delivered, never stocked. Counted separately so a
+      // services-only order stops reporting a correct run as "0 warehouse line(s) updated" — the
+      // silent zero that reads as failure.
+      const services = Number(res.services ?? 0);
       await load(order.id); onChanged();
       // A line with no catalog product cannot become stock. Say which ones, loudly — reporting
       // a flat "0 lines updated" as success is exactly how goods go missing from the warehouse.
+      const did = [
+        received > 0 ? `${received} line(s) stocked` : null,
+        services > 0 ? `${services} off-warehouse line(s) delivered` : null,
+      ].filter(Boolean).join(' · ');
       toast({
-        title: skipped > 0 ? (received > 0 ? 'Partly received' : 'Nothing received') : 'Received',
+        title: skipped > 0 ? (received + services > 0 ? 'Partly received' : 'Nothing received') : 'Received',
         description: skipped > 0
-          ? `${received} line(s) stocked · ${skipped} skipped with no catalog product: ${(res.skipped_lines ?? []).join(', ')}. Link them to a product, then receive again.`
-          : `${received} warehouse line(s) updated`,
-        variant: received === 0 && skipped > 0 ? 'destructive' : undefined,
+          ? `${did || 'Nothing stocked'} · ${skipped} skipped with no catalog product: ${(res.skipped_lines ?? []).join(', ')}. Open the line and link a product — or mark it off-warehouse if it isn’t stock.`
+          : (did || 'Everything on this order was already received.'),
+        variant: received + services === 0 && skipped > 0 ? 'destructive' : undefined,
       });
       // #237 — notify via Flows that the PO arrived (allocations flipped to reserved).
       if (order.order_type === 'purchase') {
@@ -1608,7 +1653,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         void flowEventService.emit('purchase_order.received', {
           user_id: u?.user?.id ?? null,
           title: `Purchase order ${order.order_number ?? order.id.slice(0, 8)} received`,
-          body: `${received} warehouse line(s) updated${skipped > 0 ? ` · ${skipped} skipped (no catalog product)` : ''}`,
+          body: `${did || 'Nothing stocked'}${skipped > 0 ? ` · ${skipped} skipped (no catalog product)` : ''}`,
           action_url: `/finance/orders/${order.id}`,
           order_id: order.id,
           order_number: order.order_number,
@@ -1722,7 +1767,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     ? Math.round((items.reduce((a, it) => a + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0), 0) - Number(order.subtotal_net)) * 100) / 100
     : 0;
   const outstanding = order ? Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100) : 0;
-  const creditToApply = Math.min(applicableCredit, outstanding);
   // B2B issues an invoice, a consumer a retail receipt. Derived from the buyer's VAT identity via
   // the SHARED rule — this used to be `order?.customer_company_id ? 'invoice' : 'receipt'`, which
   // called a sole trader (a contact carrying an ΑΦΜ) retail and proposed an ΑΛΠ to a business.
@@ -1764,6 +1808,25 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               <span className={`text-sm font-semibold capitalize ${order.order_type === 'sales' ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`}>{order.order_type}</span>
               <span className="text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[order.payment_status]}</span>
               <div className="ml-auto flex flex-wrap items-center gap-2">
+                {/* Which project this order belongs to — inline, ahead of Status. Only projects are
+                    offered: the order already knows its party, so re-picking one here would just be
+                    a second way to say something the order header states above. */}
+                <Label className="text-xs text-muted-foreground">Project</Label>
+                <OrderLinkPicker
+                  workspaceId={order.workspace_id}
+                  value={projectValue}
+                  onChange={(v) => {
+                    setProjectValue(v);
+                    if (v.kind === 'project') void saveMeta({ projectId: v.projectId });
+                    else if (v.kind === 'none') void saveMeta({ projectId: null });
+                  }}
+                  currency={order.currency}
+                  allowCustomer={false}
+                  allowMerge={false}
+                  allowCostOf={false}
+                  compact
+                  disabled={saving}
+                />
                 <Label className="text-xs text-muted-foreground">Status</Label>
                 <Select value={order.status} onValueChange={(v: any) => changeStatus(v)}>
                   <SelectTrigger className="h-8 w-44 text-xs" disabled={saving}><SelectValue /></SelectTrigger>
@@ -1820,13 +1883,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       <Link2 className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-muted-foreground" />
                       <span className="flex flex-col"><span>Attach an existing expense</span><span className="text-[10px] text-muted-foreground">Put a cost you already booked onto this order.</span></span>
                     </DropdownMenuItem>
-                    {/* Settle from the customer's on-account credit — no new cash movement. */}
-                    {order.order_type === 'sales' && creditToApply > 0.005 && (
-                      <DropdownMenuItem className="items-start" onClick={applyCredit}>
-                        <Banknote className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />
-                        <span className="flex flex-col"><span>Pay from account credit</span><span className="text-[10px] text-muted-foreground">Use {formatMoney(creditToApply, order.currency)} of this customer’s existing credit.</span></span>
-                      </DropdownMenuItem>
-                    )}
+                    {/* "Pay from account credit" was here. Money received now lands on what is owed
+                        by itself, so an order with the customer's cash available against it is
+                        already settled by the time this menu opens — and asking the operator to
+                        apply it by hand was the whole complication we removed. */}
                     <DropdownMenuSeparator />
                     {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
                       <DropdownMenuItem onClick={createInvoice}>
@@ -1887,20 +1947,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </div>
             </div>
 
-            {/* On-account credit available to settle this order without new cash. Shows whenever the
-                customer has unapplied "money in" and the order still has a balance. */}
-            {order.order_type === 'sales' && applicableCredit > 0.005 && outstanding > 0.005 && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2">
-                <span className="text-sm flex items-center gap-2">
-                  <Banknote className="h-4 w-4 text-emerald-600 shrink-0" />
-                  <span>This customer has <span className="font-semibold">{formatMoney(applicableCredit, order.currency)}</span> on account — settle this order from it, no new cash needed.</span>
-                </span>
-                <Button size="sm" className="h-8" onClick={applyCredit} disabled={saving}>
-                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : `Apply ${formatMoney(creditToApply, order.currency)}`}
-                </Button>
-              </div>
-            )}
-
+            {/* The "apply this customer's credit" banner used to live here. Money received now lands
+                on what is owed by itself (`auto_allocate_workspace`), so there is nothing left for
+                an operator to notice and apply — an order with cash available against it is simply
+                already settled by the time this panel renders. */}
             {/* Classification + expected payment — settable before the order is invoiced so it shows
                 a category and ages in Receivables/Payables (both carry onto the invoice/bill). */}
             <div className="flex flex-wrap items-end gap-4 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
@@ -1934,42 +1984,22 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               )}
             </div>
 
-            {/* What this order is FOR. Merging is not offered here — these lines already belong to
-                this order, so the only thing left to change is what it is attributed to. */}
-            <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-              <div className="max-w-md">
-                <OrderLinkPicker
-                  workspaceId={order.workspace_id}
-                  value={linkValue}
-                  onChange={(v) => {
-                    setLinkValue(v);
-                    if (v.kind === 'project') void saveMeta({ projectId: v.projectId, coversOrderId: null });
-                    else if (v.kind === 'sales_order') void saveMeta({ projectId: v.projectId, coversOrderId: v.orderId });
-                    else if (v.kind === 'none') void saveMeta({ projectId: null, coversOrderId: null });
-                  }}
-                  currency={order.currency}
-                  allowMerge={false}
-                  allowCustomer={order.order_type === 'purchase'}
-                  // This panel can re-point an existing order, not raise a second one alongside it.
-                  allowRaiseCustomerOrder={false}
-                  disabled={saving}
-                  label="What this order is for"
-                />
-              </div>
-              {coveredBy.length > 0 && (
-                <div className="mt-2 border-t border-border/40 pt-2">
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Covered by</span>
-                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                    {coveredBy.map((po) => (
-                      <Link key={po.id} to={`/finance/orders/${po.id}`} className="text-xs hover:underline">
-                        <span className="font-medium">{po.order_number ?? po.id.slice(0, 8)}</span>
-                        <span className="text-muted-foreground"> · {po.status} · {formatMoney(Number(po.total), po.currency)}</span>
-                      </Link>
-                    ))}
-                  </div>
+            {/* The project link moved inline into the header row above (beside Status), so all that
+                remains here is the reverse view: which purchase orders were raised to cover this
+                sale. Rendered only when there are any. */}
+            {coveredBy.length > 0 && (
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Covered by</span>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                  {coveredBy.map((po) => (
+                    <Link key={po.id} to={`/finance/orders/${po.id}`} className="text-xs hover:underline">
+                      <span className="font-medium">{po.order_number ?? po.id.slice(0, 8)}</span>
+                      <span className="text-muted-foreground"> · {po.status} · {formatMoney(Number(po.total), po.currency)}</span>
+                    </Link>
+                  ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {!editing ? (
               <>
@@ -1991,12 +2021,34 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     return (
                     <div key={it.id} className={`grid ${isSalesOrder ? 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px]' : 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_96px]'} gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center ${isSalesOrder ? 'min-w-[1040px]' : 'min-w-[760px]'}`}>
                       <span className="min-w-0">
-                        <span className="block truncate">{it.description}{!it.update_warehouse && <span className="ml-1 text-[10px] text-muted-foreground">(off-warehouse)</span>}</span>
+                        <span className="block truncate">{it.description}</span>
                         {/* #6/#7 — who supplies this line (and therefore who we owe). Only a SALES
                             order mixes suppliers across lines; on a PURCHASE order every line comes
                             from the order's own supplier, already chosen when the order was raised,
                             so asking again per line is work with no possible second answer. */}
                         <span className="inline-flex items-center gap-2">
+                          {/* What this line IS to the warehouse. A line flagged for stock but
+                              pointing at no product cannot be received — `receive_order_into_
+                              warehouse` skips it — so the gap is stated ON the line, next to the
+                              fix, rather than discovered as a red toast after the fact. Unlike the
+                              figures above, this stays editable once a bill exists: it is not a
+                              figure, and locking it is what made the skip unfixable. */}
+                          {it.update_warehouse && !it.product_id ? (
+                            <button type="button" className="text-[10px] text-amber-600 hover:underline inline-flex items-center gap-0.5"
+                              disabled={saving} onClick={() => setStockPick(it)}>
+                              <AlertTriangle className="h-2.5 w-2.5" /> not in catalog — won’t be stocked
+                            </button>
+                          ) : !it.update_warehouse ? (
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
+                              disabled={saving} onClick={() => setStockPick(it)}>
+                              <Unlink className="h-2.5 w-2.5" /> off-warehouse
+                            </button>
+                          ) : (
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
+                              disabled={saving} onClick={() => setStockPick(it)}>
+                              <Package className="h-2.5 w-2.5" /> {(it.product_id && productNames.get(it.product_id)) || 'in catalog'}
+                            </button>
+                          )}
                           {order.order_type === 'sales' && (
                             <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ itemId: it.id, productId: it.product_id ?? null, label: it.description, currentId: it.supplier_company_id ?? null })}>
                               {supName ? <><Building2 className="h-2.5 w-2.5" /> {supName}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
@@ -2162,7 +2214,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               if (!hasGap) return null;
               return (
                 <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs space-y-1">
-                  <div className="font-medium text-muted-foreground mb-1.5">Earned vs collected</div>
+                  <div className="font-medium text-muted-foreground mb-1.5">Earned vs Collected</div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Margin earned (net)</span><span className={`tabular-nums ${orderMargin >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>{formatMoney(orderMargin, order.currency)}</span></div>
                   {outstanding > 0.005 && (
                     <div className="flex justify-between"><span className="text-muted-foreground">— customer still to pay</span><span className="tabular-nums text-amber-600 dark:text-amber-400">{formatMoney(outstanding, order.currency)}</span></div>
@@ -2176,6 +2228,22 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               );
             })()}
 
+            {/* Everything below "Earned vs Collected" is REFERENCE material — the documents and
+                cash behind the figures above. Stacked, it was several screens of scrolling to reach
+                the payments list. Tabbed, each is one click and the order's own summary stays put.
+                A tab appears only when it has something in it, so an order with no invoices does
+                not offer an empty Invoices tab. */}
+            {orderTabs.length > 0 && (
+            <Tabs defaultValue={orderTabs[0]} className="w-full">
+              <TabsList>
+                {orderTabs.includes('suppliers') && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
+                {orderTabs.includes('invoices') && <TabsTrigger value="invoices">Invoices</TabsTrigger>}
+                {orderTabs.includes('expenses') && <TabsTrigger value="expenses">Expenses</TabsTrigger>}
+                {orderTabs.includes('payments') && <TabsTrigger value="payments">Payments</TabsTrigger>}
+                {orderTabs.includes('match') && <TabsTrigger value="match">3-Way Match</TabsTrigger>}
+              </TabsList>
+
+              <TabsContent value="suppliers" className="mt-3 space-y-3">
             {/* What we owe suppliers on this order — line costs grouped by the line's supplier,
                 minus money-out already paid to them. "Pay" pre-fills a money-out for the balance. */}
             {supExposure.length > 0 && (
@@ -2204,6 +2272,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </div>
             )}
 
+              </TabsContent>
+
+              <TabsContent value="invoices" className="mt-3 space-y-3">
             {/* Attached invoices */}
             {fin && fin.invoices.length > 0 && (
               <div className="rounded-md border border-border/60">
@@ -2217,6 +2288,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </div>
             )}
 
+              </TabsContent>
+
+              <TabsContent value="expenses" className="mt-3 space-y-3">
             {/* Every expense attached to this order — the supplier's own bill plus any extra cost
                 put on it. Many per order by design (`supplier_bills.order_id` is not unique), so
                 the header carries the count and the attach action, and each row can be detached
@@ -2265,6 +2339,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </div>
             )}
 
+              </TabsContent>
+
+              <TabsContent value="payments" className="mt-3 space-y-3">
             {/* Attached payments */}
             {fin && (fin.payments.length > 0 || fin.creditApplied.length > 0) && (
               <div className="rounded-md border border-border/60">
@@ -2349,9 +2426,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               receipt/invoice is the separate Create document action.
             </p>
 
-            {/* 3-way match — purchase orders only: PO cost × goods received × supplier bill. Sits
-                directly above the note as the last read-only block: it is a verdict on everything
-                above it, so it only makes sense once the lines, cash and delivery state are read. */}
+              </TabsContent>
+
+              {/* A verdict on everything else in this dialog, so it reads last. */}
+              <TabsContent value="match" className="mt-3 space-y-3">
+            {/* 3-way match — purchase orders only: PO cost × goods received × supplier bill. */}
             {order.order_type === 'purchase' && match && match.match_status !== 'no_lines' && (
               <div className="rounded-md border border-border/60 p-3 space-y-2">
                 <div className="flex items-center gap-2">
@@ -2407,8 +2486,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </div>
             )}
 
-            {/* Order note — moved below payments to keep the top of the order clean. Captured when the
-                order is placed; prints on the invoice + receipt. */}
+              </TabsContent>
+            </Tabs>
+            )}
+
+            {/* Order note — stays OUTSIDE the tabs: it belongs to the order itself, not to any one
+                of the documents behind it, and burying it in a tab would hide the field people
+                actually type into. Captured when the order is placed; prints on invoice + receipt. */}
             <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
               <Label className="text-[10px] text-muted-foreground">Order note</Label>
               <Textarea
@@ -2437,6 +2521,21 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
           currentName={supplierPick.currentId ? (supplierNames.get(supplierPick.currentId) ?? null) : null}
           onClose={() => setSupplierPick(null)}
           onPick={(companyId) => void setLineSupplier(supplierPick.itemId, supplierPick.productId, companyId)}
+        />
+      )}
+
+      {stockPick && order && (
+        <LineStockDialog
+          workspaceId={order.workspace_id}
+          label={stockPick.description}
+          unitCode={stockPick.measurement_unit_code ?? null}
+          unitCost={stockPick.unit_cost != null ? Number(stockPick.unit_cost) : null}
+          currentProductId={stockPick.product_id ?? null}
+          currentProductName={stockPick.product_id ? (productNames.get(stockPick.product_id) ?? null) : null}
+          updateWarehouse={stockPick.update_warehouse}
+          supplierCompanyId={stockPick.supplier_company_id ?? order.supplier_company_id ?? null}
+          onClose={() => setStockPick(null)}
+          onApply={(patch, note) => void setLineStock(stockPick.id, patch, note)}
         />
       )}
     </Dialog>

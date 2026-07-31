@@ -6,12 +6,14 @@ export type OrderType = 'sales' | 'purchase';
 export type OrderStatus = 'draft' | 'confirmed' | 'partially_fulfilled' | 'fulfilled' | 'cancelled';
 export type OrderPaymentStatus = 'unpaid' | 'partial' | 'paid';
 
+// Title Case, per the platform-wide heading rule in .claude/design-system.md — these render as
+// status VALUES in tables and on the order header, not as sentences.
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
-  draft: 'Pre-order', confirmed: 'Confirmed', partially_fulfilled: 'Partially delivered',
+  draft: 'Pre-Order', confirmed: 'Confirmed', partially_fulfilled: 'Partially Delivered',
   fulfilled: 'Completed', cancelled: 'Cancelled',
 };
 export const ORDER_PAYMENT_LABEL: Record<OrderPaymentStatus, string> = {
-  unpaid: 'Unpaid', partial: 'Partially paid', paid: 'Paid',
+  unpaid: 'Unpaid', partial: 'Partially Paid', paid: 'Paid',
 };
 
 export interface Order {
@@ -171,14 +173,18 @@ export interface LinkTargetSearch {
 }
 
 /**
- * What a cost is FOR. One field in the UI, four resolutions — every one of which writes a column
+ * What a cost is FOR. One field in the UI, five resolutions — every one of which writes a column
  * that already existed; this adds vocabulary, not schema.
  *
- * The distinction that matters is `merge_purchase` vs `sales_order`. Both read as "add it to an
- * order I already have", but only the first is a merge. A purchase order shares our supplier and
- * our direction (money OUT), so its lines and ours belong on one document. A customer's sales order
- * settles on money IN — appending our costs there would bill the customer what we paid. So a sales
- * order is LINKED (`covers_order_id`) and never written into.
+ * The distinction that matters is `merge_order` vs `sales_order` vs `cost_of_order`. All three read
+ * as "add it to an order I already have", and they write three different things:
+ *   • `merge_order` — the same party and the same direction, so the LINES join that order.
+ *   • `sales_order` — settles on money IN. Appending our costs there would bill the customer what
+ *     we paid, so it is LINKED (`covers_order_id`) and never written into.
+ *   • `cost_of_order` — this cost RIDES ALONG with a purchase already recorded (freight, customs,
+ *     an installer, often from a different supplier entirely). It becomes an EXPENSE on that order
+ *     (`supplier_bills.order_id`); no order is created and no line is appended, because the cost is
+ *     not part of what that order bought. An order holds as many expenses as the job needed.
  */
 export type OrderLinkTarget =
   | { kind: 'none' }
@@ -188,7 +194,9 @@ export type OrderLinkTarget =
   /** Attach to a sales order that already exists — sets `covers_order_id`, inherits its project. */
   | { kind: 'sales_order'; orderId: string; projectId: string | null; label: string }
   /** Append the lines to an existing order of the SAME type and party, instead of raising a new one. */
-  | { kind: 'merge_order'; orderId: string; orderType: OrderType; projectId: string | null; label: string };
+  | { kind: 'merge_order'; orderId: string; orderType: OrderType; projectId: string | null; label: string }
+  /** Book this cost as an expense ON an existing purchase order — `supplier_bills.order_id`. */
+  | { kind: 'cost_of_order'; orderId: string; projectId: string | null; label: string };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -470,22 +478,6 @@ export const ordersService = {
     const d = data as unknown as ThreeWayMatch & { error?: string };
     if (!d || d.error) return null;
     return d;
-  },
-
-  /** Purchase orders for a supplier that a bill can be matched against. Capped at 500 (was 50 —
-   *  a long-standing supplier's older POs fell off the picker entirely). */
-  async listPurchaseOrdersForSupplier(workspaceId: string, supplierCompanyId: string): Promise<Array<{ id: string; order_number: string | null; total: number; three_way_match_status: string | null }>> {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('id, order_number, total, three_way_match_status')
-      .eq('workspace_id', workspaceId)
-      .eq('order_type', 'purchase')
-      .eq('supplier_company_id', supplierCompanyId)
-      .neq('status', 'cancelled')
-      .order('created_at', { ascending: false })
-      .limit(500);
-    if (error) throw error;
-    return (data ?? []) as Array<{ id: string; order_number: string | null; total: number; three_way_match_status: string | null }>;
   },
 
   async create(input: {

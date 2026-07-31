@@ -12,9 +12,9 @@
  * operator would get from Add Company or the refresh button on the company record. It used
  * to run ΑΑΔΕ only, which is why inbox-created issuers had no Γ.Ε.ΜΗ. number or website.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, PackagePlus, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet, ShoppingCart, Link2, Search } from 'lucide-react';
+import { MoreVertical, Building2, PackagePlus, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet, ShoppingCart } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -30,10 +30,6 @@ import { companiesAPI } from '@/services/crm.service';
 import { researchCompany, greekAfm, summarizeResearch, missingSoftIdentity } from '@/modules/crm/services/companyResearch';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
 import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
-import { linkOrderToDocument } from '@/modules/finance/utils/inboundToOrder';
-import { ordersService, ORDER_STATUS_LABEL, type OrderListRow } from '@/modules/finance/services/ordersService';
-import { formatMoney } from '@/modules/finance/services/financeService';
-import { statusTone } from '@/utils/statusTone';
 
 interface Props {
   doc: InboundDocument;
@@ -44,7 +40,9 @@ interface Props {
   crmCompanyId?: string;
   /** Open this document's payments. READ-only — it must not convert the document. */
   onRecordPayment: () => void;
-  /** Seed a purchase order from this document's lines. Absent → the entry isn't offered. */
+  /** Open the order form seeded from this document's lines — where "what is this for?" decides
+   *  between raising the purchase and booking it onto one that already exists (freight, customs,
+   *  an installer). Absent → the entry isn't offered. */
   onCreateOrder?: () => void;
   /** This document already produced an order — offered as done rather than repeated. */
   hasOrder?: boolean;
@@ -78,55 +76,6 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
 
   // Read-only view of the document exactly as AADE holds it.
   const [previewOpen, setPreviewOpen] = useState(false);
-
-  // ---- Add to an EXISTING order ----
-  // "Add to Expenses" always creates a fresh order, which is right for the goods themselves and
-  // wrong for everything that rides along with them: the freight invoice that arrives a week
-  // later, customs, an installer. Those are costs OF a purchase already recorded, and giving each
-  // one its own order both invents an order that never happened and hides the real cost of the
-  // one that did. An order holds MANY expenses, so the document joins the order that exists.
-  const [attachOpen, setAttachOpen] = useState(false);
-  const [orderSearch, setOrderSearch] = useState('');
-  const [orderRows, setOrderRows] = useState<OrderListRow[]>([]);
-  const [orderLoading, setOrderLoading] = useState(false);
-  const [attaching, setAttaching] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!attachOpen) return;
-    setOrderLoading(true);
-    const t = setTimeout(async () => {
-      try {
-        // Purchase orders only — an expense on a SALES order is booked from that order's own
-        // "Add expense", where the sale is the context. Nothing from the myDATA inbox belongs there.
-        const res = await ordersService.search({
-          workspaceId, orderType: 'purchase', search: orderSearch.trim() || undefined, limit: 25,
-        });
-        setOrderRows(res.rows.filter((o) => o.status !== 'cancelled'));
-      } catch (err: unknown) {
-        toast({ title: 'Could not load orders', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
-      } finally { setOrderLoading(false); }
-    }, 250);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attachOpen, orderSearch, workspaceId]);
-
-  const attachToOrder = async (order: OrderListRow) => {
-    setAttaching(order.id);
-    try {
-      // The SAME helper the "create the order" path uses — the document becomes an expense (or
-      // reuses the one it already became) and that expense carries `order_id`. One way to write
-      // the link, whether the order is new or existing.
-      await linkOrderToDocument(doc, order.id);
-      toast({
-        title: 'Added to the order',
-        description: `This expense now counts on order ${order.order_number ?? order.id.slice(0, 8)}.`,
-      });
-      setAttachOpen(false);
-      onChanged?.();
-    } catch (err: unknown) {
-      toast({ title: 'Could not attach', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
-    } finally { setAttaching(null); }
-  };
 
   // ---- Add issuer → CRM supplier dialog ----
   const [crmOpen, setCrmOpen] = useState(false);
@@ -272,17 +221,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             {!hasOrder && (
               <span className="pl-6 text-[10px] text-muted-foreground">
                 The whole purchase in one step: the order, the expense against it, the goods into the warehouse, and the payment if you tick “Mark as paid”. Each is a tick you can turn off.
-              </span>
-            )}
-          </DropdownMenuItem>
-          {/* The other shape of the same act: this document is a cost OF a purchase that is
-              already recorded (freight, customs, an installer), not a purchase of its own. It
-              becomes an expense on that order instead of spawning a second one. */}
-          <DropdownMenuItem onClick={() => setAttachOpen(true)} disabled={hasOrder || doc.status === 'dismissed'} className="flex-col items-start gap-0.5">
-            <span className="flex items-center"><Link2 className="h-4 w-4 mr-2" /> Add to an existing order</span>
-            {!hasOrder && (
-              <span className="pl-6 text-[10px] text-muted-foreground">
-                For a cost that belongs to a purchase you already have — freight, customs, an installer. No second order is created.
+                Riding along with a purchase you already have — freight, customs, an installer? Name that order in “What is this for?” and no second one is created.
               </span>
             )}
           </DropdownMenuItem>
@@ -301,65 +240,6 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
       </DropdownMenu>
 
       <InboundDocPreviewDialog doc={doc} open={previewOpen} onOpenChange={setPreviewOpen} />
-
-      {/* Pick the purchase order this cost belongs to. */}
-      <Dialog open={attachOpen} onOpenChange={setAttachOpen}>
-        <DialogContent className="sm:max-w-xl" onClick={(e) => e.stopPropagation()}>
-          <DialogHeader>
-            <DialogTitle className="font-display flex items-center gap-2"><Link2 className="h-4 w-4" /> Add to an existing order</DialogTitle>
-            <DialogDescription>
-              {doc.issuer_name ?? doc.issuer_vat ?? 'This document'} becomes an expense on the order you pick.
-              The order keeps its own supplier bill — an order holds as many expenses as the job needed.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={orderSearch}
-              onChange={(e) => setOrderSearch(e.target.value)}
-              placeholder="Search purchase orders by number or supplier…"
-              className="pl-8"
-            />
-          </div>
-
-          <div className="max-h-[45vh] overflow-y-auto rounded-md border border-border/60">
-            {orderLoading ? (
-              <div className="flex items-center justify-center gap-2 px-3 py-8 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading orders…
-              </div>
-            ) : orderRows.length === 0 ? (
-              <p className="px-3 py-8 text-center text-sm text-muted-foreground">
-                {orderSearch.trim() ? 'No purchase order matches that search.' : 'No purchase orders yet — use “Add to Expenses” to create the first one.'}
-              </p>
-            ) : orderRows.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                disabled={!!attaching}
-                onClick={() => void attachToOrder(o)}
-                className="flex w-full items-center justify-between gap-2 border-t border-border/40 px-3 py-2 text-left text-sm first:border-t-0 hover:bg-muted/40 disabled:opacity-60"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate">
-                    <span className="font-mono text-xs">{o.order_number ?? o.id.slice(0, 8)}</span>
-                    {o.party_name && <span className="text-muted-foreground"> · {o.party_name}</span>}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {new Date(o.created_at).toLocaleDateString()}
-                    {' · '}<span className={statusTone(o.status)}>{ORDER_STATUS_LABEL[o.status] ?? o.status}</span>
-                  </span>
-                </span>
-                <span className="shrink-0 tabular-nums">
-                  {attaching === o.id
-                    ? <Loader2 className="h-4 w-4 animate-spin" />
-                    : formatMoney(Number(o.total), o.currency)}
-                </span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Add issuer → CRM supplier */}
       <Dialog open={crmOpen} onOpenChange={setCrmOpen}>
