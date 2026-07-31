@@ -25,6 +25,12 @@ export interface TimelineItem {
   created_at: string;
   actor_id: string | null;
   actor_name?: string | null;
+  /** Document value (order/invoice/payment/… total) when the event has one. */
+  amount?: number | null;
+  currency?: string | null;
+  /** The document behind a derived event — lets the feed link out to it. */
+  entity_kind?: string | null;
+  entity_id?: string | null;
 }
 
 class CrmActivitiesService {
@@ -55,64 +61,37 @@ class CrmActivitiesService {
   }
 
   /**
-   * Merged timeline = activity rows (excluding note_added, since notes are pulled
-   * straight from crm_notes here) + the contact/company's notes, newest-first.
-   * This is what the unified Activity view renders.
+   * The record's full timeline, from `crm_record_timeline` — the SINGLE definition of
+   * what counts as activity on a CRM party. Business events (quotes, orders, invoices,
+   * supplier bills, payments in and out, credit notes, shipments) are DERIVED from the
+   * documents themselves; crm_activities / crm_notes / crm_meetings supply only the
+   * entries that have no document (notes, calls, emails sent, lead status changes).
+   *
+   * Never re-assemble this feed here: a write-log of business events goes stale the
+   * moment a document is edited or deleted — the log this replaced was still showing
+   * four "Invoice created" entries for invoices that no longer existed.
    */
   async listTimeline(target: CrmActivityTarget, limit = 200): Promise<TimelineItem[]> {
-    const [actRes, noteRes, meetRes] = await Promise.all([
-      supabase
-        .from('crm_activities')
-        .select('id, activity_type, title, description, actor_user_id, created_at')
-        .eq('target_kind', target.kind)
-        .eq('target_id', target.id)
-        .neq('activity_type', 'note_added')
-        .order('created_at', { ascending: false })
-        .limit(limit),
-      supabase
-        .from('crm_notes')
-        .select('id, body, created_by, created_at')
-        .eq('target_kind', target.kind)
-        .eq('target_id', target.id)
-        .order('created_at', { ascending: false })
-        .limit(limit),
-      supabase
-        .from('crm_meetings')
-        .select('id, subject, notes, meeting_at, owner_user_id, created_at')
-        .eq('target_kind', target.kind)
-        .eq('target_id', target.id)
-        .neq('status', 'cancelled')
-        .order('created_at', { ascending: false })
-        .limit(limit),
-    ]);
-    const acts = (actRes.data || []) as Array<{ id: string; activity_type: string; title: string; description: string | null; actor_user_id: string | null; created_at: string }>;
-    const notes = (noteRes.data || []) as Array<{ id: string; body: string; created_by: string | null; created_at: string }>;
-    const meets = (meetRes.data || []) as Array<{ id: string; subject: string | null; notes: string | null; meeting_at: string; owner_user_id: string | null; created_at: string }>;
-
-    const items: TimelineItem[] = [
-      ...acts.map((a) => ({
-        id: `a-${a.id}`, source: 'activity' as const, activity_type: a.activity_type,
-        title: a.title, description: a.description, created_at: a.created_at, actor_id: a.actor_user_id,
-      })),
-      ...notes.map((n) => ({
-        id: `n-${n.id}`, source: 'note' as const, activity_type: 'note_added',
-        title: 'Note', description: n.body, created_at: n.created_at, actor_id: n.created_by,
-      })),
-      ...meets.map((m) => ({
-        id: `m-${m.id}`, source: 'activity' as const, activity_type: 'meeting_logged',
-        title: `${m.subject || 'Meeting'} — ${new Date(m.meeting_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`,
-        description: m.notes, created_at: m.created_at, actor_id: m.owner_user_id,
-      })),
-    ];
-
-    const ids = [...new Set(items.map((i) => i.actor_id).filter(Boolean))] as string[];
-    if (ids.length > 0) {
-      const { data: profiles } = await supabase.from('user_profiles').select('user_id, full_name').in('user_id', ids);
-      const byId = new Map<string, string | null>((profiles || []).map((p: any) => [p.user_id as string, (p.full_name ?? null) as string | null]));
-      for (const i of items) i.actor_name = i.actor_id ? (byId.get(i.actor_id) ?? null) : null;
-    }
-    items.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-    return items;
+    const { data, error } = await supabase.rpc('crm_record_timeline', {
+      p_target_kind: target.kind,
+      p_target_id: target.id,
+      p_limit: limit,
+    });
+    if (error) throw error;
+    return (data || []).map((r) => ({
+      id: r.id,
+      source: r.source === 'note' ? ('note' as const) : ('activity' as const),
+      activity_type: r.activity_type,
+      title: r.title,
+      description: r.description,
+      created_at: r.occurred_at,
+      actor_id: r.actor_id,
+      actor_name: r.actor_name,
+      amount: r.amount,
+      currency: r.currency,
+      entity_kind: r.entity_kind,
+      entity_id: r.entity_id,
+    }));
   }
 
   /** Add an internal note (also surfaces in the merged timeline). */

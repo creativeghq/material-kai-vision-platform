@@ -15673,6 +15673,7 @@ export type Database = {
       orders: {
         Row: {
           category_id: string | null
+          covers_order_id: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -15706,6 +15707,7 @@ export type Database = {
         }
         Insert: {
           category_id?: string | null
+          covers_order_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -15739,6 +15741,7 @@ export type Database = {
         }
         Update: {
           category_id?: string | null
+          covers_order_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -25049,6 +25052,7 @@ export type Database = {
           amount_due: number | null
           amount_paid: number
           category_id: string | null
+          covers_order_id: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -25075,6 +25079,7 @@ export type Database = {
           amount_due?: number | null
           amount_paid?: number
           category_id?: string | null
+          covers_order_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -25101,6 +25106,7 @@ export type Database = {
           amount_due?: number | null
           amount_paid?: number
           category_id?: string | null
+          covers_order_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -30280,6 +30286,15 @@ export type Database = {
         Args: { p_event: Json; p_job_id: string }
         Returns: undefined
       }
+      append_order_items: {
+        Args: {
+          p_expect_currency?: string
+          p_expect_order_type?: string
+          p_items: Json
+          p_order_id: string
+        }
+        Returns: Json
+      }
       apply_customer_credit_to_order: {
         Args: { p_amount?: number; p_order_id: string; p_workspace_id: string }
         Returns: Json
@@ -30562,6 +30577,23 @@ export type Database = {
           email: string
           member_kind: Database["public"]["Enums"]["crm_category_member_kind"]
           user_id: string
+        }[]
+      }
+      crm_record_timeline: {
+        Args: { p_limit?: number; p_target_id: string; p_target_kind: string }
+        Returns: {
+          activity_type: string
+          actor_id: string
+          actor_name: string
+          amount: number
+          currency: string
+          description: string
+          entity_id: string
+          entity_kind: string
+          id: string
+          occurred_at: string
+          source: string
+          title: string
         }[]
       }
       crm_resync_auto_category_members: {
@@ -32766,6 +32798,10 @@ export type Database = {
         Args: { p_order: string }
         Returns: undefined
       }
+      recompute_order_totals: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       reconcile_brand_company_ids_all: {
         Args: { p_max_makers?: number }
         Returns: Json
@@ -33228,6 +33264,18 @@ export type Database = {
           metadata: Json
           rank: number
         }[]
+      }
+      search_order_link_targets: {
+        Args: {
+          p_currency?: string
+          p_limit?: number
+          p_order_type?: string
+          p_party_company_id?: string
+          p_party_contact_id?: string
+          p_query?: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       search_orders:
         | {

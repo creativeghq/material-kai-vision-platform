@@ -116,7 +116,23 @@ Contacts can be associated with quotes:
 | `crm_tags` | Custom tags for contacts |
 | `crm_contact_tags` | Junction: contacts ↔ tags |
 | `crm_notes` | Notes attached to contacts/companies |
-| `crm_activities` | Activity log (calls, emails, meetings) |
+| `crm_activities` | Document-less activity only (calls, emails sent, lead status, company attach/detach) |
+
+---
+
+## The record Activity feed is derived, not logged
+
+`crm_record_timeline(target_kind, target_id, limit)` is the single source for the Activity tab on a
+contact or a company. Business events — quotes, orders, invoices, supplier bills, payments in and
+out, credit notes, inbound shipments — are **derived from the documents themselves**, joined to the
+party by company id or by any of the company's linked contacts. `crm_activities` / `crm_notes` /
+`crm_meetings` supply only the entries that have no document behind them.
+
+It used to be a write-log fed by two triggers on `invoices` and `quotes`, which meant orders and
+payments never appeared at all and the rows it did write outlived the documents they described.
+Do not re-introduce a trigger that logs a business event, and do not re-assemble the feed in
+TypeScript — [tests/unit/crmTimelineDerivation.test.ts](../tests/unit/crmTimelineDerivation.test.ts)
+fails the build for both.
 
 ---
 

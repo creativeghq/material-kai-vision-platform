@@ -1,13 +1,15 @@
 /**
- * CrmActivityTimeline — unified feed for a CRM contact / company: tracked actions
- * (quote/invoice created, email sent, company attach, lead status change) merged
- * with the party's internal notes, newest-first. New entries are logged from the
- * inline composer at the top — pick a type (Note / Call / Meeting) and write; notes
- * go to crm_notes, calls/meetings to crm_activities. No modal.
+ * CrmActivityTimeline — unified feed for a CRM contact / company: everything that has
+ * happened with this party, newest-first. The business half (quotes, orders, invoices,
+ * supplier bills, payments in and out, credit notes, shipments) is DERIVED from the
+ * documents by `crm_record_timeline`; the composer at the top adds the entries that
+ * have no document — notes go to crm_notes, calls/meetings to crm_activities. No modal.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Activity, FileText, Mail, Building2, Tag, ScrollText, Receipt, CreditCard, Loader2, Unlink, Trash2, Phone, CalendarDays, Users,
+  ShoppingCart, ArrowDownLeft, ArrowUpRight, CheckCircle2, ReceiptText, Undo2, Truck,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -61,9 +63,33 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   company_deleted: Trash2,
   lead_status_changed: Tag,
   quote_created: ScrollText,
+  quote_accepted: CheckCircle2,
+  order_created: ShoppingCart,
   invoice_created: Receipt,
-  payment_received: CreditCard,
+  invoice_paid: CheckCircle2,
+  bill_received: ReceiptText,
+  bill_paid: CheckCircle2,
+  payment_received: ArrowDownLeft,
+  payment_sent: ArrowUpRight,
+  credit_note_issued: Undo2,
+  supplier_credit_note_received: Undo2,
+  shipment_created: Truck,
+  registry_enrichment: Building2,
 };
+
+/** Money-in reads green, money-out amber — the same two directions the ledger uses. */
+const TONES: Record<string, string> = {
+  payment_received: 'bg-emerald-500/15 text-emerald-500',
+  invoice_paid: 'bg-emerald-500/15 text-emerald-500',
+  payment_sent: 'bg-amber-500/15 text-amber-500',
+  bill_paid: 'bg-amber-500/15 text-amber-500',
+};
+
+/** Documents that have a page of their own — the rest are read-only feed lines. */
+const ENTITY_ROUTES: Record<string, string> = { order: 'orders', invoice: 'invoices' };
+
+const money = (amount: number, currency: string | null | undefined): string =>
+  new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR' }).format(amount);
 
 // Composer entry types. `note` persists to crm_notes; the rest log a typed row to
 // crm_activities (activity_type / title) — all merge back into the timeline below.
@@ -89,8 +115,10 @@ const relativeTime = (iso: string): string => {
 export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, onComposeEmail, canEmail, people, onMeetingLogged }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
+  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const [items, setItems] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [type, setType] = useState<ComposerKey>('note');
   const [draft, setDraft] = useState('');
   const [meetingAt, setMeetingAt] = useState(''); // datetime-local value, for Meeting entries
@@ -116,9 +144,12 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
     if (!target.id) { setItems([]); setLoading(false); return; }
     try {
       setLoading(true);
+      setLoadError(null);
       setItems(await crmActivitiesService.listTimeline(target));
-    } catch {
+    } catch (err) {
+      // An empty feed and a failed feed look identical otherwise — say which it is.
       setItems([]);
+      setLoadError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -321,30 +352,42 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
           <div className="flex items-center gap-2 py-3 text-muted-foreground text-sm">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
+        ) : loadError ? (
+          <p className="text-sm text-destructive py-2">Could not load the activity feed — {loadError}</p>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">
-            No activity yet. Notes, calls and meetings you log — plus tracked actions (emails,
-            quotes, invoices, company changes, lead status) — show up here.
+            No activity yet. Notes, calls and meetings you log show up here, alongside everything
+            this party does — quotes, orders, invoices, supplier bills, payments in and out,
+            credit notes and shipments.
           </p>
         ) : (
           <div className="space-y-0">
             {items.map((a, i) => {
               const Icon = ICONS[a.activity_type] ?? Activity;
               const isNote = a.source === 'note';
+              const route = a.entity_kind ? ENTITY_ROUTES[a.entity_kind] : undefined;
+              const href = route && a.entity_id ? `${financeBase}/${route}/${a.entity_id}` : null;
               return (
                 <div key={a.id} className="flex gap-3">
                   <div className="flex flex-col items-center">
-                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${isNote ? 'bg-amber-500/15 text-amber-500' : 'bg-muted text-muted-foreground'}`}>
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${isNote ? 'bg-amber-500/15 text-amber-500' : (TONES[a.activity_type] ?? 'bg-muted text-muted-foreground')}`}>
                       <Icon className="h-3.5 w-3.5" />
                     </span>
                     {i < items.length - 1 && <span className="w-px flex-1 bg-border my-1" />}
                   </div>
                   <div className="pb-4 min-w-0 flex-1">
-                    <div className="text-sm">
-                      {isNote ? <span className="font-medium">Note</span> : a.title}
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="min-w-0">
+                        {isNote ? <span className="font-medium">Note</span> : a.title}
+                      </span>
+                      {a.amount != null && (
+                        <span className="shrink-0 tabular-nums">{money(a.amount, a.currency)}</span>
+                      )}
                     </div>
                     {a.description && (
-                      <div className={`text-xs mt-0.5 ${isNote ? 'text-foreground whitespace-pre-wrap' : 'text-muted-foreground'}`}>{a.description}</div>
+                      <div className={`text-xs mt-0.5 ${isNote ? 'text-foreground whitespace-pre-wrap' : 'text-muted-foreground'}`}>
+                        {href ? <Link to={href} className="hover:text-primary hover:underline">{a.description}</Link> : a.description}
+                      </div>
                     )}
                     <div className="text-[11px] text-muted-foreground mt-0.5">
                       {relativeTime(a.created_at)}{a.actor_name ? ` · ${a.actor_name}` : ''}
