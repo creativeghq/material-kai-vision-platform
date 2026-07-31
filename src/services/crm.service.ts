@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeIban } from '@/utils/iban';
 
 // Get Supabase URL — lazy to avoid crash at module load time
 const getApiBase = (): string => {
@@ -794,7 +795,7 @@ export const crmBankAccountsAPI = {
       contact_id: parent.companyId ? null : (parent.contactId ?? null),
       bank_name: (input.bank_name ?? '').trim(),
       account_holder: input.account_holder?.trim() || null,
-      iban: input.iban?.trim() || null,
+      iban: normalizeIban(input.iban) || null,
       account_ref: input.account_ref?.trim() || null,
       currency: input.currency || 'EUR',
       is_primary: input.is_primary ?? false,
@@ -810,7 +811,7 @@ export const crmBankAccountsAPI = {
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (input.bank_name !== undefined) patch.bank_name = (input.bank_name ?? '').trim();
     if (input.account_holder !== undefined) patch.account_holder = input.account_holder?.trim() || null;
-    if (input.iban !== undefined) patch.iban = input.iban?.trim() || null;
+    if (input.iban !== undefined) patch.iban = normalizeIban(input.iban) || null;
     if (input.account_ref !== undefined) patch.account_ref = input.account_ref?.trim() || null;
     if (input.currency !== undefined) patch.currency = input.currency || 'EUR';
     if (input.is_primary !== undefined) patch.is_primary = input.is_primary;

@@ -22,6 +22,7 @@ import { Loader2, Plus, Trash2, Landmark, Star, Wallet, CreditCard, Globe, Bankn
 import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, type BankAccountBalance, type BankAccountKind } from '@/modules/finance/services/financeService';
 import { parseDecimalOr } from '@/utils/decimal';
+import { normalizeIban } from '@/utils/iban';
 import { statusTone } from '@/utils/statusTone';
 
 const KIND_META: Record<BankAccountKind, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -238,7 +239,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
             {form.kind === 'bank' && (
               <div className="space-y-1">
                 <Label className="text-xs">IBAN</Label>
-                <Input className="h-9 text-sm" value={form.iban} onChange={(e) => patch('iban', e.target.value)} placeholder="GR00 0000 0000 0000 0000 0000 000" />
+                <Input className="h-9 text-sm" value={form.iban} onChange={(e) => patch('iban', normalizeIban(e.target.value))} placeholder="GR00 0000 0000 0000 0000 0000 000" />
               </div>
             )}
             {form.kind !== 'cash' && (

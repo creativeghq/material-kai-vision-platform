@@ -250,6 +250,8 @@ export interface PaymentWithAllocation extends Payment {
   // Enriched by listPayments for the Payments list (party label + order number for the row).
   party_name?: string | null;
   order_number?: string | null;
+  /** Which account the money moved through — what the lists print instead of `method`. */
+  bank_account_name?: string | null;
   /** What this payment settled, one entry per allocation — so the money ledger says which
    *  invoice / expense / order it went against, not just how much was allocated. Credit-note
    *  allocations never appear here: they are sourced from a credit note, not a payment. */
@@ -259,6 +261,20 @@ export interface PaymentWithAllocation extends Payment {
     label: string;
     amount: number;
   }>;
+}
+
+/** Customer credit we stopped holding and booked as income (see `releaseCustomerCredit`). */
+export interface CreditRelease {
+  id: string;
+  workspace_id: string;
+  counterparty_company_id: string | null;
+  counterparty_contact_id: string | null;
+  amount: number;
+  currency: string;
+  released_at: string;
+  category_id: string | null;
+  notes: string | null;
+  created_at: string;
 }
 
 export type SupplierBillStatus =
@@ -351,6 +367,8 @@ export interface ExpenseSettlement {
   reference: string | null;
   notes: string | null;
   bank_account_id: string | null;
+  /** The account the cash moved through — what the UI shows instead of the derived method. */
+  bank_account_name: string | null;
 }
 
 /** An already-recorded money-out payment that still has room to be attached to an expense. */
@@ -764,13 +782,13 @@ const _financeServiceCore = {
 
     const { data: allocs } = await supabase
       .from('payment_allocations')
-      .select('*, payment:payments(*)')
+      .select('*, payment:payments(*, bank_account:finance_bank_accounts(name))')
       .eq('invoice_id', invoiceId);
 
     const payments: PaymentWithAllocation[] = [];
     if (allocs) {
       const byPayment = new Map<string, PaymentWithAllocation>();
-      for (const a of allocs as Array<PaymentAllocation & { payment: Payment }>) {
+      for (const a of allocs as Array<PaymentAllocation & { payment: Payment & { bank_account?: { name: string } | null } }>) {
         if (!a.payment) continue;
         const existing = byPayment.get(a.payment.id);
         if (existing) {
@@ -778,6 +796,7 @@ const _financeServiceCore = {
         } else {
           byPayment.set(a.payment.id, {
             ...a.payment,
+            bank_account_name: a.payment.bank_account?.name ?? null,
             allocations: [{ ...a, payment: undefined } as unknown as PaymentAllocation],
           });
         }
@@ -1221,6 +1240,60 @@ const _financeServiceCore = {
   },
 
   /**
+   * Stop holding a party's leftover on-account money: release it to income.
+   *
+   * The cash does not move — it stays in whatever account it landed in and is ours to spend. What
+   * changes is whose money it is: the credit is allocated away, so the party's "on account"
+   * balance (and their statement) drops by it, and it lands in the P&L under `categoryId`.
+   * Nothing is issued to the customer; nothing goes to myDATA.
+   *
+   * `amount` is a CAP, not a promise — the RPC re-reads what is actually unallocated and never
+   * releases more than that, so a stale screen cannot release money that has since been applied
+   * somewhere else. Returns what was actually released. Undo with `reverseCreditRelease`.
+   */
+  async releaseCustomerCredit(input: {
+    workspaceId: string;
+    companyId?: string | null;
+    contactId?: string | null;
+    amount?: number | null;
+    categoryId?: string | null;
+    currency?: string;
+    notes?: string | null;
+  }): Promise<{ released: number; release_id: string | null }> {
+    const { data, error } = await supabase.rpc('release_customer_credit', {
+      p_workspace_id: input.workspaceId,
+      p_company_id: input.companyId ?? undefined,
+      p_contact_id: input.contactId ?? undefined,
+      p_amount: input.amount ?? undefined,
+      p_category_id: input.categoryId ?? undefined,
+      p_currency: input.currency ?? 'EUR',
+      p_notes: input.notes ?? undefined,
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as { released?: number; release_id?: string | null };
+    return { released: Number(r.released ?? 0), release_id: r.release_id ?? null };
+  },
+
+  /** Undo a release — the allocations cascade away and the credit reappears on the party's account. */
+  async reverseCreditRelease(releaseId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('reverse_credit_release', { p_release_id: releaseId });
+    if (error) throw error;
+    return Number((data as { reversed?: number } | null)?.reversed ?? 0);
+  },
+
+  /** Credit already released to income for a party (newest first) — the audit trail + undo list. */
+  async listCreditReleases(workspaceId: string, party: { companyId?: string | null; contactId?: string | null } = {}): Promise<CreditRelease[]> {
+    let q = supabase.from('finance_credit_releases').select('*')
+      .eq('workspace_id', workspaceId)
+      .order('released_at', { ascending: false });
+    if (party.companyId) q = q.eq('counterparty_company_id', party.companyId);
+    else if (party.contactId) q = q.eq('counterparty_contact_id', party.contactId);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as CreditRelease[];
+  },
+
+  /**
    * Gross margin earned on a customer, from the invoice lines' cost snapshots.
    *
    * `cost_coverage_pct` is the share of revenue whose line actually carries a cost — read the
@@ -1256,7 +1329,9 @@ const _financeServiceCore = {
       // Join the order (provenance) so the list can show its number, and the allocations so the
       // row can show what's settled vs still on-account. The allocation targets come along so
       // the row can name WHAT was settled. Party name is resolved in a 2nd batch.
-      .select('*, allocations:payment_allocations(*, invoice:invoices(internal_number), supplier_bill:supplier_bills(supplier_bill_number, supplier_name), allocated_order:orders(order_number)), order:orders(order_number)')
+      // `bank_account` comes along because the ACCOUNT is what the lists show — the method is
+      // derived from it (see PaidFromSelect) and printing both said the same thing twice.
+      .select('*, allocations:payment_allocations(*, invoice:invoices(internal_number), supplier_bill:supplier_bills(supplier_bill_number, supplier_name), allocated_order:orders(order_number)), order:orders(order_number), bank_account:finance_bank_accounts(name, kind)')
       .order('paid_at', { ascending: false });
     if (opts.workspaceId) q = q.eq('workspace_id', opts.workspaceId);
     if (opts.direction) q = q.eq('direction', opts.direction);
@@ -1280,6 +1355,7 @@ const _financeServiceCore = {
     return rows.map((r) => ({
       ...r,
       order_number: r.order?.order_number ?? null,
+      bank_account_name: r.bank_account?.name ?? null,
       party_name: r.counterparty_company_id
         ? (companyName.get(r.counterparty_company_id) ?? null)
         : (r.counterparty_contact_id ? (contactName.get(r.counterparty_contact_id) ?? null) : null),
@@ -1457,6 +1533,14 @@ const _financeServiceCore = {
     categoryId?: string | null;
     /** Optional purchase order this bill is matched against (drives 3-way match). */
     orderId?: string;
+    /** Optional project this cost belongs to. */
+    projectId?: string | null;
+    /**
+     * Optional SALES order this cost was incurred FOR. Deliberately not `orderId`: that one is the
+     * PURCHASE order this bill invoices and `compute_three_way_match` joins on it, so pointing it at
+     * a customer's order would corrupt the match.
+     */
+    coversOrderId?: string | null;
   }): Promise<SupplierBill> {
     const { data, error } = await supabase
       .from('supplier_bills')
@@ -1475,6 +1559,8 @@ const _financeServiceCore = {
         notes: input.notes ?? null,
         category_id: input.categoryId ?? null,
         order_id: input.orderId ?? null,
+        project_id: input.projectId ?? null,
+        covers_order_id: input.coversOrderId ?? null,
       })
       .select()
       .single();
@@ -1513,6 +1599,9 @@ const _financeServiceCore = {
     counterpartyBankAccountId?: string | null;
     /** Link this expense (the cost of goods) to the order it belongs to, so it shows on the order. */
     orderId?: string | null;
+    /** What the cost is FOR — a project, and/or the customer's sales order it was incurred against. */
+    projectId?: string | null;
+    coversOrderId?: string | null;
   }): Promise<{ billId: string; paymentId: string | null }> {
     // A supplier bill needs a payee — a saved CRM supplier OR a one-off free-text name.
     if (!input.supplierCompanyId && !input.supplierContactId && !input.supplierName?.trim()) {
@@ -1538,6 +1627,8 @@ const _financeServiceCore = {
       notes: input.notes ?? input.description ?? undefined,
       categoryId: input.categoryId,
       orderId: input.orderId ?? undefined,
+      projectId: input.projectId ?? null,
+      coversOrderId: input.coversOrderId ?? null,
     });
 
     let paymentId: string | null = null;
@@ -1747,7 +1838,7 @@ const _financeServiceCore = {
     const { data, error } = await supabase
       .from('payment_allocations')
       .select(`id, amount,
-        payment:payments(id, paid_at, method, currency, reference, notes, bank_account_id),
+        payment:payments(id, paid_at, method, currency, reference, notes, bank_account_id, bank_account:finance_bank_accounts(name)),
         supplier_credit_note:supplier_credit_notes(id, supplier_credit_note_number, issued_at, currency, reason)`)
       .eq('supplier_bill_id', supplierBillId);
     if (error) throw error;
@@ -1760,6 +1851,7 @@ const _financeServiceCore = {
             document_number: null, method: a.payment.method ?? null,
             currency: a.payment.currency, reference: a.payment.reference ?? null,
             notes: a.payment.notes ?? null, bank_account_id: a.payment.bank_account_id ?? null,
+            bank_account_name: a.payment.bank_account?.name ?? null,
           };
         }
         if (a.supplier_credit_note) {
@@ -1769,6 +1861,7 @@ const _financeServiceCore = {
             document_number: a.supplier_credit_note.supplier_credit_note_number ?? null,
             method: null, currency: a.supplier_credit_note.currency,
             reference: a.supplier_credit_note.reason ?? null, notes: null, bank_account_id: null,
+            bank_account_name: null,
           };
         }
         return null;

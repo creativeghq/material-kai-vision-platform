@@ -1,9 +1,12 @@
 /**
  * Per-row Edit + Delete for a payment on the party Payments list.
  *
- * Edit is METADATA-ONLY (bank account, method, date, reference, notes) — amount and
- * allocations are immutable here because they drive invoice settlement + treasury
- * balances.
+ * Edit is METADATA-ONLY (account, date, reference, notes) — amount and allocations are
+ * immutable here because they drive invoice settlement + treasury balances.
+ *
+ * There is NO method control, here or anywhere else. The account answers it (a cash account IS
+ * cash, a bank account books as a transfer) and `PaidFromSelect` derives `payments.method` from
+ * the account's kind. A second control could only contradict the first.
  *
  * Delete is Greek-law-correct:
  *  - If the payment settles NO transmitted invoice → hard delete (reopens any
@@ -20,17 +23,14 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
 import { Pencil, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
-  financeService, formatMoney, paymentMethodLabel,
-  type PaymentWithAllocation, type PaymentMethod, type BankAccount,
+  financeService, formatMoney,
+  type PaymentWithAllocation, type PaymentMethod, type BankAccountBalance,
 } from '@/modules/finance/services/financeService';
-
-const METHODS: PaymentMethod[] = ['cash', 'card', 'bank_transfer', 'check', 'other'];
-const NONE = '__none__';
+import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 
 type TransmittedAlloc = Awaited<ReturnType<typeof financeService.getPaymentInvoiceAllocations>>[number];
 
@@ -40,31 +40,39 @@ export const PaymentRowActions: React.FC<{
   onChanged: () => void;
 }> = ({ payment, workspaceId, onChanged }) => {
   const { toast } = useToast();
-  const [banks, setBanks] = useState<BankAccount[]>([]);
+  // Balances (not bare names) so the picker shows what is in each account while you re-point
+  // the payment at one — the same control the record dialogs use.
+  const [banks, setBanks] = useState<BankAccountBalance[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Return-flow state (only used when deleting a payment tied to a transmitted invoice).
   const [returnCtx, setReturnCtx] = useState<{ allocs: TransmittedAlloc[] } | null>(null);
 
-  // Edit form.
-  const [method, setMethod] = useState<PaymentMethod | null>((payment.method as PaymentMethod) ?? null);
-  const [bankAccountId, setBankAccountId] = useState<string>(payment.bank_account_id ?? NONE);
+  // Edit form. `method` is not edited — PaidFromSelect derives it from the chosen account.
+  const [method, setMethod] = useState<PaymentMethod>((payment.method as PaymentMethod) ?? 'bank_transfer');
+  const [bankAccountId, setBankAccountId] = useState<string>(payment.bank_account_id ?? '');
   const [paidAt, setPaidAt] = useState<string>((payment.paid_at ?? '').slice(0, 10));
   const [reference, setReference] = useState<string>(payment.reference ?? '');
   const [notes, setNotes] = useState<string>(payment.notes ?? '');
 
   useEffect(() => {
     if (!editOpen && !returnCtx) return;
-    financeService.listBankAccounts(workspaceId, { includeInactive: true }).then(setBanks).catch(() => setBanks([]));
+    financeService.getBankAccountBalances(workspaceId).then(setBanks).catch(() => setBanks([]));
   }, [editOpen, returnCtx, workspaceId]);
 
   const saveEdit = async () => {
     setBusy(true);
     try {
+      // Only re-derive the method when the ACCOUNT actually changed. `PaidFromSelect` snaps the
+      // method to the account's kind on mount too, and a bank account's implied method is
+      // `bank_transfer` — so writing it unconditionally would quietly turn an existing cheque
+      // payment into a bank transfer just because someone opened this dialog to fix a typo.
+      const accountChanged = (bankAccountId || null) !== (payment.bank_account_id ?? null);
       await financeService.updatePayment(payment.id, {
-        bankAccountId: bankAccountId === NONE ? null : bankAccountId,
-        method, paidAt: paidAt ? new Date(paidAt).toISOString() : undefined,
+        bankAccountId: bankAccountId || null,
+        method: accountChanged ? method : ((payment.method as PaymentMethod) ?? method),
+        paidAt: paidAt ? new Date(paidAt).toISOString() : undefined,
         reference: reference.trim() || null, notes: notes.trim() || null,
       });
       toast({ title: 'Payment updated' });
@@ -100,7 +108,7 @@ export const PaymentRowActions: React.FC<{
   return (
     <>
       <div className="flex items-center justify-end gap-1.5">
-        <button type="button" title="Edit (bank, method, reference…)" className="text-muted-foreground hover:text-primary disabled:opacity-40" disabled={busy} onClick={() => setEditOpen(true)}>
+        <button type="button" title="Edit (account, date, reference…)" className="text-muted-foreground hover:text-primary disabled:opacity-40" disabled={busy} onClick={() => setEditOpen(true)}>
           <Pencil className="h-3.5 w-3.5" />
         </button>
         <button type="button" title="Delete / Issue return" className="text-muted-foreground hover:text-destructive disabled:opacity-40" disabled={busy} onClick={startDelete}>
@@ -113,35 +121,22 @@ export const PaymentRowActions: React.FC<{
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Edit Payment</DialogTitle><DialogDescription className="sr-only">Edit or remove this payment.</DialogDescription></DialogHeader>
           <p className="text-[11px] text-muted-foreground -mt-2">
-            Correct where/how the money moved. The amount can't be changed here — to change it, delete this payment and record it again.
+            Correct which account the money moved through, and when. The amount can&rsquo;t be changed here — to change it, delete this payment and record it again.
           </p>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Date</Label>
-                <Input type="date" className="h-9 text-sm" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Method</Label>
-                <Select value={method ?? NONE} onValueChange={(v) => setMethod(v === NONE ? null : (v as PaymentMethod))}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>—</SelectItem>
-                    {METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
             <div className="space-y-1">
-              <Label className="text-xs">Bank / Cash account</Label>
-              <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>— Unassigned —</SelectItem>
-                  {banks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}{b.iban ? ` · ${b.iban}` : ''}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs">Date</Label>
+              <Input type="date" className="h-9 text-sm" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
             </div>
+            <PaidFromSelect
+              workspaceId={workspaceId}
+              label={payment.direction === 'in' ? 'Deposited to account' : 'Paid from account'}
+              value={bankAccountId}
+              onChange={setBankAccountId}
+              method={method}
+              onMethodChange={setMethod}
+              accounts={banks}
+            />
             <div className="space-y-1">
               <Label className="text-xs">Reference</Label>
               <Input className="h-9 text-sm" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Transaction ref, cheque no…" />
@@ -178,7 +173,7 @@ export const PaymentRowActions: React.FC<{
 const ReturnPaymentDialog: React.FC<{
   payment: PaymentWithAllocation;
   allocs: TransmittedAlloc[];
-  banks: BankAccount[];
+  banks: BankAccountBalance[];
   onClose: () => void;
   onDone: () => void;
 }> = ({ payment, allocs, banks, onClose, onDone }) => {
@@ -186,7 +181,7 @@ const ReturnPaymentDialog: React.FC<{
   const [reason, setReason] = useState('Payment reversal — customer return');
   const [refund, setRefund] = useState(true);
   const [submitFiscal, setSubmitFiscal] = useState(true);
-  const [bankAccountId, setBankAccountId] = useState<string>(payment.bank_account_id ?? NONE);
+  const [bankAccountId, setBankAccountId] = useState<string>(payment.bank_account_id ?? '');
   const [method, setMethod] = useState<PaymentMethod>((payment.method as PaymentMethod) ?? 'bank_transfer');
   const [busy, setBusy] = useState(false);
 
@@ -218,7 +213,7 @@ const ReturnPaymentDialog: React.FC<{
           counterpartyCompanyId: payment.counterparty_company_id ?? null,
           reference: `Refund — return of ${formatMoney(Number(payment.amount), payment.currency)}`,
           notes: reason.trim(),
-          bankAccountId: bankAccountId === NONE ? null : bankAccountId,
+          bankAccountId: bankAccountId || null,
           allocations: [],
         });
       }
@@ -257,27 +252,15 @@ const ReturnPaymentDialog: React.FC<{
             <Switch checked={refund} onCheckedChange={setRefund} />
           </label>
           {refund && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Refund from</Label>
-                <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>— Unassigned —</SelectItem>
-                    {banks.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}{b.iban ? ` · ${b.iban}` : ''}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Method</Label>
-                <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {METHODS.map((m) => <SelectItem key={m} value={m}>{paymentMethodLabel(m)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <PaidFromSelect
+              workspaceId={payment.workspace_id}
+              label="Refund from"
+              value={bankAccountId}
+              onChange={setBankAccountId}
+              method={method}
+              onMethodChange={setMethod}
+              accounts={banks}
+            />
           )}
         </div>
         <DialogFooter>

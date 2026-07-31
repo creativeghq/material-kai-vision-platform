@@ -7682,6 +7682,56 @@ export type Database = {
           },
         ]
       }
+      finance_credit_releases: {
+        Row: {
+          amount: number
+          category_id: string | null
+          counterparty_company_id: string | null
+          counterparty_contact_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          notes: string | null
+          released_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          counterparty_company_id?: string | null
+          counterparty_contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          notes?: string | null
+          released_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          counterparty_company_id?: string | null
+          counterparty_contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          notes?: string | null
+          released_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_credit_releases_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_branches: {
         Row: {
           address: string | null
@@ -30297,6 +30347,22 @@ export type Database = {
       }
       apply_customer_credit_to_order: {
         Args: { p_amount?: number; p_order_id: string; p_workspace_id: string }
+        Returns: Json
+      }
+      release_customer_credit: {
+        Args: {
+          p_amount?: number
+          p_category_id?: string
+          p_company_id?: string
+          p_contact_id?: string
+          p_currency?: string
+          p_notes?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      reverse_credit_release: {
+        Args: { p_release_id: string }
         Returns: Json
       }
       apply_rfq_prices_to_quote: {

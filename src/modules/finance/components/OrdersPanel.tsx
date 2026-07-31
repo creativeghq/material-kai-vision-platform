@@ -15,7 +15,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  formatMoney, financeService, VAT_CATEGORIES, paymentMethodLabel,
+  formatMoney, financeService, VAT_CATEGORIES,
   type PaymentWithAllocation, type PaymentMethod,
 } from '@/modules/finance/services/financeService';
 import {
@@ -23,7 +23,10 @@ import {
   type BuyerIdentity, type SalesDocumentKind,
 } from '@/modules/finance/utils/salesDocumentKind';
 import { statusTone } from '@/modules/finance/utils/statusTone';
+import { splitByVatRate, splitGrossLikeTotals } from '@/modules/finance/utils/vatSplit';
+import { warehouseService } from '@/services/warehouseService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
+import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { LinkExpenseToOrderDialog } from '@/modules/finance/components/LinkExpenseToOrderDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
@@ -43,7 +46,7 @@ import { PaymentRowActions } from '@/modules/finance/components/PaymentRowAction
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
   type OrderType, type OrderStatus, type OrderPaymentStatus, type OrderListRow, type OrderItem, type Order,
-  type ThreeWayMatch, type ThreeWayMatchStatus,
+  type ThreeWayMatch, type ThreeWayMatchStatus, type OrderLinkTarget,
 } from '@/modules/finance/services/ordersService';
 
 /**
@@ -430,9 +433,9 @@ export const NewOrderModal: React.FC<{
   // Per-line product lookup — the Description field IS a catalog search.
   const [activeLine, setActiveLine] = useState<number | null>(null);
   const [lineProdOpts, setLineProdOpts] = useState<Array<{ id: string; name: string; free?: number | null; outsideCatalog?: boolean }>>([]);
-  const [project, setProject] = useState<{ id: string; name: string } | null>(null);
-  const [projectSearch, setProjectSearch] = useState('');
-  const [projectOpts, setProjectOpts] = useState<Array<{ id: string; name: string }>>([]);
+  // What this order is FOR — a project, a customer (new or existing order), or an existing order of
+  // the same kind to merge into. One field; `save` resolves it.
+  const [link, setLink] = useState<OrderLinkTarget>({ kind: 'none' });
   const [currency, setCurrency] = useState('EUR');
   const [categoryId, setCategoryId] = useState('none');
   const [expectedDate, setExpectedDate] = useState('');
@@ -484,10 +487,17 @@ export const NewOrderModal: React.FC<{
   // Sales orders are income, purchase orders are expense — offer the matching category kinds.
   const catOptions = categories.filter((c) => c.kind === (isSales ? 'income' : 'expense') || c.kind === 'both');
 
+  // A merge target was found FOR a specific party and currency. Change either and it is no longer a
+  // legal target — the RPC would reject it on save, but silently keeping a stale chip on screen
+  // would make that look like a bug rather than the consequence of the edit.
+  useEffect(() => {
+    setLink((cur) => (cur.kind === 'merge_order' ? { kind: 'none' } : cur));
+  }, [party?.id, party?.type, currency]);
+
   useEffect(() => {
     if (!open) return;
     setParty(null); setPartySearch(''); setPartyOpts([]); setActiveLine(null); setLineProdOpts([]);
-    setProject(null); setProjectSearch(''); setProjectOpts([]); setCurrency('EUR');
+    setLink({ kind: 'none' }); setCurrency('EUR');
     setCategoryId('none'); setExpectedDate('');
     setDiscountType('percent'); setDiscountValue('');
     setCurrency(prefill?.currency || 'EUR');
@@ -547,18 +557,6 @@ export const NewOrderModal: React.FC<{
         });
     }
   }, [open, lockedCompanyId, lockedContactId, prefill, isSales, workspaceId]);
-
-  // Project search (optional link — workspace-scoped).
-  useEffect(() => {
-    if (!open) return;
-    const term = projectSearch.trim();
-    if (term.length < 2) { setProjectOpts([]); return; }
-    const t = setTimeout(async () => {
-      const { data } = await supabase.from('projects').select('id, name').eq('workspace_id', workspaceId).ilike('name', `%${term}%`).limit(8);
-      setProjectOpts((data ?? []) as Array<{ id: string; name: string }>);
-    }, 200);
-    return () => clearTimeout(t);
-  }, [projectSearch, open, workspaceId]);
 
   // CRM party search — by name, VAT, or email (companies + contacts).
   useEffect(() => {
@@ -707,12 +705,77 @@ export const NewOrderModal: React.FC<{
         const rolled = await financeService.resolvePrimaryCompanyId(ctId).catch(() => null);
         if (rolled) { coId = rolled; ctId = null; }
       }
+      const lineItems = clean.map((it) => ({
+        product_id: it.product_id ?? null,
+        description: it.description,
+        quantity: Number(it.quantity) || 0,
+        unit_price: Number(it.unit_price) || 0,
+        // Purchase: what we pay the supplier IS our cost.
+        unit_cost: isSales ? it.unit_cost : (Number(it.unit_price) || 0),
+        supplier_company_id: it.supplier_company_id ?? null,
+        measurement_unit_code: it.unit_code,
+        vat_percent: pctOf(it.vat_code),
+        vat_category: parseInt(it.vat_code, 10) || undefined,
+      }));
+
+      // MERGE is the one branch that creates nothing: the lines join an order that already exists,
+      // so there is no new order to stock, invoice or notify about. It returns early rather than
+      // falling through — a merge that also created an order would double-count the whole purchase.
+      if (link.kind === 'merge_order') {
+        const merged = await ordersService.appendItems({
+          orderId: link.orderId, items: lineItems,
+          expectOrderType: link.orderType, expectCurrency: currency,
+        });
+        if (!merged.ok) {
+          toast({ title: 'Could not merge', description: merged.message, variant: 'destructive' });
+          return;
+        }
+        toast({
+          title: `Added to ${merged.order_number ?? 'the order'}`,
+          description: `${merged.appended} line(s) merged into the existing order.`,
+        });
+        onCreated(link.orderId);
+        return;
+      }
+
+      // "For this customer" with no order yet: raise theirs FIRST, so the purchase can point at it.
+      // Priced through the pricing resolver, not marked up by a number invented here.
+      let coversOrderId: string | null = link.kind === 'sales_order' ? link.orderId : null;
+      let linkNote: string | undefined;
+      if (link.kind === 'customer') {
+        const mirrored = await ordersService.mirrorLinesForSale({
+          workspaceId, items: lineItems,
+          companyId: link.party.party_type === 'company' ? link.party.id : null,
+          contactId: link.party.party_type === 'contact' ? link.party.id : null,
+        });
+        coversOrderId = await ordersService.create({
+          workspaceId,
+          orderType: 'sales',
+          status: 'draft',
+          currency,
+          customerCompanyId: link.party.party_type === 'company' ? link.party.id : null,
+          customerContactId: link.party.party_type === 'contact' ? link.party.id : null,
+          notes: `Raised alongside a purchase for ${party.name}.`,
+          items: mirrored.items,
+        });
+        linkNote = mirrored.unpriced.length
+          ? `Customer order drafted — ${mirrored.unpriced.length} line(s) had no catalog price and carry cost: ${mirrored.unpriced.slice(0, 3).join(', ')}.`
+          : 'Customer order drafted at their selling price.';
+      }
+
+      const projectId = link.kind === 'project'
+        ? link.projectId
+        // A sales order already knows its project; inheriting it keeps the purchase reported under
+        // the same job rather than floating unattributed. Same thing raise_cover_purchase_orders does.
+        : (link.kind === 'sales_order' ? link.projectId : null);
+
       const orderId = await ordersService.create({
         workspaceId,
         orderType,
         status,
         currency,
-        projectId: project?.id ?? null,
+        projectId,
+        coversOrderId,
         categoryId: categoryId === 'none' ? null : categoryId,
         expectedPaymentDate: expectedDate || null,
         discountType: isSales && dv > 0 ? discountType : null,
@@ -722,18 +785,7 @@ export const NewOrderModal: React.FC<{
         customerContactId: isSales ? ctId : null,
         supplierCompanyId: !isSales ? coId : null,
         supplierContactId: !isSales ? ctId : null,
-        items: clean.map((it) => ({
-          product_id: it.product_id ?? null,
-          description: it.description,
-          quantity: Number(it.quantity) || 0,
-          unit_price: Number(it.unit_price) || 0,
-          // Purchase: what we pay the supplier IS our cost.
-          unit_cost: isSales ? it.unit_cost : (Number(it.unit_price) || 0),
-          supplier_company_id: it.supplier_company_id ?? null,
-          measurement_unit_code: it.unit_code,
-          vat_percent: pctOf(it.vat_code),
-          vat_category: parseInt(it.vat_code, 10) || undefined,
-        })),
+        items: lineItems,
       });
       // The goods on a received document already arrived, so stock them as part of creating the
       // order. Best-effort: a receipt failure must not lose the order that was just created —
@@ -781,7 +833,7 @@ export const NewOrderModal: React.FC<{
       }
       toast({
         title: status === 'draft' ? 'Pre-order saved' : 'Order created',
-        description: [stockNote, moneyNote].filter(Boolean).join(' ') || undefined,
+        description: [linkNote, stockNote, moneyNote].filter(Boolean).join(' ') || undefined,
       });
       onCreated(orderId);
     } catch (err: any) {
@@ -821,27 +873,23 @@ export const NewOrderModal: React.FC<{
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Project (optional)</Label>
-              {project ? (
-                <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
-                  <span className="text-sm">{project.name}</span>
-                  <Button size="sm" variant="ghost" onClick={() => setProject(null)}>Change</Button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input className="pl-7" placeholder="Link a project…" value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} />
-                  {projectOpts.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
-                      {projectOpts.map((o) => (
-                        <button key={o.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setProject(o); setProjectSearch(''); setProjectOpts([]); }}>{o.name}</button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* One field for "what is this for?". A project, a customer (raising or attaching their
+                order), or an existing order of the same kind to merge these lines into. Merge
+                candidates need the counterparty, so they only appear once a party is chosen; a
+                document-seeded order is never a merge source, because its lines are evidence for
+                the document that produced it and must stay on their own order. */}
+            <OrderLinkPicker
+              workspaceId={workspaceId}
+              value={link}
+              onChange={setLink}
+              orderType={orderType}
+              partyCompanyId={party?.type === 'company' ? party.id : null}
+              partyContactId={party?.type === 'contact' ? party.id : null}
+              currency={currency}
+              allowCustomer={!isSales}
+              allowMerge={!locked && !!party}
+              label="What is this for? (optional)"
+            />
             <div className="space-y-1">
               <Label>Currency</Label>
               <Select value={currency} onValueChange={setCurrency}>
@@ -1188,7 +1236,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // money OUT (paying a supplier / any cost) → NewExpenseDialog (a supplier bill → Payables & P&L),
   // attached to the order + defaulted to the "Order" category. `expensePrefill` seeds it from a line/supplier.
   const [expenseOpen, setExpenseOpen] = useState(false);
-  const [expensePrefill, setExpensePrefill] = useState<{ amount?: number; description?: string; categoryId?: string; supplier?: { companyId?: string | null; name?: string | null } } | null>(null);
+  const [expensePrefill, setExpensePrefill] = useState<{ amount?: number; vatAmount?: number; description?: string; categoryId?: string; supplier?: { companyId?: string | null; name?: string | null } } | null>(null);
   // Attaching an expense that ALREADY exists (booked before the order, or arriving separately —
   // transport, customs, an installer). `setSupplierBillOrder` on an existing bill, not a new one.
   const [linkExpenseOpen, setLinkExpenseOpen] = useState(false);
@@ -1201,6 +1249,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // Per-LINE supplier (who supplies this line / who we owe) → settable inline on any line.
   const [supplierNames, setSupplierNames] = useState<Map<string, string>>(new Map());
   const [supplierPick, setSupplierPick] = useState<{ itemId: string; productId: string | null; label: string; currentId: string | null } | null>(null);
+  // Per-LINE warehouse identity (which catalog product / is it stock at all) — see LineStockDialog.
+  const [stockPick, setStockPick] = useState<OrderItem | null>(null);
+  // Catalog names for linked lines, so a linked line can SAY what it points at rather than just
+  // being silently unlinkable.
+  const [productNames, setProductNames] = useState<Map<string, string>>(new Map());
   // What we owe each supplier on this order (line cost grouped by supplier − money already paid out).
   const [supExposure, setSupExposure] = useState<Awaited<ReturnType<typeof ordersService.getOrderSupplierExposure>>>([]);
   // Audit trail of payment edits/deletes on this order (finance-manager-readable only).
@@ -1221,7 +1274,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       const productIds = res.items.map((it) => it.product_id).filter(Boolean) as string[];
       const supplierIds = res.items.map((it) => it.supplier_company_id).filter(Boolean) as string[];
       const partyRef = orderPartyRef(res.order);
-      const [finance, lp, names, exposure, accounts, audit, buyer, party] = await Promise.all([
+      const [finance, lp, names, exposure, accounts, audit, buyer, party, prodNames] = await Promise.all([
         ordersService.getOrderFinance(id),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
         ordersService.getCompanyNames(supplierIds).catch(() => new Map<string, string>()),
@@ -1234,7 +1287,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         !partyRef ? Promise.resolve(null)
           : (partyRef.kind === 'company' ? ordersService.getCompanyNames([partyRef.id]) : ordersService.getContactNames([partyRef.id]))
               .then((m) => m.get(partyRef.id) ?? null).catch(() => null),
+        ordersService.getProductNames(productIds).catch(() => new Map<string, string>()),
       ]);
+      setProductNames(prodNames);
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
       setBankAccounts(accounts); setPayAudit(audit); setBuyerIdentity(buyer); setPartyName(party);
       setMatch(res.order.order_type === 'purchase'
@@ -1269,7 +1324,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   };
 
   // Set the order's finance category / expected payment date / note (classify + let it age pre-invoice).
-  const saveMeta = async (patch: { categoryId?: string | null; expectedPaymentDate?: string | null; notes?: string | null }) => {
+  const saveMeta = async (patch: {
+    categoryId?: string | null; expectedPaymentDate?: string | null; notes?: string | null;
+    projectId?: string | null; coversOrderId?: string | null;
+  }) => {
     if (!order) return;
     setSaving(true);
     try {
@@ -1279,12 +1337,68 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         ...('categoryId' in patch ? { category_id: patch.categoryId ?? null } : {}),
         ...('expectedPaymentDate' in patch ? { expected_payment_date: patch.expectedPaymentDate ?? null } : {}),
         ...('notes' in patch ? { notes: patch.notes ?? null } : {}),
+        ...('projectId' in patch ? { project_id: patch.projectId ?? null } : {}),
+        ...('coversOrderId' in patch ? { covers_order_id: patch.coversOrderId ?? null } : {}),
       });
       onChanged();
     } catch (err: any) {
       toast({ title: 'Failed to update order', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
+
+  /**
+   * Turn the order's stored link back into a picker value. Both halves are plain FK columns with no
+   * display name on them, so the label is resolved here rather than stored — a denormalized copy
+   * would be one more thing to keep in step with a rename.
+   */
+  const [linkValue, setLinkValue] = useState<OrderLinkTarget>({ kind: 'none' });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!order) { setLinkValue({ kind: 'none' }); return; }
+      if (order.covers_order_id) {
+        const { data } = await supabase.from('orders')
+          .select('id, order_number, project_id').eq('id', order.covers_order_id).maybeSingle();
+        if (cancelled) return;
+        setLinkValue({
+          kind: 'sales_order', orderId: order.covers_order_id,
+          projectId: (data?.project_id as string | null) ?? null,
+          label: (data?.order_number as string | null) ?? order.covers_order_id.slice(0, 8),
+        });
+        return;
+      }
+      if (order.project_id) {
+        const { data } = await supabase.from('projects').select('id, name').eq('id', order.project_id).maybeSingle();
+        if (cancelled) return;
+        setLinkValue({
+          kind: 'project', projectId: order.project_id,
+          label: (data?.name as string | null) ?? 'Project',
+        });
+        return;
+      }
+      setLinkValue({ kind: 'none' });
+    })();
+    return () => { cancelled = true; };
+  }, [order?.id, order?.project_id, order?.covers_order_id]);
+
+  /**
+   * The reverse view: purchase orders raised to cover THIS sale. `raise_cover_purchase_orders` has
+   * been writing `covers_order_id` since it shipped and nothing ever displayed it, so the POs it
+   * created looked unrelated to the sale that caused them.
+   */
+  const [coveredBy, setCoveredBy] = useState<Array<{ id: string; order_number: string | null; status: string; total: number; currency: string }>>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!order || order.order_type !== 'sales') { setCoveredBy([]); return; }
+      const { data } = await supabase.from('orders')
+        .select('id, order_number, status, total, currency')
+        .eq('covers_order_id', order.id).neq('status', 'cancelled')
+        .order('created_at', { ascending: false });
+      if (!cancelled) setCoveredBy((data ?? []) as any);
+    })();
+    return () => { cancelled = true; };
+  }, [order?.id, order?.order_type]);
 
   // Set a line's delivered quantity; the order's fulfilment status auto-advances
   // (none → confirmed, some → partially delivered, all → completed).
@@ -1311,27 +1425,56 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     } finally { setSaving(false); }
   };
 
+  /** Apply the line's warehouse identity (catalog product / off-warehouse) — see LineStockDialog. */
+  const setLineStock = async (itemId: string, patch: { productId?: string | null; updateWarehouse?: boolean }, note: string) => {
+    setSaving(true);
+    try {
+      await ordersService.setOrderItemStock(itemId, patch);
+      setStockPick(null);
+      if (order) await load(order.id);
+      // Say what is now possible, not just that a row changed — the whole point of this dialog is
+      // to unblock a receive that silently did nothing.
+      toast({ title: 'Line updated', description: `${note} Use Actions → Receive into warehouse to apply it.` });
+    } catch (err: any) {
+      toast({ title: 'Failed to update the line', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   // Record real cash ON the order: money in (a payment received) or money out (a payment sent).
   // Per-line "Mark as paid" — record a PAYMENT to this line's supplier (money out), NOT an expense.
   // Paying a supplier = money OUT = an expense (supplier bill → Payables & P&L), attached to this
   // order + defaulted to the "Order" category. All money-out on an order flows through this one form.
   // Per-line "Mark as paid": pre-fills the line cost + the line's supplier (operator adds one if absent).
-  const openLinePayment = (it: { unit_cost: number | null; quantity: number; supplier_company_id: string | null }) => {
-    const cost = it.unit_cost != null ? Math.round(Number(it.unit_cost) * Number(it.quantity) * 100) / 100 : 0;
+  /**
+   * The expense form takes a NET amount plus its VAT — the two are separate fields on the bill
+   * and feed different places (net → P&L cost, VAT → recoverable input tax). Both entry points
+   * below therefore hand it a SPLIT, never one lump sum. They used to hand it one, and the two
+   * disagreed about which one: "Mark paid" passed the net (so VAT was missing from the total)
+   * and "Pay" passed the VAT-INCLUSIVE owed figure (so the tax was folded into the net and the
+   * P&L cost was overstated by exactly the VAT). Both then showed "VAT 0" on a 24% line.
+   */
+  const openLinePayment = (it: { unit_cost: number | null; quantity: number; vat_percent?: number | null; supplier_company_id: string | null }) => {
+    const lineNet = it.unit_cost != null ? Number(it.unit_cost) * Number(it.quantity) : 0;
+    const { net, vat } = splitByVatRate(lineNet, it.vat_percent);
     setExpensePrefill({
-      amount: cost > 0 ? cost : undefined,
+      amount: net > 0 ? net : undefined,
+      vatAmount: net > 0 ? vat : undefined,
       description: `Order ${order?.order_number ?? order?.id.slice(0, 8) ?? ''} — supplier cost`,
       supplier: it.supplier_company_id ? { companyId: it.supplier_company_id, name: supplierNames.get(it.supplier_company_id) ?? null } : undefined,
     });
     setExpenseOpen(true);
   };
 
-  // Pay a specific supplier straight from the "what we owe" rollup — same expense form, supplier + amount pre-filled.
-  const openPaySupplier = (sup: { id: string; name: string }, owed: number) => {
+  // Pay a specific supplier straight from the "what we owe" rollup — same expense form, supplier +
+  // amount pre-filled. `owed` is GROSS (the rollup's cost is VAT-inclusive), so it is split back
+  // into net + VAT in the same proportion the supplier's line costs carry.
+  const openPaySupplier = (sup: { supplier_company_id: string; name: string; cost_net: number; cost: number; owed: number }) => {
+    const { net, vat } = splitGrossLikeTotals(sup.owed, sup.cost_net, sup.cost);
     setExpensePrefill({
-      amount: Math.round(Math.max(0, owed) * 100) / 100,
+      amount: net,
+      vatAmount: vat,
       description: `Order ${order?.order_number ?? order?.id.slice(0, 8) ?? ''} — ${sup.name}`,
-      supplier: { companyId: sup.id, name: sup.name },
+      supplier: { companyId: sup.supplier_company_id, name: sup.name },
     });
     setExpenseOpen(true);
   };
@@ -1359,6 +1502,29 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     } catch (err: any) {
       toast({ title: 'Failed to apply credit', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
+  };
+
+  /**
+   * Spending the customer's money on the customer's job draws their held balance down.
+   *
+   * Three things move when a cost on a SALES order is actually paid: what we owe that supplier
+   * (the rollup), the bank account it left, and — because the money we are spending is money the
+   * customer already handed us — the customer's on-account credit. The first two were already
+   * derived from the payment row; the third was not, so a customer could pay €1,373 up front,
+   * watch it fund every supplier on their order, and still show €1,373 "on account" as though we
+   * were holding it for them.
+   *
+   * It is a re-homing, not a second ledger: the SAME `apply_customer_credit_to_order` RPC the
+   * "Apply credit" banner uses, which splits payments oldest-first and never exceeds the order's
+   * outstanding. Capped by what was actually paid, so a €328 supplier payment moves €328 of
+   * credit onto the order and no more. To undo it, un-apply from the source payment.
+   */
+  const drawDownCustomerCredit = async (amountPaid: number): Promise<number> => {
+    if (!order || order.order_type !== 'sales' || amountPaid <= 0.005) return 0;
+    const available = await ordersService.getApplicableCredit(order.id, order.workspace_id).catch(() => 0);
+    const want = Math.min(available, Math.round(amountPaid * 100) / 100);
+    if (want <= 0.005) return 0;
+    return ordersService.applyCreditToOrder(order.id, order.workspace_id, want).catch(() => 0);
   };
 
   // #3 — edit the order's line items (only while it has no invoice yet).
@@ -1768,6 +1934,43 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               )}
             </div>
 
+            {/* What this order is FOR. Merging is not offered here — these lines already belong to
+                this order, so the only thing left to change is what it is attributed to. */}
+            <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+              <div className="max-w-md">
+                <OrderLinkPicker
+                  workspaceId={order.workspace_id}
+                  value={linkValue}
+                  onChange={(v) => {
+                    setLinkValue(v);
+                    if (v.kind === 'project') void saveMeta({ projectId: v.projectId, coversOrderId: null });
+                    else if (v.kind === 'sales_order') void saveMeta({ projectId: v.projectId, coversOrderId: v.orderId });
+                    else if (v.kind === 'none') void saveMeta({ projectId: null, coversOrderId: null });
+                  }}
+                  currency={order.currency}
+                  allowMerge={false}
+                  allowCustomer={order.order_type === 'purchase'}
+                  // This panel can re-point an existing order, not raise a second one alongside it.
+                  allowRaiseCustomerOrder={false}
+                  disabled={saving}
+                  label="What this order is for"
+                />
+              </div>
+              {coveredBy.length > 0 && (
+                <div className="mt-2 border-t border-border/40 pt-2">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Covered by</span>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                    {coveredBy.map((po) => (
+                      <Link key={po.id} to={`/finance/orders/${po.id}`} className="text-xs hover:underline">
+                        <span className="font-medium">{po.order_number ?? po.id.slice(0, 8)}</span>
+                        <span className="text-muted-foreground"> · {po.status} · {formatMoney(Number(po.total), po.currency)}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {!editing ? (
               <>
                 <div className="rounded-md border border-border/60 overflow-x-auto">
@@ -1991,7 +2194,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         {s.owed > 0.005 ? `owe ${formatMoney(s.owed, order.currency)}` : s.owed < -0.005 ? `overpaid ${formatMoney(-s.owed, order.currency)}` : 'settled'}
                       </span>
                       {s.owed > 0.005 && (
-                        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => openPaySupplier({ id: s.supplier_company_id, name: s.name }, s.owed)}>
+                        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => openPaySupplier(s)}>
                           <Banknote className="h-3.5 w-3.5 mr-1" /> Pay
                         </Button>
                       )}
@@ -2093,7 +2296,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                           ? <span className="text-muted-foreground">{p.direction === 'in' ? ' · from ' : ' · to '}<span className="text-foreground/80">{who}</span></span>
                           : (p.direction === 'out' && <span className="text-muted-foreground italic"> · to (no supplier set)</span>)}
                       </span>
-                      <span className="text-[11px] text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'Payment' : 'Expense'}{p.method ? ` · ${paymentMethodLabel(p.method)}` : ''}{acctName ? ` · ${acctName}` : ''}</span>
+                      {/* Account only — the method is derived from it, so printing both said
+                          "Postbank BG · Bank Payment" and taught the reader nothing twice. */}
+                      <span className="text-[11px] text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'Payment' : 'Expense'}{acctName ? ` · ${acctName}` : ''}</span>
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>
@@ -2265,7 +2470,19 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         onOpenChange={setExpenseOpen}
         orderId={order.id}
         prefill={expensePrefill ?? undefined}
-        onCreated={() => { setExpenseOpen(false); void load(order.id); onChanged(); }}
+        onCreated={async (res) => {
+          setExpenseOpen(false);
+          // Cash that actually left funds the customer's job → their held balance drops by it.
+          const drawn = await drawDownCustomerCredit(res?.amountPaid ?? 0);
+          if (drawn > 0.005) {
+            toast({
+              title: `${formatMoney(drawn, order.currency)} taken off the customer's balance`,
+              description: 'That much of the money they had on account is now applied to this order — no extra cash moved.',
+            });
+          }
+          await load(order.id);
+          onChanged();
+        }}
       />
     )}
     {/* The same link written against an expense that already exists, instead of a new one. */}
@@ -2311,6 +2528,135 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
 };
 
 // Pick (or clear) the supplier we buy a product from — searches CRM companies flagged as suppliers.
+/**
+ * What a line IS, as far as the warehouse is concerned. Two answers, and the operator has to give
+ * one of them — nothing in the data can infer it:
+ *
+ *  · goods we hold  → link (or create) a catalog product, and receiving adds to its stock;
+ *  · a service      → mark it off-warehouse, and receiving marks it delivered and stocks nothing.
+ *
+ * Creating the product from here is offered because refusing to would send someone to the catalog
+ * to build the item by hand and come back — but it is a deliberate CLICK, never automatic. Auto-
+ * creating a product for every unlinked line would fill the catalog with `Delivery`, `Discount`
+ * and typos, each carrying a phantom stock quantity that is far harder to unwind than this dialog.
+ */
+const LineStockDialog: React.FC<{
+  workspaceId: string;
+  label: string;
+  unitCode: string | null;
+  unitCost: number | null;
+  currentProductId: string | null;
+  currentProductName: string | null;
+  updateWarehouse: boolean;
+  supplierCompanyId: string | null;
+  onClose: () => void;
+  onApply: (patch: { productId?: string | null; updateWarehouse?: boolean }, note: string) => void;
+}> = ({ workspaceId, label, unitCode, unitCost, currentProductId, currentProductName, updateWarehouse, supplierCompanyId, onClose, onApply }) => {
+  const { toast } = useToast();
+  const [term, setTerm] = useState(label);
+  const [opts, setOpts] = useState<Array<{ id: string; name: string }>>([]);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const t = term.trim();
+    if (t.length < 2) { setOpts([]); return; }
+    const h = setTimeout(async () => {
+      // Workspace-scoped, like the new-order line search — RLS alone should never be the only
+      // thing standing between this box and another tenant's catalog.
+      const { data } = await supabase.from('products').select('id, name')
+        .eq('workspace_id', workspaceId).ilike('name', `%${t}%`).limit(8);
+      setOpts((data ?? []) as Array<{ id: string; name: string }>);
+    }, 200);
+    return () => clearTimeout(h);
+  }, [term, workspaceId]);
+
+  const createAndLink = async () => {
+    const name = term.trim() || label;
+    setBusy(true);
+    try {
+      // The line already knows the unit and what we paid — carrying them over means the new
+      // product arrives costed and measured instead of as a bare name someone has to finish.
+      const productId = await warehouseService.createProduct({
+        workspaceId, name, itemType: 'good',
+        unit: unitCode || null,
+        cost: unitCost != null && unitCost > 0 ? unitCost : null,
+      });
+      if (supplierCompanyId) {
+        await supabase.from('products').update({ supplier_company_id: supplierCompanyId })
+          .eq('id', productId).is('supplier_company_id', null);
+      }
+      onApply({ productId, updateWarehouse: true }, `“${name}” added to the catalog and linked.`);
+    } catch (err: any) {
+      toast({ title: 'Could not create the product', description: err?.message, variant: 'destructive' });
+      setBusy(false);
+    }
+  };
+
+  const exactMatch = opts.some((o) => o.name.trim().toLowerCase() === term.trim().toLowerCase());
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display">Stock for “{label}”</DialogTitle>
+          <DialogDescription>
+            The warehouse counts quantities against a catalog product, so a typed-in line has nothing to add to.
+            Tell it which product this is — or that it isn’t stock at all.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {currentProductId && (
+            <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
+              <span className="inline-flex items-center gap-2 min-w-0">
+                <Package className="h-4 w-4 shrink-0" />
+                <span className="truncate">{currentProductName ?? 'Linked to catalog'}</span>
+              </span>
+              <Button size="sm" variant="ghost" disabled={busy}
+                onClick={() => onApply({ productId: null }, 'Line unlinked from the catalog.')}>Unlink</Button>
+            </div>
+          )}
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-7" placeholder="Search the catalog…" value={term} disabled={busy}
+              onChange={(e) => setTerm(e.target.value)} />
+          </div>
+          {opts.length > 0 && (
+            <div className="rounded-md border border-border/60 divide-y divide-border/40">
+              {opts.map((o) => (
+                <button key={o.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" disabled={busy}
+                  onClick={() => onApply({ productId: o.id, updateWarehouse: true }, `Linked to “${o.name}”.`)}>{o.name}</button>
+              ))}
+            </div>
+          )}
+          {term.trim().length >= 2 && !exactMatch && (
+            <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => void createAndLink()}>
+              {busy ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <PackagePlus className="h-3.5 w-3.5 mr-2" />}
+              Create “{term.trim()}” as a new product
+            </Button>
+          )}
+          <div className="rounded-md border border-border/60 p-3 space-y-1.5">
+            <p className="text-xs font-medium">Not stock at all?</p>
+            <p className="text-[11px] text-muted-foreground">
+              Hire, labour, transport, a one-off charge — nothing enters the warehouse. Receiving will mark the line
+              delivered and leave stock untouched.
+            </p>
+            {updateWarehouse ? (
+              <Button size="sm" variant="outline" disabled={busy}
+                onClick={() => onApply({ updateWarehouse: false, productId: null }, 'Line marked off-warehouse — it will never be stocked.')}>
+                It’s a service — don’t stock it
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" disabled={busy}
+                onClick={() => onApply({ updateWarehouse: true }, 'Line put back on the warehouse — link a product to stock it.')}>
+                Put it back on the warehouse
+              </Button>
+            )}
+          </div>
+        </div>
+        <DialogFooter><Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const SupplierPickerDialog: React.FC<{
   label: string; currentName: string | null;
   onClose: () => void; onPick: (companyId: string | null) => void;

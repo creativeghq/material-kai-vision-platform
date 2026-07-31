@@ -171,9 +171,19 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
   }
 
-  // Resolve model
+  // Resolve model. `requestedModel` is client-supplied, so reject an unknown key
+  // here rather than letting it flow on: CREDIT_COSTS[unknown] is undefined, which
+  // debits `undefined` credits, writes credits_used=undefined onto generation_videos,
+  // and only fails much later at the provider switch — refunding undefined.
+  // (audit #304 finding 4)
   const resolvedModel: VideoModel = requestedModel || TYPE_MODEL_MAP[video_type as VideoType] || 'kling-v3.0';
   const creditCost = CREDIT_COSTS[resolvedModel];
+  if (typeof creditCost !== 'number') {
+    return jsonResponse({
+      success: false,
+      error: `Unknown model '${resolvedModel}'. Supported: ${Object.keys(CREDIT_COSTS).join(', ')}`,
+    }, 400);
+  }
 
   // ① Debit credits upfront
   const { data: debitData, error: debitError } = await supabase.rpc('debit_credits', {

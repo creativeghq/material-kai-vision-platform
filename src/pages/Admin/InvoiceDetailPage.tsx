@@ -26,20 +26,14 @@ import { useToast } from '@/hooks/use-toast';
 import {
   financeService,
   formatMoney,
-  paymentMethodLabel,
   type InvoiceWithItems,
-  type PaymentMethod,
-  type BankAccountBalance,
 } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
-import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
-
-const PAYMENT_METHODS: PaymentMethod[] = ['bank_transfer', 'cash', 'card', 'check', 'other'];
 
 const MOVE_PURPOSE_LABELS: Record<string, string> = {
   '1': 'Sale',
@@ -416,7 +410,7 @@ const InvoiceDetailPage: React.FC = () => {
             <thead className="text-xs text-muted-foreground">
               <tr className="border-b border-border/60">
                 <th className="px-4 py-2 text-left">Date</th>
-                <th className="px-4 py-2 text-left">Method</th>
+                <th className="px-4 py-2 text-left">Account</th>
                 <th className="px-4 py-2 text-left">Reference</th>
                 <th className="px-4 py-2 text-right">Amount allocated</th>
                 <th className="px-4 py-2 text-right w-24">Receipt</th>
@@ -433,7 +427,8 @@ const InvoiceDetailPage: React.FC = () => {
                 return (
                   <tr key={p.id} className="border-b border-border/30">
                     <td className="px-4 py-2">{new Date(p.paid_at).toLocaleDateString()}</td>
-                    <td className="px-4 py-2">{p.method ?? '—'}</td>
+                    {/* Account, not method — the method is derived from the account. */}
+                    <td className="px-4 py-2">{p.bank_account_name ?? '—'}</td>
                     <td className="px-4 py-2">{p.reference ?? '—'}</td>
                     <td className="px-4 py-2 text-right font-medium">{formatMoney(allocAmount, p.currency)}</td>
                     <td className="px-4 py-2 text-right"><PaymentReceiptActions paymentId={p.id} direction={(p as any).direction ?? 'in'} /></td>

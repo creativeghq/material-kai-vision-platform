@@ -3,7 +3,7 @@
 // and lazy-loads its data on first render.
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, FileText, Wallet, ShoppingBag, ShoppingCart, Banknote, AlertCircle, CalendarClock, Plus } from 'lucide-react';
+import { Loader2, FileText, Wallet, ShoppingBag, ShoppingCart, Banknote, AlertCircle, CalendarClock, Plus, Coins } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -14,12 +14,13 @@ import {
   type PaymentWithAllocation,
 } from '@/modules/finance/services/financeService';
 import { ordersService } from '@/modules/finance/services/ordersService';
-import { humanizeLabel } from '@/utils/humanize';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
+import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
+import { netPositionTermCount, netPositionDirection } from '@/modules/finance/utils/netPosition';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 
@@ -43,19 +44,24 @@ export const PartyAccountSummary: React.FC<{
   orders?: { count: number; ordered: number; owedUninvoiced: number } | null;
   /** Cash of theirs we're holding that isn't settled against anything yet (unallocated money-in). */
   credit?: number | null;
+  /**
+   * Turn the "On account" tile's number into an action: stop holding it, keep it as income.
+   * Omitted on read-only surfaces — the tile then just reports the balance as before.
+   */
+  onReleaseCredit?: () => void;
   /** Gross margin earned on this customer, from the invoice lines' cost snapshots. */
   profitability?: {
     revenue_net: number; cogs: number; gross_margin: number;
     gross_margin_pct: number | null; cost_coverage_pct: number | null;
   } | null;
   meta?: Array<{ label: string; value: React.ReactNode }>;
-}> = ({ customer, supplier, aging, orders, credit, profitability, meta }) => {
+}> = ({ customer, supplier, aging, orders, credit, onReleaseCredit, profitability, meta }) => {
   // Unallocated cash of theirs is a liability — we're holding money that isn't settled against
-  // anything yet — so it pushes the net position toward "we owe them", exactly like a supplier
+  // anything yet — so it pushes the net position into THEIR favour, exactly like a supplier
   // balance does. Leaving it out was why a customer who had overpaid still read "settled · €0".
   const heldCredit = Math.max(0, credit ?? 0);
   const net = (customer?.outstanding ?? 0) - heldCredit - (supplier?.outstanding ?? 0);
-  const netDir = net > 0 ? 'they owe us' : net < 0 ? 'we owe them' : 'settled';
+  const netDir = netPositionDirection(net);
   const netTone = net > 0 ? 'text-emerald-400' : net < 0 ? 'text-destructive' : 'text-muted-foreground';
   const netRing = net > 0 ? 'ring-1 ring-emerald-500/25' : net < 0 ? 'ring-1 ring-destructive/30' : '';
 
@@ -93,7 +99,7 @@ export const PartyAccountSummary: React.FC<{
   const balanceStat = stat(
     <Wallet className="h-3.5 w-3.5" />, <>Balance <span className="normal-case text-[9px]">· {netDir}</span></>,
     formatMoney(Math.abs(net)),
-    { tone: netTone, title: 'Net invoiced position: what they owe us on issued invoices minus what we owe them as a supplier. Separate from un-invoiced order cash (Owed on orders).' },
+    { tone: netTone, title: 'Net invoiced position: outstanding on issued invoices, less any credit held for them and anything outstanding to them as a supplier. Separate from un-invoiced order cash (Owed on orders).' },
   );
   const showCredit = heldCredit > 0.005;
   /**
@@ -104,7 +110,21 @@ export const PartyAccountSummary: React.FC<{
    * repeated (Balance survives only when it says something the role row doesn't).
    */
   const bothRoles = !!customer && !!supplier;
-  const showBalance = bothRoles || showCredit;
+  /**
+   * Balance is a NET of three terms. Netting one term is not netting — it reprints that term with
+   * a direction word beside it, which is how a party holding €1,373 of unallocated credit and
+   * nothing else ended up showing "On account €1,373" next to "Balance · we owe them €1,373":
+   * the same number twice, the second derived entirely from the first.
+   *
+   * `bothRoles || showCredit` was the culprit — credit alone forced the card on with nothing to
+   * net against. The rule this restores is the one stated above: Balance appears only when it
+   * says something the tiles beside it do not.
+   */
+  const showBalance = netPositionTermCount({
+    customerOutstanding: customer?.outstanding ?? 0,
+    heldCredit,
+    supplierOutstanding: supplier?.outstanding ?? 0,
+  }) > 1;
   const showTopStrip = !!orders || showBalance || (!!meta && meta.length > 0);
   const balanceInCustomer = showBalance && !showTopStrip && !!customer;
   const balanceInSupplier = showBalance && !showTopStrip && !customer && !!supplier;
@@ -126,10 +146,21 @@ export const PartyAccountSummary: React.FC<{
           {orders && stat(<ShoppingCart className="h-3.5 w-3.5" />, 'Orders', orders.count, { title: 'Active (non-cancelled) orders for this party' })}
           {orders && stat(<Banknote className="h-3.5 w-3.5" />, 'Ordered', formatMoney(orders.ordered), { title: 'Total value of those orders (incl. VAT)' })}
           {orders && stat(<AlertCircle className="h-3.5 w-3.5" />, 'Owed on orders', formatMoney(orders.owedUninvoiced), { danger: orders.owedUninvoiced > 0, title: 'Cash still owed on orders that have NOT been invoiced yet (order total − payments). Once invoiced, it moves into the Balance below.' })}
-          {showCredit && stat(
-            <Wallet className="h-3.5 w-3.5" />, 'On account',
-            formatMoney(heldCredit),
-            { tone: 'text-amber-500', title: 'Money of theirs we hold that is not settled against any order, invoice or bill yet. Apply it to an order, or refund it.' },
+          {showCredit && (
+            <Card className="dashboard-card border-0" title="Money of theirs we hold that is not settled against any order, invoice or bill yet. Apply it to an order, refund it — or keep it as income.">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><Wallet className="h-3.5 w-3.5" />On account</div>
+                <div className="text-lg font-semibold text-amber-500">{formatMoney(heldCredit)}</div>
+                {/* The way to stop holding it. Without this the balance had no exit other than
+                    refunding the customer, so leftover money sat as a liability forever. */}
+                {onReleaseCredit && (
+                  <button type="button" onClick={onReleaseCredit}
+                    className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
+                    <Coins className="h-3 w-3" /> Release to income
+                  </button>
+                )}
+              </CardContent>
+            </Card>
           )}
           {showBalance && balanceStat}
           {meta && meta.length > 0 && (
@@ -157,7 +188,10 @@ export const PartyAccountSummary: React.FC<{
             {balanceInCustomer && balanceStat}
             {cell('Invoiced', formatMoney(customer.invoiced))}
             {cell('Paid', formatMoney(customer.paid))}
-            {cell('They owe us', formatMoney(customer.outstanding), customer.outstanding > 0)}
+            {/* Reads as the third term of Invoiced − Paid, which is what it is. The old wording
+                ("They owe us") stated the same number as an accusation on a page account managers
+                open in front of the customer. */}
+            {cell('Outstanding', formatMoney(customer.outstanding), customer.outstanding > 0)}
           </div>
           {aging && (aging.not_due + aging.due_0_30 + aging.due_31_90 + aging.due_90_plus) > 0 && (
             <div className="grid grid-cols-4 gap-2 pt-0.5">
@@ -208,7 +242,7 @@ export const PartyAccountSummary: React.FC<{
             {balanceInSupplier && balanceStat}
             {cell('Billed to us', formatMoney(supplier.billed))}
             {cell('Paid to them', formatMoney(supplier.paid))}
-            {cell('We owe', formatMoney(supplier.outstanding), supplier.outstanding > 0)}
+            {cell('Outstanding', formatMoney(supplier.outstanding), supplier.outstanding > 0)}
             {showRoleOrdered && cell('Ordered', formatMoney(supplier.ordered ?? 0))}
           </div>
         </div>
@@ -223,7 +257,7 @@ export const PartyAccountSummary: React.FC<{
  * (customer + supplier net position) + open orders / last payment meta + the customer's top
  * products to push + email-statement + an optional "View ledger in Finance" cross-link.
  */
-export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; ledgerHref?: string }> = ({ contactId, companyId, isSupplier, ledgerHref }) => {
+export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; ledgerHref?: string }> = ({ contactId, companyId, customerName, isSupplier, ledgerHref }) => {
   const { activeWorkspaceId } = useWorkspace();
   const [loading, setLoading] = useState(true);
   const [account, setAccount] = useState<{ invoicedTotal: number; paidTotal: number; outstandingTotal: number; quoteCount: number } | null>(null);
@@ -236,6 +270,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
   const [orderStats, setOrderStats] = useState<{ count: number; ordered: number; owedUninvoiced: number } | null>(null);
   // Their cash we hold that isn't settled against anything (overpayment / deposit on account).
   const [credit, setCredit] = useState(0);
+  const [releaseOpen, setReleaseOpen] = useState(false);
   const [profitability, setProfitability] = useState<Awaited<ReturnType<typeof financeService.getCustomerProfitability>> | null>(null);
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [contactId, companyId, activeWorkspaceId, isSupplier]);
@@ -322,12 +357,24 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         aging={aging}
         orders={orderStats}
         credit={credit}
+        onReleaseCredit={activeWorkspaceId ? () => setReleaseOpen(true) : undefined}
         profitability={profitability}
         meta={[
           { label: 'Open orders', value: openOrders },
           { label: 'Last payment', value: lastPayment ? new Date(lastPayment.paid_at).toLocaleDateString() : '—' },
         ]}
       />
+
+      {activeWorkspaceId && (
+        <ReleaseCreditDialog
+          workspaceId={activeWorkspaceId}
+          open={releaseOpen}
+          onOpenChange={setReleaseOpen}
+          party={{ companyId: companyId ?? null, contactId: companyId ? null : (contactId ?? null), name: customerName ?? null }}
+          available={credit}
+          onDone={() => void load()}
+        />
+      )}
 
       {/* Receivables & payables are managed PER ORDER now — open an order to add/see them.
           "Top items to push" renders separately (CustomerTopItemsCard) BELOW the orders list. */}
@@ -409,7 +456,7 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
               <tr className="border-b border-border/60">
                 <th className="px-4 py-2 text-left">Date</th>
                 <th className="px-4 py-2 text-left">Direction</th>
-                <th className="px-4 py-2 text-left">Method</th>
+                <th className="px-4 py-2 text-left">Account</th>
                 <th className="px-4 py-2 text-left">Reference</th>
                 <th className="px-4 py-2 text-right">Amount</th>
                 <th className="px-4 py-2 text-right w-28"></th>
@@ -426,7 +473,8 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
                         {isIn ? 'Received' : 'Paid'}
                       </span>
                     </td>
-                    <td className="px-4 py-2">{p.method ? humanizeLabel(p.method) : '—'}</td>
+                    {/* Account, not method — the account is the fact; the method is derived from it. */}
+                    <td className="px-4 py-2">{p.bank_account_name ?? '—'}</td>
                     <td className="px-4 py-2 text-muted-foreground">{p.reference || '—'}</td>
                     <td className={`px-4 py-2 text-right tabular-nums font-medium ${isIn ? 'text-emerald-500' : ''}`}>
                       {isIn ? '+' : '−'}{formatMoney(Number(p.amount), p.currency)}

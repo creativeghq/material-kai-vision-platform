@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Link2, Unlink, Inbox as InboxIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
-  financeService, formatMoney, paymentMethodLabel,
+  financeService, formatMoney,
   type PayableExpense, type ExpenseSettlement, type AttachablePayment,
 } from '@/modules/finance/services/financeService';
 import {
@@ -181,8 +181,10 @@ export const ExpensePaymentsDialog: React.FC<{
                         <tr key={s.allocation_id} className="border-b border-border/30 last:border-0">
                           <td className="px-3 py-1.5">{s.occurred_at ? new Date(s.occurred_at).toLocaleDateString() : '—'}</td>
                           <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                            {/* The account the money left from — not the method, which is only
+                                a restatement of the account's kind. */}
                             {s.source === 'payment'
-                              ? paymentMethodLabel(s.method)
+                              ? (s.bank_account_name ?? '—')
                               : <span className="text-amber-600 dark:text-amber-400">Credit note</span>}
                           </td>
                           <td className="px-3 py-1.5 text-xs text-muted-foreground">

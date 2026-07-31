@@ -19,7 +19,8 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   financeService, type PaymentMethod, type BankAccountBalance, type RecurringCadence,
 } from '@/modules/finance/services/financeService';
-import { ordersService } from '@/modules/finance/services/ordersService';
+import { ordersService, type OrderLinkTarget } from '@/modules/finance/services/ordersService';
+import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service';
@@ -35,12 +36,25 @@ interface Props {
   workspaceId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: () => void;
+  /**
+   * `result.amountPaid` is the cash that ACTUALLY left an account (0 when saved as a payable).
+   * The order screen needs it to draw the customer's on-account credit down by what was spent
+   * on their job — it must never assume the form's total was paid.
+   */
+  onCreated: (result?: { billId: string; paymentId: string | null; amountPaid: number }) => void;
   /** Link the expense to an order (so it shows on that order) + seed the amount/description. Used by
    *  the order's "Add expense" to turn a line cost into a real supplier bill in one step. */
   orderId?: string;
   prefill?: {
+    /** NET, VAT excluded — it lands in "Subtotal (net)". Pass `vatAmount` for the tax on it. */
     amount?: number;
+    /**
+     * VAT on `amount`. Required whenever the source of the prefill knows a rate: without it the
+     * form opened at "net = the whole sum, VAT = 0", which books a VAT-bearing cost with its tax
+     * folded into the net — the P&L cost is overstated and the recoverable VAT is lost. Callers
+     * that pass a GROSS figure must split it before passing it, not dump it into `amount`.
+     */
+    vatAmount?: number;
     description?: string;
     categoryId?: string;
     /** Pre-select the payee: a CRM supplier company OR contact (+ display name), or a one-off name. */
@@ -84,6 +98,9 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [poOptions, setPoOptions] = useState<Array<{ id: string; order_number: string | null; total: number }>>([]);
   const [pickedOrderId, setPickedOrderId] = useState<string>('');
   const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
+  // What the cost is FOR — a project, or a customer whose order it was incurred against. Separate
+  // from the purchase-order link above, which says which PO this bill invoices (3-way match).
+  const [link, setLink] = useState<OrderLinkTarget>({ kind: 'none' });
 
   // A supplier passed in from the party page — used so the shared draft can't clobber the prefill.
   const prefillParty: Party | null = prefill?.supplier?.companyId
@@ -158,7 +175,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (!open) return;
     if (orderId) {
       setSubtotalNet(prefill?.amount != null ? String(prefill.amount) : '0');
-      setVatAmount('0');
+      setVatAmount(prefill?.vatAmount != null ? String(prefill.vatAmount) : '0');
       setDescription(prefill?.description ?? '');
       setReference(''); setNotes(''); setCurrency('EUR'); setRepeat('none');
       setPaidNow(true); setDueAt('');
@@ -173,7 +190,10 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     }
     // General mode: only apply the fields that were prefilled (keeps the draft-restore behavior).
     if (!prefill) return;
-    if (prefill.amount != null) { setSubtotalNet(String(prefill.amount)); setVatAmount('0'); }
+    if (prefill.amount != null) {
+      setSubtotalNet(String(prefill.amount));
+      setVatAmount(prefill.vatAmount != null ? String(prefill.vatAmount) : '0');
+    }
     if (prefill.description) setDescription(prefill.description);
     if (prefill.categoryId) setCategoryId(prefill.categoryId);
     if (prefill.supplier?.companyId) {
@@ -184,7 +204,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setParty({ type: 'adhoc', id: null, label: prefill.supplier.name });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, orderId, prefill?.amount, prefill?.description, prefill?.categoryId, prefill?.supplier?.companyId, prefill?.supplier?.contactId, prefill?.supplier?.name]);
+  }, [open, orderId, prefill?.amount, prefill?.vatAmount, prefill?.description, prefill?.categoryId, prefill?.supplier?.companyId, prefill?.supplier?.contactId, prefill?.supplier?.name]);
 
   // Load the picked payee's own bank accounts (for the Bank Payment "paid to their bank" selector).
   useEffect(() => {
@@ -368,7 +388,30 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         const rolled = await financeService.resolvePrimaryCompanyId(cpContactId).catch(() => null);
         if (rolled) { cpCompanyId = rolled; cpContactId = undefined; }
       }
-      await financeService.createExpense({
+
+      // Resolve "what is this for?". A customer with no order yet gets an empty draft raised so the
+      // cost has something to hang off — an expense carries no line items, so unlike the order form
+      // there is nothing to mirror onto it, and pricing it is the operator's next step.
+      let coversOrderId: string | null = link.kind === 'sales_order' ? link.orderId : null;
+      let linkNote: string | undefined;
+      if (link.kind === 'customer') {
+        coversOrderId = await ordersService.create({
+          workspaceId,
+          orderType: 'sales',
+          status: 'draft',
+          currency,
+          customerCompanyId: link.party.party_type === 'company' ? link.party.id : null,
+          customerContactId: link.party.party_type === 'contact' ? link.party.id : null,
+          notes: `Raised for a cost booked against ${party.label}.`,
+          items: [],
+        });
+        linkNote = `Draft order raised for ${link.party.name ?? 'the customer'} — add what they are buying.`;
+      }
+      const linkProjectId = link.kind === 'project'
+        ? link.projectId
+        : (link.kind === 'sales_order' ? link.projectId : null);
+
+      const created = await financeService.createExpense({
         workspaceId,
         categoryId,
         description: description.trim() || undefined,
@@ -377,6 +420,8 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         supplierContactId: cpContactId,
         supplierName: adhocSupplierName,
         orderId: effectiveOrderId,
+        projectId: linkProjectId,
+        coversOrderId,
         currency,
         subtotalNet: parseDecimalOr(subtotalNet, 0),
         vatAmount: parseDecimalOr(vatAmount, 0),
@@ -413,12 +458,17 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       }
       toast({
         title: paidNow ? 'Expense recorded & paid' : 'Expense recorded as payable',
-        description: repeat !== 'none'
-          ? `Recurring ${repeat} — the next one generates automatically.`
-          : (paidNow ? 'Booked as a paid cost — visible in Payables and Payments.' : 'Open in Payables (AP) until you mark it paid.'),
+        description: [
+          repeat !== 'none'
+            ? `Recurring ${repeat} — the next one generates automatically.`
+            : (paidNow ? 'Booked as a paid cost — visible in Payables and Payments.' : 'Open in Payables (AP) until you mark it paid.'),
+          linkNote,
+        ].filter(Boolean).join(' '),
       });
       clearDraft();
-      onCreated();
+      // Cash actually moved only when a payment was booked — `paidNow` alone is the intent, not
+      // the outcome (a zero-total bill books no payment).
+      onCreated({ ...created, amountPaid: created.paymentId ? total : 0 });
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message ?? 'Error', variant: 'destructive' });
     } finally {
@@ -519,6 +569,17 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </Select>
             </div>
           )}
+
+          {/* An expense has no line items, so there is nothing to MERGE — this only ever attributes
+              the cost: to a project, or to the customer order it was incurred against. */}
+          <OrderLinkPicker
+            workspaceId={workspaceId}
+            value={link}
+            onChange={setLink}
+            currency={currency}
+            allowMerge={false}
+            label="What is this for? (optional)"
+          />
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">

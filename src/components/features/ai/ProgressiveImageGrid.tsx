@@ -1136,9 +1136,16 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                           <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground pb-1">Used Model</DropdownMenuLabel>
                           {[
                             { value: 'auto',              label: 'Auto',           description: 'Best model selected automatically' },
+                            // `value` MUST match generate-interior-video-v2's VideoModel keys
+                            // exactly. It used to emit 'kling-3.0' and 'wan2.1-i2v', neither of
+                            // which the generator knows: CREDIT_COSTS[model] came back undefined,
+                            // debit_credits was called with p_amount undefined, a generation_videos
+                            // row was written with credits_used undefined, and the run then threw
+                            // "Unknown model" and refunded undefined credits. Wan's price was also
+                            // advertised at 10 while the generator charges 12. (audit #304 finding 4)
                             { value: 'veo-2',             label: 'Veo 2',          description: 'Google Veo 2 — high quality',        credits: 30 },
-                            { value: 'kling-3.0',         label: 'Kling 3.0',     description: 'Kling 3.0 — cinematic + audio',      credits: 20 },
-                            { value: 'wan2.1-i2v',        label: 'Wan 2.1',        description: 'Wan2.1 — open-source quality',       credits: 10 },
+                            { value: 'kling-v3.0',        label: 'Kling 3.0',     description: 'Kling 3.0 — cinematic + audio',      credits: 20 },
+                            { value: 'wan2.1-i2v-720p',   label: 'Wan 2.1',        description: 'Wan2.1 — open-source quality',       credits: 12 },
                             { value: 'runway-gen4-turbo', label: 'Runway Gen-4',   description: 'Runway Gen-4 — premium output',      credits: 40 },
                           ].map(vm => (
                             <DropdownMenuItem key={vm.value} onClick={(e) => { e.preventDefault(); setVideoModel(vm.value); }} className="gap-1.5">

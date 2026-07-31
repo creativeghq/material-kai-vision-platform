@@ -9,7 +9,6 @@
  */
 import { CalendarDays, Coins, FileText, Tags } from 'lucide-react';
 import { optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
-import { paymentMethodLabel } from '@/modules/finance/services/financeService';
 import { mydataTypeName, mydataTypeRank } from '@/modules/finance/components/mydataTypes';
 import { inboundStatusLabel } from '@/modules/finance/components/inboundStatus';
 import { humanizeLabel } from '@/utils/humanize';
@@ -68,7 +67,7 @@ export function buildDocumentFilters(
             {
               key: 'q', type: 'text', label: 'Search',
               placeholder: 'Search reference / Counterparty…',
-              accessor: (r) => [r.reference, r.counterparty_name, r.method && paymentMethodLabel(r.method)],
+              accessor: (r) => [r.reference, r.counterparty_name, r.bank_account_name],
             },
             {
               key: 'direction', type: 'multi', label: 'Direction',
@@ -76,9 +75,12 @@ export function buildDocumentFilters(
               accessor: (r) => r.direction,
             },
             {
-              key: 'method', type: 'multi', label: 'Payment method',
-              options: optionsFromRows(rows, (r) => r.method, paymentMethodLabel),
-              accessor: (r) => r.method,
+              // The ACCOUNT, not the method. The method is derived from the account's kind, so a
+              // method filter was an indirection over the same fact with a coarser vocabulary
+              // ("Bank Payment" cannot separate two bank accounts; the account name can).
+              key: 'account', type: 'multi', label: 'Account',
+              options: optionsFromRows(rows, (r) => r.bank_account_name),
+              accessor: (r) => r.bank_account_name ?? undefined,
             },
           ],
         },

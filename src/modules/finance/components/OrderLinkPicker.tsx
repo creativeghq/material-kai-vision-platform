@@ -1,0 +1,284 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Search, ChevronRight, ChevronDown, Plus, FolderOpen, Building2, User, GitMerge, Loader2 } from 'lucide-react';
+
+import { Label } from '@/components/core/ui/label';
+import { Input } from '@/components/core/ui/input';
+import { Button } from '@/components/core/ui/button';
+import { formatMoney } from '@/modules/finance/services/financeService';
+import {
+  ordersService, type OrderLinkTarget, type LinkTargetSearch, type LinkOrderSummary, type OrderType,
+} from '@/modules/finance/services/ordersService';
+
+/**
+ * "What is this for?" — one field answering the question a cost always has an answer to, whether
+ * that answer is a project, a customer, or an order that already exists.
+ *
+ * The grouping is load-bearing, not decorative. Two rows here look almost identical — an existing
+ * PURCHASE order and an existing SALES order — and they do opposite things:
+ *
+ *   • a purchase order shares our supplier and our direction (money OUT), so the lines MERGE into it
+ *   • a sales order settles on money IN, so it is only ever LINKED (`covers_order_id`)
+ *
+ * Appending purchase lines to a customer's sales order would bill the customer what we paid our
+ * supplier. `search_order_link_targets` is what decides which orders may be merged into, so the
+ * picker cannot offer an illegal target even if this file is edited carelessly.
+ */
+export const OrderLinkPicker: React.FC<{
+  workspaceId: string;
+  value: OrderLinkTarget;
+  onChange: (v: OrderLinkTarget) => void;
+  /** The type of order being composed — merge candidates must match it. */
+  orderType?: OrderType | null;
+  /** Its counterparty. Merge candidates are that party's open orders; without one there are none. */
+  partyCompanyId?: string | null;
+  partyContactId?: string | null;
+  currency?: string | null;
+  /** Offer the customers group at all. Off for a sales order, which already has a customer. */
+  allowCustomer?: boolean;
+  /**
+   * Offer "New sales order for X" inside an expanded customer. Separate from `allowCustomer`
+   * because a caller can be able to LINK to a customer's existing order while having nothing to
+   * raise a new one from — the order detail panel, where the lines already belong to this order.
+   * A caller that leaves this on MUST handle `kind: 'customer'`, or the row does nothing.
+   */
+  allowRaiseCustomerOrder?: boolean;
+  /** Offer merging into an existing order. */
+  allowMerge?: boolean;
+  label?: string;
+  disabled?: boolean;
+  /** Rendered under the field when set — used to warn about lines that could not be priced. */
+  hint?: React.ReactNode;
+}> = ({
+  workspaceId, value, onChange, orderType, partyCompanyId, partyContactId, currency,
+  allowCustomer = true, allowRaiseCustomerOrder = true, allowMerge = true,
+  label = 'What is this for?', disabled, hint,
+}) => {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<LinkTargetSearch>({ projects: [], customers: [], merge_targets: [] });
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+
+  // Blank query is a real query here — it returns the most recent projects, the customers with open
+  // orders and this supplier's open POs. "What is this for?" almost always has a recent answer, and
+  // making the operator guess a search term to see it is what pushed the old field to always-empty.
+  useEffect(() => {
+    if (!open || disabled) return;
+    let cancelled = false;
+    setBusy(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await ordersService.searchLinkTargets({
+          workspaceId, query,
+          orderType: allowMerge ? orderType ?? null : null,
+          partyCompanyId: allowMerge ? partyCompanyId ?? null : null,
+          partyContactId: allowMerge ? partyContactId ?? null : null,
+          currency: currency ?? null,
+        });
+        if (!cancelled) setRes(r);
+      } catch {
+        if (!cancelled) setRes({ projects: [], customers: [], merge_targets: [] });
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    }, 200);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query, open, disabled, workspaceId, orderType, partyCompanyId, partyContactId, currency, allowMerge]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  const pick = useCallback((v: OrderLinkTarget) => {
+    onChange(v);
+    setQuery('');
+    setOpen(false);
+    setExpanded(null);
+  }, [onChange]);
+
+  const customers = allowCustomer ? res.customers : [];
+  const mergeTargets = allowMerge ? res.merge_targets : [];
+  const empty = res.projects.length === 0 && customers.length === 0 && mergeTargets.length === 0;
+
+  const orderLine = (o: LinkOrderSummary) => (
+    <>
+      <span className="font-medium">{o.order_number ?? o.id.slice(0, 8)}</span>
+      <span className="text-muted-foreground"> · {o.status}</span>
+      <span className="tabular-nums text-muted-foreground"> · {formatMoney(Number(o.total), o.currency)}</span>
+      {o.project_name && <span className="text-muted-foreground"> · {o.project_name}</span>}
+    </>
+  );
+
+  if (value.kind !== 'none') {
+    return (
+      <div className="space-y-1">
+        <Label>{label}</Label>
+        <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
+          <span className="text-sm">
+            <LinkKindWord kind={value.kind} />
+            <span className="ml-1.5">{value.label}</span>
+          </span>
+          {!disabled && <Button size="sm" variant="ghost" onClick={() => onChange({ kind: 'none' })}>Change</Button>}
+        </div>
+        {hint}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1" ref={boxRef}>
+      <Label>{label}</Label>
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          className="pl-7"
+          placeholder="Project, customer, or an order to add this to…"
+          value={query}
+          disabled={disabled}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        />
+        {open && !disabled && (
+          <div className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-md border border-border/60 bg-popover shadow">
+            {busy && (
+              <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> Searching…
+              </div>
+            )}
+
+            {!busy && empty && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">
+                {query.trim() ? 'Nothing matches that.' : 'No projects, customers or open orders yet.'}
+              </div>
+            )}
+
+            {res.projects.length > 0 && (
+              <GroupHeading icon={<FolderOpen className="h-3 w-3" />} text="Projects" />
+            )}
+            {res.projects.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                onClick={() => pick({ kind: 'project', projectId: p.id, label: p.name })}
+              >
+                <div>{p.name}</div>
+                {p.client_name && <div className="text-[10px] text-muted-foreground">Client: {p.client_name}</div>}
+              </button>
+            ))}
+
+            {customers.length > 0 && (
+              <GroupHeading icon={<Building2 className="h-3 w-3" />} text="Customers" />
+            )}
+            {customers.map((c) => {
+              const key = `${c.party_type}:${c.id}`;
+              const isOpen = expanded === key;
+              return (
+                <div key={key}>
+                  {/* Expanding is the whole point of the customer row: pick the person, THEN decide
+                      between a new order and one they already have — without leaving the field. */}
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-muted"
+                    onClick={() => setExpanded(isOpen ? null : key)}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {c.party_type === 'contact' ? <User className="h-3 w-3 text-muted-foreground" /> : <Building2 className="h-3 w-3 text-muted-foreground" />}
+                      {c.name ?? 'Unnamed'}
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      {c.open_count > 0 ? `${c.open_count} open order${c.open_count === 1 ? '' : 's'}` : 'no open orders'}
+                      {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <div className="border-l-2 border-border/60 bg-muted/30">
+                      {allowRaiseCustomerOrder && (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-1.5 px-5 py-2 text-left text-sm hover:bg-muted"
+                          onClick={() => pick({
+                            kind: 'customer',
+                            party: { party_type: c.party_type, id: c.id, name: c.name },
+                            label: `New order for ${c.name ?? 'customer'}`,
+                          })}
+                        >
+                          <Plus className="h-3 w-3 text-muted-foreground" />
+                          New sales order for {c.name ?? 'this customer'}
+                        </button>
+                      )}
+                      {!allowRaiseCustomerOrder && c.orders.length === 0 && (
+                        <div className="px-5 py-2 text-xs text-muted-foreground">
+                          No open orders to attach this to.
+                        </div>
+                      )}
+                      {c.orders.map((o) => (
+                        <button
+                          key={o.id}
+                          type="button"
+                          className="block w-full px-5 py-2 text-left text-sm hover:bg-muted"
+                          onClick={() => pick({
+                            kind: 'sales_order', orderId: o.id, projectId: o.project_id,
+                            label: `${o.order_number ?? o.id.slice(0, 8)} · ${c.name ?? 'customer'}`,
+                          })}
+                        >
+                          {orderLine(o)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {mergeTargets.length > 0 && (
+              <GroupHeading
+                icon={<GitMerge className="h-3 w-3" />}
+                text={orderType === 'sales' ? 'Merge into sales order' : 'Merge into purchase order'}
+              />
+            )}
+            {mergeTargets.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                onClick={() => pick({
+                  kind: 'merge_order', orderId: o.id, orderType: (orderType ?? 'purchase'),
+                  projectId: o.project_id,
+                  label: `${o.order_number ?? o.id.slice(0, 8)} · ${o.party_name ?? 'counterparty'}`,
+                })}
+              >
+                {orderLine(o)}
+                <div className="text-[10px] text-muted-foreground">
+                  {o.line_count} line{o.line_count === 1 ? '' : 's'} · these items are added to it instead of raising a new order
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {hint}
+    </div>
+  );
+};
+
+const GroupHeading: React.FC<{ icon: React.ReactNode; text: string }> = ({ icon, text }) => (
+  <div className="flex items-center gap-1.5 border-b border-border/40 bg-muted/50 px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+    {icon}{text}
+  </div>
+);
+
+/** Names the VERB, so "merge" and "link" are never mistaken for each other after the fact. */
+const LinkKindWord: React.FC<{ kind: OrderLinkTarget['kind'] }> = ({ kind }) => {
+  if (kind === 'project') return <span className="text-xs font-medium text-muted-foreground">Project</span>;
+  if (kind === 'customer') return <span className="text-xs font-medium text-muted-foreground">New customer order</span>;
+  if (kind === 'sales_order') return <span className="text-xs font-medium text-muted-foreground">For customer order</span>;
+  if (kind === 'merge_order') return <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Merging into</span>;
+  return null;
+};

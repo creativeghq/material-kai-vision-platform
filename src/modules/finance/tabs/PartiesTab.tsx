@@ -13,6 +13,7 @@ import {
 } from '@/modules/finance/services/financeService';
 import { PartyAccountSummary } from '@/modules/finance/components/CustomerFinanceTabs';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
+import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditDialog';
 import { humanizeLabel } from '@/utils/humanize';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { FilterBar, NONE_VALUE, useFilters, type FilterGroupDef } from '@/components/core/filters';
@@ -80,11 +81,11 @@ function buildPartyFilters(rows: PartyRow[]): FilterGroupDef[] {
       key: 'balances', label: 'Balances', icon: Coins,
       fields: [
         {
-          key: 'receivable_outstanding', type: 'range', label: 'They owe us',
+          key: 'receivable_outstanding', type: 'range', label: 'Receivable',
           min: receivable.min, max: receivable.max, accessor: (r: PartyRow) => r.receivable_outstanding,
         },
         {
-          key: 'payable_outstanding', type: 'range', label: 'We owe them',
+          key: 'payable_outstanding', type: 'range', label: 'Payable',
           min: payable.min, max: payable.max, accessor: (r: PartyRow) => r.payable_outstanding,
         },
       ],
@@ -214,8 +215,10 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                   <th className="px-4 py-2 text-left">Party</th>
                   <th className="px-4 py-2 text-left">Role</th>
                   <th className="px-4 py-2 text-right">Invoiced</th>
-                  <th className="px-4 py-2 text-right">They owe us</th>
-                  <th className="px-4 py-2 text-right">We owe them</th>
+                  {/* Neutral ledger terms rather than "They owe us" / "We owe them" — these sit
+                      side by side, so they also need to stay distinguishable. */}
+                  <th className="px-4 py-2 text-right">Receivable</th>
+                  <th className="px-4 py-2 text-right">Payable</th>
                   <th className="px-4 py-2 text-right">Net</th>
                   <th className="px-4 py-2 text-right" />
                 </tr>
@@ -304,6 +307,9 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const [payments, setPayments] = useState<Payment[]>([]);
   /** Their cash we hold that isn't settled against anything yet (unallocated money-in). */
   const [credit, setCredit] = useState(0);
+  const [releaseOpen, setReleaseOpen] = useState(false);
+  /** Bumped after a credit release so the drill-down re-reads the balance it just changed. */
+  const [reloadKey, setReloadKey] = useState(0);
   // Each drill-down list pages independently — these used to be `.slice(0, 15)` / `.slice(0, 10)`,
   // which silently hid every older invoice/bill/payment with no way to reach it.
   const [invPage, setInvPage] = useState(1);
@@ -439,7 +445,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
         setLoading(false);
       }
     })();
-  }, [party, toast]);
+  }, [party, toast, reloadKey]);
 
   return (
     <>
@@ -461,6 +467,22 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                 : null}
               aging={aging ? { not_due: Number(aging.not_due), due_0_30: Number(aging.due_0_30), due_31_90: Number(aging.due_31_90), due_90_plus: Number(aging.due_90_plus) } : null}
               credit={credit}
+              onReleaseCredit={() => setReleaseOpen(true)}
+            />
+
+            {/* Stop holding their leftover money and keep it as income. Same action, same dialog,
+                as the CRM Account tab — this drill-down shows the same balance. */}
+            <ReleaseCreditDialog
+              workspaceId={party.workspace_id}
+              open={releaseOpen}
+              onOpenChange={setReleaseOpen}
+              party={{
+                companyId: party.party_type === 'company' ? party.party_id : null,
+                contactId: party.party_type === 'contact' ? party.party_id : null,
+                name: party.display_name,
+              }}
+              available={credit}
+              onDone={() => setReloadKey((k) => k + 1)}
             />
 
             <StatementActions

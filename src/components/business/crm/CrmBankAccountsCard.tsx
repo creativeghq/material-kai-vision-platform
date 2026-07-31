@@ -7,6 +7,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { crmBankAccountsAPI, type CrmBankAccount, type CrmBankAccountInput } from '@/services/crm.service';
+import { normalizeIban } from '@/utils/iban';
 
 interface Props {
   workspaceId: string;
@@ -96,7 +97,7 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">IBAN</Label>
-          <Input value={form.iban ?? ''} onChange={(e) => setForm((f) => ({ ...f, iban: e.target.value }))} placeholder="GR16 0110 1250 0000 0001 2300 695" className="font-mono" />
+          <Input value={form.iban ?? ''} onChange={(e) => setForm((f) => ({ ...f, iban: normalizeIban(e.target.value) }))} placeholder="GR16 0110 1250 0000 0001 2300 695" className="font-mono" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">

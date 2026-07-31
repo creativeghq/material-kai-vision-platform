@@ -16,7 +16,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { financeService, formatMoney, paymentMethodLabel, type Invoice, type CreditNote, type PaymentWithAllocation, type RecurringExpense } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, type Invoice, type CreditNote, type PaymentWithAllocation, type RecurringExpense } from '@/modules/finance/services/financeService';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
@@ -772,7 +772,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
         <th className="px-4 py-2 text-left">Direction</th>
         <th className="px-4 py-2 text-left">Party</th>
         <th className="px-4 py-2 text-left">Order</th>
-        <th className="px-4 py-2 text-left">Method</th>
+        <th className="px-4 py-2 text-left">Account</th>
         <th className="px-4 py-2 text-left">Reference</th>
         <th className="px-4 py-2 text-right">Amount</th>
         <th className="px-4 py-2 text-right">Allocated</th>
@@ -807,7 +807,9 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
                 ? <Link to={`${financeBase}/orders/${p.order_id}`} className="text-primary hover:underline text-xs">{p.order_number ?? 'open'}</Link>
                 : <span className="text-muted-foreground">—</span>}
             </td>
-            <td className="px-4 py-2">{p.method ? paymentMethodLabel(p.method) : '—'}</td>
+            {/* The ACCOUNT, not the method — the account is what was picked and the method is
+                derived from it, so printing the method restated the same fact one step removed. */}
+            <td className="px-4 py-2">{p.bank_account_name ?? '—'}</td>
             <td className="px-4 py-2 text-muted-foreground truncate max-w-[200px]" title={p.reference ?? undefined}>
               {p.reference ?? (p.category_id ? categoryName(p.category_id) : '—')}
             </td>

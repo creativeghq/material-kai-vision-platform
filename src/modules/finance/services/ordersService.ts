@@ -23,6 +23,12 @@ export interface Order {
   supplier_company_id: string | null;
   supplier_contact_id: string | null;
   project_id: string | null;
+  /**
+   * The SALES order this order exists to serve — "we are buying this FOR that customer's order".
+   * Set by `raise_cover_purchase_orders` and by the link picker. Never a merge: purchase lines are
+   * money OUT and must not land on a sales order, which settles on money IN.
+   */
+  covers_order_id: string | null;
   source_quote_id: string | null;
   order_number: string | null;
   status: OrderStatus;
@@ -138,6 +144,51 @@ export interface LinePricing {
 }
 
 export type OrderDiscountType = 'percent' | 'amount';
+
+/** A customer, as either a company or a standalone contact. */
+export interface LinkParty { party_type: 'company' | 'contact'; id: string; name: string | null }
+
+export interface LinkOrderSummary {
+  id: string;
+  order_number: string | null;
+  status: OrderStatus;
+  payment_status?: OrderPaymentStatus;
+  total: number;
+  currency: string;
+  project_id: string | null;
+  project_name: string | null;
+  created_at: string;
+}
+
+export interface LinkTargetSearch {
+  projects: Array<{
+    id: string; name: string; status: string; last_activity_at: string;
+    client_company_id: string | null; client_contact_id: string | null; client_name: string | null;
+  }>;
+  customers: Array<LinkParty & { open_count: number; orders: LinkOrderSummary[] }>;
+  /** Orders this order's lines may legally be APPENDED to. See `search_order_link_targets`. */
+  merge_targets: Array<LinkOrderSummary & { party_name: string | null; line_count: number; covers_order_id: string | null }>;
+}
+
+/**
+ * What a cost is FOR. One field in the UI, four resolutions — every one of which writes a column
+ * that already existed; this adds vocabulary, not schema.
+ *
+ * The distinction that matters is `merge_purchase` vs `sales_order`. Both read as "add it to an
+ * order I already have", but only the first is a merge. A purchase order shares our supplier and
+ * our direction (money OUT), so its lines and ours belong on one document. A customer's sales order
+ * settles on money IN — appending our costs there would bill the customer what we paid. So a sales
+ * order is LINKED (`covers_order_id`) and never written into.
+ */
+export type OrderLinkTarget =
+  | { kind: 'none' }
+  | { kind: 'project'; projectId: string; label: string }
+  /** Raise a NEW sales order for this customer, mirroring the lines at their selling price. */
+  | { kind: 'customer'; party: LinkParty; label: string }
+  /** Attach to a sales order that already exists — sets `covers_order_id`, inherits its project. */
+  | { kind: 'sales_order'; orderId: string; projectId: string | null; label: string }
+  /** Append the lines to an existing order of the SAME type and party, instead of raising a new one. */
+  | { kind: 'merge_order'; orderId: string; orderType: OrderType; projectId: string | null; label: string };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -446,6 +497,8 @@ export const ordersService = {
     supplierCompanyId?: string | null;
     supplierContactId?: string | null;
     projectId?: string | null;
+    /** The sales order this one is raised to serve (demand link, never a merge). */
+    coversOrderId?: string | null;
     currency?: string;
     notes?: string | null;
     categoryId?: string | null;
@@ -468,6 +521,7 @@ export const ordersService = {
         supplier_company_id: input.supplierCompanyId ?? null,
         supplier_contact_id: input.supplierContactId ?? null,
         project_id: input.projectId ?? null,
+        covers_order_id: input.coversOrderId ?? null,
         currency: input.currency ?? 'EUR',
         subtotal_net: subtotal,
         vat_amount: vatTotal,
@@ -509,6 +563,12 @@ export const ordersService = {
       }));
       const { error: itErr } = await supabase.from('order_items').insert(itemRows);
       if (itErr) throw itErr;
+      // SQL has the last word on the derived money. `computeOrderLines` above seeds the same
+      // numbers so the row is never briefly wrong, but `recompute_order_totals` is the definition
+      // — the one `append_order_items` also uses, so a merged order and a created order cannot
+      // end up rated by two different rules. A disagreement here is a bug in one of them, and
+      // this call means the database's answer is the one that survives.
+      await supabase.rpc('recompute_order_totals', { p_order_id: orderId });
     }
     // Flows — order lifecycle (fire-and-forget).
     flowEventService.emitToWorkspaceRoles(input.workspaceId, ['owner', 'admin'], 'order_created',
@@ -530,6 +590,122 @@ export const ordersService = {
         action_url: '/finance?tab=orders',
       }));
     return orderId;
+  },
+
+  /**
+   * Everything a cost can be attributed to, in one round trip: projects, customers with their open
+   * sales orders nested underneath, and — only when a supplier and currency are known — the purchase
+   * orders these lines may legally be merged into.
+   *
+   * `merge_targets` is filtered server-side rather than in the picker, so "what may be appended to"
+   * has exactly one definition and it is the one the database enforces.
+   */
+  async searchLinkTargets(opts: {
+    workspaceId: string;
+    query?: string | null;
+    /** The type of order being composed. Merge candidates must match it — see the RPC comment. */
+    orderType?: OrderType | null;
+    /** Its counterparty: the supplier on a purchase order, the customer on a sales order. */
+    partyCompanyId?: string | null;
+    partyContactId?: string | null;
+    currency?: string | null;
+    limit?: number;
+  }): Promise<LinkTargetSearch> {
+    const { data, error } = await supabase.rpc('search_order_link_targets', {
+      p_workspace_id: opts.workspaceId,
+      p_query: opts.query?.trim() || null,
+      p_order_type: opts.orderType ?? null,
+      p_party_company_id: opts.partyCompanyId ?? null,
+      p_party_contact_id: opts.partyContactId ?? null,
+      p_currency: opts.currency ?? null,
+      p_limit: opts.limit ?? 8,
+    });
+    if (error) throw error;
+    const d = (data ?? {}) as Partial<LinkTargetSearch>;
+    return {
+      projects: d.projects ?? [],
+      customers: d.customers ?? [],
+      merge_targets: d.merge_targets ?? [],
+    };
+  },
+
+  /**
+   * Append lines to an existing order. NOT `updateItems`, which deletes every line and re-inserts:
+   * `stock_allocations.demand_id` points at `order_items.id`, so a delete drops the order's
+   * reservations and its `quantity_delivered` with them. The RPC only inserts, then re-rates the
+   * existing lines in place (a flat-amount order discount is stored as an effective percent, so a
+   * new line legitimately changes what every other line nets).
+   *
+   * `expectOrderType` is passed so the database, not the caller, refuses a purchase-into-sales merge.
+   */
+  async appendItems(opts: {
+    orderId: string;
+    items: NewOrderItem[];
+    expectOrderType?: OrderType;
+    expectCurrency?: string;
+  }): Promise<{ ok: boolean; reason?: string; message?: string; appended?: number; order_number?: string | null }> {
+    const { data, error } = await supabase.rpc('append_order_items', {
+      p_order_id: opts.orderId,
+      p_items: opts.items.map((it) => ({
+        product_id: it.product_id ?? null,
+        description: it.description,
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+        unit_cost: it.unit_cost ?? null,
+        supplier_company_id: it.supplier_company_id ?? null,
+        measurement_unit_code: it.measurement_unit_code ?? null,
+        vat_percent: it.vat_percent ?? 0,
+        vat_category: it.vat_category ?? null,
+        update_warehouse: it.update_warehouse ?? true,
+      })),
+      p_expect_order_type: opts.expectOrderType ?? null,
+      p_expect_currency: opts.expectCurrency ?? null,
+    });
+    if (error) throw error;
+    return (data ?? { ok: false }) as any;
+  },
+
+  /**
+   * Re-price purchase lines as what the CUSTOMER pays, for the mirrored sales order.
+   *
+   * Every catalog line goes back through `resolveLinePricing` — the #227 pricing pyramid, the same
+   * resolver a hand-picked line uses — so the customer's pricing level and discount apply. It does
+   * NOT mark cost up by a house percentage; there is no such number, and inventing one here would
+   * be a second pricing rule competing with the resolver.
+   *
+   * Ad-hoc lines (no `product_id`) have nothing to look up. They are carried at cost and reported in
+   * `unpriced` so the operator is told which lines still need a price, rather than a zero-margin
+   * line quietly reaching the customer.
+   */
+  async mirrorLinesForSale(opts: {
+    workspaceId: string;
+    items: NewOrderItem[];
+    companyId?: string | null;
+    contactId?: string | null;
+  }): Promise<{ items: NewOrderItem[]; unpriced: string[] }> {
+    const unpriced: string[] = [];
+    const items = await Promise.all(opts.items.map(async (it) => {
+      if (!it.product_id) {
+        unpriced.push(it.description);
+        return { ...it, supplier_company_id: null };
+      }
+      const pr = await this.resolveLinePricing({
+        workspaceId: opts.workspaceId, productId: it.product_id, orderType: 'sales',
+        companyId: opts.companyId ?? null, contactId: opts.contactId ?? null,
+      }).catch(() => null);
+      if (pr?.unit_price == null) {
+        unpriced.push(it.description);
+        return { ...it, supplier_company_id: null };
+      }
+      return {
+        ...it,
+        unit_price: pr.unit_price,
+        unit_cost: pr.unit_cost ?? it.unit_cost ?? null,
+        // A sales line is not bought from our supplier — that stamp belongs to the purchase side.
+        supplier_company_id: null,
+      };
+    }));
+    return { items, unpriced };
   },
 
   /**
@@ -868,11 +1044,17 @@ export const ordersService = {
    * due date, so the expected payment date is what it ages against). Both carry onto the
    * invoice/supplier bill when the order is invoiced. Pass a field to change it; omit to leave it.
    */
-  async updateMeta(id: string, patch: { categoryId?: string | null; expectedPaymentDate?: string | null; notes?: string | null }): Promise<void> {
+  async updateMeta(id: string, patch: {
+    categoryId?: string | null; expectedPaymentDate?: string | null; notes?: string | null;
+    /** What the order is FOR. Was set-once-at-create until the link picker made it editable. */
+    projectId?: string | null; coversOrderId?: string | null;
+  }): Promise<void> {
     const clean: Record<string, any> = { updated_at: new Date().toISOString() };
     if (patch.categoryId !== undefined) clean.category_id = patch.categoryId;
     if (patch.expectedPaymentDate !== undefined) clean.expected_payment_date = patch.expectedPaymentDate;
     if (patch.notes !== undefined) clean.notes = patch.notes;
+    if (patch.projectId !== undefined) clean.project_id = patch.projectId;
+    if (patch.coversOrderId !== undefined) clean.covers_order_id = patch.coversOrderId;
     const { error } = await supabase.from('orders').update(clean).eq('id', id);
     if (error) throw error;
   },
@@ -939,6 +1121,9 @@ export const ordersService = {
       })
       .eq('id', orderId);
     if (error) throw error;
+    // Same authority as create(): the discount type/value were just written, so re-derive the
+    // lines and totals from them in SQL rather than trusting the numbers computed before the write.
+    await supabase.rpc('recompute_order_totals', { p_order_id: orderId });
   },
 
   /** How much of the customer's on-account credit can be applied to this (sales) order. */
@@ -1026,6 +1211,36 @@ export const ordersService = {
     if (productId && supplierCompanyId) {
       await supabase.from('products').update({ supplier_company_id: supplierCompanyId }).eq('id', productId).is('supplier_company_id', null);
     }
+  },
+
+  /**
+   * The two facts that decide whether a line can reach the warehouse: WHICH catalog product it
+   * is, and whether it belongs in stock at all.
+   *
+   * Deliberately NOT part of `updateItems`. Neither field is a figure — they change nothing about
+   * what was ordered, billed or owed — so they must stay editable after a supplier bill or invoice
+   * has been derived from the lines, which is exactly when `updateItems` locks. Without this a
+   * free-text line was a dead end: `receive_order_into_warehouse` skips it forever, the order sits
+   * at "partially delivered", and the toast telling you to link a product pointed at a UI that
+   * refused to open.
+   */
+  async setOrderItemStock(itemId: string, patch: { productId?: string | null; updateWarehouse?: boolean }): Promise<void> {
+    const upd: Record<string, unknown> = {};
+    if ('productId' in patch) upd.product_id = patch.productId ?? null;
+    if ('updateWarehouse' in patch) upd.update_warehouse = patch.updateWarehouse;
+    if (Object.keys(upd).length === 0) return;
+    const { error } = await supabase.from('order_items').update(upd).eq('id', itemId);
+    if (error) throw error;
+  },
+
+  /** Product id → catalog name, so a linked order line can say WHAT it points at. */
+  async getProductNames(productIds: string[]): Promise<Map<string, string>> {
+    const ids = [...new Set(productIds.filter(Boolean))];
+    const out = new Map<string, string>();
+    if (ids.length === 0) return out;
+    const { data } = await supabase.from('products').select('id, name').in('id', ids);
+    for (const p of (data ?? []) as Array<{ id: string; name: string }>) out.set(p.id, p.name);
+    return out;
   },
 
   /** Company id → name, for showing supplier labels on order lines. */
