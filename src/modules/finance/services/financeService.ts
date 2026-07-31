@@ -308,6 +308,8 @@ export interface PayableExpense {
   status: SupplierBillStatus;
   category_id: string | null;
   notes: string | null;
+  /** The order this expense is matched against, if any. One order holds MANY expenses. */
+  order_id: string | null;
   /** Non-null when this expense came from the Inbox (a myDATA received document). */
   inbox: {
     document_id: string;
@@ -1563,11 +1565,27 @@ const _financeServiceCore = {
    * recurring-expense cron, or the agent), so paying it never duplicates the payable.
    */
   /**
-   * Match an expense to the purchase order it belongs to (or clear it). `supplier_bills.order_id`
-   * is what 3-way match already reads, so this is the ONLY place the link is written — a document
-   * that became an order gets linked through its bill, not through a second column.
+   * Match an expense to the order it belongs to (or clear it). `supplier_bills.order_id` is what
+   * 3-way match already reads, so this is the ONLY place the link is written — a document that
+   * became an order gets linked through its bill, not through a second column. An order holds
+   * MANY expenses (no uniqueness on the FK): the supplier's own bill plus every extra cost —
+   * transport, customs, an installer — that belongs to the same purchase.
+   *
+   * Both rows must live in the same workspace. RLS scopes the UPDATE to bills the caller can
+   * reach but says nothing about the ORDER id being written into them, so without this check a
+   * caller could file their own expense against another tenant's order and have it show up in
+   * that tenant's cost roll-up and 3-way match.
    */
   async setSupplierBillOrder(supplierBillId: string, orderId: string | null): Promise<void> {
+    if (orderId) {
+      const [bill, order] = await Promise.all([
+        supabase.from('supplier_bills').select('workspace_id').eq('id', supplierBillId).maybeSingle(),
+        supabase.from('orders').select('workspace_id').eq('id', orderId).maybeSingle(),
+      ]);
+      const billWs = (bill.data as { workspace_id: string } | null)?.workspace_id;
+      const orderWs = (order.data as { workspace_id: string } | null)?.workspace_id;
+      if (!billWs || !orderWs || billWs !== orderWs) throw new Error('Expense and order are not in the same workspace.');
+    }
     const { error } = await supabase.from('supplier_bills').update({ order_id: orderId }).eq('id', supplierBillId);
     if (error) throw error;
   },
@@ -1625,19 +1643,22 @@ const _financeServiceCore = {
    * Defaults to what can still take a payment — open, non-void, something still due. Pass
    * `ids` + `includeSettled` to read specific expenses regardless of state; `getPayableExpense`
    * is that call, so the party-name / Inbox enrichment below has exactly one implementation.
-   * `inboxOnly` narrows to expenses created from a received document.
+   * `inboxOnly` narrows to expenses created from a received document; `unlinkedOnly` narrows to
+   * expenses not yet matched to an order — what the order's "Attach an existing expense" picker
+   * offers, so an already-attached cost can never be double-counted onto a second order.
    */
   async listPayableExpenses(
     workspaceId: string,
-    opts: { inboxOnly?: boolean; ids?: string[]; includeSettled?: boolean } = {},
+    opts: { inboxOnly?: boolean; unlinkedOnly?: boolean; ids?: string[]; includeSettled?: boolean } = {},
   ): Promise<PayableExpense[]> {
     if (opts.ids && opts.ids.length === 0) return [];
     let q = supabase
       .from('supplier_bills')
-      .select('id, supplier_bill_number, supplier_company_id, supplier_contact_id, supplier_name, currency, total, amount_paid, amount_due, issued_at, due_at, status, category_id, notes')
+      .select('id, supplier_bill_number, supplier_company_id, supplier_contact_id, supplier_name, currency, total, amount_paid, amount_due, issued_at, due_at, status, category_id, notes, order_id')
       .eq('workspace_id', workspaceId)
       .order('issued_at', { ascending: false, nullsFirst: false });
     if (opts.ids) q = q.in('id', opts.ids);
+    if (opts.unlinkedOnly) q = q.is('order_id', null);
     if (!opts.includeSettled) q = q.not('status', 'in', '("void","paid")').gt('amount_due', 0);
     const { data, error } = await q;
     if (error) throw error;

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
@@ -25,6 +25,7 @@ import {
 import { statusTone } from '@/modules/finance/utils/statusTone';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
+import { LinkExpenseToOrderDialog } from '@/modules/finance/components/LinkExpenseToOrderDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { linkOrderToDocument } from '@/modules/finance/utils/inboundToOrder';
@@ -1188,6 +1189,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // attached to the order + defaulted to the "Order" category. `expensePrefill` seeds it from a line/supplier.
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [expensePrefill, setExpensePrefill] = useState<{ amount?: number; description?: string; categoryId?: string; supplier?: { companyId?: string | null; name?: string | null } } | null>(null);
+  // Attaching an expense that ALREADY exists (booked before the order, or arriving separately —
+  // transport, customs, an installer). `setSupplierBillOrder` on an existing bill, not a new one.
+  const [linkExpenseOpen, setLinkExpenseOpen] = useState(false);
   // Money-in modal (received / customer refund). `{ amount }` seeds it; null = closed.
   const [payInOpen, setPayInOpen] = useState<{ amount?: number } | null>(null);
   const [editing, setEditing] = useState(false);
@@ -1617,17 +1621,39 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         : <ArrowDownLeft className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />}
                       <span className="flex flex-col"><span>Record payment</span><span className="text-[10px] text-muted-foreground">{order.order_type === 'purchase' ? 'Money paid to the supplier.' : 'Money received from the customer.'}</span></span>
                     </DropdownMenuItem>
-                    {/* SALES only. This creates a supplier_bills row by hand — the cost side of a
-                        sale (goods bought in, transport) that is not the order itself. On a PURCHASE
-                        order it produced the SAME record as "Record supplier bill" below, which
-                        generates it from the order's own lines, so offering both was two doors to
-                        one payable and an invitation to enter the cost twice. */}
-                    {order.order_type === 'sales' && (
-                      <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
-                        <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
-                        <span className="flex flex-col"><span>Add expense</span><span className="text-[10px] text-muted-foreground">A cost against this sale.</span></span>
-                      </DropdownMenuItem>
-                    )}
+                    {/* A cost booked against this order. On a sales order that is the cost side of
+                        the sale (goods bought in, transport); on a purchase order it is the
+                        supplier's own bill and every extra that rides along with the goods —
+                        freight, customs, an installer, a second supplier on the same job. An order
+                        holds MANY expenses (`supplier_bills.order_id` is not unique), so this stays
+                        available after the first one exists — hence the label counts.
+
+                        It was SALES-only, to avoid duplicating a "Record supplier bill" action that
+                        generated the payable from the order's own lines. That action no longer
+                        exists in this menu (`generate_supplier_bill_from_order` has no caller left),
+                        so the gate stopped preventing a double entry and started preventing the ONLY
+                        one: a purchase order raised by hand rather than from the Inbox had no way to
+                        record what the supplier billed, which left 3-way match permanently at
+                        "awaiting bill". */}
+                    <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
+                      <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
+                      <span className="flex flex-col">
+                        <span>Add {(fin?.supplierBills.length ?? 0) > 0 ? 'another expense' : 'expense'}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {order.order_type === 'purchase'
+                            ? 'An extra cost on this purchase — freight, customs, an installer. Not the supplier’s own bill.'
+                            : 'A cost against this sale.'}
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                    {/* The same link, for a cost that is ALREADY booked — the transport invoice that
+                        landed a week after the goods, or anything sitting in the Inbox that was
+                        added to Expenses on its own. Without this the link could only ever be
+                        written at the moment the expense was created. */}
+                    <DropdownMenuItem className="items-start" onClick={() => setLinkExpenseOpen(true)}>
+                      <Link2 className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-muted-foreground" />
+                      <span className="flex flex-col"><span>Attach an existing expense</span><span className="text-[10px] text-muted-foreground">Put a cost you already booked onto this order.</span></span>
+                    </DropdownMenuItem>
                     {/* Settle from the customer's on-account credit — no new cash movement. */}
                     {order.order_type === 'sales' && creditToApply > 0.005 && (
                       <DropdownMenuItem className="items-start" onClick={applyCredit}>
@@ -1988,14 +2014,49 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </div>
             )}
 
-            {/* Attached supplier bills (purchase orders) */}
-            {fin && fin.supplierBills.length > 0 && (
+            {/* Every expense attached to this order — the supplier's own bill plus any extra cost
+                put on it. Many per order by design (`supplier_bills.order_id` is not unique), so
+                the header carries the count and the attach action, and each row can be detached
+                again (detaching NEVER deletes the expense — it stays in Payables, just on no
+                order, which is also how you move one to a different order). */}
+            {fin && (
               <div className="rounded-md border border-border/60">
-                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Supplier bills</div>
-                {fin.supplierBills.map((b) => (
-                  <div key={b.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                  <span>Expenses on this order{fin.supplierBills.length > 0 ? ` (${fin.supplierBills.length})` : ''}</span>
+                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => setLinkExpenseOpen(true)}>
+                    <Link2 className="h-3 w-3 mr-1" /> Attach existing
+                  </Button>
+                </div>
+                {fin.supplierBills.length === 0 ? (
+                  <p className="px-3 py-2 text-[11px] text-muted-foreground">
+                    No cost is booked against this order yet.
+                  </p>
+                ) : fin.supplierBills.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
                     <span className="font-mono text-xs">{b.supplier_bill_number ?? b.id.slice(0, 8)} · {humanizeLabel(b.status)}</span>
-                    <span className="tabular-nums">{formatMoney(Number(b.total), b.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(b.amount_due), b.currency)}</span></span>
+                    <span className="flex items-center gap-2">
+                      <span className="tabular-nums">{formatMoney(Number(b.total), b.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(b.amount_due), b.currency)}</span></span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-1.5 text-[11px] text-muted-foreground hover:text-foreground"
+                        title="Detach from this order — the expense itself is kept"
+                        disabled={saving}
+                        onClick={async () => {
+                          setSaving(true);
+                          try {
+                            await financeService.setSupplierBillOrder(b.id, null);
+                            toast({ title: 'Expense detached', description: 'It stays in Payables, on no order.' });
+                            await load(order.id);
+                            onChanged();
+                          } catch (err: unknown) {
+                            toast({ title: 'Could not detach', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+                          } finally { setSaving(false); }
+                        }}
+                      >
+                        <Unlink className="h-3 w-3" />
+                      </Button>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -2205,6 +2266,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         orderId={order.id}
         prefill={expensePrefill ?? undefined}
         onCreated={() => { setExpenseOpen(false); void load(order.id); onChanged(); }}
+      />
+    )}
+    {/* The same link written against an expense that already exists, instead of a new one. */}
+    {order && (
+      <LinkExpenseToOrderDialog
+        workspaceId={order.workspace_id}
+        orderId={order.id}
+        orderLabel={`order ${order.order_number ?? order.id.slice(0, 8)}`}
+        supplierCompanyId={order.supplier_company_id}
+        open={linkExpenseOpen}
+        onOpenChange={setLinkExpenseOpen}
+        onLinked={() => { void load(order.id); onChanged(); }}
       />
     )}
     {/* Recording money ON the order. Which side depends on what KIND of order it is: a sales order
