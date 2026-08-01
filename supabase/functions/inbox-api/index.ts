@@ -725,10 +725,30 @@ async function insertMessageAndNotify(
       // Store the returned message id as `wamid` so the zernio-webhook-handler's
       // message.delivered|read|failed handler (which matches `metadata->>wamid`) can apply
       // delivery/read receipts to THIS outbound message. Keep `relay` for debugging.
+      const relayOk = !!(res as { success?: boolean })?.success;
       await db
         .from('inbox_messages')
-        .update({ metadata: { channel: 'whatsapp', wamid: (res as { messageId?: string })?.messageId ?? null, relay: res } })
+        .update({
+          metadata: {
+            channel: 'whatsapp',
+            wamid: (res as { messageId?: string })?.messageId ?? null,
+            relay: res,
+            // Explicit failure marker (pipeline convention #1) — emptiness alone is ambiguous.
+            delivery_status: relayOk ? 'sent' : 'relay_failed',
+          },
+        })
         .eq('id', (msg as { id: string }).id);
+
+      // sendWhatsAppReply NEVER throws — _shared/zernio.ts catches everything and returns
+      // { success: false, error }. `res.success` was never read, so a Zernio rejection
+      // (expired token, missing add-on, closed 24h window, rate limit) still produced a
+      // message bubble in the operator's thread and a cleared composer, while the customer
+      // received nothing. The failure text sat in metadata.relay.error with no reader.
+      // (audit #306 finding 4)
+      if (!relayOk) {
+        const detail = String((res as { error?: unknown })?.error ?? 'WhatsApp relay failed');
+        throw new HttpError(502, `Message stored but NOT delivered to WhatsApp: ${detail}`);
+      }
     }
   }
 

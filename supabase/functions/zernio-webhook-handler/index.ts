@@ -394,10 +394,25 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
     }
   }
 
-  // Outbound inbox messages relayed over WhatsApp carry the wamid in metadata (best-effort).
-  await supabase.from('inbox_messages')
-    .update({ metadata: { delivery_status: status } })
-    .eq('metadata->>wamid', wamid);
+  // Outbound inbox messages relayed over WhatsApp carry the wamid in metadata.
+  //
+  // Goes through an RPC because PostgREST `.update` is a WHOLE-COLUMN ASSIGNMENT, not a merge.
+  // The previous `.update({ metadata: { delivery_status: status } })` wrote that object OVER the
+  // entire column, deleting `wamid`, `channel` and `relay` — so the first receipt (normally
+  // `delivered`) recorded itself AND made the row permanently unmatchable. Every later `read` or
+  // `failed` receipt matched zero rows forever: read receipts never worked, and a message Meta
+  // later reported as FAILED stayed displayed as delivered. (audit #306 finding 5)
+  const { data: receiptRows, error: receiptErr } = await supabase.rpc('apply_inbox_delivery_receipt', {
+    p_wamid: wamid,
+    p_status: status,
+    p_at: at,
+  });
+  // The old code discarded the result, so a 0-row match looked exactly like success.
+  if (receiptErr) {
+    console.error('[zernio-webhook] delivery receipt failed:', receiptErr.message, 'wamid:', wamid);
+  } else if (!receiptRows) {
+    console.warn('[zernio-webhook] delivery receipt matched no inbox message. wamid:', wamid, 'status:', status);
+  }
 }
 
 Deno.serve(withApiLogging('zernio-webhook-handler', async (req) => {
