@@ -1308,19 +1308,29 @@ export const ordersService = {
   /**
    * Set per-line delivered quantities and auto-advance the order's fulfilment status:
    *   nothing delivered → confirmed · some → partially_fulfilled · all → fulfilled.
-   * (Stays out of 'draft'/'cancelled'.) Warehouse stock movement remains the dispatch flow's job.
+   * (Stays out of 'draft'/'cancelled'.)
+   *
+   * ONE call, ONE transaction. This used to loop over the lines calling `deliver_order_line`
+   * and `throw` on the first error. Each call was atomic, but the LOOP was not: a failure on
+   * line 3 left lines 1 and 2 already delivered — stock moved out of the warehouse,
+   * `quantity_delivered` written, allocations dispatched — and the operator was told only that
+   * the save failed, with no way to know how far it got. That is pipeline convention #3, "no
+   * two-call patterns that can crash mid-way". (audit #307 finding 20)
+   *
+   * `deliver_order_lines` runs the same per-line function inside a single transaction, so an
+   * exception on any line rolls the whole delivery back. Note the old comment here claimed
+   * stock movement "remains the dispatch flow's job" — it is not: `deliver_order_line` moves
+   * warehouse stock itself, by the delta (sales out / purchase in).
    */
   async setDelivery(orderId: string, deliveries: Array<{ itemId: string; quantityDelivered: number }>): Promise<OrderStatus> {
-    let status: OrderStatus = 'confirmed';
-    for (const d of deliveries) {
-      // deliver_order_line moves warehouse stock by the delta (sales out / purchase in) AND
-      // recomputes the order's fulfilment status atomically.
-      const { data, error } = await supabase.rpc('deliver_order_line', {
-        p_order: orderId, p_item: d.itemId, p_qty: Math.max(0, d.quantityDelivered),
-      });
-      if (error) throw error;
-      if (data) status = data as OrderStatus;
-    }
-    return status;
+    const { data, error } = await supabase.rpc('deliver_order_lines', {
+      p_order: orderId,
+      p_lines: deliveries.map((d) => ({
+        item_id: d.itemId,
+        qty: Math.max(0, d.quantityDelivered),
+      })),
+    });
+    if (error) throw error;
+    return (data as OrderStatus) ?? 'confirmed';
   },
 };
