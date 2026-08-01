@@ -107,13 +107,37 @@ function isThrottled(key: string): boolean {
   return false;
 }
 
-export function withApiLogging(functionName: string, handler: Handler): Handler {
+/**
+ * `name` may be a plain string, or a function of the request.
+ *
+ * The resolver form exists for DISPATCHERS — one function serving several tasks behind a
+ * query param. Logged under one flat name, their tasks are indistinguishable in
+ * `api_usage_logs`, and a dispatcher that deliberately skips some tasks with a 200 dilutes
+ * its own failure rate below every threshold `ops.silent_zero` applies. `monitoring-cron`
+ * did exactly that: 261 real 5xx sat at ~74% of its calls because the disabled-module skip
+ * kept answering 200, so neither the endpoint branch nor the cron branch ever flagged it
+ * while a feature was dead for three months (audit #305 finding 3).
+ *
+ * Resolve to `<fn>?task=<task>` and each task is measured on its own.
+ */
+export function withApiLogging(
+  name: string | ((req: Request) => string),
+  handler: Handler,
+): Handler {
   return async (req: Request): Promise<Response> => {
     const start = Date.now();
 
     // Skip logging for CORS preflight — they're noise
     if (req.method === 'OPTIONS') {
       return handler(req);
+    }
+
+    // Never let a naming resolver break the request it is only describing.
+    let functionName: string;
+    try {
+      functionName = typeof name === 'function' ? name(req) : name;
+    } catch {
+      functionName = typeof name === 'function' ? 'unknown' : name;
     }
 
     // ip_address is NOT NULL on the table — fall back to a sentinel rather than

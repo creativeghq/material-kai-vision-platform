@@ -832,7 +832,11 @@ export function PlatformOverviewTab() {
         // (audit #298 / #305)
         supabase.from('tracked_query_price_history').select('source, scraped_at').gte('scraped_at', ago12.toISOString()).limit(10000),
         supabase.from('tracked_query_price_history').select('source, scraped_at').in('source', MARKETPLACE_SOURCES).gte('scraped_at', ago12.toISOString()).limit(5000),
-        supabase.from('ai_usage_logs').select('credits_debited, created_at').eq('module_slug', 'greek-marketplaces').gte('created_at', ago12.toISOString()).limit(5000),
+        // `greek-marketplaces` is not a module_slug any row has ever carried, so this KPI was a
+        // hardcoded 0 (audit #305 finding 5). The price pipeline stamps `price-monitoring` —
+        // see perplexity_price_search_service.py:1115 and :1520. Live distribution when checked:
+        // (null) 2908 · job-research 2066 · mention-monitoring 820 · crm 23.
+        supabase.from('ai_usage_logs').select('credits_debited, created_at').eq('module_slug', 'price-monitoring').gte('created_at', ago12.toISOString()).limit(5000),
         supabase.from('tracked_queries').select('id', { count: 'exact', head: true }).eq('is_active', true),
       ]);
 

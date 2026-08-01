@@ -59,7 +59,17 @@ const TASKS: Record<string, TaskSpec> = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-Deno.serve(withApiLogging('monitoring-cron', async (req) => {
+// Logged per TASK, not as one flat 'monitoring-cron'. This function serves five tasks; under
+// a single name their outcomes are indistinguishable in api_usage_logs, and the
+// module_disabled skip below (a 200) diluted the real 5xx rate to ~74% — under every
+// threshold ops.silent_zero applies, which is how a dead feature stayed invisible for three
+// months. Per-task paths let each be judged on its own. (audit #305 finding 3)
+Deno.serve(withApiLogging(
+  (req) => {
+    const t = new URL(req.url).searchParams.get('task');
+    return t ? `monitoring-cron?task=${t}` : 'monitoring-cron';
+  },
+  async (req) => {
   await bootstrapForFunction();
   const task = new URL(req.url).searchParams.get('task') ?? '';
 
@@ -76,9 +86,20 @@ Deno.serve(withApiLogging('monitoring-cron', async (req) => {
   }
 
   // Honor the module toggle: a disabled module must not run paid refreshes/probes.
+  //
+  // Answers success:false, NOT success:true (audit #305 finding 2). A deliberate no-op and a
+  // completed refresh used to be the same response, so mention monitoring reported healthy
+  // every hour for three months after being switched off on 2026-05-03.
+  //
+  // Deliberately still HTTP 200: a skip is not a server error and must not burn the error
+  // budget, and 204 is not available because it forbids a response body. The status is not
+  // the signal here — `success:false` plus the per-task request_path above is, and
+  // `ops.monitoring_disabled_with_subjects` catches the case that actually matters, a module
+  // switched off while subjects are still tracked.
   if (!(await isModuleEnabled(moduleSupabaseClient(), spec.module))) {
     console.log(`⏸️ ${spec.module} disabled — skipping ${task}`);
-    return json({ success: true, task, skipped: 'module_disabled', timestamp: new Date().toISOString() });
+    return json({ success: false, task, skipped: 'module_disabled', module: spec.module,
+                  timestamp: new Date().toISOString() });
   }
 
   const base = Deno.env.get('PYTHON_BACKEND_URL') || 'https://v1api.materialshub.gr';
