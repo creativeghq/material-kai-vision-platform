@@ -82,7 +82,18 @@ describe('order settlement has exactly one derivation', () => {
    */
   it('never recomputes outstanding as total − settled in TypeScript', () => {
     const offenders: string[] = [];
-    const RE = /\btotal\b[^\n]{0,40}[-−]\s*(settled|paid|net)\b/i;
+    // THIS TEST HAD A PROVEN FALSE NEGATIVE (audit #309 item 5).
+    //
+    // The old pattern ended `[-−]\s*(settled|paid|net)\b`, requiring the word to start right
+    // after the minus. A live reintroduction at OrdersPanel.tsx:1778 read
+    //
+    //     Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100)
+    //
+    // and sailed straight through, because `\bsettled` does not match inside the identifier
+    // `orderSettled`. A text-pattern rule is only ever as strong as the names people happen to
+    // pick — and whoever wrote the sixth derivation naturally named the helper after the thing
+    // it returned. No leading \b now, so orderSettled / totalPaid / netSettled all count.
+    const RE = /\btotal\b[^\n]{0,40}[-−]\s*[A-Za-z_$.]*(settled|paid|net)/i;
     for (const f of files) {
       const src = stripComments(readFileSync(f, 'utf8'));
       for (const [i, line] of src.split('\n').entries()) {
@@ -93,6 +104,46 @@ describe('order settlement has exactly one derivation', () => {
       offenders,
       'Outstanding is derived once, in `get_order_settlements`. Read `outstanding` from ' +
       '`ordersService.orderBalances()` instead of subtracting here.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  /**
+   * The structural half, which carries the real weight.
+   *
+   * The pattern rule above can always be dodged by a name nobody predicted — that is how the
+   * sixth derivation got in. This one makes a claim naming cannot escape: `outstanding` is a
+   * value you READ from the derivation, never one you ASSIGN from arithmetic. Any
+   * `const outstanding = <expression containing an operator>` is a re-derivation regardless of
+   * what the operands are called.
+   *
+   * Allowed: `= fin.outstanding`, `= balances.get(id)?.outstanding ?? 0`, `= row.outstanding`.
+   * Rejected: `= Math.max(0, total - anythingAtAll)`.
+   */
+  it('assigns `outstanding` only by reading it, never by arithmetic', () => {
+    const offenders: string[] = [];
+    // `const outstanding[: type] = ...` up to the end of the line.
+    const DECL = /\b(?:const|let|var)\s+outstanding\s*(?::[^=]+)?=\s*(.+)$/;
+    for (const f of files) {
+      const src = stripComments(readFileSync(f, 'utf8'));
+      for (const [i, line] of src.split('\n').entries()) {
+        const m = DECL.exec(line);
+        if (!m) continue;
+        const rhs = m[1];
+        // A read looks like `x.outstanding`, possibly with ?? / optional chaining. Arithmetic
+        // operators or Math.* on the right-hand side mean it is being computed here instead.
+        const reads = /\.outstanding\b/.test(rhs);
+        const computes = /[-+*/]|Math\./.test(rhs.replace(/\?\?/g, ''));
+        if (!reads || computes) {
+          offenders.push(`${relative(ROOT, f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'Outstanding is derived ONCE, in `get_order_settlements`, and returned already ' +
+      'direction-resolved. Read it (`fin.outstanding`) — do not recompute it here. This is the ' +
+      'assertion the pattern rule above could not make, and the one that would have caught the ' +
+      'OrdersPanel reintroduction.\n' + offenders.join('\n'),
     ).toEqual([]);
   });
 

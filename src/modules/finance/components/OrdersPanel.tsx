@@ -1775,7 +1775,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const orderDiscountAmount = order
     ? Math.round((items.reduce((a, it) => a + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0), 0) - Number(order.subtotal_net)) * 100) / 100
     : 0;
-  const outstanding = order ? Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100) : 0;
+  // READ the derived value; never recompute it. This line used to be
+  // `Math.max(0, round((order.total - orderSettled()) * 100) / 100)` — a sixth independent
+  // derivation of outstanding, and a live reintroduction of the exact bug
+  // moneyDerivation.test.ts exists to prevent. It slipped past that guard because the guard
+  // pattern-matched `total - settled` and the local helper is named `orderSettled`, so
+  // `settled` never matched. get_order_settlements already returns `outstanding`,
+  // direction-resolved. (audit #309 item 5)
+  const outstanding = fin?.outstanding ?? 0;
   // B2B issues an invoice, a consumer a retail receipt. Derived from the buyer's VAT identity via
   // the SHARED rule — this used to be `order?.customer_company_id ? 'invoice' : 'receipt'`, which
   // called a sole trader (a contact carrying an ΑΦΜ) retail and proposed an ΑΛΠ to a business.
