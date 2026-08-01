@@ -39,3 +39,19 @@ jobs:
             --severity ERROR --severity WARNING \
             --exclude node_modules --exclude dist \
             --error
+
+  # Semgrep matches one site at a time. "This door checks ownership and that one doesn't" is a
+  # comparison ACROSS sites, so both #294 S1 findings were invisible to any per-site rule. This
+  # job covers that shape. It self-tests before it scans — it feeds itself #294 S1 as originally
+  # written and asserts it still flags it — so a detector that has stopped detecting fails the
+  # build instead of reporting a clean codebase.
+  tenancy:
+    name: Tenancy parity (two-doors)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check tenancy parity (blocking)
+        run: node scripts/check-tenancy-parity.mjs

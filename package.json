@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:edge": "node scripts/check-edge-functions.mjs",
     "lint:a11y": "node scripts/check-a11y.mjs",
+    "lint:tenancy": "node scripts/check-tenancy-parity.mjs",
     "test": "vitest run tests/unit tests/security",
     "test:watch": "vitest tests/unit",
     "test:integration": "vitest run tests/integration",

@@ -257,6 +257,11 @@ Complete documentation for Material Kai Vision Platform.
 - `ops.silent_zero` catches the dominant failure here: a number that should be non-zero sitting at zero while nothing complains
 - Janitor crons must ship with a probe on the mess they clear — an exit code proves it ran, not that it worked
 
+**[prevention-coverage.md](prevention-coverage.md)** — Which defect shapes are actually guarded ✨ NEW (2026-08)
+- The seven historical defect shapes, each mapped to its mechanism and the date that mechanism was last watched to fire
+- Answers "is this guarded?" — not "is CI green?". Six guards in this platform have reported clean while enforcing nothing
+- Only 3 of 8 mechanisms can prove they still detect; the rest of the gaps are listed in priority order
+
 **[company-assets.md](company-assets.md)** — Company assets register ✨ NEW (2026-07)
 - Fleet / phones / laptops / payment cards / equipment, one active holder each
 - Leased & financed assets flow through the existing recurring-expense → supplier-bill machinery
