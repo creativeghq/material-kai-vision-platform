@@ -211,6 +211,7 @@ export default function PropertyWorkbench() {
   // Edits require the listings-manage capability AND ownership (own listing or broker). An estate
   // agent viewing an "open for all" listing they don't own gets a read-only view.
   const editable = canManage && canEdit;
+
   const isGRbuilding = ['EL', 'GR'].includes(String(form.country_code ?? '').toUpperCase());
   const cat = form.property_type;
   const isResidential = cat === 'residential' || cat === 'other';
@@ -219,6 +220,18 @@ export default function PropertyWorkbench() {
   const isShortLet = form.transaction_type === 'short_let';
   const isBusinessSale = form.transaction_type === 'business_transfer';
   const isRental = form.transaction_type === 'rent' || form.listing_status === 'rented';
+  // The tabs actually rendered below. Kept next to the value passed to <Tabs> so the two cannot
+  // drift: a conditional trigger added without a matching entry here would silently reintroduce
+  // the blank-page state this exists to prevent (audit #303 finding 8).
+  const availableTabs = [
+    'overview', 'media', 'inquiries', 'offers', 'viewings',
+    ...(canManage && isRental && pmEnabled ? ['lettings'] : []),
+    ...(canManage && investEnabled ? ['investment'] : []),
+    ...(canManage ? ['transaction'] : []),
+  ];
+  const requestedTab = sp.get('tab') || 'overview';
+  const activeTab = availableTabs.includes(requestedTab) ? requestedTab : 'overview';
+
   const publicUrl = property.public_listing_token ? `${window.location.origin}/p/${property.public_listing_token}` : null;
   const stepId = STEPS[step].id;
 
@@ -253,7 +266,13 @@ export default function PropertyWorkbench() {
           </div>
         )}
 
-        <Tabs value={sp.get('tab') || 'overview'} onValueChange={(v) => setSp((p) => { const n = new URLSearchParams(p); n.set('tab', v); return n; }, { replace: true })}>
+        {/* `?tab=` is deep-linked from the global "Add tenancy"/"Add investment" flows, but three
+            of these tabs are conditional. Requesting one that is not rendered — e.g. Add tenancy
+            on a SALE listing, since PropertySelect lists every property — left Radix with a value
+            matching no trigger and no content: a blank page with no tab selected and no error
+            (audit #303 finding 8). Clamping to the tabs actually present covers every conditional
+            tab, not just lettings, and keeps the deep link working whenever it is legitimate. */}
+        <Tabs value={activeTab} onValueChange={(v) => setSp((p) => { const n = new URLSearchParams(p); n.set('tab', v); return n; }, { replace: true })}>
           <TabsList className="mb-4 h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="overview" className={RE_TAB}><Home className="h-4 w-4" /> Overview</TabsTrigger>
             <TabsTrigger value="media" className={RE_TAB}><ImageIcon className="h-4 w-4" /> Media {photos.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{photos.length}</Badge>}</TabsTrigger>
