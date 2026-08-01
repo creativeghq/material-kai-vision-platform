@@ -177,10 +177,15 @@ export const CampaignsTab: React.FC = () => {
                   <tr
                     key={campaign.id}
                     className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
+                    // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                    // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                    // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
                     onClick={() => handleViewCampaign(campaign)}
                   >
                     <td className="py-3 px-4">
-                      <div className="font-medium">{campaign.name}</div>
+                      <div className="font-medium">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); handleViewCampaign(campaign); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{campaign.name}</button>
+                      </div>
                       {campaign.subject_line && (
                         <div className="text-xs text-muted-foreground">{campaign.subject_line}</div>
                       )}

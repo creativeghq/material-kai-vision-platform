@@ -267,11 +267,14 @@ export const WebhooksPanel: React.FC = () => {
                     <tr
                       key={r.flow_id}
                       className="border-b border-border/40 hover:bg-muted/30 cursor-pointer"
+                      // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                      // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                      // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
                       onClick={() => openHistory(r.flow_id, r.flow_name)}
                     >
                       <td className="px-6 py-3 font-medium">
                         <div className="flex items-center gap-2">
-                          <span>{r.flow_name}</span>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); openHistory(r.flow_id, r.flow_name); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{r.flow_name}</button>
                           <History className="h-3 w-3 text-muted-foreground" />
                         </div>
                       </td>

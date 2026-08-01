@@ -275,9 +275,20 @@ export const QuotesPage: React.FC = () => {
                     <tr
                       key={quote.id}
                       className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
+                      // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                      // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                      // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
                       onClick={() => handleViewQuote(quote.id)}
                     >
-                      <td className="px-6 py-2.5 font-medium">{quote.name || 'Untitled Quote'}</td>
+                      <td className="px-6 py-2.5 font-medium">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleViewQuote(quote.id); }}
+                          className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {quote.name || 'Untitled Quote'}
+                        </button>
+                      </td>
                       <td className="px-3 py-2.5"><QuoteStatusWord status={quote.status} /></td>
                       <td className="px-3 py-2.5 tabular-nums">{quote.total_items || quote.items?.length || 0}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{new Date(quote.created_at).toLocaleDateString()}</td>

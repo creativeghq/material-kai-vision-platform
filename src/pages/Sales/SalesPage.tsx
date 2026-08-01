@@ -194,9 +194,14 @@ export const SalesPage: React.FC = () => {
                       <tr
                         key={q.id}
                         className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
+                        // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                        // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                        // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
                         onClick={() => navigate(`/quotes/${q.id}`)}
                       >
-                        <td className="px-6 py-2.5 font-medium">{q.name || 'Untitled Order'}</td>
+                        <td className="px-6 py-2.5 font-medium">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); navigate(`/quotes/${q.id}`); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{q.name || 'Untitled Order'}</button>
+                        </td>
                         <td className="px-3 py-2.5">
                           {cust ? (
                             <button className="text-primary hover:underline" onClick={(e) => { e.stopPropagation(); navigate(cust.href); }}>{cust.label}</button>

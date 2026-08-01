@@ -404,9 +404,18 @@ export const QuoteRequestsAdmin: React.FC = () => {
                 paginate(filteredQuoteRequests, page).map((quote) => {
                     const statusTag = statusTags.find(tag => tag.id === quote.status_tag_id);
                     return (
-                  <TableRow key={quote.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleViewQuote(quote.id)}>
+                  <TableRow
+                    key={quote.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                    // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                    // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                    onClick={() => handleViewQuote(quote.id)}
+                  >
                     <TableCell className="font-medium">
-                      {quote.name || 'Untitled Quote'}
+                      <button type="button" onClick={(e) => { e.stopPropagation(); handleViewQuote(quote.id); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        {quote.name || 'Untitled Quote'}
+                      </button>
                     </TableCell>
                     <TableCell>{getStatusBadge(quote.status)}</TableCell>
                     <TableCell>

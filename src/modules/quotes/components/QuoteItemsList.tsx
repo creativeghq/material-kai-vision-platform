@@ -383,6 +383,9 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                     <React.Fragment key={item.id}>
                       <tr
                         className={`hover:bg-muted/20 transition-colors group ${isCustom || editPricing ? 'cursor-default' : 'cursor-pointer'}`}
+                        // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                        // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                        // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
                         onClick={() => !isCustom && !editPricing && item.product && handleViewProduct(item.product)}
                       >
                         {/* Product + Dimensions */}
@@ -405,9 +408,19 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className={`text-sm font-medium leading-tight truncate max-w-[200px] ${!isCustom && !editPricing ? 'group-hover:text-primary transition-colors' : ''}`}>
-                                  {displayName}
-                                </p>
+                                {!isCustom && !editPricing && item.product ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleViewProduct(item.product!); }}
+                                    className="text-sm font-medium leading-tight truncate max-w-[200px] text-left group-hover:text-primary transition-colors rounded hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  >
+                                    {displayName}
+                                  </button>
+                                ) : (
+                                  <p className="text-sm font-medium leading-tight truncate max-w-[200px]">
+                                    {displayName}
+                                  </p>
+                                )}
                                 {isCustom && (
                                   <span className="text-[10px] text-primary/70 capitalize flex-shrink-0">Custom</span>
                                 )}

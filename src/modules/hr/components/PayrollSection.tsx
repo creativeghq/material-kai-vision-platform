@@ -82,8 +82,17 @@ export function PayrollSection({ workspaceId, canManage }: { workspaceId: string
               <TableHeader><TableRow><TableHead>Period</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Gross</TableHead><TableHead className="text-right">Net</TableHead><TableHead>Finance</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>
                 {paginate(runs, page).map((r) => (
-                  <TableRow key={r.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setOpenRun(r.id)}>
-                    <TableCell className="font-medium">{r.period}</TableCell>
+                  <TableRow
+                    key={r.id}
+                    className="cursor-pointer hover:bg-muted/30"
+                    // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                    // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                    // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                    onClick={() => setOpenRun(r.id)}
+                  >
+                    <TableCell className="font-medium">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setOpenRun(r.id); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{r.period}</button>
+                    </TableCell>
                     <TableCell><span className={`text-sm capitalize ${statusTone(r.status)}`}>{r.status}</span></TableCell>
                     <TableCell className="text-right">{money(r.total_gross, r.currency)}</TableCell>
                     <TableCell className="text-right">{money(r.total_net, r.currency)}</TableCell>

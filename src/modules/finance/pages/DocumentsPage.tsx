@@ -386,8 +386,17 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                         <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No {DOC_LABEL[type].toLowerCase()} yet.</td></tr>
                       )}
                       {paginate(rows, page).map((i) => (
-                        <tr key={i.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`${financeBase}/invoices/${i.id}`)}>
-                          <td className="px-4 py-2 font-mono text-xs">{i.internal_number}</td>
+                        <tr
+                          key={i.id}
+                          className="border-b border-border/30 hover:bg-muted/30 cursor-pointer"
+                          // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                          // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                          // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                          onClick={() => navigate(`${financeBase}/invoices/${i.id}`)}
+                        >
+                          <td className="px-4 py-2 font-mono text-xs">
+                            <button type="button" onClick={(e) => { e.stopPropagation(); navigate(`${financeBase}/invoices/${i.id}`); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{i.internal_number}</button>
+                          </td>
                           <td className="px-4 py-2">{i.issued_at ? new Date(i.issued_at).toLocaleDateString() : <span className="text-muted-foreground">Draft</span>}</td>
                           <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                             {isAccountant ? (

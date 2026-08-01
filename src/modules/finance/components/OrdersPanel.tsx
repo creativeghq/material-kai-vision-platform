@@ -334,8 +334,17 @@ export const OrdersPanel: React.FC<{
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => setOpenId(r.id)}>
-                    <td className="px-4 py-2 font-mono text-xs">{r.order_number ?? r.id.slice(0, 8)}</td>
+                  <tr
+                    key={r.id}
+                    className="border-b border-border/30 hover:bg-muted/30 cursor-pointer"
+                    // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                    // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                    // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                    onClick={() => setOpenId(r.id)}
+                  >
+                    <td className="px-4 py-2 font-mono text-xs">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); setOpenId(r.id); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{r.order_number ?? r.id.slice(0, 8)}</button>
+                    </td>
                     <td className="px-4 py-2">{r.party_name ?? '—'}</td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-1.5">

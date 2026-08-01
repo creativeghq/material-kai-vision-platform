@@ -192,8 +192,17 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                   </TableHeader>
                   <TableBody>
                     {articles.map((a) => (
-                      <TableRow key={a.id} className="cursor-pointer" onClick={() => setOpenArticleId(a.id)}>
-                        <TableCell className="font-medium max-w-[280px] truncate">{a.title || a.target_keyword}</TableCell>
+                      <TableRow
+                        key={a.id}
+                        className="cursor-pointer"
+                        // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                        // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                        // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                        onClick={() => setOpenArticleId(a.id)}
+                      >
+                        <TableCell className="font-medium max-w-[280px] truncate">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setOpenArticleId(a.id); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{a.title || a.target_keyword}</button>
+                        </TableCell>
                         <TableCell className="text-muted-foreground max-w-[180px] truncate">{a.target_keyword}</TableCell>
                         <TableCell className="text-right">{a.seo_score ?? '—'}</TableCell>
                         <TableCell className="text-right">{a.word_count?.toLocaleString() ?? '—'}</TableCell>

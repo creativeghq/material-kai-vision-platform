@@ -225,10 +225,17 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
               </thead>
               <tbody>
                 {paginate(filtered, page).map((r) => (
-                  <tr key={`${r.party_type}-${r.party_id}`} className="border-b border-border/30 hover:bg-muted/30 cursor-pointer" onClick={() => setSelected(r)}>
+                  <tr
+                    key={`${r.party_type}-${r.party_id}`}
+                    className="border-b border-border/30 hover:bg-muted/30 cursor-pointer"
+                    // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                    // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                    // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                    onClick={() => setSelected(r)}
+                  >
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{r.display_name}</span>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setSelected(r); }} className="font-medium text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{r.display_name}</button>
                         {r.over_credit_limit && (
                           <span className="text-[10px] font-medium text-destructive" title={`Outstanding ${formatMoney(Number(r.receivable_outstanding || 0))} exceeds credit limit ${formatMoney(Number(r.credit_limit || 0))}`}>Over limit</span>
                         )}

@@ -874,6 +874,9 @@ const FinancePage: React.FC = () => {
                       <tr
                         key={r.id}
                         className={`border-b border-border/30 hover:bg-muted/30 ${onRowClick ? 'cursor-pointer' : ''}`}
+                        // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                        // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                        // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
                         onClick={onRowClick}
                       >
                         <td className="px-4 py-2">
@@ -992,6 +995,9 @@ const FinancePage: React.FC = () => {
                       <tr
                         key={r.id}
                         className={`border-b border-border/30 hover:bg-muted/30 ${isOrder ? 'cursor-pointer' : ''}`}
+                        // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
+                        // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
+                        // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
                         onClick={isOrder ? () => openOrder(r.id) : undefined}
                       >
                         <td className="px-4 py-2">
