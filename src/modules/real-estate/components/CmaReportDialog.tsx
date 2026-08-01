@@ -10,6 +10,7 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { realEstateService, type CmaReport } from '../services/realEstateService';
+import { escapeHtml } from '@/utils/escapeHtml';
 
 const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
 const money = (n: number | null | undefined, ccy = 'EUR') => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
@@ -129,7 +130,11 @@ const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
 function buildCmaHtml(r: CmaReport): string {
   const ccy = r.subject.currency || 'EUR';
   const m = (n: number | null | undefined) => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy, maximumFractionDigits: 0 }).format(n));
-  const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+  // CLAUDE.md invariant #11: use the CANONICAL escaper, never a local copy. The copy that was
+  // here escaped only & < > " — four of the five — leaving the single quote unescaped, and this
+  // output goes to `w.document.write(...)`, a genuine HTML sink. `real-estate-buyer-digests`
+  // already imports the shared one for the same job. (audit #303 finding 10)
+  const esc = escapeHtml;
   const subjectTitle = esc(r.subject.title || `${r.subject.property_type} in ${r.subject.town || '—'}`);
   const rows = r.comps.map((c) => `<tr>
     <td>${esc(c.title || 'Listing')}${c.town ? ` · ${esc(c.town)}` : ''}</td>

@@ -357,7 +357,7 @@ const ScheduleViewingButton: React.FC<{ ws: string; onAdded: () => void }> = ({ 
   const [open, setOpen] = useState(false);
   const [propertyId, setPropertyId] = useState('');
   const [when, setWhen] = useState('');
-  const [type, setType] = useState('in_person');
+  const [type, setType] = useState('viewing');
   const [contactId, setContactId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const save = async () => {
@@ -380,7 +380,8 @@ const ScheduleViewingButton: React.FC<{ ws: string; onAdded: () => void }> = ({ 
             <div><label className="mb-1 block text-xs text-muted-foreground">Property</label><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="mb-1 block text-xs text-muted-foreground">When</label><input type="datetime-local" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
-              <div><label className="mb-1 block text-xs text-muted-foreground">Type</label><select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>{['in_person', 'virtual', 'open_house'].map((o) => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}</select></div>
+              <div><label className="mb-1 block text-xs text-muted-foreground">Type</label><select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>{/* These values are real-estate-api's VIEWING_TYPES. The select used to emit 'in_person' and 'virtual', neither of which the allowlist knew, and the API SUBSTITUTED rather than rejected — so two of three options, including the default, were silently stored as an ordinary viewing (audit #303 finding 2). */}
+                {([['viewing', 'in person'], ['virtual', 'virtual'], ['tour', 'tour'], ['open_house', 'open house']] as const).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></div>
             </div>
             <div><label className="mb-1 block text-xs text-muted-foreground">Attendee (optional)</label><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Link a CRM contact…" /></div>
           </div>

@@ -134,7 +134,14 @@ function json(body: any, status = 200): Response {
 
 const INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'viewing_booked', 'closed', 'spam'];
 const VIEWING_STATUSES = ['scheduled', 'completed', 'cancelled', 'no_show'];
-const VIEWING_TYPES = ['viewing', 'tour', 'open_house'];
+// `virtual` added 2026-08-01 (audit #303 finding 2). The scheduling dialog has always offered
+// in_person | virtual | open_house, but the allowlist held viewing | tour | open_house and
+// SUBSTITUTED rather than rejected — so `in_person` and `virtual`, two of the three options and
+// including the default, were both silently written as `viewing`. property_viewings has no CHECK
+// on `type`, so nothing downstream caught it and viewing-mix reporting was simply wrong.
+// `in_person` is normalised to the stored `viewing`; anything else now 400s.
+const VIEWING_TYPES = ['viewing', 'virtual', 'tour', 'open_house'];
+const VIEWING_TYPE_ALIASES: Record<string, string> = { in_person: 'viewing' };
 const INTEREST_TYPES = ['viewed', 'interested', 'favorite', 'offer_made'];
 
 /** url-safe random token for the public listing page. */
@@ -671,24 +678,56 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const scheduledAt = String(body.scheduled_at ?? '');
         if (!id || !scheduledAt) return json({ error: 'property_id and scheduled_at are required' }, 400);
         const prop = await loadProperty(id);
-        const type = VIEWING_TYPES.includes(body.type) ? body.type : 'viewing';
+        const rawType = body.type === undefined ? 'viewing' : String(body.type);
+        const type = VIEWING_TYPE_ALIASES[rawType] ?? rawType;
+        if (!VIEWING_TYPES.includes(type)) {
+          return json({ error: `type must be one of: ${VIEWING_TYPES.join(', ')}` }, 400);
+        }
         const contactId = body.crm_contact_id ?? null;
-        const agentId = body.agent_id ?? userId;
+
+        // `agent_id` is body-supplied and used as crm_meetings.owner_user_id. Unvalidated it
+        // could point at anyone — a plausible cause of the very insert failure the code below
+        // could not see (audit #303 finding 7). Must be an active member of THIS workspace.
+        const agentId = String(body.agent_id ?? userId);
+        if (agentId !== userId) {
+          const { data: member } = await supabase.from('workspace_members')
+            .select('user_id').eq('workspace_id', workspaceId).eq('user_id', agentId).eq('status', 'active').maybeSingle();
+          if (!member) return json({ error: 'agent_id must be an active member of this workspace' }, 400);
+        }
         // Mirror into the platform calendar (crm_meetings) so it shows in Profile→Calendar /
         // Appointments and gets the reminder cron. reminder_at is computed by crm_meetings_sync_trg.
-        const subject = `${type === 'open_house' ? 'Open house' : type === 'tour' ? 'Property tour' : 'Viewing'} — ${prop.title || prop.reference_code || 'listing'}`;
-        const location = [prop.hide_exact_address ? null : prop.address, prop.town, prop.region].filter(Boolean).join(', ') || null;
-        const { data: meeting } = await supabase.from('crm_meetings').insert({
+        const subject = `${type === 'open_house' ? 'Open house' : type === 'tour' ? 'Property tour' : type === 'virtual' ? 'Virtual viewing' : 'Viewing'} — ${prop.title || prop.reference_code || 'listing'}`;
+        const location = type === 'virtual'
+          ? null
+          : [prop.hide_exact_address ? null : prop.address, prop.town, prop.region].filter(Boolean).join(', ') || null;
+        // The error MUST be checked (audit #303 finding 7). This discarded it, so on failure
+        // `meeting` was null, `meeting_id` stored null, the viewing was created anyway and the
+        // action returned 200 — leaving a viewing that appears in the Real Estate list but never
+        // in the agent's calendar and never fires the 60-minute reminder, so the agent misses the
+        // appointment. `update-viewing`'s sync block is gated on `data?.meeting_id`, so the
+        // mismatch stayed invisible forever. Note the sibling insert two statements down has
+        // always checked its error — the omission was inconsistent within one block.
+        const { data: meeting, error: meetingErr } = await supabase.from('crm_meetings').insert({
           workspace_id: workspaceId, owner_user_id: agentId,
           target_kind: contactId ? 'contact' : null, target_id: contactId,
           subject, notes: prop.reference_code ? `Ref ${prop.reference_code}` : null,
           meeting_at: scheduledAt, location, remind_email: true, reminder_minutes_before: 60, status: 'scheduled',
         }).select('id').single();
+        if (meetingErr || !meeting?.id) {
+          throw new HttpError(400, `Could not add the viewing to the calendar: ${meetingErr?.message ?? 'unknown error'}`);
+        }
         const { data, error } = await supabase.from('property_viewings').insert({
           workspace_id: workspaceId, property_id: id, scheduled_at: scheduledAt, type,
-          crm_contact_id: contactId, agent_id: agentId, meeting_id: meeting?.id ?? null,
+          crm_contact_id: contactId, agent_id: agentId, meeting_id: meeting.id,
         }).select('*').single();
-        if (error) throw new HttpError(400, error.message);
+        if (error) {
+          // The calendar row is already written, and there is no transaction across these two
+          // inserts. Leaving it would put a reminder-bearing appointment in the agent's calendar
+          // for a viewing that does not exist — the mirror image of the bug fixed above, so it is
+          // undone rather than traded.
+          await supabase.from('crm_meetings').delete().eq('id', meeting.id).eq('workspace_id', workspaceId);
+          throw new HttpError(400, error.message);
+        }
         return json({ viewing: data });
       }
 

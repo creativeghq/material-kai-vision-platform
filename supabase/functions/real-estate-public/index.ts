@@ -251,11 +251,23 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     }
 
     // Capture the seller lead (crm_contact + real-estate extension). property_id/workspace are server-set.
-    const { data: contact } = await supabase.from('crm_contacts').insert({
+    //
+    // The error MUST be checked (audit #303 finding 6). This used to destructure only `data`, so a
+    // failed insert left `contact` null, skipped the property_contacts_ext upsert AND the
+    // crm_contact_created event, and still returned 200 with the estimate — while
+    // ValuationWidget flips to its success screen on any resolved promise. The seller saw
+    // "Thanks, we'll be in touch", the row was never written, no alert fired, and nothing logged
+    // it (withApiLogging only reports thrown errors). This is the module's headline lead magnet.
+    // `inquire`, in this same file, has always done it correctly.
+    const { data: contact, error: contactErr } = await supabase.from('crm_contacts').insert({
       workspace_id: workspaceId, name, email, phone: String(body?.phone ?? '').slice(0, 40) || null,
       contact_type: 'seller', lead_source: 'valuation_request', lead_status: 'new',
     }).select('id').single();
-    if (contact?.id) {
+    if (contactErr || !contact?.id) {
+      console.error('[real-estate-public] valuation lead capture failed:', contactErr?.message);
+      throw new HttpError(400, 'Could not record your request. Please try again.');
+    }
+    {
       await supabase.from('property_contacts_ext').upsert({
         crm_contact_id: contact.id, workspace_id: workspaceId, contact_role: 'seller',
         owned_property_address: [String(body?.address ?? '').trim(), town].filter(Boolean).join(', ') || null,
