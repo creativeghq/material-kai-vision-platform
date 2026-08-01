@@ -244,39 +244,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const isAdmin = can('pricing.manage');
   const { user } = useAuth();
   const { activeWorkspaceId } = useWorkspace();
-
-  // ── Who sees what ──────────────────────────────────────────────────────────────────────
-  //
-  // This modal is mounted on a lot of different surfaces (admin catalog, Discover, dashboard
-  // widgets, moodboards, quote lines, agent results, the 3D designer), so the viewer can be an
-  // operator, a warehouse hand, a sales rep or a project client. Two axes decide, and BOTH must
-  // pass — a capability alone is not enough:
-  //
-  //   1. OWNERSHIP. Business data only ever concerns a product in the viewer's ACTIVE
-  //      workspace. Operator-catalog reference items and other nodes' products have no stock,
-  //      cost or listing that means anything here, and asking for them would be a cross-tenant
-  //      read dressed up as a UI feature.
-  //   2. CAPABILITY, from the persona model in `auth/capabilities.ts` — not the coarse
-  //      `pricing.manage` this file used for everything, which is about pricing rules and says
-  //      nothing about stock. `staff` and `warehouse_staff` run the warehouse and hold
-  //      `warehouse.manage`; neither holds `pricing.manage`, so gating stock on the latter
-  //      would hide the warehouse from the warehouse team.
-  //
-  // Personas that hold none of these — `end_user` (project clients), `employee`, `hr_*`,
-  // `marketing_staff`, `accountant`, `realestate_agent` — see the product and nothing else.
-  // Note `end_user` DOES hold `quotes.use`, which is why availability keys off `sales.portal`
-  // rather than the ability to quote.
-  const isOwnProduct =
-    !!activeWorkspaceId &&
-    (product as unknown as { workspace_id?: string | null }).workspace_id === activeWorkspaceId;
-  /** Warehouse rows, locations, the movement ledger, listings. Operations data. */
-  const canSeeStock = isOwnProduct && can('warehouse.manage');
-  /** "In stock / Low / Out" and a total, nothing else — so a rep doesn't quote thin air. */
-  const canSeeAvailability = isOwnProduct && canAny('warehouse.manage', 'sales.portal');
-  /** What we PAID and to whom. Owner/admin personas, plus the sales manager who carries margin. */
-  const canSeeCost = isOwnProduct && canAny('pricing.manage', 'sales.team.view');
-  /** Fiscal identity is set by whoever does intake or invoicing, so it is not pricing-only. */
-  const canSeeFiscal = isOwnProduct && canAny('pricing.manage', 'warehouse.manage', 'finance.manage');
   const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [images, setImages] = useState<any[]>([]);
@@ -492,7 +459,44 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return generateGroutRecommendations(data || {});
   }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Every caller below mounts this modal unconditionally and passes `product={selectedProduct}`,
+  // which is null until a card is clicked (LatestWidgets, DiscoverPage, ProductStrip,
+  // QuoteItemsList, MoodBoardDetailPage). So the body runs with a null product on every render of
+  // those pages — anything that dereferences `product` MUST live below this line, not above it.
   if (!product) return null;
+
+  // ── Who sees what ──────────────────────────────────────────────────────────────────────
+  //
+  // This modal is mounted on a lot of different surfaces (admin catalog, Discover, dashboard
+  // widgets, moodboards, quote lines, agent results, the 3D designer), so the viewer can be an
+  // operator, a warehouse hand, a sales rep or a project client. Two axes decide, and BOTH must
+  // pass — a capability alone is not enough:
+  //
+  //   1. OWNERSHIP. Business data only ever concerns a product in the viewer's ACTIVE
+  //      workspace. Operator-catalog reference items and other nodes' products have no stock,
+  //      cost or listing that means anything here, and asking for them would be a cross-tenant
+  //      read dressed up as a UI feature.
+  //   2. CAPABILITY, from the persona model in `auth/capabilities.ts` — not the coarse
+  //      `pricing.manage` this file used for everything, which is about pricing rules and says
+  //      nothing about stock. `staff` and `warehouse_staff` run the warehouse and hold
+  //      `warehouse.manage`; neither holds `pricing.manage`, so gating stock on the latter
+  //      would hide the warehouse from the warehouse team.
+  //
+  // Personas that hold none of these — `end_user` (project clients), `employee`, `hr_*`,
+  // `marketing_staff`, `accountant`, `realestate_agent` — see the product and nothing else.
+  // Note `end_user` DOES hold `quotes.use`, which is why availability keys off `sales.portal`
+  // rather than the ability to quote.
+  const isOwnProduct =
+    !!activeWorkspaceId &&
+    (product as { workspace_id?: string | null }).workspace_id === activeWorkspaceId;
+  /** Warehouse rows, locations, the movement ledger, listings. Operations data. */
+  const canSeeStock = isOwnProduct && can('warehouse.manage');
+  /** "In stock / Low / Out" and a total, nothing else — so a rep doesn't quote thin air. */
+  const canSeeAvailability = isOwnProduct && canAny('warehouse.manage', 'sales.portal');
+  /** What we PAID and to whom. Owner/admin personas, plus the sales manager who carries margin. */
+  const canSeeCost = isOwnProduct && canAny('pricing.manage', 'sales.team.view');
+  /** Fiscal identity is set by whoever does intake or invoicing, so it is not pricing-only. */
+  const canSeeFiscal = isOwnProduct && canAny('pricing.manage', 'warehouse.manage', 'finance.manage');
 
   const materialCategory = getMaterialCategory(product);
   const theme = getCategoryTheme(materialCategory);

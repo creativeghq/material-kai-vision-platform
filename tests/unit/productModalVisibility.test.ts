@@ -99,3 +99,87 @@ describe('product modal — the gates are still conjunctions with ownership', ()
     expect(src).toMatch(/ModuleTabGate[\s\S]{0,120}moduleSlug="stock"/);
   });
 });
+
+/**
+ * The modal must survive `product === null`.
+ *
+ * Every caller mounts it unconditionally — `product={selectedProduct}` alongside
+ * `isOpen={!!selectedProduct}` — so the component body runs with a null product on EVERY render of
+ * the dashboard (LatestWidgets), Discover, quote lines, moodboards and the agent product strip.
+ * `if (!product) return null` is what makes that safe.
+ *
+ * On 2026-08-01 the persona gates above were added ABOVE that guard, reading the prop through an
+ * `as unknown as {...}` cast that erased the `| null`. tsc stayed silent, and all five surfaces
+ * threw "Cannot read properties of null (reading 'workspace_id')" into the error boundary on load.
+ *
+ * Rule: at the TOP LEVEL of the component body, nothing above the guard may touch `product` except
+ * a null check or an optional-chained read (`product?.id`, which is how the hook dep arrays cite
+ * it). Reads nested inside a hook or callback are exempt — those carry their own guards and do not
+ * run during the null render.
+ */
+describe('product modal — null product is a render, not a crash', () => {
+  const src = readFileSync(MODAL, 'utf8');
+  const GUARD = 'if (!product) return null;';
+  const BODY_OPEN = '}) => {';
+
+  /** Comments and string/template literals blanked in place, so prose mentioning "product" and
+   *  braces inside literals cannot trip the scan. Length is preserved to keep line numbers honest. */
+  const blankNoise = (s: string): string => {
+    const out = s.split('');
+    let state: 'code' | 'line' | 'block' | "'" | '"' | '`' = 'code';
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i], d = s[i + 1];
+      const blank = () => { if (c !== '\n') out[i] = ' '; };
+      if (state === 'code') {
+        if (c === '/' && d === '/') { state = 'line'; out[i] = out[i + 1] = ' '; i++; }
+        else if (c === '/' && d === '*') { state = 'block'; out[i] = out[i + 1] = ' '; i++; }
+        else if (c === "'" || c === '"' || c === '`') { state = c; out[i] = ' '; }
+      } else if (state === 'line') {
+        if (c === '\n') state = 'code'; else blank();
+      } else if (state === 'block') {
+        blank();
+        if (c === '*' && d === '/') { out[i + 1] = ' '; state = 'code'; i++; }
+      } else {
+        if (c === '\\') { out[i] = ' '; if (d !== '\n') out[i + 1] = ' '; i++; }
+        else { blank(); if (c === state) state = 'code'; }
+      }
+    }
+    return out.join('');
+  };
+
+  it('the guard runs before any top-level use of the prop', () => {
+    const bodyOpen = src.indexOf(BODY_OPEN, src.indexOf('export const ProductDetailModal'));
+    const guardAt = src.indexOf(GUARD);
+    expect(bodyOpen, 'component signature not found — was it renamed?').toBeGreaterThan(-1);
+    expect(guardAt, `"${GUARD}" not found — the null guard must stay verbatim`).toBeGreaterThan(bodyOpen);
+
+    const start = bodyOpen + BODY_OPEN.length;
+    const region = blankNoise(src.slice(start, guardAt));
+
+    // Brace depth 0 == a statement in the component body itself, not inside a hook or callback.
+    const depthAt = (upTo: number): number => {
+      let depth = 0;
+      for (const ch of region.slice(0, upTo)) {
+        if (ch === '{') depth++;
+        else if (ch === '}') depth--;
+      }
+      return depth;
+    };
+
+    const offenders: string[] = [];
+    for (const m of region.matchAll(/\bproduct\b/g)) {
+      const at = m.index!;
+      if (depthAt(at) !== 0) continue;                            // nested — carries its own guard
+      const after = region.slice(at + 'product'.length, at + 'product'.length + 2);
+      const before = region.slice(Math.max(0, at - 1), at);
+      if (after.startsWith('?.') || before === '!') continue;      // optional read / null check
+      offenders.push(`line ${src.slice(0, start + at).split('\n').length}`);
+    }
+
+    expect(
+      offenders,
+      `top-level dereference of a possibly-null \`product\` above "${GUARD}" at ${offenders.join(', ')} — ` +
+        'move it below the guard (see the "Who sees what" block)',
+    ).toEqual([]);
+  });
+});
