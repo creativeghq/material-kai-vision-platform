@@ -9777,5 +9777,57 @@
     ],
     "request": [],
     "response": "text/html — confirmation or failure page"
+  },
+  {
+    "name": "taric-reference-sync",
+    "tag": "Customs",
+    "summary": "Import the EU TARIC goods nomenclature (Greek extract) into the reference table",
+    "description": "Loads a CSV/TSV export of the TARIC goods nomenclature into public.taric_codes, which backs the commodity-code picker, code validation and the classifier shortlist. Column headers are matched against an alias table so the EU export, the Greek national export and an admin re-export all load unconfigured. Admin JWT for the import; the monthly refresh cron authenticates with x-cron-secret and fetches TARIC_REFERENCE_URL.",
+    "security": [
+      "supabaseJwt",
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "import",
+        "description": "Upsert a CSV/TSV nomenclature export. Body: source (taric_eu|gr_national), content or url, optional mapping overrides.",
+        "params": []
+      },
+      {
+        "action": "stats",
+        "description": "Row counts and last-import timestamp for the reference table.",
+        "params": []
+      }
+    ]
+  },
+  {
+    "name": "taric-classify",
+    "tag": "Customs",
+    "summary": "Propose a TARIC commodity code for catalog products",
+    "description": "Three stages, cheapest first: a supplier-declared HS/CN/TARIC code found in the product attributes is validated and applied directly; otherwise search_taric_codes shortlists candidates and Claude picks one through a forced tool call. The model result is NEVER written to products.taric_code — it lands in taric_code_suggested with a confidence for a human to confirm, because a tariff misclassification is a customs liability. Stage C debits one credit per product before the upstream call; the hourly backfill cron runs with llm=false so it only applies free supplier-declared codes.",
+    "security": [
+      "supabaseJwt",
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "action": "classify",
+        "description": "Body: product_ids (max 25), optional chapters, force, llm. Ownership is reconciled against the caller JWT per product.",
+        "params": []
+      },
+      {
+        "action": "backfill",
+        "description": "Cron only. Sweeps products at taric_status=pending for supplier-declared codes. Body: mode=backfill, limit, llm=false.",
+        "params": []
+      }
+    ]
   }
 ]

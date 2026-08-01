@@ -526,6 +526,9 @@ Complete documentation for Material Kai Vision Platform.
 **[warehouse-and-billing.md](warehouse-and-billing.md)** - Inventory & billing ✨ NEW (2026-06)
 - Multi-warehouse stock + transfers + inbound intake; time-tracking → invoice; project → invoice (full/progress/milestone)
 
+**[taric-customs-classification.md](taric-customs-classification.md)** - EU commodity codes ✨ NEW (2026-08)
+- TARIC nomenclature import, code picker + validation, supplier-code/LLM classification; the July 2026 €3-per-sub-heading rule
+
 **[sales-and-marketplace.md](sales-and-marketplace.md)** - B2B surfaces ✨ NEW (2026-06)
 - Sales rep portal (#201); supplier→factory catalog access (#196); procurement routing inbox (#177)
 

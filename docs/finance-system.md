@@ -264,7 +264,7 @@ These are documented, currently-open bugs — do not assume they are fixed:
 3. **Commission ledger bills from live `list_price`, not `cost_snapshot`** — `record_invoice_commissions` diverges from the quote when base price changed.
 4. **Nav vs route gating mismatch** — nav shows Settings for `staff` even though the route is guarded by `network.manage`.
 5. **`debit_user_credits` failure after successful transmission** is logged (`console.warn`), not hard-failed; a pre-check mitigates but full fix needs atomic reservation.
-6. **`VAT_CATEGORIES` duplicated** across `NewInvoiceDialog` / `ProductMydataCard` / `ServicesCard` with inconsistent string-vs-numeric codes (canonical copy now in `financeService.ts`).
+6. **`VAT_CATEGORIES` duplicated** across `NewInvoiceDialog` / `ProductFiscalCard` / `ServicesCard` with inconsistent string-vs-numeric codes (canonical copy now in `financeService.ts`).
 
 ---
 

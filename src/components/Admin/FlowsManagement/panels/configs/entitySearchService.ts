@@ -132,6 +132,8 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'stripe-connect', label: 'stripe-connect', sublabel: 'Stripe Connect onboarding and status for per-workspace payouts' },
   { id: 'stripe-webhooks', label: 'stripe-webhooks', sublabel: 'Stripe webhook receiver for subscription, payment, and invoice events' },
   { id: 'supplier-orders-api', label: 'supplier-orders-api', sublabel: 'Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back' },
+  { id: 'taric-classify', label: 'taric-classify', sublabel: 'Propose a TARIC commodity code for catalog products' },
+  { id: 'taric-reference-sync', label: 'taric-reference-sync', sublabel: 'Import the EU TARIC goods nomenclature (Greek extract) into the reference table' },
   { id: 'trigger-factory-enrichment', label: 'trigger-factory-enrichment', sublabel: 'Propagate factory fields within a scope and queue a factory-enrichment agent if needed' },
   { id: 'trip-expense-ops', label: 'trip-expense-ops', sublabel: 'Sales trip-expense receipts: upload, sign, and render the expense PDF' },
   { id: 'vies-validate', label: 'vies-validate', sublabel: 'Server-side EU VAT validation via the VIES REST API with optional crm_companies cache write.' },

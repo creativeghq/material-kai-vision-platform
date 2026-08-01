@@ -38,6 +38,7 @@ import { UNITS, unitSuffix, normalizeUnit, unitFromMydataCode, unitDef } from '@
 import { invoicingSetupService, type RefRow, type DocTypeSetting } from '@/services/invoicingSetupService';
 import { parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
+import { TaricCombobox } from '@/components/core/TaricCombobox';
 
 type LineMode = 'skip' | '__create' | string /* existing warehouse item id */;
 
@@ -451,7 +452,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
         const fiscal = {
           barcode: r.barcode.trim() || null,
           cpv_code: r.cpv.trim() || null,
-          taric_code: r.taric.trim() || null,
+          taric_code: r.taric || null,
           measurement_unit_code: unitDef(r.unit)?.mydataCode ?? null,
           mydata_vat_category: num(r.vatCategory),
           mydata_income_classification_category: r.incomeCatWholesale || null,
@@ -967,7 +968,8 @@ const LineCard: React.FC<{
                 <Input className="h-8 text-xs" value={row.cpv} onChange={(e) => onChange({ cpv: e.target.value })} />
               </Field>
               <Field label="TARIC code">
-                <Input className="h-8 text-xs" value={row.taric} onChange={(e) => onChange({ taric: e.target.value })} />
+                <TaricCombobox value={row.taric} onChange={(code) => onChange({ taric: code })}
+                  triggerClassName="h-8 text-xs w-full" />
               </Field>
               <Field label="Warranty">
                 <Input className="h-8 text-xs" value={row.warranty} onChange={(e) => onChange({ warranty: e.target.value })} placeholder="e.g. 2 years" />

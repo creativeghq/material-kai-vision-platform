@@ -19,6 +19,7 @@ import { AddDealerProductDialog } from '@/components/business/marketplace/AddDea
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, useFilters, optionsFromRows, type FilterGroupDef } from '@/components/core/filters';
+import { TaricCombobox } from '@/components/core/TaricCombobox';
 
 import { PendingProductsCard } from '@/modules/finance/components/PendingProductsCard';
 
@@ -493,7 +494,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
       await warehouseService.updateProductFiscal(selected.id, {
         barcode: barcode.trim() || null,
         cpv_code: cpv.trim() || null,
-        taric_code: taric.trim() || null,
+        taric_code: taric || null,
         mydata_income_classification_type: clsType.trim() || null,
         mydata_income_classification_category: clsCategory.trim() || null,
       });
@@ -563,7 +564,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
                   <div className="space-y-1"><Label className="text-xs">Barcode</Label><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></div>
                   <div className="space-y-1"><Label className="text-xs">Serial number (S/N)</Label><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
                   <div className="space-y-1"><Label className="text-xs">CPV code</Label><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></div>
-                  <div className="space-y-1"><Label className="text-xs">TARIC code</Label><Input value={taric} onChange={(e) => setTaric(e.target.value)} placeholder="customs" /></div>
+                  <div className="space-y-1"><Label className="text-xs">TARIC code</Label><TaricCombobox value={taric} onChange={setTaric} triggerClassName="w-full h-10" /></div>
                   <div className="space-y-1"><Label className="text-xs">myDATA class. type</Label><Input value={clsType} onChange={(e) => setClsType(e.target.value)} placeholder="e.g. E3_561_001" /></div>
                   <div className="space-y-1"><Label className="text-xs">myDATA class. category</Label><Input value={clsCategory} onChange={(e) => setClsCategory(e.target.value)} placeholder="e.g. category1_1" /></div>
                 </div>
@@ -679,7 +680,7 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
         await warehouseService.updateProductFiscal(item.product_id, {
           barcode: barcode.trim() || null,
           cpv_code: cpv.trim() || null,
-          taric_code: taric.trim() || null,
+          taric_code: taric || null,
           mydata_income_classification_type: clsType.trim() || null,
           mydata_income_classification_category: clsCategory.trim() || null,
         });
@@ -702,7 +703,7 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
           <div className="space-y-1"><Label className="text-xs">Barcode</Label><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></div>
           <div className="space-y-1"><Label className="text-xs">Serial number (S/N)</Label><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></div>
           <div className="space-y-1"><Label className="text-xs">CPV code</Label><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></div>
-          <div className="space-y-1"><Label className="text-xs">TARIC code</Label><Input value={taric} onChange={(e) => setTaric(e.target.value)} placeholder="customs" /></div>
+          <div className="space-y-1"><Label className="text-xs">TARIC code</Label><TaricCombobox value={taric} onChange={setTaric} triggerClassName="w-full h-10" /></div>
           <div className="space-y-1"><Label className="text-xs">myDATA class. type</Label><Input value={clsType} onChange={(e) => setClsType(e.target.value)} placeholder="e.g. E3_561_001" /></div>
           <div className="space-y-1"><Label className="text-xs">myDATA class. category</Label><Input value={clsCategory} onChange={(e) => setClsCategory(e.target.value)} placeholder="e.g. category1_1" /></div>
         </div>

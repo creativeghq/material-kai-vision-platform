@@ -33,9 +33,9 @@ import { MentionMonitorTab } from '@/components/business/mention-monitoring/Ment
 import ProductSEOTab from '@/components/business/seo-toolkit/ProductSEOTab';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { ProductPricePanel } from '@/components/features/pricing/ProductPricePanel';
-import { ProductMydataCard } from '@/components/business/marketplace/ProductMydataCard';
+import { ProductFiscalCard } from '@/components/business/marketplace/ProductFiscalCard';
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, Ship } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
@@ -1859,7 +1859,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </TabsTrigger>
                 <TabsTrigger value="pricing" className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4" />
-                  Pricing &amp; Data
+                  Pricing
+                </TabsTrigger>
+                {/* Split out of the old "Pricing & Data" tab. Fiscal identity is a dozen fields
+                    across invoicing, myDATA and customs — stacked under pricing they were
+                    unreadable, which is part of why only three of them were ever rendered. */}
+                <TabsTrigger value="fiscal" className="flex items-center gap-2">
+                  <Ship className="h-4 w-4" />
+                  Fiscal &amp; Customs
                 </TabsTrigger>
               </>
             )}
@@ -2955,7 +2962,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
-                Pricing &amp; My Data
+                Pricing
               </h3>
               <Button
                 variant="outline"
@@ -2969,11 +2976,26 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </Button>
             </div>
             <p className="text-xs text-muted-foreground -mt-2">
-              Internal pricing &amp; fiscal data — visible to admins and operators only.
+              Internal pricing — visible to admins and operators only.
             </p>
             <ProductPricePanel productId={product.id} />
             <ProductPricingCard productId={product.id} />
-            <ProductMydataCard productId={product.id} />
+          </div>
+        </TabsContent>
+      )}
+
+      {isAdmin && (
+        <TabsContent value="fiscal" className="mt-6">
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+              <Ship className="h-4 w-4" />
+              Fiscal &amp; Customs
+            </h3>
+            <p className="text-xs text-muted-foreground -mt-2">
+              What the invoice builder, the POS and a customs declaration read off this product.
+              These are the same fields the warehouse intake form collects.
+            </p>
+            <ProductFiscalCard productId={product.id} />
           </div>
         </TabsContent>
       )}

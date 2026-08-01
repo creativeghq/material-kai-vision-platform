@@ -255,6 +255,15 @@ verify_jwt = false
 [functions.zernio-webhook-handler]
 verify_jwt = false
 
+# TARIC nomenclature import + the classifier. Both gate themselves (admin JWT for the import,
+# x-cron-secret for the monthly refresh), so the platform-level JWT check has to be off for the
+# cron path to reach the handler at all.
+[functions.taric-reference-sync]
+verify_jwt = false
+
+[functions.taric-classify]
+verify_jwt = false
+
 [auth]
 # JWT secret key for token signing and verification
 # LOCAL DEV ONLY — production uses Supabase-hosted secret (never committed)

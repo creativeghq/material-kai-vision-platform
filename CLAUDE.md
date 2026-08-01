@@ -234,6 +234,7 @@ Full reference: `.claude/design-system.md`.
 | Storage buckets & cleanup | [docs/storage-buckets.md](docs/storage-buckets.md) |
 | Flows / notifications | [docs/flows-notification-system.md](docs/flows-notification-system.md) |
 | Secrets & per-workspace BYOK | [docs/platform-secrets.md](docs/platform-secrets.md), [docs/per-workspace-byok.md](docs/per-workspace-byok.md) |
+| Customs / TARIC codes | [docs/taric-customs-classification.md](docs/taric-customs-classification.md) |
 | Finance / orders / quotes | [docs/finance-system.md](docs/finance-system.md), [docs/orders-system.md](docs/orders-system.md), [docs/quotes-system-architecture.md](docs/quotes-system-architecture.md) |
 | CRM / HR / Projects / Real estate | [docs/crm-system.md](docs/crm-system.md), [docs/hr-system.md](docs/hr-system.md), [docs/projects.md](docs/projects.md), [docs/real-estate-system.md](docs/real-estate-system.md) |
 | Knowledge base | [docs/knowledge-base-implementation.md](docs/knowledge-base-implementation.md) |

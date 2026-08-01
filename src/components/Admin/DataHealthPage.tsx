@@ -9,6 +9,7 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { TaricReferencePanel } from './TaricReferencePanel';
 import {
   dataIntegrityService as svc,
   type IntegrityCheck, type IntegrityFinding, type IntegrityRun, type IntegritySeverity,
@@ -122,6 +123,10 @@ export default function DataHealthPage() {
             </div>
           </CardHeader>
         </Card>
+
+        {/* Reference data whose staleness IS one of the checks above — the fix belongs next to
+            the finding, not in a settings screen the operator has to go hunting for. */}
+        <TaricReferencePanel />
 
         <Tabs defaultValue="findings">
           <TabsList>

@@ -3259,7 +3259,7 @@ export function ageBucketLabel(b: AgeBucket): string {
 //
 // AADE standard VAT categories. cat↔percent pairs MUST match exactly or myDATA
 // rejects the document — categories 4/5/6 are the reduced island rates and were
-// previously omitted in some pickers (ServicesCard / ProductMydataCard). Do NOT
+// previously omitted in some pickers (ServicesCard / the product fiscal card). Do NOT
 // redefine this table anywhere else; import VAT_CATEGORIES from here.
 
 export interface VatCategory {

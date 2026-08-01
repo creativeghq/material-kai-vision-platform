@@ -132,6 +132,10 @@
       "description": "Internal proxies called by agents/service-role."
     },
     {
+      "name": "Customs",
+      "description": "Customs functions."
+    },
+    {
       "name": "HR",
       "description": "HR functions."
     },
@@ -18694,6 +18698,234 @@
             }
           }
         ]
+      }
+    },
+    "/taric-reference-sync": {
+      "post": {
+        "tags": [
+          "Customs"
+        ],
+        "summary": "Import the EU TARIC goods nomenclature (Greek extract) into the reference table",
+        "operationId": "post_taric_reference_sync",
+        "description": "Loads a CSV/TSV export of the TARIC goods nomenclature into public.taric_codes, which backs the commodity-code picker, code validation and the classifier shortlist. Column headers are matched against an alias table so the EU export, the Greek national export and an admin re-export all load unconfigured. Admin JWT for the import; the monthly refresh cron authenticates with x-cron-secret and fetches TARIC_REFERENCE_URL.",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "import"
+                        ],
+                        "description": "Upsert a CSV/TSV nomenclature export. Body: source (taric_eu|gr_national), content or url, optional mapping overrides."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "stats"
+                        ],
+                        "description": "Row counts and last-import timestamp for the reference table."
+                      }
+                    }
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/taric-classify": {
+      "post": {
+        "tags": [
+          "Customs"
+        ],
+        "summary": "Propose a TARIC commodity code for catalog products",
+        "operationId": "post_taric_classify",
+        "description": "Three stages, cheapest first: a supplier-declared HS/CN/TARIC code found in the product attributes is validated and applied directly; otherwise search_taric_codes shortlists candidates and Claude picks one through a forced tool call. The model result is NEVER written to products.taric_code — it lands in taric_code_suggested with a confidence for a human to confirm, because a tariff misclassification is a customs liability. Stage C debits one credit per product before the upstream call; the hourly backfill cron runs with llm=false so it only applies free supplier-declared codes.",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "classify"
+                        ],
+                        "description": "Body: product_ids (max 25), optional chapters, force, llm. Ownership is reconciled against the caller JWT per product."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "backfill"
+                        ],
+                        "description": "Cron only. Sweeps products at taric_status=pending for supplier-declared codes. Body: mode=backfill, limit, llm=false."
+                      }
+                    }
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },

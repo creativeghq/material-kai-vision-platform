@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (107)
+## 1. Supabase Edge Functions (109)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -290,6 +290,13 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `canonicalize-attributes` | public | Proxy product attribute canonicalization to MIVAA facet service |
+
+**Customs**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `taric-classify` | JWT / cron | Propose a TARIC commodity code for catalog products |
+| `taric-reference-sync` | JWT / cron | Import the EU TARIC goods nomenclature (Greek extract) into the reference table |
 
 **HR**
 
