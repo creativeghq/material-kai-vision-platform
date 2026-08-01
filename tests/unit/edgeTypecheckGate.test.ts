@@ -64,12 +64,18 @@ describe('edge-function typecheck gate', () => {
     expect(() => { base = JSON.parse(raw); }, 'baseline does not parse as JSON').not.toThrow();
     base = JSON.parse(raw);
 
-    const found = entrypoints().length;
-    expect(found, 'found no edge functions — layout changed?').toBeGreaterThan(50);
+    const all = entrypoints();
+    expect(all.length, 'found no edge functions — layout changed?').toBeGreaterThan(50);
+    // `uncheckable` is the gate's declared coverage cap. Subtracting it here (rather than
+    // ignoring the mismatch) is what keeps the cap honest: the baseline must account for
+    // EVERY function as either checked or explicitly excluded with a reason.
+    const excluded = Object.keys((base as any).uncheckable ?? {});
+    const found = all.length - excluded.length;
     // A baseline recorded against a smaller set would let new functions in unchecked.
     expect(
       base.entrypoints,
-      `baseline covers ${base.entrypoints} entrypoints but ${found} exist — regenerate it ` +
+      `baseline covers ${base.entrypoints} entrypoints but ${found} are checkable ` +
+        `(${all.length} total − ${excluded.length} excluded) — regenerate it ` +
         `(node scripts/check-edge-functions.mjs --write-baseline) so new functions are gated`,
     ).toBe(found);
     expect(typeof base.total, 'baseline has no total').toBe('number');
@@ -80,5 +86,32 @@ describe('edge-function typecheck gate', () => {
     const base = JSON.parse(readFileSync(BASELINE, 'utf8')) as { files: Record<string, number> };
     const bad = Object.entries(base.files).filter(([, n]) => !Number.isInteger(n) || n < 0);
     expect(bad, 'baseline contains non-integer or negative counts').toEqual([]);
+  });
+
+  /**
+   * The coverage cap must SHRINK, never grow.
+   *
+   * `agent-chat` is excluded because its type graph does not fit in 12 GB even checked alone,
+   * and no runner we have (this machine: 15.7 GB; GitHub standard: 16 GB) can hold it. That is
+   * a real limitation, but it is also exactly the shape of hole that quietly swallows a gate:
+   * one exclusion is a known gap, five is "the gate does not really run". Every entry must name
+   * a function that exists and carry a reason, and the count is pinned here so adding another
+   * is a deliberate, reviewed act rather than a one-line escape hatch.
+   */
+  it('the excluded-function list stays at exactly the one known offender', () => {
+    const base = JSON.parse(readFileSync(BASELINE, 'utf8')) as { uncheckable?: Record<string, string> };
+    const excluded = base.uncheckable ?? {};
+
+    expect(
+      Object.keys(excluded).sort(),
+      'the edge-typecheck coverage cap changed. Removing an entry is good — regenerate the ' +
+      'baseline. ADDING one means a function is no longer typechecked at all: fix it or shrink ' +
+      'its type graph first, and only widen this after review.',
+    ).toEqual(['agent-chat/index.ts']);
+
+    for (const [file, reason] of Object.entries(excluded)) {
+      expect(existsSync(join(FN_DIR, file)), `excluded ${file} does not exist — stale entry`).toBe(true);
+      expect(String(reason).length, `excluded ${file} has no reason`).toBeGreaterThan(20);
+    }
   });
 });

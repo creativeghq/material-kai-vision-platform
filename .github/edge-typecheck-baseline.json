@@ -1,0 +1,43 @@
+{
+  "_comment": "Per-file deno-check error counts. The gate fails when a count rises or a new file appears. Lower these as you fix things; regenerate with: node scripts/check-edge-functions.mjs --write-baseline",
+  "entrypoints": 106,
+  "total": 188,
+  "uncheckable": {
+    "agent-chat/index.ts": "type graph exceeds 12 GB even alone (@langchain/langgraph generics); no runner has the heap"
+  },
+  "files": {
+    "quote-public-share/index.ts": 46,
+    "moodboard-sheet-share/index.ts": 39,
+    "send-quote-email/index.ts": 34,
+    "quotes-api/index.ts": 7,
+    "health-check/index.ts": 5,
+    "_shared/tools/tech-radar-tools.ts": 4,
+    "crm-api/handlers/companies-api-handler.ts": 4,
+    "crm-lead-score/index.ts": 4,
+    "finance-issue-invoice/index.ts": 4,
+    "xml-import-orchestrator/index.ts": 4,
+    "mivaa-gateway/index.ts": 3,
+    "stripe-api/handlers/checkout.ts": 3,
+    "_shared/langgraph-core.ts": 2,
+    "background-agent-runner/index.ts": 2,
+    "crm-api/handlers/stripe-api-handler.ts": 2,
+    "finance-invoice-pdf/index.ts": 2,
+    "generate-vr-world/index.ts": 2,
+    "hr-checkin-cron/index.ts": 2,
+    "messaging-api/index.ts": 2,
+    "recommendations-api/index.ts": 2,
+    "stripe-api/handlers/customer-portal.ts": 2,
+    "stripe-api/handlers/modules.ts": 2,
+    "_shared/fonts/open-sans.ts": 1,
+    "_shared/react-email-renderer.ts": 1,
+    "_shared/shipping/searates.ts": 1,
+    "catalog-send-to-customers/index.ts": 1,
+    "check-material-alerts/index.ts": 1,
+    "crm-api/handlers/address-units-api-handler.ts": 1,
+    "finance-send-statement/index.ts": 1,
+    "flow-engine/index.ts": 1,
+    "generate-social-image/index.ts": 1,
+    "inbox-api/index.ts": 1,
+    "notification-dispatcher/index.ts": 1
+  }
+}
