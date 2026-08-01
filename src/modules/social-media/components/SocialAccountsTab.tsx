@@ -84,7 +84,13 @@ export const SocialAccountsTab: React.FC = () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        await fetch(`${SUPABASE_FUNCTIONS_URL}/zernio-api`, {
+        // `fetch` only rejects on a NETWORK failure — every HTTP error status resolves
+        // normally. The response was never read and res.ok never checked, so the success
+        // toast fired on 403 ('Not a member of this workspace'), 500 (upsert failure) and 503
+        // (ZERNIO_API_KEY missing). The user was told the account connected, loadAccounts()
+        // then showed nothing, and no error existed anywhere to explain it. The same file
+        // does this correctly 70 lines down. (audit #306 finding 17)
+        const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/zernio-api`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -97,6 +103,10 @@ export const SocialAccountsTab: React.FC = () => {
             workspace_id: workspaceId,
           }),
         });
+        if (!res.ok) {
+          const detail = await res.text().catch(() => res.statusText);
+          throw new Error(detail || `Connect failed (${res.status})`);
+        }
         toast({ title: `${connected} connected` });
         await loadAccounts();
       } catch (err: any) {

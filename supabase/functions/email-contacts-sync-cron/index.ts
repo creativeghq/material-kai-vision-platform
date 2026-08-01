@@ -11,7 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
-import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
+import { chargeCronWorkspace, refundCronWorkspace } from '../_shared/cron-billing.ts';
 
 serve(withApiLogging('email-contacts-sync-cron', async (req) => {
   await bootstrapForFunction();
@@ -43,9 +43,26 @@ serve(withApiLogging('email-contacts-sync-cron', async (req) => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
         body: JSON.stringify({ action: 'sync-resend-contacts', workspace_id: row.workspace_id }),
       });
-      if (res.ok) processed++; else failed++;
-    } catch (_) {
+      if (res.ok) {
+        processed++;
+      } else {
+        failed++;
+        // The 3 credits were already taken. email-api 503s when this workspace has no usable
+        // Resend key (non-root + no BYOK), which is a PERMANENT condition — so without this the
+        // tenant is billed every day, forever, for a sync that can never run. Refund whatever
+        // was charged. (audit #306 finding 23)
+        if (gate.charged > 0) {
+          await refundCronWorkspace(supabase, row.workspace_id, 'email-contacts-sync', gate.charged,
+            `Contacts sync could not run (HTTP ${res.status})`);
+        }
+      }
+    } catch (e) {
       failed++;
+      if (gate.charged > 0) {
+        await refundCronWorkspace(supabase, row.workspace_id, 'email-contacts-sync', gate.charged,
+          'Contacts sync threw before completing');
+      }
+      console.error('[email-contacts-sync-cron] sync failed:', e);
     }
   }
 

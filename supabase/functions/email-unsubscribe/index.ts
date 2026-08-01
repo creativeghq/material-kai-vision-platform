@@ -84,17 +84,35 @@ serve(withApiLogging('email-unsubscribe', async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
+    // `w` and `c` arrive from the query string. A malformed uuid makes Postgres reject the
+    // whole statement (22P02) — and the old code discarded the result and rendered the green
+    // confirmation on the next line regardless. A recipient was told the opt-out worked and
+    // kept receiving marketing mail: the road to a spam complaint and, under CAN-SPAM/GDPR, a
+    // compliance incident that nothing would have surfaced (email_unsubscribes had 0 rows).
+    // (audit #306 finding 14)
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(ws)) {
+      console.error('[email-unsubscribe] malformed workspace id:', ws);
+      return html(400, 'Invalid link', '<h1>This unsubscribe link is invalid</h1><p>Please use the link from the most recent email, or reply to the sender to be removed.</p>');
+    }
+    const campaignId = (url.searchParams.get('c') || '').trim();
     // Idempotent — a repeat opt-out is a no-op success.
-    await supabase.from('email_unsubscribes').upsert(
+    const { error: unsubErr } = await supabase.from('email_unsubscribes').upsert(
       {
         workspace_id: ws,
         email: email.toLowerCase(),
         source: (url.searchParams.get('src') || 'link'),
-        campaign_id: url.searchParams.get('c') || null,
+        // A malformed campaign id must not take the whole opt-out down with it — the opt-out
+        // matters, the attribution does not.
+        campaign_id: UUID_RE.test(campaignId) ? campaignId : null,
         unsubscribed_at: new Date().toISOString(),
       },
       { onConflict: 'workspace_id,email', ignoreDuplicates: false },
     );
+    if (unsubErr) {
+      console.error('[email-unsubscribe] opt-out NOT recorded:', unsubErr.message, 'ws:', ws);
+      return html(500, 'Could not unsubscribe', '<h1>We could not record your request</h1><p>Nothing was changed. Please reply to the sender asking to be removed and they will action it manually.</p>');
+    }
     return html(200, 'Unsubscribed', '<h1>You\'re unsubscribed</h1><p>You will no longer receive marketing emails from this sender.</p>');
   }
 

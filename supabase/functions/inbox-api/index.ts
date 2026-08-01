@@ -711,16 +711,44 @@ async function insertMessageAndNotify(
     .eq('id', threadId);
 
   // Channel relay (notes never leave the inbox). Member replies + agent replies both relay.
-  if (thread.channel === 'whatsapp' && (messageType === 'text' || messageType === 'agent') && body) {
+  //
+  // The guard used to end in `&& body`, so an ATTACHMENT-ONLY message skipped the relay
+  // entirely — even though the caller explicitly permits `body === null` when attachments
+  // exist. Combined with the hardcoded `attachmentUrl: undefined`, an operator could attach a
+  // spec sheet, see it in their own transcript, and the customer would receive the text alone
+  // or nothing at all, with no indication either way. (audit #306 finding 22)
+  if (thread.channel === 'whatsapp' && (messageType === 'text' || messageType === 'agent')
+      && (body || attachments.length > 0)) {
     const meta = (thread.metadata as Json) || {};
     const accountId = String(meta.zernio_account_id || '');
     const conversationId = String(meta.zernio_conversation_id || '');
     if (accountId && conversationId) {
+      // Attachments live in a PRIVATE bucket as bucket + object path (never a persisted URL —
+      // storage convention #7), so the relay needs a freshly signed one. Zernio accepts a
+      // single attachment per message; extras stay visible in the inbox transcript.
+      let attachmentUrl: string | undefined;
+      let attachmentType: 'image' | 'video' | 'audio' | 'file' | undefined;
+      const first = attachments[0];
+      if (first?.storage_bucket && first?.storage_object_path) {
+        const { data: signed, error: signErr } = await db.storage
+          .from(first.storage_bucket)
+          .createSignedUrl(first.storage_object_path, 60 * 60 * 24);
+        if (signErr || !signed?.signedUrl) {
+          throw new HttpError(502, `Message stored but its attachment could not be prepared for WhatsApp: ${signErr?.message ?? 'no signed url'}`);
+        }
+        attachmentUrl = signed.signedUrl;
+        const ct = String(first.content_type || '');
+        attachmentType = ct.startsWith('image/') ? 'image'
+          : ct.startsWith('video/') ? 'video'
+          : ct.startsWith('audio/') ? 'audio'
+          : 'file';
+      }
       const res = await sendWhatsAppReply({
         accountId,
         conversationId,
-        message: body,
-        attachmentUrl: undefined,
+        message: body ?? undefined,
+        attachmentUrl,
+        attachmentType,
       });
       // Store the returned message id as `wamid` so the zernio-webhook-handler's
       // message.delivered|read|failed handler (which matches `metadata->>wamid`) can apply
@@ -1055,26 +1083,39 @@ async function handleJwtAction(
       const access = await resolveThreadAccess(db, userId, thread, operator);
       if (!access.isMember) throw new HttpError(403, 'Only thread members may hand a thread to the agent');
       const agentId = String(payload.agent_id || thread.agent_id || DEFAULT_INBOX_AGENT_ID);
-      await db.from('inbox_threads').update({ agent_state: state, agent_id: agentId }).eq('id', threadId);
+      // Every write here was unchecked while the handler returned { ok: true }. The
+      // consequence was specific and bad: if the thread update failed, the UI flipped to
+      // "Handled by: AI Assistant" while agent_state was unchanged — and maybeRunAgentReply's
+      // `if (thread.agent_state !== 'active') return` then silently declined to answer a
+      // conversation the operator believed the AI owned. remove_participant, in this same
+      // file, has always done `if (error) throw`. (audit #306 finding 19)
+      const { error: threadErr } = await db.from('inbox_threads')
+        .update({ agent_state: state, agent_id: agentId }).eq('id', threadId);
+      if (threadErr) throw new HttpError(500, `Could not change agent state: ${threadErr.message}`);
 
       if (state === 'off') {
-        await db.from('inbox_participants').update({ status: 'left' })
+        const { error: leftErr } = await db.from('inbox_participants').update({ status: 'left' })
           .eq('thread_id', threadId).eq('participant_type', 'agent');
+        if (leftErr) throw new HttpError(500, `Could not remove the agent participant: ${leftErr.message}`);
       } else {
         // Ensure exactly one active agent participant.
-        const { data: existing } = await db.from('inbox_participants')
+        const { data: existing, error: exErr } = await db.from('inbox_participants')
           .select('id').eq('thread_id', threadId).eq('participant_type', 'agent').eq('status', 'active').maybeSingle();
+        if (exErr) throw new HttpError(500, `Could not read agent participants: ${exErr.message}`);
         if (!existing) {
-          await db.from('inbox_participants').insert({
+          const { error: insErr } = await db.from('inbox_participants').insert({
             thread_id: threadId, participant_type: 'agent', agent_id: agentId, thread_role: 'agent', added_by: userId,
           });
+          if (insErr) throw new HttpError(500, `Could not add the agent participant: ${insErr.message}`);
         }
       }
-      // System note so the transcript records the takeover.
-      await db.from('inbox_messages').insert({
+      // System note so the transcript records the takeover. Non-fatal: the state change above
+      // already succeeded, and losing the note must not undo a completed takeover.
+      const { error: noteErr } = await db.from('inbox_messages').insert({
         thread_id: threadId, message_type: 'system',
         body: state === 'off' ? 'Conversation handed back to the team.' : `Conversation handed to the AI assistant (${state}).`,
       });
+      if (noteErr) console.error('[inbox-api] set_agent system note failed (non-fatal):', noteErr.message);
       return json({ ok: true, agent_state: state });
     }
 
@@ -1891,50 +1932,27 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
     case 'token_claim': {
       // Conversion handshake: a freshly-signed-up user adopts the token's thread and becomes a
       // `client` member of the dealer's workspace.
-      const userId = String(payload.user_id || '');
-      if (!userId) throw new HttpError(400, 'user_id is required');
-      // allowClaimed: this action OWNS the claim check below (it must tolerate the same user
-      // re-claiming, e.g. a retried request), so it resolves the token itself.
-      const tok = await resolveToken(db, token, true);
-      if (tok.claimed_by_user_id && tok.claimed_by_user_id !== userId) {
-        throw new HttpError(409, 'This invite was already claimed');
-      }
-      const thread = await getThreadOrThrow(db, String(tok.thread_id));
-      const workspaceId = String(thread.workspace_id);
+      //
+      // ONE RPC, ONE transaction. This used to be four separate writes — crm_contacts link,
+      // inbox_participants, workspace_members, token claim — with NONE of their errors checked,
+      // returning { ok: true } regardless. A partial conversion is the damaging case: the
+      // contact links, the workspace_members row does not, and the customer lands in an inbox
+      // they cannot read, having been told signup completed. (audit #306 finding 19)
+      const claimUserId = String(payload.user_id || '');
+      if (!claimUserId) throw new HttpError(400, 'user_id is required');
 
-      // Link the CRM contact to the account + carry the account onto the participant row so the
-      // converted customer reads the thread via RLS. participant_type stays 'customer' (a
-      // converted customer still must not see internal notes).
-      if (tok.contact_id) {
-        await db.from('crm_contacts')
-          .update({ user_id: userId, linked_at: new Date().toISOString(), linked_by: userId })
-          .eq('id', tok.contact_id);
-        await db.from('inbox_participants')
-          .update({ user_id: userId })
-          .eq('thread_id', tok.thread_id)
-          .eq('contact_id', tok.contact_id);
-      } else {
-        // Token without a contact (rare): ensure the claimer is at least a participant.
-        const { data: existing } = await db.from('inbox_participants')
-          .select('id').eq('thread_id', tok.thread_id).eq('user_id', userId).maybeSingle();
-        if (!existing) {
-          await db.from('inbox_participants').insert({
-            thread_id: tok.thread_id, participant_type: 'customer', user_id: userId, thread_role: 'participant',
-          });
-        }
+      const { data: claimed, error: claimErr } = await db.rpc('claim_inbox_thread_token', {
+        p_token: token,
+        p_user_id: claimUserId,
+      });
+      if (claimErr) {
+        // The RPC raises unique_violation when a DIFFERENT user already claimed the invite.
+        const msg = claimErr.message || 'Could not claim this invite';
+        throw new HttpError(/already claimed/i.test(msg) ? 409 : 500, msg);
       }
-
-      // Become a `client` member of the dealer workspace (idempotent).
-      const { data: mem } = await db.from('workspace_members')
-        .select('id').eq('workspace_id', workspaceId).eq('user_id', userId).maybeSingle();
-      if (!mem) {
-        await db.from('workspace_members').insert({
-          workspace_id: workspaceId, user_id: userId, role: 'client', status: 'active',
-        });
-      }
-
-      await db.from('inbox_thread_tokens').update({ claimed_by_user_id: userId }).eq('token', token);
-      return json({ ok: true, thread_id: tok.thread_id });
+      const row = Array.isArray(claimed) ? claimed[0] : claimed;
+      if (!row?.thread_id) throw new HttpError(500, 'Claim returned no thread');
+      return json({ ok: true, thread_id: row.thread_id });
     }
 
     default:

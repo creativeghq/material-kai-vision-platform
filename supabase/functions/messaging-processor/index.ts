@@ -206,7 +206,16 @@ serve(withApiLogging('messaging-processor', async (req) => {
 
           if (!result.success) throw new Error(result.error || 'Failed to send message');
 
-          const { data: messageLog } = await supabase.from('messaging_logs').insert({
+          // The error MUST be checked. Discarding it left `messageLog` undefined, and the very
+          // next statement wrote status:'sent' with message_log_id: undefined — three cascading
+          // losses from one silent failure: the message vanishes from the WhatsApp log; the
+          // messaging_logs_analytics trigger never fires so messaging_analytics under-counts;
+          // and the cumulative daily cap counts messaging_logs rows, so the channel's
+          // daily_quota is silently exceeded. The receipt webhook cannot find the row either.
+          // The WhatsApp send already SUCCEEDED here, so this throws into the per-recipient
+          // catch below, which records the recipient as failed rather than silently 'sent'.
+          // (audit #306 finding 21)
+          const { data: messageLog, error: logErr } = await supabase.from('messaging_logs').insert({
             channel_type: 'whatsapp',
             workspace_id: channel.workspace_id, // #250 B6: tenant scope
             template_id: template.id,
@@ -221,11 +230,14 @@ serve(withApiLogging('messaging-processor', async (req) => {
             variables: recipient.variables || {},
             campaign_id: campaign.id,
           }).select().single();
+          if (logErr || !messageLog?.id) {
+            throw new Error(`Message sent but its log row failed: ${logErr?.message ?? 'no row returned'}`);
+          }
 
           await supabase.from('messaging_campaign_recipients').update({
             status: 'sent',
             sent_at: new Date().toISOString(),
-            message_log_id: messageLog?.id,
+            message_log_id: messageLog.id,
           }).eq('id', recipient.id);
 
           stats.messagesSent++;

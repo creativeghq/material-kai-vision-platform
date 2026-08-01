@@ -58,6 +58,38 @@ export async function chargeCronWorkspace(
   }
 }
 
+/** Refund a workspace cron charge when the work turned out to be impossible.
+ *
+ *  Invariant #10 requires the debit BEFORE the upstream call, which means some charges land for
+ *  work that then cannot run — a precondition checked downstream, a provider outage. Without a
+ *  refund path those become a standing daily charge for nothing (audit #306 finding 23).
+ *  Best-effort: a failed refund must never break the cron. */
+export async function refundCronWorkspace(
+  supabase: SupabaseLike,
+  workspaceId: string,
+  cronKey: string,
+  amount: number,
+  description?: string,
+): Promise<boolean> {
+  if (!workspaceId || !(amount > 0)) return false;
+  try {
+    const { data, error } = await supabase.rpc('cron_refund_workspace', {
+      p_workspace_id: workspaceId,
+      p_cron_key: cronKey,
+      p_amount: amount,
+      p_description: description ?? null,
+    });
+    if (error) {
+      console.error(`[cron-billing] ${cronKey}/${workspaceId} refund failed:`, error.message);
+      return false;
+    }
+    return data === true;
+  } catch (e) {
+    console.error(`[cron-billing] ${cronKey}/${workspaceId} refund threw:`, e);
+    return false;
+  }
+}
+
 /** Charge a USER's personal balance for a cron whose subject has no workspace (e.g. a personal
  *  saved search). Fails open on any error. */
 export async function chargeCronUser(
