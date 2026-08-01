@@ -766,6 +766,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
                           await loadSources();
                         } catch (e) {
                           console.error('Re-include failed', e);
+toast({ title: 'Could not re-include retailer', description: String((e as Error)?.message ?? e), variant: 'destructive' });
                         }
                       }}
                     >
@@ -973,12 +974,16 @@ const dismissAnomalyReading = async (
   trackedQueryId: string,
   productUrl: string,
 ) => {
-  await supabase
+  // Checks the error, like its sibling trustAnomalyReading above. Without it a denied update
+  // resolved quietly, the caller ran onChange() regardless, and the row looked dismissed until
+  // the next refresh brought it straight back. (audit #305 finding 15)
+  const { error } = await supabase
     .from('tracked_query_price_history')
     .update({ is_anomaly: false, manual_override: false })
     .eq('tracked_query_id', trackedQueryId)
     .eq('product_url', productUrl)
     .eq('is_anomaly', true);
+  if (error) throw error;
 };
 
 const RetailerTable: React.FC<{
@@ -989,7 +994,12 @@ const RetailerTable: React.FC<{
   productId: string;
   trackedQueryId: string | null;
   onChange?: () => void;
-}> = ({ rows, priceDiff, isAdmin, productId, trackedQueryId, onChange }) => (
+}> = ({ rows, priceDiff, isAdmin, productId, trackedQueryId, onChange }) => {
+  // RetailerTable never imported useToast, so seven admin actions had console.error as their
+  // ENTIRE user feedback: clicking "Exclude this retailer" on a row that failed looked exactly
+  // like one that succeeded, until the next refresh brought the row back. (audit #305 finding 15)
+  const { toast } = useToast();
+  return (
   <div className="divide-y">
     {rows.map((r) => {
       const diff = priceDiff(r.current_price);
@@ -1181,6 +1191,7 @@ const RetailerTable: React.FC<{
                                 onChange?.();
                               } catch (e) {
                                 console.error('Trust reading failed', e);
+toast({ title: 'Could not trust this reading', description: String((e as Error)?.message ?? e), variant: 'destructive' });
                               }
                             }}
                           >
@@ -1198,6 +1209,7 @@ const RetailerTable: React.FC<{
                               onChange?.();
                             } catch (e) {
                               console.error('Dismiss reading failed', e);
+toast({ title: 'Could not dismiss this reading', description: String((e as Error)?.message ?? e), variant: 'destructive' });
                             }
                           }}
                         >
@@ -1237,6 +1249,7 @@ const RetailerTable: React.FC<{
                     onChange?.();
                   } catch (e) {
                     console.error('Correction failed', e);
+toast({ title: 'Could not save the correction', description: String((e as Error)?.message ?? e), variant: 'destructive' });
                   }
                 }}
               >
@@ -1256,6 +1269,7 @@ const RetailerTable: React.FC<{
                     onChange?.();
                   } catch (e) {
                     console.error('Verify failed', e);
+toast({ title: 'Could not verify this price', description: String((e as Error)?.message ?? e), variant: 'destructive' });
                   }
                 }}
               >
@@ -1284,6 +1298,7 @@ const RetailerTable: React.FC<{
                     onChange?.();
                   } catch (e) {
                     console.error('Exclude failed', e);
+toast({ title: 'Could not exclude retailer', description: String((e as Error)?.message ?? e), variant: 'destructive' });
                   }
                 }}
               >
@@ -1335,7 +1350,8 @@ const RetailerTable: React.FC<{
       );
     })}
   </div>
-);
+  );
+}
 
 function timeAgo(iso: string | null | undefined): string {
   if (!iso) return 'never';

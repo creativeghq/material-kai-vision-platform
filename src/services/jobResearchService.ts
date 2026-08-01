@@ -37,7 +37,11 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 // job_research_sites. Fire-and-forget; if it fails the KB doc body lags by
 // the next refresh tick. We swallow errors silently — the source of truth is
 // the table, not the doc body.
-async function _kickSitesKbSync(_siteType: string): Promise<void> {
+// Takes NO argument on purpose: `/sites/_resync` has no body and no query string, and the
+// backend re-syncs ALL sections. It previously accepted a `_siteType` it never used, which
+// cost deleteSite an entire pre-delete round-trip to produce — and, worse, gated the resync
+// on that read succeeding. (audit #305 finding 18)
+async function _kickSitesKbSync(): Promise<void> {
   try {
     await api('/api/v1/job-research/sites/_resync', { method: 'POST' });
   } catch {
@@ -362,7 +366,7 @@ export const jobResearchService = {
       }
       throw new Error(`createSite failed: ${error.message}`);
     }
-    await _kickSitesKbSync(body.site_type);
+    await _kickSitesKbSync();
     return data as JobSite;
   },
 
@@ -385,23 +389,17 @@ export const jobResearchService = {
       .single();
     if (error) throw new Error(`updateSite failed: ${error.message}`);
     const site = data as JobSite;
-    await _kickSitesKbSync(site.site_type);
+    await _kickSitesKbSync();
     return site;
   },
 
   async deleteSite(siteId: string): Promise<void> {
-    // Read site_type before delete so we know which doc-section to resync
-    const { data: pre } = await supabase
-      .from('job_research_sites')
-      .select('site_type')
-      .eq('id', siteId)
-      .maybeSingle();
     const { error } = await supabase
       .from('job_research_sites')
       .delete()
       .eq('id', siteId);
     if (error) throw new Error(`deleteSite failed: ${error.message}`);
-    if (pre?.site_type) await _kickSitesKbSync(pre.site_type as JobSiteType);
+    await _kickSitesKbSync();
   },
 
   /** v0.5: bulk-insert multiple sites into the platform-wide default list.
@@ -444,7 +442,7 @@ export const jobResearchService = {
         failed.push({ url_or_domain: u, error: error.message });
       }
     }
-    await _kickSitesKbSync(body.site_type);
+    await _kickSitesKbSync();
     return { site_type: body.site_type, requested: urls.length, created, skipped, failed };
   },
 

@@ -280,7 +280,17 @@ export function JobResearchSitesEditor() {
                             </a>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm align-top break-words">{s.display_name || '—'}</TableCell>
+                        <TableCell className="text-sm align-top break-words">
+                          {s.display_name || '—'}
+                          {/* `notes` was written at create and edit and loaded back into the edit
+                              form, but shown nowhere else — so a curation note ("why added, who
+                              curated") was invisible exactly when scanning the list, which is when
+                              it is useful. Surfaced here rather than dropping a field that has a
+                              real purpose. (audit #305 finding 19) */}
+                          {s.notes && (
+                            <span className="mt-0.5 block text-xs italic text-muted-foreground break-words">{s.notes}</span>
+                          )}
+                        </TableCell>
                         <TableCell className="align-top">
                           {s.country_code ? <Badge variant="outline" className="text-[10px]">{s.country_code}</Badge> : '—'}
                         </TableCell>

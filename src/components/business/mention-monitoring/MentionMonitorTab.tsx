@@ -21,13 +21,12 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
-import { supabase } from '@/integrations/supabase/client';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildMentionFeedFilters } from './mentionFilters';
 import {
-  TrackedMention, MentionRow, MentionSummary, LlmVisibilitySnapshot,
+  TrackedMention, MentionRow, LlmVisibilitySnapshot,
   trackProduct, untrackProduct, getProductMonitoring, refreshProduct,
-  getProductFeed, getProductSummary, getProductLlmVisibility, probeProductLlm,
+  getProductFeed, getProductLlmVisibility, probeProductLlm,
   updateTrackedMention, submitMentionClassifierCorrection,
 } from '@/services/mentionMonitoringApi';
 
@@ -61,7 +60,6 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
   const { can } = usePermissions();
   const admin = can('platform.admin');
   const [tracked, setTracked] = useState<TrackedMention | null>(null);
-  const [summary, setSummary] = useState<MentionSummary | null>(null);
   const [feed, setFeed] = useState<MentionRow[]>([]);
   const [llm, setLlm] = useState<LlmVisibilitySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,16 +79,16 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
       const t = await getProductMonitoring(productId);
       setTracked(t);
       if (t?.id) {
-        const [s, f, v] = await Promise.all([
-          getProductSummary(productId, 30),
+        // getProductSummary was fetched on every tab open and its result never read — the KPI
+        // strip renders from `tracked.current_*`. A paid round-trip per open, discarded.
+        // (audit #305 finding 13)
+        const [f, v] = await Promise.all([
           getProductFeed(productId, { limit: 100 }),
           getProductLlmVisibility(productId),
         ]);
-        setSummary(s);
         setFeed(f);
         setLlm(v);
       } else {
-        setSummary(null);
         setFeed([]);
         setLlm(null);
       }
@@ -112,7 +110,6 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
       } else {
         await untrackProduct(productId);
         setTracked(null);
-        setSummary(null);
         setFeed([]);
         setLlm(null);
       }
