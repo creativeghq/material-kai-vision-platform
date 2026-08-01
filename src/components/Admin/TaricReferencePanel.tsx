@@ -96,7 +96,9 @@ export const TaricReferencePanel: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
+          {/* Visually hidden and driven by the button beside it, so it carries its own label. */}
           <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,text/csv" className="hidden"
+            aria-label="TARIC nomenclature CSV file"
             onChange={(e) => onFile(e.target.files)} />
           <Button size="sm" className="rounded-full" disabled={importing}
             onClick={() => fileRef.current?.click()}>

@@ -302,11 +302,16 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
               onChange={(e) => set({ markup: e.target.value })} placeholder="0" />
           </FieldBox>
           <div className="flex items-end pb-1">
-            <label className="flex items-center gap-2 text-xs cursor-pointer">
-              <Checkbox checked={form.pricesIncludeVat}
-                onCheckedChange={(v) => set({ pricesIncludeVat: v === true })} />
+            {/* htmlFor rather than nesting: Radix renders a button[role=checkbox], not a native
+                input, so wrapping it in a label associates nothing. */}
+            <Label htmlFor="fiscal-prices-include-vat" className="flex items-center gap-2 text-xs cursor-pointer font-normal">
+              <Checkbox
+                id="fiscal-prices-include-vat"
+                checked={form.pricesIncludeVat}
+                onCheckedChange={(v) => set({ pricesIncludeVat: v === true })}
+              />
               <span>Stored prices include VAT</span>
-            </label>
+            </Label>
           </div>
         </Grid>
       </Section>
