@@ -48,14 +48,64 @@ export const VR_CREDIT_COSTS: Record<string, number> = {
   'marble-1.1': 190,       // 1580 WL cr = $1.264 × 1.50 markup
 };
 
-// Inpainting credit costs per operation
+/**
+ * Inpainting credit costs.
+ *
+ * These numbers used to be hand-maintained here at 40 / 20 / 10 while the backend metered
+ * EVERY inpaint through one flat `image-inpaint` key at 3.00 credits, ignoring the user's
+ * choice entirely (audit #304 finding 6). The displayed price was fiction in both
+ * directions and the platform lost money on every Pro run.
+ *
+ * `ai_model_pricing` is now the single source: sam_routes meters the `inpaint-*` key for
+ * the model it actually runs, and `loadInpaintingCreditCosts()` below reads the same rows,
+ * so display and debit cannot drift. These constants remain ONLY as the offline fallback
+ * for a first paint or a failed fetch, and are kept equal to the seeded rows.
+ */
 export const INPAINTING_CREDIT_COSTS: Record<'flux-fill-pro' | 'flux-fill-dev' | 'sd-inpainting', number> = {
-  'flux-fill-pro': 40,   // ~$0.015 — best quality, FLUX Fill Pro
-  'flux-fill-dev': 20,   // ~$0.008 — standard quality, FLUX Fill Dev
-  'sd-inpainting': 10,   // ~$0.003 — fast/cheap, Stable Diffusion
+  'flux-fill-pro': 7.5,   // $0.050 x 1.50 markup x 100
+  'flux-fill-dev': 3.75,  // $0.025 x 1.50 markup x 100
+  'sd-inpainting': 0.45,  // $0.003 x 1.50 markup x 100
 };
 
 export type InpaintingModel = keyof typeof INPAINTING_CREDIT_COSTS;
+
+/** `ai_model_pricing.model_key` per selectable inpaint model — mirrors `_INPAINT_PRICING_KEYS`
+ *  in mivaa-pdf-extractor/app/api/sam_routes.py. Both must list the same models. */
+const INPAINT_PRICING_KEYS: Record<InpaintingModel, string> = {
+  'flux-fill-pro': 'inpaint-flux-fill-pro',
+  'flux-fill-dev': 'inpaint-flux-fill-dev',
+  'sd-inpainting': 'inpaint-sd-inpainting',
+};
+
+/**
+ * Read the live per-model inpaint prices. Returns the fallback constants on any failure —
+ * a pricing lookup must never block the editor, and showing the seeded value is better
+ * than showing nothing. Credits = cost_per_unit x markup_multiplier x 100, the same
+ * conversion credits_integration_service applies server-side.
+ */
+export async function loadInpaintingCreditCosts(): Promise<Record<InpaintingModel, number>> {
+  try {
+    const { data, error } = await supabase
+      .from('ai_model_pricing')
+      .select('model_key, cost_per_unit, markup_multiplier')
+      .in('model_key', Object.values(INPAINT_PRICING_KEYS))
+      .eq('is_active', true);
+    if (error || !data?.length) return { ...INPAINTING_CREDIT_COSTS };
+
+    type PriceRow = { model_key: string; cost_per_unit: number | string | null; markup_multiplier: number | string | null };
+    const byKey = new Map((data as PriceRow[]).map((r) => [r.model_key, r]));
+    const out = { ...INPAINTING_CREDIT_COSTS };
+    for (const model of Object.keys(INPAINT_PRICING_KEYS) as InpaintingModel[]) {
+      const row = byKey.get(INPAINT_PRICING_KEYS[model]);
+      if (!row) continue;
+      const credits = Number(row.cost_per_unit) * Number(row.markup_multiplier) * 100;
+      if (Number.isFinite(credits) && credits >= 0) out[model] = Math.round(credits * 100) / 100;
+    }
+    return out;
+  } catch {
+    return { ...INPAINTING_CREDIT_COSTS };
+  }
+}
 
 export const INPAINTING_MODEL_LABELS: Record<InpaintingModel, string> = {
   'flux-fill-pro': 'Best (FLUX Pro)',

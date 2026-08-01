@@ -35,7 +35,7 @@ import {
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { SegmentWithResults } from '@/hooks/useSegmentation';
 import { supabase } from '@/integrations/supabase/client';
-import { INPAINTING_CREDIT_COSTS, INPAINTING_MODEL_LABELS, InpaintingModel } from '@/services/vrWorldService';
+import { INPAINTING_CREDIT_COSTS, INPAINTING_MODEL_LABELS, InpaintingModel, loadInpaintingCreditCosts } from '@/services/vrWorldService';
 import {
   getMaterialCategory,
   getProductImageUrl,
@@ -512,6 +512,17 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
   const [colorOverride, setColorOverride] = useState<string>('');
   const [quality, setQuality] = useState<InpaintingModel>('flux-fill-pro');
 
+  // Live per-model prices from ai_model_pricing — the SAME rows sam_routes meters against,
+  // so what this modal prints is what the backend debits. The imported constants are only
+  // the first-paint fallback; they used to be the hand-maintained 40/20/10 ladder that the
+  // backend had never charged (audit #304 finding 6).
+  const [inpaintCosts, setInpaintCosts] = useState<Record<InpaintingModel, number>>(INPAINTING_CREDIT_COSTS);
+  useEffect(() => {
+    let cancelled = false;
+    loadInpaintingCreditCosts().then((c) => { if (!cancelled) setInpaintCosts(c); });
+    return () => { cancelled = true; };
+  }, []);
+
   // Queue state
   const [queue, setQueue] = useState<QueueItem[]>([]);
 
@@ -842,8 +853,8 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
 
   // ── Credit calculations ───────────────────────────────────────────────────────
 
-  const queueCredits = queue.reduce((sum, item) => sum + INPAINTING_CREDIT_COSTS[item.quality], 0);
-  const currentItemCredits = INPAINTING_CREDIT_COSTS[quality];
+  const queueCredits = queue.reduce((sum, item) => sum + inpaintCosts[item.quality], 0);
+  const currentItemCredits = inpaintCosts[quality];
   const totalCredits = queueCredits + (selectedMaterial ? currentItemCredits : 0);
 
   const hasAnythingToApply = selectedMaterial !== null || queue.length > 0;
@@ -1277,7 +1288,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                     <div className="space-y-1.5">
                       <span className="text-xs font-medium text-foreground">Quality</span>
                       <div className="grid grid-cols-3 gap-1.5">
-                        {(Object.keys(INPAINTING_CREDIT_COSTS) as InpaintingModel[]).map(model => {
+                        {(Object.keys(inpaintCosts) as InpaintingModel[]).map(model => {
                           const icons = { 'sd-inpainting': <Zap className="w-3 h-3" />, 'flux-fill-dev': <Layers className="w-3 h-3" />, 'flux-fill-pro': <Star className="w-3 h-3" /> };
                           return (
                             <button
@@ -1291,7 +1302,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                             >
                               {icons[model]}
                               <span className="text-[10px] font-medium leading-tight">{INPAINTING_MODEL_LABELS[model]}</span>
-                              <span className="text-[10px] text-muted-foreground">{INPAINTING_CREDIT_COSTS[model]} cr</span>
+                              <span className="text-[10px] text-muted-foreground">{inpaintCosts[model]} cr</span>
                             </button>
                           );
                         })}
@@ -1307,7 +1318,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                         className="w-full text-xs border-violet-200 text-violet-700 hover:bg-violet-50"
                       >
                         <Plus className="w-3.5 h-3.5 mr-1.5" />
-                        Add to queue ({INPAINTING_CREDIT_COSTS[quality]} cr) and add another
+                        Add to queue ({inpaintCosts[quality]} cr) and add another
                       </Button>
                     )}
 
@@ -1334,7 +1345,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                         {item.colorOverride && (
                           <div className="w-3.5 h-3.5 rounded-full border border-border flex-shrink-0" style={{ backgroundColor: item.colorOverride }} />
                         )}
-                        <span className="text-muted-foreground flex-shrink-0">{INPAINTING_CREDIT_COSTS[item.quality]}cr</span>
+                        <span className="text-muted-foreground flex-shrink-0">{inpaintCosts[item.quality]}cr</span>
                         <button
                           onClick={() => handleRemoveFromQueue(item.queueId)}
                           className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
