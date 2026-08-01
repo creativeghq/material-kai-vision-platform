@@ -38,6 +38,7 @@ import { QuoteActivityPanel } from '@/modules/finance/components/QuoteActivityPa
 import { IssueInvoiceButton } from '@/modules/finance/components/IssueInvoiceButton';
 import { formatMoney, financeService } from '@/modules/finance/services/financeService';
 import { Switch } from '@/components/core/ui/switch';
+import { previewTotalsBreakdown } from '@/modules/quotes/utils/quoteTotals';
 
 const sendQuoteNotification = (userId: string, title: string, quoteId: string) => {
   supabase.from('user_notifications').insert({
@@ -416,12 +417,35 @@ export const QuoteDetailPage: React.FC = () => {
   }, 0);
 
   const pricingVatRate = parseDecimalOr(vatRate, 0);
-  // #227 — paid-upfront (cash) discount applies to the net subtotal before VAT
+  // #227 — paid-upfront (cash) discount applies to the net subtotal before VAT.
   const pricingCashPct = paidUpfront ? cashPct : 0;
-  const pricingCashDiscount = pricingSubtotal * (pricingCashPct / 100);
-  const pricingNetAfterCash = pricingSubtotal - pricingCashDiscount;
-  const pricingVatAmount = pricingNetAfterCash * (pricingVatRate / 100);
-  const pricingGrandTotal = pricingNetAfterCash + pricingVatAmount;
+
+  // Accepted upsells only, honouring metadata.custom_price / metadata.quantity — the same
+  // rule get_quote_totals() and QuotesService.recalculateQuoteExtrasTotal use. The display
+  // tally further down used to sum EVERY upsell at its catalog price, accepted or not.
+  const pricingExtrasTotal = quoteUpsells.reduce((sum, qu) => {
+    if (qu.customer_accepted !== true) return sum;
+    const meta = (qu.metadata ?? {}) as { custom_price?: number; quantity?: number };
+    const upsell = upsells.find(u => u.id === qu.upsell_id);
+    const price = meta.custom_price ?? upsell?.price ?? 0;
+    return sum + price * (meta.quantity ?? 1);
+  }, 0);
+
+  // The operator approves THIS preview, so it has to agree to the cent with what
+  // reprice_quote_items will persist. previewTotalsBreakdown mirrors get_quote_totals
+  // step for step; the arithmetic that used to live here was the second of three
+  // divergent implementations (audit #307 finding 17) and folded in no extras, so the
+  // operator approved a Final that excluded upsells the customer had already accepted
+  // (finding 18).
+  const pricingPreview = previewTotalsBreakdown({
+    subtotal: pricingSubtotal,
+    cashDiscountPct: pricingCashPct,
+    extrasTotal: pricingExtrasTotal,
+    vatRate: pricingVatRate,
+  });
+  const pricingCashDiscount = pricingPreview.discount;
+  const pricingVatAmount = pricingPreview.vat;
+  const pricingGrandTotal = pricingPreview.final;
 
   const allItemsHavePrices = (quote?.items || []).length > 0 &&
     (quote?.items || []).every(item => {
@@ -620,10 +644,7 @@ export const QuoteDetailPage: React.FC = () => {
 
   const selectedTag = statusTags.find(tag => tag.id === quote.status_tag_id);
   const itemCount = quote.items?.length || quote.total_items || 0;
-  const extrasTotal = quoteUpsells.reduce((sum, qu) => {
-    const upsell = upsells.find(u => u.id === qu.upsell_id);
-    return sum + (upsell?.price || 0);
-  }, 0);
+  const extrasTotal = pricingExtrasTotal;
 
   return (
     <div className="min-h-screen">

@@ -97,60 +97,38 @@ class QuotePDFService {
     items: { id: string; unit_price: number; discounted_price?: number | null; line_total: number }[],
     vatRate: number,
   ): Promise<{ success: boolean; error?: string }> {
-    // Update each item's pricing
-    for (const item of items) {
-      const { error } = await supabase
-        .from('quote_items')
-        .update({
-          unit_price: item.unit_price,
-          discounted_price: item.discounted_price ?? null,
-          line_total: item.line_total,
-        })
-        .eq('id', item.id);
+    // ONE statement, ONE transaction, and the totals come back DERIVED.
+    //
+    // This used to update quote_items in a loop and then compute subtotal / cash discount /
+    // VAT / grand total in TypeScript. Two things were wrong with that (audit #307):
+    //
+    //  - finding 19: the first failing item `return`ed mid-loop, leaving earlier lines
+    //    repriced, later lines stale, and the quotes totals row untouched. No transaction,
+    //    no rollback, and the operator could not tell how far it got.
+    //  - finding 17: this was one of THREE independent implementations of the same money
+    //    chain and the only one that persisted. It rounded differently from the one the PDF
+    //    renders with, so `priceAfterDiscount + vat` and `final` could disagree by a cent.
+    //    It also resolved the cash-discount rule with a second copy of the query in
+    //    financeService.getActiveCashDiscountPct, and folded in no extras at all.
+    //
+    // reprice_quote_items applies every line or none, then restamps the quote from
+    // get_quote_totals() — the single SQL source. TypeScript no longer derives any of it.
+    const { data, error } = await supabase.rpc('reprice_quote_items', {
+      p_quote_id: quoteId,
+      p_items: items.map((i) => ({
+        id: i.id,
+        unit_price: i.unit_price,
+        discounted_price: i.discounted_price ?? null,
+        line_total: i.line_total,
+      })),
+      p_vat_rate: vatRate,
+    });
 
-      if (error) {
-        return { success: false, error: `Failed to update item: ${error.message}` };
-      }
+    if (error) {
+      return { success: false, error: `Failed to save quote pricing: ${error.message}` };
     }
-
-    // Calculate totals
-    const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
-
-    // #227 — order-level paid-upfront (cash) discount: applied to the net subtotal before VAT
-    // when the quote is flagged paid_upfront, using the workspace's active cash_payment rule.
-    let cashPct = 0;
-    const { data: quoteRow } = await supabase
-      .from('quotes').select('workspace_id, paid_upfront').eq('id', quoteId).single();
-    if (quoteRow?.paid_upfront && quoteRow?.workspace_id) {
-      const { data: rule } = await supabase
-        .from('pricing_custom_rules')
-        .select('discount_pct')
-        .eq('workspace_id', quoteRow.workspace_id)
-        .eq('rule_type', 'cash_payment')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true })
-        .limit(1);
-      cashPct = rule && rule[0] ? Number(rule[0].discount_pct) || 0 : 0;
-    }
-    const netAfterCash = subtotal * (1 - cashPct / 100);
-    const vatAmount = netAfterCash * (vatRate / 100);
-    const grandTotal = netAfterCash + vatAmount;
-
-    // Update quote totals
-    const { error: quoteError } = await supabase
-      .from('quotes')
-      .update({
-        subtotal: Math.round(subtotal * 100) / 100,
-        vat_rate: vatRate,
-        vat_amount: Math.round(vatAmount * 100) / 100,
-        grand_total: Math.round(grandTotal * 100) / 100,
-        cash_discount_pct: cashPct,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', quoteId);
-
-    if (quoteError) {
-      return { success: false, error: `Failed to update quote totals: ${quoteError.message}` };
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      return { success: false, error: 'Quote pricing saved nothing — the quote may have been deleted.' };
     }
 
     return { success: true };

@@ -23,6 +23,48 @@ export interface TotalsBreakdown {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Preview of the totals for prices the operator is still typing.
+ *
+ * `public.get_quote_totals(uuid[])` is the single source for quote money (CLAUDE.md,
+ * "One derivation per money quantity"), but it derives from STORED `quote_items.line_total`,
+ * so it cannot answer "what would this quote come to if I saved these prices?". That one
+ * question is what this exists for — and nothing else. Once prices are saved, every reader
+ * takes the SQL answer.
+ *
+ * The step order and per-step rounding here mirror get_quote_totals EXACTLY, including
+ * folding extras into the taxable base before VAT and summing rounded parts rather than
+ * re-rounding a product. If you change one, change both: the reason quote totals were
+ * wrong (audit #307 finding 17) is that three implementations rounded differently and
+ * `priceAfterDiscount + vat` disagreed with `final` by a cent.
+ */
+export function previewTotalsBreakdown(input: {
+  subtotal: number | null | undefined;
+  cashDiscountPct: number | null | undefined;
+  extrasTotal?: number | null | undefined;
+  vatRate: number | null | undefined;
+}): TotalsBreakdown {
+  const price = Number(input.subtotal) || 0;
+  const cashPct = Number(input.cashDiscountPct) || 0;
+  const vatRate = Number(input.vatRate) || 0;
+  const extras = Number(input.extrasTotal) || 0;
+
+  const discount = r2(price * cashPct / 100);
+  const priceAfterDiscount = r2(price - discount);
+  const taxableBase = r2(priceAfterDiscount + extras);
+  const vat = r2(taxableBase * vatRate / 100);
+
+  return {
+    price,
+    discount,
+    priceAfterDiscount,
+    vat,
+    vatRate,
+    final: r2(taxableBase + vat),
+    hasDiscount: discount > 0,
+  };
+}
+
 export function computeTotalsBreakdown(input: {
   subtotal: number | null | undefined;        // pre-discount net subtotal
   cashDiscountPct: number | null | undefined;  // order-level paid-upfront %

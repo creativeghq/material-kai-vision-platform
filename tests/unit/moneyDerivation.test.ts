@@ -113,3 +113,109 @@ describe('order settlement has exactly one derivation', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * Quote totals had the SAME shape of bug, found later (audit #307 findings 17/18/19): the money
+ * chain subtotal -> cash discount -> +extras -> VAT -> grand total was implemented THREE times in
+ * TypeScript and ZERO times in SQL. They rounded differently, so `priceAfterDiscount + vat` and
+ * `final` could disagree by a cent — and none of them folded in `extras_total`, so a customer
+ * accepting a EUR 500 upsell signed a document reading Price 1000 / Extras 500 / VAT 240 /
+ * Final 1240 and was never billed for the upsell.
+ *
+ * `public.get_quote_totals(uuid[])` is now the single source and `reprice_quote_items` the only
+ * write path. Exactly ONE TypeScript function may mirror the arithmetic —
+ * `previewTotalsBreakdown`, which answers "what would this come to if I saved these prices?" for
+ * prices that are not in the database yet. These tests fail the build if a second one appears.
+ */
+describe('quote totals have exactly one derivation', () => {
+  const posix = (p: string) => relative(ROOT, p).split('\\').join('/');
+
+  /**
+   * Deliberately narrower than FINANCE_DIRS. The VAT-step pattern is generic — the wider scan
+   * flagged `timeTrackingService` and `tripExpenseService`, which compute VAT for time entries
+   * and trip expenses. Those are DIFFERENT money quantities with their own derivations, and
+   * pointing this failure at them would send someone to "fix" a non-bug by routing a timesheet
+   * through get_quote_totals. Quote money lives in these paths.
+   */
+  const files = [
+    ...walk(join(ROOT, 'src/modules/quotes')),
+    join(ROOT, 'src/pages/PublicQuotePage.tsx'),
+  ].filter((f) => { try { return statSync(f).isFile(); } catch { return false; } });
+
+  it('finds quote sources to scan', () => {
+    expect(files.length).toBeGreaterThan(5);
+  });
+
+  /** The one sanctioned mirror, for unsaved prices only. */
+  const QUOTE_TOTALS_SOURCE = 'src/modules/quotes/utils/quoteTotals.ts';
+
+  /**
+   * The one sanctioned reader of the paid-upfront rule. `previewTotalsBreakdown` needs the
+   * percentage as an INPUT before anything is saved, and it has to be the same percentage
+   * `get_quote_totals` will pick — so this query mirrors that ORDER BY sort_order / LIMIT 1
+   * deliberately. It is a lookup, not a second derivation of the total. The copy that made
+   * this a finding was the inline duplicate inside QuotePDFService.saveItemPrices, which is
+   * gone: that path now derives in SQL and never asks for the percentage at all.
+   */
+  const CASH_DISCOUNT_SOURCE = 'src/modules/finance/services/financeService.ts';
+
+  it('computes VAT from a net base in exactly one place', () => {
+    const offenders: string[] = [];
+    // `<net|taxable|afterDiscount…> * (vatRate / 100)` — the VAT step itself.
+    //
+    // Case-insensitive and WITHOUT a leading \b on purpose. Both were wrong in the first
+    // draft of this test, which then passed against the very line it was written to catch:
+    // `pricingNetAfterCash * (pricingVatRate / 100)` carries its "net" mid-identifier, so
+    // `\bnet` never matched. A guard that cannot fail is worth less than no guard at all —
+    // it reports the codebase clean. Verified against both real offenders before landing.
+    const RE = /(net|taxable|aftercash|afterdiscount|priceafter)\w*\s*\*\s*\(?\s*\w*vat\w*\s*\/\s*100/i;
+    for (const f of files) {
+      if (posix(f) === QUOTE_TOTALS_SOURCE) continue;
+      const src = stripComments(readFileSync(f, 'utf8'));
+      for (const [i, line] of src.split('\n').entries()) {
+        if (RE.test(line)) offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+      }
+    }
+    expect(
+      offenders,
+      'Quote VAT is derived once, in `public.get_quote_totals`. Persist through ' +
+      '`reprice_quote_items` and render what it returns; for an unsaved preview call ' +
+      `\`previewTotalsBreakdown\` in ${QUOTE_TOTALS_SOURCE}.\n` + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  it('never re-resolves the cash-discount rule with its own query', () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      if (posix(f) === CASH_DISCOUNT_SOURCE) continue;
+      const src = stripComments(readFileSync(f, 'utf8'));
+      // A copy of the pricing_custom_rules lookup = a second definition of the discount input.
+      if (/from\(['"]pricing_custom_rules['"]\)[\s\S]{0,300}cash_payment/.test(src)) {
+        offenders.push(posix(f));
+      }
+    }
+    expect(
+      offenders,
+      'The paid-upfront discount is resolved inside `get_quote_totals` for anything that ' +
+      `persists, and read once via \`${CASH_DISCOUNT_SOURCE}\` for the unsaved preview. ` +
+      'Do not add a third copy of the query.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  it('saves quote pricing only through the atomic RPC', () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      const src = stripComments(readFileSync(f, 'utf8'));
+      // Writing the cached totals directly bypasses the derivation AND the drift check.
+      if (/from\(['"]quotes['"]\)[\s\S]{0,200}\.update\(\{[\s\S]{0,300}grand_total/.test(src)) {
+        offenders.push(posix(f));
+      }
+    }
+    expect(
+      offenders,
+      'Call `reprice_quote_items`, which restamps quotes from `get_quote_totals()` in one ' +
+      'transaction. Writing grand_total by hand is what the `finance.quote_totals_drift` ' +
+      'integrity check exists to catch.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+});

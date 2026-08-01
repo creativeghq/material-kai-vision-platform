@@ -262,6 +262,12 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         if (!warehouseId) return json({ error: 'warehouse_id is required' }, 400);
         if (!name) return json({ error: 'name is required' }, 400);
         const fields = pick(body, ITEM_WRITABLE);
+        // Every column here must exist on warehouse_items. PostgREST rejects the WHOLE
+        // statement on one unknown name, so `barcode`, `cpv_code`, `taric_code` and the
+        // two `mydata_classification_*` fields — none of which are columns — did not
+        // merely go unwritten, they made create-item fail 100% of the time. The
+        // allowlist above was already corrected; this payload still named them.
+        // (audit #307 finding 16)
         const { data, error } = await usr.from('warehouse_items').insert({
           workspace_id: workspaceId, warehouse_id: warehouseId, name,
           product_id: body?.product_id ? String(body.product_id) : null,
@@ -270,12 +276,13 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
           reorder_point: num(body?.reorder_point) ?? 0,
           location: (fields.location as string) ?? null,
           sku: (fields.sku as string) ?? null,
-          barcode: (fields.barcode as string) ?? null,
           serial_number: (fields.serial_number as string) ?? null,
-          cpv_code: (fields.cpv_code as string) ?? null,
-          taric_code: (fields.taric_code as string) ?? null,
-          mydata_classification_type: (fields.mydata_classification_type as string) ?? null,
-          mydata_classification_category: (fields.mydata_classification_category as string) ?? null,
+          manufacturer: (fields.manufacturer as string) ?? null,
+          supplier_product_code: (fields.supplier_product_code as string) ?? null,
+          width_mm: num(fields.width_mm),
+          length_mm: num(fields.length_mm),
+          thickness_mm: num(fields.thickness_mm),
+          weight_kg: num(fields.weight_kg),
         }).select('*').single();
         if (error) throw new HttpError(denied(error) ? 403 : 400, error.message);
         return json({ item: data }, 201);
