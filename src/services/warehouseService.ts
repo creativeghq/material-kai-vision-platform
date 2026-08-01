@@ -55,6 +55,23 @@ export interface WarehouseItem {
   is_active: boolean;
 }
 
+/** A stock row with its warehouse resolved — what the product record shows. */
+export interface ProductStockRow extends WarehouseItem {
+  warehouse_name: string | null;
+  warehouse_is_default: boolean;
+}
+
+export interface StockMovementRow {
+  id: string;
+  item_id: string;
+  direction: 'in' | 'out' | 'adjust';
+  quantity: number;
+  reason: string | null;
+  source_type: string | null;
+  source_id: string | null;
+  occurred_at: string;
+}
+
 /**
  * Physical / identity metadata. Populated at intake by `parseSupplierLine` (dimensions out of
  * "AMALFI GRIS 80X80", maker from the issuer) and by operator photo uploads. Lengths are
@@ -183,6 +200,47 @@ export const warehouseService = {
     const { data, error } = await q.order('name');
     if (error) throw error;
     return (data ?? []) as WarehouseItem[];
+  },
+
+  /**
+   * Everything the catalog knows about one product's physical stock, for the product record.
+   *
+   * Scoped by `workspace_id` on top of RLS on purpose: `wh_items_read` is
+   * `is_workspace_member(workspace_id)`, so the policy alone would happily return stock for a
+   * product that belongs to a DIFFERENT workspace the caller also happens to be a member of.
+   * The caller passes the ACTIVE workspace and must already have checked that the product
+   * belongs to it — stock for someone else's catalog product is never a meaningful answer.
+   */
+  async productStock(workspaceId: string, productId: string): Promise<ProductStockRow[]> {
+    const { data, error } = await supabase
+      .from('warehouse_items')
+      .select('*, warehouses(id, name, code, is_default)')
+      .eq('workspace_id', workspaceId)
+      .eq('product_id', productId)
+      .eq('is_active', true)
+      .order('name');
+    if (error) throw error;
+    return (data ?? []).map((r: any) => ({
+      ...(r as WarehouseItem),
+      warehouse_name: r.warehouses?.name ?? null,
+      warehouse_is_default: !!r.warehouses?.is_default,
+    })) as ProductStockRow[];
+  },
+
+  /** The in/out ledger for one product, newest first. Answers "where did it go". */
+  async productMovements(workspaceId: string, productId: string, limit = 20): Promise<StockMovementRow[]> {
+    const items = await this.productStock(workspaceId, productId);
+    const ids = items.map((i) => i.id);
+    if (ids.length === 0) return [];
+    const { data, error } = await supabase
+      .from('stock_movements')
+      .select('id, item_id, direction, quantity, reason, source_type, source_id, occurred_at')
+      .eq('workspace_id', workspaceId)
+      .in('item_id', ids)
+      .order('occurred_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []) as StockMovementRow[];
   },
 
   async createItem(input: {

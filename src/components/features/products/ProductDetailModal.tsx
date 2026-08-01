@@ -34,8 +34,11 @@ import ProductSEOTab from '@/components/business/seo-toolkit/ProductSEOTab';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { ProductPricePanel } from '@/components/features/pricing/ProductPricePanel';
 import { ProductFiscalCard } from '@/components/business/marketplace/ProductFiscalCard';
+import { ProductStockPanel } from '@/components/business/marketplace/ProductStockPanel';
+import { ProductCostCard } from '@/components/business/marketplace/ProductCostCard';
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
-import { DollarSign, Ship } from 'lucide-react';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { DollarSign, Ship, Boxes } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
@@ -235,9 +238,43 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // node-admin via the unified capability layer (replaces the per-mount workspace_members fetch).
   // pricing.manage is granted to exactly the owner/admin personas (operator/dealer/architect),
   // preserving the old `workspace_members.role IN (owner,admin)` behaviour for the active workspace.
-  const { can } = usePermissions();
+  const { can, canAny } = usePermissions();
   const isAdmin = can('pricing.manage');
   const { user } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
+
+  // ── Who sees what ──────────────────────────────────────────────────────────────────────
+  //
+  // This modal is mounted on a lot of different surfaces (admin catalog, Discover, dashboard
+  // widgets, moodboards, quote lines, agent results, the 3D designer), so the viewer can be an
+  // operator, a warehouse hand, a sales rep or a project client. Two axes decide, and BOTH must
+  // pass — a capability alone is not enough:
+  //
+  //   1. OWNERSHIP. Business data only ever concerns a product in the viewer's ACTIVE
+  //      workspace. Operator-catalog reference items and other nodes' products have no stock,
+  //      cost or listing that means anything here, and asking for them would be a cross-tenant
+  //      read dressed up as a UI feature.
+  //   2. CAPABILITY, from the persona model in `auth/capabilities.ts` — not the coarse
+  //      `pricing.manage` this file used for everything, which is about pricing rules and says
+  //      nothing about stock. `staff` and `warehouse_staff` run the warehouse and hold
+  //      `warehouse.manage`; neither holds `pricing.manage`, so gating stock on the latter
+  //      would hide the warehouse from the warehouse team.
+  //
+  // Personas that hold none of these — `end_user` (project clients), `employee`, `hr_*`,
+  // `marketing_staff`, `accountant`, `realestate_agent` — see the product and nothing else.
+  // Note `end_user` DOES hold `quotes.use`, which is why availability keys off `sales.portal`
+  // rather than the ability to quote.
+  const isOwnProduct =
+    !!activeWorkspaceId &&
+    (product as unknown as { workspace_id?: string | null }).workspace_id === activeWorkspaceId;
+  /** Warehouse rows, locations, the movement ledger, listings. Operations data. */
+  const canSeeStock = isOwnProduct && can('warehouse.manage');
+  /** "In stock / Low / Out" and a total, nothing else — so a rep doesn't quote thin air. */
+  const canSeeAvailability = isOwnProduct && canAny('warehouse.manage', 'sales.portal');
+  /** What we PAID and to whom. Owner/admin personas, plus the sales manager who carries margin. */
+  const canSeeCost = isOwnProduct && canAny('pricing.manage', 'sales.team.view');
+  /** Fiscal identity is set by whoever does intake or invoicing, so it is not pricing-only. */
+  const canSeeFiscal = isOwnProduct && canAny('pricing.manage', 'warehouse.manage', 'finance.manage');
   const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [images, setImages] = useState<any[]>([]);
@@ -1861,19 +1898,40 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <DollarSign className="h-4 w-4" />
                   Pricing
                 </TabsTrigger>
-                {/* Split out of the old "Pricing & Data" tab. Fiscal identity is a dozen fields
-                    across invoicing, myDATA and customs — stacked under pricing they were
-                    unreadable, which is part of why only three of them were ever rendered. */}
-                <TabsTrigger value="fiscal" className="flex items-center gap-2">
-                  <Ship className="h-4 w-4" />
-                  Fiscal &amp; Customs
-                </TabsTrigger>
               </>
+            )}
+            {/* Fiscal and Stock carry their OWN gates rather than riding on `isAdmin`
+                (= pricing.manage): the warehouse team sets these fields and must be able to
+                read them back. */}
+            {canSeeFiscal && (
+              <TabsTrigger value="fiscal" className="flex items-center gap-2">
+                <Ship className="h-4 w-4" />
+                Fiscal &amp; Customs
+              </TabsTrigger>
+            )}
+            {canSeeStock && (
+              <TabsTrigger value="stock" className="flex items-center gap-2">
+                <Boxes className="h-4 w-4" />
+                Stock
+              </TabsTrigger>
             )}
           </TabsList>
 
           {/* Details Tab */}
           <TabsContent value="details" className="mt-6">
+            {/* Availability, for people who quote but do not run the warehouse. A total and a
+                word — no warehouses, no locations, no ledger, no listings. Rendered for anyone
+                with availability access; those who also hold `warehouse.manage` get the full
+                Stock tab, but keeping the line for them too means one code path, not two. */}
+            {canSeeAvailability && activeWorkspaceId && (
+              <div className="mb-4">
+                <ProductStockPanel
+                  productId={product.id}
+                  workspaceId={activeWorkspaceId}
+                  variant="summary"
+                />
+              </div>
+            )}
             {/* Full description card — first thing on the Details tab so users
                 see the narrative before diving into specs. Falls back through:
                   1. product.long_description
@@ -2980,11 +3038,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </p>
             <ProductPricePanel productId={product.id} />
             <ProductPricingCard productId={product.id} />
+            {/* Cost carries a NARROWER gate than the rest of this tab: the tab opens on
+                pricing.manage, but what we paid a supplier is owner/admin + sales-manager only. */}
+            {canSeeCost && <ProductCostCard productId={product.id} />}
           </div>
         </TabsContent>
       )}
 
-      {isAdmin && (
+      {canSeeFiscal && (
         <TabsContent value="fiscal" className="mt-6">
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
@@ -2996,6 +3057,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               These are the same fields the warehouse intake form collects.
             </p>
             <ProductFiscalCard productId={product.id} />
+          </div>
+        </TabsContent>
+      )}
+
+      {canSeeStock && activeWorkspaceId && (
+        <TabsContent value="stock" className="mt-6">
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+              <Boxes className="h-4 w-4" />
+              Stock
+            </h3>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Where this product physically is, what moved, and whether it is listed.
+            </p>
+            {/* UX gate only — the upsell for a workspace that hasn't bought the module. RLS on
+                warehouse_items is the tenancy boundary; see docs/warehouse-and-billing.md. */}
+            <ModuleTabGate
+              moduleSlug="stock"
+              moduleName="Stock"
+              blurb="Track this product across warehouses, see what moved, and list surplus."
+            >
+              <ProductStockPanel productId={product.id} workspaceId={activeWorkspaceId} />
+            </ModuleTabGate>
           </div>
         </TabsContent>
       )}

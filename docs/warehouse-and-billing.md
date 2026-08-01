@@ -53,6 +53,44 @@ Workspace-scoped inventory. Each workspace lazily gets one default "Main" wareho
 
 **One editor over the whole set.** These columns are written by three surfaces (warehouse intake, the stock-item editor, the product modal) and the product modal used to render three of them — a write-only path where a value set on intake could never be seen or corrected again. `ProductFiscalCard` is now the single editor; `FISCAL_KEYS` in `warehouseService` stays the single definition of the column list, and [tests/unit/productFiscalCoverage.test.ts](../tests/unit/productFiscalCoverage.test.ts) fails the build when the two drift. Customs classification is documented separately in [taric-customs-classification.md](taric-customs-classification.md).
 
+### Who sees stock on the product record
+
+The product modal is mounted on a dozen surfaces (admin catalog, Discover, dashboard widgets,
+moodboards, quote lines, agent results, the 3D designer), so the viewer can be an operator, a
+warehouse hand, a sales rep, an invited employee or a project client. Every internal surface
+used to gate on one capability, `pricing.manage`, which is about pricing rules and says nothing
+about stock — coarse in both directions, since the warehouse team could not read back fields
+they set at intake.
+
+Two axes now decide, and **both** must pass:
+
+1. **Ownership** — the product belongs to the viewer's ACTIVE workspace. Operator-catalog
+   reference items and other nodes' products have no stock, cost or listing that means anything
+   here.
+2. **Capability**, from `auth/capabilities.ts`.
+
+| Surface | Capability | Personas |
+|---|---|---|
+| Stock tab: warehouses, locations, movements, listings, as-received physical facts | `warehouse.manage` | operator, dealer, architect, staff, warehouse_staff |
+| Availability line: "In stock / Low / Out" + a total, nothing else | `warehouse.manage` or `sales.portal` | the above + sales, sales_manager |
+| Purchase cost + supplier | `pricing.manage` or `sales.team.view` | operator, dealer, architect, sales_manager |
+| Fiscal & Customs tab | `pricing.manage`, `warehouse.manage` or `finance.manage` | the above + staff, warehouse_staff, accountant |
+
+`end_user`, `employee`, `hr_*`, `marketing_staff` and `realestate_agent` see none of it.
+Availability deliberately does **not** key off `quotes.use`: `end_user` holds that capability, so
+gating on it would show stock levels to a project client. Pinned by
+[tests/unit/productModalVisibility.test.ts](../tests/unit/productModalVisibility.test.ts), which
+asserts the matrix against `PERSONA_CAPABILITIES` — widening a persona fails the build.
+
+> **Open server-side gap.** RLS on `warehouse_items` (`wh_items_read`) and `stock_movements`
+> (`sm_read`) is `is_workspace_member(workspace_id)` — it enforces TENANCY, not role. So the UI
+> gate above is currently the only thing separating a warehouse reader from an invited employee
+> or a project client who is a workspace member: the data is reachable through the API. The fix
+> is a `is_workspace_stock_reader(workspace_id)` predicate (member AND warehouse/finance/sales
+> role) applied to both policies, but it needs a sweep of every consumer first —
+> `warehouseService`, `deliveryNotesService`, `ordersService`, `OrdersPanel`, `marketplaceService`
+> — because a read that the Sales portal depends on must not start returning nothing.
+
 **Wholesale vs retail classification**: the same product files under different E3 codes depending on the document. `invoice-builder` picks the `*_retail` pair when the document type is family `11.x`, the wholesale pair otherwise; the POS (which only issues 11.x) prefers retail with wholesale as fallback.
   - A line with no `item_description` is not receivable, and most type-2.x (services) documents have none — the dialog says so explicitly instead of showing an empty list.
 - **Delivery notes** also move stock: for an order-linked dispatch note `issue_delivery_note` routes each line through `deliver_order_line` (single `order_items.quantity_delivered` ledger — no double-decrement with the Orders UI); a standalone note (no order) calls `record_stock_movement` per line with a `warehouse_item_id`.
