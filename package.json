@@ -170,6 +170,9 @@
     "node": ">=18.0.0"
   },
   "overrides": {
-    "underscore": "^1.13.8"
+    "underscore": "^1.13.8",
+    "@mdxeditor/editor": {
+      "js-yaml": "^4.3.0"
+    }
   }
 }
