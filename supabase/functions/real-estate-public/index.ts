@@ -26,22 +26,40 @@ function json(body: any, status = 200): Response {
  *  returns null. IP is hashed (never stored raw). Service-role table; no captcha dependency. */
 const PUBLIC_LEAD_HOURLY_LIMIT = 8;
 async function enforceLeadRateLimit(supabase: any, req: Request, action: string, workspaceId: string | null): Promise<Response | null> {
+  // The two halves have DIFFERENT failure policies, and collapsing them into one
+  // `catch { return null }` is what made this brake fail open (audit #303 finding 5):
+  //
+  //   - The COUNT is the enforcement decision. If it cannot be answered we do not know
+  //     whether the caller is over budget, so we must refuse. Failing open here hands an
+  //     attacker an unlimited channel the moment they can induce an error in this query,
+  //     which is exactly what a flood would do.
+  //   - The INSERT is bookkeeping. Losing one row costs a little accuracy on a later
+  //     window and must never block a legitimate submission.
+  let ipHash: string;
   try {
     const ipRaw = getTrustedClientIp(req);
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ipRaw));
-    const ipHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 40);
+    ipHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 40);
+
     const sinceIso = new Date(Date.now() - 3600_000).toISOString();
-    const { count } = await supabase.from('public_realestate_submissions')
+    const { count, error } = await supabase.from('public_realestate_submissions')
       .select('id', { count: 'exact', head: true }).eq('ip_hash', ipHash).gte('created_at', sinceIso);
+    if (error) throw error;
     if ((count ?? 0) >= PUBLIC_LEAD_HOURLY_LIMIT) {
       return json({ error: 'Too many requests. Please try again later.' }, 429);
     }
-    await supabase.from('public_realestate_submissions').insert({ ip_hash: ipHash, workspace_id: workspaceId, action });
-    return null;
-  } catch (_) {
-    // Never let a throttle-bookkeeping failure block a legitimate submission.
-    return null;
+  } catch (e) {
+    console.error('[real-estate-public] lead throttle check failed — refusing (fail closed):', e);
+    return json({ error: 'Too many requests. Please try again later.' }, 429);
   }
+
+  // Bookkeeping only: never blocks the submission.
+  try {
+    await supabase.from('public_realestate_submissions').insert({ ip_hash: ipHash, workspace_id: workspaceId, action });
+  } catch (e) {
+    console.error('[real-estate-public] lead throttle bookkeeping insert failed (non-fatal):', e);
+  }
+  return null;
 }
 
 

@@ -339,6 +339,15 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           is_public: true,
           published_at: new Date().toISOString(),
           public_listing_token: property.public_listing_token ?? newToken(),
+          // `in_discovery` had NO writer anywhere in the platform (audit #303 finding 1). The
+          // column stayed at its `false` default forever, while `real-estate-feed` filters
+          // `.eq('in_discovery', true)` and the cross-workspace Properties tab gates on it. So a
+          // broker could enable syndication, copy the feed URL, hand it to Kyero or an OpenImmo
+          // portal — and the portal pulled an empty document, permanently, with no error anywhere.
+          // `unpublish-property` already clears it, so setting it here makes the pair symmetric.
+          // Defaults true because publishing IS the act of making a listing publicly
+          // discoverable; pass `in_discovery: false` to publish to the agency's own site only.
+          in_discovery: body.in_discovery === undefined ? true : body.in_discovery === true,
         };
         if (!property.listing_date) patch.listing_date = new Date().toISOString().slice(0, 10);
         const { data, error } = await supabase.from('properties').update(patch).eq('id', id).eq('workspace_id', workspaceId).select('*').single();
@@ -527,6 +536,19 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         // Edit a lead: status and/or its contact fields (name/email/phone/message).
         const inqId = String(body.inquiry_id ?? '');
         if (!inqId) return json({ error: 'inquiry_id is required' }, 400);
+
+        // SECURITY (audit #303 finding 3, second half): requireManage() only proves the caller
+        // may manage SOMETHING here — for a realestate_agent it is true, so on its own it lets
+        // agent B rewrite the buyer PII on agent A's listing, including listings A has not
+        // flagged open_for_all and B therefore cannot even READ. `list-inquiries` already scopes
+        // reads by `property.listing_agent_id === userId`; scoping the write the same way is what
+        // stops read and write permissions disagreeing.
+        const { data: inqRow, error: inqErr } = await supabase
+          .from('property_inquiries').select('property_id').eq('id', inqId).eq('workspace_id', workspaceId).maybeSingle();
+        if (inqErr) throw new HttpError(400, inqErr.message);
+        if (!inqRow) throw new HttpError(404, 'not found');
+        if (inqRow.property_id) await loadEditable(String(inqRow.property_id));
+
         const patch: Record<string, unknown> = {};
         if (body.status !== undefined) {
           const status = String(body.status);
@@ -677,6 +699,22 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const vId = String(body.viewing_id ?? '');
         if (!vId) return json({ error: 'viewing_id is required' }, 400);
+
+        // SECURITY (audit #303 finding 3, second half): this action previously did no property
+        // or agent lookup at all — workspace scoping alone let one agent cancel or reschedule
+        // another agent's viewing. `list-viewings` self-scopes reads with
+        // `if (!access.isBroker) q = q.eq('agent_id', userId)`; the write now matches, and also
+        // defers to listing ownership so a listing agent retains control of viewings on their
+        // own property. 404 rather than 403 on the lookup, to stay enumeration-safe.
+        const { data: vRow, error: vErr } = await supabase
+          .from('property_viewings').select('agent_id, property_id').eq('id', vId).eq('workspace_id', workspaceId).maybeSingle();
+        if (vErr) throw new HttpError(400, vErr.message);
+        if (!vRow) throw new HttpError(404, 'not found');
+        if (!access.isBroker && vRow.agent_id !== userId) {
+          if (!vRow.property_id) throw new HttpError(403, 'This viewing belongs to another agent.');
+          await loadEditable(String(vRow.property_id)); // throws 403/404 unless the caller owns the listing
+        }
+
         const patch: Record<string, unknown> = {};
         if (body.status !== undefined) {
           if (!VIEWING_STATUSES.includes(String(body.status))) return json({ error: 'invalid status' }, 400);
