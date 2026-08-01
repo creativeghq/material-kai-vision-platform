@@ -7,43 +7,22 @@
  *   - the KAI agent edge function (when it builds its tool list, if/when
  *     it adopts dynamic module-tool merging)
  *
- * Adding a new tool: drop the factory into `tools.ts` and add it to
- * `toolFactories` below.
+ * Adding a new social capability: extend the `manage_social` tool in
+ * `_shared/tools/social-tools.ts` and its SERVER_TOOLKITS / client TOOLKITS entries.
+ * Do NOT add tool factories here — nothing consumes them.
  */
 
 import type { EdgeModuleManifest } from '../registry.ts';
-import { SocialAnalyticsSyncAgent } from './agents/social-analytics-sync-agent.ts';
-import { SocialInsightsSyncAgent } from './agents/social-insights-sync-agent.ts';
-import {
-  createSocialConnectAccountTool,
-  createSocialListAccountsTool,
-  createSocialDisconnectAccountTool,
-  createSocialGeneratePostTool,
-  createSocialGenerateImageTool,
-  createSocialGenerateVideoTool,
-  createSocialPublishPostTool,
-  createSocialSchedulePostTool,
-  createSocialGetBestTimeTool,
-  createSocialGetAnalyticsTool,
-  createSocialGetAccountInsightsTool,
-} from './tools.ts';
 
+// NOTE: this module exposes its agent surface through the single consolidated `manage_social`
+// tool registered in agent-chat, NOT through per-action tool factories. An 11-entry
+// `toolFactories` array used to sit here alongside a 490-line tools.ts, and NOTHING consumed
+// either — a maintainer adding a social capability here shipped nothing. Both are deleted, and
+// the unconsumed `toolFactories` field is gone from EdgeModuleManifest so it cannot be declared
+// again in the belief that it works. (audit #306 finding 18)
 const manifest: EdgeModuleManifest = {
   slug: 'social-media',
   agents: [SocialAnalyticsSyncAgent, SocialInsightsSyncAgent],
-  toolFactories: [
-    createSocialConnectAccountTool,
-    createSocialListAccountsTool,
-    createSocialDisconnectAccountTool,
-    createSocialGeneratePostTool,
-    createSocialGenerateImageTool,
-    createSocialGenerateVideoTool,
-    createSocialPublishPostTool,
-    createSocialSchedulePostTool,
-    createSocialGetBestTimeTool,
-    createSocialGetAnalyticsTool,
-    createSocialGetAccountInsightsTool,
-  ],
 };
 
 export default manifest;

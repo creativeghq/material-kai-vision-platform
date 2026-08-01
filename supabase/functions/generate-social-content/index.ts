@@ -18,7 +18,14 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 
-const CREDIT_COST = 2; // flat 2 credits per generation
+// Pre-flight estimate ONLY — shown before the call, never persisted. The real charge is
+// derived inside debitExternalServiceCredits from ai_model_pricing and comes back as
+// debitResult.credits_debited. Reporting this constant instead was a second derivation of a
+// money quantity (anti-regression rule #1): a caption is actually billed 0.3 and was reported
+// as 2 — a 6.7x overstatement that could never reconcile against credit_transactions or
+// ai_usage_logs, and that any future "what did this post cost" rollup would inherit.
+// (audit #306 finding 20)
+const CREDIT_COST = 2;
 
 const PLATFORM_SPECS: Record<string, { max_chars: number; hashtag_style: string; tone_notes: string }> = {
   instagram:  { max_chars: 2200, hashtag_style: 'mix of popular and niche', tone_notes: 'visual, aspirational, story-driven' },
@@ -197,8 +204,8 @@ Return exactly this JSON structure:
           caption: parsed.captions[0]?.caption,
           hashtags: parsed.hashtags,
           status: 'draft',
-          credits_used: CREDIT_COST,
-          credits_breakdown: { caption: CREDIT_COST },
+          credits_used: debitResult.credits_debited,
+          credits_breakdown: { caption: debitResult.credits_debited },
           generation_model: 'claude-haiku-4-5',
           metadata: { topic, tone, all_captions: parsed.captions },
         })
@@ -213,11 +220,11 @@ Return exactly this JSON structure:
         .single();
 
       if (existingPost) {
-        const newBreakdown = { ...(existingPost.credits_breakdown || {}), caption: CREDIT_COST };
+        const newBreakdown = { ...(existingPost.credits_breakdown || {}), caption: debitResult.credits_debited };
         await supabase
           .from('social_posts')
           .update({
-            credits_used: (existingPost.credits_used || 0) + CREDIT_COST,
+            credits_used: (existingPost.credits_used || 0) + debitResult.credits_debited,
             credits_breakdown: newBreakdown,
             caption: parsed.captions[0]?.caption,
             hashtags: parsed.hashtags,

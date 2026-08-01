@@ -26,7 +26,6 @@
  *   {
  *     slug: 'social-media',
  *     agents: [SocialAnalyticsSyncAgent, SocialInsightsSyncAgent],
- *     toolFactories: [createSocialConnectAccountTool, …],
  *   }
  *
  * Ordering is irrelevant — the platform-level builder just unions all
@@ -46,7 +45,6 @@ export type AgentRunnerCtor = new () => AgentRunner;
  * Keeping it `unknown[]` here lets the platform pass whatever it
  * already passes — type-tightened at the platform-side call site.
  */
-export type ToolFactory = (...args: unknown[]) => unknown;
 
 export interface EdgeModuleManifest {
   /** Must match the row in `public.modules.slug`. */
@@ -54,7 +52,6 @@ export interface EdgeModuleManifest {
   /** Background agents this module contributes. Each ctor produces one runner. */
   agents?: AgentRunnerCtor[];
   /** LLM tool factories this module contributes. */
-  toolFactories?: ToolFactory[];
 }
 
 /**

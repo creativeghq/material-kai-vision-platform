@@ -264,6 +264,10 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     // in this family passes it. (audit #304 finding 12)
     workspace_id ?? null,
   );
+  // What was ACTUALLY charged, derived from ai_model_pricing inside the debit. `creditCost` is
+  // a pre-flight estimate and drifts from it — xai-aurora bills 10.5 and was reported as 10,
+  // flux-2-pro bills 6.0 and was reported as 5. Persisting the estimate was a second
+  // derivation of a money quantity (anti-regression rule #1). (audit #306 finding 20)
   if (!debitResult.success) {
     return jsonResponse({ success: false, error: debitResult.error || 'Insufficient credits', required: creditCost }, 402);
   }
@@ -298,13 +302,13 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
         .single();
 
       if (existingPost) {
-        const newBreakdown = { ...(existingPost.credits_breakdown || {}), image: creditCost };
+        const newBreakdown = { ...(existingPost.credits_breakdown || {}), image: debitResult.credits_debited };
         const newImageUrls = [...(existingPost.image_urls || []), storedUrl];
         await supabase
           .from('social_posts')
           .update({
             image_urls: newImageUrls,
-            credits_used: (existingPost.credits_used || 0) + creditCost,
+            credits_used: (existingPost.credits_used || 0) + debitResult.credits_debited,
             credits_breakdown: newBreakdown,
             generation_model: resolvedModel,
           })
@@ -318,8 +322,8 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
         post_type: 'image',
         image_urls: [storedUrl],
         status: 'draft',
-        credits_used: creditCost,
-        credits_breakdown: { image: creditCost },
+        credits_used: debitResult.credits_debited,
+        credits_breakdown: { image: debitResult.credits_debited },
         generation_model: resolvedModel,
         metadata: { prompt, image_type, aspect_ratio },
       });
@@ -329,7 +333,7 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
       success: true,
       image_url: storedUrl,
       model_used: resolvedModel,
-      credits_used: creditCost,
+      credits_used: debitResult.credits_debited,
       credits_remaining: debitResult.new_balance,
       aspect_ratio,
     });
