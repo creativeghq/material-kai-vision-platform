@@ -40,6 +40,17 @@ export const BUILT_IN_PROVIDER: InvoiceProvider = {
 /**
  * Resolve the active invoice provider from a given set of enabled slugs.
  * Pure function — easy to unit test, no React or DB.
+ *
+ * NO MODULE DECLARES `provides.invoicing` TODAY, so this always returns BUILT_IN_PROVIDER and
+ * `isErp` is currently always false. That is a live extension point awaiting its first
+ * consumer, NOT a broken branch: the only modules declaring `provides` are payments-stripe and
+ * payments-viva, both `{ payments: true }`, and `myaade` is an ΑΦΜ lookup rather than an
+ * invoicer. The first real ERP integration (Novus e-invoicing is the planned one) sets
+ * `provides.invoicing: true` in its manifest and every gated surface lights up — the banner in
+ * InvoicingPanel, the hidden Issue button in IssueInvoiceButton, the disabled numbering card.
+ *
+ * Flagged by audit #298 finding 18 as "unreachable". Verified and kept deliberately: the
+ * mechanism is correct, so deleting it would remove working plumbing rather than dead code.
  */
 export function resolveInvoiceProvider(enabledSlugs: ReadonlySet<string>): InvoiceProvider {
   const erpCandidates = registeredModules
