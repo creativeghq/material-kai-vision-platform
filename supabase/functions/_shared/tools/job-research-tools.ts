@@ -211,6 +211,12 @@ export const createTrackJobSearchTool = (
       description: [
         'Create, update, pause, resume, or delete a background job search.',
         '',
+        'SETUP CHECKLIST — when creating a search (action=start), ALWAYS collect these from the user, asking for anything missing before you create it:',
+        '  1. JOBS / KEYWORDS — ask "Which roles? (list as many as you like, separated by commas)". Split their comma-separated answer into the `keywords` array and pass EVERY term — there is no limit, do not trim the list.',
+        '  2. LOCATION — ask for a location, or "remote". Set `location` and/or `remote_only=true`.',
+        '  3. DAILY EMAIL — ALWAYS ask "Do you want a daily email when new jobs are found?" If yes → alert_channels=["bell","email"]; if no → alert_channels=["bell"].',
+        'Confirm the collected keywords + location + email choice back to the user before creating.',
+        '',
         'When the user says things like:',
         '  • "find me jobs daily"           → digest_hour_utc=7 (or the hour they specify), digest_day_of_week=null, refresh_interval_hours=24',
         '  • "weekly summary on Mondays"    → digest_day_of_week=1 (0=Sunday..6=Saturday), refresh_interval_hours=168',
@@ -244,7 +250,7 @@ export const createTrackJobSearchTool = (
         action: z.enum(['start', 'update', 'pause', 'resume', 'delete']).default('start'),
         label: z.string().optional().describe('Human-readable name like "Senior React jobs in Athens". REQUIRED for action=start.'),
         tracked_job_id: z.string().optional().describe('UUID of an existing tracked job search; pass instead of label for update/pause/resume/delete'),
-        keywords: z.array(z.string()).optional().describe('Search terms — pass the user\'s primary terms verbatim. The platform will Haiku-expand them into variants on first save (Senior X, X Lead, X abbreviations). Required for action=start.'),
+        keywords: z.array(z.string()).optional().describe('Search terms. Ask the user for their roles as a COMMA-SEPARATED list and pass EVERY term they give — no cap, do not trim. Split "Product Manager, Vibe Coder, Product Builder" into ["Product Manager","Vibe Coder","Product Builder"]. Each keyword is searched independently across Google Jobs + Perplexity. Required for action=start.'),
         excluded_keywords: z.array(z.string()).optional().describe('Keywords that should disqualify a match (e.g. ["junior","intern","contract"])'),
         location: z.string().optional().describe('Free-form location like "Athens, Greece" or "London, UK"'),
         country_code: z.string().optional().describe('ISO-2 country code (GR, US, UK, DE, …) — biases DataForSEO Google Jobs results to that locale'),
@@ -334,19 +340,46 @@ export const createFindJobsTool = (
       const r = await callMivaa(`/api/v1/job-research/track/${targetId}/listings?${qs}`, { method: 'GET', jwt });
       if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
       const listings = r.data?.listings ?? [];
+
+      // ALWAYS pull the last run's empty-source report so every job answer ends
+      // with "these boards returned nothing — check them manually". This is a
+      // hard product rule: the report must be identical every time.
+      let emptySources: string[] = [];
+      let lastRefreshedAt: string | null = null;
+      try {
+        const sb = svcClient();
+        const { data: tj } = await sb
+          .from('tracked_jobs')
+          .select('last_sources_empty, last_refreshed_at')
+          .eq('id', targetId)
+          .maybeSingle();
+        emptySources = Array.isArray(tj?.last_sources_empty) ? tj!.last_sources_empty : [];
+        lastRefreshedAt = tj?.last_refreshed_at ?? null;
+      } catch (_) { /* report degrades gracefully, never blocks the listings */ }
+
       onChunk?.({
         type: 'job_listings_feed',
         tracked_job_id: targetId,
         days,
         listings,
+        empty_sources: emptySources,
+        last_refreshed_at: lastRefreshedAt,
         timestamp: Date.now(),
       });
-      return JSON.stringify({ success: true, count: listings.length, listings });
+      return JSON.stringify({
+        success: true,
+        count: listings.length,
+        listings,
+        empty_sources: emptySources,
+        // Instruction the model MUST honour so reporting is always identical.
+        reporting_instruction:
+          'ALWAYS end your reply with a section titled "Sources that returned nothing this run — check manually" listing every url in empty_sources as clickable links, and tell the user to browse those by hand. If empty_sources is empty, state "All job boards returned results this run." Never omit this section.',
+      });
     },
     {
       name: 'find_jobs',
       description:
-        'Fetch recent matched job listings the platform discovered for one of the user\'s tracked job searches. Returns titles, companies, locations, salary, application URLs. 0 credits. To find a tracked job, pass either tracked_job_id or its label.',
+        'Fetch recent matched job listings the platform discovered for one of the user\'s tracked job searches. Returns titles, companies, locations, salary, application URLs, AND `empty_sources` (job boards that returned nothing on the last run). 0 credits. To find a tracked job, pass either tracked_job_id or its label.\n\nMANDATORY REPORTING: after listing the jobs you MUST always append a section listing `empty_sources` (the boards that returned nothing) and suggest the user check those manually. This section appears every time, with or without jobs.',
       schema: z.object({
         label: z.string().optional(),
         tracked_job_id: z.string().optional(),
