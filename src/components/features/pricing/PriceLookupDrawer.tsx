@@ -499,7 +499,13 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
       if (commitToProductPrices && productId && activeWorkspaceId) {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          await supabase.from('product_prices').upsert(
+          // The error MUST be destructured and thrown. supabase-js RESOLVES on an RLS denial
+          // rather than throwing, so discarding it let a rejected write flow straight into the
+          // "Price confirmed" toast below and close the drawer — the user saw a price they
+          // believed was saved, the catalog was unchanged, and no second signal existed
+          // anywhere. The enclosing try/catch could not help: nothing threw. The other two
+          // product_prices call sites both check. (audit #305 finding 14)
+          const { error: priceErr } = await supabase.from('product_prices').upsert(
             {
               workspace_id: activeWorkspaceId,
               product_id: productId,
@@ -517,6 +523,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
             },
             { onConflict: 'workspace_id,product_id' },
           );
+          if (priceErr) throw new Error(`Could not save the catalog price: ${priceErr.message}`);
         }
       }
 

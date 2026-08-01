@@ -132,7 +132,7 @@ systemctl show mivaa-pdf-extractor --property=Environment | tr ' ' '\n' | grep -
 ### B. Deploy the two new edge functions + agent-chat
 
 ```bash
-supabase functions deploy mention-monitoring-cron
+supabase functions deploy monitoring-cron   # single dispatcher for all five monitoring tasks
 supabase functions deploy llm-mention-probe-cron
 supabase functions deploy agent-chat
 ```
@@ -226,7 +226,17 @@ Each adapter checks for an empty key on init and silently disables itself — pa
 
 **"youtube: search failed: 400 quotaExceeded"** → daily quota burned. Either wait 24h or request a quota raise. The pipeline auto-recovers on the next cron tick.
 
-**Cron jobs show `failed` in `cron.job_run_details`** → check the edge function logs at https://supabase.com/dashboard/project/bgbavxtjlbvgplozizxu/functions/mention-monitoring-cron/logs. Most common cause: `CRON_SECRET` mismatched between the value pg_cron sends and MIVAA's env.
+**Do NOT debug these by looking for `failed` rows in `cron.job_run_details`.** These jobs run
+`SELECT net.http_post(...)`, and pg_net is fire-and-forget — that status only reports whether the
+ENQUEUE worked, so it reads `succeeded` no matter what the target does. It stayed at 181/181
+succeeded through 261 real HTTP 500s (audit #305 finding 3).
+
+Check the effect instead:
+- `api_usage_logs` where `request_path` starts `monitoring-cron` — now logged **per task**, e.g. `monitoring-cron?task=mention-refresh`
+- the function logs at https://supabase.com/dashboard/project/bgbavxtjlbvgplozizxu/functions/monitoring-cron/logs
+- the `ops.silent_zero` and `ops.monitoring_stalled` integrity checks, which now cover exactly this
+
+Most common cause: `CRON_SECRET` mismatched between the value pg_cron sends and MIVAA's env.
 
 **Module flipped on but agent tools return "disabled"** → the in-memory `is_module_enabled()` cache lasts 300s. Wait 5 minutes or restart the MIVAA service.
 

@@ -354,6 +354,12 @@ interface MarketAnalytics {
 const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<MarketAnalytics | null>(null);
+  // A failed RPC used to be indistinguishable from an empty result, and the empty state then
+  // told the user "No catalog products are linked to this company yet" — presenting a broken
+  // query as a FACT ABOUT THEIR DATA, which is the failure mode most likely to be acted on
+  // incorrectly (someone goes and re-links a factory that was never unlinked).
+  // (audit #305 finding 16)
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -362,6 +368,7 @@ const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
       // RPC added 2026-07-26; not yet in generated types → cast the call.
       const { data, error } = await (supabase.rpc as any)('company_market_analytics', { p_company_id: companyId, p_days: 90 });
       if (cancelled) return;
+      setLoadError(!!error);
       setData(error ? null : (data as unknown as MarketAnalytics));
       setLoading(false);
     })();
@@ -387,6 +394,11 @@ const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
       <CardContent className="space-y-4">
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
+        ) : loadError ? (
+          <p className="text-sm text-destructive italic">
+            Could not load market analytics. This is a query failure, not a statement about your
+            data — try again, and report it if it persists.
+          </p>
         ) : !hasSignal ? (
           <p className="text-sm text-muted-foreground italic">
             {(!data || data.product_count === 0)
@@ -454,7 +466,7 @@ interface ProductRow {
 const money = (n: number | null | undefined, currency?: string | null) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR', maximumFractionDigits: 2 }).format(n);
 
-const ProductPriceIntelCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
+const ProductPriceIntelCard: React.FC<CompanyMarketTabProps> = ({ companyId, workspaceId }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -466,13 +478,18 @@ const ProductPriceIntelCard: React.FC<CompanyMarketTabProps> = ({ companyId }) =
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data } = await supabase
+      // workspaceId was passed in and dropped on the floor, so this listed products across
+      // every tenant that RLS happened to expose — unlike the sibling cards, which scope.
+      // The error was discarded too, so a failure rendered as an empty catalogue.
+      // (audit #305 finding 16)
+      let pq = supabase
         .from('products')
         .select('id, name, cost, cost_currency')
-        .eq('brand_company_id', companyId)
-        .order('name')
-        .limit(60);
-      const rows = (data as ProductRow[]) ?? [];
+        .eq('brand_company_id', companyId);
+      if (workspaceId) pq = pq.eq('workspace_id', workspaceId);
+      const { data, error } = await pq.order('name').limit(60);
+      if (error) console.error('[CompanyMarketTab] product load failed:', error.message);
+      const rows = (error ? [] : (data as ProductRow[])) ?? [];
       if (cancelled) return;
       setProducts(rows);
       if (rows.length) {

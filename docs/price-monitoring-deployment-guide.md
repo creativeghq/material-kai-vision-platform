@@ -138,7 +138,7 @@ Verify with `supabase secrets list`.
 ### Deploy
 
 ```bash
-supabase functions deploy price-monitoring-cron
+supabase functions deploy monitoring-cron   # single dispatcher for all five monitoring tasks
 ```
 
 ### Manual smoke test

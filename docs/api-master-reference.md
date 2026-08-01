@@ -376,7 +376,7 @@ All service-role-authenticated (pg_cron invokes them). No user-facing API.
 | `ai-pricing-updater` | weekly | Syncs AI model pricing from provider sources into `ai_model_pricing` |
 | `campaign-processor` | every 1 min | Dispatches scheduled email campaigns via Resend (rate-limited 8/min) |
 | `check-material-alerts` | daily | Runs saved-search queries, emails matching results to subscribers |
-| `price-monitoring-cron` | every 4 hr | Executes due price checks against competitor URLs |
+| `monitoring-cron` | `15/30/45 * * * *` + `0 3 * * *` | Single dispatcher for ALL five monitoring tasks — `?task=price-refresh\|mention-refresh\|mention-probe\|job-refresh\|job-digest`. Replaced the five per-task functions, which are retired. |
 | `scheduled-import-runner` | every 5 min | Runs due XML imports |
 | `messaging-processor` | every 1 min | Batches outbound WhatsApp campaign sends (Zernio) |
 | `finance-fiscal-offline-recovery` | hourly | Backfills myDATA MARK on offline-queued documents (Novus `RequestTransmittedDocs`) |
@@ -466,7 +466,7 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 
 | Function | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `price-monitoring` | POST | JWT | Actions: `start-monitoring`, `stop-monitoring`, `check-now`, `get-status`. See [price-monitoring-cron-api](api/price-monitoring-cron-api.md) for cron variant. |
+| ~~`price-monitoring`~~ | — | — | **DOES NOT EXIST.** No such edge function is deployed or in the repo; the documented `start-monitoring` / `stop-monitoring` / `check-now` / `get-status` actions were never implemented here. Price monitoring is driven by `monitoring-cron?task=price-refresh` → MIVAA. (audit #305 finding 20) |
 | `POST /api/v1/prices/lookup` | POST | API key (Bearer) | **Public curl-callable** one-shot price lookup. Two modes: `url` (Firecrawl) or `search_query` (Perplexity Sonar). Rate-limited per key. Does NOT create a monitoring subscription. |
 | `POST /api/v1/prices/track` | POST | API key (Bearer) | **External project integration** — register a tracked query (search_query + country_code + refresh_interval_hours). First refresh runs synchronously; subsequent refreshes via cron on the caller's cadence. CASCADE-deletes on api_key deletion. |
 | `GET /api/v1/prices/track` | GET | API key (Bearer) | List all tracked queries owned by this api_key. |
@@ -477,7 +477,7 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 | `DELETE /api/v1/prices/track/{id}` | DELETE | API key (Bearer) | Soft delete (`is_active=false`); history preserved. Hard delete by revoking the api_key. |
 | `POST /api/v1/price-monitoring/discover` | POST | User JWT | Internal: Perplexity + DataForSEO + Firecrawl discovery for a monitored product (UI-triggered). 6h throttle; admin `force_refresh` bypass. Every row now carries `match_kind` (product-identity verdict), `product_title`, and optional `original_price` / `verified`. |
 | `POST /api/v1/price-monitoring/market-check` | POST | User JWT (admin) | Stateless one-shot market scan used by the KB-price drawer. Reuses the monitoring snapshot when the product is already enrolled and ≤6h old (`from_monitoring_cache=true`, 0 credits). Returns `stats {min, median, max, count, verified_count, currency}` computed over exact matches only. |
-| `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` | POST | `x-cron-secret` | Internal cron: refreshes all due `tracked_queries` rows. Called hourly from the Supabase price-monitoring-cron edge function. |
+| `POST /api/v1/price-monitoring/tracked-queries/cron-refresh` | POST | `x-cron-secret` | Internal cron: refreshes all due `tracked_queries` rows. Called hourly from `monitoring-cron?task=price-refresh`. |
 
 **Full external-API reference**: [docs/api/price-monitoring-api.md](api/price-monitoring-api.md) — auth, schemas, error codes, curl/TypeScript/Python recipes.
 

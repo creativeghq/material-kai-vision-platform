@@ -38,10 +38,14 @@ const MentionMonitoringDashboard: React.FC = () => {
       setRows(all);
       const productIds = Array.from(new Set(all.map((r) => r.product_id).filter(Boolean))) as string[];
       if (productIds.length) {
-        const { data: prods } = await supabase
+      // A discarded error made every row silently fall back to rendering the raw
+      // search_query instead of the product name — an outage that looks like a naming
+      // quirk, so nobody reports it. (audit #305 finding 17)
+        const { data: prods, error: prodErr } = await supabase
           .from('products')
           .select('id, name')
           .in('id', productIds);
+        if (prodErr) console.error('[MentionMonitoringDashboard] product-name lookup failed:', prodErr.message);
         const map: Record<string, string> = {};
         (prods || []).forEach((p: any) => { map[p.id] = p.name; });
         setProductNames(map);

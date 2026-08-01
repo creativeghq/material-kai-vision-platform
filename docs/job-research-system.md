@@ -178,8 +178,8 @@ Cloned wholesale from the [[mention-monitoring]] template (subject row → histo
 **RPCs**: `get_internal_tracked_jobs_due`, `get_tracked_jobs_due_for_digest`, `update_tracked_job_cadence`, `append_job_alert_log`, `stamp_job_refresh_cost`, `recompute_job_cost`. All `SECURITY DEFINER` — service role and edge functions call them across user boundaries; RLS still applies to direct client reads.
 
 **Cron** (pg_cron):
-- `job-research-refresh-hourly` (`45 * * * *`) → `job-research-cron` edge function → MIVAA `/cron-refresh`
-- `job-research-digest-hourly` (`5 * * * *`) → `job-research-digest-cron` edge function → MIVAA `/cron-digest?current_hour_utc=<H>`. Each user's tracked_jobs whose `digest_hour_utc == H` and `last_digest_sent_at < today` receive ONE consolidated email covering all their searches.
+- `job-research-refresh-hourly` (`45 * * * *`) → **`monitoring-cron?task=job-refresh`** → MIVAA `/cron-refresh`
+- `job-research-digest-hourly` (`5 * * * *`) → **`monitoring-cron?task=job-digest`** → MIVAA `/cron-digest?current_hour_utc=<H>`. Each user's tracked_jobs whose `digest_hour_utc == H` and `last_digest_sent_at < today` receive ONE consolidated email covering all their searches.
 - `job-classifier-cache-prune` (`30 4 * * *`) → DELETE expired verdict cache rows.
 
 **Refresh pipeline** ([mivaa-pdf-extractor/app/services/integrations/job_research_service.py](mivaa-pdf-extractor/app/services/integrations/job_research_service.py)):

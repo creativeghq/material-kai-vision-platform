@@ -436,7 +436,7 @@ The platform uses **7 embedding types** for comprehensive search:
 - Automation: `flow-engine`, `flow-scheduler-cron`, `flow-webhook`
 - Messaging: `email-api`, `messaging-api`, `notification-dispatcher`
 - Scraping & Import: `scrape-session-manager`, `scrape-single-page`, `scrape-preview`, `parse-sitemap`, `xml-import-orchestrator`, `scheduled-import-runner`, `pdf-batch-process`
-- Monitoring: `price-monitoring`, `price-monitoring-cron`, `check-material-alerts`, `ai-pricing-updater`, `auto-recovery-cron`, `job-cleanup-cron`, `health-check`
+- Monitoring: `monitoring-cron` (one dispatcher, `?task=price-refresh|mention-refresh|mention-probe|job-refresh|job-digest`), `check-material-alerts`, `ai-pricing-updater`, `auto-recovery-cron`, `job-cleanup-cron`, `health-check`
 - Recommendations: `recommendations-api`
 - SEO: `seo-analyze`, `seo-pipeline`, `seo-plan`, `seo-research`, `seo-write`
 

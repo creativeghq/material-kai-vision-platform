@@ -62,11 +62,15 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
 
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      // A discarded error made every row silently fall back to rendering the raw
+      // search_query instead of the product name — an outage that looks like a naming
+      // quirk, so nobody reports it. (audit #305 finding 17)
+      const { data, error } = await supabase
         .from('products')
         .select('id, name')
         .in('id', productIds);
       if (cancelled) return;
+      if (error) console.error('[MonitoredProductsList] product-name lookup failed:', error.message);
       const map: Record<string, string> = {};
       for (const p of data ?? []) map[p.id] = p.name;
       setProductNames(map);

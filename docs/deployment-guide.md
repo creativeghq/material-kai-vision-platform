@@ -371,8 +371,8 @@ Used by the `vies-validate` edge function (mounted in `src/components/core/Profi
 
 | Secret Name | Type | Used By Edge Functions | Description | Example/Format |
 |------------|------|----------------------|-------------|----------------|
-| `CRON_SECRET` | **Secret** | `price-monitoring-cron` | Secret for authenticating cron job requests | `your-secure-cron-secret` |
-| `PYTHON_BACKEND_URL` | Public | `price-monitoring-cron` | MIVAA Python backend URL | `https://v1api.materialshub.gr` |
+| `CRON_SECRET` | **Secret** | `monitoring-cron` | Secret for authenticating cron job requests | `your-secure-cron-secret` |
+| `PYTHON_BACKEND_URL` | Public | `monitoring-cron` | MIVAA Python backend URL | `https://v1api.materialshub.gr` |
 | `PYTHON_API_URL` | Public | `xml-import-orchestrator` | Python API URL for XML imports (default: `https://v1api.materialshub.gr`) | `https://v1api.materialshub.gr` |
 
 > **Note:** Default sender email and name are now configured through the Admin Panel at `/admin/email` → Email Settings, not as environment variables.

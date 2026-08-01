@@ -68,8 +68,8 @@ Subject-id flow (brand/keyword):
 Cross-flow: `/classifier-correction`, `/cron-refresh`, `/cron-probe-llm` (latter two require `x-cron-secret`).
 
 **Cron** (pg_cron):
-- `mention-monitoring-refresh-hourly` (`30 * * * *`) → POSTs to `mention-monitoring-cron` edge function → MIVAA `/cron-refresh`
-- `llm-mention-probe-daily` (`0 3 * * *`) → `llm-mention-probe-cron` edge function → MIVAA `/cron-probe-llm`
+- `mention-monitoring-refresh-hourly` (`30 * * * *`) → POSTs to **`monitoring-cron?task=mention-refresh`** → MIVAA `/cron-refresh`
+- `llm-mention-probe-daily` (`0 3 * * *`) → **`monitoring-cron?task=mention-probe`** → MIVAA `/cron-probe-llm`
 - `mention-classifier-cache-prune` (`0 4 * * *`) → DELETE expired cache rows
 
 **Notification dispatcher** ([mivaa-pdf-extractor/app/modules/mention_monitoring_notifications/service.py](mivaa-pdf-extractor/app/modules/mention_monitoring_notifications/service.py)):

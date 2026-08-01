@@ -10,6 +10,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { TrendingDown, Activity, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +23,11 @@ import { SectionHeader } from '@/components/shared/SectionHeader';
 
 export const PriceMonitoringDashboard: React.FC = () => {
   const [monitoredProducts, setMonitoredProducts] = useState<TrackedQuery[]>([]);
+  // The Price History tab mounted <PriceHistoryChart /> with NO props while the dashboard held
+  // no selection state at all, so the chart hit its `if (!productId)` guard and rendered
+  // "Select a product to view its price trends" — with no selector anywhere on the page to
+  // satisfy it. The tab could never draw a chart. (audit #305 finding 11)
+  const [historyProductId, setHistoryProductId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
     totalMonitored: 0,
@@ -168,7 +174,34 @@ export const PriceMonitoringDashboard: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
-          <PriceHistoryChart />
+          {(() => {
+            // Only products with a product_id can be charted — PriceHistoryChart keys on it.
+            const chartable = monitoredProducts.filter((p) => !!p.product_id);
+            if (chartable.length === 0) {
+              return (
+                <p className="text-sm text-muted-foreground">
+                  No monitored product has price history yet. Add one from the Monitored Products tab.
+                </p>
+              );
+            }
+            return (
+              <>
+                <Select value={historyProductId} onValueChange={setHistoryProductId}>
+                  <SelectTrigger className="w-full sm:w-96">
+                    <SelectValue placeholder="Select a product to chart" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {chartable.map((p) => (
+                      <SelectItem key={p.id} value={p.product_id as string}>
+                        {p.search_query}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <PriceHistoryChart productId={historyProductId || undefined} />
+              </>
+            );
+          })()}
         </TabsContent>
       </Tabs>
     </div>
