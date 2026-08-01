@@ -1418,6 +1418,15 @@ const PnlCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => (
       <CardTitle className="flex items-center gap-2"><Activity className="h-4 w-4" /> Monthly P&amp;L (last 12 months)</CardTitle>
     </CardHeader>
     <CardContent className="p-0">
+      {/* The ONLY element measured as clipping on the platform at 375px: 418px of table inside
+          a 365px content box, with Layout's `overflow-x-hidden` on <main> suppressing both the
+          scrollbar and the swipe — so 53px was simply unreachable. `%` vanished entirely and
+          `Margin` was cut, meaning a phone user opened Monthly P&L and could not see the margin
+          they came for. Note the issue's claim that "every other wide table on this page already
+          has this wrapper" does NOT hold for this file — this is its only overflow-x-auto. The 12
+          scrollers measured on /finance come from the child panels in src/modules/finance.
+          (audit #299 finding 1) */}
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="text-xs text-muted-foreground">
           <tr className="border-b border-border/60">
@@ -1443,6 +1452,7 @@ const PnlCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => (
           ))}
         </tbody>
       </table>
+      </div>
     </CardContent>
   </Card>
 );

@@ -317,7 +317,10 @@ const IdealoPage: React.FC = () => {
                   <span>{Object.entries(searchResult.counts).map(([s, n]) => `${s}: ${n}`).join(' · ') || 'no sources'}</span>
                 </div>
 
-                <div className="border border-white/10 rounded-lg overflow-hidden">
+                {/* overflow-x-auto, not overflow-hidden: <main> already clips, so a table
+                    wider than the phone viewport would lose its right-hand columns with no
+                    scrollbar and no swipe to recover them. (audit #299) */}
+                <div className="border border-white/10 rounded-lg overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-white/5 text-xs text-muted-foreground">
                       <tr>
