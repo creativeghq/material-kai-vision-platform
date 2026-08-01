@@ -87,7 +87,14 @@ If you need to feed reference images alongside the prompt (style transfer, room 
 
 ## Reference implementation: `seed-sheet-references`
 
-[`supabase/functions/seed-sheet-references/`](../supabase/functions/seed-sheet-references/) is the simplest end-to-end example. One-shot admin endpoint that generates 8 static reference images (one per moodboard sheet type) and uploads them into the public `moodboard-sheet-references` bucket.
+> **The source is gone.** `supabase/functions/seed-sheet-references/` does not exist in this
+> repo — the slug is still deployed but cannot be read, changed or redeployed, and its
+> output bucket `moodboard-sheet-references` is **empty**, so it has never successfully
+> seeded. Verified 2026-08-01 (audit #298 finding 25). The description below is kept as a
+> design record; do not link it as a working example to copy.
+
+A one-shot admin endpoint that generates 8 static reference images (one per moodboard sheet
+type) and uploads them into the public `moodboard-sheet-references` bucket.
 
 ### What it does
 
