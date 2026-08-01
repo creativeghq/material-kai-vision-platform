@@ -486,9 +486,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // `marketing_staff`, `accountant`, `realestate_agent` — see the product and nothing else.
   // Note `end_user` DOES hold `quotes.use`, which is why availability keys off `sales.portal`
   // rather than the ability to quote.
-  const isOwnProduct =
-    !!activeWorkspaceId &&
-    (product as { workspace_id?: string | null }).workspace_id === activeWorkspaceId;
+  const isOwnProduct = !!activeWorkspaceId && product.workspace_id === activeWorkspaceId;
   /** Warehouse rows, locations, the movement ledger, listings. Operations data. */
   const canSeeStock = isOwnProduct && can('warehouse.manage');
   /** "In stock / Low / Out" and a total, nothing else — so a rep doesn't quote thin air. */

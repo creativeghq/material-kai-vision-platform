@@ -108,6 +108,17 @@ export interface Product {
   stock: ProductStock;
   tags: string[];
   variants?: ProductVariant[];
+  /**
+   * Owning workspace. `products.workspace_id` is `uuid NOT NULL` in the DB, so anything loaded
+   * from PostgREST always carries one — it is optional here only because synthetic products that
+   * never round-trip the DB (the `src/data/demo/*.json` fixtures, the moodboard-item adapter) are
+   * built client-side without a workspace. Those correctly fail the ownership check.
+   *
+   * Declared rather than cast at the point of use: this is what gates stock, cost and fiscal data
+   * on the product record, and a cast there would let a rename silently turn every one of those
+   * surfaces off instead of failing the build.
+   */
+  workspace_id?: string | null;
   /** Source PDF document this product was extracted from (when applicable) */
   source_document_id?: string;
   /** Denormalized review aggregates (maintained by the material_reviews trigger). */
