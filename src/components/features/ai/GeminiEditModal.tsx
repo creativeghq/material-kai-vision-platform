@@ -375,8 +375,12 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
                   : 'Choose model and apply your edit'}
               </p>
             </div>
-            {/* Step dots */}
-            <div className="flex items-center gap-1.5">
+            {/* Step dots. Current-vs-done was carried by colour alone (WCAG 1.4.1) with no
+                "Step 2 of 3" anywhere, so a screen reader announced nothing and a
+                colour-blind user could not tell position. The dots are decorative; the
+                sr-only text is the actual announcement. (audit #302 finding 7) */}
+            <div className="flex items-center gap-1.5" role="group" aria-label={`Step ${step} of 3`}>
+              <span className="sr-only">{`Step ${step} of 3`}</span>
               {[1, 2, 3].map((s) => (
                 <div
                   key={s}
@@ -384,6 +388,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
                     'w-2 h-2 rounded-full transition-colors',
                     s === step ? 'bg-primary' : s < step ? 'bg-primary/40' : 'bg-muted',
                   )}
+                  aria-hidden="true"
                 />
               ))}
             </div>

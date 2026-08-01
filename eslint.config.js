@@ -117,11 +117,23 @@ export default [
       'import/no-unresolved': 'off', // TypeScript handles this
       'import/order': 'off',
 
-      // Accessibility - off for now
-      'jsx-a11y/alt-text': 'off',
-      'jsx-a11y/anchor-is-valid': 'off',
-      'jsx-a11y/click-events-have-key-events': 'off',
-      'jsx-a11y/no-static-element-interactions': 'off',
+      // Accessibility — WARN, ratcheted by scripts/check-a11y.mjs against
+      // .github/a11y-baseline.json. They were ALL 'off' under a comment reading
+      // "off for now", which is why the counts could only grow: every one of the 280
+      // unnamed icon buttons and 72 mouse-only handlers was added AFTER the plugin was
+      // installed. `warn` + a baseline that fails CI when a count RISES turns an unbounded
+      // backlog into a monotonically shrinking one without blocking the build today.
+      // Ratchet the numbers down; never edit them upward. (audit #302 finding 8)
+      // At ZERO — promoted from warn to error so it can never regress. This is the workflow
+      // the ratchet documents: drive a rule to 0, promote it, drop its baseline entry.
+      'jsx-a11y/alt-text': 'error',
+      'jsx-a11y/anchor-is-valid': 'warn',
+      'jsx-a11y/click-events-have-key-events': 'warn',
+      'jsx-a11y/no-static-element-interactions': 'warn',
+      'jsx-a11y/label-has-associated-control': 'warn',
+      'jsx-a11y/control-has-associated-label': 'warn',
+      'jsx-a11y/aria-props': 'warn',
+      'jsx-a11y/role-has-required-aria-props': 'warn',
 
       // Formatting - errors for auto-fix
       'quotes': ['error', 'single', { avoidEscape: true }],

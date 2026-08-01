@@ -164,8 +164,11 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
               <DialogTitle className="font-semibold">{isDesign ? 'New Interior Design' : 'Virtual Staging'}</DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">{stepLabel}</p>
             </div>
-            {/* Step indicators */}
-            <div className="flex items-center gap-1.5">
+            {/* Step indicators. Current-vs-done was carried by colour alone (WCAG 1.4.1) with
+                no "Step 2 of 3" anywhere. The dots are decorative; the sr-only text is the
+                actual announcement. (audit #302 finding 7) */}
+            <div className="flex items-center gap-1.5" role="group" aria-label={`Step ${step} of 3`}>
+              <span className="sr-only">{`Step ${step} of 3`}</span>
               {[1, 2, 3].map((s) => (
                 <div
                   key={s}
@@ -173,6 +176,7 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
                     'w-2 h-2 rounded-full transition-colors',
                     s === step ? 'bg-primary' : s < step ? 'bg-primary/40' : 'bg-muted',
                   )}
+                  aria-hidden="true"
                 />
               ))}
             </div>

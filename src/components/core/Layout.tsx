@@ -18,10 +18,21 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Command-center atmosphere — brand aurora + film grain behind every page. */}
       <div className="app-aurora" aria-hidden="true" />
       <div className="app-grain" aria-hidden="true" />
+      {/* Skip link — the platform had none anywhere across 640 components, so a keyboard user
+          tabbed the ENTIRE sidebar on every route change before reaching content. Visually
+          hidden until focused, which is the point: invisible to mouse users, the first stop for
+          a keyboard user. Placed before <Sidebar /> so it is genuinely first in DOM order.
+          (audit #302 finding 9) */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
       <Sidebar />
       {/* `mobile-content` reserves room for the fixed bottom tab bar (mobile only).
           `relative z-10` lifts page content above the fixed atmosphere. */}
-      <main className="relative z-10 flex-1 min-h-0 overflow-x-hidden overflow-y-auto flex flex-col page-wrapper mobile-content">
+      <main id="main-content" tabIndex={-1} className="relative z-10 flex-1 min-h-0 overflow-x-hidden overflow-y-auto flex flex-col page-wrapper mobile-content">
         {/* Localize a page render throw to the content area (nav + chrome stay usable) instead of
             letting it bubble to the top-level CriticalErrorBoundary and blank the whole app — the
             heavy authenticated pages (finance tables, agent canvas, PDF viewer) are the main risk. */}

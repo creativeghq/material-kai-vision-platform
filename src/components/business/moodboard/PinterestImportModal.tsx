@@ -327,7 +327,9 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                       <div className="space-y-1">
                         {importResult.matches.slice(0, 3).map((m, i) => (
                           <div key={i} className="flex items-center gap-2 text-xs bg-white rounded-lg p-2 border border-border/40">
-                            {m.image_url && <img src={m.image_url} className="w-8 h-8 rounded object-cover flex-shrink-0" />}
+                            {/* Decorative: the product name is announced by the sibling span, so a duplicate
+    image name would just be noise. (audit #302 finding 6) */}
+                            {m.image_url && <img src={m.image_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />}
                             <span className="flex-1 truncate font-medium">{m.product_name}</span>
                             <Badge variant="secondary" className="text-[10px] rounded-full">{Math.round(m.similarity * 100)}%</Badge>
                           </div>
@@ -407,7 +409,9 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                           }}
                           className="aspect-square rounded-lg overflow-hidden bg-muted relative group"
                         >
-                          {pin.image_url && <img src={pin.image_url} className="w-full h-full object-cover" />}
+                          {/* The pin thumbnail IS the content here — with no alt the picker reads as a list of
+    URLs. (audit #302 finding 6) */}
+                          {pin.image_url && <img src={pin.image_url} alt={pin.title || 'Pinterest pin'} className="w-full h-full object-cover" />}
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                             <Plus className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                           </div>
@@ -427,7 +431,8 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                       className="flex items-center gap-2 p-2 rounded-xl border border-border/60 hover:border-primary/40 hover:bg-muted/50 transition-colors text-left"
                     >
                       <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
-                        {board.image_url ? <img src={board.image_url} className="w-full h-full object-cover" /> : <Image className="w-full h-full p-2 text-muted-foreground" />}
+                        {/* Decorative: the board name is rendered in the sibling block. (audit #302 finding 6) */}
+                        {board.image_url ? <img src={board.image_url} alt="" className="w-full h-full object-cover" /> : <Image className="w-full h-full p-2 text-muted-foreground" />}
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-medium truncate">{board.name}</p>
