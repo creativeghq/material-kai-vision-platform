@@ -30,6 +30,10 @@ export interface ApiUsageLog {
   created_at: string | null;
 }
 
+/** Cap for an unfiltered api_usage_logs read. The table is 216,737 rows / 50 MB and grows on
+ *  every request; no admin view needs more than this at once. (audit #301 finding 15) */
+const DEFAULT_USAGE_LOG_LIMIT = 500;
+
 class ApiGatewayService {
   // ============= API Keys Management =============
   async getUserApiKeys(userId: string): Promise<ApiKey[]> {
@@ -122,14 +126,29 @@ class ApiGatewayService {
     if (options?.userId) {
       query = query.eq('user_id', options.userId);
     }
-    if (options?.limit) {
-      query = query.limit(options.limit);
-    }
+    // ALWAYS bounded. The limit used to apply only when a caller passed one, on a table
+    // holding 216,737 rows / 50 MB — so a bare call pulled the whole table, ordered, through
+    // PostgREST AND the RLS predicate on the VOLATILE has_role overload. (audit #301
+    // finding 15, and the worst pairing of it with finding 7.)
+    //
+    // One row over the cap is fetched so the caller can tell "exactly N" from "more than N"
+    // and SAY SO in the UI. A silently truncated list is the same silent-zero shape the
+    // platform guards against everywhere else.
+    const limit = options?.limit ?? DEFAULT_USAGE_LOG_LIMIT;
+    query = query.limit(limit + 1);
 
     const { data, error } = await query;
 
     if (error) throw error;
-    return (data || []) as ApiUsageLog[];
+    const rows = (data || []) as ApiUsageLog[];
+    if (rows.length > limit) {
+      console.warn(
+        `[apiGateway] api_usage_logs truncated to ${limit} rows — narrow the date range or pass a ` +
+        'higher limit. The view is showing a partial result.',
+      );
+      return rows.slice(0, limit);
+    }
+    return rows;
   }
 
   // ============= Utility Functions =============
