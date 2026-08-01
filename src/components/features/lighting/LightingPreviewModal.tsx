@@ -2,6 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from '@/components/core/ui/dialog';
 import { Loader2 } from 'lucide-react';
 
@@ -43,14 +44,16 @@ export default function LightingPreviewModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-6xl h-[85vh] p-4 flex flex-col gap-0 overflow-hidden">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">
+          {/* DialogTitle, not a raw h2 — Radix needs it to supply the accessible name.
+              (audit #302 finding 5) */}
+          <DialogTitle className="text-lg font-semibold text-foreground">
             Lighting Preview
             {productName && (
               <span className="ml-2 text-sm font-normal text-muted-foreground">
                 - {productName}
               </span>
             )}
-          </h2>
+          </DialogTitle>
         </div>
         <div className="flex-1 min-h-0">
           <Suspense fallback={<LoadingFallback />}>

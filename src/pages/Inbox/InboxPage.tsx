@@ -23,7 +23,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/core/ui/avatar';
 import { Separator } from '@/components/core/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
-import { Sheet, SheetContent } from '@/components/core/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/core/ui/sheet';
 import { Switch } from '@/components/core/ui/switch';
 import { Label } from '@/components/core/ui/label';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -936,6 +936,10 @@ const InboxPage: React.FC = () => {
             side={isMobile ? 'bottom' : 'right'}
             className={`p-0 bg-card overflow-hidden flex flex-col ${isMobile ? 'h-[85vh] rounded-t-2xl' : 'h-full w-full sm:max-w-md'}`}
           >
+            {/* sr-only: this panel has no visible heading, and without a SheetTitle Radix
+                logs a warning and a screen reader announces it with no name at all.
+                (audit #302 finding 5) */}
+            <SheetTitle className="sr-only">Conversation details</SheetTitle>
             {memberControls && (
               <div className="md:hidden flex flex-wrap items-center gap-1.5 px-4 py-3 border-b border-white/10 shrink-0">
                 {memberControls}

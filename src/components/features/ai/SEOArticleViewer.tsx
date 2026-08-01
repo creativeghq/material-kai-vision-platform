@@ -18,7 +18,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { Dialog, DialogContent } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { Progress } from '@/components/core/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
@@ -1951,6 +1951,10 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
       {/* Modal with full article details */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-5xl w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto p-0">
+          {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
+              warning without one and, more importantly, a screen reader announces the dialog with
+              no name at all. (audit #302 finding 5) */}
+          <DialogTitle className="sr-only">SEO article</DialogTitle>
           <div className="p-6 space-y-4">
             {/* Header */}
             <div className="space-y-2 pr-8">

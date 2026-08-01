@@ -14,7 +14,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Dialog, DialogContent } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 
 type Slot = 'cover' | 'intro' | 'background' | 'backcover';
@@ -227,6 +227,10 @@ export const WorkspacePdfTemplateCard: React.FC = () => {
 
         <Dialog open={!!enlarged} onOpenChange={(o) => !o && setEnlarged(null)}>
           <DialogContent className="max-w-4xl p-2 bg-transparent border-0 shadow-none">
+            {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
+                warning without one and, more importantly, a screen reader announces the dialog with
+                no name at all. (audit #302 finding 5) */}
+            <DialogTitle className="sr-only">Template preview</DialogTitle>
             {enlarged && <img src={enlarged} alt="Template preview" className="w-full h-auto max-h-[85vh] object-contain rounded-md" />}
           </DialogContent>
         </Dialog>

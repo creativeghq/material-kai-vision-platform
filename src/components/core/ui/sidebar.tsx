@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Separator } from '@/components/core/ui/separator';
-import { Sheet, SheetContent } from '@/components/core/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/core/ui/sheet';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import {
   Tooltip,
@@ -212,6 +212,10 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
+            {/* sr-only: the mobile sidebar is a Sheet with no visible heading. Without a
+                SheetTitle Radix logs a warning and a screen reader announces an unnamed
+                dialog — on the app's primary navigation. (audit #302 finding 5) */}
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>

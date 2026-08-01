@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Package, BookOpen, Users, Factory, ArrowRight, FileText, Building2, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Dialog, DialogContent } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { ProfileModal } from '@/components/features/discover/ProfileModal';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
@@ -335,6 +335,10 @@ function FactoryDetailModal({
     <>
       <Dialog open={!!factory} onOpenChange={() => onClose()}>
         <DialogContent hideClose className="max-w-2xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[85vh] flex flex-col">
+          {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
+              warning without one and, more importantly, a screen reader announces the dialog with
+              no name at all. (audit #302 finding 5) */}
+          <DialogTitle className="sr-only">Details</DialogTitle>
           {/* Banner */}
           <div
             className="h-24 sm:h-32 relative overflow-hidden shrink-0"

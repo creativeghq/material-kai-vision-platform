@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
-import { Dialog, DialogContent } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -326,6 +326,10 @@ function FactoryModal({
       {/* 92dvh, not 92vh — 92% of the LARGE viewport puts the bottom of the
           modal (the end of the products list) under mobile Safari's toolbar. */}
       <DialogContent hideClose className="no-card-hover w-[95vw] max-w-5xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[92dvh] flex flex-col">
+        {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
+            warning without one and, more importantly, a screen reader announces the dialog with
+            no name at all. (audit #302 finding 5) */}
+        <DialogTitle className="sr-only">Profile</DialogTitle>
         {/* Banner */}
         <div
           className="h-28 sm:h-36 relative overflow-hidden shrink-0"

@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Filter, Search, X, RotateCcw, Check } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
@@ -294,7 +294,10 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         <div className="flex items-center justify-between border-b border-border/60 px-5 py-3">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">{title}</h2>
+            {/* DialogTitle, not a raw h2: Radix wires aria-labelledby from it, which a plain
+                heading does not. This is the shared filter modal on every list view, so it was
+                the most-used unnamed dialog in the app. (audit #302 finding 5) */}
+            <DialogTitle className="text-sm font-semibold">{title}</DialogTitle>
             {total > 0 && <Badge variant="secondary" className="h-5 text-[10px]">{total} active</Badge>}
           </div>
         </div>

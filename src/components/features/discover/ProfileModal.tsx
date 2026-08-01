@@ -5,7 +5,7 @@ import {
   MessageCircle, Grid3x3, UserCircle, X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Dialog, DialogContent } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 // Card/CardContent replaced with dashboard-card divs for dark theme compliance
@@ -276,6 +276,10 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
     <>
       <Dialog open={isOpen} onOpenChange={() => onClose()}>
         <DialogContent hideClose className="no-card-hover w-[95vw] max-w-5xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[92vh] flex flex-col">
+          {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
+              warning without one and, more importantly, a screen reader announces the dialog with
+              no name at all. (audit #302 finding 5) */}
+          <DialogTitle className="sr-only">Profile</DialogTitle>
 
           {/* ── Banner ──────────────────────────────────────────────────────── */}
           <div

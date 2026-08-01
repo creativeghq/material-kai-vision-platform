@@ -21,6 +21,7 @@ import { Slider } from '@/components/core/ui/slider';
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from '@/components/core/ui/dialog';
 import { useARSupport } from './useARSupport';
 
@@ -234,6 +235,10 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="flex h-[95vh] max-w-[95vw] flex-col gap-0 overflow-hidden p-0 sm:h-[90vh] sm:max-w-4xl">
+        {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
+            warning without one and, more importantly, a screen reader announces the dialog with
+            no name at all. (audit #302 finding 5) */}
+        <DialogTitle className="sr-only">Material preview</DialogTitle>
         {/* Hidden download anchor */}
         <a ref={linkRef} className="hidden" aria-hidden="true" />
 

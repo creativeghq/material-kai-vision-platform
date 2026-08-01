@@ -10,7 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
-import { Dialog, DialogContent } from '@/components/core/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   userWebsitesService,
@@ -360,6 +360,10 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
       {/* Article viewer */}
       <Dialog open={!!openArticleId} onOpenChange={(o) => { if (!o) setOpenArticleId(null); }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
+              warning without one and, more importantly, a screen reader announces the dialog with
+              no name at all. (audit #302 finding 5) */}
+          <DialogTitle className="sr-only">SEO article</DialogTitle>
           {openArticleId && <SEOArticleViewer articleId={openArticleId} />}
         </DialogContent>
       </Dialog>
