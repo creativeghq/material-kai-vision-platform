@@ -128,7 +128,7 @@ async function _logEmbeddingUsage(
     const rawCost = (estimatedTokens / 1_000_000) * costPer1M;
     const billedCost = rawCost * MARKUP_MULTIPLIER;
 
-    await supabase.from('ai_usage_logs').insert({
+    const { error } = await supabase.from('ai_usage_logs').insert({
       operation_type: operationType,
       model_name: 'voyage-4',
       input_tokens: estimatedTokens,
@@ -141,8 +141,13 @@ async function _logEmbeddingUsage(
       job_id: jobId || null,
       metadata: { latency_ms: latencyMs, source: 'edge_function' },
     });
-  } catch {
-    // best-effort — never block the embedding result
+    // Not blocking, but never silent: this row IS the billing record. A swallowed failure here
+    // is the exact silent-zero shape CLAUDE.md documents (stamp_job_refresh_cost referenced a
+    // missing column, the exception was eaten, and billing sat at 0 for months while embeddings
+    // kept running). Logging it is what lets ops.silent_zero and a log grep see the gap.
+    if (error) console.error('[embedding-utils] ai_usage_logs insert failed — usage unbilled:', error.message);
+  } catch (e) {
+    console.error('[embedding-utils] ai_usage_logs insert threw — usage unbilled:', e);
   }
 }
 

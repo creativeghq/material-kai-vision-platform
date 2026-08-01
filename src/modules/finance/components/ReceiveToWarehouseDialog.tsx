@@ -39,6 +39,7 @@ import { invoicingSetupService, type RefRow, type DocTypeSetting } from '@/servi
 import { parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
 import { TaricCombobox } from '@/components/core/TaricCombobox';
+import { productUomService } from '@/services/productUomService';
 
 type LineMode = 'skip' | '__create' | string /* existing warehouse item id */;
 
@@ -434,9 +435,40 @@ export const ReceiveToWarehouseDialog: React.FC<{
       const mappings: { item_id: string; quantity: number }[] = [];
       let created = 0;
       let notEmbedded = 0;
+      const converted: string[] = [];
       for (const { i, r } of active) {
         const qty = parseDecimalOr(r.qty, 0);
-        if (r.mode !== '__create') { mappings.push({ item_id: r.mode, quantity: qty }); continue; }
+        if (r.mode !== '__create') {
+          // Receiving into an EXISTING stock row: the document states one unit, the row counts
+          // in another, and `inbound_doc_receive_to_warehouse` takes a bare number. Left alone,
+          // a supplier line of 288 m² adds 288 PIECES to a row of gypsum boards — a valid
+          // number, off by the area of a board, that nothing downstream can detect.
+          const target = items.find((it) => it.id === r.mode);
+          const targetUnit = normalizeUnit(target?.unit);
+          const lineUnit = normalizeUnit(r.unit);
+          if (target?.product_id && targetUnit && lineUnit && targetUnit !== lineUnit) {
+            const uom = await productUomService.getUom(target.product_id).catch(() => null);
+            const base = uom ? productUomService.convertToBase(uom, qty, lineUnit) : null;
+            // A conversion we cannot make is a hard stop, never a 1:1 fallback.
+            if (base == null || normalizeUnit(uom?.base_unit) !== targetUnit) {
+              toast({
+                title: `Cannot receive "${r.name || 'this line'}"`,
+                description:
+                  `The document bills in ${lineUnit} but "${target.name}" is counted in ${targetUnit}, ` +
+                  'and this product has no conversion between them. Set the packaging on the product ' +
+                  '(Fiscal & Customs → Packaging & units), or receive it into a matching stock item.',
+                variant: 'destructive',
+              });
+              setBusy(false);
+              return;
+            }
+            converted.push(`${qty} ${lineUnit} → ${base} ${targetUnit} (${r.name || 'line'})`);
+            mappings.push({ item_id: r.mode, quantity: base });
+            continue;
+          }
+          mappings.push({ item_id: r.mode, quantity: qty });
+          continue;
+        }
 
         const cost = unitCostOf(i);
         const dimensions = {
@@ -544,6 +576,9 @@ export const ReceiveToWarehouseDialog: React.FC<{
         description: [
           created > 0 ? `${created} new catalog product${created === 1 ? '' : 's'} created.` : null,
           notEmbedded > 0 ? `${notEmbedded} created without embeddings — the ingest service was unreachable.` : null,
+          // Never convert silently: the operator typed one number and a different one was
+          // recorded, so they get told which and why.
+          converted.length > 0 ? `Converted to stock units — ${converted.join('; ')}.` : null,
         ].filter(Boolean).join(' ') || undefined,
       });
       onDone();

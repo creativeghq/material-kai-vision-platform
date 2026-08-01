@@ -165,13 +165,17 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
           contactId = existing?.id ?? null;
         }
         if (!contactId) {
-          const { data: created } = await asUser.from('crm_contacts')
+          const { data: created, error: createError } = await asUser.from('crm_contacts')
             .insert({ workspace_id: workspaceId, name: String(body?.counterparty_name ?? email ?? 'Contract counterparty'), email: email || null, created_by: userId, lead_source: 'contract' })
             .select('id').single();
+          // Degrading silently is intended; degrading INVISIBLY is not. `asUser` means an RLS
+          // denial resolves rather than throws, so without this the spine link would just never
+          // form and every contract would quietly carry a null crm_contact_id.
+          if (createError) console.error('[contracts-api] spine link: crm_contacts insert failed:', createError.message);
           contactId = created?.id ?? null;
         }
         if (contactId) payload.crm_contact_id = contactId;
-      } catch { /* best-effort spine link — proceed without it */ }
+      } catch (e) { console.error('[contracts-api] spine link threw — contract has no crm_contact_id:', e); }
     }
 
     const { data, error } = await asUser.from('contracts').insert(payload).select().single();

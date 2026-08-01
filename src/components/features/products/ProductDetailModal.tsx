@@ -36,6 +36,8 @@ import { ProductPricePanel } from '@/components/features/pricing/ProductPricePan
 import { ProductFiscalCard } from '@/components/business/marketplace/ProductFiscalCard';
 import { ProductStockPanel } from '@/components/business/marketplace/ProductStockPanel';
 import { ProductCostCard } from '@/components/business/marketplace/ProductCostCard';
+import { ProductPackagingCard } from '@/components/business/marketplace/ProductPackagingCard';
+import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { DollarSign, Ship, Boxes } from 'lucide-react';
@@ -3041,6 +3043,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {/* Cost carries a NARROWER gate than the rest of this tab: the tab opens on
                 pricing.manage, but what we paid a supplier is owner/admin + sales-manager only. */}
             {canSeeCost && <ProductCostCard productId={product.id} />}
+            {/* Breaks resolve inside the same RPC quotes and orders already call, so this is
+                configuration of the existing ladder rather than a second pricing path. */}
+            {activeWorkspaceId && (
+              <ProductPriceBreaksCard productId={product.id} workspaceId={activeWorkspaceId} />
+            )}
           </div>
         </TabsContent>
       )}
@@ -3057,6 +3064,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               These are the same fields the warehouse intake form collects.
             </p>
             <ProductFiscalCard productId={product.id} />
+            {/* The ladder that relates the invoicing unit above to the counting unit on the
+                stock row. Without it the two are compared 1:1 and a board billed per m²
+                decrements pieces. */}
+            {activeWorkspaceId && (
+              <ProductPackagingCard productId={product.id} workspaceId={activeWorkspaceId} />
+            )}
           </div>
         </TabsContent>
       )}

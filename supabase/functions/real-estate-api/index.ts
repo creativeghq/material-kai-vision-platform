@@ -122,10 +122,21 @@ async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property:
       // doesn't email them the SAME listing again (double-notify). Only for new_listing (the digest is
       // about new listings; a price_drop alert doesn't overlap it).
       if (reason === 'new_listing' && alertedReqIds.length > 0) {
-        await supabase.from('property_buyer_requirements').update({ last_digest_at: new Date().toISOString() }).in('id', alertedReqIds).catch(() => {});
+        // This write IS the double-notify guard. Swallowing its failure means last_digest_at
+        // never advances and tonight's digest emails the same listing to the same buyers a
+        // second time — the exact outcome the line above exists to prevent — with nothing
+        // anywhere saying why.
+        const { error: stampError } = await supabase.from('property_buyer_requirements')
+          .update({ last_digest_at: new Date().toISOString() }).in('id', alertedReqIds);
+        if (stampError) {
+          console.error(
+            `[real-estate-api] last_digest_at not advanced for ${alertedReqIds.length} buyer(s) — ` +
+            `tonight's digest will re-notify them about property ${property.id}:`, stampError.message,
+          );
+        }
       }
     }
-  } catch (_) { /* non-fatal — alerting must never block the listing op */ }
+  } catch (e) { console.error('[real-estate-api] buyer alerting failed (listing op unaffected):', e); }
 }
 
 function json(body: any, status = 200): Response {

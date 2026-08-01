@@ -326,7 +326,11 @@ async function autoDetectCallouts(
       metadata: { feature: 'presentation_sheet', event: 'auto_detect_callouts', moodboard_id: moodboardId },
       created_at: new Date().toISOString(),
     }).then?.(({ error }: any) => { if (error) console.warn('[autoDetectCallouts] cost log failed:', error); });
-  } catch { /* non-blocking */ }
+  } catch (e) {
+    // Non-blocking, but not silent — this is the billing row for a Haiku call that already
+    // happened, so swallowing the failure means real spend with no record of it.
+    console.error('[autoDetectCallouts] cost log threw — Haiku call unbilled:', e);
+  }
 
   const text: string = data?.content?.[0]?.text ?? '';
   const jsonMatch = text.match(/\[[\s\S]*\]/);

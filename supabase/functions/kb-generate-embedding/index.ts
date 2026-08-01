@@ -188,15 +188,19 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
     // Mark document as failed
     if (doc_id) {
       try {
-        await supabaseAdmin
+        const { error: markError } = await supabaseAdmin
           .from('kb_docs')
           .update({
             embedding_status: 'failed',
             embedding_error_message: err instanceof Error ? err.message : String(err),
           })
           .eq('id', doc_id);
-      } catch {
-        // ignore — best effort
+        // If this status write is lost the doc is stuck in its previous state forever — it never
+        // reads 'failed', so nothing retries it and nothing reports it. That is a worse outcome
+        // than the embedding failure this handler is here to record.
+        if (markError) console.error('kb-generate-embedding: could not mark doc failed — status is now stale:', markError.message);
+      } catch (e) {
+        console.error('kb-generate-embedding: marking doc failed threw — status is now stale:', e);
       }
     }
 

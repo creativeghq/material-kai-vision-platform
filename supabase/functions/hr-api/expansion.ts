@@ -452,12 +452,15 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
             crmContactId = existing?.id ?? null;
           }
           if (!crmContactId) {
-            const { data: c2 } = await supabase.from('crm_contacts')
+            const { data: c2, error: c2Err } = await supabase.from('crm_contacts')
               .insert({ workspace_id: workspaceId, name: String((cf as any).name), email: email || null, phone: (cf as any).phone ?? null, lead_source: 'application' })
               .select('id').single();
+            // The application still goes through without the link, but a permanently-null
+            // crm_contact_id on every candidate is a broken spine that nothing would report.
+            if (c2Err) console.error('[hr-api] spine link: crm_contacts insert failed:', c2Err.message);
             crmContactId = c2?.id ?? null;
           }
-        } catch { /* best-effort spine link */ }
+        } catch (e) { console.error('[hr-api] spine link threw — candidate has no crm_contact_id:', e); }
         const { data: created, error: cErr } = await supabase.from('hr_candidates').insert({ ...cf, workspace_id: workspaceId, crm_contact_id: crmContactId }).select('id').single();
         if (cErr) throw new HttpError(400, cErr.message);
         candidateId = created.id;

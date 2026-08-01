@@ -56,14 +56,18 @@ async function auditWorkcard(supabase: any, workspaceId: string, userId: string 
   submit_date?: string | null; request?: unknown; response?: unknown; error?: string | null;
 }): Promise<void> {
   try {
-    await supabase.from('hr_ergani_submissions').insert({
+    const { error } = await supabase.from('hr_ergani_submissions').insert({
       workspace_id: workspaceId, submission_type: 'WRKCardSE', entity_type: 'punch',
       entity_id: row.entity_id ?? null, employee_id: row.employee_id, environment: row.environment,
       status: row.status, protocol: row.protocol ?? null, ergani_id: row.ergani_id ?? null,
       submit_date: row.submit_date ?? null, request: row.request ?? null, response: row.response ?? null,
       error: row.error ?? null, created_by: userId,
     });
-  } catch (_e) { /* audit must never mask the real result */ }
+    // Still never masks the real result — but this row is the EVIDENCE that a government
+    // filing happened. Losing it silently means an audit finds no proof of a punch that was
+    // actually filed, which is worse than the write failing loudly.
+    if (error) console.error('[ergani/workcard] submission audit row not written:', error.message);
+  } catch (e) { console.error('[ergani/workcard] submission audit row threw:', e); }
 }
 
 export async function fileWorkcardPunch(

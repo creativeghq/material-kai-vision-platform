@@ -55,3 +55,109 @@ rules:
       - pattern: $T.insert($REQ.model_dump())
       - pattern: $T.insert(**$REQ.dict())
       - pattern: $T.insert(**$REQ.model_dump())
+
+  # ── #309 item 6 · Swallowed failure in money / payment paths ───────────────
+  # 7 of the 8 swallowed-failure findings across the whole audit were ONE shape: a bare
+  # `catch {}` (or a discarded `error`) followed by an unconditional success toast. The user is
+  # told the money moved and it did not — PosPage "Receipt issued" with no payments row,
+  # real-estate-public "Thanks, we'll be in touch" on a lead never saved, email-unsubscribe
+  # "You're unsubscribed" on an opt-out Postgres rejected, record-payment reporting a failed
+  # allocation as allocated. Scoped to the paths where the consequence is money or a legal
+  # obligation; a bare catch in a UI nicety is not worth a build failure.
+  - id: no-swallowed-write
+    languages: [typescript]
+    severity: ERROR
+    # Scoped to WRITES, and deliberately unfiltered by path.
+    #
+    # The first draft of this rule flagged any `catch {}` under the finance/quotes paths and hit
+    # 43 sites. Reading all 43: every one was a documented, deliberate best-effort catch around a
+    # READ (a logo download, a prior-balance lookup, a PDF embed, a fire-and-forget notification)
+    # — semgrep counts a comment-only body as empty, so the rule could not tell `catch {}` from
+    # `catch { /* logo optional */ }`. It was measuring syntax, not the defect.
+    #
+    # The defect is a swallowed WRITE. Re-scoped to that, the whole platform yielded 9 — and 7
+    # were real: three lost `ai_usage_logs` billing rows (spend with no record), a lost ERGANI
+    # submission audit row (no proof of a government filing), a lost `last_digest_at` stamp (the
+    # double-notify guard failing open), a lost `embedding_status='failed'` write (doc stuck
+    # forever), and a recovery cron whose counter incremented on a failed update.
+    message: >
+      Swallowed write (#309 item 6): this insert/update/delete sits inside a `try` whose `catch`
+      does nothing, so a failed write is indistinguishable from a successful one and the code
+      after it carries on as though the row exists. Best-effort is fine — INVISIBLE is not.
+      Log the error (or rethrow). If the no-op is genuinely correct, say why in the catch body
+      AND annotate with `// nosemgrep: no-swallowed-write`.
+    patterns:
+      - pattern-either:
+          - pattern: $X.insert(...)
+          - pattern: $X.update(...)
+          - pattern: $X.upsert(...)
+          - pattern: $X.delete(...)
+      # This direction (match the write, require the empty-catch context) is the one that parses.
+      # `try { ... $X.insert(...) ... } catch ($E) { }` is a TypeScript parse error in semgrep,
+      # and a rule that fails to parse loads as a rule that matches NOTHING.
+      - pattern-inside: 'try { ... } catch ($E) { }'
+
+  - id: no-unchecked-supabase-write-in-money-path
+    languages: [typescript, javascript]
+    severity: ERROR
+    paths:
+      include:
+        - "src/modules/finance/**"
+        - "src/modules/quotes/**"
+        - "supabase/functions/_shared/payments/**"
+        - "supabase/functions/finance-*/**"
+    message: >
+      Unchecked write (#309 item 6): supabase-js resolves on an RLS denial instead of throwing,
+      so destructuring only `data` means a rejected insert/update/delete looks identical to a
+      successful one. Destructure `error` and act on it.
+    # `{ data: $D }` also matches `{ data, error }` — verified against a probe, where it
+    # flagged the CORRECT form. A rule that fires on correct code gets disabled within a day,
+    # so the compliant shapes are excluded explicitly.
+    patterns:
+      - pattern-either:
+          - pattern: 'const { data: $D } = await $Q.insert(...)'
+          - pattern: 'const { data: $D } = await $Q.update(...)'
+          - pattern: 'const { data: $D } = await $Q.upsert(...)'
+          - pattern: 'const { data: $D } = await $Q.delete(...)'
+      - pattern-not: 'const { ..., error: $E } = await $Q.insert(...)'
+      - pattern-not: 'const { ..., error: $E } = await $Q.update(...)'
+      - pattern-not: 'const { ..., error: $E } = await $Q.upsert(...)'
+      - pattern-not: 'const { ..., error: $E } = await $Q.delete(...)'
+
+  # ── #309 item 7 · Fail-open auth / entitlement / quota / credit gates ──────
+  # One of the two cross-cutting root causes the audit named: fail-open is the house default.
+  # A gate that returns "allowed" when it errors is not a gate. The instance that proves the
+  # cost: real-estate-public's enforceLeadRateLimit was `catch { return null; }`, so the ONLY
+  # brake on an unauthenticated cross-tenant CRM injection failed open under exactly the load
+  # a flood would produce.
+  - id: no-fail-open-in-gate
+    # typescript ONLY. With `javascript` also declared, semgrep threw
+    # "Invalid pattern for JavaScript: Stdlib.Parsing.Parse_error" on `catch (...)` and
+    # rejected the WHOLE rule — it loaded and matched nothing. Caught by scanning a probe;
+    # it would have looked like a clean codebase forever. `.ts`/`.tsx` are covered by
+    # `typescript`, which is all this repo has.
+    languages: [typescript]
+    severity: ERROR
+    # NO path filter, deliberately. The first draft scoped this to **/*auth*, **/*credit* etc.
+    # and matched NOTHING — camelCase filenames like rateLimitProbe.ts fall outside those
+    # globs, so the rule was inert. Measured platform-wide instead: this shape occurs ZERO
+    # times across src/ and supabase/functions/ today, so there is no noise to scope away from
+    # and the rule simply prevents it coming back anywhere.
+    message: >
+      Fail-open gate (#309 item 7): this catch returns a permissive value, so an error in the
+      check GRANTS access instead of denying it. The instance that proves the cost:
+      real-estate-public's enforceLeadRateLimit was `catch { return null; }`, so the only brake
+      on an unauthenticated cross-tenant CRM injection failed open under exactly the load a
+      flood would produce. Gates fail CLOSED. If failing open is a deliberate availability
+      trade, say so in a comment and name the blast radius.
+    pattern-either:
+      # `catch ($E)` also matches a bare `catch {` — verified against a probe carrying both
+      # forms, so listing the bare variant separately is redundant.
+      #
+      # `catch (...)` is a parse error in BOTH javascript and typescript. That is what made the
+      # first draft of this rule load and silently match nothing: semgrep reports the rule as
+      # broken but keeps scanning, so the run looks clean.
+      - pattern: 'try { ... } catch ($E) { return true; }'
+      - pattern: 'try { ... } catch ($E) { return {..., allowed: true}; }'
+      - pattern: 'try { ... } catch ($E) { return {..., success: true}; }'
+      - pattern: 'try { ... } catch ($E) { return {..., ok: true}; }'

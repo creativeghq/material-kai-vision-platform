@@ -107,7 +107,7 @@ async function refund(userId: string, amount: number, op: string, productId?: st
   if (amount <= 0) return;
   try {
     const sb = svcClient();
-    await sb.rpc('refund_credits', {
+    const { error: refundError } = await sb.rpc('refund_credits', {
       p_user_id: userId,
       p_amount: amount,
       p_operation_type: `${op}.refund`,
@@ -115,6 +115,12 @@ async function refund(userId: string, amount: number, op: string, productId?: st
       p_metadata: { feature: 'mention_monitoring_agent_tool', product_id: productId, reason: 'tool_call_failed' },
       p_workspace_id: null,
     });
+    // supabase-js RESOLVES on an RPC error instead of throwing, so discarding this result made a
+    // failed refund indistinguishable from a successful one. The user has already been debited
+    // for a tool call that failed; a silent refund failure means they simply stay charged.
+    if (refundError) {
+      console.error(`mention-tools: refund_credits FAILED for ${op} — user ${userId} stays debited ${amount}:`, refundError.message);
+    }
 
     // Mirror refund as a negative-credit row so dashboard nets out correctly.
     sb.from('ai_usage_logs').insert({
@@ -136,8 +142,8 @@ async function refund(userId: string, amount: number, op: string, productId?: st
     }).then(({ error }) => {
       if (error) console.warn('mention-tools: refund ai_usage_logs insert failed (non-blocking):', error.message);
     });
-  } catch (_) {
-    /* best-effort */
+  } catch (e) {
+    console.error(`mention-tools: refund threw for ${op} — user ${userId} stays debited ${amount}:`, e);
   }
 }
 

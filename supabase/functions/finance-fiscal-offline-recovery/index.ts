@@ -52,10 +52,21 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
           conn.ctx,
         );
         if (res?.status === 'accepted' && res.mark) {
-          await supabase.from(table).update({ fiscal_status: 'accepted', fiscal_mark: res.mark, updated_at: new Date().toISOString() }).eq('id', r.id);
-          if (table === 'invoices') results.invoices_recovered++; else results.credit_notes_recovered++;
+          // The counter must follow the WRITE, not the fetch. supabase-js resolves on error
+          // instead of throwing, so the old `await update(); results.recovered++` incremented
+          // even when the update failed — the cron reported N documents recovered while N rows
+          // were still sitting at fiscal_status='offline', and the next tick re-fetched them.
+          const { error: markError } = await supabase.from(table)
+            .update({ fiscal_status: 'accepted', fiscal_mark: res.mark, updated_at: new Date().toISOString() })
+            .eq('id', r.id);
+          if (markError) {
+            console.error(`[fiscal-offline-recovery] ${table} ${r.id} accepted upstream but NOT marked locally:`, markError.message);
+          } else if (table === 'invoices') results.invoices_recovered++;
+          else results.credit_notes_recovered++;
         }
-      } catch { /* leave offline; retried next tick */ }
+      } catch (e) {
+        console.error(`[fiscal-offline-recovery] ${table} ${r.id} left offline, retried next tick:`, e);
+      }
     }
   };
 
