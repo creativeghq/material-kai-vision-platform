@@ -1351,7 +1351,7 @@ toast({ title: 'Could not exclude retailer', description: String((e as Error)?.m
     })}
   </div>
   );
-}
+};
 
 function timeAgo(iso: string | null | undefined): string {
   if (!iso) return 'never';
