@@ -352,7 +352,6 @@ const TABLES_TO_CLEAR = [
   // collections) is TRUNCATEd via the reset_truncate_heavy() RPC in STEP 3.
   'ai_pricing_update_logs',        // AI pricing auto-update audit log
   'email_events',                  // Email open/click/bounce events (child of email_logs)
-  'email_analytics',               // Email engagement analytics (derived)
   'email_actions',                 // Email action log (derived)
   'email_logs',                    // Email send log (derived; templates/settings PRESERVED)
   'social_account_insights',       // Social follower/engagement insights (derived; accounts PRESERVED)
