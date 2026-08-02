@@ -49,7 +49,19 @@ export async function createUser(svc: SupabaseClient, label: string, rid: string
 export async function createWorkspace(svc: SupabaseClient, label: string, rid: string, ownerId: string): Promise<string> {
   const { data, error } = await svc
     .from('workspaces')
-    .insert({ name: `E2E ${label} ${rid}`, slug: `e2e-${label}-${rid}`.toLowerCase(), created_by: ownerId })
+    // is_fixture is what stops outbound paths (email, WhatsApp, webhooks) from reaching a real
+    // provider for this tenant. This tier runs against PRODUCTION on purpose — that is how it
+    // covers real RLS — and on 2026-07-28 a test flipping a delivery note to `issued` fired the
+    // seeded Order-Dispatched flow and produced 134 attempted sends from the production domain.
+    // Set it HERE rather than inferring it from the `e2e-` slug: that convention exists for
+    // cleanup_test_artifacts to reap rows, and reusing it as an egress signal would silently mute
+    // a real customer who happened to pick a matching slug. (#292 item 1)
+    .insert({
+      name: `E2E ${label} ${rid}`,
+      slug: `e2e-${label}-${rid}`.toLowerCase(),
+      created_by: ownerId,
+      is_fixture: true,
+    })
     .select('id')
     .single();
   if (error) throw new Error(`createWorkspace(${label}): ${error.message}`);

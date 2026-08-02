@@ -313,6 +313,34 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           }
         }
 
+        // Fixture tenants never reach a provider. tests/integration/_harness.ts runs against
+        // PRODUCTION on purpose — that is how the suite covers real RLS — and on 2026-07-28 a
+        // test flipping a delivery note to `issued` fired the seeded Order-Dispatched flow and
+        // produced 134 attempted sends from the production domain.
+        //
+        // The recipient-validity guard above closed that specific case, because the address
+        // rendered as the literal "null". The next one will not be malformed; it will be a valid
+        // address belonging to a real person. This is the guard that does not depend on the
+        // payload being obviously wrong.
+        //
+        // Reported as a 200 with `skipped`, not an error: the caller is a flow node doing exactly
+        // what it should, and failing it would make every fixture-tenant test red for a reason
+        // that is not a defect. (#292 item 1)
+        if (body.workspace_id) {
+          const { data: ws } = await supabaseClient
+            .from('workspaces').select('is_fixture').eq('id', body.workspace_id).maybeSingle();
+          if (ws?.is_fixture) {
+            console.log(`[email-api] fixture workspace ${body.workspace_id} — send suppressed`);
+            return new Response(
+              JSON.stringify({
+                success: true, skipped: 'fixture_workspace',
+                detail: 'Workspace is flagged is_fixture; no message was sent to a provider.',
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
+        }
+
         // Resolve the Resend key + sender: the workspace's own BYOK config wins when set,
         // otherwise the platform key + global email_settings sender.
         const sender = await resolveWorkspaceEmailSender(supabaseClient, body.workspace_id);
