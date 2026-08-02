@@ -21,8 +21,19 @@
  * health check that accepted a 302: a check that looks green because it never reached the app.
  * So a protected target with no secret is a hard failure, never a silent skip.
  *
- * `x-vercel-set-bypass-cookie` matters as much as the header: an SPA fires many subresource and
- * fetch requests, and the cookie carries the bypass through the whole browser session.
+ * WHY THERE IS NO `x-vercel-set-bypass-cookie`
+ * --------------------------------------------
+ * The obvious companion header asks Vercel to set a bypass COOKIE so a browser session carries
+ * the bypass onward. It is the wrong tool here and it broke the first run. Measured 2026-08-02
+ * against a real candidate:
+ *
+ *   header only                          -> 200, 0 redirects
+ *   header + cookie directive + jar      -> 200, 1 redirect
+ *   header + cookie directive, no jar    -> infinite 307 loop (curl exit 47)
+ *
+ * Playwright applies `extraHTTPHeaders` to EVERY request in the context, so the header already
+ * authorises each one and the cookie buys nothing — while the redirect it triggers is one more
+ * thing that can go wrong between the test and the page. Simplest path that measures clean.
  */
 
 /** Hosts Vercel puts behind deployment protection. Custom domains are exempt by configuration. */
@@ -50,9 +61,5 @@ export function bypassHeaders(baseURL: string): Record<string, string> {
     );
   }
 
-  return {
-    'x-vercel-protection-bypass': secret,
-    // Sets a bypass cookie on the first response so subresources and fetches inherit it.
-    'x-vercel-set-bypass-cookie': 'samesitenone',
-  };
+  return { 'x-vercel-protection-bypass': secret };
 }

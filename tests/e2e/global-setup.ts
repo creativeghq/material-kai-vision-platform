@@ -33,7 +33,24 @@ export default async function globalSetup(_config: FullConfig) {
   if (!(await emailField.isVisible().catch(() => false))) {
     await page.getByRole('tab', { name: /sign in/i }).click().catch(() => {});
   }
-  await emailField.waitFor({ state: 'visible', timeout: 15_000 });
+  // Say WHERE we ended up when the form never appears. The first gated run failed here with a
+  // bare "locator #signin-email not visible" timeout, which is consistent with the app being
+  // slow, the markup changing, OR the deployment-protection bypass not working and Vercel's
+  // login page being served instead — three very different problems, indistinguishable from
+  // the message. The landed URL and title tell them apart immediately.
+  try {
+    await emailField.waitFor({ state: 'visible', timeout: 15_000 });
+  } catch (err) {
+    const landedOn = page.url();
+    const title = await page.title().catch(() => '(no title)');
+    console.error(`[smoke] sign-in form not found.\n  landed on: ${landedOn}\n  title: ${title}`);
+    if (/vercel\.com\/(login|sso)/.test(landedOn)) {
+      console.error('[smoke] That is Vercel\'s deployment-protection wall — the bypass header ' +
+        'did not take effect. Check VERCEL_AUTOMATION_BYPASS_SECRET against the project\'s ' +
+        'current Protection Bypass for Automation value.');
+    }
+    throw err;
+  }
   await emailField.fill(email);
   await page.locator('#signin-password').fill(password);
   await page.getByRole('button', { name: /^sign in$/i }).click();

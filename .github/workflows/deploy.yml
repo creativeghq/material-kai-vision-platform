@@ -472,7 +472,8 @@ jobs:
   #
   # It targets a *.vercel.app URL, which is behind Vercel SSO (`all_except_custom_domains`) and
   # answers 302 to an auth wall. VERCEL_AUTOMATION_BYPASS_SECRET carries the
-  # `x-vercel-protection-bypass` header past it (verified 2026-08-02: 302 without, 200 with).
+  # `x-vercel-protection-bypass` header past it (verified 2026-08-02: 302 without, 200 with —
+  # header alone, no `x-vercel-set-bypass-cookie`, which answers 307 and can loop).
   # If that secret ever goes missing the suite would smoke a login page and pass on anything,
   # so tests/e2e/vercelBypass.ts FAILS LOUDLY when the target is protected and the secret isn't set.
   fe-smoke:

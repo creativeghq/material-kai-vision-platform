@@ -42,12 +42,19 @@ describe('vercel protection bypass', () => {
     expect(returned).toBe('threw');
   });
 
-  it('sends the header AND the cookie directive when the secret is present', () => {
+  it('sends the bypass header when the secret is present', () => {
     process.env[VAR] = 'a'.repeat(32);
-    const h = bypassHeaders('https://x.vercel.app');
-    expect(h['x-vercel-protection-bypass']).toBe('a'.repeat(32));
-    // Without the cookie an SPA's subresource requests would each hit the auth wall.
-    expect(h['x-vercel-set-bypass-cookie']).toBe('samesitenone');
+    expect(bypassHeaders('https://x.vercel.app')['x-vercel-protection-bypass']).toBe('a'.repeat(32));
+  });
+
+  it('does NOT ask Vercel to set a bypass cookie', () => {
+    // This is a regression pin, not a style preference. Sending `x-vercel-set-bypass-cookie`
+    // makes Vercel answer 307 + Set-Cookie; measured against a real candidate the header alone
+    // is 200 with 0 redirects, while the cookie directive is 200 after a redirect at best and
+    // an infinite 307 loop when cookies are not retained. Playwright applies extraHTTPHeaders to
+    // every request anyway, so the cookie adds a redirect and buys nothing.
+    process.env[VAR] = 'a'.repeat(32);
+    expect(bypassHeaders('https://x.vercel.app')).not.toHaveProperty('x-vercel-set-bypass-cookie');
   });
 
   it('tolerates a scheme-less URL, as `vercel deploy` output can be', () => {
