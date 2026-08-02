@@ -152,11 +152,16 @@ Deno.serve(withApiLogging(
  * and nothing more. No formulas, no styles, no dates-as-serial-numbers (the extraction writes
  * dates as text).
  *
- * The one subtlety that matters, and the reason a naive reader silently corrupts this file:
- * **empty cells are simply absent from the XML.** The extraction leaves `End date` blank on most
- * rows, so reading `<c>` elements in order shifts every later column left by one — descriptions
- * land in the language column and dates land in the description. Cells are therefore placed by
- * their `r="H1234"` reference, not by their position in the stream.
+ * Two subtleties, both of which silently corrupt this file rather than failing:
+ *
+ * 1. **Cells are placed by their `r="H1234"` reference, never by stream position.** Positional
+ *    reading shifts every later column when a cell is missing.
+ * 2. **An empty cell is written self-closing — `<c r="C536" t="inlineStr" />`.** A pattern that
+ *    demands a closing `</c>` does not merely skip it, it swallows the NEXT cell along with it:
+ *    the following cell's value gets attributed to the empty cell's column. That put `EL` in the
+ *    End-date column and pushed each description into the Indent column, where a description
+ *    like "…κλάσεων 0801 μέχρι και 0806" reduced to the digits 8010806 and overflowed a
+ *    smallint mid-import. Both forms are matched below.
  */
 async function parseXlsx(bytes: Uint8Array): Promise<string[][]> {
   const { unzipSync, strFromU8 } = await import('npm:fflate@0.8.2');
@@ -187,9 +192,11 @@ async function parseXlsx(bytes: Uint8Array): Promise<string[][]> {
 
   for (const rowXml of xml.match(/<row[\s\S]*?<\/row>/g) ?? []) {
     const cells: string[] = [];
-    for (const m of rowXml.matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
+    // Self-closing `<c … />` OR `<c …>…</c>`. The alternation order matters: `/>` is tried
+    // first so an empty cell terminates at itself instead of consuming its neighbour.
+    for (const m of rowXml.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const attrs = m[1];
-      const body = m[2];
+      const body = m[2] ?? '';
       const col = columnIndex(/\br="([A-Z]+)\d+"/.exec(attrs)?.[1] ?? '');
       const type = /\bt="([^"]+)"/.exec(attrs)?.[1];
 
@@ -397,11 +404,14 @@ async function importGrid(
     const suffixCell = (at(r, 'product_line_suffix') ?? '').replace(/[^0-9]/g, '');
     const suffix = suffixCell || suffixFromCode || '80';
 
-    // Indent is published as dashes ("- - -"), not a number.
+    // Indent is published as dashes ("- - -"), not a number. Anything outside 0..99 is not an
+    // indent whatever the file says — a stray value there means the column mapping is wrong, and
+    // it must not be allowed to abort a 25,000-row import at the smallint boundary.
     const indentCell = (at(r, 'indent') ?? '').trim();
-    const indent = /^[-\s]+$/.test(indentCell) && indentCell
+    const indentRaw = /^[-\s]+$/.test(indentCell) && indentCell
       ? (indentCell.match(/-/g) ?? []).length
       : (indentCell.replace(/[^0-9]/g, '') ? Number(indentCell.replace(/[^0-9]/g, '')) : null);
+    const indent = indentRaw != null && indentRaw >= 0 && indentRaw <= 99 ? indentRaw : null;
 
     // One description column plus a Language column is how the extraction ships. Route by the
     // row's own language rather than by which file we think we are reading.
