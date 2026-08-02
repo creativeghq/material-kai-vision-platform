@@ -95,6 +95,15 @@ caught during the fix phase.
 6. **When a claim is wrong, retract it in the issue with the corrected measurement.**
    Do not quietly delete it. The retractions are how a reader calibrates the rest.
 
+7. **"Blocked on someone else" needs the same proof as any other claim.**
+   It is the least falsifiable status an issue can carry — nobody re-tests it, and it survives
+   every sweep. `ALTER TABLE net._http_response …` is genuinely refused (`supabase_admin` owns
+   it), and that was recorded as "needs a superuser or a Supabase ticket". But setting a storage
+   parameter was never the goal — *reclaiming the space* was, and `postgres` already held PG17's
+   `MAINTAIN` privilege, so a plain `VACUUM` ran fine and a daily cron closed it outright.
+   **When a command is refused, ask what it was FOR and whether the goal has another route,
+   before recording the goal as blocked.**
+
 ---
 
 ## Known traps in THIS platform
