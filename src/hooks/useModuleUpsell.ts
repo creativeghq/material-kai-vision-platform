@@ -59,8 +59,19 @@ export function useModuleUpsell(moduleSlug: string, moduleName?: string): Module
   }, [loading, available, moduleSlug]);
 
   const isOwner = workspaceRole === 'owner' || isPlatformOperator;
-  const purchasable = !!mod?.is_addon;
+  // `is_addon` alone was the test, which made this claim buyable when it is not: all four
+  // priced add-ons have addon_stripe_product_id = NULL, stripe-api/handlers/modules.ts REQUIRES
+  // that id, and NULL returns 400 `not_available_on_plan`. So the owner saw a live
+  // "Add Contracts — €29/mo" button and every single click errored — measured:
+  // workspace_module_subscriptions has 0 rows, the purchase path has never once executed.
+  //
+  // A module priced but not wired to Stripe is not purchasable, and saying so drops the user
+  // into the subscriptions route below instead of a dead end. This does NOT create the Stripe
+  // products — that is a dashboard action — it stops the UI lying about them. (audit #272)
+  const purchasable = !!mod?.is_addon && !!mod?.addon_stripe_product_id;
   const label = moduleName ?? mod?.name ?? moduleSlug;
+  // Price still shows on an unpurchasable add-on: knowing it costs EUR 29/mo is useful even
+  // when the checkout is not wired yet. Only the BUTTON is gated.
   const price = mod?.is_addon
     ? formatAddonPrice(mod.addon_price_cents, mod.addon_currency, mod.billing_interval)
     : null;
