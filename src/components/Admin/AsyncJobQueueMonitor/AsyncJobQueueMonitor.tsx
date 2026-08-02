@@ -93,6 +93,15 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [pipelineValidationResult, setPipelineValidationResult] = useState<any | null>(null);
   const [showTempCleanupModal, setShowTempCleanupModal] = useState(false);
   const [productProgress, setProductProgress] = useState<ProductProgress[]>([]);
+  /**
+   * Page for the per-product drilldown.
+   *
+   * The list rendered EVERY product with ~570 lines of JSX each and its source query has no
+   * limit, so a catalog job with a few hundred products built a DOM the browser had to lay out in
+   * full — on a screen that also re-renders on a 10-second poll. Paginated with the same shared
+   * TablePagination this file already uses five times.
+   */
+  const [productPage, setProductPage] = useState(1);
   const [loadingProducts, setLoadingProducts] = useState(false);
   // Map of product_id → total billed AI cost (USD) for the selected job.
   // Populated alongside fetchProductProgress by summing ai_usage_logs.
@@ -728,6 +737,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       if (interval) clearInterval(interval);
     };
   }, [selectedJob?.id, selectedJob?.status]);
+
+  // A different job has a different product list; keep the drilldown on page 1 rather than
+  // wherever the previous job happened to be. clampPage already prevents an out-of-range page,
+  // but landing mid-list on a job you just opened is disorienting rather than broken.
+  useEffect(() => { setProductPage(1); }, [selectedJob?.id]);
 
   // Handle jobId query parameter - auto-open modal for specific job
   useEffect(() => {
@@ -3374,8 +3388,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </CardHeader>
                   <CardContent className="p-0">
                     {productProgress.length > 0 ? (
+                      <>
                       <Accordion type="multiple" className="w-full">
-                        {productProgress.map((product, productIndex) => {
+                        {paginate(productProgress, clampPage(productPage, productProgress.length)).map((product, productIndex) => {
                           const isCompleted = product.status === 'completed';
                           const isFailed = product.status === 'failed';
                           const isProcessing = product.status === 'processing';
@@ -3686,6 +3701,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           );
                         })}
                       </Accordion>
+                      <TablePagination
+                        page={clampPage(productPage, productProgress.length)}
+                        total={productProgress.length}
+                        onPageChange={setProductPage}
+                        label="products"
+                      />
+                      </>
                     ) : (
                       <div className="p-12 text-center text-muted-foreground">
                         <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
