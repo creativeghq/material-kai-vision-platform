@@ -121,7 +121,7 @@ import { SheetPreviewCard } from '@/components/features/sheets/SheetPreviewCard'
 import { QuoteCanvasCard, type QuoteCanvasData } from '@/components/features/ai/QuoteCanvasCard';
 import { SheetWizardModal, type SheetWizardResult } from '@/components/features/sheets/SheetWizardModal';
 import type { SheetType } from '@/services/moodboardSheetsService';
-// Agent response caching removed 2026-07-06 (see the send handler) — it replayed stale
+// No agent response caching (see the send handler) — it replays stale
 // full-text answers and short-circuited the live agent. Do not reintroduce for KAI.
 import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
 /**
@@ -2123,7 +2123,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         }
       }
 
-      // The client-side agent response cache was REMOVED 2026-07-06. It replayed a 30-min-old
+      // There is NO client-side agent response cache. One replays a 30-min-old
       // full-text answer for a repeated question (keyed on query+agent+workspace, NOT the
       // conversation) WITHOUT ever calling agent-chat — so it served stale answers, ignored
       // fresh KB / live data, and short-circuited the agent entirely (even in a new

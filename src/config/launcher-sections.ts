@@ -138,7 +138,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
 };
 
 // Right-column context-aware quick-CREATE triggers, keyed by SidebarNavItem.id. Each `to` carries a
-// ?new= param that the target PAGE reads to open its real create modal/route (wired 2026-07-18):
+// ?new= param that the target PAGE reads to open its real create modal/route:
 //   /crm?new=contact → contacts/new · /crm?new=company → AddCompanyModal
 //   /finance?new=invoice → New Invoice modal · /finance?tab=doc_orders&new=order → New (sales) order
 //   /quotes?new=quote → Create Quote · /projects?new=project → New Project

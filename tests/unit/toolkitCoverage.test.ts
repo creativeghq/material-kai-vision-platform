@@ -37,12 +37,12 @@ const QUOTED_RE = /'([a-z][a-z0-9_]+)'/g;
 // from the ToolkitPickerModal. Each one is a missing ToolkitDefinition in
 // agentToolsCatalog.ts, NOT a missing tool. SHRINK by adding the picker entry;
 // never grow (a newly-orphaned cluster should fail the build).
-// Emptied 2026-07-16: flows-toolkit / knowledge-graph / social / tech-radar were
+// Emptied: flows-toolkit / knowledge-graph / social / tech-radar were
 // all given picker entries. Keep at zero.
 const KNOWN_PICKERLESS_CLUSTERS = new Set<string>([]);
 
 // Per-cluster tool_ids the server binds that the picker's same-named cluster omits.
-// Same rule: shrink only. Emptied 2026-07-16 (projects gained add_purchase_item +
+// Same rule: shrink only. Emptied (projects gained add_purchase_item +
 // generate_purchase_sheet).
 const KNOWN_MIRROR_GAPS: Record<string, string[]> = {};
 
@@ -63,7 +63,7 @@ const INTERNAL_TOOLS = new Set([
 const KNOWN_UNCLUSTERED = new Set([
   // Generation extras (belong in the Interior Design cluster). generate_gemini and
   // virtual_staging ARE bound — they piggyback on the generate_3d branch — they just
-  // have no cluster of their own. generate_video was cleared 2026-07-31: it wasn't
+  // have no cluster of their own. generate_video was cleared: it wasn't
   // merely unclustered, it was never instantiated at all, so the tool was unreachable
   // from any agent. It now sits in the `generation` cluster in
   // both mirrors and is pushed alongside generate_vr_world.

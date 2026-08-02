@@ -2,7 +2,7 @@
  * Pipeline Strategy Metrics panel.
  *
  * Reads from `pipeline_strategy_metrics` — the per-stage distribution log
- * the 2026-05-01 audit added. Surfaces:
+ * the pipeline-strategy audit added. Surfaces:
  *   - chunking strategy distribution (which path actually fired per product:
  *     product_layout_regions_cache vs document_layout_cache vs text_fallback)
  *   - Stage 1.5 failed-page count aggregated from `notes.stage_1_5_failed_pages`

@@ -145,7 +145,7 @@ for (const rpc of ['find_similar_products', 'find_complementary_products']) {
 
 // 4b. plpgsql contract lint — fails if ANY function has an error-level issue (broken
 //   column/table ref, type mismatch). This is the class that 500'd recommendations and
-//   silently broke quote→invoice. As of 2026-06-19 the baseline is ZERO (all live fns fixed,
+//   silently broke quote→invoice. The baseline is ZERO (all live fns fixed,
 //   dead-legacy dropped), so this is now a strict gate: any new breakage fails.
 const KNOWN_BROKEN_FUNCTIONS = new Set([]);
 await check('db.plpgsql-lint', ['DB_KEY'], async () => {

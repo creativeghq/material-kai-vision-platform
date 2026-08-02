@@ -73,7 +73,7 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
         if (exhaustedFailed > 0) {
           console.log(`[AutoRecoveryCron] Terminally failed ${exhaustedFailed} exhausted PDF job(s)`);
           // (No HF endpoint cost-watchdog anymore — both GPU endpoints are on
-          // Modal, which scales to zero on its own idle clock. 2026-06-14.)
+          // Modal, which scales to zero on its own idle clock.)
         }
       }
     } catch (e) {
@@ -510,7 +510,7 @@ async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
   let dispatchError: string | null = null;
   try {
     // Real MIVAA endpoint is POST /api/rag/documents/job/{job_id}/resume
-    // (verified 2026-05-01 against rag_routes.py:1520). No auth header
+    // (verified against rag_routes.py:1520). No auth header
     // required — the endpoint is open. cron-secret kept for future-proofing.
     const resp = await fetch(`${mivaaBaseUrl}/api/rag/documents/job/${job.id}/resume`, {
       method: 'POST',

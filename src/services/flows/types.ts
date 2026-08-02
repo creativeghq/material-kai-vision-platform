@@ -36,7 +36,7 @@ export type TriggerType =
   | 'material_reviewed'
   | 'review_submitted'
   | 'preferred_factory_added'
-  // ── Added 2026-05-30: event vocabulary for notification→flow migration ──
+  // ── Event vocabulary for notification→flow migration ──
   | 'quote_pdf_generated'
   | 'factory_approved'
   | 'factory_rejected'
@@ -278,7 +278,7 @@ export interface MaterialReviewedTriggerConfig {
 
 export interface PreferredFactoryAddedTriggerConfig {}
 
-// ── Added 2026-05-30: notification→flow migration events. These carry their
+// ── Notification→flow migration events. These carry their
 // full notification payload in trigger.data, so no filter config is needed. ──
 export interface QuotePdfGeneratedTriggerConfig {}
 export interface FactoryApprovedTriggerConfig {}
@@ -511,7 +511,7 @@ export interface SendSmsConfig {
   channel_id?: string;
 }
 
-/** Messaging module — WhatsApp via Zernio (replaced Twilio/SMS 2026-06-08).
+/** Messaging module — WhatsApp via Zernio; there is no Twilio/SMS path.
  *  `send_sms` remains a legacy alias in the engine; new flows use this. */
 export interface SendWhatsAppConfig {
   to: string;

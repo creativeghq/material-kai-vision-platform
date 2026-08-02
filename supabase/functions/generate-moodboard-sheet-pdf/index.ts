@@ -1,4 +1,3 @@
-// Redeploy 2026-06-02: ensure the client-view + area_breakdown code actually
 // lands (prior CI run no-op'd this function under parallel deploy).
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';

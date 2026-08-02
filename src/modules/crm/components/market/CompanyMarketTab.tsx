@@ -364,7 +364,7 @@ const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      // RPC added 2026-07-26; not yet in generated types → cast the call.
+      // RPC is not in the generated types yet → cast the call.
       const { data, error } = await (supabase.rpc as any)('company_market_analytics', { p_company_id: companyId, p_days: 90 });
       if (cancelled) return;
       setLoadError(!!error);

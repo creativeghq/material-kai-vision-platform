@@ -397,7 +397,7 @@ export const paletteItems: NodePaletteItem[] = [
   // ════════════════════════════════════════════════════
 
   // ── Communications ──
-  // Messaging module — WhatsApp via Zernio (Twilio/SMS removed 2026-06-08). The `send_sms`
+  // Messaging module — WhatsApp via Zernio; there is no Twilio/SMS path. The `send_sms`
   // action type is kept as a legacy engine alias so old flows still render/run; new flows
   // use send_whatsapp.
   { type: 'actionNode', category: 'action', subType: 'send_whatsapp', group: 'Communications',

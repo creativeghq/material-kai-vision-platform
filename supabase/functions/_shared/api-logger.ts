@@ -6,8 +6,7 @@
  *
  *  1. **Request logging** — one row per request in `api_usage_logs`. Column
  *     mapping (the table is request-shaped, not "endpoint/method/status"
- *     shaped — this mismatch silently failed every insert until it was fixed
- *     2026-05-31):
+ *     shaped — a mismatch here silently fails every insert):
  *       request_path        ← function name
  *       request_method      ← HTTP method
  *       response_status     ← status code

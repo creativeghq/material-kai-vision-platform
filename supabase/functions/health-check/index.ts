@@ -96,7 +96,7 @@ async function checkPaddleOcr(): Promise<ServiceResult> {
 }
 
 async function checkSlig(): Promise<ServiceResult> {
-  // SLIG (SigLIP2) visual embeddings moved off HuggingFace to Modal 2026-06-14.
+  // SLIG (SigLIP2) visual embeddings run on Modal, not HuggingFace.
   // Probe the unauthenticated GET /health; a 303 means the scale-to-zero
   // container is cold-starting (still healthy, just waking up).
   const start = Date.now();

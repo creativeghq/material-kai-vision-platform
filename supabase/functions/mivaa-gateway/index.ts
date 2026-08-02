@@ -198,10 +198,8 @@ async function handleFileUpload(req: Request): Promise<Response> {
       }
     }
 
-    // Forward the form data to MIVAA RAG upload endpoint. The path was
-    // `/upload-async` previously which silently 404'd — the actual route is
-    // `/upload` (rag_routes.py:539). All uploads through this gateway have
-    // been hitting a 404 until this fix (2026-05-23 round-3 audit).
+    // Forward the form data to MIVAA's RAG upload endpoint. The route is `/upload`
+    // (rag_routes.py:539), NOT `/upload-async` — that path silently 404s.
     const mivaaUrl = `${MIVAA_SERVICE_URL()}/api/rag/documents/upload`;
     console.log(`📡 Forwarding to MIVAA upload endpoint: POST ${mivaaUrl}`);
 

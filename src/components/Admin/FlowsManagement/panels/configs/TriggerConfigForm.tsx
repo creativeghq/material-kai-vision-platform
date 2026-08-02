@@ -441,7 +441,7 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
         </div>
       );
 
-    // ── 2026-05-30 notification→flow migration events ──
+    // ── notification→flow migration events ──
     // These carry a standard notification payload so a Create Notification /
     // Send Email action can template them uniformly.
     case 'quote_pdf_generated':

@@ -116,7 +116,7 @@ export function PlatformOverviewTab() {
 
   // ── 3D Generation ─────────────────────────────────────────────
   const [gen3dTrend, setGen3dTrend] = useState<{ week: string; jobs: number; segments: number }[]>([]);
-  // SVBRDF state removed 2026-07-31: `svbrdf_extractions` is not a table in this
+  // No SVBRDF state here: `svbrdf_extractions` is not a table in this
   // database and no SVBRDF producer exists (no MIVAA route, no svbrdf-extractor edge
   // function, generate-pbr-maps deleted). The KPIs read a permanent 0 / '—'.
   const [canvasKpis, setCanvasKpis] = useState({ gen3dJobs: 0, gen3dSegments: 0 });

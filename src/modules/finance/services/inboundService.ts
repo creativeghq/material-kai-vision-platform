@@ -67,7 +67,7 @@ export interface InboundDocument {
   /** Issuer's own document number, e.g. series 'ΤΔΑ' + aa '5160'. */
   series: string | null;
   aa: string | null;
-  // ── Full myDATA payload (parsed 2026-07-28; previously discarded) ──
+  // ── Full myDATA payload ──
   uid: string | null;
   authentication_code: string | null;
   qr_code_url: string | null;

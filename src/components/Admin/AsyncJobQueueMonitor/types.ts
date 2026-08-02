@@ -81,7 +81,7 @@ export interface BackgroundJob {
   total_ai_cost_usd?: number;
   total_credits_used?: number;
   user_id?: string;
-  // Error observability rollup (added 2026-05-02). NULL on clean jobs.
+  // Error observability rollup. NULL on clean jobs.
   failure_summary?: JobFailureSummary | null;
   // Active long-running operation marker (Stage 0, Stage 1.5, Stage 3).
   // Set/cleared via tracker.set_slow_operation / clear_slow_operation.

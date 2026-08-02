@@ -51,7 +51,7 @@ describe('tenancy parity gate', () => {
   it('the workspace-scoped table list does not shrink', () => {
     const { tables } = JSON.parse(readFileSync(TABLES, 'utf8')) as { tables: string[] };
     expect(Array.isArray(tables)).toBe(true);
-    // 255 relations carried workspace_id on 2026-08-01. New tenant tables should push this UP.
+    // 255 relations carry workspace_id. New tenant tables should push this UP.
     expect(
       tables.length,
       'The tenant-table list got smaller. Every removed table drops out of the tenancy gate ' +

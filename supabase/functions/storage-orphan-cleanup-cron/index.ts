@@ -18,7 +18,7 @@
  *   pdf-tiles         | 48h   (extracted/ + catalog-extracted/)
  *   generation-images | 14d   (AI outputs + product-crops/ + 3d/ + designer/ + agent/ + social/)
  *
- * Grace was bumped from 24h → 72h on pdf-documents 2026-05-23 to widen the
+ * Grace is 72h rather than 24h on pdf-documents, to widen the
  * absorption window for delayed-DB-write paths (admin uploads, scheduled
  * workers that upload to storage minutes before inserting the documents row,
  * background catalog-restore from snapshot). pdf-tiles 24h → 48h for the same

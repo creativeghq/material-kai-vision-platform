@@ -19,7 +19,7 @@
  *   key (env GEMI_API_KEY → platform_secrets) serves every workspace. Caller only needs to be
  *   an authenticated user; writing the cache onto a CRM company still requires ownership/admin.
  *
- * Contract (verified against the live OpenAPI 2.0 spec, 2026-07-18):
+ * Contract (verified against the live OpenAPI 2.0 spec):
  *   GET /companies?afm=NNNNNNNNN            → { searchMetadata, searchResults: [Company] }
  *   GET /companies/{arGemi}                 → Company (full)
  *   auth: header `api_key: <key>`

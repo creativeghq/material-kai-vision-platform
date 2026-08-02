@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Prop-contract guard — the prevention layer for the 2026-07-26 finance wiring sweep.
+ * Prop-contract guard — the prevention layer for the finance wiring sweep.
  *
  * The whole "component accepts context as a prop but no caller passes it" class (RecordPaymentDialog
  * had an `orderId` prop with no picker + callers that dropped it, NewSupplierBillDialog had no

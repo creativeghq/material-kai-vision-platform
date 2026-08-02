@@ -108,7 +108,7 @@ describe('product modal — the gates are still conjunctions with ownership', ()
  * the dashboard (LatestWidgets), Discover, quote lines, moodboards and the agent product strip.
  * `if (!product) return null` is what makes that safe.
  *
- * On 2026-08-01 the persona gates above were added ABOVE that guard, reading the prop through an
+ * The persona gates above sit ABOVE that guard, reading the prop through an
  * `as unknown as {...}` cast that erased the `| null`. tsc stayed silent, and all five surfaces
  * threw "Cannot read properties of null (reading 'workspace_id')" into the error boundary on load.
  *

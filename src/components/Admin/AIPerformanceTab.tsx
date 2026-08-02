@@ -3,7 +3,7 @@
  * (Claude vision/chunking/haiku + embedding models) plus Interior Design
  * generation stats and chunk-quality metrics.
  *
- * Relocated 2026-07-15 from the Operations dashboard's inline "AI Performance"
+ * Lifted out of the Operations dashboard's inline "AI Performance"
  * tab into its own component so it can live under /admin/ai-configs?tab=performance.
  * Loads its own data (ai_usage_logs + agent_usage_logs + generation_3d) instead
  * of borrowing the Operations dashboard's shared fetch.

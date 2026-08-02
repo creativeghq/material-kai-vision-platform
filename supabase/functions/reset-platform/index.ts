@@ -56,7 +56,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   Internal product monitoring also lives in tracked_queries now (api_key_id
 //   IS NULL + product_id NOT NULL) — the legacy competitor_sources /
 //   price_history / price_monitoring_products / product_excluded_urls tables
-//   were dropped 2026-05-01.
+//   were dropped.
 //   - tracked_queries                 ← every monitored subject (internal + external)
 //   - tracked_query_price_history     ← every price snapshot (internal + external)
 //   - tracked_query_promoted_urls     ← sticky admin URL overrides

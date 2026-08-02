@@ -28,9 +28,9 @@ const FUNCTIONS_DIR = join(ROOT, 'supabase/functions');
 
 // Real, deployed edge functions with no entry in edge-endpoints.json. SHRINK by
 // documenting each; never grow. A new undocumented function should fail instead.
-// Emptied 2026-07-21: contracts-api and stock-api both gained spec entries in d5045782, and the
+// Emptied: contracts-api and stock-api both gained spec entries, and the
 // "stays honest" assertion correctly failed until they were pruned. Keep at zero.
-// Emptied again 2026-07-29: the Real Estate surfaces (api/public/feed + the buyer-digest and
+// Emptied again: the Real Estate surfaces (api/public/feed + the buyer-digest and
 // rent-invoicing crons), the consolidated monitoring-cron, the moodboard dormancy pair and
 // crm-lead-score all gained spec entries. Keep at zero — a cron being internal is a reason to
 // document its auth and payload, not a reason to hide it from the spec.

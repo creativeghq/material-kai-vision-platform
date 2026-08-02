@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { splitByVatRate, splitGrossLikeTotals } from '../../src/modules/finance/utils/vatSplit';
 
 /**
- * Guards the bug this was extracted from (ORD-2026-0001, 2026-07-31).
+ * Guards the bug this was extracted from (ORD-2026-0001).
  *
  * The order's "Pay" action pre-filled the Add Expense form with the supplier's OWED figure — a
  * VAT-INCLUSIVE number — into the form's "Subtotal (net)" box, with VAT hardcoded to 0. The IZIDA

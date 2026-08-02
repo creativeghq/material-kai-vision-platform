@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  *
  * Use this for every parameter/field that receives a client. The two obvious
  * alternatives are both WRONG in this version of supabase-js, and both were in
- * use across the edge functions until 2026-07-30:
+ * use across the edge functions:
  *
  * 1. Bare `SupabaseClient`. Its default type arguments resolve to schema `never`
  *    (`SupabaseClient<unknown, { PostgrestVersion: string }, never, never, …>`),

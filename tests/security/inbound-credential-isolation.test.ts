@@ -7,10 +7,10 @@
  * credential resolver. This is a source-level guard: it fails loudly if a future change
  * introduces a master-key fallback into the inbound path.
  */
-// This import was missing until 2026-07-17. vitest.config.ts has no
+// This import is what makes the file collectable. vitest.config.ts has no
 // `globals: true`, so without it the file ReferenceErrors on `describe` — and it
 // never surfaced because tests/security/** was not in vitest's `include` either, so
-// the file was never collected. Double-dead: a security guard added 2026-06-07 that
+// the file is never collected. Double-dead: a security guard that
 // had literally never executed. Both halves fixed together; do not remove either.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';

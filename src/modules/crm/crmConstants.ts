@@ -46,8 +46,8 @@ export const ROLE_LABELS: Record<string, string> = {
   architect: 'Architect',
   admin: 'Admin',
   // legacy aliases (rows removed from roles; keep labels resolvable for old data)
-  sales: 'Sales',      // removed as a tier 2026-07-31 — now a workspace role
-  finance: 'Finance',  // removed as a tier 2026-07-31 — now the `accountant` workspace role
+  sales: 'Sales',      // not a tier — a workspace role
+  finance: 'Finance',  // not a tier — the `accountant` workspace role
   dealer: 'Supplier',
   factory: 'Supplier',
   super_admin: 'Admin',

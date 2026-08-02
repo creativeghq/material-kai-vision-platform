@@ -195,7 +195,7 @@ describe('account-tier roles (public.roles)', () => {
   it('NO functional team role is assignable as a global account tier', () => {
     // public.roles is global: a tier is true in every workspace the user belongs to. "Runs HR" /
     // "on the warehouse team" / "sales manager" are per-workspace facts, so they must exist ONLY in
-    // workspace_members.role. Five of them were briefly added here and withdrawn on 2026-07-31.
+    // workspace_members.role. Five of them were briefly added here and withdrawn.
     const TEAM_ONLY = [
       'sales', 'sales_manager', 'hr', 'hr_manager', 'warehouse', 'marketing',
       'accountant', 'employee', 'realestate_agent',

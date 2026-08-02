@@ -5,7 +5,7 @@
  * ---------------
  * The smoke used to run against https://app.materialshub.gr — i.e. against production, AFTER
  * users were already being served the new build. It caught a null-crash on `/` and `/discover`
- * on 2026-08-01, but only once ~6 people had hit it. It is now a real gate: `deploy-frontend`
+ * once, but only after ~6 people had hit it. It is now a real gate: `deploy-frontend`
  * uploads with `--skip-domain`, so the candidate is a production build that nothing is aliased
  * to, and `promote` only moves the domain onto it once these tests pass.
  *
@@ -24,7 +24,7 @@
  * WHY THERE IS NO `x-vercel-set-bypass-cookie`
  * --------------------------------------------
  * The obvious companion header asks Vercel to set a bypass COOKIE so a browser session carries
- * the bypass onward. It is the wrong tool here and it broke the first run. Measured 2026-08-02
+ * the bypass onward. It is the wrong tool here and it broke the first run. Measured
  * against a real candidate:
  *
  *   header only                          -> 200, 0 redirects
@@ -50,7 +50,7 @@ export function bypassHeaders(baseURL: string): Record<string, string> {
   if (!isProtectedHost(baseURL)) return {};
 
   // Trim. A secret piped into `gh secret set` from a Windows shell picks up a trailing CRLF,
-  // and a header value ending in CR is not the same credential: measured 2026-08-02, the clean
+  // and a header value ending in CR is not the same credential: measured, the clean
   // value returns 200 while the same value with a trailing CR returns 400 — and in Chromium it
   // simply fails the bypass, so the run lands on Vercel's login page and every route "passes".
   const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();

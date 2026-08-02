@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { hasCreds, serviceClient, createUser, createWorkspace, addMember, grantModule, teardown, runId, type TestUser } from './_harness';
 
-// Stock ↔ Orders pure-SQL invariants (shipped 2026-07-26). Like money-paths, these are SECURITY
+// Stock ↔ Orders pure-SQL invariants. Like money-paths, these are SECURITY
 // DEFINER functions + triggers where being silently wrong loses stock/money: neither the route-load
 // smoke nor the plpgsql lint says anything about whether the DECREMENT ARITHMETIC and the RESERVATION
 // LIFECYCLE are right. We drive the fixtures with the service client (triggers fire regardless of

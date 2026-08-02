@@ -510,7 +510,7 @@ export async function generateStructuredWithClaude<T>(
 
 // ── Gemini: Image generation + editing ──
 // GA image models (Nano Banana 2 / Pro). The `-preview` aliases were deprecated
-// and shut down 2026-06-25; the GA ids use the identical generateContent API.
+// and shut down; the GA ids use the identical generateContent API.
 export type GeminiImageModel = 'gemini-3.1-flash-image' | 'gemini-3-pro-image';
 export type ImageAspectRatio = '1:1' | '16:9' | '3:2' | '4:3' | '9:16' | '3:4' | '4:5' | '5:4' | '21:9' | '2:3';
 

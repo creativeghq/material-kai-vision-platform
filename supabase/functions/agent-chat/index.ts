@@ -1,4 +1,3 @@
-// Redeploy 2026-06-02: pick up the area_breakdown presentation-sheet tool
 // (prior CI run no-op'd this function under parallel deploy).
 /**
  * Agent Chat - LangChain.js Multi-Agent System

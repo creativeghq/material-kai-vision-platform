@@ -132,7 +132,7 @@ async function buyerRiskBlocks(supabase: any, invoiceId: string): Promise<string
     block_inactive: s?.risk_block_inactive_vat ?? true,
     block_unvalidated: s?.risk_block_unvalidated_vat ?? false,
     block_over: s?.risk_block_over_credit_limit ?? false,
-    // Wired 2026-07-17. These two were offered in Finance → Settings → "Buyer risk
+    // These two are offered in Finance → Settings → "Buyer risk
     // rules" as **Block** switches (and persisted fine) but NOTHING read them — this
     // select listed only the four columns above, so an operator could enable
     // "Block issuance while the buyer has an unpaid / overdue invoice" and every

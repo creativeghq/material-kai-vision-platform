@@ -7,7 +7,7 @@
  *   • tests/security/** was missing from `include` for ~5 weeks (a #183 guard that never ran), and
  *   • three src/services/__tests__/ suites sat uncollected long enough to rot (Jest-era
  *     `jest.mock` in a vitest repo, asserting a column name that was itself the bug). Deleted
- *     2026-07-20 along with the three dead services they covered.
+ *     along with the three dead services they covered.
  *
  * So: every test file in the repo must live under a collected tier, or be explicitly declared
  * here as running on a different runner (Playwright).

@@ -484,7 +484,7 @@ export interface AgingRow {
   /**
    * The document's own currency, from vw_ar_aging / vw_ap_aging.
    *
-   * Absent until 2026-08-02, which meant every AR/AP figure fell through to formatMoney's EUR
+   * Absent, every AR/AP figure falls through to formatMoney's EUR
    * default: a USD invoice's 1,000 rendered as €1,000 AND was summed into the € bucket totals,
    * the DSO base and the AR-outstanding KPI. Synthesised rows (orders, credits) must set it from
    * their own source row, never assume the workspace base.
