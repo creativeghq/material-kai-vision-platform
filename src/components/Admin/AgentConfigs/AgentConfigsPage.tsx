@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, Wrench, ChevronRight, Info, Trash2, AlertTriangle, DollarSign, ListChecks, Activity, Database, Boxes, Network, Box } from 'lucide-react';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Textarea } from '@/components/core/ui/textarea';

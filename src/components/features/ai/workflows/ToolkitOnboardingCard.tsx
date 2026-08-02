@@ -18,7 +18,6 @@ import {
   Users, CalendarOff, CalendarPlus, LayoutDashboard,
   Package, PackagePlus, AlertTriangle,
 } from 'lucide-react';
-import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
 import type { ToolkitDefinition, ToolkitQuickStart } from '../agentToolsCatalog';

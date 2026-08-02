@@ -51,7 +51,7 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
       setLoading(true);
       const data = await projectsService.listProjectQuotes(projectId);
       setQuotes(data as QuoteRow[]);
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to load quotes', variant: 'destructive' });
     } finally {
       setLoading(false);

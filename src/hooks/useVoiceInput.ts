@@ -142,7 +142,7 @@ export const useVoiceInput = (options: UseVoiceInputOptions = {}): UseVoiceInput
     if (recognitionRef.current && !isRecording) {
       try {
         recognitionRef.current.start();
-      } catch (err) {
+      } catch (_err) {
         const errorMsg = 'Failed to start speech recognition';
         setError(errorMsg);
         if (onError) {

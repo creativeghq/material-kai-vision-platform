@@ -39,7 +39,6 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
   quoteNumber,
   data,
   onPreview,
-  headerMode = false,
   viewContext = 'customer',
 }) => {
   const { toast } = useToast();

@@ -1,6 +1,5 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { cn } from '@/lib/utils';
 
 interface AdminStatCardProps {
@@ -23,7 +22,6 @@ export const AdminStatCard: React.FC<AdminStatCardProps> = ({
   description,
   trend,
   className,
-  variant = 'glass',
 }) => {
   return (
     <div className={cn('dashboard-card', className)}>

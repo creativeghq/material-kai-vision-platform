@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Loader2, GitBranch, ArrowUp, ArrowDown, GripVertical, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Loader2, GitBranch, ArrowUp, ArrowDown, Save } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { statusTone } from '@/utils/statusTone';

@@ -185,7 +185,19 @@ export const RecordPaymentDialog: React.FC<{
           : ordersService.list({ workspaceId, orderType: 'sales', companyId: initialCounterparty?.companyId ?? undefined, contactId: initialCounterparty?.contactId ?? undefined }).catch(() => [] as OrderListRow[]),
       ]);
       setCategories(cats);
-      setInvoices(invs);
+      // Same "pull the preset in" treatment the expense list above already gets. The invoice
+      // query is scoped to status ['issued','partially_paid','overdue','paid'] with limit 200,
+      // so a DRAFT invoice — or any invoice past the 200-row cap — was never in this array.
+      // InvoiceDetailPage renders "Record payment" on drafts (it gates only on void /
+      // credit_noted), so selectedTarget resolved to null, allocations stayed [], and the money
+      // was booked as unallocated on-account credit while the toast said "Payment recorded" and
+      // amount_due never moved.
+      let invoiceRows = invs;
+      if (presetInvoiceId && !invoiceRows.some((i) => i.id === presetInvoiceId)) {
+        const one = await financeService.getInvoice(presetInvoiceId).catch(() => null);
+        if (one) invoiceRows = [one as unknown as Invoice, ...invoiceRows];
+      }
+      setInvoices(invoiceRows);
       setBankAccounts(banks);
       // Attachable = not cancelled and not already fully paid.
       const attachable = ords.filter((o) => o.status !== 'cancelled' && o.payment_status !== 'paid');
@@ -198,7 +210,7 @@ export const RecordPaymentDialog: React.FC<{
       // Default to the workspace's default account so cash location is always captured.
       setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
     })();
-  }, [open, workspaceId, presetExpenseId]);
+  }, [open, workspaceId, presetExpenseId, presetInvoiceId]);
 
   // Received → open invoices. Refund → any issued invoice (usually paid).
   // When opened from a party page (initialCounterparty set) the picker is HARD-SCOPED to that
@@ -267,6 +279,28 @@ export const RecordPaymentDialog: React.FC<{
     const o = expenseOptions.find((x) => x.value === expenseId);
     if (o) setAmount(String(o.due));
   }, [open, expenseId, amount, expenseOptions]);
+
+  /**
+   * Default the currency from whatever this payment is settling.
+   *
+   * The picker below used to render only for `received`, so on a refund or a supplier payment
+   * `currency` kept its reset value 'EUR' and was passed to recordPayment unchanged — a refund of
+   * a USD invoice booked a EUR cash-out, so the refund and the invoice it reverses ended up in
+   * different currencies. `received` is excluded here on purpose: money genuinely can arrive in a
+   * currency the invoice is not in, which is what the FX rate inputs exist for.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const target =
+      kind === 'refund' ? selectedInvoice?.currency :
+      kind === 'supplier' ? selectedBill?.currency :
+      kind === 'expense' ? selectedOption?.currency :
+      null;
+    if (target && target !== currency) setCurrency(target);
+    // `currency` is deliberately absent from the deps: including it would fight the user's own
+    // manual override on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, kind, selectedInvoice?.currency, selectedBill?.currency, selectedOption?.currency]);
 
   const pickExpense = (value: string) => {
     setExpenseId(value);
@@ -343,6 +377,21 @@ export const RecordPaymentDialog: React.FC<{
         });
         creditNoteRef = cn.credit_note_id;
         creditNoteFiscalError = cn.fiscal_error;
+      }
+
+      // A caller that named a target invoice MEANS it. If the row still cannot be resolved after
+      // the fetch above, silently degrading to unallocated on-account credit is the worst
+      // available outcome: the money is booked, "Payment recorded" is toasted, and the invoice's
+      // amount_due never moves — the operator believes it is settled. Refuse instead.
+      if (kind === 'received' && presetInvoiceId && targetInvoiceId === presetInvoiceId && !selectedTarget) {
+        toast({
+          title: 'Could not load that invoice',
+          description: 'The payment was NOT recorded. Reopen this from the invoice and try again — '
+            + 'recording it now would book unallocated credit instead of settling the invoice.',
+          variant: 'destructive',
+        });
+        setBusy(false);
+        return;
       }
 
       const direction = kind === 'received' ? 'in' : 'out';
@@ -460,14 +509,17 @@ export const RecordPaymentDialog: React.FC<{
               <Label>Amount</Label>
               <div className="flex gap-2">
                 <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                {kind === 'received' && (
-                  <Select value={currency} onValueChange={setCurrency}>
-                    <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {['EUR', 'USD', 'GBP', 'CHF'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
+                {/* Shown for EVERY direction. It used to render only for `received`, so on a
+                    refund or a supplier payment the state stayed at its reset value 'EUR' and was
+                    passed straight to recordPayment — refunding a USD invoice booked a EUR
+                    cash-out, leaving the refund and the invoice it reverses in different
+                    currencies. The effect above defaults it from the selected target. */}
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['EUR', 'USD', 'GBP', 'CHF'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

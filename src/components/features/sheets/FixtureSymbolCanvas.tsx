@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Save, Lightbulb, Droplets } from 'lucide-react';
+import { Trash2, Save, Lightbulb } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { AnnotationLayer } from './AnnotationLayer';

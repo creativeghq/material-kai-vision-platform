@@ -4,10 +4,29 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import {
-  Building2, LayoutDashboard, Star, Users, Eye, Package, Loader2,
-  Search, Target, Zap, Award, Globe, Layers, DollarSign, Cpu,
-  Database, FileText, Clock, TrendingUp, Bell, Mail, MessageSquare, Monitor,
-  ShoppingCart, CheckCircle2,
+  Building2,
+  LayoutDashboard,
+  Star,
+  Users,
+  Eye,
+  Package,
+  Loader2,
+  Search,
+  Target,
+  Award,
+  Globe,
+  Layers,
+  DollarSign,
+  Cpu,
+  Database,
+  FileText,
+  TrendingUp,
+  Bell,
+  Mail,
+  MessageSquare,
+  Monitor,
+  ShoppingCart,
+  CheckCircle2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { supabase } from '@/integrations/supabase/client';

@@ -108,7 +108,7 @@ export const ProjectDetailPage: React.FC = () => {
         return;
       }
       setProject(data);
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to load project', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -123,7 +123,7 @@ export const ProjectDetailPage: React.FC = () => {
       const updated = await projectsService.updateProject(project.id, { status });
       setProject(prev => prev ? { ...prev, status: updated.status } : null);
       toast({ title: `Status set to ${STATUS_LABELS[status]}` });
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to update status', variant: 'destructive' });
     }
   };
@@ -147,7 +147,7 @@ export const ProjectDetailPage: React.FC = () => {
       await projectsService.deleteProject(project.id);
       toast({ title: 'Project deleted' });
       navigate('/projects');
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to delete project', variant: 'destructive' });
     }
   };

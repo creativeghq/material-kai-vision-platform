@@ -20,8 +20,10 @@ import {
   type PaymentWithAllocation, type PaymentMethod,
 } from '@/modules/finance/services/financeService';
 import {
-  salesDocumentKindFor, salesDocumentKindLabel, salesDocumentKindReason,
-  type BuyerIdentity, type SalesDocumentKind,
+  salesDocumentKindFor,
+  salesDocumentKindReason,
+  type BuyerIdentity,
+  type SalesDocumentKind,
 } from '@/modules/finance/utils/salesDocumentKind';
 import { statusTone } from '@/modules/finance/utils/statusTone';
 import { splitByVatRate, splitGrossLikeTotals } from '@/modules/finance/utils/vatSplit';

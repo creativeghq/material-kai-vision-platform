@@ -23,7 +23,7 @@ interface Props {
   headerMode?: boolean;
 }
 
-export const QuoteShareButton: React.FC<Props> = ({ quoteId, enabled, token, onChange, headerMode = false }) => {
+export const QuoteShareButton: React.FC<Props> = ({ quoteId, enabled, token, onChange }) => {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
 

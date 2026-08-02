@@ -4,7 +4,6 @@ import {
   Activity,
   BarChart3,
   Database as DatabaseIcon,
-  Link2,
   Microscope,
   Settings,
   Home,

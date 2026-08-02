@@ -16,19 +16,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
-import { Textarea } from '@/components/core/ui/textarea';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import {
   financeService,
   formatMoney,
   type InvoiceWithItems,
 } from '@/modules/finance/services/financeService';
-import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';

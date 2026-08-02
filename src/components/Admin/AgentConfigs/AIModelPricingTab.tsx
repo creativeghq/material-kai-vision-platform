@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, RefreshCw, Save, Edit2, Clock, Cpu, Image, Sparkles, ToggleLeft, ToggleRight, ExternalLink, Check, X } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { DollarSign, RefreshCw, Edit2, Clock, Cpu, Image, Sparkles, ToggleLeft, ToggleRight, ExternalLink, Check, X } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';

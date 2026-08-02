@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, User, Check } from 'lucide-react';
 import { usersAPI } from '@/services/crm.service';
-import { Input } from '@/components/core/ui/input';
 import { Button } from '@/components/core/ui/button';
 import {
   Command,

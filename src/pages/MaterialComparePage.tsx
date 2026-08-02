@@ -11,7 +11,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Skeleton } from '@/components/core/ui/skeleton';
-import { Input } from '@/components/core/ui/input';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -19,7 +18,6 @@ import {
   Plus,
   ArrowLeft,
   Search,
-  Star,
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';

@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Mail, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';

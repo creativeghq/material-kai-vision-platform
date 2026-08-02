@@ -57,7 +57,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
       setLoading(true);
       const data = await projectsService.listRooms(projectId);
       setRooms(data);
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to load rooms', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -83,7 +83,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
       setNewBudget('');
       setNewDeadline('');
       await load();
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to add room', variant: 'destructive' });
     } finally {
       setCreating(false);
@@ -95,7 +95,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
     try {
       await projectsService.deleteRoom(id);
       await load();
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to delete room', variant: 'destructive' });
     }
   };

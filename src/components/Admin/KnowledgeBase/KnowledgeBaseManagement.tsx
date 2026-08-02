@@ -1,22 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
-  BookOpen,
-  Plus,
   Search,
   FileText,
-  Upload,
   FolderTree,
   Link2,
-  History,
-  MessageSquare,
   BarChart3,
   Brain,
   ExternalLink,
 } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';

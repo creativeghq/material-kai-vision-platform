@@ -47,7 +47,6 @@ import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/gro
 import {
   getCategoryDisplayConfig,
   resolveUploadCategory,
-  type UploadCategory,
 } from '@/lib/categoryFieldRegistry';
 
 interface ProductDetailModalProps {
@@ -2354,7 +2353,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </h3>
                   </div>
                   <div className="space-y-0">
-                    {universalRows.map((r, i) => (
+                    {universalRows.map((r, _i) => (
                       <div key={r.label} className="flex justify-between items-center py-2 border-b border-border/30">
                         <span className="text-xs text-muted-foreground">{r.label}</span>
                         <span className="text-xs font-semibold">{r.value}</span>

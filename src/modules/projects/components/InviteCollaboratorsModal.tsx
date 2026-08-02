@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Mail,
-  Plus,
   Loader2,
   Trash2,
   Send,
@@ -47,7 +46,7 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
     try {
       setLoading(true);
       setCollaborators(await projectsService.listCollaborators(projectId));
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to load collaborators', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -89,7 +88,7 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
       await projectsService.revokeCollaborator(id);
       toast({ title: 'Access revoked' });
       await load();
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to revoke', variant: 'destructive' });
     }
   };
@@ -98,7 +97,7 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
     try {
       await projectsService.resendCollaboratorInvite(id);
       toast({ title: 'Invitation re-sent', description: email });
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to re-send', variant: 'destructive' });
     }
   };

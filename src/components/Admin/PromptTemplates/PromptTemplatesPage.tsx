@@ -4,7 +4,6 @@ import {
   Plus,
   Edit,
   RefreshCw,
-  Sparkles,
 } from 'lucide-react';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { supabase } from '@/integrations/supabase/client';

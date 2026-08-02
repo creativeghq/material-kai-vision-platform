@@ -38,7 +38,7 @@ export const InviteLandingPage: React.FC = () => {
       setLoading(true);
       const data = await projectsService.getInvitationPreview(token);
       setPreview(data);
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to load invitation', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -56,7 +56,7 @@ export const InviteLandingPage: React.FC = () => {
       try {
         const result = await projectsService.acceptInvitation(token);
         navigate(`/projects/${result.project_id}`, { replace: true });
-      } catch (err) {
+      } catch (_err) {
         // Most likely cause: signed-in user's email doesn't match the invite.
         // Fall through to the email-entry form so they can sign out + retry with the right email.
         setAutoAccepting(false);

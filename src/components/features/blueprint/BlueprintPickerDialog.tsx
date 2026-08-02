@@ -3,7 +3,6 @@ import { Loader2, LayoutTemplate, Sparkles } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/core/ui/dialog';
-import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { blueprintsService, type Blueprint } from '@/services/blueprintsService';

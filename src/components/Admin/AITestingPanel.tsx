@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   TestTube,
   Brain,
-  Sparkles,
   Clock,
   CheckCircle,
   XCircle,

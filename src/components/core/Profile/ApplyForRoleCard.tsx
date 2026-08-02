@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, Factory, Send, Loader2, Lock, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { Briefcase, Factory, Send, Loader2, Lock, Clock, XCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';

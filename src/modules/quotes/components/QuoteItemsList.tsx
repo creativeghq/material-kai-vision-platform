@@ -132,7 +132,7 @@ const PriceCell: React.FC<{
   placeholder?: string;
   onSave: (v: number | null) => void;
   highlight?: boolean;
-}> = ({ value, editable, placeholder = '—', onSave, highlight }) => {
+}> = ({ value, editable, onSave, highlight }) => {
   const [local, setLocal] = useState(value != null ? String(value) : '');
   const inputRef = useRef<HTMLInputElement>(null);
 

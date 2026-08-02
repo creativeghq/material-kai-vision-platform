@@ -7,7 +7,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { ProfileModal } from '@/components/features/discover/ProfileModal';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import type { Product } from '@/components/features/products/types';
-import { CAT_COLORS, PROFESSIONAL_TYPE_LABELS as PROF_LABELS, detectCat, catLabel } from '@/lib/materialCategories';
+import { CAT_COLORS, PROFESSIONAL_TYPE_LABELS as PROF_LABELS, detectCat } from '@/lib/materialCategories';
 import {
   PRODUCT_IMAGE_SELECT,
   getManufacturer,

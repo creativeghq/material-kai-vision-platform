@@ -9,7 +9,7 @@ import {
   type XYPosition,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Save, AlertTriangle, CheckCircle2, Undo2, Loader2, Play, TestTube } from 'lucide-react';
+import { Save, AlertTriangle, CheckCircle2, Loader2, Play, TestTube } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';

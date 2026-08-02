@@ -42,7 +42,7 @@ interface EmbeddingsTabProps {
   onStatsUpdate: () => void;
 }
 
-export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobIdFilter, onStatsUpdate }) => {
+export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobIdFilter}) => {
   const [embeddings, setEmbeddings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedEmbedding, setSelectedEmbedding] = useState<any | null>(null);

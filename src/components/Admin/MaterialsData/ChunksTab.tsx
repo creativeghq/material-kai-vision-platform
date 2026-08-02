@@ -29,7 +29,7 @@ interface ChunksTabProps {
   onStatsUpdate: () => void;
 }
 
-export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, onStatsUpdate }) => {
+export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter}) => {
   const [chunks, setChunks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedChunk, setSelectedChunk] = useState<any | null>(null);

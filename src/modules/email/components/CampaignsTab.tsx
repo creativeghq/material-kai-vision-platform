@@ -4,8 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Send, Calendar, Users, BarChart3, Pause, Play, Trash2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Plus, Send, Calendar, Users, Trash2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { statusTone } from '@/utils/statusTone';

@@ -65,7 +65,6 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
   jobId,
   modelCount,
   models,
-  onImageClick,
   onGenerateVR,
   vrGenerating,
   workspaceId = '',

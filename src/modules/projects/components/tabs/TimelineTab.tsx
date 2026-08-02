@@ -109,7 +109,7 @@ export const TimelineTab: React.FC<TimelineTabProps> = ({ projectId }) => {
       setLoading(true);
       const data = await projectsService.listEvents(projectId, { limit: 200 });
       setEvents(data);
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to load timeline', variant: 'destructive' });
     } finally {
       setLoading(false);

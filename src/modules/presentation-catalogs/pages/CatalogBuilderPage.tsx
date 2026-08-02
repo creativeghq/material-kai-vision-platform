@@ -1,8 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, MessageSquare, FileDown, ExternalLink, Globe, Archive, RefreshCw,
-  Trash2, Plus, BookOpen, Eye, Activity, Send, Mail, Inbox, FileText,
+  ArrowLeft,
+  Loader2,
+  MessageSquare,
+  FileDown,
+  ExternalLink,
+  Globe,
+  Archive,
+  RefreshCw,
+  Trash2,
+  Plus,
+  BookOpen,
+  Eye,
+  Activity,
+  Send,
+  Mail,
+  FileText,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { getErrorMessage } from '@/core/errors/utils';

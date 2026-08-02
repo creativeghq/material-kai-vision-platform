@@ -11,7 +11,6 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Badge } from '@/components/core/ui/badge';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';

@@ -61,7 +61,7 @@ export const EmailSettingsForm = React.forwardRef<EmailSettingsFormHandle, Props
           if (it.setting_key === 'default_from_name') map.default_from_name = it.setting_value;
         });
         setSettings(map);
-      } catch (err) {
+      } catch (_err) {
         toast({ title: 'Error', description: 'Failed to load email settings', variant: 'destructive' });
       } finally {
         setLoading(false);
@@ -94,7 +94,7 @@ export const EmailSettingsForm = React.forwardRef<EmailSettingsFormHandle, Props
         toast({ title: 'Settings Saved', description: 'Email settings have been updated successfully' });
         onSaved?.();
         return true;
-      } catch (err) {
+      } catch (_err) {
         toast({ title: 'Error', description: 'Failed to save email settings', variant: 'destructive' });
         return false;
       } finally {

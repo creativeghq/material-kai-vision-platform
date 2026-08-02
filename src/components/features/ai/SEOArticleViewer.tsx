@@ -50,7 +50,6 @@ import {
   AlertOctagon,
   Quote,
   BookOpen,
-  HelpCircle,
 } from 'lucide-react';
 
 // ─── Types (matching seo-pipeline output / ArticleOutput) ───────

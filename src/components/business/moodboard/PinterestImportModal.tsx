@@ -175,7 +175,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
       setLoadingPins(true);
       const data = await pinterestService.getBoardPins(board.id);
       setBoardPins(data.pins);
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Error', description: 'Failed to load board pins', variant: 'destructive' });
     } finally {
       setLoadingPins(false);
@@ -186,7 +186,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
     try {
       const authUrl = await pinterestService.getAuthUrl();
       window.open(authUrl, '_blank', 'width=600,height=700');
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Error', description: 'Failed to start Pinterest connection', variant: 'destructive' });
     }
   };

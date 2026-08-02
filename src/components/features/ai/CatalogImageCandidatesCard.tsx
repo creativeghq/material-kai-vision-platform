@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { ImageIcon, Loader2, Globe, Database, Check } from 'lucide-react';
-import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { catalogsService } from '@/services/catalogsService';

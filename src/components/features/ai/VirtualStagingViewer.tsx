@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Download, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { Download, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 
 interface VirtualStagingViewerProps {

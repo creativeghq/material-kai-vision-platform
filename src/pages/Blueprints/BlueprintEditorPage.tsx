@@ -5,7 +5,6 @@ import { Loader2, ChevronLeft, Plus, Trash2, Save, LayoutTemplate, Copy } from '
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';

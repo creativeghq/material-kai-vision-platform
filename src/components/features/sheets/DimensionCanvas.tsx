@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Trash2, Save, Ruler, Tag } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { AnnotationLayer } from './AnnotationLayer';
 import { moodboardSheetsService } from '@/services/moodboardSheetsService';
 import { LivePreviewPanel } from './LivePreviewPanel';

@@ -15,7 +15,6 @@ interface GlobalAdminHeaderProps {
 export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
   title,
   description,
-  breadcrumbs = [],
   badge,
 }) => {
   const navigate = useNavigate();

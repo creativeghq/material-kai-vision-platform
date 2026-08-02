@@ -5,9 +5,6 @@ import { Button } from '@/components/core/ui/button';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/core/ui/card';
 import {
   Dialog,
@@ -230,7 +227,7 @@ export const MoodBoardPage = () => {
                       </div>
                     );
                   }
-                  return previews.map((item, idx) => (
+                  return previews.map((item, _idx) => (
                     <div key={item.id} className={`overflow-hidden bg-muted ${previews.length === 1 ? 'col-span-2 row-span-2' : previews.length === 2 ? 'row-span-2' : ''}`}>
                       <img
                         src={item.material!.thumbnail_url}

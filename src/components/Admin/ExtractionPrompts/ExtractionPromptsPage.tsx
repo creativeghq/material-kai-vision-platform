@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus,
   Edit,
   History,
   RefreshCw,
-  Sparkles,
   Save,
   X,
   Code,
@@ -47,7 +45,6 @@ import {
   DialogTitle,
 } from '@/components/core/ui/dialog';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 

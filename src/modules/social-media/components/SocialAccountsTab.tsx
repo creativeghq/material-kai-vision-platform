@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Share2, Plus, Trash2, Loader2, RefreshCw, Users } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { statusTone } from '@/utils/statusTone';
 import { useAuth } from '@/contexts/AuthContext';

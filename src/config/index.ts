@@ -6,7 +6,7 @@
  */
 
 // API Configuration System
-import { apiRegistry, ApiConfig, SupabaseApiConfig } from './apiConfig';
+import { apiRegistry, ApiConfig } from './apiConfig';
 import replicateConfig from './apis/replicateConfig';
 import supabaseConfig from './apis/supabaseConfig';
 // New Centralized Configuration System

@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';

@@ -340,7 +340,7 @@ class LoggerService {
       }).catch(() => {
         // Silently fail - don't want logging to break the app
       });
-    } catch (error) {
+    } catch (_error) {
       // Don't let logging errors break the app
     }
   }

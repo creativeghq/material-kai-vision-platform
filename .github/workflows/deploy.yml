@@ -192,11 +192,16 @@ jobs:
       - run: npm test
       # Lint is a gate as of 2026-07-16 (it never was, so 3468 errors accumulated
       # unnoticed — including 9 real react-hooks/rules-of-hooks violations).
-      # `npm run lint` = eslint . --max-warnings 316 → ZERO errors tolerated; the
-      # 316 remaining no-unused-vars WARNINGS are ratcheted at today's count so
-      # they can only go down. When you clear some, lower the number in
-      # package.json; never raise it.
+      # `npm run lint` tolerates ZERO errors; the remaining WARNINGS are ratcheted
+      # at today's count so they can only go down. The budget is DERIVED — a11y
+      # baseline + declared non-a11y debt — and pinned by a11yRatchet.test.ts, so
+      # it cannot be raised to go green. When you clear some, lower it there.
       - run: npm run lint
+      # The a11y ratchet (per-rule counts in .github/a11y-baseline.json, fails when
+      # one RISES). It shipped 2026-08-01 but was never wired into CI, so for its
+      # first day it gated nothing while its warnings sat inside the `npm run lint`
+      # budget above and turned this job red instead.
+      - run: npm run lint:a11y
 
   # ────────────────────────────────────────────────────────────────────
   # deploy-frontend: prebuilt Vercel upload (no double build).

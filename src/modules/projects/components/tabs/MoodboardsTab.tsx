@@ -47,7 +47,7 @@ export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId }) => {
       setLoading(true);
       const data = await projectsService.listProjectMoodboards(projectId);
       setMoodboards(data as MoodboardRow[]);
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to load moodboards', variant: 'destructive' });
     } finally {
       setLoading(false);

@@ -11,12 +11,10 @@ import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import {
-  BarChart3,
   CheckCircle,
   XCircle,
   AlertTriangle,
   RefreshCw,
-  FileText,
   TrendingUp,
   TrendingDown,
   Filter,

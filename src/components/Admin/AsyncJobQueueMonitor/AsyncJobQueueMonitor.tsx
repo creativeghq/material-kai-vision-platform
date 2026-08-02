@@ -19,7 +19,6 @@ import { mivaaApi } from '@/services/mivaaApiClient';
 import { toast } from 'sonner';
 import { logger } from '@/services/logger.service';
 import { TempFileCleanupModal } from '../TempFileCleanupModal';
-import { JobCheckpointTimeline } from '../JobCheckpointTimeline';
 import { DocumentHealthPanel } from './DocumentHealthPanel';
 import { EmbeddingBackfillCard } from './EmbeddingBackfillCard';
 import {
@@ -31,13 +30,11 @@ import {
   Zap,
   Activity,
   ChevronRight,
-  ChevronDown,
   FileText,
   Image as ImageIcon,
   Package,
   XCircle,
   Trash2,
-  Link,
   Terminal,
   Download,
   Copy,
@@ -58,17 +55,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/core/ui/accordion';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/core/ui/tooltip';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
-import type { ProductProgress, BackgroundJob, XMLImportJob, JobCheckpoint, JobTypeMetrics, QueueMetrics } from './types';
-import { GLOBAL_PIPELINE_FLOW, XML_IMPORT_PIPELINE_FLOW, WEB_SCRAPING_PIPELINE_FLOW, PRODUCT_STAGES, getPipelineForJobType } from './constants';
+import type { ProductProgress, BackgroundJob, XMLImportJob, JobTypeMetrics, QueueMetrics } from './types';
+import { PRODUCT_STAGES, getPipelineForJobType } from './constants';
 import { LiveTimer } from './components/LiveTimer';
-import { hasRecentHeartbeat, getStatusBadge } from './components/StatusBadge';
+import { getStatusBadge } from './components/StatusBadge';
 import { PipelineErrorsPanel } from './components/PipelineErrorsPanel';
 import { buildJobQueueFilters } from './jobQueueFilters';
 import { MIVAA_API_URL } from '@/config/mivaa';
@@ -1272,7 +1263,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       }
 
       return 'N/A';
-    } catch (error) {
+    } catch (_error) {
       return 'N/A';
     }
   };

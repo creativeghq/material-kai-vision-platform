@@ -25,7 +25,7 @@ interface ImagesTabProps {
   onStatsUpdate: () => void;
 }
 
-export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, onStatsUpdate }) => {
+export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter}) => {
   const [images, setImages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<any | null>(null);

@@ -11,14 +11,41 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  ChevronDown, ChevronRight, ChevronsUp, Check, Circle, Loader2, X, SkipForward,
-  PencilLine, AlertCircle, BookOpen, Sparkles, FileDown, Globe, Send, FileText, Plus,
-  ImageIcon, Search, ListTree, PenLine, BadgeCheck, Megaphone, RefreshCw, Bot, Settings2,
-  LayoutTemplate, Grid3x3, Building2, Users, Mail, Save, Wrench,
+  ChevronRight,
+  ChevronsUp,
+  Check,
+  Circle,
+  Loader2,
+  X,
+  SkipForward,
+  PencilLine,
+  AlertCircle,
+  BookOpen,
+  Sparkles,
+  FileDown,
+  Globe,
+  Send,
+  FileText,
+  Plus,
+  ImageIcon,
+  Search,
+  ListTree,
+  PenLine,
+  BadgeCheck,
+  Megaphone,
+  RefreshCw,
+  Bot,
+  Settings2,
+  LayoutTemplate,
+  Grid3x3,
+  Building2,
+  Users,
+  Mail,
+  Save,
+  Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import type {
   WorkflowRuntimeState, WorkflowStepStatus, WorkflowStepRuntimeState,
 } from './types';
@@ -132,7 +159,7 @@ const StepNode: React.FC<{
   icon?: string;
   expanded: boolean;
   onClick: () => void;
-}> = ({ index, status, title, icon, expanded, onClick }) => {
+}> = ({ index, status, title, expanded, onClick }) => {
   const StatusIcon = (() => {
     switch (status) {
       case 'done':            return <Check className="h-3 w-3" />;

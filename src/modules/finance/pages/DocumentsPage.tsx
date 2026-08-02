@@ -873,7 +873,7 @@ const IssuerCell: React.FC<{ doc: InboundDocument; crmCompanyId?: string }> = ({
   );
 };
 
-const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string; onOpenExpense: (billId: string) => void }> = ({ rows, workspaceId, readOnly, onChanged, categories, categoryName, onOpenExpense }) => {
+const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string; onOpenExpense: (billId: string) => void }> = ({ rows, workspaceId, readOnly, onChanged, categories, categoryName }) => {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);

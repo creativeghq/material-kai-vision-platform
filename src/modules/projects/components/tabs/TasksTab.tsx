@@ -86,7 +86,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
       ]);
       setTasks(t);
       setRooms(r);
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to load tasks', variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -117,7 +117,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
       setNewTitle('');
       setNewRoomId('');
       await load();
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to add task', variant: 'destructive' });
     } finally {
       setCreating(false);
@@ -142,7 +142,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
     try {
       await projectsService.updateTask(id, { status });
       await load();
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to update task', variant: 'destructive' });
     }
   };
@@ -152,7 +152,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
       const next: TaskVisibility = task.visibility === 'internal' ? 'client_visible' : 'internal';
       await projectsService.updateTask(task.id, { visibility: next });
       await load();
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to update visibility', variant: 'destructive' });
     }
   };
@@ -163,7 +163,7 @@ export const TasksTab: React.FC<TasksTabProps> = ({ projectId, isOwner = true })
     try {
       await projectsService.deleteTask(id);
       await load();
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to delete task', variant: 'destructive' });
     }
   };

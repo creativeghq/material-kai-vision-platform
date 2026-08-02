@@ -15,7 +15,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BellRing, Mail, Webhook, Loader2, Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Switch } from '@/components/core/ui/switch';
-import { Badge } from '@/components/core/ui/badge';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';

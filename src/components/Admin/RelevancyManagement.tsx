@@ -380,7 +380,7 @@ export const RelevancyManagement: React.FC = () => {
 
       toast({ title: 'Success', description: 'Relationship deleted successfully' });
       loadRelationships();
-    } catch (error) {
+    } catch (_error) {
       toast({ title: 'Error', description: 'Failed to delete relationship', variant: 'destructive' });
     }
   };

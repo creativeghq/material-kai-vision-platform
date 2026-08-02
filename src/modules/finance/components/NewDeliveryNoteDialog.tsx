@@ -10,7 +10,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Loader2, Plus, Trash2, Truck } from 'lucide-react';
+import { Loader2, Trash2, Truck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { deliveryNotesService, type WarehousePick, type DeliveryLineInput } from '@/modules/finance/services/deliveryNotesService';

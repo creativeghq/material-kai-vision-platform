@@ -691,7 +691,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                         ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1 text-sm text-foreground/80 pl-2">{children}</ol>,
                         li: ({ children }) => <li className="leading-relaxed">{children}</li>,
                         blockquote: ({ children }) => <blockquote className="border-l-4 border-primary/30 pl-4 my-3 text-sm text-muted-foreground italic">{children}</blockquote>,
-                        code: ({ className, children, ...props }) => {
+                        code: ({ className, children, ..._props }) => {
                           const isBlock = className?.includes('language-');
                           return isBlock
                             ? <code className="block bg-muted rounded-lg p-4 text-sm font-mono text-foreground overflow-x-auto my-3">{children}</code>

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Loader2, Download, ExternalLink, FileText } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
-import { moodboardSheetsService, SHEET_TYPE_LABELS } from '@/services/moodboardSheetsService';
+import { SHEET_TYPE_LABELS } from '@/services/moodboardSheetsService';
 import { supabase } from '@/integrations/supabase/client';
 
 /**

@@ -41,9 +41,6 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/core/ui/card';
 import {
   Tooltip,

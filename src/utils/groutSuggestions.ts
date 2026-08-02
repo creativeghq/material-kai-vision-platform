@@ -90,7 +90,7 @@ function extractDominantColor(metadata: Record<string, any>): string | null {
  */
 function suggestGroutColorForProduct(
   productColor: string | null,
-  metadata: Record<string, any>,
+  _metadata: Record<string, any>,
 ): GroutColor[] {
   const suggestions: GroutColor[] = [];
 

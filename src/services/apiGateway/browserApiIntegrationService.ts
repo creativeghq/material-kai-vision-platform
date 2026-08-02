@@ -8,7 +8,6 @@
 
 import { browserApiClientFactory } from './browserApiClientFactory';
 import type { StandardizedApiResponse } from './standardizedApiClient';
-import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Common parameter types for different API operations

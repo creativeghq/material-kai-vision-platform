@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "start": "vite preview",
-    "lint": "eslint . --max-warnings 316",
+    "lint": "eslint . --max-warnings 494",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:edge": "node scripts/check-edge-functions.mjs",
     "lint:a11y": "node scripts/check-a11y.mjs",

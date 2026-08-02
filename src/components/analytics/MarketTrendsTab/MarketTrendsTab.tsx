@@ -1,15 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from 'recharts';
 import {
   TrendingUp, Search, Target, Zap, Award, Globe, Layers, Activity, Building2,
   Download, Calendar, ChevronUp, ChevronDown, Minus, Package, Star, Eye, Users,
 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -17,11 +23,16 @@ import {
   getMomentum, prettifyKey, getLifecycle, formatProfType,
 } from '../shared/AnalyticsUIComponents';
 import {
-  buildWeeks, weeksAgo, buildMonthlyTrend, forecastWeeks, downloadCSV,
-  convRate, CHART_MARGINS, GRID_PROPS,
+  weeksAgo,
+  buildMonthlyTrend,
+  forecastWeeks,
+  downloadCSV,
+  convRate,
+  CHART_MARGINS,
+  GRID_PROPS,
 } from '../shared/analyticsUtils';
 
-export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boolean }> = ({ factoryName, isFactory }) => {
+export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boolean }> = ({ factoryName}) => {
   const [isDemoData, setIsDemoData] = useState(false);
   const [viewScope, setViewScope] = useState<'platform' | 'factory'>('platform');
   const [timeRange, setTimeRange] = useState<number>(12);

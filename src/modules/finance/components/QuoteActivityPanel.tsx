@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';

@@ -3,7 +3,6 @@ import { Plus, Loader2, FileText, Download, Trash2, Wand2, ScanLine, Receipt, Ch
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';

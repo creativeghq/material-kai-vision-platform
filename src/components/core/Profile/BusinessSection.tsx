@@ -5,10 +5,6 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/core/ui/select';
-import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { VatCountryCombobox } from '@/components/core/VatCountryCombobox';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, ShieldCheck, AlertTriangle, Wrench, Check, EyeOff, Loader2 } from 'lucide-react';
+import { RefreshCw, ShieldCheck, AlertTriangle, Wrench, EyeOff, Loader2 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
-import { Loader2, Link2, Image as ImageIcon, FileText, Package } from 'lucide-react';
+import { Loader2, Link2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SmartPagination } from '@/components/core/ui/smart-pagination';
@@ -19,7 +19,7 @@ interface RelationsTabProps {
   onStatsUpdate: () => void;
 }
 
-export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFilter, onStatsUpdate }) => {
+export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFilter}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [relations, setRelations] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);

@@ -59,6 +59,44 @@ describe('accessibility ratchet', () => {
   });
 
   /**
+   * `npm run lint --max-warnings N` and this baseline count the SAME eslint run, so N has to
+   * account for the a11y backlog or the build is red for warnings the a11y ratchet already owns.
+   * That is exactly what happened: enabling the rules as `warn` added ~408 warnings on top of a
+   * cap set at 316, and `unit-tests` went red on every commit from that day — while
+   * `npm run lint:a11y`, the gate that actually owns those warnings, was never wired into CI at
+   * all. A permanently-red gate teaches people to ignore it.
+   *
+   * So N is DERIVED, not chosen: the a11y backlog (ratcheted per-rule, here) plus the non-a11y
+   * debt below. Neither term may rise. When you fix a11y issues and regenerate the baseline, this
+   * test fails until N comes down with it — the cap cannot be left slack for new warnings to hide
+   * in, and it cannot be raised without moving one of two numbers that are each guarded.
+   */
+  it('the lint budget is the a11y baseline plus the declared non-a11y debt', () => {
+    /**
+     * Unused locals that need a human: an unused `const navigate = useNavigate()`, a dead helper,
+     * a `useState` pair nobody reads. Deleting them is right (dead code does not stay) but each
+     * needs eyes. 310 -> 86 on 2026-08-02 by removing 172 unused imports and giving 52 unused
+     * args/catch-bindings the `_` prefix the rule sanctions. DRIVE THIS TO ZERO. NEVER RAISE IT.
+     */
+    const NON_A11Y_DEBT = 86;
+
+    const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const cap = /--max-warnings\s+(\d+)/.exec(pkg.scripts.lint ?? '')?.[1];
+    expect(cap, '`npm run lint` must carry an explicit --max-warnings budget').toBeTruthy();
+
+    const expected = readBaseline().total + NON_A11Y_DEBT;
+    expect(
+      Number(cap),
+      `--max-warnings is ${cap} but should be ${expected} = ${readBaseline().total} (a11y ` +
+      `baseline) + ${NON_A11Y_DEBT} (non-a11y debt). If you fixed a11y issues and regenerated ` +
+      'the baseline, lower --max-warnings by the same amount. If you fixed non-a11y warnings, ' +
+      'lower NON_A11Y_DEBT here and --max-warnings together. Never raise either to go green.',
+    ).toBe(expected);
+  });
+
+  /**
    * A rule at 0 should be promoted to `error`, and a rule promoted to `error` must be at 0 —
    * otherwise the build is already broken. This keeps the two files honest about each other.
    */

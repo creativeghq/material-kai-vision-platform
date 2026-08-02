@@ -16,7 +16,7 @@ class BrowserApiClientFactory {
   /**
    * Get a client for a specific API type
    */
-  public getClient(apiType: string): BrowserApiClient | null {
+  public getClient(_apiType: string): BrowserApiClient | null {
     // Return null - not implemented
     // All API calls should go through MIVAA API instead
     return null;
@@ -25,7 +25,7 @@ class BrowserApiClientFactory {
   /**
    * Get available models for an API type
    */
-  public getAvailableModels(apiType: string): string[] {
+  public getAvailableModels(_apiType: string): string[] {
     // Return empty array - not implemented
     return [];
   }
@@ -33,7 +33,7 @@ class BrowserApiClientFactory {
   /**
    * Get model configuration
    */
-  public getModelConfig(apiType: string, modelId: string): any {
+  public getModelConfig(_apiType: string, _modelId: string): any {
     // Return null - not implemented
     return null;
   }

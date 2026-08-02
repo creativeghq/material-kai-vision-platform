@@ -4,7 +4,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, FileSignature, Plus, Link2, Ban, CheckCircle2, Send, Download } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';

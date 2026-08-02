@@ -5,8 +5,6 @@ import { Button } from '@/components/core/ui/button';
 import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { edgeError } from '@/utils/edgeError';
 import {
   customerDocumentsService,
   type CustomerInvoiceDoc,

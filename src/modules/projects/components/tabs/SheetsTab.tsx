@@ -36,7 +36,7 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId }) => {
       setLoading(true);
       const data = await projectsService.listProjectSheets(projectId);
       setSheets(data);
-    } catch (err) {
+    } catch (_err) {
       toast({ title: 'Failed to load sheets', variant: 'destructive' });
     } finally {
       setLoading(false);

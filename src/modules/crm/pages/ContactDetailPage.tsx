@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';

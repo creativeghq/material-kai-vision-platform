@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, Tag, Timer, Boxes, Milestone, RotateCcw, CreditCard } from 'lucide-react';
+import { ArrowLeft, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, Tag, Boxes, Milestone, RotateCcw, CreditCard } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney } from '@/modules/finance/services/financeService';
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef } from 'react';
 
 /**
  * Shared image-backdrop canvas used by every interactive sheet widget

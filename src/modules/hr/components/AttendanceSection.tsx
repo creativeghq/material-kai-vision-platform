@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock, LogIn, LogOut, Loader2, Settings, Copy, Check, Bell, Smartphone } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, FileText, Loader2, Download, ExternalLink, Pencil, Trash2, AlertCircle, RotateCw, Copy, Share2, Check } from 'lucide-react';
+import { Plus, FileText, Loader2, ExternalLink, Pencil, Trash2, AlertCircle, RotateCw, Copy, Share2, Check } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
 import {

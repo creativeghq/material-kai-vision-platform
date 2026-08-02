@@ -64,7 +64,7 @@ export function RunHistoryTab() {
       ]);
       setRuns(data);
       setFlows(flowList);
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'Error',
         description: 'Failed to load run history',

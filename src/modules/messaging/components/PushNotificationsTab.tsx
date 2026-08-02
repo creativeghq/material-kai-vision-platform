@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Bell, Send, Trash2, AlertCircle, CheckCircle2, Chrome, Globe, Smartphone } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';

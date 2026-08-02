@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { flowService } from '@/services/flows';
-import type { FlowRun, FlowRunStep } from '@/services/flows';
+import type { FlowRun } from '@/services/flows';
 
 interface UseFlowExecutionReturn {
   executing: boolean;

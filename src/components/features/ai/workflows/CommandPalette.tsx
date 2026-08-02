@@ -19,11 +19,14 @@ import { Sparkles, Wrench, ArrowRight, Lock, AlertCircle, ListChecks } from 'luc
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/core/ui/badge';
 import {
-  AGENTS, type AgentToolEntry, getAccessibleAgents,
-  getAccessibleToolkits, getToolkitOwnerAgents,
-  type ToolkitQuickStart, type ToolkitDefinition,
+  type AgentToolEntry,
+  getAccessibleAgents,
+  getAccessibleToolkits,
+  getToolkitOwnerAgents,
+  type ToolkitQuickStart,
+  type ToolkitDefinition,
 } from '../agentToolsCatalog';
-import { WORKFLOWS, getWorkflowsForRole } from './workflowRegistry';
+import { getWorkflowsForRole } from './workflowRegistry';
 import type { WorkflowDefinition } from './types';
 
 interface Props {

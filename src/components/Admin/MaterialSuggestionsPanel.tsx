@@ -23,7 +23,6 @@ import {
 } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 // Removed direct Supabase client - using Edge Functions instead
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 
