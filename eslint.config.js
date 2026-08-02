@@ -117,20 +117,44 @@ export default [
       'import/no-unresolved': 'off', // TypeScript handles this
       'import/order': 'off',
 
-      // Accessibility — WARN, ratcheted by scripts/check-a11y.mjs against
-      // .github/a11y-baseline.json. They were ALL 'off' under a comment reading
-      // "off for now", which is why the counts could only grow: every one of the 280
-      // unnamed icon buttons and 72 mouse-only handlers was added AFTER the plugin was
-      // installed. `warn` + a baseline that fails CI when a count RISES turns an unbounded
-      // backlog into a monotonically shrinking one without blocking the build today.
-      // Ratchet the numbers down; never edit them upward. (audit #302 finding 8)
-      // At ZERO — promoted from warn to error so it can never regress. This is the workflow
-      // the ratchet documents: drive a rule to 0, promote it, drop its baseline entry.
+      // Accessibility — ALL AT ZERO, ALL 'error'. (audit #302)
+      //
+      // These were every one of them 'off', under a comment reading "off for now", while the
+      // plugin sat installed and registered. That is how the backlog reached 407: every unnamed
+      // icon button and every mouse-only handler was added AFTER the tool that would have caught
+      // it was switched off. The failure was never a missing tool.
+      //
+      // The route back was: turn them on as 'warn', let .github/a11y-baseline.json absorb the
+      // existing count so the build was not red on day one, then ratchet each rule to 0 and
+      // promote it to 'error'. That is now finished — the baseline is empty and every rule is an
+      // error, so a new violation fails the build instead of joining a queue.
+      //
+      // NEVER move one of these back to 'warn' or 'off' to get a build green. The whole 407 came
+      // from exactly that decision, made once. tests/unit/a11yRatchet.test.ts fails if you do.
       'jsx-a11y/alt-text': 'error',
-      'jsx-a11y/anchor-is-valid': 'warn',
-      'jsx-a11y/click-events-have-key-events': 'warn',
-      'jsx-a11y/no-static-element-interactions': 'warn',
-      'jsx-a11y/label-has-associated-control': 'warn',
+      'jsx-a11y/anchor-is-valid': 'error',
+      'jsx-a11y/click-events-have-key-events': 'error',
+      'jsx-a11y/no-static-element-interactions': 'error',
+      // `controlComponents` names the custom components that ARE form controls. Without it the
+      // rule cannot see through <Checkbox>/<Switch>/<Slider>/<RadioGroup> and reports every
+      // `<label><span>Text</span><Switch/></label>` as unlabelled — 37 of them here.
+      //
+      // That markup is already correct: Radix renders a labelable <button role="switch">, the
+      // wrapping <label> names it, and clicking the label toggles it. The alternative "fix" was
+      // 37 hand-minted ids, and several of these labels sit inside .map() loops where a static id
+      // would be DUPLICATED across rows — an id collision is a worse defect than the warning.
+      //
+      // This only relaxes the NESTING form. A label that is merely a SIBLING of a <Checkbox>
+      // still fails, which is the shape that is genuinely broken and is fixed in the code.
+      //
+      // `depth` is how far down the label's subtree the rule looks for its TEXT. The default of 2
+      // misses `<label><Button asChild><span>Browse Files</span></Button></label>`, where the text
+      // is real and visible but sits under two wrappers.
+      // At ZERO — promoted to error (see alt-text above).
+      'jsx-a11y/label-has-associated-control': ['error', {
+        controlComponents: ['Checkbox', 'Switch', 'Slider', 'RadioGroup', 'Toggle'],
+        depth: 4,
+      }],
       // Configured with the ignore lists from the rule's OWN documentation, which the bare
       // 'warn' form does not apply.
       //
@@ -143,7 +167,7 @@ export default [
       // It also flagged 7 <tr>, 7 <video> and 4 <canvas>, none of which is a form control at
       // all. `th`/`td` are deliberately NOT ignored — an unlabelled header cell is a real (if
       // minor) defect, and those are fixed in the code rather than configured away.
-      'jsx-a11y/control-has-associated-label': ['warn', {
+      'jsx-a11y/control-has-associated-label': ['error', {
         labelAttributes: ['label'],
         controlComponents: [],
         // The documented list, plus two of our own:
@@ -160,8 +184,8 @@ export default [
         ],
         depth: 5,
       }],
-      'jsx-a11y/aria-props': 'warn',
-      'jsx-a11y/role-has-required-aria-props': 'warn',
+      'jsx-a11y/aria-props': 'error',
+      'jsx-a11y/role-has-required-aria-props': 'error',
 
       // Formatting - errors for auto-fix
       'quotes': ['error', 'single', { avoidEscape: true }],

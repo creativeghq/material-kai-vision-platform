@@ -19,6 +19,8 @@ import {
 } from '@/components/core/ui/dialog';
 import { ImageEmbeddingsInspector } from './ImageEmbeddingsInspector';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
 interface ImagesTabProps {
   workspaceId: string;
   jobIdFilter?: string;
@@ -335,6 +337,9 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4" style={{ gap: 'var(--grid-gap)' }}>
               {images.map((image) => (
                 <div
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={onEnterOrSpace(() => handleViewImage(image))}
                   key={image.id}
                   className="dashboard-card transition-all duration-200 hover:shadow-md cursor-pointer"
                   style={{ padding: 'var(--card-padding)' }}

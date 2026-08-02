@@ -1,10 +1,5 @@
 {
-  "_comment": "Per-rule jsx-a11y warning counts. CI fails when a count RISES. Lower them as you fix things and regenerate: node scripts/check-a11y.mjs --write-baseline. When a rule reaches 0, promote it to \"error\" in eslint.config.js and delete its entry here.",
-  "total": 146,
-  "rules": {
-    "jsx-a11y/label-has-associated-control": 71,
-    "jsx-a11y/no-static-element-interactions": 37,
-    "jsx-a11y/click-events-have-key-events": 36,
-    "jsx-a11y/control-has-associated-label": 2
-  }
+  "_comment": "Per-rule jsx-a11y warning counts. EMPTY: every jsx-a11y rule reached 0 and was promoted to \"error\" in eslint.config.js, so new violations fail the build outright and never reach a baseline. Keep this file: if a future rule is added as \"warn\" with an existing backlog, record it here and ratchet it down the same way. CI fails when a count RISES. Regenerate with: node scripts/check-a11y.mjs --write-baseline",
+  "total": 0,
+  "rules": {}
 }

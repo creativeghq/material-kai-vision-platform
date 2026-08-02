@@ -106,6 +106,20 @@ function FlowBuilderCanvas({ flowId, tenantMode = false }: FlowBuilderTabProps) 
     [reactFlowInstance, addNode],
   );
 
+  // Keyboard/click path for the palette. Drops land where the pointer is; a click has no
+  // pointer, so the node goes to the middle of whatever the user is currently looking at.
+  const handleAddNodeFromPalette = useCallback(
+    (type: string, data: FlowNodeData) => {
+      if (!reactFlowInstance) return;
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      });
+      addNode(type, position, data);
+    },
+    [reactFlowInstance, addNode],
+  );
+
   // Handle save
   const handleSave = useCallback(async () => {
     const validation = validateGraph();
@@ -248,7 +262,7 @@ function FlowBuilderCanvas({ flowId, tenantMode = false }: FlowBuilderTabProps) 
         className="h-[calc(100vh-340px)] border rounded-lg overflow-hidden flex"
       >
         {/* Left: Palette */}
-        <NodePalette tenantMode={tenantMode} />
+        <NodePalette tenantMode={tenantMode} onAddNode={handleAddNodeFromPalette} />
 
         {/* Center: Canvas */}
         <div className="flex-1">

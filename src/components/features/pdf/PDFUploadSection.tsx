@@ -211,7 +211,10 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
   return (
     <div className="space-y-4">
       {/* Drag & Drop Area */}
+      {/* Presentational: drag-and-drop is an enhancement here. The keyboard path is the real
+          "Browse Files" label + hidden file input inside this box. */}
       <div
+        role="presentation"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}

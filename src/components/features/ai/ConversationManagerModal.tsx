@@ -31,6 +31,8 @@ import { cn } from '@/lib/utils';
 import type { ChatConversation } from '@/services/agents/agentChatHistoryService';
 import { TOOLKITS, ALWAYS_ON_TOOLKIT_IDS } from './agentToolsCatalog';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
 interface ConversationManagerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -195,6 +197,13 @@ export const ConversationManagerModal: React.FC<ConversationManagerModalProps> =
                   const editing = editingId === c.id;
                   return (
                     <div
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={onEnterOrSpace(() => {
+                        if (editing) return;
+                        onSelect(c.id);
+                        onOpenChange(false);
+                      })}
                       key={c.id}
                       onClick={() => {
                         if (editing) return;

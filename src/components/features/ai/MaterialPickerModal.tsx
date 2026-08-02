@@ -1282,6 +1282,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                           {['#FFFFFF', '#F5F5DC', '#8B7355', '#2F4F4F', '#708090', '#4A4A4A', '#C8A97A', '#E8D5B7'].map(c => (
                             <button
                               key={c}
+                              aria-label={`Use colour ${c}`}
                               onClick={() => setColorOverride(c)}
                               className={`w-5 h-5 rounded-full border-2 transition-all ${
                                 colorOverride === c ? 'border-violet-600 scale-110' : 'border-border'

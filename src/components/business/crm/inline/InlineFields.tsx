@@ -18,6 +18,8 @@ import {
 } from '@/components/core/ui/command';
 import { useToast } from '@/hooks/use-toast';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
 type SaveFn = (value: any) => Promise<void> | void;
 
 /** Small copy-to-clipboard button shown next to copyable values. */
@@ -157,6 +159,9 @@ export const InlineText: React.FC<InlineTextProps> = ({
   return (
     <Field label={label} hint={hint}>
       <div
+        role="button"
+        tabIndex={0}
+        onKeyDown={onEnterOrSpace(() => begin)}
         className="group flex items-center gap-2 min-h-[28px] cursor-text rounded px-2 hover:bg-muted/40"
         onClick={begin}
       >

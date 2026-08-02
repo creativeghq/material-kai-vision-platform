@@ -15,6 +15,10 @@ import { AddToQuoteModal } from '@/modules/quotes/components/AddToQuoteModal';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 import { VirtualStagingModal, VirtualStagingParams } from './VirtualStagingModal';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
+
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 interface ModelResult {
   model_id: string;
   model_name: string;
@@ -98,6 +102,9 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
   const [modalSegmentsLoaded, setModalSegmentsLoaded] = useState(false);
   const [modalSegmentError, setModalSegmentError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // The lightbox is a bare fixed-inset div, not a Radix Dialog: without this it closed on a
+  // backdrop click and on nothing else.
+  useEscapeKey(lightboxUrl !== null, () => setLightboxUrl(null));
   // Synchronous race guard — `setModalSegmenting(true)` is async (queued for
   // next render), so two effects can both see modalSegmenting=false in the
   // same tick and both fire loadModalSegments. The ref flips synchronously
@@ -705,6 +712,9 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
           {modelResults.map((result) => (
             <div key={result.model_id} className="flex flex-col gap-1.5">
               <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={onEnterOrSpace(() => handleImageClick(result))}
                 className="relative aspect-square rounded-lg overflow-hidden border-2 border-border cursor-pointer hover:border-primary/50 transition-all"
                 onClick={() => handleImageClick(result)}
               >
@@ -779,6 +789,9 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
           <div className={`grid gap-3 ${editedImages.length === 1 ? 'grid-cols-1 max-w-sm' : 'grid-cols-2'}`}>
             {editedImages.map(edited => (
               <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={onEnterOrSpace(() => setSelectedImage({ url: edited.url, name: `Edited: ${edited.label}`, model_id: 'edited' }))}
                 key={edited.id}
                 className="relative rounded-xl overflow-hidden border-2 border-violet-500/30 bg-card group cursor-pointer"
                 onClick={() => setSelectedImage({ url: edited.url, name: `Edited: ${edited.label}`, model_id: 'edited' })}
@@ -1394,12 +1407,18 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                             {/* Crop thumbnail */}
                             <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
                               {(seg.crop_storage_url || seg.crop_data_url) && (
-                                <img
-                                  src={getOptimizedImageUrl(seg.crop_storage_url ?? seg.crop_data_url, 'thumbnail')}
-                                  alt={seg.label}
-                                  className="w-full h-full object-cover cursor-zoom-in"
+                                <button
+                                  type="button"
+                                  className="block w-full h-full"
+                                  aria-label={`Enlarge ${seg.label}`}
                                   onClick={() => setLightboxUrl(seg.crop_storage_url ?? seg.crop_data_url!)}
-                                />
+                                >
+                                  <img
+                                    src={getOptimizedImageUrl(seg.crop_storage_url ?? seg.crop_data_url, 'thumbnail')}
+                                    alt={seg.label}
+                                    className="w-full h-full object-cover cursor-zoom-in"
+                                  />
+                                </button>
                               )}
                               <div className="absolute bottom-0 right-0 bg-black/70 text-white text-[9px] px-1 rounded-tl leading-tight">
                                 {Math.round(seg.confidence * 100)}%
@@ -1441,12 +1460,18 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                     {/* Product image */}
                                     <div className="w-10 h-10 rounded-md overflow-hidden bg-muted flex-shrink-0 border border-border">
                                       {match.image_url ? (
-                                        <img
-                                          src={getOptimizedImageUrl(match.image_url, 'thumbnail')}
-                                          alt={name}
-                                          className="w-full h-full object-cover cursor-zoom-in"
+                                        <button
+                                          type="button"
+                                          className="block w-full h-full"
+                                          aria-label={`Enlarge ${name}`}
                                           onClick={() => setLightboxUrl(match.image_url)}
-                                        />
+                                        >
+                                          <img
+                                            src={getOptimizedImageUrl(match.image_url, 'thumbnail')}
+                                            alt={name}
+                                            className="w-full h-full object-cover cursor-zoom-in"
+                                          />
+                                        </button>
                                       ) : (
                                         <div className="w-full h-full flex items-center justify-center text-muted-foreground/60">
                                           <Package className="w-3.5 h-3.5" />
@@ -1725,10 +1750,12 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
       {/* Lightbox — full-screen image viewer */}
       {lightboxUrl && (
         <div
+          role="presentation"
           className="fixed inset-0 z-[200] bg-black/92 flex items-center justify-center"
           onClick={() => setLightboxUrl(null)}
         >
           <img
+            role="presentation"
             src={getOptimizedImageUrl(lightboxUrl, 'full')}
             alt=""
             className="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"

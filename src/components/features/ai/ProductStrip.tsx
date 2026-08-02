@@ -13,6 +13,8 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useShowPrices } from '@/hooks/useShowPrices';
 import { supabase } from '@/integrations/supabase/client';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
 interface ProductStripProps {
   products: Product[];
   title?: string;
@@ -85,6 +87,9 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
 
           return (
             <div
+              role="button"
+              tabIndex={0}
+              onKeyDown={onEnterOrSpace(() => handleOpenModal(product))}
               key={product.id}
               className="group cursor-pointer rounded-xl border border-border bg-card overflow-hidden hover:shadow-md hover:border-primary/30 transition-all"
               onClick={() => handleOpenModal(product)}

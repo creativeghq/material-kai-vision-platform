@@ -6,6 +6,10 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { catalogsService } from '@/services/catalogsService';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
+
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 export interface ExtractionCandidate {
   source_pdf_id: string;
   page_no: number | null;
@@ -30,6 +34,7 @@ export const CatalogExtractionCandidatesCard: React.FC<Props> = ({ catalogId, qu
   const [submitting, setSubmitting] = useState(false);
   const [committed, setCommitted] = useState(false);
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
+  useEscapeKey(previewIdx !== null, () => setPreviewIdx(null));
 
   const allSelected = selected.size === candidates.length;
   const noneSelected = selected.size === 0;
@@ -106,6 +111,9 @@ export const CatalogExtractionCandidatesCard: React.FC<Props> = ({ catalogId, qu
           const isSelected = selected.has(i);
           return (
             <div
+              role="button"
+              tabIndex={0}
+              onKeyDown={onEnterOrSpace(() => !committed && toggle(i))}
               key={i}
               className={`relative rounded border p-2 flex gap-2 cursor-pointer transition ${
                 committed ? 'opacity-60 cursor-default' : isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
@@ -153,6 +161,7 @@ export const CatalogExtractionCandidatesCard: React.FC<Props> = ({ catalogId, qu
                   if (specEntries.length === 0) return null;
                   return (
                     <details
+                      role="presentation"
                       className="group rounded-lg border border-border bg-muted/40 mt-1.5"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -204,6 +213,7 @@ export const CatalogExtractionCandidatesCard: React.FC<Props> = ({ catalogId, qu
 
       {previewCandidate?.image_url && (
         <div
+          role="presentation"
           className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-pointer"
           onClick={() => setPreviewIdx(null)}
         >

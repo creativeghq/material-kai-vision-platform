@@ -10,6 +10,8 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
 interface PDFTemplateConfig {
   first_page_path: string;
   intro_page_path: string;
@@ -384,6 +386,9 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
               <Label>Cover Page</Label>
               <div className="relative">
                 <div
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={onEnterOrSpace(() => coverInputRef.current?.click())}
                   className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
                   onClick={() => coverInputRef.current?.click()}
                 >
@@ -429,6 +434,9 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
               <Label>Intro Page</Label>
               <div className="relative">
                 <div
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={onEnterOrSpace(() => introInputRef.current?.click())}
                   className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
                   onClick={() => introInputRef.current?.click()}
                 >
@@ -474,6 +482,9 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
               <Label>Items Background</Label>
               <div className="relative">
                 <div
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={onEnterOrSpace(() => bgInputRef.current?.click())}
                   className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
                   onClick={() => bgInputRef.current?.click()}
                 >
@@ -519,6 +530,9 @@ export const QuoteSettingsPage: React.FC<QuoteSettingsProps> = ({ embedded = fal
               <Label>Back Cover Page</Label>
               <div className="relative">
                 <div
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={onEnterOrSpace(() => backcoverInputRef.current?.click())}
                   className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
                   onClick={() => backcoverInputRef.current?.click()}
                 >

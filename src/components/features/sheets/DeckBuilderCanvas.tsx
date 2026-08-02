@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { GripVertical, Save, Loader2, Image as ImageIcon } from 'lucide-react';
+import { GripVertical, Save, Loader2, Image as ImageIcon, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
@@ -82,6 +82,19 @@ export function DeckBuilderCanvas({ sheetId, moodboardId, initialData, onPdfRead
       const next = new Set(s);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  };
+
+  /** Reorder by one position. Drag-and-drop is mouse-only; these back the arrow buttons so a
+   *  keyboard or touch user can reorder the deck at all. */
+  const nudge = (id: string, delta: -1 | 1) => {
+    setOrder((arr) => {
+      const next = arr.slice();
+      const i = next.indexOf(id);
+      const j = i + delta;
+      if (i === -1 || j < 0 || j >= next.length) return next;
+      [next[i], next[j]] = [next[j], next[i]];
       return next;
     });
   };
@@ -201,9 +214,10 @@ export function DeckBuilderCanvas({ sheetId, moodboardId, initialData, onPdfRead
             </div>
           ) : (
             <div className="space-y-1 max-h-[420px] overflow-y-auto">
-              {orderedSheets.map((s) => (
+              {orderedSheets.map((s, idx) => (
                 <div
                   key={s.id}
+                  role="presentation"
                   draggable
                   onDragStart={() => setDraggingId(s.id)}
                   onDragEnd={() => setDraggingId(null)}
@@ -227,6 +241,26 @@ export function DeckBuilderCanvas({ sheetId, moodboardId, initialData, onPdfRead
                     </div>
                   </div>
                   <ImageIcon className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />
+                  <div className="flex flex-col flex-shrink-0">
+                    <button
+                      type="button"
+                      aria-label={`Move ${s.title} up`}
+                      disabled={idx === 0}
+                      onClick={() => nudge(s.id, -1)}
+                      className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                    >
+                      <ChevronUp className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${s.title} down`}
+                      disabled={idx === orderedSheets.length - 1}
+                      onClick={() => nudge(s.id, 1)}
+                      className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                    >
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

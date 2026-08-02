@@ -8,6 +8,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
 interface ContactRequest {
   id: string;
   from_name: string;
@@ -140,6 +142,9 @@ export const InboxTab: React.FC = () => {
                     </div>
                   )}
                   <p
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={onEnterOrSpace(() => setExpanded(expanded === msg.id ? null : msg.id))}
                     className={`text-sm text-muted-foreground leading-relaxed cursor-pointer ${expanded === msg.id ? '' : 'line-clamp-2'}`}
                     onClick={() => setExpanded(expanded === msg.id ? null : msg.id)}
                   >

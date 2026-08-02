@@ -672,11 +672,12 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
 
                               {/* Installation Requirements */}
                               <div className="space-y-1">
-                                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                                   <Wrench className="h-3 w-3" /> Installation Requirements
-                                </label>
+                                </span>
                                 {editable && onUpdateItem ? (
                                   <FFETextAreaCell
+                                    ariaLabel="Installation requirements"
                                     value={item.installation_requirements || ''}
                                     placeholder="e.g. Requires electrical outlet, wall mounting brackets..."
                                     onSave={v => handleFFESave(item.id, 'installation_requirements', v)}
@@ -805,11 +806,15 @@ const FFETextAreaCell: React.FC<{
   value: string;
   placeholder?: string;
   onSave: (v: string) => void;
-}> = ({ value, placeholder, onSave }) => {
+  // The cell renders a bare <textarea> inside a per-item .map(), so it cannot take an id without
+  // colliding across rows. aria-label is per-instance and is the only name it has ever had.
+  ariaLabel?: string;
+}> = ({ value, placeholder, onSave, ariaLabel }) => {
   const [local, setLocal] = useState(value);
   useEffect(() => setLocal(value), [value]);
   return (
     <textarea
+      aria-label={ariaLabel}
       value={local}
       onChange={e => setLocal(e.target.value)}
       onBlur={() => { if (local !== value) onSave(local); }}

@@ -36,12 +36,14 @@ import {
 } from '@/lib/materialCategories';
 import { buildFactoryFilters, buildProductFilters, buildProfileFilters } from '@/pages/discoverFilters';
 import {
+
   PRODUCT_IMAGE_SELECT,
   getManufacturer,
   getMaterialCategory,
   getProductImageUrl,
   getProductName,
 } from '@/utils/productMetadata';
+import { onEnterOrSpace } from '@/utils/a11y';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -198,6 +200,9 @@ function ProductRow({ product, onView, surplus }: { product: RawProduct; onView:
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onKeyDown={onEnterOrSpace(() => onView(product))}
       className="flex items-center px-3 sm:px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group gap-2 sm:gap-3"
       onClick={() => onView(product)}
     >

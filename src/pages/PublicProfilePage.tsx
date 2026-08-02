@@ -39,6 +39,8 @@ import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { BookingWidget } from '@/components/features/profile/BookingWidget';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
 interface PublicProfile {
   user_id: string;
   full_name: string;
@@ -625,6 +627,14 @@ export const PublicProfilePage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {moodboards.map((mb, i) => (
                     <div key={mb.id}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={onEnterOrSpace(() => {
+                        if (!trackedMoodboardsRef.current.has(mb.id)) {
+                          trackedMoodboardsRef.current.add(mb.id);
+                          supabase.rpc('increment_moodboard_views', { p_moodboard_id: mb.id }).then(() => {});
+                        }
+                      })}
                       className="dashboard-card rounded-2xl overflow-hidden border-0 hover:ring-1 hover:ring-primary/30 transition-all group"
                       onClick={() => {
                         if (!trackedMoodboardsRef.current.has(mb.id)) {

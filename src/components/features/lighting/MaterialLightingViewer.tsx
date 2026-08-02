@@ -398,10 +398,10 @@ export default function MaterialLightingViewer({
 
         {/* Preset selector */}
         <div>
-          <label className="mb-2 block text-xs font-medium text-muted-foreground">
+          <span id="lighting-preset-label" className="mb-2 block text-xs font-medium text-muted-foreground">
             Preset
-          </label>
-          <div className="flex flex-wrap gap-1.5">
+          </span>
+          <div role="group" aria-labelledby="lighting-preset-label" className="flex flex-wrap gap-1.5">
             {(Object.entries(LIGHTING_PRESETS) as [PresetKey, LightingPreset][]).map(
               ([key, p]) => {
                 const Icon = ICON_MAP[p.icon] ?? Sun;
@@ -427,7 +427,7 @@ export default function MaterialLightingViewer({
         {/* Time of day */}
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <label className="text-xs font-medium text-muted-foreground">Time of Day</label>
+            <span id="lighting-time-label" className="text-xs font-medium text-muted-foreground">Time of Day</span>
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-semibold tabular-nums text-foreground">
                 {formatTime(hour)}
@@ -443,6 +443,7 @@ export default function MaterialLightingViewer({
             </div>
           </div>
           <Slider
+            aria-labelledby="lighting-time-label"
             min={6}
             max={21}
             step={0.25}
@@ -458,9 +459,9 @@ export default function MaterialLightingViewer({
         <div>
           <div className="mb-2 flex items-center gap-1.5">
             <Compass className="h-3.5 w-3.5 text-muted-foreground" />
-            <label className="text-xs font-medium text-muted-foreground">Room Orientation</label>
+            <span id="lighting-orientation-label" className="text-xs font-medium text-muted-foreground">Room Orientation</span>
           </div>
-          <div className="flex gap-1.5">
+          <div role="group" aria-labelledby="lighting-orientation-label" className="flex gap-1.5">
             {ORIENTATION_OPTIONS.map((opt) => (
               <Button
                 key={opt.value}
@@ -477,10 +478,10 @@ export default function MaterialLightingViewer({
 
         {/* Surface type */}
         <div>
-          <label className="mb-2 block text-xs font-medium text-muted-foreground">
+          <span id="lighting-surface-label" className="mb-2 block text-xs font-medium text-muted-foreground">
             Surface Type
-          </label>
-          <div className="flex gap-1.5">
+          </span>
+          <div role="group" aria-labelledby="lighting-surface-label" className="flex gap-1.5">
             {SURFACE_OPTIONS.map((opt) => (
               <Button
                 key={opt.value}
@@ -515,12 +516,13 @@ export default function MaterialLightingViewer({
             )}
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <label className="text-xs text-muted-foreground">Roughness</label>
+                <span id="lighting-roughness-label" className="text-xs text-muted-foreground">Roughness</span>
                 <span className="text-xs tabular-nums text-foreground">
                   {roughness.toFixed(2)}
                 </span>
               </div>
               <Slider
+                aria-labelledby="lighting-roughness-label"
                 min={0}
                 max={1}
                 step={0.01}
@@ -530,12 +532,13 @@ export default function MaterialLightingViewer({
             </div>
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <label className="text-xs text-muted-foreground">Clearcoat</label>
+                <span id="lighting-clearcoat-label" className="text-xs text-muted-foreground">Clearcoat</span>
                 <span className="text-xs tabular-nums text-foreground">
                   {clearcoat.toFixed(2)}
                 </span>
               </div>
               <Slider
+                aria-labelledby="lighting-clearcoat-label"
                 min={0}
                 max={1}
                 step={0.01}

@@ -897,18 +897,18 @@ const PosPage: React.FC = () => {
               <p className="text-[11px] text-muted-foreground">No EFT-POS terminal registered — this card receipt will transmit without a terminal signature. Add one in Finance → Settings → Documents.</p>
             )}
 
-            <label className="flex cursor-pointer items-center justify-between text-xs text-muted-foreground">
+            <label htmlFor="pospage-vat-inclusive" className="flex cursor-pointer items-center justify-between text-xs text-muted-foreground">
               <span>Prices include VAT</span>
-              <Checkbox checked={vatInclusive} onCheckedChange={(v) => setVatInclusive(v === true)} />
+              <Checkbox id="pospage-vat-inclusive" checked={vatInclusive} onCheckedChange={(v) => setVatInclusive(v === true)} />
             </label>
-            <label htmlFor="pospage-constitutes-a-movement-document-setmovem" className="flex cursor-pointer items-center justify-between text-xs text-muted-foreground">
+            <label htmlFor="pospage-movement-doc" className="flex cursor-pointer items-center justify-between text-xs text-muted-foreground">
               <span>Constitutes a movement document</span>
-              <Checkbox checked={movementDoc} onCheckedChange={(v) => setMovementDoc(v === true)} />
+              <Checkbox id="pospage-movement-doc" checked={movementDoc} onCheckedChange={(v) => setMovementDoc(v === true)} />
             </label>
             {movementDoc && (
               <div className="grid grid-cols-2 gap-2">
-                <Input id="pospage-constitutes-a-movement-document-setmovem" className="h-8 text-xs" value={movVehicle} onChange={(e) => setMovVehicle(e.target.value)} placeholder="Vehicle no." />
-                <Input className="h-8 text-xs" value={movShipTo} onChange={(e) => setMovShipTo(e.target.value)} placeholder="Ship to" />
+                <Input aria-label="Vehicle number" className="h-8 text-xs" value={movVehicle} onChange={(e) => setMovVehicle(e.target.value)} placeholder="Vehicle no." />
+                <Input aria-label="Ship to" className="h-8 text-xs" value={movShipTo} onChange={(e) => setMovShipTo(e.target.value)} placeholder="Ship to" />
               </div>
             )}
           </div>

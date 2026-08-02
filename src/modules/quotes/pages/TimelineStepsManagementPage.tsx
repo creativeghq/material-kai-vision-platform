@@ -258,8 +258,8 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
             <Input id="timelinestepsmanagementpage-display-order" type="number" min="0" value={displayOrder} onChange={(e) => setDisplayOrder(e.target.value)} placeholder="0" className="mt-1" />
           </div>
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">Active</label>
-            <Switch checked={isActive} onCheckedChange={setIsActive} />
+            <label htmlFor="timeline-step-active" className="text-sm font-medium">Active</label>
+            <Switch id="timeline-step-active" checked={isActive} onCheckedChange={setIsActive} />
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={handleCloseModal}>Cancel</Button>
@@ -289,8 +289,8 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
             <Textarea id="timelinestepsmanagementpage-description-2" value={stepDescription} onChange={(e) => setStepDescription(e.target.value)} placeholder="Describe this timeline step..." className="mt-1" rows={3} />
           </div>
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">Active</label>
-            <Switch checked={isActive} onCheckedChange={setIsActive} />
+            <label htmlFor="timeline-step-edit-active" className="text-sm font-medium">Active</label>
+            <Switch id="timeline-step-edit-active" checked={isActive} onCheckedChange={setIsActive} />
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={handleCloseModal}>Cancel</Button>

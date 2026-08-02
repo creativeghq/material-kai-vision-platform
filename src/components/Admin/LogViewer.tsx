@@ -460,39 +460,39 @@ export function LogViewer() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Timestamp</label>
+                  <span className="block text-sm font-medium text-muted-foreground">Timestamp</span>
                   <p className="text-sm font-mono">{new Date(selectedLog.timestamp).toLocaleString()}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Level</label>
+                  <span className="block text-sm font-medium text-muted-foreground">Level</span>
                   <div className="mt-1">{getLevelBadge(selectedLog.level)}</div>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Logger</label>
+                  <span className="block text-sm font-medium text-muted-foreground">Logger</span>
                   <p className="text-sm">{selectedLog.logger_name}</p>
                 </div>
                 {selectedLog.job_id && (
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Job ID</label>
+                    <span className="block text-sm font-medium text-muted-foreground">Job ID</span>
                     <p className="text-sm font-mono">{selectedLog.job_id}</p>
                   </div>
                 )}
                 {selectedLog.request_id && (
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Request ID</label>
+                    <span className="block text-sm font-medium text-muted-foreground">Request ID</span>
                     <p className="text-sm font-mono">{selectedLog.request_id}</p>
                   </div>
                 )}
               </div>
 
               <div>
-                <label className="text-sm font-medium text-muted-foreground">Message</label>
+                <span className="block text-sm font-medium text-muted-foreground">Message</span>
                 <p className="text-sm mt-1 p-3 bg-muted text-foreground rounded border border-border">{selectedLog.message}</p>
               </div>
 
               {selectedLog.context && Object.keys(selectedLog.context).length > 0 && (
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Context</label>
+                  <span className="block text-sm font-medium text-muted-foreground">Context</span>
                   <pre className="text-xs mt-1 p-3 bg-muted text-foreground rounded border border-border overflow-x-auto">
                     {JSON.stringify(selectedLog.context, null, 2)}
                   </pre>

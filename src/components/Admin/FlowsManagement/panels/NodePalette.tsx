@@ -25,7 +25,7 @@ import {
   AccordionTrigger,
 } from '@/components/core/ui/accordion';
 import { triggerPaletteItems, conditionPaletteItems, actionPaletteItems, groupBySubcategory, isTenantAllowedItem } from '../utils/paletteItems';
-import type { NodePaletteItem } from '@/services/flows/types';
+import type { NodePaletteItem, FlowNodeData } from '@/services/flows/types';
 
 const iconMap: Record<string, React.ElementType> = {
   Hand, Clock, Globe, UserPlus, FileText,
@@ -67,9 +67,11 @@ const categoryAccentDot: Record<string, string> = {
 
 interface PaletteItemProps {
   item: NodePaletteItem;
+  /** Click/keyboard path. Drag remains available as a mouse shortcut. */
+  onAdd: (item: NodePaletteItem) => void;
 }
 
-function PaletteItem({ item }: PaletteItemProps) {
+function PaletteItem({ item, onAdd }: PaletteItemProps) {
   const Icon = iconMap[item.icon] || Globe;
 
   const onDragStart = (e: React.DragEvent) => {
@@ -79,17 +81,20 @@ function PaletteItem({ item }: PaletteItemProps) {
   };
 
   return (
-    <div
+    <button
+      type="button"
       draggable
       onDragStart={onDragStart}
-      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border cursor-grab active:cursor-grabbing transition-colors ${categoryColors[item.category]}`}
+      onClick={() => onAdd(item)}
+      title={`Add ${item.label} to the canvas`}
+      className={`w-full text-left flex items-center gap-2 px-2.5 py-1.5 rounded-md border cursor-grab active:cursor-grabbing transition-colors ${categoryColors[item.category]}`}
     >
       <Icon className={`h-3.5 w-3.5 flex-shrink-0 ${categoryTextColors[item.category]}`} />
       <div className="min-w-0">
         <p className="text-xs font-medium truncate">{item.label}</p>
         <p className="text-[10px] text-muted-foreground truncate leading-tight">{item.description}</p>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -97,9 +102,10 @@ interface PaletteSectionProps {
   label: string;
   category: string;
   items: NodePaletteItem[];
+  onAdd: (item: NodePaletteItem) => void;
 }
 
-function PaletteSection({ label, category, items }: PaletteSectionProps) {
+function PaletteSection({ label, category, items, onAdd }: PaletteSectionProps) {
   const groups = groupBySubcategory(items);
 
   return (
@@ -120,7 +126,7 @@ function PaletteSection({ label, category, items }: PaletteSectionProps) {
             <AccordionContent className="pb-2 pt-0">
               <div className="space-y-1">
                 {groupItems.map((item) => (
-                  <PaletteItem key={item.subType} item={item} />
+                  <PaletteItem key={item.subType} item={item} onAdd={onAdd} />
                 ))}
               </div>
             </AccordionContent>
@@ -135,9 +141,11 @@ interface NodePaletteProps {
   /** #256 — when true, show only the tenant-safe subset (workspace builder). The DB guard trigger
    *  is the real enforcer; this trims the palette so a workspace user never sees privileged nodes. */
   tenantMode?: boolean;
+  /** Adds the node without a drag. Required for keyboard users, who cannot drag at all. */
+  onAddNode: (type: string, data: FlowNodeData) => void;
 }
 
-export function NodePalette({ tenantMode = false }: NodePaletteProps) {
+export function NodePalette({ tenantMode = false, onAddNode }: NodePaletteProps) {
   const [search, setSearch] = useState('');
 
   const q = search.toLowerCase().trim();
@@ -161,11 +169,14 @@ export function NodePalette({ tenantMode = false }: NodePaletteProps) {
   const filteredConditions = filterItems(conditionPaletteItems);
   const filteredActions = filterItems(actionPaletteItems);
 
+  const handleAdd = (item: NodePaletteItem) =>
+    onAddNode(item.type, item.defaultData as FlowNodeData);
+
   return (
     <div className="w-[240px] border-r bg-muted/30 flex flex-col h-full">
       <div className="p-3 space-y-2 border-b">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Drag to canvas
+          Click or drag to add
         </p>
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
@@ -180,13 +191,13 @@ export function NodePalette({ tenantMode = false }: NodePaletteProps) {
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {filteredTriggers.length > 0 && (
-          <PaletteSection label="Triggers" category="trigger" items={filteredTriggers} />
+          <PaletteSection label="Triggers" category="trigger" items={filteredTriggers} onAdd={handleAdd} />
         )}
         {filteredConditions.length > 0 && (
-          <PaletteSection label="Conditions" category="condition" items={filteredConditions} />
+          <PaletteSection label="Conditions" category="condition" items={filteredConditions} onAdd={handleAdd} />
         )}
         {filteredActions.length > 0 && (
-          <PaletteSection label="Actions" category="action" items={filteredActions} />
+          <PaletteSection label="Actions" category="action" items={filteredActions} onAdd={handleAdd} />
         )}
         {filteredTriggers.length === 0 && filteredConditions.length === 0 && filteredActions.length === 0 && (
           <p className="text-xs text-muted-foreground text-center pt-6">No nodes match "{search}"</p>

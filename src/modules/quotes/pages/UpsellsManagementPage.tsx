@@ -380,8 +380,8 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
                 <Input id="upsellsmanagementpage-price" type="text" inputMode="decimal" value={upsellPrice} onChange={(e) => setUpsellPrice(e.target.value)} placeholder="0.00" className="mt-1" />
               </div>
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Active</label>
-                <Switch checked={isActive} onCheckedChange={setIsActive} />
+                <label htmlFor="upsell-create-active" className="text-sm font-medium">Active</label>
+                <Switch id="upsell-create-active" checked={isActive} onCheckedChange={setIsActive} />
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={handleCloseModal}>Cancel</Button>
@@ -597,8 +597,9 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
               <p className="text-xs text-gray-500 mt-1">Lower numbers appear first</p>
             </div>
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">Active</label>
+              <label htmlFor="upsell-edit-active" className="text-sm font-medium text-gray-700">Active</label>
               <Switch
+                id="upsell-edit-active"
                 checked={isActive}
                 onCheckedChange={setIsActive}
               />

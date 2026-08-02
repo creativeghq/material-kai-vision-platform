@@ -17,6 +17,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
 /** The two radio lists, as data — six near-identical option blocks were copied out by hand,
  *  which is how one of them ended up with no handler at all (the disabled "filtered" row). */
 const AUDIENCE_OPTIONS: Array<{ value: string; title: string; hint: string; disabled?: boolean }> = [
@@ -599,6 +601,9 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                           .filter(r => !selectedRecipients.find(sr => sr.id === r.id))
                           .map((recipient) => (
                             <div
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={onEnterOrSpace(() => setSelectedRecipients([...selectedRecipients, recipient]))}
                               key={recipient.id}
                               className="p-3 hover:bg-muted/50 cursor-pointer flex items-center justify-between"
                               onClick={() => setSelectedRecipients([...selectedRecipients, recipient])}

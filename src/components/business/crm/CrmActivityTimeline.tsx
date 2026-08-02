@@ -365,22 +365,22 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
                   />
                 </div>
                 {isFutureMeeting && attendeeCandidates.some((p) => attendeeIds.includes(p.id) && (p.email ?? '').trim()) && (
-                  <label className="flex cursor-pointer items-center gap-1.5 pl-5 text-xs text-foreground">
-                    <Checkbox checked={sendInvites} onCheckedChange={(v) => setSendInvites(v === true)} />
+                  <label htmlFor="crm-send-invites" className="flex cursor-pointer items-center gap-1.5 pl-5 text-xs text-foreground">
+                    <Checkbox id="crm-send-invites" checked={sendInvites} onCheckedChange={(v) => setSendInvites(v === true)} />
                     Email a calendar invite to the selected attendee(s)
                   </label>
                 )}
                 {isFutureMeeting && (
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-5 text-xs text-muted-foreground">
                     <span>Remind me</span>
-                    <label className="flex cursor-pointer items-center gap-1.5 text-foreground">
-                      <Checkbox checked={remindEmail} onCheckedChange={(v) => setRemindEmail(v === true)} /> Email
+                    <label htmlFor="crm-remind-email" className="flex cursor-pointer items-center gap-1.5 text-foreground">
+                      <Checkbox id="crm-remind-email" checked={remindEmail} onCheckedChange={(v) => setRemindEmail(v === true)} /> Email
                     </label>
-                    <label htmlFor="crmactivitytimeline-setremindwhatsapp-v-true-whatsapp" className="flex cursor-pointer items-center gap-1.5 text-foreground">
-                      <Checkbox checked={remindWhatsapp} onCheckedChange={(v) => setRemindWhatsapp(v === true)} /> WhatsApp
+                    <label htmlFor="crm-remind-whatsapp" className="flex cursor-pointer items-center gap-1.5 text-foreground">
+                      <Checkbox id="crm-remind-whatsapp" checked={remindWhatsapp} onCheckedChange={(v) => setRemindWhatsapp(v === true)} /> WhatsApp
                     </label>
                     {(remindEmail || remindWhatsapp) && (
-                      <select id="crmactivitytimeline-setremindwhatsapp-v-true-whatsapp"
+                      <select
                         value={reminderLead}
                         onChange={(e) => setReminderLead(Number(e.target.value))}
                         className="h-7 rounded-md border bg-background px-1.5 text-xs"

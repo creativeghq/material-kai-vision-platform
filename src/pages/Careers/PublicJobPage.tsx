@@ -247,6 +247,8 @@ function ApplicationForm({ slug, job, siteKey, onDone }: {
           </div>
         ) : (
           <div
+            // Presentational: the keyboard path is the file button inside this box.
+            role="presentation"
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={(e) => { e.preventDefault(); setDragging(false); takeFile(e.dataTransfer.files?.[0] ?? null); }}

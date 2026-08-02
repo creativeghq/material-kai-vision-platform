@@ -65,6 +65,8 @@ import { buildJobQueueFilters } from './jobQueueFilters';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { statusTone } from '@/utils/statusTone';
 
+import { onEnterOrSpace } from '@/utils/a11y';
+
 export const AsyncJobQueueMonitor: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1712,6 +1714,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
                       >
                         <div
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={onEnterOrSpace(() => fetchJobDetails(job))}
                           className="flex-1 cursor-pointer"
                           onClick={() => fetchJobDetails(job)}
                         >
@@ -1959,6 +1964,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
                       >
                         <div
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={onEnterOrSpace(() => fetchJobDetails(job))}
                           className="flex-1 cursor-pointer"
                           onClick={() => fetchJobDetails(job)}
                         >
@@ -2170,6 +2178,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
                       >
                         <div
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={onEnterOrSpace(() => fetchJobDetails(job))}
                           className="flex-1 cursor-pointer"
                           onClick={() => fetchJobDetails(job)}
                         >
@@ -2381,6 +2392,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
                       >
                         <div
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={onEnterOrSpace(() => fetchJobDetails(job))}
                           className="flex-1 cursor-pointer"
                           onClick={() => fetchJobDetails(job)}
                         >

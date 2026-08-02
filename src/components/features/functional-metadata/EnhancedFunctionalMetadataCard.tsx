@@ -317,6 +317,8 @@ export const EnhancedFunctionalMetadataCard: React.FC<
                 <div className="space-y-3">
                   {Object.entries(categoryData).map(([propKey, propValue]) => (
                     <div
+                      role="button"
+                      tabIndex={0}
                       key={propKey}
                       className="flex justify-between items-start p-2 rounded-md hover:bg-white/50 cursor-pointer transition-colors border border-transparent hover:border-gray-200"
                       onClick={() =>

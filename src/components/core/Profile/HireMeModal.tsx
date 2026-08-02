@@ -150,10 +150,10 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
             {/* Service selection — only shown when profile has services */}
             {services.length > 0 && (
               <div className="space-y-2">
-                <label className="text-xs text-muted-foreground font-medium">
+                <span id="hireme-services-label" className="block text-xs text-muted-foreground font-medium">
                   Which service(s) are you interested in?
-                </label>
-                <div className="space-y-2">
+                </span>
+                <div role="group" aria-labelledby="hireme-services-label" className="space-y-2">
                   {services.map((svc) => {
                     const selected = selectedServices.includes(svc.id);
                     return (

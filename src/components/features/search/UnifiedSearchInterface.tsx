@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/core/ui/select';
+import { onEnterOrSpace } from '@/utils/a11y';
 
 // Search result type based on UnifiedSearchService response
 type SearchResult = {
@@ -493,6 +494,9 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
               </div>
             ) : (
               <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={onEnterOrSpace(() => fileInputRef.current?.click())}
                 className="flex flex-col items-center justify-center py-8 cursor-pointer hover:bg-muted/50 rounded"
                 onClick={() => fileInputRef.current?.click()}
               >

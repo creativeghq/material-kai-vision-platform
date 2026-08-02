@@ -5,6 +5,7 @@ import { Input } from '@/components/core/ui/input';
 import { AnnotationLayer } from './AnnotationLayer';
 import { moodboardSheetsService } from '@/services/moodboardSheetsService';
 import { LivePreviewPanel } from './LivePreviewPanel';
+import { onEnterOrSpace } from '@/utils/a11y';
 
 /**
  * Annotated Render Sheet canvas.
@@ -178,7 +179,11 @@ export function CalloutCanvas({
                     selectedIdx === idx ? 'ring-2 ring-primary' : 'border border-black/40'
                   }`}
                   style={{ left: `${a.line_endpoint_x * 100}%`, top: `${a.line_endpoint_y * 100}%` }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Select callout ${a.label || 'Untitled'}`}
                   onPointerDown={handleHandlePointerDown(idx, 'endpoint')}
+                  onKeyDown={onEnterOrSpace(() => setSelectedIdx(idx))}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedIdx(idx);
@@ -200,6 +205,9 @@ export function CalloutCanvas({
           )}
           {annotations.map((a, idx) => (
             <div
+              role="button"
+              tabIndex={0}
+              onKeyDown={onEnterOrSpace(() => setSelectedIdx(idx))}
               key={idx}
               className={`p-2 rounded-lg border space-y-1 ${
                 selectedIdx === idx ? 'border-primary bg-primary/5' : 'border-white/15'

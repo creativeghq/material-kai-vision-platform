@@ -27,6 +27,7 @@ import {
   Plus,
   Globe,
   GripVertical,
+  ArrowLeftRight,
   Pencil,
   FileText,
   Loader2,
@@ -137,7 +138,9 @@ import { moodboardAPI } from '@/services/moodboardAPI';
 import { ActiveMoodboardProvider, type ActiveMoodboard } from '@/contexts/ActiveMoodboardContext';
 import { GeminiEditModal } from './GeminiEditModal';
 import { RegionEditCanvas, type RegionEditResult } from './RegionEditCanvas';
+import { onEnterOrSpace } from '@/utils/a11y';
 
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 // Agent definitions with RBAC and default models
 interface AgentDefinition {
   id: string;
@@ -1354,6 +1357,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Material Modal State
   // Image Lightbox State (full-size view of a generated image)
   const [lightboxImage, setLightboxImage] = useState<{ url: string; name?: string } | null>(null);
+  useEscapeKey(lightboxImage !== null, () => setLightboxImage(null));
 
   // Voice input hook
   const {
@@ -4513,6 +4517,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         <video src={message.videoData.video_url} controls className="w-full rounded-xl border border-white/20 shadow-md" />
       ) : (
         <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={onEnterOrSpace(() => setGeminiModalImage(message.geminiImageData!.image_url))}
           className="group relative cursor-pointer"
           onClick={() => setGeminiModalImage(message.geminiImageData!.image_url)}
         >
@@ -5204,7 +5211,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             className="w-full rounded-xl border border-white/20 shadow-md"
                           />
                         ) : (
-                          <div className="relative group cursor-pointer" onClick={() => setGeminiModalImage(message.geminiImageData!.image_url)}>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={onEnterOrSpace(() => setGeminiModalImage(message.geminiImageData!.image_url))}
+                           className="relative group cursor-pointer" onClick={() => setGeminiModalImage(message.geminiImageData!.image_url)}>
                             <img
                               src={message.geminiImageData.image_url}
                               alt="Gemini interior design"
@@ -5694,6 +5705,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       return (
                         <div
                           key={slotIdx}
+                          role="presentation"
                           className="flex flex-col items-center gap-1"
                           onDragOver={(e) => { e.preventDefault(); setImageDragOverIndex(slotIdx); }}
                           onDragLeave={() => setImageDragOverIndex(null)}
@@ -5712,6 +5724,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           }}
                         >
                           <div
+                            role="presentation"
                             draggable
                             onDragStart={() => { imageDragIndexRef.current = slotIdx; }}
                             onDragEnd={() => { imageDragIndexRef.current = null; setImageDragOverIndex(null); }}
@@ -5731,11 +5744,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               <GripVertical className="w-5 h-5 text-white drop-shadow opacity-0 hover:opacity-100 transition-opacity" />
                             </div>
                             <button
+                              aria-label={`Remove ${slotLabel}`}
                               onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== slotIdx))}
                               className="absolute top-1 right-1 bg-black/50 hover:bg-destructive text-white rounded-full w-5 h-5 flex items-center justify-center text-xs transition-colors"
                             >
                               ×
                             </button>
+                            {/* Keyboard equivalent of the drag-to-swap above. With two slots the
+                                reorder IS a swap, so one control covers it. */}
+                            {attachedImages.length > 1 && (
+                              <button
+                                aria-label={`Swap ${slotLabel} with the other slot`}
+                                title="Swap the two images"
+                                onClick={() => setAttachedImages((prev) => {
+                                  const next = [...prev];
+                                  [next[0], next[1]] = [next[1], next[0]];
+                                  return next;
+                                })}
+                                className="absolute bottom-1 right-1 bg-black/50 hover:bg-black/70 text-white rounded-full w-5 h-5 flex items-center justify-center transition-colors"
+                              >
+                                <ArrowLeftRight className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                           <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', labelColor)}>
                             {slotLabel}
@@ -6620,10 +6650,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       {lightboxImage && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-sm"
-          onClick={() => setLightboxImage(null)}
           role="dialog"
           aria-label={lightboxImage.name || 'Image preview'}
         >
+          {/* Click-to-dismiss backdrop. It sits BEHIND the content as its own presentational
+              layer rather than being an onClick on the dialog itself - a dialog is not a button,
+              and keyboard dismissal is Escape (useEscapeKey above) plus the close button. */}
+          <div
+            role="presentation"
+            className="absolute inset-0"
+            onClick={() => setLightboxImage(null)}
+          />
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setLightboxImage(null); }}
@@ -6633,6 +6670,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             <X className="h-5 w-5" />
           </button>
           <img
+            role="presentation"
             src={lightboxImage.url}
             alt={lightboxImage.name || 'Generated image'}
             className="max-h-[92vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"

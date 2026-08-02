@@ -10,6 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { onEnterOrSpace } from '@/utils/a11y';
 
 interface EmailAction {
   id: string;
@@ -126,6 +127,9 @@ export const AssignTemplateModal: React.FC<AssignTemplateModalProps> = ({
             <div className="space-y-2">
               {templates.map((template) => (
                 <div
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={onEnterOrSpace(() => setSelectedTemplateId(template.id))}
                   key={template.id}
                   className={`p-4 rounded-lg border cursor-pointer transition-colors ${
                     selectedTemplateId === template.id
@@ -164,6 +168,9 @@ export const AssignTemplateModal: React.FC<AssignTemplateModalProps> = ({
             {/* Option to unassign */}
             {action.template_id && (
               <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={onEnterOrSpace(() => setSelectedTemplateId(undefined))}
                 className={`p-4 rounded-lg border cursor-pointer transition-colors ${
                   selectedTemplateId === undefined
                     ? 'border-primary bg-primary/5'

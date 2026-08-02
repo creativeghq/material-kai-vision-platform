@@ -31,7 +31,7 @@ function Scalar({ v }: { v: any }) {
   if (typeof v === 'string') {
     if (IMG_URL_RE.test(v)) {
       return (
-        <a href={v} target="_blank" rel="noopener noreferrer" className="inline-block">
+        <a href={v} target="_blank" rel="noopener noreferrer" className="inline-block" aria-label="Open image in a new tab">
           <img
             src={v}
             alt=""

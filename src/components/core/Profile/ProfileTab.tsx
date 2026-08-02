@@ -281,18 +281,21 @@ const EMPTY_SERVICE: Omit<ServiceItem, 'id'> = {
 
 // ─── Searchable combobox ──────────────────────────────────────────────────────
 function SearchCombobox({
-  options, value, onSelect, placeholder = 'Search…', emptyText = 'No results.',
+  options, value, onSelect, placeholder = 'Search…', emptyText = 'No results.', id,
 }: {
   options: { value: string; label: string; sub?: string }[];
   value: string; onSelect: (v: string) => void;
-  placeholder?: string; emptyText?: string;
+  // Forwarded to the trigger so a <label htmlFor> can name it. Without this the combobox is
+  // announced only by its current value, and an empty one announces the placeholder as if it
+  // were the field's name.
+  placeholder?: string; emptyText?: string; id?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open}
+        <Button id={id} variant="outline" role="combobox" aria-expanded={open}
           className="w-full justify-between font-normal text-sm">
           <span className={selected ? '' : 'text-muted-foreground'}>
             {selected ? selected.label : placeholder}
@@ -375,9 +378,9 @@ function ServiceForm({
 
       {/* Previous work */}
       <div className="space-y-2">
-        <label className="text-xs text-muted-foreground flex items-center gap-1">
+        <span className="text-xs text-muted-foreground flex items-center gap-1">
           <LinkIcon className="h-3 w-3" /> Previous Work
-        </label>
+        </span>
         {(form.previous_work ?? []).map((w, i) => (
           <div key={i} className="flex items-center gap-2 text-sm">
             {w.url ? (
@@ -1145,8 +1148,9 @@ export const ProfileTab: React.FC = () => {
             <div className="rounded-xl border p-4 space-y-3 bg-muted/20">
               {factoryComboOptions.length > 0 ? (
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">From your product catalog</label>
+                  <label htmlFor="profile-factory-from-catalog" className="text-xs text-muted-foreground">From your product catalog</label>
                   <SearchCombobox
+                    id="profile-factory-from-catalog"
                     options={factoryComboOptions}
                     value={selectedFactoryName}
                     onSelect={setSelectedFactoryName}
@@ -1228,8 +1232,9 @@ export const ProfileTab: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">Claim factory from catalog *</label>
+                  <label htmlFor="profile-claim-factory" className="text-xs text-muted-foreground">Claim factory from catalog *</label>
                   <SearchCombobox
+                    id="profile-claim-factory"
                     options={factoryOptions.map((f) => ({ value: f.name, label: f.name }))}
                     value={regForm.factory_claimed_name}
                     onSelect={(v) => setRegForm({ ...regForm, factory_claimed_name: v })}

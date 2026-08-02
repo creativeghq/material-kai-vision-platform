@@ -340,10 +340,11 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
         <div className="flex flex-col gap-3 border-t bg-background/80 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
           {/* Tile scale slider */}
           <div className="flex items-center gap-3">
-            <label className="whitespace-nowrap text-xs text-muted-foreground">
+            <span id="ar-tile-scale-label" className="whitespace-nowrap text-xs text-muted-foreground">
               Tile Scale
-            </label>
+            </span>
             <Slider
+              aria-labelledby="ar-tile-scale-label"
               value={[tileScale]}
               onValueChange={([v]) => setTileScale(v)}
               min={1}

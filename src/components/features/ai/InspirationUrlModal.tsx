@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Globe, X, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 
 interface InspirationUrlModalProps {
   onSubmit: (url: string, focus: string) => void;
@@ -22,6 +23,9 @@ export function InspirationUrlModal({ onSubmit, onClose }: InspirationUrlModalPr
   const [focus, setFocus] = useState('all');
   const [error, setError] = useState('');
 
+  // Hand-rolled overlay: Radix would give Escape for free, this does not.
+  useEscapeKey(true, onClose);
+
   const handleSubmit = () => {
     if (!url.trim()) {
       setError('Please paste a URL');
@@ -38,8 +42,9 @@ export function InspirationUrlModal({ onSubmit, onClose }: InspirationUrlModalPr
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div role="presentation" className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
+        role="presentation"
         className="bg-background rounded-2xl shadow-2xl border border-white/20 w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
@@ -77,8 +82,8 @@ export function InspirationUrlModal({ onSubmit, onClose }: InspirationUrlModalPr
 
           {/* Focus Selector */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Focus on</label>
-            <div className="flex flex-wrap gap-2">
+            <span id="inspiration-focus-label" className="block text-sm font-medium">Focus on</span>
+            <div role="group" aria-labelledby="inspiration-focus-label" className="flex flex-wrap gap-2">
               {FOCUS_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}

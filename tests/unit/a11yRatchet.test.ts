@@ -113,7 +113,10 @@ describe('accessibility ratchet', () => {
   it('rules promoted to error carry no baselined violations', () => {
     const cfg = readFileSync(CONFIG, 'utf8');
     const base = readBaseline();
-    const errorRules = [...cfg.matchAll(/'(jsx-a11y\/[a-z-]+)'\s*:\s*'error'/g)].map((m) => m[1]);
+    // Both spellings: `'rule': 'error'` and the options form `'rule': ['error', {...}]`. Matching
+    // only the first would have silently skipped every rule that carries configuration — which is
+    // most of the interesting ones, and exactly the rules whose config could hide a violation.
+    const errorRules = [...cfg.matchAll(/'(jsx-a11y\/[a-z-]+)'\s*:\s*\[?\s*'error'/g)].map((m) => m[1]);
     expect(errorRules.length, 'no a11y rule has reached "error" yet').toBeGreaterThan(0);
 
     const contradictions = errorRules.filter((r) => (base.rules[r] ?? 0) > 0);
