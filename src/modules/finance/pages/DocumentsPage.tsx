@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, Send } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -16,7 +16,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
-import { financeService, formatMoney, type Invoice, type CreditNote, type PaymentWithAllocation, type RecurringExpense } from '@/modules/finance/services/financeService';
+import { financeService, formatMoney, type Invoice, type CreditNote, type SupplierCreditNote, type PaymentWithAllocation, type RecurringExpense } from '@/modules/finance/services/financeService';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
@@ -66,6 +66,27 @@ const DOC_LABEL: Record<DocType, string> = {
 
 const isReceipt = (docType: any) => String(docType ?? '').startsWith('11');
 const transmitted = (s: any) => s === 'accepted' || s === 'offline';
+/** myDATA states that mean the tax authority REFUSED or errored — not merely 'not sent yet'. */
+const fiscalRejected = (s: any) => s === 'rejected' || s === 'error' || s === 'failed';
+
+/**
+ * Three states, not two.
+ *
+ * This was `transmitted(s) ? '✓' : '—'`, so `rejected`, `error`, `pending` and `null` all rendered
+ * the same grey dash — an invoice AADE REJECTED looked identical to one never submitted. That is a
+ * compliance failure sitting in the list disguised as backlog.
+ */
+const FiscalCell: React.FC<{ status: any; error?: string | null }> = ({ status, error }) => {
+  if (transmitted(status)) return <span className="text-emerald-500" title="Transmitted to myDATA">✓</span>;
+  if (fiscalRejected(status)) {
+    return (
+      <span className="text-destructive font-semibold" title={error || `myDATA ${String(status)} — not accepted. Retransmit from this row.`}>
+        ✗
+      </span>
+    );
+  }
+  return <span className="text-muted-foreground" title="Not sent to myDATA">—</span>;
+};
 
 const NONE = '__none';
 
@@ -110,6 +131,25 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   // cursor serves them all — it's reset on every type/filter change below.
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+
+  /**
+   * Which document sources failed to load this round, keyed by the tab they feed.
+   *
+   * Without this an errored fetch and an empty result render identically — "No payments
+   * recorded." for a query that never returned — and the operator reads a transport failure as a
+   * statement about their books.
+   */
+  const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
+
+  /**
+   * Which side of the Credit Notes tab is showing.
+   *
+   * CreditNoteTable was fed only from listCreditNotes (the customer side). listSupplierCreditNotes
+   * existed with NO caller anywhere in src/, so a supplier credit note recorded from Payables could
+   * never be listed, opened, PDF'd or corrected — write-only data.
+   */
+  const [creditSide, setCreditSide] = useState<'customer' | 'supplier'>('customer');
+  const [supplierCreditNotes, setSupplierCreditNotes] = useState<SupplierCreditNote[]>([]);
   const categoryName = (id: any) => (id && categoryMap[id]) || '—';
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newDeliveryOpen, setNewDeliveryOpen] = useState(false);
@@ -147,17 +187,26 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     if (!activeWorkspaceId) return;
     setLoading(true);
     try {
+      // `.catch(() => [])` on five of these made a FAILED query indistinguishable from an empty
+      // one: a payments query that errored rendered the same "No payments recorded." as a ledger
+      // with nothing in it, and the operator concluded the money was never entered. Each source
+      // still degrades independently — one failure must not blank the whole page — but it now
+      // records WHICH source failed so the table can say so.
+      const failed: Record<string, string> = {};
+      const guard = <T,>(key: string, pr: Promise<T>, empty: T): Promise<T> =>
+        pr.catch((e: any) => { failed[key] = e?.message ?? 'could not be loaded'; return empty; });
       const [inv, cn, inb, pmts, dns, chq, cats] = await Promise.all([
         // Paged client-side below, so the fetch cap is a safety ceiling, not a page size —
         // 200 silently hid older documents once a workspace crossed it.
         financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 1000 }),
         financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
-        inboundService.list(activeWorkspaceId).catch(() => []),
-        financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 1000 }).catch(() => []),
-        deliveryNotesService.list(activeWorkspaceId).catch(() => []),
-        chequesService.list(activeWorkspaceId).catch(() => []),
-        financeCategoriesService.list(activeWorkspaceId).catch(() => [] as FinanceCategory[]),
+        guard('expenses', inboundService.list(activeWorkspaceId), [] as any[]),
+        guard('payments', financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 1000 }), [] as any[]),
+        guard('delivery_notes', deliveryNotesService.list(activeWorkspaceId), [] as any[]),
+        guard('cheques', chequesService.list(activeWorkspaceId), [] as any[]),
+        guard('categories', financeCategoriesService.list(activeWorkspaceId), [] as FinanceCategory[]),
       ]);
+      setLoadErrors(failed);
       // Recurring templates — Expenses tab only.
       if (type === 'expenses') {
         setRecurring(await financeService.listRecurringExpenses(activeWorkspaceId).catch(() => [] as RecurringExpense[]));
@@ -166,6 +215,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       setCategoryMap(Object.fromEntries((cats ?? []).map((c) => [c.id, c.name])));
       setInvoices(inv);
       setCreditNotes(cn);
+      setSupplierCreditNotes(
+        await financeService.listSupplierCreditNotes({ workspaceId: activeWorkspaceId }).catch(() => [] as SupplierCreditNote[]),
+      );
       setInbound(inb);
       setPayments(pmts);
       setDeliveryNotes(dns);
@@ -193,7 +245,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     switch (type) {
       case 'invoices': return invoices.filter((i) => !isReceipt((i as any).document_type));
       case 'receipts': return invoices.filter((i) => isReceipt((i as any).document_type));
-      case 'credit_notes': return creditNotes;
+      case 'credit_notes': return creditSide === 'supplier' ? supplierCreditNotes : creditNotes;
       // `?issuer_vat=` scopes the Inbox to one supplier — how their CRM record links here.
       // VAT is the join key (it is the only thing tying a received document to a company), and
       // it is compared on digits so EL800370260 and 800370260 are the same supplier.
@@ -207,7 +259,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
       case 'cheques': return cheques;
       default: return [];
     }
-  }, [type, invoices, creditNotes, inbound, payments, deliveryNotes, cheques, issuerVatParam]);
+  }, [type, invoices, creditNotes, supplierCreditNotes, creditSide, inbound, payments, deliveryNotes, cheques, issuerVatParam]);
 
   // myDATA code → name, so the document-type filter offers "Sales Invoice", not a bare "1.1".
   const mydataTypes = useMydataTypeLabels();
@@ -352,13 +404,41 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
                 <CardTitle className="flex items-center gap-2 capitalize"><FileText className="h-4 w-4" /> {DOC_LABEL[type]}</CardTitle>
+                {/* Credit notes exist on BOTH sides of the trade. Only the customer side had a
+                    surface, so supplier credit notes were unreachable once recorded. */}
+                {type === 'credit_notes' && (
+                  <div className="flex items-center gap-1 rounded-full border border-border/60 p-0.5 text-xs">
+                    {(['customer', 'supplier'] as const).map((sideKey) => (
+                      <button
+                        key={sideKey}
+                        type="button"
+                        onClick={() => { setCreditSide(sideKey); setPage(1); }}
+                        className={`rounded-full px-3 py-1 transition ${creditSide === sideKey ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        {sideKey === 'customer' ? 'Issued to customers' : 'Received from suppliers'}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {docActions}
               </CardHeader>
               <CardContent className="p-0">
+                {/* A source that FAILED must not render as a source that is empty. */}
+                {loadErrors[type] && (
+                  <div className="flex items-center justify-between gap-3 border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
+                    <span>
+                      Could not load {DOC_LABEL[type]} — <span className="opacity-80">{loadErrors[type]}</span>.
+                      This list is <strong>not</strong> a statement that there are none.
+                    </span>
+                    <Button size="sm" variant="outline" onClick={() => void load()}>Retry</Button>
+                  </div>
+                )}
                 {loading || wsLoading ? (
                   <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
                 ) : type === 'credit_notes' ? (
-                  <CreditNoteTable rows={paginate(activeRows as CreditNote[], page)} financeBase={financeBase} />
+                  creditSide === 'supplier'
+                    ? <SupplierCreditNoteTable rows={paginate(activeRows as SupplierCreditNote[], page)} />
+                    : <CreditNoteTable rows={paginate(activeRows as CreditNote[], page)} financeBase={financeBase} onChanged={() => void load()} />
                 ) : type === 'expenses' ? (
                   <InboundTable rows={paginate(filteredInbound, page)} financeBase={financeBase} workspaceId={activeWorkspaceId} readOnly={!canOperateFinance} onChanged={load} categories={sideCategories} categoryName={categoryName} onOpenExpense={setPaymentsExpenseId} />
                 ) : type === 'payments' ? (
@@ -408,7 +488,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                           <td className="px-4 py-2 text-right">{formatMoney(i.total, i.currency)}</td>
                           <td className="px-4 py-2 text-right font-medium">{formatMoney(i.amount_due, i.currency)}</td>
                           <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(i.status)}`}>{humanizeLabel(i.status)}</span></td>
-                          <td className="px-4 py-2 text-center">{transmitted((i as any).fiscal_status) ? <span className="text-emerald-500" title="Transmitted to myDATA">✓</span> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="px-4 py-2 text-center"><FiscalCell status={(i as any).fiscal_status} error={(i as any).fiscal_error} /></td>
                           <td className="px-4 py-2 text-right">
                             <InvoiceActionsMenu invoiceId={i.id} financeBase={financeBase} status={i.status} fiscalStatus={(i as any).fiscal_status ?? null} fiscalMark={(i as any).fiscal_mark ?? null} onChanged={load} />
                           </td>
@@ -721,7 +801,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
   );
 };
 
-const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = ({ rows, financeBase }) => {
+const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onChanged?: () => void }> = ({ rows, financeBase, onChanged }) => {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
   const genPdf = async (id: string) => {
@@ -729,6 +809,24 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = (
     try { const { pdf_url } = await financeService.generateCreditNotePdf(id, true); if (pdf_url) window.open(pdf_url, '_blank'); }
     catch (err: any) { toast({ title: 'PDF failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
+  };
+  /**
+   * Retransmit to myDATA.
+   *
+   * RecordPaymentDialog tells the operator to "Retransmit it from the credit notes list" when a
+   * 5.1 is rejected — but this table's action cell held ONLY a PDF button, so no submit control
+   * existed on the surface the error names. A rejected credit note therefore stayed permanently
+   * untransmitted: the invoice is netted locally while AADE has no 5.1 against it.
+   */
+  const submitFiscal = async (id: string) => {
+    setBusy(id);
+    try {
+      await financeService.submitCreditNoteFiscal(id);
+      toast({ title: 'Submitted to myDATA', description: 'The credit note was transmitted.' });
+      onChanged?.();
+    } catch (err: any) {
+      toast({ title: 'myDATA submission failed', description: err?.message, variant: 'destructive' });
+    } finally { setBusy(null); }
   };
   return (
   <table className="w-full text-sm">
@@ -755,9 +853,15 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = (
           <td className="px-4 py-2"><span className="text-xs text-muted-foreground">{cn.document_type ?? '—'}</span></td>
           <td className="px-4 py-2 text-muted-foreground truncate max-w-[220px]">{cn.reason ?? '—'}</td>
           <td className="px-4 py-2 text-right font-medium">{formatMoney(cn.total ?? cn.amount, cn.currency)}</td>
-          <td className="px-4 py-2 text-center">{transmitted(cn.fiscal_status) ? <span className="text-emerald-500">✓</span> : <span className="text-muted-foreground">—</span>}</td>
+          <td className="px-4 py-2 text-center"><FiscalCell status={cn.fiscal_status} error={(cn as any).fiscal_error} /></td>
           <td className="px-4 py-2">{cn.invoice_id ? <Link to={`${financeBase}/invoices/${cn.invoice_id}`} className="text-primary hover:underline text-xs">open</Link> : '—'}</td>
           <td className="px-4 py-2 text-right">
+            {!transmitted(cn.fiscal_status) && (
+              <Button size="sm" variant="ghost" disabled={busy === cn.id} onClick={() => submitFiscal(cn.id)}
+                title={fiscalRejected(cn.fiscal_status) ? 'Rejected by myDATA — retransmit' : 'Submit to myDATA'}>
+                <Send className={`h-3.5 w-3.5 ${fiscalRejected(cn.fiscal_status) ? 'text-destructive' : ''}`} />
+              </Button>
+            )}
             <Button size="sm" variant="ghost" disabled={busy === cn.id} onClick={() => genPdf(cn.id)} title="Download PDF">
               {busy === cn.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
             </Button>
@@ -769,6 +873,44 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string }> = (
   );
 };
 
+/**
+ * Supplier credit notes — money coming BACK from a supplier against a bill we received.
+ *
+ * listSupplierCreditNotes had no caller anywhere in src/, so these rows were write-only: recorded
+ * from Payables and then invisible. Read-only here on purpose — correcting one is a Payables
+ * action against the bill it credits, not a document-list action.
+ */
+const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] }> = ({ rows }) => (
+  <table className="w-full text-sm">
+    <thead className="border-b border-border/60 text-xs text-muted-foreground">
+      <tr>
+        <th className="px-4 py-2 text-left">Number</th>
+        <th className="px-4 py-2 text-left">Date</th>
+        <th className="px-4 py-2 text-left">Reason</th>
+        <th className="px-4 py-2 text-left">Status</th>
+        <th className="px-4 py-2 text-right">Net</th>
+        <th className="px-4 py-2 text-right">VAT</th>
+        <th className="px-4 py-2 text-right">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {rows.length === 0 && (
+        <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No supplier credit notes yet.</td></tr>
+      )}
+      {rows.map((cn) => (
+        <tr key={cn.id} className="border-b border-border/30">
+          <td className="px-4 py-2 font-mono text-xs">{cn.supplier_credit_note_number}</td>
+          <td className="px-4 py-2">{cn.issued_at ? new Date(cn.issued_at).toLocaleDateString() : '—'}</td>
+          <td className="px-4 py-2 text-muted-foreground truncate max-w-[220px]">{cn.reason ?? '—'}</td>
+          <td className={`px-4 py-2 ${cn.status === 'void' ? 'text-muted-foreground' : 'text-emerald-600 dark:text-emerald-400'}`}>{cn.status}</td>
+          <td className="px-4 py-2 text-right">{formatMoney(cn.subtotal_net, cn.currency)}</td>
+          <td className="px-4 py-2 text-right">{formatMoney(cn.vat_amount, cn.currency)}</td>
+          <td className="px-4 py-2 text-right font-medium">{formatMoney(cn.total, cn.currency)}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
 const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string; financeBase: string }> = ({ rows, categoryName, financeBase }) => {
   // Deep-link the party name to its CRM record. Mirror the finance mount point:
   // operator surfaces are under /admin/*, business-owner surfaces at the root.
@@ -793,7 +935,14 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
         <tr><td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">No payments recorded.</td></tr>
       )}
       {rows.map((p: any) => {
-        const allocated = (p.allocations ?? []).reduce((s: number, a: any) => s + Number(a.amount ?? 0), 0);
+        // `a.amount` is denominated in the TARGET's currency (RecordPaymentDialog sets
+        // amount = amt x fx, amount_doc = amt), so summing it and then formatting with the
+        // PAYMENT's currency showed a euro figure labelled USD on any cross-currency settlement —
+        // and made the on-account remainder below arithmetically meaningless. amount_doc_currency
+        // is the payment-currency figure, which is what both this column and `onAccount` need;
+        // listAttachablePayments and getDepositsOnAccount already use it.
+        const allocated = (p.allocations ?? []).reduce(
+          (s: number, a: any) => s + Number(a.amount_doc_currency ?? a.amount ?? 0), 0);
         // On-account remainder — the credit still available on a money-in payment.
         const onAccount = p.direction === 'in' ? Math.round((Number(p.amount ?? 0) - allocated) * 100) / 100 : 0;
         return (
@@ -801,7 +950,17 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
             <td className="px-4 py-2">{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}</td>
             <td className="px-4 py-2">
               <span className={p.direction === 'in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
-                {p.direction === 'in' ? 'Received' : (p.credit_number ? 'Refund' : 'Paid')}
+                {/* A refund is money OUT that settles a credit note. `credit_number` is a
+                    money-IN field — recordPayment never sets it on an outbound payment (it
+                    writes `reference: 'Refund - CN ...'`), so this branch was unreachable and
+                    every customer refund read as "Paid", indistinguishable from money spent on
+                    stock. Derived from what the payment actually settled instead. */}
+                {p.direction === 'in'
+                  ? 'Received'
+                  : ((p.settled ?? []).some((x: any) => x?.source === 'credit_note' || x?.source === 'supplier_credit_note')
+                      || /credit note|CN/i.test(String(p.reference ?? ''))
+                    ? 'Refund'
+                    : 'Paid')}
               </span>
             </td>
             <td className="px-4 py-2 truncate max-w-[180px]" title={p.party_name ?? undefined}>
@@ -873,7 +1032,7 @@ const IssuerCell: React.FC<{ doc: InboundDocument; crmCompanyId?: string }> = ({
   );
 };
 
-const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string; onOpenExpense: (billId: string) => void }> = ({ rows, workspaceId, readOnly, onChanged, categories, categoryName }) => {
+const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string; onOpenExpense: (billId: string) => void }> = ({ rows, financeBase, workspaceId, readOnly, onChanged, categories, categoryName }) => {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);
@@ -934,9 +1093,19 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
 
   if (rows.length === 0) {
     return (
-      <div className="p-8 text-center text-sm text-muted-foreground">
-        No received documents yet. Documents other businesses issue to you on myDATA appear here once the
-        inbound poller has your AADE received-docs credentials — then you can turn each into a supplier bill or warehouse intake.
+      <div className="space-y-2 p-8 text-center text-sm text-muted-foreground">
+        <p>
+          No received documents yet. Documents other businesses issue to you on myDATA appear here once the
+          inbound poller has your AADE received-docs credentials — then you can turn each into a supplier bill or warehouse intake.
+        </p>
+        {/* This tab lists inbound_documents ONLY, but its "Add expense" button creates a
+            supplier_bills row — so an expense recorded here does not appear here. A workspace with
+            no myDATA feed read "No received documents yet" forever and concluded the expense had
+            not saved. Say where it went. */}
+        <p className="text-xs">
+          Expenses you add yourself are <strong>supplier bills</strong>, not received documents —
+          they appear under <Link to={`${financeBase}?tab=ap`} className="text-primary hover:underline">Payables</Link>.
+        </p>
       </div>
     );
   }
@@ -951,7 +1120,12 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           <th className="px-4 py-2 text-left">Category</th>
           <th className="px-4 py-2 text-right">Net</th>
           <th className="px-4 py-2 text-right">VAT</th>
-          <th className="px-4 py-2 text-right">Payable</th>
+          {/* "Gross", not "Payable". This renders total_gross — the document's amount as AADE
+              sent it, a BRONZE fact that never changes. It is not reduced by anything paid on
+              the supplier_bills row the document became, so a fully-settled inbound document
+              showed its whole amount under "Payable" forever. What is still owed lives on the
+              bill (its derived amount_due), reachable from the expense this row opens. */}
+          <th className="px-4 py-2 text-right">Gross</th>
           <th className="px-4 py-2 text-center">Handled</th>
           <th className="px-4 py-2 text-right" />
         </tr>
