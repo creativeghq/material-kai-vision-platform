@@ -505,11 +505,34 @@ export const NewOrderModal: React.FC<{
     () => (prefill?.lines ?? []).filter((l) => l.original_unit_price != null && Math.abs(Number(l.unit_price ?? 0) - Number(l.original_unit_price)) > 0.005),
     [prefill?.lines],
   );
+  /**
+   * Stable signature of the prefill's CONTENT, used as the reset effect's dependency.
+   *
+   * Both call sites pass an inline object literal, so `prefill` itself is a new reference on every
+   * parent render — depending on it made the form reset while the operator was typing in it.
+   */
+  const prefillKey = useMemo(
+    () => (prefill ? JSON.stringify({
+      c: prefill.currency ?? null,
+      n: prefill.notes ?? null,
+      d: prefill.fromDocument ?? false,
+      i: prefill.inboundDocumentId ?? null,
+      l: (prefill.lines ?? []).map((l) => [l.description, l.product_id ?? null, l.quantity ?? null, l.unit_price ?? null, l.unit_cost ?? null]),
+    }) : ''),
+    [prefill],
+  );
   const applyPricingMode = (mode: 'today' | 'original') => {
     setPricingMode(mode);
     const src = prefill?.lines ?? [];
-    setItems((ls) => ls.map((l, i) => {
-      const s = src[i];
+    // Matched on a STABLE key, not array index. The re-order form allows add and remove, so after
+    // deleting or inserting a line the index mapping wrote the wrong source line's price and cost
+    // onto every line below it — under an affordance that promises the original figures.
+    const keyOf = (l: { product_id?: string | null; description?: string }) =>
+      `${l.product_id ?? ''}::${(l.description ?? '').trim().toLowerCase()}`;
+    const byKey = new Map<string, typeof src[number]>();
+    for (const sl of src) if (!byKey.has(keyOf(sl))) byKey.set(keyOf(sl), sl);
+    setItems((ls) => ls.map((l) => {
+      const s = byKey.get(keyOf(l));
       if (!s || s.original_unit_price == null) return l;
       return mode === 'original'
         ? { ...l, unit_price: Number(s.original_unit_price), unit_cost: s.original_unit_cost ?? l.unit_cost }
@@ -613,7 +636,12 @@ export const NewOrderModal: React.FC<{
             sub: [data.vat_number ? `VAT ${data.vat_number}` : null, data.email, 'Contact'].filter(Boolean).join(' · ') });
         });
     }
-  }, [open, lockedCompanyId, lockedContactId, prefill, isSales, workspaceId]);
+    // `prefill` is passed as an INLINE OBJECT LITERAL at both call sites, so its identity changes
+    // on every render of the parent — any re-render of OrderDetailDialog while this form was open
+    // re-ran the reset and silently wiped items, currency, notes, category, expected date, pricing
+    // mode and every catalog link. Keyed on a stable signature of the prefill's CONTENT instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, lockedCompanyId, lockedContactId, prefillKey, isSales, workspaceId]);
 
   // CRM party search — by name, VAT, or email (companies + contacts).
   useEffect(() => {
@@ -622,19 +650,28 @@ export const NewOrderModal: React.FC<{
     if (term.length < 2) { setPartyOpts([]); return; }
     const like = `%${term}%`;
     const t = setTimeout(async () => {
-      const [c, p] = await Promise.all([
-        supabase.from('crm_companies').select('id, name, vat_number, email')
-          .or(`name.ilike.${like},vat_number.ilike.${like},email.ilike.${like}`).limit(8),
-        supabase.from('crm_contacts').select('id, name, vat_number, email')
-          .or(`name.ilike.${like},vat_number.ilike.${like},email.ilike.${like}`).limit(8),
-      ]);
+      // Same role and workspace filters the per-LINE SupplierPickerDialog applies (and tells the
+      // user about). Without them a purchase order could be raised against a company the line-level
+      // picker then refuses to offer — the on-screen rule contradicting itself — and the search
+      // reached across every workspace's CRM.
+      let companyQ = supabase.from('crm_companies').select('id, name, vat_number, email')
+        .eq('workspace_id', workspaceId)
+        .or(`name.ilike.${like},vat_number.ilike.${like},email.ilike.${like}`).limit(8);
+      let contactQ = supabase.from('crm_contacts').select('id, name, vat_number, email')
+        .eq('workspace_id', workspaceId)
+        .or(`name.ilike.${like},vat_number.ilike.${like},email.ilike.${like}`).limit(8);
+      if (!isSales) {
+        companyQ = companyQ.eq('is_supplier', true);
+        contactQ = contactQ.eq('is_supplier', true);
+      }
+      const [c, p] = await Promise.all([companyQ, contactQ]);
       const opts: Party[] = [];
       for (const r of (c.data ?? []) as any[]) opts.push({ type: 'company', id: r.id, name: r.name, vat: r.vat_number, sub: [r.vat_number ? `VAT ${r.vat_number}` : null, r.email, 'Company'].filter(Boolean).join(' · ') });
       for (const r of (p.data ?? []) as any[]) opts.push({ type: 'contact', id: r.id, name: r.name, vat: r.vat_number, sub: [r.vat_number ? `VAT ${r.vat_number}` : null, r.email, 'Contact'].filter(Boolean).join(' · ') });
       setPartyOpts(opts);
     }, 200);
     return () => clearTimeout(t);
-  }, [partySearch, open]);
+  }, [partySearch, open, isSales, workspaceId]);
 
   // Per-line product lookup — typing in a line's Description searches the catalog.
   useEffect(() => {
@@ -743,9 +780,13 @@ export const NewOrderModal: React.FC<{
   const discountAmount = r2(r2(rawNet) - netTotal);
   // Margin = revenue − cost across lines that carry a cost. null when no line has cost yet. The
   // discount reduces revenue, so it reduces margin by the same net amount.
+  // Same definition the saved order uses: post-discount line net minus cost x qty. Subtracting
+  // `discountAmount` from a PRE-discount margin produced the same number only when the discount
+  // was order-level — with per-line discounts the figure quoted at creation changed once the order
+  // was saved and reopened.
   const anyCost = items.some((l) => l.unit_cost != null);
   const marginTotal = anyCost
-    ? items.reduce((a, l) => a + ((Number(l.unit_price) || 0) - (Number(l.unit_cost) || 0)) * (Number(l.quantity) || 0), 0) - discountAmount
+    ? r2(discCalc.reduce((a, c, i) => a + c.net - ((Number(items[i]?.unit_cost) || 0) * (Number(items[i]?.quantity) || 0)), 0))
     : null;
 
   // status: 'draft' = pre-order (not yet committed); 'confirmed' = a live order.
@@ -905,10 +946,21 @@ export const NewOrderModal: React.FC<{
           // Idempotent: an existing bill for the document is returned rather than duplicated.
           const billId = await linkOrderToDocument({ id: prefill.inboundDocumentId }, orderId);
           if (paidNow && status !== 'draft') {
+            // Pay what the BILL says, not what this form recomputed.
+            //
+            // The bill is created from the DOCUMENT by inbound_doc_to_supplier_bill, while
+            // `grossTotal` is recomputed from the form's lines — and orderLinesFromDoc rounds
+            // net/qty per line and defaults vat_code to 24% when myDATA omits vat_category, so the
+            // two disagree. When the form total came out higher, record_payment_fx raised
+            // 'over-allocation' and the error was reported INSIDE a success-titled 'Order created'
+            // toast; when lower, the bill was left permanently part-paid.
+            const { data: billRow } = await supabase.from('supplier_bills')
+              .select('amount_due, total').eq('id', billId).maybeSingle();
+            const payable = Number((billRow as any)?.amount_due ?? (billRow as any)?.total ?? grossTotal);
             await financeService.paySupplierBill({
               workspaceId,
               supplierBillId: billId,
-              amount: grossTotal,
+              amount: payable,
               method: payMethod,
               paidAt: new Date().toISOString(),
               bankAccountId: payBankAccountId || null,
@@ -920,8 +972,14 @@ export const NewOrderModal: React.FC<{
           moneyNote = `Order created, but the expense step failed: ${linkErr?.message ?? 'unknown error'}.`;
         }
       }
+      // A failed expense/payment step is not a success. It used to be appended to a toast titled
+      // 'Order created', so an over-allocation error read as part of the good news.
+      const partialFailure = !!(moneyNote?.includes('failed') || stockNote?.includes('failed'));
       toast({
-        title: status === 'draft' ? 'Pre-order saved' : 'Order created',
+        title: partialFailure
+          ? (status === 'draft' ? 'Pre-order saved — with problems' : 'Order created — with problems')
+          : (status === 'draft' ? 'Pre-order saved' : 'Order created'),
+        variant: partialFailure ? 'destructive' : undefined,
         description: [linkNote, stockNote, moneyNote].filter(Boolean).join(' ') || undefined,
       });
       onCreated(orderId);
@@ -1426,6 +1484,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
+  /**
+   * Statuses DERIVED from the delivered quantities, which a human must not set by hand.
+   *
+   * deliver_order_line and receive_order_into_warehouse both recompute the order's fulfilment from
+   * the sum of quantity_delivered, so a manual value here is silently reverted by the next
+   * delivery edit — and in the meantime an order can read 'Completed' with 0/10 delivered.
+   */
+  const DERIVED_ORDER_STATUSES = new Set<OrderStatus>(['partially_fulfilled', 'fulfilled']);
+
   const changeStatus = async (status: OrderStatus) => {
     if (!order) return;
     setSaving(true);
@@ -1445,6 +1512,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     projectId?: string | null; coversOrderId?: string | null;
   }) => {
     if (!order) return;
+    // generate_invoice_from_order copies category_id and expected_payment_date -> invoices.due_at
+    // at CREATION time only, so editing them after a document exists moved nothing: the invoice
+    // kept the old due_at and the AR aging bucket disagreed with this screen. The fields are
+    // frozen once a document exists (see `metaFrozen` where they render).
+    if (metaFrozen && ('categoryId' in patch || 'expectedPaymentDate' in patch)) {
+      toast({
+        title: 'Already on a document',
+        description: 'Category and expected payment date were copied to the invoice/bill when it was created. Change them there — editing here would leave the two disagreeing.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSaving(true);
     try {
       await ordersService.updateMeta(order.id, patch);
@@ -1493,7 +1572,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const orderTabs = useMemo(() => {
     if (!order) return [] as string[];
     const t: string[] = [];
-    if (supExposure.length > 0) t.push('suppliers');
+    // SALES orders only. `create()` stamps every PURCHASE line with the order's own supplier, so
+    // on a purchase order this block re-derived the order's OWN payable with a different formula
+    // (getOrderSupplierExposure, not get_order_settlements) — 'owe X' beside a differently-derived
+    // Outstanding — and its Pay button opens NewExpenseDialog, which books ANOTHER supplier bill
+    // and double-counts the cost in P&L. Its stated purpose is what a SALE costs us to fulfil.
+    if (order.order_type === 'sales' && supExposure.length > 0) t.push('suppliers');
     if (fin && fin.invoices.length > 0) t.push('invoices');
     if (fin) t.push('expenses');
     if (fin && (fin.payments.length > 0 || fin.creditApplied.length > 0)) t.push('payments');
@@ -1635,6 +1719,29 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // old figures, which is exactly the €420 gap the 3-way match had to catch after the fact.
   const editable = !!order && order.status !== 'cancelled' && order.status !== 'fulfilled'
     && (fin?.invoices.length ?? 0) === 0 && (fin?.supplierBills.length ?? 0) === 0;
+  /** A document or settled cash exists — the order's classification is already copied onto it. */
+  const metaFrozen = !!fin && (fin.invoices.length > 0 || fin.supplierBills.length > 0);
+  /**
+   * Cancelling is only honest while nothing downstream depends on the order. With an issued
+   * invoice or settled cash behind it, 'cancelled' describes the order and contradicts the ledger.
+   */
+  const cancellable = !metaFrozen && (fin?.payments.length ?? 0) === 0;
+  /** 'Completed' means every line is delivered — set the thing the derivation reads. */
+  const markAllDelivered = async () => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      // One batched call — the same API the per-line editor uses.
+      const pending = items
+        .filter((it) => Number(it.quantity_delivered) !== Number(it.quantity))
+        .map((it) => ({ itemId: it.id, quantityDelivered: Number(it.quantity) }));
+      if (pending.length > 0) await ordersService.setDelivery(order.id, pending);
+      await load(order.id); onChanged();
+      toast({ title: 'All lines marked delivered' });
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
   const startEdit = () => {
     setEditItems(items.map((it) => ({ product_id: it.product_id, description: it.description, quantity: Number(it.quantity), unit_price: Number(it.unit_price), unit_cost: it.unit_cost, unit_code: it.measurement_unit_code || DEFAULT_UNIT, vat_code: vatCodeOf(it.vat_percent), supplier_company_id: it.supplier_company_id, available: null })));
     setEditing(true);
@@ -1813,10 +1920,25 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // (its price is its cost) and no money-in half, so everything derived from those is hidden
   // rather than rendered as a permanent zero.
   const isSalesOrder = order?.order_type === 'sales';
-  // Order margin = Σ (unit_price − unit_cost) × qty over lines that carry a cost. null = no cost yet.
+  /**
+   * Deliveries do nothing on a draft or cancelled order.
+   *
+   * deliver_order_line writes quantity_delivered but explicitly skips stock movement and status
+   * recomputation for those statuses, so the editor happily turned a line green with no ledger
+   * row and no stock change behind it (#297 finding 18).
+   */
+  const deliveryLocked = order?.status === 'draft' || order?.status === 'cancelled';
+  /**
+   * Order margin = SUM(net_value - unit_cost x qty). ONE definition.
+   *
+   * This used to be SUM((unit_price - unit_cost) x qty) with `unit_price` stored PRE-discount,
+   * while the per-line Profit column below computes `net_value - lineCost` (POST-discount). On any
+   * discounted order the Profit column therefore did not sum to the Profit total beneath it. Both
+   * now read net_value, which is the discounted line revenue the invoice is actually built from.
+   */
   const anyCost = items.some((it) => it.unit_cost != null);
   const orderMargin = order && anyCost
-    ? items.reduce((a, it) => a + ((Number(it.unit_price) || 0) - (Number(it.unit_cost) || 0)) * (Number(it.quantity) || 0), 0)
+    ? items.reduce((a, it) => a + (Number(it.net_value) || 0) - ((Number(it.unit_cost) || 0) * (Number(it.quantity) || 0)), 0)
     : null;
   // Total discount given vs the catalog list price (shown once at the bottom, not per line).
   const discountTotal = order
@@ -1899,10 +2021,19 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   disabled={saving}
                 />
                 <Label className="text-xs text-muted-foreground">Status</Label>
+                {/* Only the statuses a human actually owns. `partially_fulfilled` and `fulfilled`
+                    are DERIVED from the delivered quantities — deliver_order_line and
+                    receive_order_into_warehouse recompute them on every delivery edit — so setting
+                    them by hand was reverted by the next tick, and meanwhile an order could sit at
+                    'Completed' with 0/10 delivered. Cancel is blocked once a document or settled
+                    cash exists, because cancelling then leaves an issued invoice behind it. */}
                 <Select value={order.status} onValueChange={(v: any) => changeStatus(v)}>
                   <SelectTrigger className="h-8 w-44 text-xs" disabled={saving}><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((s) => <SelectItem key={s} value={s}>{ORDER_STATUS_LABEL[s]}</SelectItem>)}
+                    {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[])
+                      .filter((st) => st === order.status || !DERIVED_ORDER_STATUSES.has(st))
+                      .filter((st) => st !== 'cancelled' || cancellable)
+                      .map((st) => <SelectItem key={st} value={st}>{ORDER_STATUS_LABEL[st]}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <DropdownMenu>
@@ -2008,7 +2139,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => changeStatus('fulfilled')}>
+                        {/* Derived from the delivered quantities; setting it here is reverted by
+                            the next delivery edit. Marks every line delivered instead, which is
+                            what 'completed' actually means and what the derivation reads. */}
+                        <DropdownMenuItem onClick={() => void markAllDelivered()}>
                           <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark completed
                         </DropdownMenuItem>
                       </>
@@ -2139,12 +2273,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       <span className="text-muted-foreground text-xs">{unitLabel}</span>
                       {/* Delivered: inline-editable (reads like text, box on hover/focus) + quick menu.
                           Tone: green = fully delivered, amber = partial. Status auto-advances. */}
-                      <div className="flex items-center justify-end gap-0.5">
+                      {/* deliver_order_line writes quantity_delivered but skips ALL stock movement
+                          and status recomputation while the order is draft/cancelled — so the cell
+                          turned green "3 / 3" with no movement row, no stock change and no status
+                          change. Disabled there, with the reason on hover. */}
+                      <div className="flex items-center justify-end gap-0.5"
+                        title={deliveryLocked ? `Deliveries are recorded once the order leaves ${order.status}. Confirm it first.` : undefined}>
                         <Input key={`${it.id}-${it.quantity_delivered}`}
-                          className={`h-6 w-9 text-right text-xs px-0.5 tabular-nums border-0 shadow-none bg-transparent rounded hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-1 ${delTone}`}
-                          type="number" step="1" min="0" defaultValue={del} disabled={saving}
+                          className={`h-6 w-9 text-right text-xs px-0.5 tabular-nums border-0 shadow-none bg-transparent rounded hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-1 ${delTone} ${deliveryLocked ? 'opacity-50' : ''}`}
+                          type="number" step="1" min="0" defaultValue={del} disabled={saving || deliveryLocked}
                           onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== del) void setLineDelivered(it.id, v); }} />
                         <span className="text-[10px] text-muted-foreground">/ {q}</span>
+                        {!deliveryLocked && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><button type="button" className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronDown className="h-3 w-3" /></button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -2153,6 +2293,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                             <DropdownMenuItem onClick={() => void setLineDelivered(it.id, 0)}>Mark not delivered</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        )}
                       </div>
                       <span className="text-right tabular-nums" title={Number(it.discount_pct) > 0 ? `List ${formatMoney(Number(it.unit_price), order.currency)} · ${Number(it.discount_pct)}% off` : 'Sell price per unit (excl. VAT)'}>
                         {Number(it.discount_pct) > 0 && Number(it.quantity) > 0
@@ -2317,7 +2458,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               <TabsContent value="suppliers" className="mt-3 space-y-3">
             {/* What we owe suppliers on this order — line costs grouped by the line's supplier,
                 minus money-out already paid to them. "Pay" pre-fills a money-out for the balance. */}
-            {supExposure.length > 0 && (
+            {order.order_type === 'sales' && supExposure.length > 0 && (
               <div className="rounded-md border border-border/60">
                 <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Suppliers on this order — what we owe</div>
                 {supExposure.map((s) => (

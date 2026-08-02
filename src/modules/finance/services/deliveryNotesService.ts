@@ -230,7 +230,7 @@ export const deliveryNotesService = {
 
     const [itemsRes, whRes, dnRes, companiesRes, contactsRes] = await Promise.all([
       supabase.from('invoice_items').select('invoice_id, product_id, description, sku, unit, quantity').in('invoice_id', invoiceIds),
-      supabase.from('warehouse_items').select('id, name, sku, qty_on_hand, product_id').eq('workspace_id', workspaceId),
+      supabase.from('warehouse_items').select('id, name, sku, qty_on_hand, qty_reserved, product_id').eq('workspace_id', workspaceId),
       supabase.from('delivery_notes').select('id, invoice_id, status, delivery_note_number, fiscal_mark').eq('workspace_id', workspaceId).eq('kind', 'dispatch').in('invoice_id', invoiceIds).neq('status', 'void'),
       companyIds.length ? supabase.from('crm_companies').select('id, name').in('id', companyIds) : Promise.resolve({ data: [] as any[] }),
       contactIds.length ? supabase.from('crm_contacts').select('id, name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
@@ -256,7 +256,8 @@ export const deliveryNotesService = {
       const rawLines = itemsByInvoice.get(o.id) ?? [];
       const lines: DispatchQueueLine[] = rawLines.map((l) => {
         const match = matchWarehouseItem(l, wh);
-        const onHand = match?.qty_on_hand ?? null;
+        // Free stock across ALL warehouses, not the first matching row's raw on-hand.
+        const onHand = freeStockForLine(l, wh);
         const qty = Number(l.quantity ?? 0);
         return {
           description: (l.description ?? '').trim() || 'Item',
@@ -266,7 +267,9 @@ export const deliveryNotesService = {
           warehouse_item_id: match?.id ?? null,
           product_id: l.product_id ?? match?.product_id ?? null,
           qty_on_hand: onHand,
-          shortfall: onHand != null && onHand < qty,
+          // A line that matches NO stock row is short by definition — it used to be the one case
+          // that produced no warning at all.
+          shortfall: onHand == null ? qty > 0 : onHand < qty,
         };
       });
 
@@ -322,4 +325,32 @@ function matchWarehouseItem(line: { product_id?: string | null; sku?: string | n
   if (line.sku) { const s = String(line.sku).toLowerCase().trim(); const m = wh.find((w) => (w.sku ?? '').toLowerCase().trim() === s); if (m) return m; }
   if (line.description) { const d = String(line.description).toLowerCase().trim(); const m = wh.find((w) => (w.name ?? '').toLowerCase().trim() === d); if (m) return m; }
   return null;
+}
+
+/**
+ * FREE stock for a line, summed across every warehouse that holds it.
+ *
+ * matchWarehouseItem returns the FIRST matching row, and the shortfall test used its raw
+ * qty_on_hand — so a product split across two warehouses raised a false alarm, reserved stock was
+ * counted as available (a missed alarm), and a product with no stock row at all yielded
+ * `qty_on_hand == null` which the old test read as "no shortfall" — no warning whatsoever for the
+ * one case that is certainly short.
+ *
+ * Returns null only when the line matches NO warehouse row, which the caller treats as a shortfall.
+ */
+function freeStockForLine(
+  line: { product_id?: string | null; sku?: string | null; description?: string | null },
+  wh: WarehousePick[],
+): number | null {
+  const matches = wh.filter((w) => {
+    if (line.product_id && w.product_id === line.product_id) return true;
+    if (line.sku && (w.sku ?? '').toLowerCase().trim() === String(line.sku).toLowerCase().trim()) return true;
+    if (line.description && (w.name ?? '').toLowerCase().trim() === String(line.description).toLowerCase().trim()) return true;
+    return false;
+  });
+  if (matches.length === 0) return null;
+  return matches.reduce(
+    (sum, w) => sum + (Number((w as any).qty_on_hand ?? 0) - Number((w as any).qty_reserved ?? 0)),
+    0,
+  );
 }
