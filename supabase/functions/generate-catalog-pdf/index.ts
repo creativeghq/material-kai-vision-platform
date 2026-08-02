@@ -9,7 +9,7 @@ import { renderBrandedDocument, type BrandedDoc, type BrandedDocSection } from '
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
+import { round2 } from '../_shared/money.ts';
 // Cap embedded product images so a huge catalog can't blow the request budget.
 const MAX_ITEM_IMAGES = 60;
 // (redeploy nudge — prior deploy hit a transient Supabase 502 during upload)

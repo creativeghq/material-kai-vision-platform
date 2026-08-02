@@ -18,6 +18,7 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { formatMoney } from '../_shared/money.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';
@@ -225,10 +226,7 @@ function buildPrompt(snap: Snapshot): string {
 }
 
 // ── Deterministic fallback (used when the LLM path fails) ──────────────────────
-function fmtMoney(n: number, currency: string): string {
-  const sym = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'GBP' ? '£' : `${currency} `;
-  return `${sym}${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-}
+const fmtMoney = (n: number, currency: string) => formatMoney(n, currency, { decimals: 0 });
 
 function buildFallbackInsights(snap: Snapshot): Insights {
   const out: Insights['insights'] = [];

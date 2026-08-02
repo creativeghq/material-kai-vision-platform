@@ -19,7 +19,7 @@ function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
-const round2 = (n: number) => Math.round(n * 100) / 100;
+import { round2 } from '../_shared/money.ts';
 
 /** Pull a usable image URL out of the product's metadata jsonb (best-effort, schema-loose). */
 function imageFromMetadata(meta: any): string | null {

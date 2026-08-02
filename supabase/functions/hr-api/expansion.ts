@@ -111,7 +111,7 @@ function businessDaysInMonth(period: string): number {
   }
   return count;
 }
-const round2 = (n: number) => Math.round(n * 100) / 100;
+import { round2 } from '../_shared/money.ts';
 
 // ── Payroll rules engine (configurable per workspace; Greek 2026 defaults) ──────────────
 // tax_credit_per_child holds the ADD-ON over the base credit: base 777 (0 kids) → 900/1120/1340/1580/1780.

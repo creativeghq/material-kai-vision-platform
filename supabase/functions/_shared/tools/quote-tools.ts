@@ -36,7 +36,7 @@ function svcClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 }
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
+import { round2 } from '../money.ts';
 
 // One line item as the model supplies it. Either `product_id` (catalog, auto-priced)
 // or `name` + `unit_price` (custom). `unit_price` on a catalog line overrides pricing.

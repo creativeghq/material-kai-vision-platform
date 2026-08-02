@@ -12,6 +12,7 @@
  */
 import { PDFDocument, PDFFont, PDFImage, PDFPage, rgb, RGB } from 'pdf-lib';
 import { embedOpenSans } from '../fonts/open-sans.ts';
+import { round2 } from '../money.ts';
 
 // ── Colors (immutable) ─────────────────────────────────────────────────────────
 // Neutral greys + black only — no accent hue, so the table sits on any template.
@@ -578,4 +579,3 @@ function formatCurrency(amount: number, currency = 'EUR'): string {
   const symbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'GBP' ? '£' : `${currency} `;
   return `${symbol}${amount.toFixed(2)}`;
 }
-function round2(n: number): number { return Math.round(n * 100) / 100; }

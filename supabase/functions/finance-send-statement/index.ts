@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { formatMoneyLocalized } from '../_shared/money.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 // @pdf-lib/fontkit's published types declare no default export, so `import fontkit from`
@@ -119,10 +120,8 @@ function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
-function fmtMoney(value: number, currency = 'EUR', lang: Lang = 'el'): string {
-  const locale = lang === 'el' ? 'el-GR' : 'en-IE';
-  return new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 2 }).format(value || 0);
-}
+const fmtMoney = (value: number, currency = 'EUR', lang: Lang = 'el') =>
+  formatMoneyLocalized(value, currency, lang);
 
 function fmtDate(d: string | null, lang: Lang = 'el'): string {
   if (!d) return '—';

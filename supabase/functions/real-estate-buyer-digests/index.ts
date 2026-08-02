@@ -7,6 +7,7 @@
  * last_digest_at so the same listings never re-send. Runs daily via pg_cron (x-cron-secret).
  */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { formatMoney } from '../_shared/money.ts';
 import { matchesCriteria } from '../_shared/real-estate.ts';
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -14,7 +15,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
 import { escapeHtml } from '../_shared/html.ts';
 
-const money = (n: number | null, ccy = 'EUR') => (n == null ? 'Price on request' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+const money = (n: number | null, ccy = 'EUR') => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on request' });
 
 serve(withApiLogging('real-estate-buyer-digests', async (req) => {
   await bootstrapForFunction();

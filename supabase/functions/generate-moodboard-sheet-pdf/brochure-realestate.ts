@@ -4,6 +4,7 @@
 // cover (hero photo + title + price + location + agent block) → facts + description → photo gallery.
 // Output lands in the protected `property-media` bucket (private; signed URL returned).
 import { PDFDocument, rgb } from 'pdf-lib';
+import { formatMoney } from '../_shared/money.ts';
 import {
   loadFonts, embedImageBytes, wrapText, truncate,
   PAGE_W, PAGE_H, MARGIN, COLOR_DARK, COLOR_GRAY, COLOR_WHITE,
@@ -22,7 +23,7 @@ function json(body: any, status = 200): Response {
 
 const ACCENT = rgb(0.85, 0.15, 0.45); // magenta accent (matches the platform primary)
 const money = (n: number | null, ccy: string) =>
-  n == null ? 'Price on request' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n);
+  formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on request' });
 
 /** Facts shown on the brochure, chosen by category so a plot/warehouse reads correctly. */
 function factsFor(p: any): Array<[string, string]> {

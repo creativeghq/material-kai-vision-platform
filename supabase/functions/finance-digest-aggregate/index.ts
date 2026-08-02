@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
+import { formatMoney } from '../_shared/money.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { authenticate, isCronAuthorized } from '../_shared/auth.ts';
@@ -58,12 +59,7 @@ function json(body: any, status = 200): Response {
 }
 
 function fmtMoney(value: number | null | undefined, currency = 'EUR'): string {
-  if (value == null || isNaN(Number(value))) return '—';
-  try {
-    return new Intl.NumberFormat('en-IE', { style: 'currency', currency, maximumFractionDigits: 2 }).format(Number(value));
-  } catch {
-    return `${currency} ${Number(value).toFixed(2)}`;
-  }
+  return formatMoney(value, currency);
 }
 
 // escapeHtml now imported from ../_shared/html.ts (was a local `& < > "`-only copy,

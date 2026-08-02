@@ -2,12 +2,14 @@
 // Payslip PDF generation. For each item in an (approved/paid) payroll run, render a one-page
 // A4 payslip and file it into hr_documents (doc_type='payslip') so the employee sees it in /my-hr.
 import { PDFDocument, rgb } from 'pdf-lib';
+import { formatMoney } from '../_shared/money.ts';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 
 const HR_DOC_BUCKET = 'pdf-documents';
-const money = (n: number, c: string) => `${Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${c}`;
+// Was "1,234.56 EUR"; now matches the leading-symbol form the HR screens use.
+const money = (n: number, c: string) => formatMoney(n ?? 0, c);
 
 function json(body: any, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

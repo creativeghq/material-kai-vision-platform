@@ -16,6 +16,7 @@
  * require the caller to be the owner while the card is draft, or a finance manager.
  */
 import { createClient } from '@supabase/supabase-js';
+import { formatMoney } from '../_shared/money.ts';
 import { PDFDocument, rgb } from 'pdf-lib';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -285,10 +286,7 @@ function hr(page: any, x1: number, y: number, x2: number, thickness = 1, color: 
 function textW(font: any, t: string, size: number): number { return font.widthOfTextAtSize(t || '', size); }
 function truncate(s: string, n: number): string { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 function cap(s: string): string { s = String(s ?? ''); return s ? s[0].toUpperCase() + s.slice(1) : s; }
-function money(n: number, cur: string): string {
-  const sym = cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : cur === 'USD' ? '$' : (cur ? cur + ' ' : '');
-  return `${sym}${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+const money = (n: number, cur: string) => formatMoney(n, cur);
 function wrap(s: string, n: number): string[] {
   const words = String(s ?? '').split(/\s+/); const lines: string[] = []; let cur = '';
   for (const w of words) { if ((cur + ' ' + w).trim().length > n) { if (cur) lines.push(cur); cur = w; } else { cur = (cur + ' ' + w).trim(); } }

@@ -106,7 +106,7 @@ function vatCategory(pct: number): number {
   return 4;
 }
 
-const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+import { round2 } from '../money.ts';
 
 function partyFromCrm(c: any): FiscalParty {
   // A party may be invoiced under a SEPARATE billing identity (different

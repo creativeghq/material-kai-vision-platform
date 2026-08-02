@@ -19,6 +19,7 @@
  * and returned as a 7-day signed URL.
  */
 import { createClient } from '@supabase/supabase-js';
+import { formatMoney } from '../_shared/money.ts';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';
 import { escapeHtml } from '../_shared/html.ts';
@@ -684,10 +685,7 @@ function hr(page: any, x1: number, y: number, x2: number, thickness = 1, color: 
 function textW(font: any, t: string, size: number): number { return font.widthOfTextAtSize(t || '', size); }
 function truncate(s: string, n: number): string { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
 function cap(s: string): string { s = String(s ?? ''); return s ? s[0].toUpperCase() + s.slice(1) : s; }
-function money(n: number, cur: string): string {
-  const sym = cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : cur === 'USD' ? '$' : (cur ? cur + ' ' : '');
-  return `${sym}${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+const money = (n: number, cur: string) => formatMoney(n, cur);
 async function fetchBytes(url: string): Promise<Uint8Array | null> {
   try {
     const res = await fetch(url);
@@ -886,7 +884,9 @@ interface POCtx {
 
 async function drawPurchaseOrderDoc(pdf: PDFDocument, font: any, bold: any, ctx: POCtx) {
   const W = 595.28, H = 841.89, M = 42;
-  const money = (n: number) => `${n.toFixed(2)} ${ctx.currency}`;
+  // Was `${n.toFixed(2)} ${currency}` — ungrouped, code-suffixed — while the same PDF's other
+  // money helper printed "€1,234.56". One document, two formats.
+  const money = (n: number) => formatMoney(n, ctx.currency);
   const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max - 1) + '…' : s);
   // Our logo (top-right of the header) — from finance_settings.business_logo_path.
   let logoImg: any = null;
