@@ -21,8 +21,6 @@ export interface QuoteCanvasData {
   pdf_error?: string | null;
 }
 
-const CURRENCY_SYMBOL: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' };
-
 function money(v: number | null | undefined, currency?: string): string {
   return formatMoney(v, currency || 'EUR');
 }

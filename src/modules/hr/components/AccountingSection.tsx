@@ -10,7 +10,7 @@ import { statusTone } from '@/utils/statusTone';
 import {
   hrService, type AccountingDoc, type Reconciliation, ACCT_KIND_GROUP_LABELS,
 } from '../services/hrService';
-import { SectionHeader, EmptyState, fileToBase64, hrMoney } from './_shared';
+import { SectionHeader, EmptyState, fileToBase64 } from './_shared';
 
 const money = (n: number | null | undefined, c: string) => formatMoney(n, c);
 const thisMonth = () => new Date().toISOString().slice(0, 7);
