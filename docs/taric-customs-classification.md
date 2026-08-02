@@ -132,6 +132,46 @@ supersedes any caller-supplied chapter filter — it is strictly more specific.
 **D — name search.** Only when the category is unmapped. This was the whole of stage B before,
 and it is now the last resort.
 
+### Rules key on FACTS, not on our category buckets
+
+The category is a merchandising bucket — 11 of them — and a tariff heading is not. "Furniture"
+holds both seats (**9401**) and everything else (**9403**); "wood" holds sawn timber (4407),
+fibreboard (4411) and flooring (4418). No amount of care with 11 buckets separates those.
+
+So a rule matches on **any set of extracted facts**, expressed as
+`conditions: [{attribute, matches}]` where all must hold. `category_key` is optional — a rule may
+match purely on facts, which is what makes this work for a dealer or architect upload that never
+touched our category picker. Among matching rules the **most specific wins** (most conditions
+satisfied), so "is a seat → 9401" beats "furniture → 9403" without either rule knowing the other
+exists, and rules can be added incrementally instead of being kept mutually exclusive by hand.
+
+`product_attribute_value()` resolves an attribute through synonym rings, because extraction has
+written the same idea as `product_type`, `material_category`, `subcategory` and `material_subtype`
+at different times. A rule names the FACT it needs; it does not need to know where that fact landed.
+
+Verified: a sofa filed under `furniture` resolves to 9401, a table to 9403, `wood_flooring` to
+4418, an MDF panel to 4411, a water-based paint to 3209 (two conditions) — and **a sofa with no
+category at all still resolves to 9401**.
+
+### When a fact is missing, the model supplies the FACT — not the code
+
+`resolve_taric_for_product` returns `missing_facts`: the attribute a more specific rule would
+have needed. When that attribute is one a model can actually perceive, the classifier asks for
+**it** rather than for a tariff code, stores it on the product, and re-resolves through the rules.
+
+The split is deliberate:
+
+| | |
+|---|---|
+| **Perceivable** — `product_type`, `material` | readable off a name, description or photo; a human can check it at a glance; useful to search, filters and every later rule |
+| **Not perceivable** — water absorption, fire rating | lab measurements. A model cannot measure, and a confident guess would put a fabricated value behind a customs code |
+| **Not perceivable** — the tariff code itself | a legal conclusion, which is the whole reason rules exist |
+
+So the model does perception and the rules do classification. A wrong perception is visible,
+correctable and reusable; a wrong code is none of those. `PERCEIVABLE_FACTS` is pinned by
+[tests/unit/taricRuleClassification.test.ts](../tests/unit/taricRuleClassification.test.ts), and
+re-resolution is attempted at most once so a fact that still satisfies no rule cannot loop.
+
 ### Confirmation moved from the product to the rule
 
 Seeded rules arrive **unconfirmed**. An unconfirmed rule still resolves — it just produces a

@@ -101,3 +101,39 @@ describe('the confirmation surface exists and says what it means', () => {
     expect(panel).not.toMatch(/<Badge[^>]*>\s*\{?\s*(r\.is_confirmed|Confirmed)/);
   });
 });
+
+describe('the model is asked for FACTS, never for a code it cannot justify', () => {
+  it('only perceivable facts may be requested', () => {
+    // A model can read "this is a sofa" off a description. It cannot measure water absorption,
+    // and inviting it to try would put a fabricated lab value behind a customs code.
+    const setIdx = classifier.indexOf('PERCEIVABLE_FACTS = new Set(');
+    expect(setIdx).toBeGreaterThan(-1);
+    const decl = classifier.slice(setIdx, classifier.indexOf(')', setIdx));
+    expect(decl).toContain('product_type');
+    expect(decl).toContain('material');
+    expect(decl).not.toContain('water_absorption');
+    expect(decl).not.toContain('fire_rating');
+  });
+
+  it('the fact schema asks what it IS and what it is MADE OF — not for a code', () => {
+    const idx = classifier.indexOf('const FACT_SCHEMA');
+    expect(idx).toBeGreaterThan(-1);
+    // Bound the slice to THIS declaration. A fixed character window runs into VERDICT_SCHEMA,
+    // which mentions codes for good reason, and the assertion then fails on the wrong text.
+    const end = classifier.indexOf('});', idx);
+    expect(end).toBeGreaterThan(idx);
+    const block = classifier.slice(idx, end);
+    expect(block).toContain('product_type');
+    expect(block).toContain('material');
+    expect(block).not.toMatch(/taric|code/i);
+  });
+
+  it('a perceived fact is persisted, so it serves more than this one classification', () => {
+    expect(classifier).toMatch(/attributes: attrs/);
+  });
+
+  it('re-resolution is attempted at most once', () => {
+    // Without the guard a fact that still satisfies no rule would recurse forever.
+    expect(classifier).toContain('__factsEnriched');
+  });
+});
