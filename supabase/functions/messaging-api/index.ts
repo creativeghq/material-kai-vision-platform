@@ -21,6 +21,7 @@ import { isWorkspaceEntitled, notEntitledResponse } from '../_shared/entitlement
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { sendDelayMs } from '../_shared/messaging-rate.ts';
+import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
 import {
   zernioApi,
   zernioKey,
@@ -269,6 +270,13 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             }
           }
 
+          // Fixture tenants never reach a provider. The integration suite runs against
+          // PRODUCTION, and one test already produced 134 attempted sends. (#292 item 1)
+          if (await isFixtureWorkspace(supabaseClient, tenantWsId)) {
+            results.push({ to, success: true, skipped: 'fixture_workspace' });
+            continue;
+          }
+
           let result: any;
           try {
             result = await sendWhatsAppMessage({
@@ -363,6 +371,13 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               // Stop the bulk run once the owner is out of credits — no point retrying every row.
               break;
             }
+          }
+
+          // Fixture tenants never reach a provider. The integration suite runs against
+          // PRODUCTION, and one test already produced 134 attempted sends. (#292 item 1)
+          if (await isFixtureWorkspace(supabaseClient, tenantWsId)) {
+            results.push({ to, success: true, skipped: 'fixture_workspace' });
+            continue;
           }
 
           let result: any;

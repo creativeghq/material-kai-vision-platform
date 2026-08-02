@@ -21,6 +21,7 @@ import { zernioKey, sendWhatsAppMessage } from '../_shared/zernio.ts';
 import { sendDelayMs } from '../_shared/messaging-rate.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+import { isFixtureWorkspace } from '../_shared/fixture-guard.ts';
 
 const BATCH_SIZE = 10;
 const MAX_RETRIES = 3;
@@ -190,6 +191,14 @@ serve(withApiLogging('messaging-processor', async (req) => {
         }
 
         await supabase.from('messaging_campaign_recipients').update({ status: 'sending' }).eq('id', recipient.id);
+
+        // Fixture tenants never reach a provider. (#292 item 1)
+        if (await isFixtureWorkspace(supabase, channel.workspace_id)) {
+          await supabase.from('messaging_campaign_recipients')
+            .update({ status: 'skipped', error_message: 'Fixture workspace - send suppressed' })
+            .eq('id', recipient.id);
+          continue;
+        }
 
         try {
           const variables = { name: recipient.contact_name || '', phone: recipient.phone_number, ...(recipient.variables || {}) };
