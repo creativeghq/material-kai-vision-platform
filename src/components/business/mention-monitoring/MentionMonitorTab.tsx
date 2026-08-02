@@ -17,17 +17,18 @@ import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
   RefreshCw, ExternalLink, AlertCircle, Sparkles, Bell, Globe,
-  TrendingUp, TrendingDown, MessageSquare, Bot, Newspaper, ThumbsDown,
+  TrendingUp, TrendingDown, MessageSquare, Bot, Newspaper, ThumbsDown, Ban, ThumbsUp,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildMentionFeedFilters } from './mentionFilters';
 import {
-  TrackedMention, MentionRow, LlmVisibilitySnapshot,
+  TrackedMention, MentionRow, LlmVisibilitySnapshot, MentionExclusion,
   trackProduct, untrackProduct, getProductMonitoring, refreshProduct,
   getProductFeed, getProductLlmVisibility, probeProductLlm,
   updateTrackedMention, submitMentionClassifierCorrection,
+  listExclusions, excludeMentionUrl, includeMentionUrl, promoteMentionUrl,
 } from '@/services/mentionMonitoringApi';
 
 interface Props {
@@ -61,6 +62,13 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
   const admin = can('platform.admin');
   const [tracked, setTracked] = useState<TrackedMention | null>(null);
   const [feed, setFeed] = useState<MentionRow[]>([]);
+  // Exclusions were reachable through the API and through nothing else: all four bindings
+  // (list / exclude / include / promote) had exactly one reference each — their own definition.
+  // A wrong or noisy outlet therefore stayed in the feed permanently, unlike the price-monitoring
+  // twin which wires the same four on RetailerTable. (#310 item 5)
+  const [exclusions, setExclusions] = useState<MentionExclusion[]>([]);
+  const [showExclusions, setShowExclusions] = useState(false);
+  const [busyUrl, setBusyUrl] = useState<string | null>(null);
   const [llm, setLlm] = useState<LlmVisibilitySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -170,6 +178,80 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
       toast({ title: 'Correction failed', description: String(e?.message || e), variant: 'destructive' });
     }
   }, [toast, load]);
+
+  const loadExclusions = useCallback(async (trackedId: string) => {
+    try {
+      setExclusions(await listExclusions(trackedId));
+    } catch (e) {
+      // Non-fatal: the feed is still usable without the exclusions panel. Logged rather than
+      // swallowed so a broken endpoint is visible instead of looking like "nothing excluded".
+      console.error('Could not load mention exclusions', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tracked?.id) void loadExclusions(tracked.id);
+  }, [tracked?.id, loadExclusions]);
+
+  /** Hide every future mention from this outlet. Domain-level, because the noisy unit is the
+   *  outlet, not the individual article — excluding one URL from a syndicating site is whack-a-mole. */
+  const handleExclude = useCallback(async (row: MentionRow) => {
+    if (!tracked?.id) return;
+    const domain = row.outlet_domain || undefined;
+    setBusyUrl(row.url);
+    try {
+      await excludeMentionUrl({
+        trackedMentionId: tracked.id,
+        ...(domain ? { domain } : { url: row.url }),
+        reason: `Excluded from ${productName} feed by an admin`,
+      });
+      toast({
+        title: domain ? `Excluded ${domain}` : 'Excluded this URL',
+        description: 'It will not appear in this subject\u2019s feed again. Restore it from Excluded sources.',
+      });
+      await Promise.all([load(), loadExclusions(tracked.id)]);
+    } catch (e: any) {
+      toast({ title: 'Could not exclude', description: String(e?.message || e), variant: 'destructive' });
+    } finally {
+      setBusyUrl(null);
+    }
+  }, [tracked?.id, productName, toast, load, loadExclusions]);
+
+  /** Force a mention the classifier down-ranked back to `exact`. The counterpart to the existing
+   *  "wrong match" thumbs-down: without it an operator could only ever push results DOWN. */
+  const handlePromote = useCallback(async (row: MentionRow) => {
+    if (!tracked?.id) return;
+    setBusyUrl(row.url);
+    try {
+      await promoteMentionUrl({
+        trackedMentionId: tracked.id,
+        url: row.url,
+        override_relevance: 'exact',
+        reason: `Promoted by an admin from ${row.relevance ?? 'unclassified'}`,
+      });
+      toast({ title: 'Promoted to exact match' });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Could not promote', description: String(e?.message || e), variant: 'destructive' });
+    } finally {
+      setBusyUrl(null);
+    }
+  }, [tracked?.id, toast, load]);
+
+  const handleRestore = useCallback(async (ex: MentionExclusion) => {
+    if (!tracked?.id) return;
+    try {
+      await includeMentionUrl({
+        trackedMentionId: tracked.id,
+        url: ex.url ?? undefined,
+        domain: ex.domain ?? undefined,
+      });
+      toast({ title: 'Restored', description: 'Future refreshes will include this source again.' });
+      await Promise.all([load(), loadExclusions(tracked.id)]);
+    } catch (e: any) {
+      toast({ title: 'Could not restore', description: String(e?.message || e), variant: 'destructive' });
+    }
+  }, [tracked?.id, toast, load, loadExclusions]);
 
   const enabled = !!tracked?.is_active;
 
@@ -343,14 +425,44 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
                                 <p className="text-[10px] text-muted-foreground mt-1 italic">{row.match_note}</p>
                               )}
                             </div>
-                            {admin && row.relevance !== 'mismatch' && (
-                              <Button
-                                size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
-                                onClick={() => handleCorrect(row, 'mismatch')}
-                                title="Mark as wrong match"
-                              >
-                                <ThumbsDown className="h-3 w-3" />
-                              </Button>
+                            {admin && (
+                              <div className="flex items-center gap-0.5 shrink-0">
+                                {row.relevance !== 'mismatch' && (
+                                  <Button
+                                    size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
+                                    onClick={() => handleCorrect(row, 'mismatch')}
+                                    title="Mark as wrong match"
+                                    aria-label="Mark as wrong match"
+                                  >
+                                    <ThumbsDown className="h-3 w-3" />
+                                  </Button>
+                                )}
+                                {row.relevance !== 'exact' && (
+                                  <Button
+                                    size="sm" variant="ghost" className="h-7 px-2 text-[11px]"
+                                    disabled={busyUrl === row.url}
+                                    onClick={() => handlePromote(row)}
+                                    title="Promote to exact match"
+                                    aria-label="Promote to exact match"
+                                  >
+                                    <ThumbsUp className="h-3 w-3" />
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm" variant="ghost"
+                                  className="h-7 px-2 text-[11px] hover:text-destructive"
+                                  disabled={busyUrl === row.url}
+                                  onClick={() => handleExclude(row)}
+                                  title={row.outlet_domain
+                                    ? `Never show ${row.outlet_domain} again`
+                                    : 'Never show this URL again'}
+                                  aria-label={row.outlet_domain
+                                    ? `Exclude ${row.outlet_domain}`
+                                    : 'Exclude this URL'}
+                                >
+                                  <Ban className="h-3 w-3" />
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </li>
@@ -359,6 +471,66 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
                   )}
                 </CardContent>
               </Card>
+
+              {/* Excluded sources — the undo half of the Ban button on each row. Without a
+                  visible list an exclusion is a one-way door: an operator who muted the wrong
+                  outlet would have no way to find or reverse it. Mirrors the Excluded Results
+                  panel on ProductMonitorTab. (#310 item 5) */}
+              {admin && exclusions.length > 0 && (
+                <Card className="dashboard-card mt-3">
+                  <CardHeader className="pb-3">
+                    <button
+                      type="button"
+                      className="flex items-center justify-between gap-3 w-full text-left"
+                      onClick={() => setShowExclusions((v) => !v)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Ban className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="font-medium">Excluded sources</CardTitle>
+                        <Badge variant="outline" className="text-[10px]">{exclusions.length}</Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {showExclusions ? 'Hide' : 'Show'}
+                      </span>
+                    </button>
+                  </CardHeader>
+                  {showExclusions && (
+                    <CardContent className="p-0">
+                      <div className="divide-y divide-border">
+                        {exclusions.map((ex) => (
+                          <div key={ex.id} className="flex items-start justify-between gap-3 px-6 py-2.5 text-xs">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">
+                                {ex.domain || ex.url}
+                              </div>
+                              {ex.domain && ex.url && (
+                                <div className="text-[10px] text-muted-foreground truncate">{ex.url}</div>
+                              )}
+                              {ex.reason && (
+                                <div className="text-[10px] text-muted-foreground italic mt-0.5">{ex.reason}</div>
+                              )}
+                              <div className="text-[10px] text-muted-foreground mt-0.5">
+                                Excluded {new Date(ex.excluded_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                            <Button
+                              size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1"
+                              onClick={() => handleRestore(ex)}
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              Restore
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="px-6 py-3 text-[10px] text-muted-foreground border-t bg-muted/20">
+                        Excluded URLs and domains never appear in this subject&rsquo;s feed, outlet
+                        counts or alerts. Other subjects tracking the same outlet are unaffected.
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              )}
             </TabsContent>
 
             {/* Outlets */}
