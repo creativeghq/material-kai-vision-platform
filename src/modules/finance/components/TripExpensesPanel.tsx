@@ -498,23 +498,23 @@ const NewTripCardDialog: React.FC<{
         <DialogHeader><DialogTitle>New Expense Card</DialogTitle><DialogDescription className="sr-only">Expense card form.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Type</label>
+            <label htmlFor="tripexpensespanel-type" className="text-xs text-muted-foreground">Type</label>
             <Select value={cardType} onValueChange={(v: any) => setCardType(v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="tripexpensespanel-type"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {EXPENSE_CARD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Title</label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isTrip ? 'e.g. Athens client visits — June' : 'e.g. June 2026 expenses'} />
+            <label htmlFor="tripexpensespanel-title" className="text-xs text-muted-foreground">Title</label>
+            <Input id="tripexpensespanel-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isTrip ? 'e.g. Athens client visits — June' : 'e.g. June 2026 expenses'} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             {isTrip && (
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Destination</label>
-                <Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Athens" />
+                <label htmlFor="tripexpensespanel-destination" className="text-xs text-muted-foreground">Destination</label>
+                <Input id="tripexpensespanel-destination" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Athens" />
               </div>
             )}
             <div className="space-y-1">
@@ -588,9 +588,9 @@ const RequestCardDialog: React.FC<{
         <p className="text-xs text-muted-foreground">Create a card for a team member to fill in — they’ll get a notification with a link to add their expenses and submit.</p>
         <div className="space-y-3">
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Team member</label>
+            <label htmlFor="tripexpensespanel-team-member" className="text-xs text-muted-foreground">Team member</label>
             <Select value={userId} onValueChange={setUserId} disabled={loadingPeople}>
-              <SelectTrigger><SelectValue placeholder={loadingPeople ? 'Loading…' : 'Select a team member'} /></SelectTrigger>
+              <SelectTrigger id="tripexpensespanel-team-member"><SelectValue placeholder={loadingPeople ? 'Loading…' : 'Select a team member'} /></SelectTrigger>
               <SelectContent>
                 {assignees.map((a) => <SelectItem key={a.user_id} value={a.user_id}>{a.name}{a.email ? ` · ${a.email}` : ''}</SelectItem>)}
               </SelectContent>
@@ -598,22 +598,22 @@ const RequestCardDialog: React.FC<{
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Type</label>
+              <label htmlFor="tripexpensespanel-type-2" className="text-xs text-muted-foreground">Type</label>
               <Select value={cardType} onValueChange={(v: any) => setCardType(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="tripexpensespanel-type-2"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {EXPENSE_CARD_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Title / Category</label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Q3 client tour" />
+              <label htmlFor="tripexpensespanel-title-category" className="text-xs text-muted-foreground">Title / Category</label>
+              <Input id="tripexpensespanel-title-category" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Q3 client tour" />
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Note to the team member (optional)</label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What this card is for / what to include" />
+            <label htmlFor="tripexpensespanel-note-to-the-team-member-optional" className="text-xs text-muted-foreground">Note to the team member (optional)</label>
+            <Input id="tripexpensespanel-note-to-the-team-member-optional" value={note} onChange={(e) => setNote(e.target.value)} placeholder="What this card is for / what to include" />
           </div>
         </div>
         <DialogFooter>
@@ -678,13 +678,13 @@ const AddExpenseDialog: React.FC<{
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Date</label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <label htmlFor="tripexpensespanel-date" className="text-xs text-muted-foreground">Date</label>
+              <Input id="tripexpensespanel-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Category</label>
+              <label htmlFor="tripexpensespanel-category" className="text-xs text-muted-foreground">Category</label>
               <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="tripexpensespanel-category"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {TRIP_EXPENSE_CATEGORIES.map((c) => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
                 </SelectContent>
@@ -692,22 +692,22 @@ const AddExpenseDialog: React.FC<{
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Description</label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Taxi airport → hotel" />
+            <label htmlFor="tripexpensespanel-description" className="text-xs text-muted-foreground">Description</label>
+            <Input id="tripexpensespanel-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Taxi airport → hotel" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Vendor</label>
-              <Input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Beat / Hotel name" />
+              <label htmlFor="tripexpensespanel-vendor" className="text-xs text-muted-foreground">Vendor</label>
+              <Input id="tripexpensespanel-vendor" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Beat / Hotel name" />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Amount ({currency})</label>
               <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Paid with</label>
+              <label htmlFor="tripexpensespanel-paid-with" className="text-xs text-muted-foreground">Paid with</label>
               <Select value={method} onValueChange={(v: any) => setMethod(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="tripexpensespanel-paid-with"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="personal">Personal funds</SelectItem>
                   <SelectItem value="cash">Cash</SelectItem>
@@ -725,9 +725,9 @@ const AddExpenseDialog: React.FC<{
           </label>
           {billable && (
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Project</label>
+              <label htmlFor="tripexpensespanel-project" className="text-xs text-muted-foreground">Project</label>
               <Select value={projectId || '__none__'} onValueChange={(v) => setProjectId(v === '__none__' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="Pick the project to bill" /></SelectTrigger>
+                <SelectTrigger id="tripexpensespanel-project"><SelectValue placeholder="Pick the project to bill" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">— No project —</SelectItem>
                   {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name || p.id.slice(0, 8)}</SelectItem>)}

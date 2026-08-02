@@ -246,16 +246,16 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium">Name *</label>
-            <Input value={stepName} onChange={(e) => setStepName(e.target.value)} placeholder="e.g., Materials Ordered" className="mt-1" />
+            <label htmlFor="timelinestepsmanagementpage-name" className="text-sm font-medium">Name *</label>
+            <Input id="timelinestepsmanagementpage-name" value={stepName} onChange={(e) => setStepName(e.target.value)} placeholder="e.g., Materials Ordered" className="mt-1" />
           </div>
           <div>
-            <label className="text-sm font-medium">Description</label>
-            <Textarea value={stepDescription} onChange={(e) => setStepDescription(e.target.value)} placeholder="Describe this timeline step..." className="mt-1" rows={3} />
+            <label htmlFor="timelinestepsmanagementpage-description" className="text-sm font-medium">Description</label>
+            <Textarea id="timelinestepsmanagementpage-description" value={stepDescription} onChange={(e) => setStepDescription(e.target.value)} placeholder="Describe this timeline step..." className="mt-1" rows={3} />
           </div>
           <div>
-            <label className="text-sm font-medium">Display Order</label>
-            <Input type="number" min="0" value={displayOrder} onChange={(e) => setDisplayOrder(e.target.value)} placeholder="0" className="mt-1" />
+            <label htmlFor="timelinestepsmanagementpage-display-order" className="text-sm font-medium">Display Order</label>
+            <Input id="timelinestepsmanagementpage-display-order" type="number" min="0" value={displayOrder} onChange={(e) => setDisplayOrder(e.target.value)} placeholder="0" className="mt-1" />
           </div>
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium">Active</label>
@@ -281,12 +281,12 @@ export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = (
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium">Name *</label>
-            <Input value={stepName} onChange={(e) => setStepName(e.target.value)} placeholder="e.g., Materials Ordered" className="mt-1" />
+            <label htmlFor="timelinestepsmanagementpage-name-2" className="text-sm font-medium">Name *</label>
+            <Input id="timelinestepsmanagementpage-name-2" value={stepName} onChange={(e) => setStepName(e.target.value)} placeholder="e.g., Materials Ordered" className="mt-1" />
           </div>
           <div>
-            <label className="text-sm font-medium">Description</label>
-            <Textarea value={stepDescription} onChange={(e) => setStepDescription(e.target.value)} placeholder="Describe this timeline step..." className="mt-1" rows={3} />
+            <label htmlFor="timelinestepsmanagementpage-description-2" className="text-sm font-medium">Description</label>
+            <Textarea id="timelinestepsmanagementpage-description-2" value={stepDescription} onChange={(e) => setStepDescription(e.target.value)} placeholder="Describe this timeline step..." className="mt-1" rows={3} />
           </div>
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium">Active</label>

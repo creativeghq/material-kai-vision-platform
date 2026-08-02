@@ -88,8 +88,8 @@ export const QuoteEmailButton: React.FC<Props> = ({ quoteId, defaultEmail, onSen
 
           <div className="space-y-3 py-1">
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Recipient</label>
-              <Input
+              <label htmlFor="quoteemailbutton-recipient" className="text-sm font-medium mb-1.5 block">Recipient</label>
+              <Input id="quoteemailbutton-recipient"
                 type="email"
                 placeholder="Customer on file"
                 value={to}
@@ -97,8 +97,8 @@ export const QuoteEmailButton: React.FC<Props> = ({ quoteId, defaultEmail, onSen
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1.5 block">Message (optional)</label>
-              <Textarea
+              <label htmlFor="quoteemailbutton-message-optional" className="text-sm font-medium mb-1.5 block">Message (optional)</label>
+              <Textarea id="quoteemailbutton-message-optional"
                 placeholder="Add a short note…"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}

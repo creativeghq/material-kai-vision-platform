@@ -559,10 +559,10 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium">
+                    <label htmlFor="aitestingpanel-test-image-url" className="text-sm font-medium">
                       Test Image URL
                     </label>
-                    <Input
+                    <Input id="aitestingpanel-test-image-url"
                       value={testImageUrl}
                       onChange={(e) => setTestImageUrl(e.target.value)}
                       placeholder="https://example.com/material-image.jpg"
@@ -710,8 +710,8 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium">Test Text</label>
-                    <Textarea
+                    <label htmlFor="aitestingpanel-test-text" className="text-sm font-medium">Test Text</label>
+                    <Textarea id="aitestingpanel-test-text"
                       value={multiModalTestText}
                       onChange={(e) => setMultiModalTestText(e.target.value)}
                       placeholder="Enter material description or specification text..."
@@ -753,10 +753,10 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium">
+                    <label htmlFor="aitestingpanel-test-image-url-2" className="text-sm font-medium">
                       Test Image URL
                     </label>
-                    <Input
+                    <Input id="aitestingpanel-test-image-url-2"
                       value={multiModalTestImage}
                       onChange={(e) => setMultiModalTestImage(e.target.value)}
                       placeholder="https://example.com/material-image.jpg"
@@ -1006,8 +1006,8 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium">Search Query</label>
-                  <Input
+                  <label htmlFor="aitestingpanel-search-query" className="text-sm font-medium">Search Query</label>
+                  <Input id="aitestingpanel-search-query"
                     value={similarityQuery}
                     onChange={(e) => setSimilarityQuery(e.target.value)}
                     placeholder="Enter search query (e.g., 'waterproof ceramic tiles')"
@@ -1015,11 +1015,11 @@ export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = fa
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">
+                  <label htmlFor="aitestingpanel-similarity-threshold" className="text-sm font-medium">
                     Similarity Threshold
                   </label>
                   <div className="flex items-center gap-4 mt-2">
-                    <input
+                    <input id="aitestingpanel-similarity-threshold"
                       type="range"
                       min="0.5"
                       max="0.95"

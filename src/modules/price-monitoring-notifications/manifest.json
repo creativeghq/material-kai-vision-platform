@@ -3,6 +3,7 @@
   "name": "Price Monitoring Notifications",
   "description": "Send users price-drop, new-retailer, promo-start, and anomaly alerts for tracked products. Per-channel credit-metered: bell free, email costs credits, webhook free. Opt-in per product or per tracked query.",
   "category": "pricing",
+  "parent": "price-monitoring",
   "priceTier": "pro",
   "icon": "BellRing",
   "version": "0.1.0"

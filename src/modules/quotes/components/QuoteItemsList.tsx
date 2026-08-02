@@ -654,11 +654,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pl-[52px]">
                               {/* Notes */}
                               <div className="space-y-1">
-                                <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                <label htmlFor="quoteitemslist-notes" className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                                   <Package className="h-3 w-3" /> Notes
                                 </label>
                                 {editable && onUpdateItem ? (
-                                  <textarea
+                                  <textarea id="quoteitemslist-notes"
                                     defaultValue={item.notes || ''}
                                     placeholder="General notes..."
                                     rows={2}
@@ -690,11 +690,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                   installation) OR the pricing tab; customers see it read-only once quoted. */}
                               {(editable || editPricing || (showPricing && item.delivery_date)) && (
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                  <label htmlFor="quoteitemslist-expected-delivery" className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                                     <Truck className="h-3 w-3" /> Expected Delivery
                                   </label>
                                   {(editable || editPricing) && onUpdateItem ? (
-                                    <Input
+                                    <Input id="quoteitemslist-expected-delivery"
                                       type="date"
                                       defaultValue={item.delivery_date || ''}
                                       className="h-7 text-xs"

@@ -618,10 +618,10 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
             <>
               {/* Prompt preview */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">
+                <label htmlFor="geminieditmodal-edit-instruction-edit-freely-before-appl" className="text-xs font-medium text-muted-foreground">
                   Edit instruction — edit freely before applying
                 </label>
-                <textarea
+                <textarea id="geminieditmodal-edit-instruction-edit-freely-before-appl"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   rows={5}

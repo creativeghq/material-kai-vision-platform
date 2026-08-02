@@ -1709,8 +1709,8 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
             {mode === 'team' ? (
               <>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">Topic</label>
-                  <Input placeholder="e.g. Follow up on the Andronikos quote" value={subject} onChange={(e) => setSubject(e.target.value)} />
+                  <label htmlFor="inboxpage-topic" className="text-xs text-muted-foreground">Topic</label>
+                  <Input id="inboxpage-topic" placeholder="e.g. Follow up on the Andronikos quote" value={subject} onChange={(e) => setSubject(e.target.value)} />
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground mb-1.5">Who's in this conversation?</div>
@@ -1737,10 +1737,10 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">Customer</label>
+                  <label htmlFor="inboxpage-customer" className="text-xs text-muted-foreground">Customer</label>
                   <div className="relative">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                    <Input placeholder="Search contacts by name or email" value={contactQuery} onChange={(e) => { setContactQuery(e.target.value); setContactId(null); }} className="pl-9" />
+                    <Input id="inboxpage-customer" placeholder="Search contacts by name or email" value={contactQuery} onChange={(e) => { setContactQuery(e.target.value); setContactId(null); }} className="pl-9" />
                   </div>
                   <div className="max-h-40 overflow-y-auto space-y-0.5 rounded-xl border border-white/10 p-1.5">
                     {contacts.map((ct) => (
@@ -1764,12 +1764,12 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">Subject (optional)</label>
-                  <Input placeholder="What's this about?" value={custSubject} onChange={(e) => setCustSubject(e.target.value)} />
+                  <label htmlFor="inboxpage-subject-optional" className="text-xs text-muted-foreground">Subject (optional)</label>
+                  <Input id="inboxpage-subject-optional" placeholder="What's this about?" value={custSubject} onChange={(e) => setCustSubject(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">First message (optional)</label>
-                  <Textarea placeholder="Write the first message to the customer…" value={custMessage} onChange={(e) => setCustMessage(e.target.value)} className="min-h-[72px] resize-none" />
+                  <label htmlFor="inboxpage-first-message-optional" className="text-xs text-muted-foreground">First message (optional)</label>
+                  <Textarea id="inboxpage-first-message-optional" placeholder="Write the first message to the customer…" value={custMessage} onChange={(e) => setCustMessage(e.target.value)} className="min-h-[72px] resize-none" />
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   Contacts with an account see this in their inbox. For others you'll get a private link to send them.

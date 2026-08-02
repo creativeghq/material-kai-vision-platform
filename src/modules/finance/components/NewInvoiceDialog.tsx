@@ -1417,7 +1417,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             {/* #207 — B2G (public-sector e-invoicing). Hidden for retail (11.x) docs. */}
             {!documentType.startsWith('11') && (
               <section className="border-t border-border/40 pt-4 space-y-2">
-                <label className="flex items-center justify-between cursor-pointer">
+                <label htmlFor="newinvoicedialog-b2g-public-sector-invoice-setisb2g-v-tru" className="flex items-center justify-between cursor-pointer">
                   <span className="text-xs uppercase tracking-wide text-muted-foreground">B2G — public-sector invoice</span>
                   <Checkbox className="h-4 w-4 rounded" checked={isB2g} onCheckedChange={(v) => setIsB2g(v === true)} />
                 </label>
@@ -1425,7 +1425,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   <>
                     <p className="text-[11px] text-muted-foreground">Transmitted on the same myDATA envelope with the public-buyer reference block. Fill the references provided by the contracting authority.</p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                      <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Contract reference (ΑΔΑΜ)</Label><Input className="h-8 text-xs" value={b2gContractRef} onChange={(e) => setB2gContractRef(e.target.value)} placeholder="e.g. 20SYMV006467658" /></div>
+                      <div id="newinvoicedialog-b2g-public-sector-invoice-setisb2g-v-tru" className="space-y-1"><Label className="text-[10px] text-muted-foreground">Contract reference (ΑΔΑΜ)</Label><Input className="h-8 text-xs" value={b2gContractRef} onChange={(e) => setB2gContractRef(e.target.value)} placeholder="e.g. 20SYMV006467658" /></div>
                       <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Buyer reference</Label><Input className="h-8 text-xs" value={b2gBuyerRef} onChange={(e) => setB2gBuyerRef(e.target.value)} placeholder="contracting authority" /></div>
                       <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Buyer legal registration id</Label><Input className="h-8 text-xs" value={b2gBuyerReg} onChange={(e) => setB2gBuyerReg(e.target.value)} placeholder="defaults to buyer VAT" /></div>
                       <div className="space-y-1"><Label className="text-[10px] text-muted-foreground">Buyer identifier (ΚΗΜΔΗΣ/KAE)</Label><Input className="h-8 text-xs" value={b2gBuyerIdentifier} onChange={(e) => setB2gBuyerIdentifier(e.target.value)} placeholder="e.g. 1007.909.0001" /></div>
@@ -1459,10 +1459,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <label className="flex items-center justify-between cursor-pointer"><span>Include in MYF report</span><Checkbox className="h-4 w-4 rounded" checked={includeInMyf} onCheckedChange={(v) => setIncludeInMyf(v === true)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Move stock on issue (decrement warehouse)</span><Checkbox className="h-4 w-4 rounded" checked={moveStock} onCheckedChange={(v) => setMoveStock(v === true)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Print terms & comments</span><Checkbox className="h-4 w-4 rounded" checked={printTerms} onCheckedChange={(v) => setPrintTerms(v === true)} /></label>
-                <label className="flex items-center justify-between cursor-pointer"><span>Send by email on create</span><Checkbox className="h-4 w-4 rounded" checked={sendEmail} onCheckedChange={(v) => setSendEmail(v === true)} /></label>
+                <label htmlFor="newinvoicedialog-send-by-email-on-create-setsendemail-v-t" className="flex items-center justify-between cursor-pointer"><span>Send by email on create</span><Checkbox className="h-4 w-4 rounded" checked={sendEmail} onCheckedChange={(v) => setSendEmail(v === true)} /></label>
                 <div className="flex items-center justify-between"><span>Logo</span>
                   <Select value={logoMode} onValueChange={(v: any) => setLogoMode(v)}>
-                    <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="newinvoicedialog-send-by-email-on-create-setsendemail-v-t" className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="auto">Business logo</SelectItem><SelectItem value="none">No logo</SelectItem></SelectContent>
                   </Select>
                 </div>

@@ -131,7 +131,28 @@ export default [
       'jsx-a11y/click-events-have-key-events': 'warn',
       'jsx-a11y/no-static-element-interactions': 'warn',
       'jsx-a11y/label-has-associated-control': 'warn',
-      'jsx-a11y/control-has-associated-label': 'warn',
+      // Configured with the ignore lists from the rule's OWN documentation, which the bare
+      // 'warn' form does not apply.
+      //
+      // Without them the rule double-reports: it flagged 57 <input> and 18 <textarea> that
+      // `label-has-associated-control` above already covers — and covers BETTER, because the
+      // right fix for an input is a real <label htmlFor>, not an aria-label bolted onto the
+      // control. Chasing those warnings would have produced 75 aria-labels papering over
+      // missing labels.
+      //
+      // It also flagged 7 <tr>, 7 <video> and 4 <canvas>, none of which is a form control at
+      // all. `th`/`td` are deliberately NOT ignored — an unlabelled header cell is a real (if
+      // minor) defect, and those are fixed in the code rather than configured away.
+      'jsx-a11y/control-has-associated-label': ['warn', {
+        labelAttributes: ['label'],
+        controlComponents: [],
+        ignoreElements: ['audio', 'canvas', 'embed', 'input', 'textarea', 'tr', 'video'],
+        ignoreRoles: [
+          'grid', 'listbox', 'menu', 'menubar', 'radiogroup', 'row',
+          'tablist', 'toolbar', 'tree', 'treegrid',
+        ],
+        depth: 5,
+      }],
       'jsx-a11y/aria-props': 'warn',
       'jsx-a11y/role-has-required-aria-props': 'warn',
 

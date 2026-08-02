@@ -231,8 +231,8 @@ export const StatusTagsManagement: React.FC = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-gray-700">Tag Name *</label>
-              <Input
+              <label htmlFor="statustagsmanagementpage-tag-name" className="text-sm font-medium text-gray-700">Tag Name *</label>
+              <Input id="statustagsmanagementpage-tag-name"
                 value={tagName}
                 onChange={(e) => setTagName(e.target.value)}
                 placeholder="e.g., Awaiting Approval"
@@ -240,9 +240,9 @@ export const StatusTagsManagement: React.FC = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Color *</label>
+              <label htmlFor="statustagsmanagementpage-color" className="text-sm font-medium text-gray-700">Color *</label>
               <div className="flex items-center gap-3 mt-1">
-                <input
+                <input id="statustagsmanagementpage-color"
                   type="color"
                   value={tagColor}
                   onChange={(e) => setTagColor(e.target.value)}
@@ -257,8 +257,8 @@ export const StatusTagsManagement: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Description (Optional)</label>
-              <Textarea
+              <label htmlFor="statustagsmanagementpage-description-optional" className="text-sm font-medium text-gray-700">Description (Optional)</label>
+              <Textarea id="statustagsmanagementpage-description-optional"
                 value={tagDescription}
                 onChange={(e) => setTagDescription(e.target.value)}
                 placeholder="Describe when to use this tag..."

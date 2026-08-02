@@ -322,7 +322,7 @@ const PayInvoicePage: React.FC = () => {
           >
             <span>Another amount</span>
             {choice === 'custom' && (
-              <span onClick={(e) => e.stopPropagation()} className="w-32">
+              <span role="presentation" onClick={(e) => e.stopPropagation()} className="w-32">
                 <MoneyInput className="h-8 text-right text-sm" value={custom} onValueChange={setCustom} />
               </span>
             )}

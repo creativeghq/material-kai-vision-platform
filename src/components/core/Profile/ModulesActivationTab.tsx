@@ -10,7 +10,7 @@ import { Loader2, Check, Sparkles, Send, ArrowRight, Lock, Coins } from 'lucide-
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useEntitlements } from '@/hooks/useEntitlements';
-import { registeredModules, refreshModuleRegistry } from '@/modules/_core';
+import { registeredModules, refreshModuleRegistry, parentSlugOf, groupByParent } from '@/modules/_core';
 import { SIDEBAR_NAV_ITEMS, type Hub } from '@/config/nav-items';
 import { resolveModuleMeta, hubOrder, type ModuleMeta } from '@/config/module-catalog-meta';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -78,6 +78,12 @@ interface ModuleTile {
   sub?: ModuleSubscriptionRow;
 }
 
+/** One card: a top-level module plus the sub-modules rendered inside it. */
+interface ModuleGroupEntry {
+  tile: ModuleTile;
+  children: ModuleTile[];
+}
+
 export const ModulesActivationTab: React.FC = () => {
   const { activeWorkspaceId, workspaceRole, isPlatformOperator } = useWorkspace();
   const { planLevel, planName, availableSlugs, loading: entLoading } = useEntitlements();
@@ -134,8 +140,19 @@ export const ModulesActivationTab: React.FC = () => {
   // Modules the owner can activate: published add-ons + published modules that surface a
   // workspace launcher entry, joined with their presentation meta + entitlement state.
   const tiles = useMemo<ModuleTile[]>(
-    () => catalog
-      .filter((m) => m.is_addon || tenantFacingSlugs.has(m.slug))
+    () => {
+      const eligible = new Set(
+        catalog.filter((m) => m.is_addon || tenantFacingSlugs.has(m.slug)).map((m) => m.slug),
+      );
+      // A sub-module never floats as a loose card: pull in its parent's catalog row so it has
+      // somewhere to nest, even when the parent itself isn't tenant-facing on its own (Payments
+      // is an admin-only settings surface, but Stripe/Viva are purchasable add-ons under it).
+      for (const slug of [...eligible]) {
+        const parent = parentSlugOf(slug);
+        if (parent) eligible.add(parent);
+      }
+      return catalog
+      .filter((m) => eligible.has(m.slug))
       .map((row) => {
         const covered = planLevel >= tierRank(row.price_tier);
         const isActivated = activated.has(row.slug) || availableSlugs.has(row.slug);
@@ -150,7 +167,8 @@ export const ModulesActivationTab: React.FC = () => {
           sub: subs.get(row.slug),
         };
       })
-      .sort((a, b) => a.row.name.localeCompare(b.row.name)),
+      .sort((a, b) => a.row.name.localeCompare(b.row.name));
+    },
     [catalog, planLevel, activated, availableSlugs, subs],
   );
 
@@ -165,23 +183,39 @@ export const ModulesActivationTab: React.FC = () => {
     available: matched.filter((t) => !t.hasIt).length,
   }), [matched]);
 
-  // Group the filtered tiles by Hub, preserving the launcher's Hub order.
+  // Group the filtered tiles by Hub, preserving the launcher's Hub order. Within a Hub, a
+  // sub-module (`manifest.parent`) renders INSIDE its parent's card rather than as a sibling —
+  // Stripe/Viva under Payments, Property Management/Investments under Real Estate.
   const groups = useMemo(() => {
     const visible = matched.filter((t) => filter === 'all' || (filter === 'active' ? t.hasIt : !t.hasIt));
-    const byHub = new Map<string, { label: string; hub: Hub | null; tiles: ModuleTile[]; order: number }>();
+    // A sub-module that survived the filters keeps its parent card as its host even when the
+    // parent itself was filtered out — otherwise it would reappear as the loose card we just fixed.
+    const shown = new Map(visible.map((t) => [t.row.slug, t] as const));
     for (const t of visible) {
+      const parent = parentSlugOf(t.row.slug);
+      if (!parent || shown.has(parent)) continue;
+      const parentTile = tiles.find((x) => x.row.slug === parent);
+      if (parentTile) shown.set(parent, parentTile);
+    }
+
+    const { topLevel, childrenByParent } = groupByParent([...shown.values()], (t) => t.row.slug);
+    const byHub = new Map<string, { label: string; hub: Hub | null; entries: ModuleGroupEntry[]; count: number; order: number }>();
+    for (const t of topLevel) {
       const key = t.meta.hub?.id ?? '__more__';
       const entry = byHub.get(key) ?? {
         label: t.meta.hub?.label ?? 'Platform & integrations',
         hub: t.meta.hub,
-        tiles: [],
+        entries: [],
+        count: 0,
         order: hubOrder(t.meta.hub?.id ?? null),
       };
-      entry.tiles.push(t);
+      const children = childrenByParent.get(t.row.slug) ?? [];
+      entry.entries.push({ tile: t, children });
+      entry.count += 1 + children.length;
       byHub.set(key, entry);
     }
     return [...byHub.values()].sort((a, b) => a.order - b.order);
-  }, [matched, filter]);
+  }, [matched, filter, tiles]);
 
   const handleActivate = async (m: ModuleCatalogRow) => {
     if (!activeWorkspaceId) return;
@@ -263,15 +297,13 @@ export const ModulesActivationTab: React.FC = () => {
     </button>
   );
 
-  const renderTile = (t: ModuleTile) => {
-    const { row: m, meta, covered, isActivated, hasIt, purchasable, price, sub } = t;
-    const Icon = meta.icon;
-    const isBusy = busy === m.slug;
+  // ── Cost line: what this actually costs, and what happens next. Driven by the live Stripe
+  //    subscription row so a cancelled-but-still-running add-on says so. Shared by the parent
+  //    card and the sub-module rows inside it so both tell the same story. ──
+  const statusOf = (t: ModuleTile): React.ReactNode => {
+    const { row: m, covered, hasIt, purchasable, price, sub } = t;
     const periodEnd = formatDate(sub?.current_period_end);
     const canceling = sub?.status === 'canceling' || sub?.status === 'cancelling';
-
-    // ── Cost line (bottom-left): what this actually costs, and what happens next. Driven by the
-    //    live Stripe subscription row so a cancelled-but-still-running add-on says so. ──
     let status: React.ReactNode;
     if (covered) {
       status = <span className="text-xs text-muted-foreground">Included in {planName}</span>;
@@ -301,10 +333,23 @@ export const ModulesActivationTab: React.FC = () => {
         </span>
       );
     }
+    return status;
+  };
 
-    // ── Action (bottom-right). ──
+  // ── Action. `blockedBy` is the parent module a sub-module needs first — activating a provider
+  //    without its parent buys something that cannot run. ──
+  const actionOf = (t: ModuleTile, blockedBy?: ModuleTile): React.ReactNode => {
+    const { row: m, meta, covered, isActivated, hasIt, purchasable, price, sub } = t;
+    const isBusy = busy === m.slug;
+    const canceling = sub?.status === 'canceling' || sub?.status === 'cancelling';
     let action: React.ReactNode;
-    if (hasIt) {
+    if (!hasIt && blockedBy) {
+      action = (
+        <Button size="sm" variant="outline" disabled title={`Activate ${blockedBy.row.name} first`}>
+          <Lock className="mr-1 h-3.5 w-3.5" /> Needs {blockedBy.row.name}
+        </Button>
+      );
+    } else if (hasIt) {
       // Cancelling is destructive + billing-affecting → confirm with the end date first.
       const cancel = isOwner && isActivated && m.is_addon && !covered && !canceling ? (
         <Button size="sm" variant="ghost" className="text-muted-foreground" disabled={isBusy} onClick={() => setConfirmCancel(t)}>
@@ -340,6 +385,34 @@ export const ModulesActivationTab: React.FC = () => {
         </Button>
       );
     }
+    return action;
+  };
+
+  /**
+   * A sub-module, rendered as a row INSIDE its parent's card — same cost line and same actions as a
+   * standalone card, just compact. This is what keeps "Stripe" attached to "Payments" instead of
+   * sitting next to it as an unrelated tile.
+   */
+  const renderChildRow = (t: ModuleTile, parent: ModuleTile) => {
+    const { row: m, meta } = t;
+    const Icon = meta.icon;
+    return (
+      <div key={m.slug} className="flex items-start justify-between gap-2 py-2">
+        <div className="flex min-w-0 items-start gap-2">
+          <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', t.hasIt ? 'text-primary' : 'text-muted-foreground')} />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium">{m.name}</div>
+            <div className="mt-0.5">{statusOf(t)}</div>
+          </div>
+        </div>
+        <div className="shrink-0">{actionOf(t, parent.hasIt ? undefined : parent)}</div>
+      </div>
+    );
+  };
+
+  const renderTile = (t: ModuleTile, children: ModuleTile[] = []) => {
+    const { row: m, meta, hasIt, price } = t;
+    const Icon = meta.icon;
 
     return (
       <Card
@@ -380,10 +453,25 @@ export const ModulesActivationTab: React.FC = () => {
               )}
             </div>
           </div>
-          <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/60 pt-3">
-            {status}
-            {action}
+          <div className={cn(
+            'flex items-center justify-between gap-2 border-t border-border/60 pt-3',
+            children.length === 0 && 'mt-auto',
+          )}>
+            {statusOf(t)}
+            {actionOf(t)}
           </div>
+
+          {/* Sub-modules live inside their parent — the providers/extensions this module owns. */}
+          {children.length > 0 && (
+            <div className="mt-auto rounded-lg bg-muted/40 px-3 pb-1 pt-2">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {children.length === 1 ? 'Add-on' : 'Add-ons'} for {m.name}
+              </div>
+              <div className="divide-y divide-border/40">
+                {children.map((c) => renderChildRow(c, t))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -449,10 +537,10 @@ export const ModulesActivationTab: React.FC = () => {
                   {HubIcon ? <HubIcon className="h-4 w-4 shrink-0 text-primary" /> : null}
                   <h3 className="shrink-0 text-base font-semibold">{g.label}</h3>
                   <span className="h-px flex-1 bg-muted" />
-                  <span className="shrink-0 text-xs text-muted-foreground">{g.tiles.length}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{g.count}</span>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {g.tiles.map(renderTile)}
+                  {g.entries.map((e) => renderTile(e.tile, e.children))}
                 </div>
               </section>
             );

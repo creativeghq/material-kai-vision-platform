@@ -244,7 +244,7 @@ function ProductRow({ product, onView, surplus }: { product: RawProduct; onView:
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-end gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-end gap-1 shrink-0" role="presentation" onClick={(e) => e.stopPropagation()}>
         <AddToMoodboardButton
           productId={product.id}
           productName={product.name}
@@ -730,12 +730,12 @@ export const DiscoverPage: React.FC = () => {
                           )}
                           {creator.website_url && (
                             <a href={creator.website_url} target="_blank" rel="noopener noreferrer"
-                              className="hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                              className="hover:text-primary" role="presentation" onClick={(e) => e.stopPropagation()}>
                               <Globe className="h-3.5 w-3.5" />
                             </a>
                           )}
                         </div>
-                        <div onClick={(e) => e.stopPropagation()}>
+                        <div role="presentation" onClick={(e) => e.stopPropagation()}>
                           <FollowButton targetUserId={creator.user_id} currentUserId={user?.id} />
                         </div>
                       </div>

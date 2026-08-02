@@ -9,6 +9,12 @@ export type {
 export { registeredModules, getModule } from './registry';
 
 export {
+  parentSlugOf,
+  groupByParent,
+  type ParentGrouping,
+} from './moduleHierarchy';
+
+export {
   useEnabledModules,
   useModule,
   refreshModuleRegistry,

@@ -376,11 +376,11 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
                     <label className="flex cursor-pointer items-center gap-1.5 text-foreground">
                       <Checkbox checked={remindEmail} onCheckedChange={(v) => setRemindEmail(v === true)} /> Email
                     </label>
-                    <label className="flex cursor-pointer items-center gap-1.5 text-foreground">
+                    <label htmlFor="crmactivitytimeline-setremindwhatsapp-v-true-whatsapp" className="flex cursor-pointer items-center gap-1.5 text-foreground">
                       <Checkbox checked={remindWhatsapp} onCheckedChange={(v) => setRemindWhatsapp(v === true)} /> WhatsApp
                     </label>
                     {(remindEmail || remindWhatsapp) && (
-                      <select
+                      <select id="crmactivitytimeline-setremindwhatsapp-v-true-whatsapp"
                         value={reminderLead}
                         onChange={(e) => setReminderLead(Number(e.target.value))}
                         className="h-7 rounded-md border bg-background px-1.5 text-xs"

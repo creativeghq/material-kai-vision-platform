@@ -338,8 +338,8 @@ const XMLImportTab: React.FC = () => {
               </div>
               <div className="w-full max-w-xl space-y-4">
                 <div>
-                  <label className="text-sm text-muted-foreground mb-2 block font-medium">XML File URL</label>
-                  <Input
+                  <label htmlFor="xmlimporttab-xml-file-url" className="text-sm text-muted-foreground mb-2 block font-medium">XML File URL</label>
+                  <Input id="xmlimporttab-xml-file-url"
                     type="url"
                     placeholder="https://example.com/products.xml"
                     value={remoteUrl}

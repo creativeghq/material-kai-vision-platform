@@ -198,9 +198,9 @@ export const ProjectTimelineModal: React.FC<ProjectTimelineModalProps> = ({
                             {isEditing && isAdmin ? (
                               <div className="space-y-3 mt-4 bg-white p-4 rounded border border-blue-200">
                                 <div>
-                                  <label className="text-sm font-medium text-gray-700">Status</label>
+                                  <label htmlFor="projecttimelinemodal-status" className="text-sm font-medium text-gray-700">Status</label>
                                   <Select value={editStatus} onValueChange={setEditStatus}>
-                                    <SelectTrigger className="mt-1">
+                                    <SelectTrigger id="projecttimelinemodal-status" className="mt-1">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -212,8 +212,8 @@ export const ProjectTimelineModal: React.FC<ProjectTimelineModalProps> = ({
                                   </Select>
                                 </div>
                                 <div>
-                                  <label className="text-sm font-medium text-gray-700">Notes</label>
-                                  <Textarea
+                                  <label htmlFor="projecttimelinemodal-notes" className="text-sm font-medium text-gray-700">Notes</label>
+                                  <Textarea id="projecttimelinemodal-notes"
                                     value={editNotes}
                                     onChange={(e) => setEditNotes(e.target.value)}
                                     placeholder="Add notes about this step..."

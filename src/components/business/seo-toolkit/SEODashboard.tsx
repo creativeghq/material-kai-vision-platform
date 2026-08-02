@@ -502,25 +502,25 @@ const AddDomainDialog: React.FC<{ open: boolean; onClose: () => void; onAdded: (
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-muted-foreground">Domain</label>
-            <Input placeholder="flobali.gr" value={domain} onChange={(e) => setDomain(e.target.value)} />
+            <label htmlFor="seodashboard-domain" className="text-xs text-muted-foreground">Domain</label>
+            <Input id="seodashboard-domain" placeholder="flobali.gr" value={domain} onChange={(e) => setDomain(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground">Display label (optional)</label>
-            <Input placeholder="Flobali (main brand)" value={label} onChange={(e) => setLabel(e.target.value)} />
+            <label htmlFor="seodashboard-display-label-optional" className="text-xs text-muted-foreground">Display label (optional)</label>
+            <Input id="seodashboard-display-label-optional" placeholder="Flobali (main brand)" value={label} onChange={(e) => setLabel(e.target.value)} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
-              <label className="text-xs text-muted-foreground">Country</label>
-              <Input placeholder="US" maxLength={2} value={country} onChange={(e) => setCountry(e.target.value.toUpperCase())} />
+              <label htmlFor="seodashboard-country" className="text-xs text-muted-foreground">Country</label>
+              <Input id="seodashboard-country" placeholder="US" maxLength={2} value={country} onChange={(e) => setCountry(e.target.value.toUpperCase())} />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Language</label>
-              <Input placeholder="en" maxLength={5} value={language} onChange={(e) => setLanguage(e.target.value.toLowerCase())} />
+              <label htmlFor="seodashboard-language" className="text-xs text-muted-foreground">Language</label>
+              <Input id="seodashboard-language" placeholder="en" maxLength={5} value={language} onChange={(e) => setLanguage(e.target.value.toLowerCase())} />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Cadence (hrs)</label>
-              <Input type="number" value={cadence} onChange={(e) => setCadence(parseInt(e.target.value, 10) || 168)} />
+              <label htmlFor="seodashboard-cadence-hrs" className="text-xs text-muted-foreground">Cadence (hrs)</label>
+              <Input id="seodashboard-cadence-hrs" type="number" value={cadence} onChange={(e) => setCadence(parseInt(e.target.value, 10) || 168)} />
             </div>
           </div>
         </div>

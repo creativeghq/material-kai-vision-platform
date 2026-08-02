@@ -873,9 +873,9 @@ const PosPage: React.FC = () => {
             )}
 
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Payment</label>
+              <label htmlFor="pospage-payment" className="text-xs text-muted-foreground">Payment</label>
               <Select value={method} onValueChange={(v: any) => setMethod(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="pospage-payment"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="card">Card</SelectItem>
@@ -886,9 +886,9 @@ const PosPage: React.FC = () => {
 
             {method !== 'cash' && terminals.length > 0 && (
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Terminal (signed payment)</label>
+                <label htmlFor="pospage-terminal-signed-payment" className="text-xs text-muted-foreground">Terminal (signed payment)</label>
                 <Select value={terminalId} onValueChange={setTerminalId}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="pospage-terminal-signed-payment"><SelectValue /></SelectTrigger>
                   <SelectContent>{terminals.map((t) => <SelectItem key={t.id} value={t.id}>{t.label} · {t.terminal_id}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
@@ -901,13 +901,13 @@ const PosPage: React.FC = () => {
               <span>Prices include VAT</span>
               <Checkbox checked={vatInclusive} onCheckedChange={(v) => setVatInclusive(v === true)} />
             </label>
-            <label className="flex cursor-pointer items-center justify-between text-xs text-muted-foreground">
+            <label htmlFor="pospage-constitutes-a-movement-document-setmovem" className="flex cursor-pointer items-center justify-between text-xs text-muted-foreground">
               <span>Constitutes a movement document</span>
               <Checkbox checked={movementDoc} onCheckedChange={(v) => setMovementDoc(v === true)} />
             </label>
             {movementDoc && (
               <div className="grid grid-cols-2 gap-2">
-                <Input className="h-8 text-xs" value={movVehicle} onChange={(e) => setMovVehicle(e.target.value)} placeholder="Vehicle no." />
+                <Input id="pospage-constitutes-a-movement-document-setmovem" className="h-8 text-xs" value={movVehicle} onChange={(e) => setMovVehicle(e.target.value)} placeholder="Vehicle no." />
                 <Input className="h-8 text-xs" value={movShipTo} onChange={(e) => setMovShipTo(e.target.value)} placeholder="Ship to" />
               </div>
             )}
@@ -942,8 +942,8 @@ const PosPage: React.FC = () => {
                 press <strong>SETTLE POS</strong> to finalize the {awaiting.method === 'iris' ? 'IRIS' : 'card'} payment and send it to myDATA.
               </p>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Terminal transaction code (optional)</label>
-                <Input className="h-9 font-mono text-xs" value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="from the POS receipt" />
+                <label htmlFor="pospage-terminal-transaction-code-optional" className="text-xs text-muted-foreground">Terminal transaction code (optional)</label>
+                <Input id="pospage-terminal-transaction-code-optional" className="h-9 font-mono text-xs" value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="from the POS receipt" />
               </div>
               <div className="flex flex-col gap-2">
                 <Button size="lg" className="h-12 w-full text-base font-semibold" onClick={chargeAndComplete} disabled={completing}>

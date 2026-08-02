@@ -377,9 +377,9 @@ const ScheduleViewingButton: React.FC<{ ws: string; onAdded: () => void }> = ({ 
         <DialogContent>
           <DialogHeader><DialogTitle>Schedule a Viewing</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><label className="mb-1 block text-xs text-muted-foreground">Property</label><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
+            <div><label htmlFor="realestatepage-property" className="mb-1 block text-xs text-muted-foreground">Property</label><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
             <div className="grid grid-cols-2 gap-2">
-              <div><label className="mb-1 block text-xs text-muted-foreground">When</label><input type="datetime-local" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
+              <div id="realestatepage-property"><label className="mb-1 block text-xs text-muted-foreground">When</label><input type="datetime-local" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
               <div><label className="mb-1 block text-xs text-muted-foreground">Type</label><select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>{/* These values are real-estate-api's VIEWING_TYPES. The select used to emit 'in_person' and 'virtual', neither of which the allowlist knew, and the API SUBSTITUTED rather than rejected — so two of three options, including the default, were silently stored as an ordinary viewing (audit #303 finding 2). */}
                 {([['viewing', 'in person'], ['virtual', 'virtual'], ['tour', 'tour'], ['open_house', 'open house']] as const).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></div>
             </div>
@@ -426,8 +426,8 @@ const AddBuyerButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onA
         <DialogContent>
           <DialogHeader><DialogTitle>Add a Buyer</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><label className="mb-1 block text-xs text-muted-foreground">Contact</label><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Search CRM contacts…" /></div>
-            <input placeholder="Label (e.g. “3-bed in Athens”)" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={label} onChange={(e) => setLabel(e.target.value)} />
+            <div><label htmlFor="realestatepage-contact" className="mb-1 block text-xs text-muted-foreground">Contact</label><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Search CRM contacts…" /></div>
+            <input id="realestatepage-contact" placeholder="Label (e.g. “3-bed in Athens”)" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={label} onChange={(e) => setLabel(e.target.value)} />
             <div>
               <div className="mb-1 text-xs text-muted-foreground">Requirements (optional — auto-matches new listings)</div>
               <div className="grid grid-cols-2 gap-2">{field('property_type', 'Type e.g. apartment')}{field('town', 'Town')}{field('bedrooms_min', 'Min beds', 'number')}{field('price_max', 'Max price', 'number')}</div>
@@ -495,10 +495,10 @@ const AddLeadButton: React.FC<{ ws: string; onAdded: () => void }> = ({ ws, onAd
         <DialogContent>
           <DialogHeader><DialogTitle>Add a Lead</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><label className="mb-1 block text-xs text-muted-foreground">Property they’re interested in</label><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
+            <div><label htmlFor="realestatepage-property-they-re-interested-in" className="mb-1 block text-xs text-muted-foreground">Property they’re interested in</label><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
             <div className="grid grid-cols-2 gap-2">{field('name', 'Name')}{field('email', 'Email', 'email')}</div>
             {field('phone', 'Phone')}
-            <textarea placeholder="Notes / What they’re after…" rows={2} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" value={f.message ?? ''} onChange={(e) => setF((p) => ({ ...p, message: e.target.value }))} />
+            <textarea id="realestatepage-property-they-re-interested-in" placeholder="Notes / What they’re after…" rows={2} className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" value={f.message ?? ''} onChange={(e) => setF((p) => ({ ...p, message: e.target.value }))} />
           </div>
           <DialogFooter>
             <Button variant="outline" className="rounded-full" onClick={() => setOpen(false)}>Cancel</Button>

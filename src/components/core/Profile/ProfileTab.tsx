@@ -355,20 +355,20 @@ function ServiceForm({
     <div className="rounded-xl border bg-muted/20 p-4 space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground">Service name *</label>
-          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+          <label htmlFor="profiletab-service-name" className="text-xs text-muted-foreground">Service name *</label>
+          <Input id="profiletab-service-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="e.g. Interior Design Consultation" autoFocus />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground flex items-center gap-1">
+          <label htmlFor="profiletab-price" className="text-xs text-muted-foreground flex items-center gap-1">
             <DollarSign className="h-3 w-3" /> Price
           </label>
-          <Input value={form.price ?? ''} onChange={(e) => setForm({ ...form, price: e.target.value })}
+          <Input id="profiletab-price" value={form.price ?? ''} onChange={(e) => setForm({ ...form, price: e.target.value })}
             placeholder="e.g. from €500, €80/hr, on request" />
         </div>
         <div className="space-y-1.5 md:col-span-2">
-          <label className="text-xs text-muted-foreground">Description</label>
-          <Textarea value={form.description ?? ''} onChange={(e) => setForm({ ...form, description: e.target.value })}
+          <label htmlFor="profiletab-description" className="text-xs text-muted-foreground">Description</label>
+          <Textarea id="profiletab-description" value={form.description ?? ''} onChange={(e) => setForm({ ...form, description: e.target.value })}
             placeholder="Describe what's included in this service…" rows={2} className="resize-none" />
         </div>
       </div>
@@ -1219,8 +1219,8 @@ export const ProfileTab: React.FC = () => {
             ) : showRegForm ? (
               <form onSubmit={submitRegistration} className="rounded-xl border p-4 space-y-3 bg-muted/20">
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">Company name *</label>
-                  <Input
+                  <label htmlFor="profiletab-company-name" className="text-xs text-muted-foreground">Company name *</label>
+                  <Input id="profiletab-company-name"
                     value={regForm.company_name}
                     onChange={(e) => setRegForm({ ...regForm, company_name: e.target.value })}
                     placeholder={personal.company || 'Your company name'}
@@ -1246,8 +1246,8 @@ export const ProfileTab: React.FC = () => {
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">Message to admin (optional)</label>
-                  <Textarea
+                  <label htmlFor="profiletab-message-to-admin-optional" className="text-xs text-muted-foreground">Message to admin (optional)</label>
+                  <Textarea id="profiletab-message-to-admin-optional"
                     value={regForm.message}
                     onChange={(e) => setRegForm({ ...regForm, message: e.target.value })}
                     placeholder="Any additional information…"

@@ -522,7 +522,7 @@ export const AgentConfigsPage: React.FC = () => {
 
                             {/* Expanded Actions */}
                             {isExpanded && (
-                              <div className="mt-4 pt-4 border-t flex gap-2" onClick={(e) => e.stopPropagation()}>
+                              <div className="mt-4 pt-4 border-t flex gap-2" role="presentation" onClick={(e) => e.stopPropagation()}>
                                 <Button
                                   onClick={() => handleEdit(prompt)}
                                   variant="default"

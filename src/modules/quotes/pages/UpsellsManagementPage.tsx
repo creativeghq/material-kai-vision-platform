@@ -368,16 +368,16 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium">Name *</label>
-                <Input value={upsellName} onChange={(e) => setUpsellName(e.target.value)} placeholder="e.g., Express Shipping" className="mt-1" />
+                <label htmlFor="upsellsmanagementpage-name" className="text-sm font-medium">Name *</label>
+                <Input id="upsellsmanagementpage-name" value={upsellName} onChange={(e) => setUpsellName(e.target.value)} placeholder="e.g., Express Shipping" className="mt-1" />
               </div>
               <div>
-                <label className="text-sm font-medium">Description</label>
-                <Textarea value={upsellDescription} onChange={(e) => setUpsellDescription(e.target.value)} placeholder="Describe this upsell..." className="mt-1" rows={3} />
+                <label htmlFor="upsellsmanagementpage-description" className="text-sm font-medium">Description</label>
+                <Textarea id="upsellsmanagementpage-description" value={upsellDescription} onChange={(e) => setUpsellDescription(e.target.value)} placeholder="Describe this upsell..." className="mt-1" rows={3} />
               </div>
               <div>
-                <label className="text-sm font-medium">Price *</label>
-                <Input type="text" inputMode="decimal" value={upsellPrice} onChange={(e) => setUpsellPrice(e.target.value)} placeholder="0.00" className="mt-1" />
+                <label htmlFor="upsellsmanagementpage-price" className="text-sm font-medium">Price *</label>
+                <Input id="upsellsmanagementpage-price" type="text" inputMode="decimal" value={upsellPrice} onChange={(e) => setUpsellPrice(e.target.value)} placeholder="0.00" className="mt-1" />
               </div>
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Active</label>
@@ -555,8 +555,8 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-gray-700">Name *</label>
-              <Input
+              <label htmlFor="upsellsmanagementpage-name-2" className="text-sm font-medium text-gray-700">Name *</label>
+              <Input id="upsellsmanagementpage-name-2"
                 value={upsellName}
                 onChange={(e) => setUpsellName(e.target.value)}
                 placeholder="e.g., Express Shipping"
@@ -564,8 +564,8 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Description</label>
-              <Textarea
+              <label htmlFor="upsellsmanagementpage-description-2" className="text-sm font-medium text-gray-700">Description</label>
+              <Textarea id="upsellsmanagementpage-description-2"
                 value={upsellDescription}
                 onChange={(e) => setUpsellDescription(e.target.value)}
                 placeholder="Describe the upsell item..."
@@ -574,8 +574,8 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Price (USD) *</label>
-              <Input
+              <label htmlFor="upsellsmanagementpage-price-usd" className="text-sm font-medium text-gray-700">Price (USD) *</label>
+              <Input id="upsellsmanagementpage-price-usd"
                 type="text"
                 inputMode="decimal"
                 value={upsellPrice}
@@ -585,8 +585,8 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Display Order</label>
-              <Input
+              <label htmlFor="upsellsmanagementpage-display-order" className="text-sm font-medium text-gray-700">Display Order</label>
+              <Input id="upsellsmanagementpage-display-order"
                 type="number"
                 min="0"
                 value={displayOrder}

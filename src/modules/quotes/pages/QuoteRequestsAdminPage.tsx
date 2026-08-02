@@ -484,9 +484,9 @@ export const QuoteRequestsAdmin: React.FC = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Select User</label>
+              <label htmlFor="quoterequestsadminpage-select-user" className="text-sm font-medium">Select User</label>
               <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger id="quoterequestsadminpage-select-user" className="mt-1">
                   <SelectValue placeholder="Choose a user..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -504,8 +504,8 @@ export const QuoteRequestsAdmin: React.FC = () => {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium">Quote Name (Optional)</label>
-              <Input
+              <label htmlFor="quoterequestsadminpage-quote-name-optional" className="text-sm font-medium">Quote Name (Optional)</label>
+              <Input id="quoterequestsadminpage-quote-name-optional"
                 value={quoteName}
                 onChange={(e) => setQuoteName(e.target.value)}
                 placeholder="e.g., Office Renovation Quote"
@@ -513,8 +513,8 @@ export const QuoteRequestsAdmin: React.FC = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Notes (Optional)</label>
-              <Textarea
+              <label htmlFor="quoterequestsadminpage-notes-optional" className="text-sm font-medium">Notes (Optional)</label>
+              <Textarea id="quoterequestsadminpage-notes-optional"
                 value={quoteNotes}
                 onChange={(e) => setQuoteNotes(e.target.value)}
                 placeholder="Add any notes or instructions..."
@@ -523,8 +523,8 @@ export const QuoteRequestsAdmin: React.FC = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Custom Request (Optional)</label>
-              <Textarea
+              <label htmlFor="quoterequestsadminpage-custom-request-optional" className="text-sm font-medium">Custom Request (Optional)</label>
+              <Textarea id="quoterequestsadminpage-custom-request-optional"
                 value={customRequest}
                 onChange={(e) => setCustomRequest(e.target.value)}
                 placeholder="Describe custom requirements..."

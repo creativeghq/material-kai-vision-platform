@@ -3,6 +3,7 @@
   "name": "Job Research Notifications",
   "description": "Sends the consolidated daily job-digest email summarising newly-discovered job listings across all of a user's tracked job searches. Per-channel credit-metered: bell free, email costs credits, webhook free.",
   "category": "research",
+  "parent": "job-research",
   "priceTier": "pro",
   "icon": "Mail",
   "version": "0.1.0"

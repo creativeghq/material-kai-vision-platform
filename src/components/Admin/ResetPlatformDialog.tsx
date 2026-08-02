@@ -171,10 +171,10 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
         </div>
 
         <div className="flex-shrink-0 pt-2 space-y-2">
-          <label className="text-sm font-medium text-foreground">
+          <label htmlFor="resetplatformdialog-type-reset-platform-to-confirm" className="text-sm font-medium text-foreground">
             Type <span className="font-mono bg-muted px-2 py-1 rounded">RESET PLATFORM</span> to confirm:
           </label>
-          <input
+          <input id="resetplatformdialog-type-reset-platform-to-confirm"
             type="text"
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}

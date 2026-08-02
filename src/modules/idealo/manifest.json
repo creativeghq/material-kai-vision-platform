@@ -3,6 +3,7 @@
   "name": "Idealo (DACH + IT)",
   "description": "Idealo.de / .it / .co.uk / .es / .fr price comparison as a discovery source for non-Greek markets. Same Firecrawl scrape pattern as the Greek marketplaces module.",
   "category": "pricing",
+  "parent": "price-monitoring",
   "priceTier": "pro",
   "icon": "ShoppingCart",
   "version": "0.1.0"

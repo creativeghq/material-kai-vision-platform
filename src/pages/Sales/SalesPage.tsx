@@ -218,7 +218,7 @@ export const SalesPage: React.FC = () => {
                         <td className="px-3 py-2.5 tabular-nums">{q.total_items || q.items?.length || 0}</td>
                         <td className="px-3 py-2.5 text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</td>
                         <td className="px-6 py-2.5 text-right">
-                          <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1" role="presentation" onClick={(e) => e.stopPropagation()}>
                             {partyId && (
                               <StatementActions
                                 partyType={partyCompanyId ? 'company' : 'contact'}

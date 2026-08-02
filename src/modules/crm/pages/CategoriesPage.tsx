@@ -283,7 +283,7 @@ export const CategoriesPanel: React.FC = () => {
                                 </>
                               )}
                             </div>
-                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-1" role="presentation" onClick={(e) => e.stopPropagation()}>
                               <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>Edit</Button>
                               <Button size="sm" variant="ghost" onClick={() => handleDelete(c)} title={c.kind !== 'manual' ? 'Delete (auto categories reappear on resync)' : 'Delete'}>
                                 <Trash2 className="h-3 w-3 text-destructive" />

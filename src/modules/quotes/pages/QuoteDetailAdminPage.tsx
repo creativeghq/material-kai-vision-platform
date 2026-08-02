@@ -1151,9 +1151,9 @@ export const QuoteDetailPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                   {/* Upsell Dropdown */}
                   <div className="md:col-span-2">
-                    <label className="text-sm font-medium mb-2 block">Select Upsell</label>
+                    <label htmlFor="quotedetailadminpage-select-upsell" className="text-sm font-medium mb-2 block">Select Upsell</label>
                     <Select value={selectedUpsellId} onValueChange={setSelectedUpsellId}>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger id="quotedetailadminpage-select-upsell" className="w-full">
                         <SelectValue placeholder="Choose an upsell..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1173,11 +1173,11 @@ export const QuoteDetailPage: React.FC = () => {
 
                   {/* Custom Price */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">
+                    <label htmlFor="quotedetailadminpage-price" className="text-sm font-medium mb-2 block">
                       <DollarSign className="h-3 w-3 inline mr-1" />
                       Price (€)
                     </label>
-                    <Input
+                    <Input id="quotedetailadminpage-price"
                       type="text"
                       inputMode="decimal"
                       placeholder="Custom price"
@@ -1188,11 +1188,11 @@ export const QuoteDetailPage: React.FC = () => {
 
                   {/* Quantity */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">
+                    <label htmlFor="quotedetailadminpage-quantity" className="text-sm font-medium mb-2 block">
                       <Ruler className="h-3 w-3 inline mr-1" />
                       Quantity
                     </label>
-                    <Input
+                    <Input id="quotedetailadminpage-quantity"
                       type="text"
                       inputMode="decimal"
                       placeholder="1"
@@ -1203,8 +1203,8 @@ export const QuoteDetailPage: React.FC = () => {
 
                   {/* Measurement */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Measurement</label>
-                    <Input
+                    <label htmlFor="quotedetailadminpage-measurement" className="text-sm font-medium mb-2 block">Measurement</label>
+                    <Input id="quotedetailadminpage-measurement"
                       placeholder="e.g., m², pcs"
                       value={upsellMeasurement}
                       onChange={(e) => setUpsellMeasurement(e.target.value)}
@@ -1339,9 +1339,9 @@ export const QuoteDetailPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                   {/* Timeline Step Dropdown */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Step</label>
+                    <label htmlFor="quotedetailadminpage-step" className="text-sm font-medium mb-2 block">Step</label>
                     <Select value={selectedTimelineStepId} onValueChange={setSelectedTimelineStepId}>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger id="quotedetailadminpage-step" className="w-full">
                         <SelectValue placeholder="Choose step..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -1358,9 +1358,9 @@ export const QuoteDetailPage: React.FC = () => {
 
                   {/* Product (optional) */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Product (optional)</label>
+                    <label htmlFor="quotedetailadminpage-product-optional" className="text-sm font-medium mb-2 block">Product (optional)</label>
                     <Select value={selectedTimelineItemId} onValueChange={setSelectedTimelineItemId}>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger id="quotedetailadminpage-product-optional" className="w-full">
                         <SelectValue placeholder="All products" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1381,11 +1381,11 @@ export const QuoteDetailPage: React.FC = () => {
 
                   {/* Note */}
                   <div className="md:col-span-2">
-                    <label className="text-sm font-medium mb-2 block">
+                    <label htmlFor="quotedetailadminpage-note-optional" className="text-sm font-medium mb-2 block">
                       <MessageSquare className="h-3 w-3 inline mr-1" />
                       Note (optional)
                     </label>
-                    <Textarea
+                    <Textarea id="quotedetailadminpage-note-optional"
                       placeholder="Add a note for this timeline step..."
                       value={timelineNote}
                       onChange={(e) => setTimelineNote(e.target.value)}
@@ -1505,11 +1505,11 @@ export const QuoteDetailPage: React.FC = () => {
 
                             {/* Note Section */}
                             <div className="mt-3 p-3 bg-background rounded border">
-                              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                              <label htmlFor="quotedetailadminpage-note" className="text-xs font-medium text-muted-foreground mb-1 block">
                                 <MessageSquare className="h-3 w-3 inline mr-1" />
                                 Note
                               </label>
-                              <Textarea
+                              <Textarea id="quotedetailadminpage-note"
                                 placeholder="Add a note..."
                                 value={currentNote}
                                 onChange={(e) => setEditingTimelineNotes(prev => ({

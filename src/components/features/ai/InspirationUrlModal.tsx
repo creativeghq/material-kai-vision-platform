@@ -63,8 +63,8 @@ export function InspirationUrlModal({ onSubmit, onClose }: InspirationUrlModalPr
         <div className="p-5 space-y-5">
           {/* URL Input */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">URL</label>
-            <Input
+            <label htmlFor="inspirationurlmodal-url" className="text-sm font-medium">URL</label>
+            <Input id="inspirationurlmodal-url"
               value={url}
               onChange={(e) => { setUrl(e.target.value); setError(''); }}
               placeholder="https://www.houzz.com/photos/modern-bathroom..."

@@ -1239,7 +1239,7 @@ export const NewOrderModal: React.FC<{
               installer bring no goods, and that order's own stock arrived with its own document. */}
           {!isSales && locked && !attachingToOrder && (
             <div className="space-y-2 rounded-md border border-border/60 p-3">
-              <label className="flex items-center gap-2 text-sm">
+              <label htmlFor="orderspanel-setreceivenow-v-true-receive-these-goods" className="flex items-center gap-2 text-sm">
                 <Checkbox className="h-3.5 w-3.5 rounded" checked={receiveNow} onCheckedChange={(v) => setReceiveNow(v === true)} />
                 <span className="font-medium">Receive these goods into the warehouse now</span>
               </label>
@@ -1247,7 +1247,7 @@ export const NewOrderModal: React.FC<{
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">Warehouse</Label>
                   <Select value={warehouseId} onValueChange={setWarehouseId}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Pick a warehouse" /></SelectTrigger>
+                    <SelectTrigger id="orderspanel-setreceivenow-v-true-receive-these-goods" className="h-8 text-xs"><SelectValue placeholder="Pick a warehouse" /></SelectTrigger>
                     <SelectContent>
                       {warehouses.map((w) => (
                         <SelectItem key={w.id} value={w.id}>{w.name}{w.is_default ? ' · default' : ''}</SelectItem>

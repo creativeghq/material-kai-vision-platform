@@ -198,8 +198,8 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground">Your Name</label>
-              <Input
+              <label htmlFor="hirememodal-your-name" className="text-xs text-muted-foreground">Your Name</label>
+              <Input id="hirememodal-your-name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Jane Smith"
@@ -207,8 +207,8 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground">Your Email</label>
-              <Input
+              <label htmlFor="hirememodal-your-email" className="text-xs text-muted-foreground">Your Email</label>
+              <Input id="hirememodal-your-email"
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -217,8 +217,8 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground">Message</label>
-              <Textarea
+              <label htmlFor="hirememodal-message" className="text-xs text-muted-foreground">Message</label>
+              <Textarea id="hirememodal-message"
                 value={form.message}
                 onChange={(e) => setForm({ ...form, message: e.target.value })}
                 placeholder={`Hi ${toUserName}, I'd like to discuss...`}

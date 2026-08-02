@@ -185,12 +185,12 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                 </div>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-[120px_140px_1fr_160px]">
                   <div className="space-y-0.5">
-                    <label className="text-[10px] text-muted-foreground">Unit cost</label>
-                    <Input className="h-8 text-sm text-right" type="text" inputMode="decimal" value={e.unit_cost} onChange={(ev) => setEdit(it.id, { unit_cost: ev.target.value })} placeholder="0.00" />
+                    <label htmlFor="pendingproductscard-unit-cost" className="text-[10px] text-muted-foreground">Unit cost</label>
+                    <Input id="pendingproductscard-unit-cost" className="h-8 text-sm text-right" type="text" inputMode="decimal" value={e.unit_cost} onChange={(ev) => setEdit(it.id, { unit_cost: ev.target.value })} placeholder="0.00" />
                   </div>
                   <div className="space-y-0.5">
-                    <label className="text-[10px] text-muted-foreground">Sale price</label>
-                    <Input className="h-8 text-sm text-right" type="text" inputMode="decimal" value={e.sales_price}
+                    <label htmlFor="pendingproductscard-sale-price" className="text-[10px] text-muted-foreground">Sale price</label>
+                    <Input id="pendingproductscard-sale-price" className="h-8 text-sm text-right" type="text" inputMode="decimal" value={e.sales_price}
                       onChange={(ev) => setEdit(it.id, { sales_price: ev.target.value })}
                       placeholder={autoPrice != null ? `auto ${formatMoney(autoPrice, it.currency)}` : 'set price'} />
                   </div>
@@ -205,9 +205,9 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                     </Select>
                   </div>
                   <div className="space-y-0.5">
-                    <label className="text-[10px] text-muted-foreground">Warehouse</label>
+                    <label htmlFor="pendingproductscard-warehouse" className="text-[10px] text-muted-foreground">Warehouse</label>
                     <Select value={e.warehouse_id} onValueChange={(v) => setEdit(it.id, { warehouse_id: v })}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Default" /></SelectTrigger>
+                      <SelectTrigger id="pendingproductscard-warehouse" className="h-8 text-xs"><SelectValue placeholder="Default" /></SelectTrigger>
                       <SelectContent>{warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}{w.is_default ? ' (default)' : ''}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>

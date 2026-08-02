@@ -77,7 +77,7 @@ export const PaymentReceiptActions: React.FC<{
   };
 
   return (
-    <span className={`inline-flex items-center gap-1.5 ${className ?? ''}`} onClick={(e) => e.stopPropagation()}>
+    <span className={`inline-flex items-center gap-1.5 ${className ?? ''}`} role="presentation" onClick={(e) => e.stopPropagation()}>
       <button type="button" title={`Email the ${noun} to the ${party}`} className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={busy} onClick={email}><Mail className={iconClassName} /></button>
       <button type="button" title={`Copy a shareable link to the ${noun} PDF`} className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={busy} onClick={copyLink}><Link2 className={iconClassName} /></button>
       <button type="button" title={`Download the ${noun} PDF (not sent to myDATA)`} className="text-muted-foreground hover:text-foreground disabled:opacity-40" disabled={busy} onClick={download}><Download className={iconClassName} /></button>

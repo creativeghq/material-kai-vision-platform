@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/core/ui/switch';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
-import { registeredModules, useEnabledModules, refreshModuleRegistry } from '@/modules/_core';
+import { registeredModules, useEnabledModules, refreshModuleRegistry, groupByParent } from '@/modules/_core';
 import { invalidateInvoiceProviderCache } from '@/modules/payments/services/invoiceProviderService';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { ModuleBillingDialog } from './ModuleBillingDialog';
@@ -78,17 +78,10 @@ const ModulesPage: React.FC = () => {
 
   const orphanedRows = rows.filter((row) => !registeredSlugs.has(row.slug));
 
-  // Group sub-modules (manifest.parent set) UNDER their parent instead of as loose tiles.
-  const childrenByParent = useMemo(() => {
-    const map = new Map<string, typeof registeredModules[number][]>();
-    for (const m of registeredModules) {
-      const parent = m.manifest.parent;
-      if (parent) map.set(parent, [...(map.get(parent) ?? []), m]);
-    }
-    return map;
-  }, []);
-  const topLevelModules = useMemo(
-    () => registeredModules.filter((m) => !m.manifest.parent),
+  // Group sub-modules (manifest.parent set) UNDER their parent instead of as loose tiles —
+  // same derivation the tenant storefront uses (`groupByParent`).
+  const { topLevel: topLevelModules, childrenByParent } = useMemo(
+    () => groupByParent(registeredModules, (m) => m.manifest.slug),
     [],
   );
 

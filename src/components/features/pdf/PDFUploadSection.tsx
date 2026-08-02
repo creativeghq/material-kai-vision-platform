@@ -248,9 +248,9 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       {file && (
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-muted-foreground mb-2 block font-medium">Material Category</label>
+            <label htmlFor="pdfuploadsection-material-category" className="text-sm text-muted-foreground mb-2 block font-medium">Material Category</label>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger>
+              <SelectTrigger id="pdfuploadsection-material-category">
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
