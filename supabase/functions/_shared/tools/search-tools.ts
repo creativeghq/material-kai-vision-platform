@@ -12,6 +12,54 @@ const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
+import { rerankResults, type RerankCandidate } from '../rerank.ts';
+
+/**
+ * Rerank whichever result array a MIVAA /api/rag/search payload came back with, in place.
+ *
+ * MIVAA returns different keys per strategy (`results` for fused multi-vector, `chunks` and
+ * `products` for the KB-ish shapes), so this reorders every array it recognises rather than
+ * assuming one. Anything it does not recognise is left exactly as received.
+ *
+ * Fully inert when there is nothing to rank: rerankResults returns the input untouched, with no
+ * model call, for fewer than 2 candidates — which is every search on this platform until the
+ * catalog pipeline produces products. Wiring it now means it starts working the day data arrives
+ * rather than needing to be remembered then. (#310 item 1)
+ */
+const RERANKABLE_KEYS = ['results', 'chunks', 'products'] as const;
+
+// deno-lint-ignore no-explicit-any
+const toCandidate = (r: any, i: number): RerankCandidate => ({
+  id: String(r?.id ?? r?.product_id ?? r?.chunk_id ?? r?.document_id ?? `idx-${i}`),
+  name: String(r?.name ?? r?.title ?? r?.document_title ?? r?.heading ?? '').slice(0, 200),
+  description: String(r?.description ?? r?.content ?? r?.text ?? '') || undefined,
+  category: r?.category ?? r?.category_name ?? undefined,
+  relevanceScore: typeof r?.relevance_score === 'number' ? r.relevance_score : undefined,
+  semanticScore: typeof r?.similarity_score === 'number'
+    ? r.similarity_score
+    : (typeof r?.score === 'number' ? r.score : undefined),
+  understandingScore: typeof r?.understanding_score === 'number' ? r.understanding_score : undefined,
+});
+
+async function rerankMivaaPayload(
+  // deno-lint-ignore no-explicit-any
+  data: any,
+  query: string,
+  task: string,
+  // deno-lint-ignore no-explicit-any
+): Promise<any> {
+  if (!data || typeof data !== 'object') return data;
+  for (const key of RERANKABLE_KEYS) {
+    const arr = data[key];
+    if (!Array.isArray(arr) || arr.length < 2) continue;
+    const outcome = await rerankResults(query, arr, toCandidate, { supabase, task });
+    if (outcome.reranked) {
+      data[key] = outcome.items;
+      data.reranked = true;
+    }
+  }
+  return data;
+}
 
 // MIVAA's /api/rag/* search endpoints now require authentication.
 // The agent is trusted infrastructure: it authenticates as the Material Kai platform
@@ -149,7 +197,10 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
           }
 
           const data = await response.json();
-          return JSON.stringify(data);
+          // Fuse the per-aspect candidate sets into one ordering. MIVAA returns candidates
+          // scored per embedding aspect; without this the agent sees whichever aspect happened
+          // to sort first, which is not a ranking.
+          return JSON.stringify(await rerankMivaaPayload(data, query, 'material_search_rerank'));
         } catch (fetchError) {
           clearTimeout(timeoutId);
 
@@ -249,7 +300,10 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
           }
 
           const data = await response.json();
-          return JSON.stringify(data);
+          // The text query is optional here, so this reranks only when the user gave one to
+          // rank against; pure image-similarity results keep MIVAA's visual ordering, which is
+          // the right answer when there is no stated intent to weigh them against.
+          return JSON.stringify(await rerankMivaaPayload(data, query || '', 'visual_search_rerank'));
         } catch (fetchError) {
           clearTimeout(timeoutId);
           if (fetchError instanceof Error && fetchError.name === 'AbortError') {
@@ -375,6 +429,29 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
             }));
           }
 
+
+          // Rank articles and products against the query. These come back ordered by raw
+          // vector similarity per source; the agent reads them top-down and its answer is
+          // shaped by whatever is first.
+          if (results.articles.length > 1) {
+            const ranked = await rerankResults(query, results.articles, (a, i) => ({
+              id: String(a.docId ?? `idx-${i}`),
+              name: String(a.documentTitle ?? a.heading ?? ''),
+              description: String(a.content ?? ''),
+              category: a.category,
+              relevanceScore: typeof a.relevanceScore === 'number' ? a.relevanceScore : undefined,
+            }), { supabase, task: 'kb_search_rerank' });
+            results.articles = ranked.items;
+          }
+          if (results.products.length > 1) {
+            const ranked = await rerankResults(query, results.products, (pr, i) => ({
+              id: String(pr.name ?? `idx-${i}`),
+              name: String(pr.name ?? ''),
+              description: String(pr.description ?? ''),
+              relevanceScore: typeof pr.relevanceScore === 'number' ? pr.relevanceScore : undefined,
+            }), { supabase, task: 'kb_search_rerank' });
+            results.products = ranked.items;
+          }
 
           // Track agent mentions for returned KB docs (fire-and-forget)
           if (results.articles.length > 0) {

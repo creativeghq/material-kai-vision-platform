@@ -34,6 +34,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'agent-chat', label: 'agent-chat', sublabel: 'Multi-agent LangGraph chat with tool execution and SSE streaming' },
   { id: 'agent-scheduler-cron', label: 'agent-scheduler-cron', sublabel: 'Every-minute cron: dispatch background agents whose cron schedule is due' },
   { id: 'ai-pricing-updater', label: 'ai-pricing-updater', sublabel: 'Weekly cron (Sunday 00:00 UTC): sync AI model prices from hardcoded reference tables' },
+  { id: 'ai-rerank', label: 'ai-rerank', sublabel: 'Reorder search results by relevance to a query' },
   { id: 'auto-recovery-cron', label: 'auto-recovery-cron', sublabel: 'Every-5-minute cron: detect and recover stuck PDF, XML, scraping, and agent runs' },
   { id: 'background-agent-runner', label: 'background-agent-runner', sublabel: 'Execute a registered background agent by agent_id' },
   { id: 'campaign-processor', label: 'campaign-processor', sublabel: 'Every-minute cron: start scheduled campaigns and drip-send emails to recipients' },

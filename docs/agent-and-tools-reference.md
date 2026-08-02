@@ -50,6 +50,14 @@ Each tool has: `name` · `id` · `desc` · `adminOnly` flag · optional `moduleS
 - `visual_search` — Image-based catalog search (image required)
 - `analyze_inspiration_url` — Scrape webpage → design tokens → match catalog (1 credit, Firecrawl)
 
+**All three search tools rerank their own results** through `_shared/rerank.ts` before returning
+them (`claude-haiku-4-5`, prompt at `/admin/ai-configs`, `prompts.category='ai_rerank'`). Vector
+search returns candidates scored *per embedding aspect*; reranking is what fuses them into one
+ordering. It is inert below 2 candidates — no model call, no cost — and every failure path returns
+the source order unchanged, so it can never make search worse. Turn it off platform-wide with
+`SEARCH_RERANK_ENABLED=false`. The `ai-rerank` edge function is the same logic for callers outside
+the agent runtime.
+
 ### Mentions (all users, module-gated `mention-monitoring`)
 
 - `track_product_mentions` — Start/stop monitoring on a product
