@@ -211,6 +211,8 @@ jobs:
     if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -233,47 +235,93 @@ jobs:
       - name: 🏗️ Build (Vercel, local)
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: 🚀 Deploy prebuilt artifact
+      # --skip-domain is what turns fe-smoke from a post-mortem into a gate. It builds and
+      # uploads a PRODUCTION deployment (production env vars, production build) but does NOT
+      # move app.materialshub.gr onto it. Users keep getting the previous build until the
+      # `promote` job aliases this one, which only happens after the route-load smoke passes.
+      # Without this flag the deploy IS the release and every check after it is a post-mortem —
+      # which is how a null-crash on `/` and `/discover` reached ~6 users on 2026-08-01.
+      - name: 🚀 Deploy prebuilt artifact (unaliased)
         id: deploy
         run: |
           set -euo pipefail
-          URL=$(vercel deploy --prebuilt --prod --archive=tgz --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "🌐 Deployed: $URL"
-
-      - name: 🏥 Health check
-        run: |
-          set -euo pipefail
-          # Check the CUSTOM DOMAIN, not the deployment URL.
-          #
-          # The project has Vercel SSO protection on `all_except_custom_domains`, so every
-          # *.vercel.app deployment URL answers 302 to an auth wall. This step curled that URL
-          # and accepted 302, so it was really only asserting "Vercel's login redirect responds"
-          # — it never reached the app and would have passed on a completely broken build. That
-          # is the exact "looks checked, isn't" shape the note here used to claim it had fixed.
-          # Measured 2026-08-02: deployment URL -> 302, app.materialshub.gr -> 200.
-          #
-          # The custom domain is exempt from SSO, serves the just-promoted build, and is what
-          # users actually load — so only a real 2xx passes now.
-          URL="https://app.materialshub.gr"
-          if [ -z "${{ steps.deploy.outputs.url }}" ]; then
-            echo "❌ Deployment URL not captured — cannot verify the deploy"; exit 1
+          URL=$(vercel deploy --prebuilt --prod --skip-domain --archive=tgz --token=${{ secrets.VERCEL_TOKEN }})
+          if [ -z "$URL" ]; then
+            echo "❌ Deployment URL not captured — cannot verify or promote"; exit 1
           fi
-          sleep 10
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" --connect-timeout 30 --max-time 60 || echo "000")
-          echo "📊 HTTP $HTTP_STATUS — $URL"
-          case "$HTTP_STATUS" in
-            200) echo "✅ Healthy" ;;
-            *) echo "❌ Unhealthy: HTTP $HTTP_STATUS"; exit 1 ;;
-          esac
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "🌐 Deployed (NOT yet serving users): $URL"
 
       - name: 📋 Summary
         if: always()
         run: |
           echo "## 🚀 Frontend Deploy" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL:** ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **App:** https://materialshub.gr" >> $GITHUB_STEP_SUMMARY
+          echo "- **Candidate:** ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Live only after:** fe-smoke passes → promote" >> $GITHUB_STEP_SUMMARY
+
+  # ────────────────────────────────────────────────────────────────────
+  # promote: the step that actually releases. Moves app.materialshub.gr onto the candidate
+  # deploy-frontend uploaded, and ONLY runs when the route-load smoke passed against it.
+  #
+  # If fe-smoke fails, this is skipped and the previous build keeps serving — no rollback
+  # needed, because the broken build was never live. That is the whole point of --skip-domain.
+  # ────────────────────────────────────────────────────────────────────
+  promote:
+    needs: [deploy-frontend, fe-smoke]
+    if: ${{ needs.deploy-frontend.result == 'success' && needs.fe-smoke.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: 🔧 Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: 📥 Pull Vercel environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: 🎬 Promote the smoked candidate
+        run: |
+          set -euo pipefail
+          URL="${{ needs.deploy-frontend.outputs.url }}"
+          if [ -z "$URL" ]; then
+            echo "❌ No candidate URL from deploy-frontend — refusing to promote"; exit 1
+          fi
+          echo "Promoting $URL"
+          # `--non-interactive`, NOT `--yes`: `vercel promote --help` lists only --timeout,
+          # --cwd, --no-color and --non-interactive, so --yes would fail as an unknown option
+          # and leave the smoked build sitting unreleased.
+          vercel promote "$URL" --non-interactive --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: 🏥 Health check the live domain
+        run: |
+          set -euo pipefail
+          # The custom domain, which is exempt from SSO and is what users actually load. This
+          # step previously curled the *deployment* URL and accepted 302 — i.e. it asserted that
+          # Vercel's login redirect responds, and would have passed on a completely broken build.
+          # Measured 2026-08-02: deployment URL -> 302, app.materialshub.gr -> 200.
+          URL="https://app.materialshub.gr"
+          sleep 10
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" --connect-timeout 30 --max-time 60 || echo "000")
+          echo "📊 HTTP $HTTP_STATUS — $URL"
+          case "$HTTP_STATUS" in
+            200) echo "✅ Live" ;;
+            *) echo "❌ Unhealthy after promote: HTTP $HTTP_STATUS"; exit 1 ;;
+          esac
+
+      - name: 📋 Summary
+        if: always()
+        run: |
+          echo "## 🎬 Promoted" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Now serving:** ${{ needs.deploy-frontend.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **App:** https://app.materialshub.gr" >> $GITHUB_STEP_SUMMARY
 
   # ────────────────────────────────────────────────────────────────────
   # deploy-functions: parallel selective deploy.
@@ -419,14 +467,14 @@ jobs:
   # preventing it. On 2026-08-01 it correctly caught an error boundary on `/` and `/discover` —
   # but only after ~6 users had already hit it.
   #
-  # Making it a true gate means: deploy WITHOUT --prod (a preview), smoke that preview URL, then
-  # `vercel promote` it. The blocker is deployment protection: ssoProtection is enabled for
-  # `all_except_custom_domains`, so a preview URL answers 302 to an auth wall and Playwright
-  # would smoke the login page instead of the app. The supported fix is a "Protection Bypass for
-  # Automation" secret (Vercel → Project → Settings → Deployment Protection), sent as the
-  # `x-vercel-protection-bypass` header and stored here as VERCEL_AUTOMATION_BYPASS_SECRET.
-  # That secret can only be minted in the Vercel dashboard, so this is left as an explicit
-  # follow-up rather than half-wired — a gate that looks connected and isn't is worse than none.
+  # It is now a REAL GATE: deploy-frontend uploads with --skip-domain, so this runs against a
+  # production build that no user can reach yet, and `promote` only aliases it if this passes.
+  #
+  # It targets a *.vercel.app URL, which is behind Vercel SSO (`all_except_custom_domains`) and
+  # answers 302 to an auth wall. VERCEL_AUTOMATION_BYPASS_SECRET carries the
+  # `x-vercel-protection-bypass` header past it (verified 2026-08-02: 302 without, 200 with).
+  # If that secret ever goes missing the suite would smoke a login page and pass on anything,
+  # so tests/e2e/vercelBypass.ts FAILS LOUDLY when the target is protected and the secret isn't set.
   fe-smoke:
     needs: [deploy-frontend]
     if: ${{ always() && needs.deploy-frontend.result == 'success' }}
@@ -442,7 +490,12 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: 🖥️ Front-end route-load smoke
         env:
-          SMOKE_BASE_URL: 'https://app.materialshub.gr'
+          # The unaliased production candidate, NOT the live domain — this has to fail before
+          # users can reach it. It is a *.vercel.app URL and therefore behind SSO, which is what
+          # the bypass secret is for; without the secret Playwright would smoke the login page
+          # and pass on anything.
+          SMOKE_BASE_URL: ${{ needs.deploy-frontend.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
           SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
         run: npx playwright test --reporter=line

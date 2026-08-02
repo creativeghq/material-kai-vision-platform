@@ -1,5 +1,6 @@
 import { chromium, type FullConfig } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { bypassHeaders } from './vercelBypass';
 
 // Logs the smoke account in via the real /auth form once, saves the storage state, and all
 // route-load tests reuse it. Using the UI (not token injection) guarantees the session is in
@@ -19,7 +20,12 @@ export default async function globalSetup(_config: FullConfig) {
   }
 
   const browser = await chromium.launch();
-  const page = await browser.newPage({ ignoreHTTPSErrors: true });
+  // This launches its own context, so it does NOT inherit `use.extraHTTPHeaders` from the
+  // config — the bypass has to be applied here too, or the login would hit the SSO wall.
+  const page = await browser.newPage({
+    ignoreHTTPSErrors: true,
+    extraHTTPHeaders: bypassHeaders(baseURL),
+  });
   await page.goto(`${baseURL}/auth`, { waitUntil: 'domcontentloaded' });
 
   // The auth page defaults to the Sign Up tab — activate Sign In if its field isn't visible.
