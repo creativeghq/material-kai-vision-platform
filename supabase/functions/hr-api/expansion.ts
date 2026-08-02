@@ -9,7 +9,7 @@ import { sha256hex } from '../_shared/hash.ts';
 import { emitApplicantStage } from '../_shared/hr/applicant-events.ts';
 import { callClaudeTool, meterHrAi, creditBalance, reserveHrCredits, refundHrCredits, base64FromBytes } from './ai-meter.ts';
 import { businessDaysInclusive } from './hr-util.ts';
-// NOTE: payslip.ts (→ pdf-lib + fontkit, heavy) is imported LAZILY inside the generate-payslips
+// payslip.ts (→ pdf-lib + fontkit, heavy) is imported LAZILY inside the generate-payslips
 // case so the common read paths (analytics, lists) don't pay its cold-start cost on every call.
 
 // Conservative pre-check ceilings ONLY — the ACTUAL charge is usage-based (see ./ai-meter.ts).
@@ -937,7 +937,7 @@ export async function handleExpansion(action: string, ctx: Ctx): Promise<Respons
       return json({ ok: true, invited, role_note: roleNote });
     }
 
-    // NOTE: the former `analytics` edge action was removed — it re-implemented the
+    // The former `analytics` edge action was removed — it re-implemented the
     // `hr_overview_analytics` RPC that the Overview page (hrService.analytics) already calls
     // directly, so it was dead code that would silently drift from the RPC.
 

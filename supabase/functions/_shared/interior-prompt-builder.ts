@@ -157,7 +157,7 @@ Architectural drawing style, clean and precise.`.trim();
  *
  * Used for Copy Style and Redesign Room chip modes when two images are attached.
  *
- * NOTE: The images are sent with labeled text separators in generateMultiImageWithGemini
+ * The images are sent with labeled text separators in generateMultiImageWithGemini
  * so Gemini knows exactly which image is the layout donor and which is the design donor.
  */
 export function buildDualReferenceStylePrompt(style?: string, userPrompt?: string): string {

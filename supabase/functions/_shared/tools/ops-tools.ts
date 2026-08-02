@@ -80,7 +80,7 @@ export const createQuerySentryTool = () => {
     async ({ jobId, timeRange }) => {
       try {
 
-        // Note: This is a placeholder implementation
+        // This is a placeholder implementation
         // In production, you would integrate with Sentry API using SENTRY_AUTH_TOKEN
         // For now, we'll return a mock response indicating the feature is available
 

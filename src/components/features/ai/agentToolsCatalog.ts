@@ -1646,7 +1646,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     id: 'knowledge-graph',
     name: 'Product Intelligence',
     // All users, 0 credits — DB-only RPC reads over relationships that already exist.
-    // NOTE: supplier_overview is finance data and is admin/owner-gated at the agent-chat
+    // supplier_overview is finance data and is admin/owner-gated at the agent-chat
     // push site; the rest bind for everyone, so the cluster itself is not adminOnly.
     description: 'Answer "where did this come from?" from data you already have: provenance, price history, which projects use a product, and brand / customer / supplier overviews.',
     icon: 'Network',

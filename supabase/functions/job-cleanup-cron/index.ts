@@ -19,8 +19,8 @@
  * - ai_call_logs            > 30 days old  (per-call AI API debug logs, distinct from ai_usage_logs)
  * - search_query_tracking   > 90 days old  (search analytics)
  *
- * NOTE: ai_usage_logs is intentionally excluded — retained indefinitely for billing/business analytics.
- * NOTE: system_logs also has a dedicated daily pg_cron SQL job (system-logs-daily-cleanup) for
+ * ai_usage_logs is intentionally excluded — retained indefinitely for billing/business analytics.
+ * system_logs also has a dedicated daily pg_cron SQL job (system-logs-daily-cleanup) for
  *       high-volume purging — this weekly pass handles any overflow.
  */
 

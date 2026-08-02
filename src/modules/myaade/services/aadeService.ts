@@ -63,7 +63,7 @@ export const aadeService = {
    * Look up a Greek business by ΑΦΜ. If `companyId` is supplied, the server caches the result
    * on `crm_companies` and mirrors structured fields (commercial_title, kad_primary, tax_office, …).
    *
-   * NOTE: every live call writes an audit entry into the looked-up ΑΦΜ's TAXISnet inbox AND into
+   * Every live call writes an audit entry into the looked-up ΑΦΜ's TAXISnet inbox AND into
    * our internal `aade_lookup_log`. Pass `reason` so the audit records WHY the lookup happened
    * ('own_business' | 'crm_enrichment' | 'invoice_counterparty'). Looking up a counterparty's ΑΦΜ
    * is legitimate in the context of a real business relationship (e.g. before invoicing them).

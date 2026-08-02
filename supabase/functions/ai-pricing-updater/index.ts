@@ -234,7 +234,7 @@ Deno.serve(withApiLogging('ai-pricing-updater', async (req) => {
           }
 
           // Log the price change for audit. Non-critical: surface the error and carry on.
-          // NOTE: a PostgREST builder is PromiseLike — it implements `then` but NOT `catch`,
+          // A PostgREST builder is PromiseLike — it implements `then` but NOT `catch`,
           // so `.catch(...)` here threw a synchronous TypeError, which the per-model catch
           // below turned into models_failed++ for every model we had just updated fine.
           const { error: logError } = await supabase.from('ai_pricing_update_logs').insert({

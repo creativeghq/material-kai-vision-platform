@@ -335,7 +335,7 @@ export const ContactDetailPage: React.FC = () => {
    *      business's registry data belongs), then both records are reloaded;
    *   3. otherwise the typed employer name → web research only, onto the contact.
    *
-   * NOTE: a contact id is NEVER passed as companyId — the registry edge functions cache onto
+   * A contact id is NEVER passed as companyId — the registry edge functions cache onto
    * `crm_companies`, so handing them a contact id would write to the wrong table.
    */
   const runResearch = async () => {

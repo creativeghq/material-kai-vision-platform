@@ -59,10 +59,6 @@ export const QuoteDetailPage: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [quote, setQuote] = useState<QuoteWithItems | null>(null);
-  // NOTE: `statusTags` used to be fetched here on every mount via quotesService.getStatusTags().
-  // Its only reader was a `selectedTag` derivation that nothing rendered, so the whole chain —
-  // request, state, derived value — produced nothing. Removed rather than left as a network
-  // call whose result is discarded.
   const [upsells, setUpsells] = useState<Upsell[]>([]);
   const [quoteUpsells, setQuoteUpsells] = useState<QuoteUpsell[]>([]);
   const [loadingUpsells, setLoadingUpsells] = useState(false);

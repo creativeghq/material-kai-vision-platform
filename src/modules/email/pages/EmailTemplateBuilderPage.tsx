@@ -485,7 +485,7 @@ async function addMhBlocks(editor: GrapesEditor, isPlatformOperator: boolean) {
 
         // Called by GrapesJS after every render — paint the placeholder and attach
         // the attribute-change listener once (guarded by _mhBound flag).
-        // NOTE: we intentionally do NOT override initialize() — doing so with
+        // We intentionally do NOT override initialize() — doing so with
         // (this).__proto__.initialize causes infinite recursion because __proto__
         // resolves to the NewView prototype (our own methods), not ComponentView.
         onRender() {
@@ -774,7 +774,7 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
     setPreviewHtml(injectPreheader(rawHtml, previewText));
   };
 
-  // NOTE: we never early-return while loading because containerRef must stay in the DOM
+  // We never early-return while loading because containerRef must stay in the DOM
   // so the GrapesJS useEffect (empty deps) can attach to it on first mount.
 
   return (

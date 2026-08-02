@@ -387,7 +387,7 @@ function jsonResponse(body: unknown, status = 200) {
  * a blocked address after the check). The error message must not echo the URL or the upstream
  * status — that makes it a usable response oracle.
  *
- * NOTE: `reference_image_url` is ALSO passed to Replicate (callFluxDepthPro),
+ * `reference_image_url` is ALSO passed to Replicate (callFluxDepthPro),
  * which fetches it from Replicate's own network — validate before it leaves here.
  */
 async function fetchImageBuffer(url: string): Promise<Uint8Array> {

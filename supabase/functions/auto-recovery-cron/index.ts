@@ -689,7 +689,7 @@ async function markAsFailed(supabase: any, job: StuckJob): Promise<void> {
   // and the PipelineErrorsPanel summary chip would render an empty "Recovery
   // (N/N ok)" stub. Same anti-pattern as the post-2026-05-01 audit principle
   // ("explicit failure markers, not empty returns").
-  // Note: append_recovery_history writes to background_jobs.recovery_history,
+  // append_recovery_history writes to background_jobs.recovery_history,
   // so it only makes sense for non-agent_run / non-scraping jobs.
   if (table === 'background_jobs') {
     const resolvedFromStage = await resolveLastCheckpointStage(supabase, job);

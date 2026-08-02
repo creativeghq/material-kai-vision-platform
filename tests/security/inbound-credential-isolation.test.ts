@@ -7,7 +7,7 @@
  * credential resolver. This is a source-level guard: it fails loudly if a future change
  * introduces a master-key fallback into the inbound path.
  */
-// NOTE: this import was missing until 2026-07-17. vitest.config.ts has no
+// This import was missing until 2026-07-17. vitest.config.ts has no
 // `globals: true`, so without it the file ReferenceErrors on `describe` — and it
 // never surfaced because tests/security/** was not in vitest's `include` either, so
 // the file was never collected. Double-dead: a security guard added 2026-06-07 that

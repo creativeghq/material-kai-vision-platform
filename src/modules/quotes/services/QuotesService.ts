@@ -892,7 +892,7 @@ export class QuotesService {
 
   /**
    * Delete a quote request (and its associated quote)
-   * Note: quote_requests may not exist for draft quotes that haven't been submitted
+   * quote_requests may not exist for draft quotes that haven't been submitted
    * Cascade deletes: quote_items, quote_upsells, quote_timeline
    * Admins can delete any quote, users can only delete their own quotes
    */
@@ -1542,7 +1542,7 @@ export class QuotesService {
     limit: number,
   ): Promise<(Product & { image_url?: string })[]> {
     // Search products by name or description
-    // Note: products table doesn't have 'sku' column - it may be in metadata
+    // Products table doesn't have 'sku' column - it may be in metadata
     const searchTerms = query.split(/\s+/).filter(t => t.length > 1);
 
     // Build OR conditions for each search term across name and description

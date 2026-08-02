@@ -346,7 +346,7 @@ export const createGeminiGenerationTool = (
         }
 
         // copy-style: images[0] = Inspiration (style donor), images[1] = Your Room (layout donor)
-        // NOTE: this matches the drag-and-drop slot order in AgentHub (Slot 0 = Inspiration, Slot 1 = Your Room)
+        // This matches the drag-and-drop slot order in AgentHub (Slot 0 = Inspiration, Slot 1 = Your Room)
         let copyStyleRoomUrl: string | undefined;
         let copyStyleInspirationUrl: string | undefined;
         if (resolvedMode === 'copy-style') {

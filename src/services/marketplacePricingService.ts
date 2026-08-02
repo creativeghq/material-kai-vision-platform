@@ -58,7 +58,7 @@ export const marketplacePricingService = {
       currency: opts.currency ?? 'EUR',
       unit: opts.unit ?? null,
       // The catalog discount shown on the product (ProductPricingCard / PriceLookupDrawer).
-      // NOTE: this is NOT the discount the pricing engine applies — verified against the live
+      // This is NOT the discount the pricing engine applies — verified against the live
       // RPC, `get_product_price_for_workspace` resolves discount from the CUSTOMER only
       // (crm_contacts/crm_companies override → pricing_level_discounts → workspace level) and
       // never reads this column, returning discount_source 'none' when only this is set.

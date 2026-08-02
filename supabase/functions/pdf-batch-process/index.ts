@@ -649,6 +649,6 @@ async function sendWebhookNotification(webhookUrl: string, data: any): Promise<v
   }
 }
 
-// Note: Utility functions (calculateEstimatedCompletion, getClientIP, logApiUsage, createErrorResponse)
+// Utility functions (calculateEstimatedCompletion, getClientIP, logApiUsage, createErrorResponse)
 // are now imported from ../_shared/config.ts via Utils and Logger namespaces.
 // Removed redundant local definitions to avoid code duplication.

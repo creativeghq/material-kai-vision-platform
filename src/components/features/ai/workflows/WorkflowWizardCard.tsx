@@ -72,7 +72,7 @@ interface Props {
 export const WorkflowWizardCard: React.FC<Props> = ({ runtime, onAdvance, onSkip, onDismiss }) => {
   const definition = getWorkflow(runtime.definition_id);
 
-  // NOTE: both useMemos must run before the `if (!definition) return null` bail-out —
+  // Both useMemos must run before the `if (!definition) return null` bail-out —
   // they only depend on `runtime`, so hoisting is safe. Bailing out first made the hook
   // count vary between renders (React: "Rendered more hooks than during the previous
   // render") the moment an unknown definition_id resolved.

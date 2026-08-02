@@ -136,7 +136,7 @@ const TABLES_TO_CLEAR = [
   'agent_uploaded_files',          // Files uploaded in chat
 
   // ── Background Agent Framework (runs + state, NOT definitions) ──────
-  // NOTE: 'background_agents' (agent definitions) is PRESERVED — admin config.
+  // 'background_agents' (agent definitions) is PRESERVED — admin config.
   'agent_tool_call_logs',          // Per-tool-call log (child of agent_runs)
   'agent_run_logs',                // Run log lines (child of agent_runs)
   'agent_runs',                    // Background agent runs
@@ -156,7 +156,7 @@ const TABLES_TO_CLEAR = [
   // ── Flow Engine ─────────────────────────────────────────────────────
   'flow_run_steps',                // Step runs (child of flow_runs)
   'flow_runs',                     // Flow runs
-  // NOTE: 'flows' (definitions) is PRESERVED — admin config.
+  // 'flows' (definitions) is PRESERVED — admin config.
 
   // ── Quotes System (except global upsells and timeline steps) ────────
   'quote_analytics_events',        // Quote view/interaction analytics
@@ -177,7 +177,7 @@ const TABLES_TO_CLEAR = [
   'moodboards',                    // Moodboards
 
   // ── Catalogs & Presentation (user-generated deliverables) ───────────
-  // NOTE: 'catalog_templates' (admin branding) is PRESERVED.
+  // 'catalog_templates' (admin branding) is PRESERVED.
   'catalog_view_events',           // Catalog view analytics (child, CASCADE)
   'catalog_access_log',            // Catalog access log (child, CASCADE)
   'catalog_email_sends',           // Catalog email sends (child, CASCADE)
@@ -256,7 +256,7 @@ const TABLES_TO_CLEAR = [
   'trending_searches',             // Trending terms
   'unmatched_term_frequency',      // Unknown term frequency
   'query_intelligence',            // Derived query intelligence
-  // NOTE: query_understanding_cache (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
+  // query_understanding_cache (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'duplicate_detection_cache',     // Cached duplicate detection
   'product_similarity_cache',      // Cached product similarity
 
@@ -279,7 +279,7 @@ const TABLES_TO_CLEAR = [
   'processing_queue',              // Generic processing queue
   'processing_metrics',            // Processing metrics
   'pipeline_strategy_metrics',     // Chunking-strategy / Phase-3 distribution metrics
-  // NOTE: paddleocr_metrics (bigint PK, not uuid) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
+  // paddleocr_metrics (bigint PK, not uuid) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'batch_jobs',                    // Batch jobs
   'embedding_stability_metrics',   // Embedding drift metrics
   'product_prices',                // Product price rows (child of products, CASCADE)
@@ -302,7 +302,7 @@ const TABLES_TO_CLEAR = [
   'pdf_processing_results',        // PDF processing results
   'pdf_integration_health_results',// PDF integration health
   'validation_results',            // Validation results
-  // NOTE: review_summaries (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
+  // review_summaries (no `id` column) is TRUNCATEd via reset_truncate_heavy() — STEP 3.
   'document_images',               // Extracted images from PDFs
   'document_chunks',               // Semantic text chunks
   'products',                      // Extracted products
@@ -313,7 +313,7 @@ const TABLES_TO_CLEAR = [
   // ── Materials & Catalog (user-populated) ────────────────────────────
   'material_images',               // Material images
   'material_properties',           // Material properties
-  // NOTE: 'material_categories' (admin-curated ingestion taxonomy) is PRESERVED — see NEVER_CLEAR.
+  // 'material_categories' (admin-curated ingestion taxonomy) is PRESERVED — see NEVER_CLEAR.
   'materials_catalog',             // Materials catalog entries
 
   // ── Processing Results ──────────────────────────────────────────────
@@ -334,7 +334,7 @@ const TABLES_TO_CLEAR = [
   'mivaa_api_usage_logs',          // MIVAA API usage logs
   'webhook_calls',                 // Webhook call history
   'storage_cleanup_log',           // Orphan-cleanup cron audit log (derived)
-  // NOTE: system_logs is NOT here — at ~1M+ rows a PostgREST delete-all hits the
+  // system_logs is NOT here — at ~1M+ rows a PostgREST delete-all hits the
   // statement timeout. It (plus the id-less metric/cache tables + all vecs.*
   // collections) is TRUNCATEd via the reset_truncate_heavy() RPC in STEP 3.
   'ai_pricing_update_logs',        // AI pricing auto-update audit log

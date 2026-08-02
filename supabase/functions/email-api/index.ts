@@ -835,7 +835,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         );
       }
 
-      // NOTE: the 'logs' action was removed. It ran
+      // The 'logs' action was removed. It ran
       // `select('*')` on email_logs with the SERVICE-ROLE client, no workspace
       // filter and no admin gate, so any signed-in user could read every
       // tenant's rendered email bodies (html_body, text_body, to_email,

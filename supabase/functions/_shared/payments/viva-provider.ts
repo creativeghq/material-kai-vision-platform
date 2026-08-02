@@ -70,7 +70,7 @@ export async function getVivaAccessToken(ctx: PaymentProviderContext): Promise<s
   const hit = tokenCache.get(cacheKey);
   if (hit && hit.expiresAt > Date.now() + 60_000) return hit.token;
 
-  // NOTE: no `scope` parameter — Viva derives scope from the client's entitlements and
+  // No `scope` parameter — Viva derives scope from the client's entitlements and
   // RETURNS it. Sending one is undocumented.
   const res = await fetch(`${hosts.accounts}/connect/token`, {
     method: 'POST',

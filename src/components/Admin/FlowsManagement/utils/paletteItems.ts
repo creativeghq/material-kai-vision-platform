@@ -5,7 +5,7 @@ export const paletteItems: NodePaletteItem[] = [
   //  TRIGGERS
   // ════════════════════════════════════════════════════
 
-  // NOTE: There is no "Manual Trigger" node. Any flow can be run on demand via
+  // There is no "Manual Trigger" node. Any flow can be run on demand via
   // the "Run Now" button on the Flows dashboard, regardless of its trigger.
   // A flow with no trigger node is treated as on-demand / manual-only.
 

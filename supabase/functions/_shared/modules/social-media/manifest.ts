@@ -14,7 +14,7 @@
 
 import type { EdgeModuleManifest } from '../registry.ts';
 
-// NOTE: this module exposes its agent surface through the single consolidated `manage_social`
+// This module exposes its agent surface through the single consolidated `manage_social`
 // tool registered in agent-chat, NOT through per-action tool factories. An 11-entry
 // `toolFactories` array used to sit here alongside a 490-line tools.ts, and NOTHING consumed
 // either — a maintainer adding a social capability here shipped nothing. Both are deleted, and

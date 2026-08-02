@@ -386,7 +386,7 @@ export const CRMManagement: React.FC = () => {
     return primary?.company_name ?? c.company ?? '';
   };
 
-  // NOTE: contacts + companies are filtered SERVER-side (see contactQuery / companyQuery)
+  // Contacts + companies are filtered SERVER-side (see contactQuery / companyQuery)
   // — `contacts` / `companies` already hold exactly the rows for the current page.
 
   // ── pagination ────────────────────────────────────────────────────────────

@@ -55,10 +55,7 @@ export const MaterialSuggestionsPanel: React.FC<{ embedded?: boolean }> = ({ emb
 
   const [suggestions, setSuggestions] = useState<MaterialSuggestion[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  // NOTE: the "Integration Tests" tab that lived here was removed. Its "Test 3D Integration"
-  // button had already been deleted in favour of /agent-hub, so nothing could ever call
-  // setTestResults — the tab could only ever render its empty state, which told the operator to
-  // click the button that no longer existed. Run these from /agent-hub instead.
+  // 3D integration tests live at /agent-hub, not here.
   const { toast } = useToast();
 
   const generateSuggestions = useCallback(async () => {

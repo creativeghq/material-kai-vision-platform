@@ -166,7 +166,7 @@ export interface SocialPostFailedTriggerConfig {}
 export interface ClientViewFeedbackReceivedTriggerConfig {}
 export interface CrmContactCreatedTriggerConfig {}
 export interface CrmCompanyCreatedTriggerConfig {}
-/** NOTE: opens/clicks are HIGH-VOLUME. Each event fires a metered flow run — pair with a
+/** Opens/clicks are HIGH-VOLUME. Each event fires a metered flow run — pair with a
  *  Filter node (e.g. only a specific campaign) to avoid running on every open. */
 export interface EmailOpenedTriggerConfig {}
 export interface EmailClickedTriggerConfig {}

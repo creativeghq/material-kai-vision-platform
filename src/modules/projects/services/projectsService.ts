@@ -628,7 +628,7 @@ class ProjectsService {
     if (rooms.length === 0) return [];
 
     // Pull every accepted-quote item in this project that has a room_id set.
-    // Note: !inner join filter ensures we only get items whose parent quote is accepted + in this project.
+    // !inner join filter ensures we only get items whose parent quote is accepted + in this project.
     const { data: items } = await (supabase as any)
       .from('quote_items')
       .select('room_id, line_total, quote_id, quote:quotes!inner(project_id, status)')

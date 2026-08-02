@@ -5473,7 +5473,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           </div>
                         )}
 
-                        {/* NOTE: materialData is handled by its own ternary branch above (with the
+                        {/* materialData is handled by its own ternary branch above (with the
                             SearchSpec + products chip); it never reaches this regular-message block. */}
 
                         {/* Async 3D room-generation grid — full grid opens in the canvas (chip in chat) */}

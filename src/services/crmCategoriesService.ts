@@ -128,7 +128,7 @@ class CrmCategoriesService {
   }
 
   async listMembers(categoryId: string): Promise<CrmCategoryMember[]> {
-    // NOTE: platform_user display fields are fetched separately rather than via a
+    // platform_user display fields are fetched separately rather than via a
     // PostgREST embed. crm_category_members.user_id has a FK to auth.users (not
     // user_profiles), so `user_profiles!crm_category_members_user_id_fkey(...)`
     // raises PGRST200 ("no relationship found") and fails the whole query. The

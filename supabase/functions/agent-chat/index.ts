@@ -954,8 +954,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'add_purchase_item', 'generate_purchase_sheet',
     ],
     // systemPrompt loaded from database
-    // NOTE: generate_3d triggers async generation and returns job ID immediately
-    // NOTE: material_search is only injected when user message contains keywords like "find materials"
+    // generate_3d triggers async generation and returns job ID immediately
+    // material_search is only injected when user message contains keywords like "find materials"
   },
   // Estate: the real-estate specialist. Every tool self-gates on the real-estate
   // module + entitlement, so binding is safe even for workspaces without the module.
@@ -3272,7 +3272,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                 // pending Approve/Decline isn't lost if the user navigates away (and so
                 // background/tool-result-triggered confirmations — invariant #9 — surface
                 // at all). The inline card stays the primary surface. Fire-and-forget.
-                // NOTE: written directly rather than via a Flows event because no
+                // Written directly rather than via a Flows event because no
                 // system-default delivery flow is seeded in this environment — an emitted
                 // event would be a silent no-op (inert). Convert to emitFlowEvent once the
                 // system-default flows are seeded.

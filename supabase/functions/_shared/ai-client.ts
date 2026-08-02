@@ -70,7 +70,7 @@ const _PRICING_PER_M_TOKENS: Record<string, { input: number; output: number }> =
   'claude-opus-4-8':   { input: 15.00, output: 75.00 },
   'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
   // Google Gemini (per Google AI Studio pricing)
-  // NOTE: gemini-3.5-flash numbers carried forward from the 3-flash-preview
+  // gemini-3.5-flash numbers carried forward from the 3-flash-preview
   // estimate — confirm against current Google AI Studio pricing.
   'gemini-3.5-flash':       { input: 0.50, output: 3.00 },
   'gemini-3-flash-preview': { input: 0.50, output: 3.00 },
@@ -131,7 +131,7 @@ async function _logTrackedCall(opts: {
 // bootstrapped into Deno.env inside the request handler are reflected in apiKey.
 // Existing call sites (`google(modelId)`, `google.image(modelId)`, `anthropic(modelId)`,
 // `klingai.video(modelId)`) are unchanged — the Proxy makes lazy construction invisible.
-// NOTE: KlingAIProvider is an object, not a function — it must be reached through the
+// KlingAIProvider is an object, not a function — it must be reached through the
 // `get` trap (`.video()` / `.videoModel()`). The `apply` trap below would throw for it.
 
 let _google: ReturnType<typeof createGoogleGenerativeAI> | null = null;

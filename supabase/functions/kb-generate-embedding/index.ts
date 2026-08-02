@@ -5,7 +5,7 @@
  * embedding infrastructure (Voyage AI, 1024D — model is whatever MIVAA's
  * `voyage_model` setting resolves to, currently voyage-4). Updates kb_docs
  * with the resulting vector + embedding_model, and sets embedding_status.
- * NOTE: query embeddings MUST use the same model as stored docs — a
+ * Query embeddings MUST use the same model as stored docs — a
  * cross-generation mismatch (e.g. voyage-3.5 doc vs voyage-4 query) yields
  * near-zero cosine and silently returns 0 search results.
  */

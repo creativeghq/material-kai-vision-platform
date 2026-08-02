@@ -366,7 +366,7 @@ class ConfigurationFactory implements ConfigFactory {
       cachingEnabled: this.currentConfig.performance.caching.enabled,
       rateLimitEnabled: this.currentConfig.performance.rateLimit.enabled,
       monitoringEnabled: this.currentConfig.performance.monitoring.enabled,
-      // Note: API keys and secrets are never included in summaries
+      // API keys and secrets are never included in summaries
     };
   }
 

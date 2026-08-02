@@ -273,7 +273,7 @@ const FinancePage: React.FC = () => {
         // operator's expected payment date when set, else order date + the workspace's default
         // payment terms (see ordersService.listUninvoicedOutstanding). Only an order whose date
         // can't be derived at all stays 'no_due_date'. Buckets mirror vw_ar_aging exactly.
-        // NOTE: the invoice aging view computes `CURRENT_DATE - due_at` in the DB session timezone
+        // The invoice aging view computes `CURRENT_DATE - due_at` in the DB session timezone
         // (UTC on Supabase). We MUST match that reference or an order and an invoice with the same
         // date can disagree by a day near midnight — so both "today" and the due date are compared
         // as UTC calendar days (date-only), not local time.
