@@ -113,15 +113,17 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId, tier = 
       if (sortedKeys.length > 0 && !attributeKey) setAttributeKey(sortedKeys[0]);
 
       // 2. Factory name searches.
-      // The column is `query_text`; there is no `query` column on search_analytics. PostgREST
-      // rejected both the select and the ilike, and `error` was discarded, so this panel showed
-      // an empty state instead of a failure — and would have kept showing it after the table
-      // started receiving rows.
+      // Two defects, one after the other. First the column: this selected and filtered on
+      // `query`, which does not exist (it is `query_text`), so PostgREST rejected the call and
+      // the discarded `error` turned a failure into an empty panel. Fixing that left it pointed
+      // at `search_analytics`, which has NO PRODUCER — valid query, permanently empty answer.
+      // The searches are recorded in `search_query_tracking` by MIVAA's /api/rag/search, which
+      // is what the smart-search path actually calls. (#310 item 4)
       const { data: searchRows, error: searchErr } = await supabase
-        .from('search_analytics')
+        .from('search_query_tracking')
         .select('query_text')
         .ilike('query_text', `%${factoryName}%`)
-        .gte('created_at', ago12.toISOString());
+        .gte('timestamp', ago12.toISOString());
       if (searchErr) console.error('factory search analytics failed:', searchErr);
 
       const termMap = new Map<string, number>();

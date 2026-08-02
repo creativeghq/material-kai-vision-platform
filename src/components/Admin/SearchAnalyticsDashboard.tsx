@@ -119,11 +119,22 @@ interface MaterialDemand {
 interface AnalyticsStats {
   totalSearches: number;
   uniqueUsers: number;
-  avgSearchesPerUser: number;
+  // NULL when there are no identified users to divide by — not 0. A rate with an empty
+  // denominator is undefined, and rendering it as 0.0 asserts a measurement nobody made.
+  avgSearchesPerUser: number | null;
   topSearchStrategy: string;
-  savedSearchRate: number;
-  moodboardConversionRate: number;
+  // NULL means NOT TRACKED. `saved_search` and `added_to_moodboard` live only on the dead
+  // `search_analytics` table; nothing in the platform records either signal. Showing 0.0% here
+  // would be indistinguishable from "measured, and nobody does it". (#310 item 4)
+  savedSearchRate: number | null;
+  moodboardConversionRate: number | null;
 }
+
+/** Renders a percentage, or an explicit "not tracked" dash when the metric has no producer. */
+const Rate = ({ value }: { value: number | null }) =>
+  value == null
+    ? <span className="text-muted-foreground" title="No producer writes this metric yet">—</span>
+    : <>{value.toFixed(1)}%</>;
 
 export const SearchAnalyticsDashboard = () => {
   const [popularSearches, setPopularSearches] = useState<PopularSearch[]>([]);
@@ -328,7 +339,9 @@ export const SearchAnalyticsDashboard = () => {
             </div>
             <div className="text-2xl font-bold">{stats.totalSearches.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.avgSearchesPerUser.toFixed(1)} per user
+              {stats.avgSearchesPerUser == null
+                ? 'per-user rate needs identified searchers'
+                : `${stats.avgSearchesPerUser.toFixed(1)} per user`}
             </p>
           </div>
 
@@ -346,8 +359,10 @@ export const SearchAnalyticsDashboard = () => {
               <TrendingUp className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               <p className="text-xs text-muted-foreground">Save Rate</p>
             </div>
-            <div className="text-2xl font-bold">{stats.savedSearchRate.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground mt-1">Searches saved</p>
+            <div className="text-2xl font-bold"><Rate value={stats.savedSearchRate} /></div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.savedSearchRate == null ? 'Not tracked yet' : 'Searches saved'}
+            </p>
           </div>
 
           <div className="dashboard-card">
@@ -356,9 +371,11 @@ export const SearchAnalyticsDashboard = () => {
               <p className="text-xs text-muted-foreground">Moodboard Rate</p>
             </div>
             <div className="text-2xl font-bold">
-              {stats.moodboardConversionRate.toFixed(1)}%
+              <Rate value={stats.moodboardConversionRate} />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Added to moodboards</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.moodboardConversionRate == null ? 'Not tracked yet' : 'Added to moodboards'}
+            </p>
           </div>
         </div>
       )}

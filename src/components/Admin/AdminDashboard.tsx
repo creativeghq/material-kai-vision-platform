@@ -237,8 +237,12 @@ const AdminDashboard: React.FC = () => {
         .from('materials_catalog')
         .select('*', { count: 'exact', head: true });
 
+      // Rendered as the "Search Queries" tile. It counted `search_analytics`, which has no
+      // producer — its only writer sits in a method with zero callers — so the tile read 0
+      // permanently while real searches were being recorded in `search_query_tracking` by
+      // MIVAA's /api/rag/search. (#310 item 4)
       const { count: activeSessions } = await supabase
-        .from('search_analytics')
+        .from('search_query_tracking')
         .select('*', { count: 'exact', head: true });
 
       const { count: totalChats } = await supabase

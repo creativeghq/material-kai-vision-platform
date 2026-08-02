@@ -32,7 +32,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
     totalDocs: 0,
     totalCategories: 0,
     totalAttachments: 0,
-    totalSearches: 0,
+    totalSearches: null as number | null,
   });
 
   const { toast } = useToast();
@@ -55,6 +55,11 @@ export const KnowledgeBaseManagement: React.FC = () => {
         supabase.from('kb_docs').select('*', { count: 'exact', head: true }),
         supabase.from('kb_categories').select('*', { count: 'exact', head: true }),
         supabase.from('kb_doc_attachments').select('*', { count: 'exact', head: true }),
+        // `kb_search_analytics` has NO PRODUCER — nothing in the platform writes a KB search.
+        // The count is therefore 0 forever, which reads as "nobody searches the KB" rather than
+        // "KB search is not instrumented". It is NOT repointed at `search_query_tracking`: that
+        // table records only the material multi_vector path, so borrowing it would report
+        // material searches as KB searches, which is worse than reporting nothing.
         supabase.from('kb_search_analytics').select('*', { count: 'exact', head: true }),
       ]);
 
@@ -62,7 +67,8 @@ export const KnowledgeBaseManagement: React.FC = () => {
         totalDocs: docsCount || 0,
         totalCategories: categoriesCount || 0,
         totalAttachments: attachmentsCount || 0,
-        totalSearches: searchesCount || 0,
+        // null, not 0 — see the query above. Rendered as "not tracked".
+        totalSearches: searchesCount || null,
       });
     } catch (error) {
       console.error('Failed to load stats:', error);
@@ -155,7 +161,13 @@ export const KnowledgeBaseManagement: React.FC = () => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Searches</p>
-                <p className="text-lg font-semibold">{isLoading ? '—' : stats.totalSearches}</p>
+                <p className="text-lg font-semibold">
+                  {isLoading ? '—' : (stats.totalSearches ?? (
+                    <span className="text-sm font-normal text-muted-foreground" title="No producer writes kb_search_analytics">
+                      not tracked
+                    </span>
+                  ))}
+                </p>
               </div>
             </div>
           </div>
