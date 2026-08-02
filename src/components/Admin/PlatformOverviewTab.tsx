@@ -584,7 +584,12 @@ export function PlatformOverviewTab() {
         Promise.all([
           supabase.from('credit_transactions').select('amount,transaction_type,created_at').gte('created_at', ago12.toISOString()).limit(5000),
           supabase.from('user_credits').select('balance'),
-          supabase.from('ai_usage_logs').select('model_name,operation_type,billed_cost_usd,credits_debited,user_id,created_at').gte('created_at', ago12.toISOString()).limit(10000),
+          // Aggregated in SQL. This used to pull up to 10,000 raw rows into the browser to compute
+          // five small summaries — and the cap meant every figure derived from it was silently
+          // WRONG past 10,000 rows in the window. The RPC sees all of them and returns ~42 rows.
+          // It returns per-DAY buckets on purpose: the week label below is a bespoke non-ISO
+          // number computed in LOCAL time, so bucketing in SQL would shift edges off UTC.
+          supabase.rpc('admin_ai_usage_summary', { p_since: ago12.toISOString() }),
         ]),
         // KB health
         Promise.all([
@@ -672,23 +677,35 @@ export function PlatformOverviewTab() {
         const buckets = new Map([['0–100',0],['101–500',0],['501–1k',0],['1k–5k',0],['5k+',0]]);
         (balances ?? []).forEach((u: any) => { const b = u.balance ?? 0; if (b <= 100) buckets.set('0–100', (buckets.get('0–100') ?? 0) + 1); else if (b <= 500) buckets.set('101–500', (buckets.get('101–500') ?? 0) + 1); else if (b <= 1000) buckets.set('501–1k', (buckets.get('501–1k') ?? 0) + 1); else if (b <= 5000) buckets.set('1k–5k', (buckets.get('1k–5k') ?? 0) + 1); else buckets.set('5k+', (buckets.get('5k+') ?? 0) + 1); });
         setCreditBalanceDist(Array.from(buckets.entries()).map(([range, count]) => ({ range, count })));
-        const modelMap = new Map<string, { credits: number; cost: number }>();
-        const opMap = new Map<string, number>();
+        // Pre-aggregated by admin_ai_usage_summary. Only the WEEK bucketing stays client-side,
+        // because weekLabel is a bespoke non-ISO number computed in local time — moving it to SQL
+        // would shift bucket edges for anyone off UTC. Everything else is summed in the database.
+        const ai = (aiLogs ?? {}) as {
+          by_model?: { model_name: string; credits: number; cost: number }[];
+          by_operation?: { operation_type: string; credits: number }[];
+          by_day?: { day: string; cost: number; credits: number }[];
+          by_user?: { user_id: string; credits: number; top_op: string | null }[];
+          totals?: { total_cost_usd: number; unique_users: number };
+        };
         const costWkMap = new Map<string, { cost: number; credits: number }>(wks12.map(w => [w, { cost: 0, credits: 0 }]));
-        const userMap = new Map<string, { credits: number; ops: Map<string, number> }>();
-        (aiLogs ?? []).forEach((l: any) => {
-          const m = (l.model_name ?? 'unknown').replace('claude-', 'Claude ').replace('gpt-', 'GPT-');
-          const e = modelMap.get(m) ?? { credits: 0, cost: 0 }; e.credits += l.credits_debited ?? 0; e.cost += l.billed_cost_usd ?? 0; modelMap.set(m, e);
-          const op = l.operation_type ?? 'unknown'; opMap.set(op, (opMap.get(op) ?? 0) + (l.credits_debited ?? 0));
-          const wk = weekLabel(new Date(l.created_at)); if (costWkMap.has(wk)) { costWkMap.get(wk)!.cost += l.billed_cost_usd ?? 0; costWkMap.get(wk)!.credits += l.credits_debited ?? 0; }
-          const uid = l.user_id; if (uid) { const ue = userMap.get(uid) ?? { credits: 0, ops: new Map() }; ue.credits += l.credits_debited ?? 0; ue.ops.set(op, (ue.ops.get(op) ?? 0) + 1); userMap.set(uid, ue); }
+        (ai.by_day ?? []).forEach((d) => {
+          const wk = weekLabel(new Date(d.day));
+          if (costWkMap.has(wk)) { costWkMap.get(wk)!.cost += Number(d.cost ?? 0); costWkMap.get(wk)!.credits += Number(d.credits ?? 0); }
         });
-        setAiModelCosts(Array.from(modelMap.entries()).sort((a, b) => b[1].credits - a[1].credits).slice(0, 8).map(([model, d]) => ({ model, credits: d.credits, cost: +d.cost.toFixed(2) })));
-        setAiOperationCosts(Array.from(opMap.entries()).sort((a, b) => b[1] - a[1]).map(([operation, credits]) => ({ operation, credits })));
+        setAiModelCosts((ai.by_model ?? []).map((m) => ({
+          model: (m.model_name ?? 'unknown').replace('claude-', 'Claude ').replace('gpt-', 'GPT-'),
+          credits: Number(m.credits ?? 0),
+          cost: +Number(m.cost ?? 0).toFixed(2),
+        })));
+        setAiOperationCosts((ai.by_operation ?? []).map((o) => ({ operation: o.operation_type, credits: Number(o.credits ?? 0) })));
         setAiCostTrend(Array.from(costWkMap.entries()).map(([week, d]) => ({ week, cost: +d.cost.toFixed(2), credits: d.credits })));
-        const totalCost = Array.from(modelMap.values()).reduce((s, v) => s + v.cost, 0);
-        setCreditKpis2({ totalCostUsd: +totalCost.toFixed(2), uniqueUsers: userMap.size });
-        setTopCreditConsumers(Array.from(userMap.entries()).sort((a, b) => b[1].credits - a[1].credits).slice(0, 10).map(([uid, d]) => { const topOp = Array.from(d.ops.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—'; return { userId: uid.slice(-8), credits: d.credits, topOp }; }));
+        setCreditKpis2({
+          totalCostUsd: +Number(ai.totals?.total_cost_usd ?? 0).toFixed(2),
+          uniqueUsers: Number(ai.totals?.unique_users ?? 0),
+        });
+        setTopCreditConsumers((ai.by_user ?? []).map((u) => ({
+          userId: String(u.user_id).slice(-8), credits: Number(u.credits ?? 0), topOp: u.top_op ?? '—',
+        })));
       }
 
       // Process KB health
