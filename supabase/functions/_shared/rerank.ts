@@ -1,5 +1,5 @@
 /**
- * Cross-encoder style reranking for search results. (#310 item 1)
+ * Cross-encoder style reranking for search results.
  *
  * WHY THIS IS SHARED RATHER THAN ONLY AN EDGE FUNCTION
  * ----------------------------------------------------
@@ -8,10 +8,8 @@
  * candidates PER ASPECT. Something has to fuse them into a single ordering, and without that the
  * only options are "pick one aspect" or "average them", neither of which is ranking.
  *
- * The original `ai-rerank` edge function was deployed with no source in the repo, then tombstoned
- * (audit #298 finding 25). The tombstone said the original could be recovered via the Management
- * API — but deploying the tombstone overwrote exactly that, so this is a fresh implementation
- * against the interface recorded in #310.
+ * This is a fresh implementation, not a restoration: the original `ai-rerank` edge function was
+ * deployed with no source in the repo and the tombstone that replaced it overwrote the only copy.
  *
  * It lives in `_shared` so the three search paths can call it IN-PROCESS. Making them each do an
  * HTTP round-trip to an edge function to reorder a list they already hold would add a network hop

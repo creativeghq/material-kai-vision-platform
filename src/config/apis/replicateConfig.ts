@@ -138,7 +138,7 @@ export const replicateConfig: ReplicateApiConfig = {
       version: 'e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9',
       inputSchema: z.object({
         prompt: z.string().min(1, 'Prompt is required'),
-        input: z.string().url('Image URL is required'), // NOTE: 'input', not 'image'
+        input: z.string().url('Image URL is required'), // the field is 'input', not 'image'
         negative_prompt: z.string().optional(),
         num_inference_steps: z.number().int().min(1).max(500).default(50).optional(),
         guidance_scale: z.number().min(1).max(50).default(7.5).optional(),

@@ -24,7 +24,7 @@ import { rerankResults, type RerankCandidate } from '../rerank.ts';
  * Fully inert when there is nothing to rank: rerankResults returns the input untouched, with no
  * model call, for fewer than 2 candidates — which is every search on this platform until the
  * catalog pipeline produces products. Wiring it now means it starts working the day data arrives
- * rather than needing to be remembered then. (#310 item 1)
+ * rather than needing to be remembered then.
  */
 const RERANKABLE_KEYS = ['results', 'chunks', 'products'] as const;
 

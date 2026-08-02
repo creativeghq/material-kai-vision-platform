@@ -1,16 +1,12 @@
 /**
  * ai-rerank — reorder search results by relevance to a query.
  *
- * HISTORY, BECAUSE IT MATTERS FOR HOW TO TREAT THIS FILE
- * -----------------------------------------------------
- * This slug was originally deployed with NO SOURCE in the repository (audit #298 finding 25):
- * unreadable, unreviewable, service-role capable and reachable unauthenticated. It was tombstoned
- * on 2026-08-01. The tombstone said the original body could be recovered through the Management
- * API — but `get_edge_function` only ever returns the CURRENT version, so deploying the tombstone
- * destroyed the one thing that instruction depended on.
- *
- * So this is a fresh implementation against the request interface recorded in #310, not a
- * restoration. It exists in the repo, is covered by `npm run typecheck:edge`, and requires a JWT.
+ * THIS SLUG MUST KEEP ITS SOURCE IN THE REPO
+ * ------------------------------------------
+ * It was once deployed with no source here — unreadable, unreviewable, service-role capable and
+ * reachable unauthenticated — and the body could not be recovered afterwards, because
+ * `get_edge_function` only ever returns the CURRENT version. This implementation exists in the
+ * repo, is covered by `npm run typecheck:edge`, and requires a JWT. Keep it that way.
  *
  * The ranking itself lives in `_shared/rerank.ts`, which is what the three in-agent search paths
  * (material_search, visual_search, knowledge_base_search) call directly — they already hold the
