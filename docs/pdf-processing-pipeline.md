@@ -276,7 +276,7 @@
 
 Stage 0 discovers: `name="NOVA"`, `page_range=[12,13,14]`
 
-Stage 1 (Layout + Tables, FOR NOVA ONLY): the PaddleOCR-VL structural pass detects 15 regions on pages 12-14 and recognizes their content (table regions → markdown/HTML preserved in `metadata.html`); Camelot extracts 3 tables from page 13; tables stored with product_id = NOVA's ID. (Note: the structural pass actually runs once per document as Stage 1 BEFORE discovery; this per-product framing reflects how each product reads its slice of the shared `document_layout_analysis` cache.)
+Stage 1 (Layout + Tables, FOR NOVA ONLY): the PaddleOCR-VL structural pass detects 15 regions on pages 12-14 and recognizes their content (table regions → markdown/HTML preserved in `metadata.html`). Stage 2.5 parses those 3 table regions on page 13 into `product_tables` rows with product_id = NOVA's ID. (Note: the structural pass actually runs once per document as Stage 1 BEFORE discovery; this per-product framing reflects how each product reads its slice of the shared `document_layout_analysis` cache.)
 
 Stage 2 (Text Chunking, FOR NOVA ONLY): Extracts text from pages 12-14 only, creates 45 chunks, each with product_id = NOVA's ID.
 
@@ -382,12 +382,12 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 1. **Page Mapping**: Map catalog pages to physical PDF pages
 2. **PaddleOCR-VL structural pass** (`mode=page`): **PP-DocLayoutV2** (RT-DETR detector + pointer network) localizes regions + labels them + predicts reading order; the **0.9B VLM** recognizes content inside each region (text, tables→markdown/HTML, formulas→LaTeX, charts).
 3. **Layout cache persistence**: Map the `/parse` JSON onto the unchanged `document_layout_analysis.layout_elements[]` schema and persist with `processing_version='paddleocr-vl'`.
-4. **Table Extraction**: Camelot extracts structured tables (table region `content` markdown/HTML is also preserved in `metadata.html`).
+4. **Table content**: table region `content` (markdown/HTML recognized by the VLM) is preserved in `metadata.html`. It is parsed into `product_tables` by **Stage 2.5**, not here — see below.
 
 **Services Used**:
 - `PaddleOCRManager.from_config` (`paddleocr_endpoint_manager.py`) — `run_structural_pass` (page) holds inference + retry + `paddleocr_metrics` telemetry; lifecycle (warmup `/health` probe / scale-to-zero) delegated to `ModalEndpointProvider` in `endpoint_providers.py`
 - `paddleocr_pipeline.py` — maps `/parse` JSON onto `document_layout_analysis.layout_elements[]`; PP-DocLayout labels (`doc_title`/`paragraph_title`/`text`/`table`/`image`/`figure`/`chart`/…) → existing `region_type` vocab via `PADDLE_LABEL_TO_REGION_TYPE`. RT-DETR **pixel** bboxes → normalized 0..1 at the parser boundary → denormalized at crop render in `region_to_layout_element`
-- `TableExtractor` — table extraction using Camelot
+- `TableExtractor` (`app/services/pdf/table_extraction.py`) — parses the VLM's `metadata.html` (markdown OR `<table>` HTML) into `product_tables` rows. Called from **Stage 2.5**. Never reopens the PDF: the pdfplumber implementation that did was dead from #248 and was removed 2026-08-02 along with the dependency.
 
 **Hosting**: Modal app `paddleocr-vl` at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`, GPU L4, scale-to-zero (`min_containers=0` + `scaledown_window=120` = $0 idle, `max_containers=4`). Custom contract: `GET /health` (unauth warmup probe) + `POST /parse {image_b64, mode}` → `{regions:[{bbox:[x0,y0,x1,y1] px, label, content, order}], width, height}`; `mode=page` = structural pass, `mode=block` = per-crop OCR. Cold start ~90s (paid once per job at warmup); ~1-3s/page warm.
 
@@ -404,7 +404,7 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
    - formula regions — recognized to LaTeX
 
 3. **Tables**
-   - Structured table data with headers and rows (Camelot) + markdown/HTML from the VLM in `metadata.html`
+   - Markdown/HTML from the VLM in `metadata.html`, parsed by Stage 2.5 into structured headers + rows
    - Table type classification (specifications, dimensions, etc.)
    - Confidence scores for extraction quality
    - Page numbers for linking to products
@@ -520,6 +520,43 @@ Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via p
 **Output**:
 - Extracted text formatted as markdown with product name header, specification subsection, and description subsection
 - Chunks stored in database linked by product_id
+
+---
+
+### Stage 2.5: Persist VLM tables → `product_tables` (added 2026-08-02)
+
+**File**: `app/services/pdf/table_extraction.py` → `TableExtractor.persist_tables_from_layout_cache`, called from `product_processor.py` right after Stage 2.
+
+**Purpose**: parse the table content PaddleOCR-VL already recognized in Stage 1 into structured rows, so `TableMetadataExtractor` (Stage 5) can mine it.
+
+**Process**:
+1. Read this product's pages from the `document_layout_analysis` cache (the same reader Stage 2 chunking uses — no PDF is reopened, no inference re-run)
+2. Keep `region_type='TABLE'` elements with non-empty `metadata.html`
+3. Parse markdown pipe tables **or** `<table>` HTML into a header row + data rows
+4. Classify (`dimensions` / `packaging` / `specifications` / `pricing` / `comparison` / `other`, multilingual)
+5. Delete this product's existing rows, then insert — idempotent, so resume is safe
+
+**Why it is NOT gated on `skip_chunking`**: a job resuming from a run that predates this stage has chunks but no tables, and a gated call would never give it any.
+
+> **The regression this closes.** #248 (2026-07-04) deleted the per-product table writer,
+> stating that TABLE content "is preserved as metadata.html … and consumed by Stage 2."
+> Nothing consumed it. `product_tables` was written by **no stage at all** for a month:
+> `TableMetadataExtractor` ran on every product against an empty table, packaging and
+> performance specs were never populated, and `available_sizes` / `thickness` fell
+> through to the Stage 4.6 regex net at 0.65 confidence. Guarded now by the
+> `product_tables_never_written` probe in `ops.silent_zero` and by
+> `tests/unit/test_table_extraction.py` in the MIVAA repo.
+
+**Fields this unlocks** (previously unreachable — the regex layers have no patterns for them): `packaging.pieces_per_box`, `boxes_per_pallet`, `weight_per_box_kg`, `coverage_per_box_m2`, and `performance.{slip_resistance, water_absorption, frost_resistance, abrasion_resistance, breaking_strength, chemical_resistance, fire_rating}`.
+
+**Confidence ladder for thickness** (one home: `metadata.material_properties.thickness`):
+
+| Source | Confidence | Stage |
+|---|---|---|
+| `product_table` | 0.95 | 5 (entity linking, from Stage 2.5 rows) |
+| `sibling_product` | 0.75 | 4.5 |
+| `image_text` | 0.70 | Phase 1 inline |
+| `document_text` | 0.65 | 4.6 |
 
 ---
 
