@@ -1,13 +1,14 @@
 // Buyer portal: a saved search's shareable matches page. The buyer opens /buyer/:token
 // (no login), sees listings that match their criteria, favourites them, and requests viewings.
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { useParams, Link } from 'react-router-dom';
 import { Heart, CalendarPlus, Home, Loader2, Building2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { realEstatePublic, type PublicListingCard } from '@/modules/real-estate/services/realEstateService';
 
-const money = (n: number | null | undefined, ccy = 'EUR') => (n == null ? 'Price on request' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+const money = (n: number | null | undefined, ccy = 'EUR') => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on request' });
 
 function criteriaSummary(c: Record<string, any>): string {
   const parts: string[] = [];

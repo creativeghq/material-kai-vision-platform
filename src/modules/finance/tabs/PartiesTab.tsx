@@ -132,10 +132,17 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
         financeService.getCustomerAgingBuckets({ workspaceId }),
       ]);
       setRows(r);
+      // One row per (customer, CURRENCY) since audit #287 T2-8. A plain `map[key] = a` was
+      // LAST-WRITE-WINS across currencies, so a customer holding EUR and USD balances showed
+      // whichever row the view happened to return last — nondeterministic, and silently dropping
+      // the other. Keep the largest exposure instead: deterministic, and the number shown is at
+      // least the worst one rather than a coin flip.
       const map: Record<string, CustomerAgingBuckets> = {};
       for (const a of aging) {
         const key = a.customer_company_id ? `company:${a.customer_company_id}` : a.customer_contact_id ? `contact:${a.customer_contact_id}` : null;
-        if (key) map[key] = a;
+        if (!key) continue;
+        const prev = map[key];
+        if (!prev || Number(a.total_outstanding) > Number(prev.total_outstanding)) map[key] = a;
       }
       setAgingMap(map);
     } catch (err: any) {

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { useSearchParams } from 'react-router-dom';
 import {
   Inbox as InboxIcon, Send, Plus, Loader2, MessageSquare, Lock, Paperclip,
@@ -79,10 +80,7 @@ function avatarTint(name: string | null | undefined): string {
 }
 
 function money(amount: number | null | undefined, currency: string | null | undefined): string {
-  if (amount == null) return '—';
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR' }).format(amount);
-  } catch { return `${amount} ${currency || ''}`.trim(); }
+  return formatMoney(amount, currency || 'EUR');
 }
 
 /** Per-source presentation for a thread's channel (the "Team / Customer / WhatsApp" tag). Email is

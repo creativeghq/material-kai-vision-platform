@@ -2,6 +2,7 @@
 // counts, total entitled (incl. plan-included), add-on MRR, and the workspace list. Data comes
 // from the operator-guarded admin_module_subscription_overview() RPC.
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { CreditCard, RefreshCw, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -34,10 +35,9 @@ interface ModuleOverviewRow {
   subscribers: SubscriberRow[];
 }
 
+/** Stripe amounts arrive in minor units; the canonical formatter takes major. */
 function money(cents: number, currency: string | null): string {
-  const cur = (currency || 'eur').toLowerCase();
-  const symbol = cur === 'eur' ? '€' : cur === 'usd' ? '$' : `${cur.toUpperCase()} `;
-  return `${symbol}${(cents / 100).toFixed(2)}`;
+  return formatMoney(cents / 100, (currency || 'EUR').toUpperCase());
 }
 
 const STATUS_TONE: Record<string, string> = {

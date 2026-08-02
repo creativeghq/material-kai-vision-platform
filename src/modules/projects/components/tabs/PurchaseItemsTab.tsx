@@ -10,6 +10,7 @@
  * Owner-only (operator/dealer/architect) — end-customer collaborators never reach this tab.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import {
   Hammer, Loader2, Plus, Trash2, Pencil, Sparkles, FileDown, Search, X, DoorOpen, Square, Package,
 } from 'lucide-react';
@@ -38,8 +39,7 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   door: DoorOpen, window: Square, other: Package,
 };
 
-const money = (n: number | null | undefined, c: string | null | undefined) =>
-  n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c || 'EUR' }).format(n);
+const money = (n: number | null | undefined, c: string | null | undefined) => formatMoney(n, c ?? 'EUR');
 
 // Compact spec summary shown on the row (the most identifying keys per type).
 function specSummary(it: ProjectPurchaseItem): string {

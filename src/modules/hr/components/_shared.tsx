@@ -2,17 +2,24 @@
 import React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { SectionHeader as SharedSectionHeader } from '@/components/shared/SectionHeader';
+import { formatMoney } from '@/utils/decimal';
 
-/** Currency formatter for the HR sections. `minDecimals` defaults to 2 (accounting-style); pass 0 for
- *  payroll totals that read cleaner as whole numbers. `nullDash` shows "—" for null instead of 0. */
+/**
+ * Currency formatter for the HR sections — now a thin adapter over the canonical `formatMoney`
+ * rather than a third implementation. It kept its own: browser locale (so the grouping changed with
+ * the viewer's language) and a trailing currency CODE, so a payroll figure read "1,234.56 EUR"
+ * while the same amount everywhere else read "€1,234.56". The API is unchanged.
+ *
+ * `minDecimals` defaults to 2 (accounting-style); pass 0 for payroll totals that read cleaner whole.
+ * `nullDash` shows "—" for null instead of 0.
+ */
 export function hrMoney(
   n: number | null | undefined,
   currency: string,
   opts: { minDecimals?: number; nullDash?: boolean } = {},
 ): string {
-  if (n == null && opts.nullDash) return '—';
-  const min = opts.minDecimals ?? 2;
-  return `${Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: min, maximumFractionDigits: 2 })} ${currency || 'EUR'}`;
+  if (n == null && !opts.nullDash) return formatMoney(0, currency, { decimals: opts.minDecimals ?? 2 });
+  return formatMoney(n, currency, { decimals: opts.minDecimals ?? 2 });
 }
 
 /** Stat tile — a glass dashboard-card div (NOT a shadcn Card, which kills the glass effect). */

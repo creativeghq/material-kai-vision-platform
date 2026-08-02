@@ -107,11 +107,30 @@ export function round2(n: number): number {
  * still prints as a real amount (one of the replaced copies returned the dash for 0 as well,
  * because it tested falsiness).
  */
-export function formatMoney(value: number | null | undefined, currency = 'EUR'): string {
-  if (value == null) return '—';
+export interface FormatMoneyOptions {
+  /** Minimum fraction digits. 2 (accounting) by default; 0 for figures that read better whole,
+   *  like a property asking price or a payroll total. Maximum stays 2 either way. */
+  decimals?: number;
+  /** What `null`/`undefined` renders as. "—" by default; a listing might want "On request". */
+  fallback?: string;
+}
+
+export function formatMoney(
+  value: number | null | undefined,
+  currency = 'EUR',
+  opts: FormatMoneyOptions = {},
+): string {
+  if (value == null) return opts.fallback ?? '—';
+  const min = opts.decimals ?? 2;
   try {
-    return new Intl.NumberFormat('en-IE', { style: 'currency', currency: currency || 'EUR', maximumFractionDigits: 2 }).format(value);
+    return new Intl.NumberFormat('en-IE', {
+      style: 'currency',
+      currency: currency || 'EUR',
+      minimumFractionDigits: min,
+      maximumFractionDigits: 2,
+    }).format(value);
   } catch {
-    return `${currency} ${Number(value).toFixed(2)}`;
+    // Unknown/invalid currency code — Intl throws rather than degrading.
+    return `${currency} ${Number(value).toFixed(min)}`;
   }
 }

@@ -1,6 +1,7 @@
 // Deal pipeline board. Stage columns with cards; a deal moves via a stage <Select>
 // (the app's established "board" pattern — see HR RecruitmentSection — not drag-and-drop).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { useNavigate } from 'react-router-dom';
 import { Plus, MoreVertical, Trophy, XCircle, Trash2, ListChecks, Loader2, RotateCcw, Pencil } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
@@ -22,7 +23,7 @@ const STAGES: { key: DealStage; label: string }[] = [
   { key: 'exchanged', label: 'Exchanged' }, { key: 'completed', label: 'Completed' },
 ];
 const STAGE_LABEL = (s: DealStage) => STAGES.find((x) => x.key === s)?.label ?? s;
-const money = (n: number | null, ccy: string) => (n == null ? '' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: '' });
 
 export const PipelineBoard: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, canManage }) => {
   const navigate = useNavigate();

@@ -1,9 +1,10 @@
 import React from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { Link } from 'react-router-dom';
 import { Building2, MapPin, BedDouble, Bath, Ruler } from 'lucide-react';
 import type { PublicListingCard } from '../services/realEstateService';
 
-const money = (n: number | null, ccy: string) => (n == null ? 'On request' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'On request' });
 
 /** Public listing cards linking to the `/p/:token` page. Shared by Discovery + the agency profile tab. */
 export const PropertyCardGrid: React.FC<{ listings: PublicListingCard[] }> = ({ listings }) => {

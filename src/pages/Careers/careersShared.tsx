@@ -1,5 +1,6 @@
 // Presentation helpers shared by the public careers board and the job detail page.
 import { Building2 } from 'lucide-react';
+import { formatMoney } from '@/utils/decimal';
 import type { CareersJobSummary, CompanyProfile, CompensationBand } from '@/services/publicCareersService';
 
 export const EMPLOYMENT_LABELS: Record<string, string> = {
@@ -15,11 +16,9 @@ export function locationTypeLabel(j: Pick<CareersJobSummary, 'location_type' | '
   return j.remote ? 'Remote' : null;
 }
 
-const money = (n: number, currency: string) => {
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR', maximumFractionDigits: 0 }).format(n);
-  } catch { return `${n.toLocaleString()} ${currency}`.trim(); }
-};
+// Salary figures read better whole. The canonical formatter already falls back on an unknown
+// currency code, which is what the old local try/catch was for.
+const money = (n: number, currency: string) => formatMoney(n, currency || 'EUR', { decimals: 0 });
 
 /** "€90,000 – €122,000" / "From €90,000" / "Up to €122,000". */
 export function rangeLabel(min: number | null, max: number | null, currency: string | null): string | null {

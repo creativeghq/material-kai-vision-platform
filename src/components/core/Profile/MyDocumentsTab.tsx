@@ -16,8 +16,7 @@ import {
 } from '@/services/customerDocumentsService';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 
-const money = (v: number, currency: string) =>
-  new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(v || 0);
+import { formatMoney as money } from '@/utils/decimal';
 const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString() : '—');
 
 const ORDER_STATUS_LABEL: Record<CustomerOrder['status'], string> = {

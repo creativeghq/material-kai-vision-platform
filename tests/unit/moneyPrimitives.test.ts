@@ -56,13 +56,30 @@ describe('round2 is declared once', () => {
 });
 
 describe('formatMoney is declared once', () => {
-  it('any file declaring it must be delegating to the canonical one', () => {
+  /**
+   * Checked by NAME as well as by identifier, because the first sweep of this only looked for
+   * `formatMoney` and reported six copies. The real count was far higher: thirty-nine files
+   * declared the same formatter as `money`, across real estate, projects, HR, quotes, CRM, the
+   * public pages and eight edge functions. A rule that names one identifier just renames the
+   * problem, so both spellings are covered.
+   */
+  it.each(['formatMoney', 'money'])('a local `%s` must delegate to the canonical one', (ident) => {
+    const decl = new RegExp(`(const\\s+${ident}\\s*=\\s*\\(|function\\s+${ident}\\s*\\()`);
     const offenders = FILES.filter(({ path, src }) =>
       !path.endsWith('/src/utils/decimal.ts')
-      && /(const\s+formatMoney\s*=|function\s+formatMoney\s*\()/.test(src)
+      && decl.test(src)
       && !/from '@\/utils\/decimal'/.test(src))
       .map(({ path }) => rel(path));
-    expect(offenders, 'import { formatMoney } from "@/utils/decimal" instead').toEqual([]);
+    expect(offenders, `import { formatMoney } from "@/utils/decimal" instead of declaring ${ident}`).toEqual([]);
+  });
+
+  it('expresses the real variations as options rather than new implementations', () => {
+    // The copies differed in exactly two ways beyond locale — how many decimals, and what a null
+    // renders as. Both are options, so a caller never needs to reach for Intl again.
+    expect(formatMoney(1234.5, 'EUR', { decimals: 0 })).toContain('1,234');
+    expect(formatMoney(1234.5, 'EUR', { decimals: 0 })).not.toContain('.50');
+    expect(formatMoney(null, 'EUR', { fallback: 'On request' })).toBe('On request');
+    expect(formatMoney(null, 'EUR', { fallback: '' })).toBe('');
   });
 
   it('pins the locale so an amount reads the same for every viewer', () => {

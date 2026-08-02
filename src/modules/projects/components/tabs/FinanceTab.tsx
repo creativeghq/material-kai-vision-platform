@@ -6,6 +6,7 @@
  * Owner-only + finance.manage. End-customer collaborators never reach this tab.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { useNavigate } from 'react-router-dom';
 import {
   Loader2, Plus, ArrowDownLeft, ArrowUpRight, Link2Off, FileText,
@@ -25,8 +26,7 @@ import {
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
 
-const money = (n: number | null | undefined, c: string | null | undefined) =>
-  n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c || 'EUR' }).format(n);
+const money = (n: number | null | undefined, c: string | null | undefined) => formatMoney(n, c ?? 'EUR');
 
 const KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', supplier_bill: 'Supplier bill',

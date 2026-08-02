@@ -153,8 +153,7 @@ const hrefFor = (kind: string | null | undefined, id: string | null | undefined,
   return null;
 };
 
-const money = (amount: number, currency: string | null | undefined): string =>
-  new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR' }).format(amount);
+import { formatMoney as money } from '@/utils/decimal';
 
 // Composer entry types. `note` persists to crm_notes; the rest log a typed row to
 // crm_activities (activity_type / title) — all merge back into the timeline below.

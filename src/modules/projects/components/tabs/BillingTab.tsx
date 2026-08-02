@@ -4,6 +4,7 @@
  * Gated on the `finance.manage` capability (end-users never see this).
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Loader2, Plus, ArrowRight, Receipt } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -18,8 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { projectsService } from '../../services/projectsService';
 
-const money = (n: number | null, c: string | null) =>
-  n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c || 'EUR' }).format(n);
+const money = (n: number | null, c: string | null) => formatMoney(n, c ?? 'EUR');
 
 export const BillingTab: React.FC<{ projectId: string }> = ({ projectId }) => {
   const { toast } = useToast();

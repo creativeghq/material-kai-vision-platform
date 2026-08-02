@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { Download, FileText, ExternalLink, ClipboardList, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
@@ -23,9 +24,7 @@ export interface QuoteCanvasData {
 const CURRENCY_SYMBOL: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' };
 
 function money(v: number | null | undefined, currency?: string): string {
-  if (v == null) return '—';
-  const sym = CURRENCY_SYMBOL[currency || 'EUR'] || '';
-  return `${sym}${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatMoney(v, currency || 'EUR');
 }
 
 /**

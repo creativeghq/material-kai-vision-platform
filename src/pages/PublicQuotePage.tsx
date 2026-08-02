@@ -70,8 +70,7 @@ interface IssuedDocument {
   pdf_url: string | null;
 }
 
-const money = (v: number | null | undefined, currency: string) =>
-  v == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(v);
+import { formatMoney as money } from '@/utils/decimal';
 
 export default function PublicQuotePage() {
   const { token } = useParams<{ token: string }>();

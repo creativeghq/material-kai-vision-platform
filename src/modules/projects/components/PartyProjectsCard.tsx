@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { Link } from 'react-router-dom';
 import { FolderKanban, Loader2, Plus, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -46,8 +47,7 @@ export const PartyProjectsCard: React.FC<{
   useEffect(() => { setPage(1); }, [companyId, contactId]);
   useEffect(() => { setPage((p) => clampPage(p, rows.length)); }, [rows.length]);
 
-  const money = (n: number | null | undefined, ccy: string) =>
-    n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(Number(n));
+  const money = (n: number | null | undefined, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0 });
 
   return (
     <Card>

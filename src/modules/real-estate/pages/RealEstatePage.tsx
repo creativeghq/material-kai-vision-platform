@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil } from 'lucide-react';
 import { PipelineBoard } from '../components/PipelineBoard';
@@ -21,7 +22,7 @@ import { realEstateService, feedUrl, type PropertyListItem, type PropertyInquiry
 import { statusTone } from '@/utils/statusTone';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
 
-const money = (n: number | null, ccy: string) => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0 });
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
 const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
 

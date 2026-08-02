@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { TrendingUp, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
 import { realEstatePublic, type ValuationResult } from '../services/realEstateService';
 
-const money = (n: number | null, ccy = 'EUR') => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy, maximumFractionDigits: 0 }).format(n));
+const money = (n: number | null, ccy = 'EUR') => formatMoney(n, ccy, { decimals: 0 });
 
 // Public seller lead-magnet on the agency profile: instant comps-based valuation + captures
 // the visitor as a seller lead. Estimate comes from the agency's own comparable listings.

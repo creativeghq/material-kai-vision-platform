@@ -5,6 +5,7 @@
  * quotes are linked to this quote so they show here regardless of BYOK-vs-operator timing.
  */
 import React, { useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { Loader2, Ship, Calculator, Plus } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -21,7 +22,7 @@ const CONTAINERS = [
   { value: '20st', label: "20' Standard" }, { value: '40st', label: "40' Standard" },
   { value: '40hq', label: "40' High Cube" }, { value: '20ref', label: "20' Reefer" }, { value: '40ref', label: "40' Reefer" },
 ];
-const money = (a: number | null, c: string | null) => a == null ? '—' : `${c === 'USD' ? '$' : c === 'GBP' ? '£' : c === 'EUR' ? '€' : `${c ?? ''} `}${Number(a).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const money = (a: number | null, c: string | null) => formatMoney(a, c ?? 'EUR', { decimals: 0 });
 
 export const QuoteShippingCard: React.FC<{ quoteId: string; editable: boolean; onAdded: () => void }> = ({ quoteId, editable, onAdded }) => {
   const { toast } = useToast();

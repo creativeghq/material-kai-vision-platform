@@ -9,6 +9,7 @@
  * Owner-only (operator/dealer/architect). End-customer collaborators never reach this tab.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import {
   Package, Loader2, Plus, Trash2, Tag, DownloadCloud, Search, X,
 } from 'lucide-react';
@@ -38,8 +39,7 @@ const STATUS_LABELS: Record<ProjectProductStatus, string> = {
   delivered: 'Delivered',
 };
 
-const money = (n: number | null | undefined, c: string | null | undefined) =>
-  n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c || 'EUR' }).format(n);
+const money = (n: number | null | undefined, c: string | null | undefined) => formatMoney(n, c ?? 'EUR');
 
 export const ProductsTab: React.FC<{ projectId: string; workspaceId?: string | null }> = ({ projectId, workspaceId }) => {
   const { toast } = useToast();

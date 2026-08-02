@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { useParams } from 'react-router-dom';
 import { Building2, MapPin, BedDouble, Bath, Ruler, Zap, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
@@ -9,7 +10,7 @@ import { realEstatePublic, type PublicListing } from '@/modules/real-estate/serv
 
 // Public `/p/:token` listing page (anonymous). All content comes from the token-gated
 // real-estate-public edge fn's toPublic() projection; rendered via JSX only (no HTML-string assembly).
-const money = (n: number | null, ccy: string) => (n == null ? 'Price on request' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on request' });
 
 export default function PublicListingPage() {
   const { token = '' } = useParams();

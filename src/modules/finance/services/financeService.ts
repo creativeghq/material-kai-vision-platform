@@ -555,6 +555,20 @@ export interface CustomerAgingBuckets {
   /** >90 days past due — "more than 90 days". */
   due_90_plus: number;
   max_days_overdue: number;
+  /**
+   * Identity key = COALESCE(company_id, contact_id). A company IS the customer when present.
+   * Group and join on this rather than re-deriving the COALESCE per call site — the view used to
+   * group on (company_id, contact_id) and split one customer across several rows whenever some of
+   * their invoices carried only a company. (audit #287 T3-14)
+   */
+  customer_id: string | null;
+  /**
+   * Rows are per (customer, CURRENCY). Amounts are never summed across currencies — a customer
+   * with a EUR and a USD invoice previously reported their total as one currency-less number.
+   * Anything rendering these MUST show the currency, or two honest rows read as a duplicate bug.
+   * (audit #287 T2-8)
+   */
+  currency: string | null;
 }
 
 

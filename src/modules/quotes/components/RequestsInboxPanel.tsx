@@ -8,6 +8,7 @@
  * owner prices/declines per line and the requester folds the returned costs back into the quote.
  */
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { useNavigate } from 'react-router-dom';
 import { Inbox, Loader2, ArrowRight, ArrowUpCircle, CheckCircle2, XCircle, Send, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -19,8 +20,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { masterRequestsService, type MasterRequest, type MasterRequestLine } from '@/services/masterRequestsService';
 
-const money = (n: number | null, c: string | null) =>
-  n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c || 'EUR' }).format(n);
+const money = (n: number | null, c: string | null) => formatMoney(n, c ?? 'EUR');
 
 const TONE: Record<string, string> = {
   new: 'text-blue-400',

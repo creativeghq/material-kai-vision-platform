@@ -2,6 +2,7 @@
 // agency's own comparable stock (active + sold). In-app preview + a self-contained print/PDF
 // (opens a styled window → browser "Save as PDF"), so no server-side pdf-lib build needed.
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { FileText, Loader2, Printer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
@@ -13,7 +14,7 @@ import { realEstateService, type CmaReport } from '../services/realEstateService
 import { escapeHtml } from '@/utils/escapeHtml';
 
 const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
-const money = (n: number | null | undefined, ccy = 'EUR') => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+const money = (n: number | null | undefined, ccy = 'EUR') => formatMoney(n, ccy || 'EUR', { decimals: 0 });
 const perSqm = (n: number | null, ccy = 'EUR') => (n == null ? '—' : `${money(n, ccy)}/m²`);
 
 export const CmaReportDialog: React.FC<{ ws: string; propertyId?: string; open: boolean; onOpenChange: (o: boolean) => void }> = ({ ws, propertyId, open, onOpenChange }) => {

@@ -329,8 +329,20 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         } catch { setOrderStats(null); }
 
         // Per-customer AR aging breakdown (skip for supplier-only views).
+        // The view returns one row per (customer, CURRENCY) — it no longer sums a EUR and a USD
+        // invoice into one currency-less total (audit #287 T2-8). The service orders by
+        // total_outstanding DESC, so [0] is the customer's LARGEST exposure rather than an
+        // arbitrary row. Every workspace is single-currency today so this picks the only row;
+        // showing all currencies at once is a panel redesign, not a one-line change, and picking
+        // deterministically beats picking silently.
         const buckets = await financeService.getCustomerAgingBuckets({ workspaceId: activeWorkspaceId, companyId, contactId });
         const b = buckets[0];
+        if (buckets.length > 1) {
+          console.warn(
+            `[finance] ${companyId ?? contactId} has open balances in ${buckets.length} currencies `
+            + `(${buckets.map((x) => x.currency).join(', ')}); the aging panel shows ${b.currency} only.`,
+          );
+        }
         setAging(b ? { not_due: Number(b.not_due), due_0_30: Number(b.due_0_30), due_31_90: Number(b.due_31_90), due_90_plus: Number(b.due_90_plus) } : null);
 
         // What we actually earned on this customer (revenue net − cost of goods on the lines).

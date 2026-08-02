@@ -4,6 +4,7 @@
  * /pay/:token Stripe-Connect flow.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { useParams } from 'react-router-dom';
 import { Loader2, ShoppingCart, Plus, Minus, Trash2, Store, ArrowRight, Package, Wrench } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -12,7 +13,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { storefrontService, type StorefrontMeta, type StorefrontProduct } from '@/modules/finance/services/storefrontService';
 
-const money = (n: number, ccy: string) => new Intl.NumberFormat(undefined, { style: 'currency', currency: ccy || 'EUR' }).format(n);
+const money = (n: number, ccy: string) => formatMoney(n, ccy || 'EUR');
 
 const PublicStorefrontPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();

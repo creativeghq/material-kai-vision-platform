@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { servicesService, type ServiceItem, type ServiceInput } from '@/modules/finance/services/servicesService';
 import { invoicingSetupService, type RefRow } from '@/services/invoicingSetupService';
 import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
-import { parseDecimal } from '@/utils/decimal';
+import { parseDecimal, formatMoney } from '@/utils/decimal';
 
 const EMPTY: ServiceInput = { name: '', description: '', unit: '', price: null, currency: 'EUR', vatCategory: 1, incType: '', incCat: '' };
 
@@ -73,7 +73,7 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
     catch (err: any) { toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' }); }
   };
 
-  const money = (v: number | null, c: string) => v == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: c }).format(v);
+  const money = (v: number | null, c: string) => formatMoney(v, c);
 
   return (
     <Card>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { Link } from 'react-router-dom';
 import {
   Users, Sparkles, Loader2, ExternalLink, Wallet, Inbox, ArrowRight, Building2, Search,
@@ -462,8 +463,7 @@ interface ProductRow {
   cost_currency: string | null;
 }
 
-const money = (n: number | null | undefined, currency?: string | null) =>
-  n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR', maximumFractionDigits: 2 }).format(n);
+const money = (n: number | null | undefined, currency?: string | null) => formatMoney(n, currency ?? 'EUR');
 
 const ProductPriceIntelCard: React.FC<CompanyMarketTabProps> = ({ companyId, workspaceId }) => {
   const { toast } = useToast();

@@ -44,8 +44,7 @@ const LIGHTING_PRESETS: { label: string; filter: string }[] = [
   { label: 'Night', filter: 'brightness(0.55) saturate(0.85) hue-rotate(205deg) contrast(1.05)' },
 ];
 
-const money = (v: number | null | undefined, currency: string) =>
-  v == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(v);
+import { formatMoney as money } from '@/utils/decimal';
 
 export default function PublicClientViewPage() {
   const { token } = useParams<{ token: string }>();

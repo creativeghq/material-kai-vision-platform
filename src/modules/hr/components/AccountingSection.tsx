@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { Plus, Loader2, FileText, Download, Trash2, Wand2, ScanLine, Receipt, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -11,7 +12,7 @@ import {
 } from '../services/hrService';
 import { SectionHeader, EmptyState, fileToBase64, hrMoney } from './_shared';
 
-const money = (n: number | null | undefined, c: string) => hrMoney(n, c, { nullDash: true });
+const money = (n: number | null | undefined, c: string) => formatMoney(n, c);
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
 export function AccountingSection({ workspaceId, canManage }: { workspaceId: string | null; canManage: boolean }) {

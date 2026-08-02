@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { Link } from 'react-router-dom';
 import {
   Wallet,
@@ -25,8 +26,7 @@ import {
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 function money(n: number, currency = 'EUR'): string {
-  const sym = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'GBP' ? '£' : `${currency} `;
-  return `${sym}${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+  return formatMoney(n, currency, { decimals: 0 });
 }
 
 const TONE_STYLES: Record<InsightTone, { icon: React.ComponentType<{ className?: string }>; cls: string; chip: string }> = {
