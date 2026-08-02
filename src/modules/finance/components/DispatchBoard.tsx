@@ -86,8 +86,26 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
     if (!o.dispatch) return;
     setBusy(o.invoice_id);
     try {
-      await deliveryNotesService.issue(o.dispatch.id);
-      toast({ title: 'Shipped · stock decremented', description: `Order ${o.internal_number} dispatched.` });
+      const res = await deliveryNotesService.issue(o.dispatch.id);
+      // Report what ACTUALLY moved. A note whose lines never matched a catalog product moves no
+      // stock at all, and saying "stock decremented" there is how goods go untracked.
+      if (res.moved === 0) {
+        toast({
+          title: 'Issued — but NO stock moved',
+          description: res.skipped > 0
+            ? `${res.skipped} line(s) had no catalog product: ${res.skipped_lines.join(', ')}. Link them to products, then correct the stock manually.`
+            : `Order ${o.internal_number} has no stock-tracked lines.`,
+          variant: 'destructive',
+        });
+      } else if (res.skipped > 0) {
+        toast({
+          title: `Shipped ${res.moved} line(s) — ${res.skipped} skipped`,
+          description: `Not stocked (no catalog product): ${res.skipped_lines.join(', ')}.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Shipped · stock decremented', description: `Order ${o.internal_number} dispatched.` });
+      }
       await load();
     } catch (err: any) {
       toast({ title: 'Failed to issue', description: err?.message, variant: 'destructive' });

@@ -366,7 +366,22 @@ export const ordersService = {
     companyId?: string;
     contactId?: string;
   }): Promise<Array<{ id: string; order_number: string | null; order_type: OrderType; party_name: string | null; total: number; settled: number; outstanding: number; currency: string; status: OrderStatus; created_at: string; category_id: string | null; category_name: string | null; expected_payment_date: string | null; due_date: string | null; due_from_terms: boolean }>> {
-    const list = await this.list({ workspaceId: opts.workspaceId, companyId: opts.companyId, contactId: opts.contactId });
+    // Paged until exhausted. `list()` delegates to listPage with a DEFAULT limit of 500 and
+    // discards `count`, so past 500 orders un-invoiced receivables/payables simply stopped
+    // appearing in AR/AP — real overdue money vanished from both tabs with no truncation signal
+    // anywhere. The page size is a transport detail; the caller needs the whole set.
+    const PAGE = 500;
+    const list: OrderListRow[] = [];
+    for (let offset = 0; ; offset += PAGE) {
+      const res = await this.listPage({
+        workspaceId: opts.workspaceId, companyId: opts.companyId, contactId: opts.contactId,
+        limit: PAGE, offset,
+      });
+      list.push(...res.rows);
+      if (res.rows.length < PAGE || list.length >= res.count) break;
+      // Defensive stop: a count that never converges must not spin forever.
+      if (offset > 20_000) break;
+    }
     // Candidates = every non-cancelled order. We include a draft/pre-order only once it has moved
     // real cash (a deposit received / paid) — empty drafts stay hidden, but a pre-order with a
     // deposit is real money and must surface in Receivables/Payables.
@@ -1026,7 +1041,11 @@ export const ordersService = {
       .filter('old_row->>order_id', 'eq', orderId)
       .order('changed_at', { ascending: false })
       .limit(500);
-    if (error) return [];
+    // Propagate. `return []` here — with the caller adding its own `.catch(() => [])` — meant a
+    // finance manager investigating a changed amount was shown "no history" for a read that
+    // FAILED. "Nothing was edited" and "we could not check" are opposite answers to the question
+    // being asked.
+    if (error) throw error;
     return (data ?? []) as any;
   },
 
@@ -1187,10 +1206,17 @@ export const ordersService = {
     const ids = [...new Set(productIds.filter(Boolean))];
     const out = new Map<string, number>();
     if (ids.length === 0) return out;
-    const { data } = await supabase.from('warehouse_items').select('product_id, qty_on_hand')
+    // FREE stock (on hand minus reserved), not raw on-hand.
+    //
+    // The picker dropdown already computed qty_on_hand - qty_reserved, so the two disagreed inside
+    // one dialog: the dropdown said "0 free / out of stock" while the shortfall banner beneath it
+    // stayed silent because on-hand was 5. Reserved stock is spoken for; offering it as available
+    // is how the same unit gets promised twice.
+    const { data } = await supabase.from('warehouse_items').select('product_id, qty_on_hand, qty_reserved')
       .eq('workspace_id', workspaceId).in('product_id', ids);
-    for (const r of (data ?? []) as Array<{ product_id: string; qty_on_hand: number | null }>) {
-      out.set(r.product_id, (out.get(r.product_id) ?? 0) + Number(r.qty_on_hand ?? 0));
+    for (const r of (data ?? []) as Array<{ product_id: string; qty_on_hand: number | null; qty_reserved: number | null }>) {
+      const free = Number(r.qty_on_hand ?? 0) - Number(r.qty_reserved ?? 0);
+      out.set(r.product_id, (out.get(r.product_id) ?? 0) + free);
     }
     return out;
   },
@@ -1274,12 +1300,54 @@ export const ordersService = {
       bySup.set(it.supplier_company_id, cur);
     }
     if (bySup.size === 0) return [];
-    const { data: pays } = await supabase.from('payments')
-      .select('counterparty_company_id, amount').eq('order_id', orderId).eq('direction', 'out');
+    // What has been PAID comes from the allocation ledger, not from payments that happen to carry
+    // this order_id.
+    //
+    // The old query subtracted only payments tagged with BOTH order_id and a matching
+    // counterparty_company_id, so a bill settled from Payables, from the Expenses Inbox, or by
+    // on-account credit was invisible: "you still owe X" and a live Pay button persisted after the
+    // debt was already paid, inviting a second payment. payment_allocations is the settlement
+    // ledger (the same one get_order_settlements reads); supplier_bills.order_id ties a bill to
+    // this order.
+    const supplierIds = [...bySup.keys()];
     const paid = new Map<string, number>();
-    for (const p of (pays ?? []) as Array<{ counterparty_company_id: string | null; amount: number }>) {
-      if (p.counterparty_company_id) paid.set(p.counterparty_company_id, (paid.get(p.counterparty_company_id) ?? 0) + Number(p.amount));
+
+    // (a) allocations against supplier bills belonging to this order
+    const { data: orderBills } = await supabase.from('supplier_bills')
+      .select('id, supplier_company_id').eq('order_id', orderId);
+    const billOwner = new Map<string, string>();
+    for (const b of (orderBills ?? []) as Array<{ id: string; supplier_company_id: string | null }>) {
+      if (b.supplier_company_id) billOwner.set(b.id, b.supplier_company_id);
     }
+    if (billOwner.size > 0) {
+      const { data: allocs } = await supabase.from('payment_allocations')
+        .select('supplier_bill_id, amount').in('supplier_bill_id', [...billOwner.keys()]);
+      for (const a of (allocs ?? []) as Array<{ supplier_bill_id: string | null; amount: number }>) {
+        const owner = a.supplier_bill_id ? billOwner.get(a.supplier_bill_id) : null;
+        if (owner) paid.set(owner, (paid.get(owner) ?? 0) + Number(a.amount ?? 0));
+      }
+    }
+
+    // (b) money-out tagged directly to the order with no bill in between (a direct supplier
+    //     payment against the order). Kept so nothing that WAS counted stops being counted.
+    const { data: pays } = await supabase.from('payments')
+      .select('id, counterparty_company_id, amount').eq('order_id', orderId).eq('direction', 'out');
+    const directIds = ((pays ?? []) as Array<{ id: string }>).map((p) => p.id);
+    const allocatedPaymentIds = new Set<string>();
+    if (directIds.length > 0) {
+      const { data: pa } = await supabase.from('payment_allocations')
+        .select('payment_id').in('payment_id', directIds);
+      for (const r of (pa ?? []) as Array<{ payment_id: string }>) allocatedPaymentIds.add(r.payment_id);
+    }
+    for (const p of (pays ?? []) as Array<{ id: string; counterparty_company_id: string | null; amount: number }>) {
+      // Skip anything already counted through its allocation above — otherwise a bill-settling
+      // payment tagged with the order would be double-subtracted.
+      if (allocatedPaymentIds.has(p.id)) continue;
+      if (p.counterparty_company_id) {
+        paid.set(p.counterparty_company_id, (paid.get(p.counterparty_company_id) ?? 0) + Number(p.amount));
+      }
+    }
+    void supplierIds;
     const names = await this.getCompanyNames([...bySup.keys()]);
     return [...bySup.entries()].map(([sid, c]) => {
       const net = Math.round(c.net * 100) / 100;
@@ -1297,7 +1365,11 @@ export const ordersService = {
   async getListPrices(productIds: string[]): Promise<Map<string, number>> {
     const ids = [...new Set(productIds.filter(Boolean))];
     if (ids.length === 0) return new Map();
-    const { data } = await supabase.from('product_prices').select('product_id, list_price, updated_at').in('product_id', ids);
+    // Ordered, so "first row wins" means NEWEST. `updated_at` was already selected and unused,
+    // and without the ordering the kept row was arbitrary — "Discount (off list)" was computed
+    // against a random historical price and could change between two loads of the same order.
+    const { data } = await supabase.from('product_prices').select('product_id, list_price, updated_at')
+      .in('product_id', ids).order('updated_at', { ascending: false });
     const m = new Map<string, number>();
     for (const r of (data ?? []) as Array<{ product_id: string; list_price: number | null }>) {
       if (r.list_price != null && !m.has(r.product_id)) m.set(r.product_id, Number(r.list_price));

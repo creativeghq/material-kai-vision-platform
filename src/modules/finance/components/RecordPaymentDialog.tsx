@@ -70,7 +70,18 @@ export const RecordPaymentDialog: React.FC<{
   /** Open supplier bills this payment may settle — only meaningful with side='supplier'. Passed in
    *  by the caller that already loaded them rather than re-fetched here. */
   payableBills?: Array<{ id: string; supplier_bill_number: string | null; amount_due: number; currency: string }>;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, fiscalDocKind, fiscalDocReason, onIssueDoc, side = 'customer', payableBills = [] }) => {
+  /**
+   * Currency of the ORDER this payment is being recorded against.
+   *
+   * Without it the reset below forced 'EUR' on open and the picker rendered only for
+   * kind==='received', so every purchase-order payment submitted EUR. record_payment_fx books the
+   * unallocated remainder onto the order ONLY when the currencies match — deliberately, rather
+   * than booking a cross-currency remainder at a guess — so GBP 500 on a GBP purchase order was
+   * stored as EUR 500, the guard correctly declined, NO allocation row was created, and the order
+   * showed Unpaid with full Outstanding forever while the cash sat in the bank ledger.
+   */
+  orderCurrency?: string;
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, fiscalDocKind, fiscalDocReason, onIssueDoc, side = 'customer', payableBills = [], orderCurrency }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -144,7 +155,7 @@ export const RecordPaymentDialog: React.FC<{
     // because it is a counter-side collection.
     setAmount(defaultAmount != null && defaultAmount > 0 ? String(defaultAmount) : ''); setMethod(payingExpense ? 'bank_transfer' : 'cash'); setPaidAt(new Date().toISOString().slice(0, 10));
     setCategoryId(''); setReference(''); setNotes('');
-    setCurrency('EUR'); setFxRate('1'); setFxRateToBase('1');
+    setCurrency(orderCurrency || 'EUR'); setFxRate('1'); setFxRateToBase('1');
     setTargetInvoiceId(presetInvoiceId ?? '');
     setInvoiceId('');
     setIssueCreditNote(true);

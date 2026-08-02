@@ -153,9 +153,24 @@ export const deliveryNotesService = {
     return id;
   },
 
-  async issue(id: string): Promise<void> {
-    const { error } = await supabase.rpc('issue_delivery_note', { p_id: id });
+  /**
+   * Issue the note and report WHAT MOVED.
+   *
+   * The RPC used to return void, and it silently skips any line with no product_id — so the board
+   * reported "Shipped · stock decremented" for a note where nothing moved at all, the note left
+   * the board, and the goods became untracked. It returns {moved, skipped, skipped_lines} now,
+   * the same shape receive_order_into_warehouse already returns.
+   */
+  async issue(id: string): Promise<{ moved: number; skipped: number; skipped_lines: string[]; delivery_note_number: string | null }> {
+    const { data, error } = await supabase.rpc('issue_delivery_note', { p_id: id });
     if (error) throw error;
+    const r = (data ?? {}) as any;
+    return {
+      moved: Number(r.moved ?? 0),
+      skipped: Number(r.skipped ?? 0),
+      skipped_lines: (r.skipped_lines ?? []) as string[],
+      delivery_note_number: r.delivery_note_number ?? null,
+    };
   },
 
   /** Schedule (or clear) an order's ship date — the dispatch board buckets by this. RLS-gated to

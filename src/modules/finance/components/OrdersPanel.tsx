@@ -49,7 +49,7 @@ import { PaymentRowActions } from '@/modules/finance/components/PaymentRowAction
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
   type OrderType, type OrderStatus, type OrderPaymentStatus, type OrderListRow, type OrderItem, type Order,
-  type ThreeWayMatch, type ThreeWayMatchStatus, type OrderLinkTarget,
+  type ThreeWayMatch, type ThreeWayMatchStatus, type OrderLinkTarget, type OrderBalance,
 } from '@/modules/finance/services/ordersService';
 
 /**
@@ -137,7 +137,10 @@ export const OrdersPanel: React.FC<{
   const [rows, setRows] = useState<OrderListRow[]>([]);
   // Outstanding € per order for the visible page (total − settled), so the list doubles as a
   // collections worklist. Keyed by order id; filled after each page load.
-  const [outstandingById, setOutstandingById] = useState<Map<string, number>>(new Map());
+  /** Full derived settlement per order — outstanding AND the payment_status the ledger implies. */
+  const [balanceById, setBalanceById] = useState<Map<string, OrderBalance | null>>(new Map());
+  /** True when the settlement RPC failed. Unknown must never render as settled. */
+  const [balancesFailed, setBalancesFailed] = useState(false);
   // Total MATCHING rows as counted by the server — the list itself only ever holds one page.
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -221,8 +224,21 @@ export const OrdersPanel: React.FC<{
       // never show "Paid" next to a non-zero balance again.
       try {
         const balances = await ordersService.orderBalances(res.rows.map((r) => r.id));
-        setOutstandingById(new Map(res.rows.map((r) => [r.id, balances.get(r.id)?.outstanding ?? 0] as const)));
-      } catch { setOutstandingById(new Map()); }
+        // Keep the WHOLE balance. `payment_status` is derived by the same SQL that derives
+        // `outstanding`, and it was being fetched and thrown away while the Payment column
+        // rendered the CACHED orders.payment_status beside it — the exact 'Paid next to a
+        // non-zero Outstanding' condition finance.order_payment_status_drift exists to detect.
+        setBalanceById(new Map(res.rows.map((r) => [r.id, balances.get(r.id) ?? null] as const)));
+        setBalancesFailed(false);
+      } catch (balErr) {
+        // NEVER map unknown to zero. The cell below treated a missing entry the same as a
+        // settled one, so a single failed RPC — an RLS change, a timeout, a bad id batch —
+        // rendered EVERY order green 'Settled' with no error at all, and the collections
+        // worklist reported the whole ledger as collected.
+        setBalanceById(new Map());
+        setBalancesFailed(true);
+        console.error('[OrdersPanel] orderBalances failed — outstanding is unknown, not zero:', balErr);
+      }
     } catch (err: any) {
       toast({ title: 'Failed to load orders', description: err?.message, variant: 'destructive' });
     } finally {
@@ -359,12 +375,34 @@ export const OrdersPanel: React.FC<{
                       </div>
                     </td>
                     <td className="px-4 py-2"><span className={`text-xs ${statusTone(r.status)}`}>{ORDER_STATUS_LABEL[r.status]}</span></td>
-                    <td className="px-4 py-2 text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[r.payment_status]}</td>
+                    {/* The DERIVED payment status, not the cached orders.payment_status column —
+                        the derived one was already in hand and discarded. */}
+                    <td className="px-4 py-2 text-xs text-muted-foreground">
+                      {balancesFailed
+                        ? <span title="Settlement could not be loaded">—</span>
+                        : ORDER_PAYMENT_LABEL[(balanceById.get(r.id)?.payment_status ?? r.payment_status) as keyof typeof ORDER_PAYMENT_LABEL]}
+                    </td>
                     <td className="px-4 py-2 text-right tabular-nums">{formatMoney(Number(r.total), r.currency)}</td>
                     <td className="px-4 py-2 text-right tabular-nums">
                       {(() => {
-                        const o = outstandingById.get(r.id);
-                        if (o == null || o <= 0.005) return <span className="text-xs text-emerald-600">Settled</span>;
+                        // Unknown is not settled (F2), a cancelled order is not debt (F24), and a
+                        // NEGATIVE outstanding is an over-payment that get_order_settlements
+                        // deliberately returns and both screens used to hide (F21).
+                        if (balancesFailed) {
+                          return <span className="text-xs text-muted-foreground" title="Could not load settlement — this is NOT a statement that the order is settled">—</span>;
+                        }
+                        const bal = balanceById.get(r.id);
+                        const o = bal?.outstanding;
+                        if (o == null) {
+                          return <span className="text-xs text-muted-foreground" title="No settlement figure for this order">—</span>;
+                        }
+                        if (r.status === 'cancelled') {
+                          return <span className="text-xs text-muted-foreground" title="Cancelled — not collectable">—</span>;
+                        }
+                        if (o < -0.005) {
+                          return <span className="text-xs font-medium text-purple-600 dark:text-purple-400" title="More has been settled than this order is worth">Overpaid {formatMoney(Math.abs(o), r.currency)}</span>;
+                        }
+                        if (o <= 0.005) return <span className="text-xs text-emerald-600">Settled</span>;
                         return <span className={r.order_type === 'sales' ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-red-400 font-medium'}>{formatMoney(o, r.currency)}</span>;
                       })()}
                     </td>
@@ -982,8 +1020,10 @@ export const NewOrderModal: React.FC<{
               <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
               {/* A pre-order stays out of Receivables/Payables until a deposit is recorded, so the
                   expected date won't age until then — flag it so the operator isn't surprised. */}
+              {/* A PURCHASE pre-order ages in Payables, not Receivables — this named Receivables
+                  regardless of order type; the detail version already gets it right. */}
               {preset.draft && expectedDate && (
-                <p className="text-[11px] text-amber-600">Pre-orders age in Receivables only after a deposit is recorded.</p>
+                <p className="text-[11px] text-amber-600">Pre-orders age in {orderType === 'purchase' ? 'Payables' : 'Receivables'} only after a deposit is recorded.</p>
               )}
             </div>
           </div>
@@ -1286,6 +1326,9 @@ export const orderPartyRef = (o: Pick<Order, 'order_type' | 'customer_company_id
 export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: FinanceCategory[]; open: boolean; onClose: () => void; onChanged: () => void; onOpenOrder?: (id: string) => void }> = ({ orderId, categories, open, onClose, onChanged, onOpenOrder }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  // Mirror the mount point. Hardcoded '/finance/...' links threw an admin-shell user out of the
+  // shell the moment they created an invoice or followed a covered-by link (#297 finding 26).
+  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
@@ -1323,6 +1366,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const [supExposure, setSupExposure] = useState<Awaited<ReturnType<typeof ordersService.getOrderSupplierExposure>>>([]);
   // Audit trail of payment edits/deletes on this order (finance-manager-readable only).
   const [payAudit, setPayAudit] = useState<Awaited<ReturnType<typeof ordersService.listOrderPaymentAudit>>>([]);
+  /** True when the audit read FAILED. Distinct from "there is no history" — see #297 finding 23. */
+  const [payAuditFailed, setPayAuditFailed] = useState(false);
   const [showPayAudit, setShowPayAudit] = useState(false);
   // Purchase-order 3-way match (PO × goods received × supplier bill).
   const [match, setMatch] = useState<ThreeWayMatch | null>(null);
@@ -1346,7 +1391,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         ordersService.getCompanyNames(supplierIds).catch(() => new Map<string, string>()),
         ordersService.getOrderSupplierExposure(id).catch(() => []),
         financeService.listBankAccounts(res.order.workspace_id).catch(() => []),
-        ordersService.listOrderPaymentAudit(id).catch(() => []),
+        // A failed audit read is recorded, not flattened to "no history" — see the note on
+        // listOrderPaymentAudit.
+        ordersService.listOrderPaymentAudit(id).then(
+          (rows) => ({ ok: true as const, rows }),
+          (e) => ({ ok: false as const, rows: [] as never[], error: e }),
+        ),
         financeService.getBuyerIdentity({
           companyId: res.order.customer_company_id, contactId: res.order.customer_contact_id,
         }).catch(() => null),
@@ -1360,7 +1410,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       ]);
       setProductNames(prodNames);
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
-      setBankAccounts(accounts); setPayAudit(audit); setBuyerIdentity(buyer); setPartyName(party);
+      setBankAccounts(accounts);
+      setPayAudit(audit.rows);
+      setPayAuditFailed(!audit.ok);
+      setBuyerIdentity(buyer); setPartyName(party);
       setMatch(threeWay);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
@@ -1625,7 +1678,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       if (error) throw error;
       await load(order.id); onChanged();
       toast({ title: `Draft ${salesDocKind === 'receipt' ? 'receipt' : 'invoice'} created`, description: 'Review it, then issue & transmit to myDATA.' });
-      if (data) navigate(`/finance/invoices/${data}`);
+      if (data) navigate(`${financeBase}/invoices/${data}`);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
@@ -2010,7 +2063,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Covered by</span>
                 <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                   {coveredBy.map((po) => (
-                    <Link key={po.id} to={`/finance/orders/${po.id}`} className="text-xs hover:underline">
+                    <Link key={po.id} to={`${financeBase}/orders/${po.id}`} className="text-xs hover:underline">
                       <span className="font-medium">{po.order_number ?? po.id.slice(0, 8)}</span>
                       <span className="text-muted-foreground"> · {po.status} · {formatMoney(Number(po.total), po.currency)}</span>
                     </Link>
@@ -2415,6 +2468,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             )}
 
             {/* Audit trail of payment edits/deletes (finance-manager-readable). Collapsed by default. */}
+            {payAuditFailed && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                Payment history unavailable — the audit log could not be read. This is <strong>not</strong> a statement that nothing was edited.
+              </div>
+            )}
             {payAudit.length > 0 && (
               <div className="rounded-md border border-border/60">
                 <button type="button" className="flex w-full items-center justify-between px-3 py-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground" onClick={() => setShowPayAudit((v) => !v)}>
@@ -2628,6 +2686,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         initialCounterparty={order.order_type === 'purchase'
           ? { companyId: order.supplier_company_id, contactId: order.supplier_contact_id }
           : { companyId: order.customer_company_id, contactId: order.customer_contact_id }}
+        // The ORDER's currency. Without this the dialog reset to EUR and record_payment_fx
+        // silently refused to allocate the remainder onto a non-EUR order (#297 finding 1).
+        orderCurrency={order.currency}
         payableBills={(fin?.supplierBills ?? []).filter((b) => Number(b.amount_due) > 0)}
         defaultAmount={payInOpen?.amount}
         presetInvoiceId={order.order_type === 'sales' ? (fin?.invoices ?? []).find((iv) => Number(iv.amount_due) > 0)?.id : undefined}
