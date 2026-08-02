@@ -1,5 +1,5 @@
 /**
- * #207 — Pending products queue. When a myDATA expense (supplier invoice) is pulled,
+ * Pending products queue. When a myDATA expense (supplier invoice) is pulled,
  * the inbound sync runs the cheapest AI model in the background to turn each line into a
  * clean product and queues it here. The operator reviews/edits and ✓ adds it to the
  * warehouse (matched to an existing product or created new, with cost from the invoice and

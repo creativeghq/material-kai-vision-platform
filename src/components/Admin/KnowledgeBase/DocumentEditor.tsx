@@ -3,7 +3,7 @@ import { Save, Eye, Code, Settings2, ExternalLink, Search as SearchIcon, Plus, T
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-// #254 — lazy-load the MarkdownEditor (MDXEditor) so its ~400KB chunk loads only when the editor
+// lazy-load the MarkdownEditor (MDXEditor) so its ~400KB chunk loads only when the editor
 // actually renders, not on every admin page that imports this modal.
 const MarkdownEditorLazy = lazy(() =>
   import('@/components/shared/MarkdownEditor').then((m) => ({ default: m.MarkdownEditor })),

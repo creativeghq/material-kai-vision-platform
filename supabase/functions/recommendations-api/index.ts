@@ -48,7 +48,7 @@ Deno.serve(withApiLogging('recommendations-api', async (req) => {
     const user = auth.user;
     const userId = auth.userId;
 
-    // Pentest #250 M11: this fn uses the service-role client (RLS bypassed) and trusts
+    // This fn uses the service-role client (RLS bypassed) and trusts
     // workspace_id from the body / path / query on every route. Bind the caller to any
     // workspace_id it supplies (admin-secret backend callers exempt). Returns a 403
     // Response to short-circuit, or null when access is OK.

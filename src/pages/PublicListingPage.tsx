@@ -7,7 +7,7 @@ import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { realEstatePublic, type PublicListing } from '@/modules/real-estate/services/realEstateService';
 
-// #249 — public `/p/:token` listing page (anonymous). All content comes from the token-gated
+// Public `/p/:token` listing page (anonymous). All content comes from the token-gated
 // real-estate-public edge fn's toPublic() projection; rendered via JSX only (no HTML-string assembly).
 const money = (n: number | null, ccy: string) => (n == null ? 'Price on request' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
 

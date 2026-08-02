@@ -138,7 +138,7 @@ function PaletteSection({ label, category, items, onAdd }: PaletteSectionProps) 
 }
 
 interface NodePaletteProps {
-  /** #256 — when true, show only the tenant-safe subset (workspace builder). The DB guard trigger
+  /** When true, show only the tenant-safe subset (workspace builder). The DB guard trigger
    *  is the real enforcer; this trims the palette so a workspace user never sees privileged nodes. */
   tenantMode?: boolean;
   /** Adds the node without a drag. Required for keyboard users, who cannot drag at all. */

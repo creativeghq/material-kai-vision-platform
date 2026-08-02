@@ -1,5 +1,5 @@
 /**
- * #177 — project → invoice(s). Lists the project's invoices and lets the owner bill an
+ * Project → invoice(s). Lists the project's invoices and lets the owner bill an
  * accepted project quote either in full or as a progress/milestone/final percentage.
  * Gated on the `finance.manage` capability (end-users never see this).
  */

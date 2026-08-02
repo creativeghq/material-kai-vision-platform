@@ -17,7 +17,7 @@
  *       is_internal_request ← service-role / internal Bearer call
  *
  *  2. **Error reporting to Sentry** — the single unified mechanism for
- *     edge-function error capture (2026-06-09). Wrapped functions should NOT
+ *     edge-function error capture. Wrapped functions should NOT
  *     call `captureException` themselves for top-level request failures — the
  *     wrapper does it. Sentry is kept signal-only:
  *       - handler throws (unhandled) → captureException(realError) — stack-grouped

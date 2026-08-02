@@ -1,5 +1,5 @@
 /**
- * #176 — supplier per-product pricing + supply mode.
+ * Supplier per-product pricing + supply mode.
  *
  * The price set here is the BASE the cascade resolver reads:
  *  - root operator → the catalog base price every downstream tier inherits;

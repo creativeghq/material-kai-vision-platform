@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — payslip PDF generation. For each item in an (approved/paid) payroll run, render a one-page
+// Payslip PDF generation. For each item in an (approved/paid) payroll run, render a one-page
 // A4 payslip and file it into hr_documents (doc_type='payslip') so the employee sees it in /my-hr.
 import { PDFDocument, rgb } from 'pdf-lib';
 import { embedOpenSans } from '../_shared/fonts/open-sans.ts';

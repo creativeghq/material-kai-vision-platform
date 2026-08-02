@@ -352,7 +352,7 @@ serve(withApiLogging('notification-dispatcher', async (req) => {
 
     switch (action) {
       case 'send-push': {
-        // Pentest #250 C19: send-push/send-webhook POST to caller-supplied endpoints
+        // send-push/send-webhook POST to caller-supplied endpoints
         // (SSRF) — restrict to trusted backend (service-role/admin-secret). The only
         // caller is flow-engine (service-role). get-vapid-key stays open for the frontend.
         if (!isAdminAccess(auth)) throw new HttpError(403, 'Forbidden');

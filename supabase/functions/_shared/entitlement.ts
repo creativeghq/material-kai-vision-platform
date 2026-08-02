@@ -1,10 +1,8 @@
-// #212 — module entitlement enforcement at the API boundary (the real security line; nav + route
+// Module entitlement enforcement at the API boundary (the real security line; nav + route
 // guards are UX only). A paid-module edge function calls assertEntitled() after it resolves the
 // target workspace and refuses with a 402 when the workspace doesn't own the module.
-//
 //   const ent = await assertEntitled(supabase, workspaceId, 'sales-finance');
 //   if (!ent.ok) return ent.response;
-//
 // is_workspace_entitled(workspace, slug) returns true for the operator root (gets everything) OR
 // when a workspace_module_entitlements grant exists. Fails CLOSED on error — this is a security
 // gate, and a DB error that breaks this check would break the operation anyway.

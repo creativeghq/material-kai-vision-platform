@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 
 /**
- * Project Plans — per-project (or ephemeral) instances of a Blueprint (#242).
+ * Project Plans — per-project (or ephemeral) instances of a Blueprint.
  * CRUD/read is direct-supabase (RLS-gated); the authoritative compute
  * (create-from-blueprint, rescale, reprice, versioning, quote bridge) is the
  * `project-plan-engine` edge function — the only writer of persisted money.

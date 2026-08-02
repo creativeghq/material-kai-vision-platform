@@ -112,7 +112,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       net, vatPct: pct, vatAmount: vat, lineTotal: net + vat,
     };
   });
-  // #227 — paid-upfront (cash) discount is order-level; line items + per-rate VAT are PRE-discount
+  // paid-upfront (cash) discount is order-level; line items + per-rate VAT are PRE-discount
   // (the discount is not distributed to lines), so multiply by the cash factor to get the
   // post-discount taxable figures. "Price" = pre-discount net; "Price after Discount" = taxable.
   const cashPct = Number(inv.cash_discount_pct ?? 0);

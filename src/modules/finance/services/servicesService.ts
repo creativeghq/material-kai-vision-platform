@@ -1,5 +1,5 @@
 /**
- * #203 — sellable services. A service is a `products` row with item_type='service'
+ * Sellable services. A service is a `products` row with item_type='service'
  * (no stock, no image suite) so it reuses the pricing/line/myDATA machinery. Price lives
  * in product_prices (per workspace); myDATA VAT + income classification live on the product.
  */

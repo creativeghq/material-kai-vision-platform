@@ -1,8 +1,6 @@
 // myAADE module — Greek business-lookup integration via ΑΑΔΕ RgWsPublic2 (SOAP/TAXISnet).
-//
 // Public API (named exports):
 //   - aadeService — programmatic API for ΑΑΔΕ lookups
-//
 // Module registry (default export): consumed by src/modules/_core/registry.ts
 //   - manifest, routes, navItems → registers the module on /admin/modules
 //   - /admin/modules/myaade/settings is auto-mounted by ModuleSettingsPage

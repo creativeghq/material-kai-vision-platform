@@ -59,7 +59,7 @@ interface ExecutionContext {
 }
 
 /**
- * #256 — the owning scope of the flow currently executing. Threaded from the flow row down
+ * The owning scope of the flow currently executing. Threaded from the flow row down
  * to each action so tenant flows resolve the workspace's OWN Resend (BYOK) sender and the
  * per-workspace daily cap, while operator/global flows send as the platform (unmetered),
  * exactly as system/transactional mail does today.
@@ -72,7 +72,7 @@ interface FlowScope {
   ownerUserId: string | null;
 }
 
-// #256 — every TENANT flow RUN costs a base fee (billed to the workspace credit pool),
+// Every TENANT flow RUN costs a base fee (billed to the workspace credit pool),
 // plus any per-action external/AI cost. Operator/global flows and test runs are free.
 // 1 credit = $0.01 in this system, so $0.20 = 20 credits.
 const FLOW_RUN_BASE_CREDITS = 20;
@@ -385,7 +385,7 @@ async function executeAction(
         }
       }
 
-      // #256 — the "from" identity follows the WORKSPACE the email is ABOUT, so a tenant's
+      // The "from" identity follows the WORKSPACE the email is ABOUT, so a tenant's
       // customer-facing mail carries the tenant's own domain, not the platform's:
       //  • TENANT flow (is_global=false): strict BYOK from the flow's workspace — 503 if unset
       //    (never silently fall back to the platform domain for a tenant's own automation).
@@ -449,7 +449,7 @@ async function executeAction(
     }
 
     case 'send_campaign': {
-      // #256 — bridge a flow to the Email Marketing module (#255). The action names an
+      // Bridge a flow to the Email Marketing module. The action names an
       // existing email campaign owned by THIS flow's workspace; we flip it to 'sending' so
       // campaign-processor fans it out via the workspace's BYOK Resend. Tenant-only: refuse
       // when the flow has no workspace scope, and only ever touch a campaign that belongs to
@@ -676,7 +676,6 @@ async function executeAction(
             // column is `agent_id` (text), not `agent_type` — the wrong name made this
             // insert fail, and since the block then throws, the very fallback written to
             // stop a missing conversation from killing the flow was itself killing it.
-            // (audit #298)
             agent_id: resolved.agent_type || 'kai',
             title: 'Flow-initiated conversation',
             last_message_at: new Date().toISOString(),
@@ -731,7 +730,7 @@ async function executeAction(
         moodboard_id: resolved.moodboard_id,
         // moodboard_items keys products as `material_id`, not `product_id` — the wrong
         // name made every add_to_moodboard node throw and take the rest of the flow
-        // run down with it. (audit #298)
+        // run down with it.
         material_id: resolved.product_id,
         notes: resolved.notes || '',
         position: nextPosition,
@@ -1582,14 +1581,14 @@ async function handleExecuteFlow(
     return jsonResponse({ success: false, error: `Failed to create run: ${runError.message}` }, 500);
   }
 
-  // #256 — the flow's own scope drives BYOK sender resolution AND per-run credit metering.
+  // The flow's own scope drives BYOK sender resolution AND per-run credit metering.
   const scope: FlowScope = {
     workspaceId: (flow.workspace_id as string | null) ?? null,
     isGlobal: flow.is_global === true,
     ownerUserId: (flow.created_by as string | null) ?? null,
   };
 
-  // #256 — every TENANT flow RUN costs a base fee billed to the workspace credit pool
+  // Every TENANT flow RUN costs a base fee billed to the workspace credit pool
   // (operator/global flows and test runs are free). Debit BEFORE running (invariant #10):
   // if the workspace pool can't cover it, don't do the work — mark the run failed.
   const isTenantRun = !isTestRun && !!scope.workspaceId && !scope.isGlobal;
@@ -1715,7 +1714,7 @@ async function handleTriggerEvent(
 ): Promise<Response> {
   const { event_type, data } = body;
 
-  // #256 — resolve the AUTHORITATIVE workspace for this event. Trust the payload's
+  // Resolve the AUTHORITATIVE workspace for this event. Trust the payload's
   // workspace_id ONLY from a trusted server emitter (service-role bearer or the cron
   // secret — how emitFlowEvent / DB triggers dispatch). A plain authenticated user may
   // only scope to a workspace they actually belong to (verified via userCanAccessWorkspace),

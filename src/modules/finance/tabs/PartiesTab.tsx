@@ -381,7 +381,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
 
   const printLedger = () => {
     if (!party) return;
-    // Pentest #250 J1: this HTML is written into a same-origin about:blank popup via
+    // This HTML is written into a same-origin about:blank popup via
     // document.write — CRM party name/email + ledger doc fields (attacker-influenced via
     // counterparty/import data) MUST be escaped or an <img onerror> in a party name runs
     // in the app origin and can read the Supabase session token from localStorage.

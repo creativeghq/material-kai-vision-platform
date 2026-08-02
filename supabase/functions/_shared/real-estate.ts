@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #249 — Real Estate shared logic used by BOTH real-estate-api (management) and real-estate-public
+// Real Estate shared logic used by BOTH real-estate-api (management) and real-estate-public
 // (token page). Keeping the publish gate and the public projection here makes them the SINGLE source
 // for compliance + field visibility across every surface (a security control, not cosmetics).
 

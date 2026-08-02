@@ -20,9 +20,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // auto-extracted catalog docs in the public per-material categories that mirror
 // the ingestion taxonomy: Tiles/Wood/Heating/…/General), which are cleaned in
 // STEP 1.5 via wipe_unprotected_kb_docs(). Locked/agent-level KB docs survive.
-//
 // PRESERVED (never deleted during platform reset):
-//
 // DB Tables:
 //   - system_settings          ← /admin/system-settings config
 //   - upsells                  ← global admin-managed upsell catalogue
@@ -42,17 +40,14 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //                              ← CRM (user request — keep contacts)
 //   - profiles / auth.users / workspaces / workspace_members
 //                              ← user accounts & workspaces
-//
 //   ── Credits & Billing (DO NOT TOUCH) ──
 //   - user_credits             ← per-user credit balances
 //   - credit_transactions      ← full credit debit/top-up history
 //   - credit_packages          ← available credit package catalogue
-//
 //   ── Prompts (admin-managed) ──
 //   - prompts                  ← saved agent/system prompts
 //   - extraction_prompts       ← PDF extraction prompt configurations
 //   - prompt_history           ← audit trail — TRIMMED to 5 most recent per prompt_id (not wiped)
-//
 //   ── Price Monitoring (DO NOT WIPE — long-running observational state) ──
 //   Price-history series are only useful when contiguous; a reset would
 //   destroy weeks/months of trend data and invalidate sanity bands,
@@ -73,7 +68,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - classifier_verdict_cache        ← Haiku product-identity verdict cache (7d TTL)
 //   - brand_retailer_index            ← (brand, retailer_domain, country) cache
 //   - retailer_extraction_recipes     ← per-retailer selector recipes + self-heal stats
-//
 //   ── Finance / Fiscal (LEGALLY RETAINED — NEVER WIPE) ──
 //   Greek myDATA/AADE records are legally required to be retained. A reset
 //   here is irreversible data destruction with compliance consequences.
@@ -92,13 +86,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - workspace_fiscal_bindings / workspace_inbound_credentials
 //     / workspace_payment_config / workspace_storefront / workspace_doc_type
 //     / workspace_module_entitlements
-//
 //   ── Secrets & API keys (NEVER WIPE) ──
 //   - platform_secrets / platform_secret_module_links
 //   - api_keys                    ← CASCADE root: deleting wipes every external
 //                                    customer's tracked_queries/mentions/jobs
 //   - material_kai_keys
-//
 //   ── Customer-facing monitoring (DO NOT WIPE — same policy as price monitoring) ──
 //   Long-running observational series + external API consumer state.
 //   - tracked_mentions + mention_history / mention_outlets / mention_promoted_urls
@@ -107,16 +99,13 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - tracked_jobs + job_listings / job_excluded_urls / job_match_corrections
 //     / job_alert_log / job_classifier_verdict_cache / job_research_sites
 //   - seo_tracked_domains / seo_research_runs / seo_domain_audit_history
-//
 //   ── Agent Fabric persistent layer (#132 — NEVER WIPE, secrets cascade) ──
 //   - agent_definitions / agent_projects / agent_project_secrets
 //     / agent_project_deployments / agent_project_snapshots
 //     (only the runtime — agent_runs/agent_artifacts/agent_inbox_messages — is cleared)
-//
 //   ── Connection tokens (NEVER WIPE — re-auth pain) ──
 //   - social_accounts / social_zernio_profiles
 //   - messaging_channels / messaging_settings / messaging_optouts (compliance)
-//
 //   ── Config / reference ──
 //   - modules / api_endpoints / mydata_reference / aade_lookup_log
 //   - xml_mapping_templates / flow_area_registry / category_complement_rules
@@ -125,7 +114,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //                                    ingestion/PDF-processing classifier (ai_extraction_
 //                                    enabled, prototype embeddings). NOT user content —
 //                                    wiping it breaks discovery until re-seeded.
-//
 // Storage Buckets (6 buckets post-consolidation 2026-05-23):
 //   - pdf-documents            ← KB raw uploads + catalog-output/ + quote-output/ + moodboard-output/
 //   - pdf-tiles                ← extracted/ (KB) + catalog-extracted/
@@ -137,7 +125,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Tables to clear (in order to respect foreign key constraints).
 // Order matters — delete child tables before parent tables.
-//
 // Grouped by functional area. Anything that caches, embeds, summarizes or
 // logs derived/AI-produced data MUST be in this list — otherwise a "reset"
 // leaves behind stale state that the AI will happily serve back to users
@@ -158,7 +145,7 @@ const TABLES_TO_CLEAR = [
   'agent_usage_logs',              // Per-run token/cost usage
   'agent_tasks',                   // Agent task records
 
-  // ── Agent Fabric runtime (#132) — runtime only; the persistent layer
+  // ── Agent Fabric runtime — runtime only; the persistent layer
   //    (agent_definitions / agent_projects / agent_project_secrets /
   //    agent_project_deployments / agent_project_snapshots) is PRESERVED in
   //    NEVER_CLEAR — agent_project_secrets CASCADEs from agent_projects, so the
@@ -221,7 +208,7 @@ const TABLES_TO_CLEAR = [
   'social_post_analytics',         // Post analytics (child of social_posts, CASCADE)
   'social_posts',                  // Published/scheduled social posts
 
-  // ── Inbox (#209) — threads + child participants/messages/tokens (CASCADE) ──
+  // ── Inbox — threads + child participants/messages/tokens (CASCADE) ──
   'inbox_threads',                 // unified inbox (incl. WhatsApp customer threads)
   // ── Messaging content (channels/settings/optouts are PRESERVED) ─────
   'messaging_campaign_recipients', // Campaign send recipients
@@ -357,12 +344,12 @@ const TABLES_TO_CLEAR = [
   'social_account_insights',       // Social follower/engagement insights (derived; accounts PRESERVED)
   'facet_merge_log',               // Facet canonicalization merge audit (derived; vocab PRESERVED)
 
-  // ── Surplus Marketplace (#219) — user-generated cross-tenant listings ───
+  // ── Surplus Marketplace — user-generated cross-tenant listings ───
   'marketplace_inquiries',         // Buyer inquiries (child of listings)
   'marketplace_want_lists',        // Buyer want-lists
   'marketplace_listings',          // Last-stock listings (product_id SET NULL on product wipe)
 
-  // ── Pricing Pyramid (#227) — user-generated requests ────────────────
+  // ── Pricing Pyramid — user-generated requests ────────────────
   'master_requests',               // Master/resale requests
   'pricing_change_requests',       // Pricing change requests
 
@@ -404,13 +391,11 @@ const TABLES_TO_CLEAR = [
 
 // ============================================================
 // NEVER_CLEAR — hard guard against catastrophic future edits.
-//
 // These tables hold legally-retained financial records, secrets, customer
 // API-key state, or long-running customer-facing observational data. If any
 // of them is ever added to TABLES_TO_CLEAR (by mistake, refactor, or a future
 // switch to a denylist), the reset ABORTS before deleting anything — see the
 // overlap assertion at the top of the handler. This is fail-closed by design.
-//
 // Do NOT "resolve" an overlap by removing the entry from here. Remove it from
 // TABLES_TO_CLEAR instead.
 const NEVER_CLEAR = new Set<string>([
@@ -445,7 +430,7 @@ const NEVER_CLEAR = new Set<string>([
   // Connection tokens + compliance
   'social_accounts', 'social_zernio_profiles', 'messaging_channels',
   'messaging_settings', 'messaging_optouts',
-  // Agent Fabric persistent layer (#132) — definitions + projects + secrets +
+  // Agent Fabric persistent layer — definitions + projects + secrets +
   // deployments + snapshots. agent_project_secrets CASCADEs from agent_projects,
   // so the entire persistent layer must be preserved to keep secrets safe; only
   // the runtime (agent_runs/agent_artifacts/agent_inbox_messages) is cleared.
@@ -471,8 +456,7 @@ const IDLESS_DELETE_COLUMN: Record<string, string> = {
 
 // ============================================================
 // Storage buckets to clear (AI/processing-generated content only)
-//
-// Post-consolidation (2026-05-23): 6 anchor buckets exist. We clear the two
+// Post-consolidation: 6 anchor buckets exist. We clear the two
 // that hold regenerable AI/processing output. pdf-documents holds raw user
 // uploads (KB) plus generated outputs (catalog-source/, catalog-output/,
 // quote-output/, moodboard-output/, client-view-output/) — those become
@@ -480,7 +464,6 @@ const IDLESS_DELETE_COLUMN: Record<string, string> = {
 // catalog_source_pdfs, quotes, moodboards, project_client_views) and the
 // nightly storage-orphan-cleanup-cron sweeps them within its grace window.
 // pdf-tiles/catalog-extracted/ is removed outright since we wipe pdf-tiles whole.
-//
 // PRESERVED buckets:
 //   - pdf-documents                ← KB raw uploads + generated outputs (cleaned by orphan cron)
 //   - quote-templates              ← admin-uploaded template assets (quotes + catalog branding)

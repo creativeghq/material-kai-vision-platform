@@ -1,5 +1,5 @@
 /**
- * #227 — canonical totals breakdown shown on every "final" customer-facing document
+ * Canonical totals breakdown shown on every "final" customer-facing document
  * (quotes, invoices, exports). Five explicit lines so VAT + discount are never hidden:
  *
  *   Price                 (net subtotal, after per-line/customer discounts)

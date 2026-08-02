@@ -1,5 +1,5 @@
 /**
- * #255 — Email Marketing setup step. Surfaces the workspace BYOK Resend status and mounts the
+ * Email Marketing setup step. Surfaces the workspace BYOK Resend status and mounts the
  * shared WorkspaceEmailConfigCard so activation flows straight into configuring the sender.
  * Marketing is BYOK-ONLY: until the workspace has its own Resend key + verified sender, campaigns
  * can't send (enforced server-side too via requireWorkspaceSender).

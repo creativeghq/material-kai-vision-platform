@@ -14,7 +14,7 @@
  *   post.failed         → social_posts.status = 'failed'
  *   post.cancelled      → social_posts.status = 'cancelled'
  *   account.disconnected → social_accounts.is_active = false
- *   message.received    → capture WhatsApp reply into the unified inbox (#209): inbox_threads
+ *   message.received    → capture WhatsApp reply into the unified inbox: inbox_threads
  *                         (thread_type='customer', channel='whatsapp') + inbox_participants
  *                         (channel-customer + assign-on-reply owner) + inbox_messages, STOP/START
  *   message.delivered|read|failed → update messaging_logs / campaign recipient delivery status
@@ -64,7 +64,7 @@ async function verifySignature(rawBody: ArrayBuffer, signature: string): Promise
 
     // Support both "sha256=xxx" and plain hex formats
     const receivedHex = signature.startsWith('sha256=') ? signature.slice(7) : signature;
-    // #250 C29: constant-time comparison — a plain `===` on the HMAC leaks timing.
+    // constant-time comparison — a plain `===` on the HMAC leaks timing.
     return timingSafeEqualHex(expectedHex, receivedHex);
   } catch {
     return false;
@@ -173,7 +173,7 @@ async function matchOrCreateContact(
 }
 
 /**
- * Inbound WhatsApp reply (message.received) → the unified inbox (#209).
+ * Inbound WhatsApp reply (message.received) → the unified inbox.
  * A WhatsApp reply is a `thread_type='customer'`, `channel='whatsapp'` thread owned by the
  * workspace whose WABA received it. The contact is a channel-customer participant (contact_id,
  * user_id NULL — never converts to an app account). Assign-on-first-reply adds the campaign /
@@ -395,7 +395,6 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
   }
 
   // Outbound inbox messages relayed over WhatsApp carry the wamid in metadata.
-  //
   // Goes through an RPC because PostgREST `.update` is a WHOLE-COLUMN ASSIGNMENT, not a merge.
   // The previous `.update({ metadata: { delivery_status: status } })` wrote that object OVER the
   // entire column, deleting `wamid`, `channel` and `relay` — so the first receipt (normally

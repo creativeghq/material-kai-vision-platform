@@ -276,7 +276,6 @@ class MoodBoardAPI {
   }
 
   // Delete a moodboard
-  //
   // FKs on moodboard_items.moodboard_id and moodboard_presentation_sheets.moodboard_id
   // are ON DELETE CASCADE, so every child row is removed in one transaction.
   // Storage files (moodboard images in generation-images, sheet PDFs in pdf-documents)
@@ -430,7 +429,6 @@ class MoodBoardAPI {
   }
 
   // Add chat-generated/attached media to a moodboard (copy-on-promote).
-  //
   // Chat media lives under the per-session prefix
   // `generation-images/u/{user_id}/sessions/{conversation_id}/...`, which is
   // prefix-deleted when the originating chat is deleted. To make the image

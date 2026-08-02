@@ -299,7 +299,7 @@ const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   );
 };
 
-// #249 — link an existing CRM contact into Real Estate as a buyer/seller (writes
+// Link an existing CRM contact into Real Estate as a buyer/seller (writes
 // property_contacts_ext.contact_role). The manual counterpart to the inbound capture paths
 // (public valuation widget / listing inquiries): the cross-module "connect" affordance — pick a
 // contact from the shared CRM spine and give it a real-estate role.
@@ -338,7 +338,7 @@ const AddPartyButton: React.FC<{ ws: string; role: 'seller' | 'buyer'; onAdded: 
   );
 };
 
-// #249 — shared property picker for the global "add" flows whose create is property-scoped
+// Shared property picker for the global "add" flows whose create is property-scoped
 // (schedule viewing / add tenancy / add investment) — pick the listing first.
 const PropertySelect: React.FC<{ ws: string | null; value: string; onChange: (id: string) => void }> = ({ ws, value, onChange }) => {
   const [opts, setOpts] = useState<PropertyListItem[]>([]);
@@ -656,7 +656,7 @@ const ViewingsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   );
 };
 
-// #281 — registered buyers (saved searches) across the portfolio.
+// Registered buyers (saved searches) across the portfolio.
 const CRITERIA_KEYS: [string, string][] = [['property_type', ''], ['transaction_type', ''], ['town', ''], ['region', ''], ['bedrooms_min', 'beds ≥'], ['price_max', '≤']];
 const summariseCriteria = (c: Record<string, any>): string => {
   const parts: string[] = [];
@@ -700,7 +700,7 @@ const BuyersPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   );
 };
 
-// #281 — portfolio lettings: active tenancies + open maintenance across all rentals.
+// Portfolio lettings: active tenancies + open maintenance across all rentals.
 const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -754,7 +754,7 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   );
 };
 
-// #281 — completed sales + commission (the portfolio view of "how much have we earned").
+// Completed sales + commission (the portfolio view of "how much have we earned").
 const SalesPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -806,7 +806,7 @@ const Stat: React.FC<{ label: string; value: string; accent?: boolean }> = ({ la
   </div>
 );
 
-// #281 — Investments portfolio: per-property yield/cash-flow + roll-up.
+// Investments portfolio: per-property yield/cash-flow + roll-up.
 const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   const navigate = useNavigate();
   const { toast } = useToast();

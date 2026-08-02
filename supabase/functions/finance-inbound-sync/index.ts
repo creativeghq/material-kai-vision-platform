@@ -1,5 +1,5 @@
 /**
- * #206 — inbound myDATA poller. Pulls documents OTHER businesses issued to us via the
+ * Inbound myDATA poller. Pulls documents OTHER businesses issued to us via the
  * myDATA `RequestDocs` REST endpoint (per-tenant AADE creds: aade-user-id +
  * Ocp-Apim-Subscription-Key), upserts them into `inbound_documents`, and advances the
  * per-workspace MARK watermark. No-ops cleanly when creds aren't configured yet, so it
@@ -114,7 +114,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
     const workspaceId = c.workspace_id as string;
     const baseUrl = c.base_url || defaultBase;
 
-    // #212 — myDATA inbound is a Finance-module feature; skip workspaces that don't own it.
+    // myDATA inbound is a Finance-module feature; skip workspaces that don't own it.
     // (Root passes via is_workspace_entitled; the configured-but-unentitled case is skipped,
     //  not errored, so one unentitled tenant can't fail the whole cron batch.)
     if (!(await isWorkspaceEntitled(supabase, workspaceId, 'sales-finance'))) {
@@ -347,7 +347,6 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       const autosyncMode = (wsFin as any)?.warehouse_autosync_mode ?? 'suggest';
       const r2 = (n: number) => Math.round(n * 100) / 100;
       // `off` means don't read supplier lines at all: no AI call, no credits, no queue.
-      //
       // The batch comes from documents that still NEED extraction. This used to be
       // `.order(created_at desc).limit(30)` with the "already extracted?" test applied inside the
       // loop — so the window was fixed BEFORE the skip and never advanced: once the 30 newest were

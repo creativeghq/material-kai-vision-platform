@@ -374,13 +374,13 @@ export function PlatformOverviewTab() {
       ] = await Promise.all([
         supabase.from('quote_requests').select('id,status,created_at').gte('created_at', ago12.toISOString()),
         supabase.from('profiles').select('id,professional_type,created_at').gte('created_at', ago12.toISOString()),
-        // `quote_request_id` does not exist — the FK is `quote_id`. (audit #298)
+        // `quote_request_id` does not exist — the FK is `quote_id`.
         supabase.from('quote_items').select('product_id,quote_id').gte('created_at', ago12.toISOString()).limit(3000),
         supabase.from('hire_me_requests').select('id,services,status,created_at').gte('created_at', ago12.toISOString()),
         supabase.from('agent_runs').select('created_at,status,execution_time_ms,credits_debited,background_agents(agent_type)').gte('created_at', ago12.toISOString()),
         // vr_worlds has no `quality_preset` and no `credits_used` — the tier is `model` and
         // the charge is `credits_charged`. moodboard_items timestamps on `added_at`, not
-        // `created_at` (both the projection AND the range filter). (audit #298)
+        // `created_at` (both the projection AND the range filter).
         supabase.from('vr_worlds').select('created_at,status,model,credits_charged').gte('created_at', ago12.toISOString()),
         supabase.from('moodboards').select('id,created_at').gte('created_at', ago12.toISOString()),
         supabase.from('moodboard_items').select('added_at,material_id').gte('added_at', ago12.toISOString()).limit(3000),
@@ -557,7 +557,6 @@ export function PlatformOverviewTab() {
           // does not exist at all and was never consumed here, so it is dropped rather than
           // aliased to `total_cost` (which has no writer — see #304).
           // generation_3d_segments: `zone_name`/`detected_material` are `label`/`material_type`.
-          // (audit #298)
           supabase.from('generation_3d').select('created_at,generation_status,room_type').gte('created_at', ago12.toISOString()),
           supabase.from('generation_3d_segments').select('created_at,label,material_type,confidence').gte('created_at', ago12.toISOString()).limit(5000),
         ]),
@@ -582,7 +581,7 @@ export function PlatformOverviewTab() {
         Promise.all([
           supabase.from('pdf_batch_jobs').select('created_at,status').gte('created_at', ago12.toISOString()),
           // `status` is `processing_status`; `records_imported` does not exist — each row IS
-          // one imported product record, so the consumer counts rows. (audit #298)
+          // one imported product record, so the consumer counts rows.
           supabase.from('data_import_history').select('created_at,processing_status').gte('created_at', ago12.toISOString()),
           supabase.from('product_processing_status').select('status').limit(5000),
         ]),
@@ -846,7 +845,6 @@ export function PlatformOverviewTab() {
         // returned null and every KPI, the 12-week trend AND the source-distribution pie on
         // this tab read a permanent zero — which an admin reads as "the module is quiet"
         // rather than "the query is broken". PriceHistoryChart.tsx:131 had it right.
-        // (audit #298 / #305)
         supabase.from('tracked_query_price_history').select('source, scraped_at').gte('scraped_at', ago12.toISOString()).limit(10000),
         supabase.from('tracked_query_price_history').select('source, scraped_at').in('source', MARKETPLACE_SOURCES).gte('scraped_at', ago12.toISOString()).limit(5000),
         // `greek-marketplaces` is not a module_slug any row has ever carried, so this KPI was a

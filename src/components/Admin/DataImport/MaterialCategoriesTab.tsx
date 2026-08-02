@@ -93,7 +93,7 @@ export const MaterialCategoriesTab: React.FC = () => {
     default_unit: 'pcs',
   });
   const [saving, setSaving] = useState(false);
-  // #227 — category aliases (operator-managed normalization for drifted import keys).
+  // Category aliases (operator-managed normalization for drifted import keys).
   const [aliases, setAliases] = useState<Array<{ alias: string; category_key: string }>>([]);
   const [newAlias, setNewAlias] = useState('');
   const [newAliasCat, setNewAliasCat] = useState('');
@@ -545,7 +545,7 @@ export const MaterialCategoriesTab: React.FC = () => {
       </Dialog>
     </Card>
 
-    {/* #227 — category aliases: map drifted/supplier keys to a canonical category so imports
+    {/* Category aliases: map drifted/supplier keys to a canonical category so imports
         auto-normalize (the products write-trigger reads this table). */}
     <Card>
       <CardHeader>

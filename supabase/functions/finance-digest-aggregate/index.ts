@@ -8,11 +8,9 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 // Sales/Finance — digest aggregator.
-//
 // Replaces the standalone finance-send-digest function. Invoked via:
 //   - The 'Finance digest' flows row (cron='5 * * * *', single run_edge_function node) → mode='cron'
 //   - The Finance Settings 'Run now' / 'Send test' buttons → mode='now' (admin-auth)
-//
 // Renders a flat variable bag (string-only — including pre-rendered HTML
 // fragments for sections that need looping) and calls email-api with
 // templateSlug='finance.digest'. The HTML layout lives in the
@@ -403,7 +401,7 @@ Deno.serve(withApiLogging('finance-digest-aggregate', async (req) => {
 
   try {
     if (body.mode === 'cron') {
-      // #250 C16: the cron branch dispatches digests to EVERY workspace's recipients —
+      // The cron branch dispatches digests to EVERY workspace's recipients —
       // gate it so only the scheduler (service-role) or a caller with the cron secret
       // can trigger it. Fails closed.
       if (!isCronAuthorized(req)) return json({ error: 'Unauthorized' }, 401);

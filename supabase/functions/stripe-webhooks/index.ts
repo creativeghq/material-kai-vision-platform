@@ -6,7 +6,7 @@ import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-ev
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getStripe, getPlatformBillingStripe, getSupabase, stripeWebhookSecret, platformBillingWebhookSecret } from '../_shared/stripe-clients.ts';
 import { moduleTierRank } from '../_shared/module-tiers.ts';
-// #273 Phase 0 — provider-neutral commerce-payment ingestion. Used ONLY by the
+// provider-neutral commerce-payment ingestion. Used ONLY by the
 // invoice_payment / statement_payment branches; platform billing (credits, subscriptions,
 // module add-ons) settles to the operator and deliberately does NOT route through here.
 import { recordInvoicePayment, recordStatementPayment } from '../_shared/payments/record-payment.ts';
@@ -18,7 +18,7 @@ import { recordInvoicePayment, recordStatementPayment } from '../_shared/payment
 // references just stay in scope.
 let stripe!: Stripe;
 let supabase!: DbClient;
-// #200 — true when THIS event was signed by the dedicated platform-billing account (verified
+// True when THIS event was signed by the dedicated platform-billing account (verified
 // with STRIPE_BILLING_WEBHOOK_SECRET). Drives which customer-id column we persist/lookup.
 let eventIsBilling = false;
 
@@ -72,8 +72,7 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
   // fault is a server error (5xx, must be retried AND reported to Sentry). The
   // two used to share one catch that returned 400 for both, which made a real
   // failure indistinguishable from a bad signature and hid the cause for weeks.
-  //
-  // #200 — the same webhook URL receives events from BOTH the default account (tenant
+  // The same webhook URL receives events from BOTH the default account (tenant
   // payments) and, when configured, the dedicated platform-billing account. Verify against
   // the default secret first; on failure try the billing secret. Whichever verifies decides
   // which Stripe client downstream API calls use (subscriptions.retrieve, etc.) and which
@@ -161,7 +160,6 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
       // "Unhandled event type". A refunded or charged-back invoice therefore read `paid`
       // forever: AR, revenue and the payment_allocations ledger all over-counted by the
       // reversed amount.
-      //
       // Because it is a MISSING branch rather than a failing one, no error rate, no Sentry
       // event and no silent-zero probe could ever have surfaced it. That is what makes this
       // class worth handling explicitly rather than relying on monitoring.
@@ -245,7 +243,7 @@ async function handleCustomerUpdated(customer: Stripe.Customer) {
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  // #251 — per-module add-on subscriptions carry kind='module_addon' metadata. They grant a
+  // per-module add-on subscriptions carry kind='module_addon' metadata. They grant a
   // per-workspace entitlement, NOT a platform plan tier, so branch out before the tier logic.
   if (subscription.metadata?.kind === 'module_addon') {
     await handleModuleAddonSubscription(subscription);
@@ -288,14 +286,14 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
   console.log(`Subscription updated for user ${profile.user_id}: ${tier}`);
 
-  // #251 — if the new plan tier now INCLUDES a module this owner is paying for as an add-on,
+  // If the new plan tier now INCLUDES a module this owner is paying for as an add-on,
   // cancel the redundant add-on so they aren't double-billed. Access is preserved because the
   // tier now covers it (and handleModuleAddonDeleted won't revoke a plan-covered module).
   await reconcileModuleAddonsForOwner(profile.user_id, tier).catch((e) =>
     console.error('[modules] add-on reconcile failed:', e));
 }
 
-// #251 — cancel (at period end) any add-on subscriptions for workspaces this user owns whose
+// Cancel (at period end) any add-on subscriptions for workspaces this user owns whose
 // module is now covered by the given plan tier.
 async function reconcileModuleAddonsForOwner(userId: string, planTier: string) {
   const rank = moduleTierRank(planTier);
@@ -337,7 +335,7 @@ async function reconcileModuleAddonsForOwner(userId: string, planTier: string) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  // #251 — module add-on cancellation → revoke the workspace entitlement.
+  // Module add-on cancellation → revoke the workspace entitlement.
   if (subscription.metadata?.kind === 'module_addon') {
     await handleModuleAddonDeleted(subscription);
     return;
@@ -362,7 +360,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log(`Subscription canceled for user ${profile.user_id}`);
 }
 
-// #251 — a per-workspace module add-on subscription was created/updated. This is the ONLY
+// A per-workspace module add-on subscription was created/updated. This is the ONLY
 // place a paid entitlement is granted (never trust the client). Grants on active/trialing;
 // keeps the entitlement through past_due (dunning grace) and only revokes on deletion.
 async function handleModuleAddonSubscription(subscription: Stripe.Subscription) {
@@ -409,7 +407,7 @@ async function handleModuleAddonSubscription(subscription: Stripe.Subscription) 
   }
 }
 
-// #251 — module add-on subscription deleted → mark the sub row and revoke the entitlement,
+// Module add-on subscription deleted → mark the sub row and revoke the entitlement,
 // UNLESS the workspace's plan tier now covers the module (e.g. after a plan upgrade the add-on
 // was cancelled). In that case access must persist even though the add-on ended.
 async function handleModuleAddonDeleted(subscription: Stripe.Subscription) {

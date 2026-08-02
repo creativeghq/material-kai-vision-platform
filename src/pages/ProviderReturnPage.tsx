@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { financeService } from '@/modules/finance/services/financeService';
 
 /**
- * #273 — provider return leg.
+ * Provider return leg.
  *
  * Viva cannot take a success/cancel URL per API call: it uses whatever is configured on
  * the payment SOURCE in the merchant's dashboard, and returns the customer with

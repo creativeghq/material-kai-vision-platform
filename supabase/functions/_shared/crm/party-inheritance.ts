@@ -3,7 +3,6 @@
 // a business has no separate commercial identity (the per-section "different from
 // business" override was removed 2026-06). Only an unattached contact (sole
 // trader / freelancer) carries its own billing/VAT/pricing.
-//
 // "Primary company" = the contact's crm_company_contacts row flagged is_primary,
 // falling back to the oldest attachment when none is flagged. These helpers run
 // under the service-role client in edge functions (invoice-builder, price-tools).

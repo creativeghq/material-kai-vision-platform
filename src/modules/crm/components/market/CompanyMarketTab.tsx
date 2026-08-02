@@ -41,7 +41,7 @@ const hostOf = (url?: string | null): string | null => {
  * "Market" tab — competitive & market intelligence for one company, built from data we
  * already hold. Increment 1a: Competitors (same-ΚΑΔ CRM matches + Apollo/web-search discovery)
  * and the Financial snapshot (per-company billed/owed/paid + unbooked myDATA invoices). Product
- * price intel + re-scoped market-position analytics land in 1b (issue #288).
+ * price intel + re-scoped market-position analytics land in 1b.
  */
 export const CompanyMarketTab: React.FC<CompanyMarketTabProps> = ({ workspaceId, companyId, company }) => {
   return (

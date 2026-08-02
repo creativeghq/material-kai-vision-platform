@@ -94,7 +94,7 @@ async function fetchText(url: string, timeoutMs = 15_000): Promise<string | null
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    // #250 C24: every URL fetched here is user-derived (site base, robots, and
+    // Every URL fetched here is user-derived (site base, robots, and
     // sitemap <loc> values parsed from fetched XML). Guard the initial host AND
     // re-guard every redirect hop so a public URL can't 302 us into cloud metadata
     // / internal services. We follow redirects manually to re-check each hop.

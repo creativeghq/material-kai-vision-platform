@@ -1,5 +1,5 @@
 /**
- * #185 — EFT-POS terminal registry (settings_pos parity). Register the physical/virtual
+ * EFT-POS terminal registry (settings_pos parity). Register the physical/virtual
  * card terminals a workspace charges through. A card(7)/IRIS(8) receipt issued on a
  * registered terminal is signed by Novus (Law 5155/2023) and finalized to AADE only after
  * the terminal charge succeeds. `terminal_id` + `pos_nsp_id` are sent to Novus as the

@@ -1,5 +1,5 @@
 /**
- * #195 — route-level capability gate. Renders children only when the active persona
+ * route-level capability gate. Renders children only when the active persona
  * holds the capability; otherwise shows an access-restricted card (and never the page).
  * This is the URL-level half of capability gating — hiding the nav item isn't enough,
  * an end-user could otherwise type `/finance` directly.

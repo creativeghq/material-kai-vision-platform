@@ -1,4 +1,4 @@
-// #251 — operator view of module add-on activation. Per module: active/canceling subscriber
+// Operator view of module add-on activation. Per module: active/canceling subscriber
 // counts, total entitled (incl. plan-included), add-on MRR, and the workspace list. Data comes
 // from the operator-guarded admin_module_subscription_overview() RPC.
 import React, { useCallback, useEffect, useState } from 'react';

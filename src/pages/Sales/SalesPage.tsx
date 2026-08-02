@@ -1,4 +1,4 @@
-// #201 — Sales Team portal. A focused, capability-gated surface for invited sales reps
+// Sales Team portal. A focused, capability-gated surface for invited sales reps
 // (persona 'sales', capability 'sales.portal'). A rep picks/creates a customer, names an
 // order, and we create a draft `quotes` row (customer_contact_id/customer_company_id +
 // user_id = rep) then hand off to the existing quote detail page to build line items from
@@ -28,7 +28,7 @@ export const SalesPage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
-  // Sales manager (#201): RLS (is_workspace_sales_manager) already returns the whole team's book,
+  // Sales manager: RLS (is_workspace_sales_manager) already returns the whole team's book,
   // so this only decides whether to label + total it as a team view.
   const { can } = usePermissions();
   const canSeeTeam = can('sales.team.view');

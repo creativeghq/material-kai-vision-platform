@@ -196,7 +196,7 @@ export const SubscriptionPlansPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Included modules (#214) — which features this plan unlocks. */}
+                {/* Included modules — which features this plan unlocks. */}
                 {modulesForPlan(plan.name).length > 0 && (
                   <div className="border-t border-white/10 pt-3">
                     <p className="text-white/50 text-xs uppercase tracking-wide mb-1.5">Includes</p>

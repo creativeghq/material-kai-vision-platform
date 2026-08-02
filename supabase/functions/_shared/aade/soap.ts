@@ -1,10 +1,8 @@
 // Shared SOAP/XML/credential helpers for every ΑΑΔΕ web-service edge function.
-//
 // Every ΑΑΔΕ service (RgWsPublic2, future myDATA endpoints, ICISnet customs, etc.) shares:
 //   - the same WS-Security UsernameToken auth header
 //   - the same credential storage (AADE_USERNAME + AADE_PASSWORD via resolveSecret)
 //   - the same XML-extraction quirks (multiple namespace prefixes, NULL/--- sentinels)
-//
 // Functions that wrap a specific ΑΑΔΕ operation should:
 //   1. Call resolveAadeCredentials() to get { username, password, afmCalledBy, sources }
 //   2. Compose the operation-specific <Body> via buildSoapEnvelope(creds, bodyXml)

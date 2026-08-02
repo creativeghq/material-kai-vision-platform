@@ -372,7 +372,7 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                     <Button className="rounded-full gap-2 px-4" size="sm" onClick={() => openHireModal()}>
                       <Mail className="h-3.5 w-3.5" />Hire me
                     </Button>
-                    {/* #196 — request access to this factory's catalog (verified-factory profiles only). */}
+                    {/* Request access to this factory's catalog (verified-factory profiles only). */}
                     <RequestFactoryAccessButton factoryUserId={profile.user_id} show={profile.professional_type === 'supplier' && !isOwnProfile} />
                   </div>
                 </div>

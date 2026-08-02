@@ -1,5 +1,5 @@
 /**
- * #177 — master requests: a child workspace submits a procurement quote to its parent
+ * Master requests: a child workspace submits a procurement quote to its parent
  * node; the parent prices it or escalates upward. All writes go through SECURITY DEFINER
  * RPCs (the table is RLS write-locked); reads are visible to requester + target members.
  */

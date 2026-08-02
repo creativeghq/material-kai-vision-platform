@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 /**
- * #273 Phase 2 — Viva.com webhook receiver (multi-tenant BYOK).
+ * Viva.com webhook receiver (multi-tenant BYOK).
  *
  * SECURITY MODEL — read this before changing anything here.
  *
@@ -124,7 +124,6 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     }
 
     // Stamp the registration here, not on the first delivery.
-    //
     // This GET *is* Viva's "Verify" step: their dashboard calls it while the merchant
     // registers the URL, so answering it correctly is the proof that registration
     // happened. Waiting for a real POST instead would deadlock setup — the switch that
@@ -224,12 +223,11 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     // `provider_order_code = rawOrderCode(rawBody)` — the REVERSAL message's own order code,
     // not the original payment's — and matched `''` whenever that returned null, so it hit
     // the wrong row or none at all.
-    //
     // There is also no correct row to repoint it at: the reversal carries only `ParentId`
     // (the original TransactionId) while intents are keyed by `provider_order_code`, and
     // `invoice_payment_intents` has no provider_ref column to join on. Cancelling would be
     // wrong regardless — the intent was genuinely fulfilled; the money came back afterwards.
-    // Reversing settled books is the credit note's job. (audit #307)
+    // Reversing settled books is the credit note's job.
     let paymentRow: { id: string; workspace_id: string | null } | null = null;
     if (parentId) {
       const { data: pay } = await db
@@ -243,7 +241,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
 
     // "Flag it loudly for a human" was only ever a console.error — which reaches no human.
     // Emit the same payment_reversed event the Stripe path now emits, so the seeded default
-    // flow puts it in front of the workspace's owners and admins. (audit #307)
+    // flow puts it in front of the workspace's owners and admins.
     const amount = Number(data?.Amount ?? 0);
     const wsId = paymentRow?.workspace_id ?? null;
     const payload = {

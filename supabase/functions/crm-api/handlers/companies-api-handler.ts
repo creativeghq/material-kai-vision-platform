@@ -24,10 +24,10 @@ const COMPANY_WRITABLE_COLUMNS = [
   'linkedin', 'twitter', 'facebook', 'description',
   'is_supplier', 'is_customer', 'discount_percent', 'discount_notes', 'credit_limit',
   'factory_names', // supplier↔factory pin (ingested metadata.factory_name values)
-  'user_level_key', // #227 — pricing level
-  'prices_vat_inclusive', // #227 — show this customer gross (VAT-incl) prices
+  'user_level_key', // Pricing level
+  'prices_vat_inclusive', // Show this customer gross (VAT-incl) prices
 
-  // #207 — commercial depth: segmentation, ΜΥΦ inclusion, on-invoice VAT-exemption
+  // Commercial depth: segmentation, ΜΥΦ inclusion, on-invoice VAT-exemption
   // reason, and a separate billing identity (consumed by partyFromCrm at issue).
   'contact_group', 'include_in_myf', 'vat_exemption_reason',
   'billing_name', 'billing_vat', 'billing_tax_office', 'billing_street',
@@ -72,7 +72,7 @@ async function companyWorkspaceInScope(
   return data?.workspace_id ?? null;
 }
 
-// Pentest #250 H7: mirror of companyInScope for contacts. The company↔contact link
+// Mirror of companyInScope for contacts. The company↔contact link
 // insert verified the company but NOT the contact, so a caller could attach another
 // tenant's contact_id to their own company and then read that contact's PII via the
 // nested crm_contacts join on GET /companies/{id}.
@@ -516,7 +516,7 @@ export async function handleCompanies(req: Request): Promise<Response> {
         contact_id = created.id;
         createdContactId = created.id;
       } else {
-        // Pentest #250 H7: an existing contact must also be in the caller's scope, else
+        // An existing contact must also be in the caller's scope, else
         // attaching a foreign contact_id leaks that tenant's contact PII via the join.
         if (!(await contactInScope(contact_id, scope))) {
           return new Response(

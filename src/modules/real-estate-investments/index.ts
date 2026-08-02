@@ -2,7 +2,7 @@ import { LineChart } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
-// #281 — Investments is an entitlement-gated add-on that surfaces as tabs INSIDE the Real Estate
+// Investments is an entitlement-gated add-on that surfaces as tabs INSIDE the Real Estate
 // module (the "Investments" portfolio tab + per-listing "Investment" tab), not as its own route.
 // No routes/settingsPanels of its own; the DB `modules` row + this registration drive the catalog,
 // admin Modules page, and per-workspace entitlement. An admin-dashboard card aids discovery.

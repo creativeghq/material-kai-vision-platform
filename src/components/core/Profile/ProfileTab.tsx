@@ -507,7 +507,7 @@ export const ProfileTab: React.FC = () => {
   const [savingPersonal, setSavingPersonal] = useState(false);
 
   const [isPublic, setIsPublic] = useState(false);
-  const [showListings, setShowListings] = useState(true); // #249 — show property listings on public profile
+  const [showListings, setShowListings] = useState(true); // Show property listings on public profile
   const { enabled: realEstateEnabled } = useModule('real-estate');
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [factories, setFactories] = useState<{ name: string; country?: string }[]>([]);
@@ -920,7 +920,7 @@ export const ProfileTab: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* #249 — Public sections: show property listings on the public profile */}
+      {/* Public sections: show property listings on the public profile */}
       {isPublic && realEstateEnabled && (
         <Card className="rounded-2xl">
           <CardContent className="flex items-center justify-between gap-3 py-4">
@@ -1175,7 +1175,7 @@ export const ProfileTab: React.FC = () => {
       {/* Supplier Verification — gated on professional_type='supplier'. The
           underlying column is factory_verified for historical reasons; the
           user-facing label is "Supplier" since the merge of
-          brand/manufacturer/supplier → supplier (2026-05-24). */}
+          brand/manufacturer/supplier → supplier. */}
       {personal.professional_type === 'supplier' && (
         <Card className="rounded-2xl">
           <CardHeader>

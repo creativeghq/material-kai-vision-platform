@@ -1,5 +1,4 @@
 // Standard table footer: "Showing 21–40 of 137" + numbered page buttons.
-//
 // House rule: long tables paginate with NUMBERED pages, never "Load more" — an append-forever
 // list makes it impossible to tell how much data exists, to jump to older rows, or to keep your
 // place after a re-render. `SmartPagination` renders the numbers (with ellipsis past 7 pages);

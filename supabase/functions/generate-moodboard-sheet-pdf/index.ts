@@ -112,7 +112,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
     // Project-level Client View deck — assembled from sheets across any of the
     // project's moodboards. Same builders, project scope. (Folded in here rather
     // than a separate function — see the merge-functions rule.)
-    // #249 — Real Estate property brochure. Same pdf-lib/layout stack, property scope + module
+    // Real Estate property brochure. Same pdf-lib/layout stack, property scope + module
     // gates. Folded in here rather than a separate function (merge-functions rule).
     if ((body as any).property_brochure_id) {
       return await buildPropertyBrochurePdf(supabase, auth, String((body as any).property_brochure_id));
@@ -181,7 +181,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       return jsonResponse({ success: false, error: 'Not authorized for this sheet' }, 403);
     }
 
-    // Pentest #250 H3: sheet.data can embed quote_id / product_ids / included_sheet_ids
+    // sheet.data can embed quote_id / product_ids / included_sheet_ids
     // that point at OTHER users' entities. The created_by check only proves the top-level
     // sheet belongs to the caller — bind every embedded fetch below to the caller too.
     // Service-role calls (the upstream tool already verified ownership) bypass, mirroring

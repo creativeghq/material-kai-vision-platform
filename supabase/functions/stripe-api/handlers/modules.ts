@@ -1,16 +1,13 @@
 // #251 module framework — owner self-serve module activation + add-on billing.
-//
 // Actions (dispatched from stripe-api/index.ts):
 //   activate-module    { workspace_id, module_slug, successUrl?, cancelUrl? }
 //   deactivate-module  { workspace_id, module_slug }
 //   request-module     { workspace_id, module_slug }   (non-owner → notify owner)
 //   list-stripe-products                               (operator only)
-//
 // An add-on module binds to a Stripe PRODUCT (1:1). The charge uses that product's
 // default_price, resolved fresh at activation — so it's always the current price and two
 // modules can never collide on a shared price id.
-//
-// Security baseline (#250 / #251):
+// Security baseline:
 //   - authenticate() returns a service-role client (RLS bypassed) → we bind every
 //     action to the CALLER, never to a body-supplied id. Activation requires the
 //     caller to be the OWNER of the target workspace (or the platform operator).
@@ -257,7 +254,7 @@ async function deactivateModule(auth: AuthResult, body: Record<string, unknown>)
   return json({ deactivated: true, module: moduleSlug });
 }
 
-// #251 — a NON-owner member requests activation → notify the workspace owner(s). Uses the
+// A NON-owner member requests activation → notify the workspace owner(s). Uses the
 // Flows engine (emitFlowEvent → seeded `module_access_requested` flow → bell), never a
 // hardcoded notification insert. Caller must be a member of the workspace.
 async function requestModule(auth: AuthResult, body: Record<string, unknown>): Promise<Response> {
@@ -337,7 +334,7 @@ async function requestModule(auth: AuthResult, body: Record<string, unknown>): P
  * returned with `price: null` so the admin UI can flag them as not subscription-ready.
  */
 /**
- * #256 — one-click "make this module purchasable": create a Stripe PRODUCT + recurring price on
+ * one-click "make this module purchasable": create a Stripe PRODUCT + recurring price on
  * the platform-billing account, set the price as the product default, and bind it to the module
  * row (is_addon + addon_stripe_product_id + price). Operator-only. Saves the operator a trip to
  * the Stripe dashboard; the normal activate-module → checkout → webhook grant flow then works.

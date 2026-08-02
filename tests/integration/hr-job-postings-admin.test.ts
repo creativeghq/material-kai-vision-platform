@@ -4,7 +4,6 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, grantM
 
 // The ADMIN write path for job postings (`hr-api` → create/update-job-posting), with a real user
 // JWT so auth + entitlement + hr.manage are all exercised.
-//
 // Written because the public careers suite seeded its postings with service-role SQL, which
 // bypasses the edge function entirely — so `normalizeJobPostingFields` (the compensation /
 // apply_config sanitiser that a public page renders) had never executed even once in a test.

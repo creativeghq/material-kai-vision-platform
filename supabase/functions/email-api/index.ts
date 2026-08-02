@@ -115,7 +115,7 @@ async function buildUnsubscribe(
 }
 
 /**
- * #255 — map a Resend `last_event` (from GET /emails/{id}) onto the timestamp/status columns shared
+ * Map a Resend `last_event` (from GET /emails/{id}) onto the timestamp/status columns shared
  * by campaign_recipients + email_logs. `last_event` is the LATEST event only, so a click implies the
  * prior open+delivery — we backfill those. Existing timestamps are preserved (COALESCE-style) by the
  * caller. Returns null for events that don't change our stored state.
@@ -299,7 +299,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           throw new HttpError(400, `Invalid recipient address: ${JSON.stringify(body.to ?? null)}`);
         }
 
-        // Pentest #250 H4: body.workspace_id selects WHOSE Resend key + verified sender
+        // body.workspace_id selects WHOSE Resend key + verified sender
         // domain is used. Without binding it to the caller, a workspace-A owner could
         // send from workspace B's verified domain — billed to B's key, counted against
         // B's quota, stamped to B. Require membership when a workspace_id is supplied
@@ -445,7 +445,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           // subjectOverride (campaign subject_line) wins over the template's own subject when supplied.
           subject = renderTemplateWithVariables(body.subjectOverride || template.subject_template || body.subject, variables);
 
-          // Pentest #250 C11: react_code is executed via import() in the edge worker
+          // react_code is executed via import() in the edge worker
           // (arbitrary JS + all platform secrets). Only ever run it for platform-authored
           // SYSTEM templates — never tenant-authored ones. The DB trigger already blocks
           // non-operators from writing react_code/is_system; this is defense-in-depth.
@@ -583,7 +583,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
       }
 
       case 'sync-campaign-stats': {
-        // #255 — pull delivery/open/click/bounce status for a workspace's campaign from its OWN
+        // Pull delivery/open/click/bounce status for a workspace's campaign from its OWN
         // Resend account (GET /emails/{id}). Marketing sends go out under the tenant's Resend, so
         // their events never reach our webhook — this on-demand poll backfills the stats.
         if (req.method !== 'POST') throw new Error('Method not allowed');
@@ -835,7 +835,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         );
       }
 
-      // NOTE: the 'logs' action was removed (audit #294/#306). It ran
+      // NOTE: the 'logs' action was removed. It ran
       // `select('*')` on email_logs with the SERVICE-ROLE client, no workspace
       // filter and no admin gate, so any signed-in user could read every
       // tenant's rendered email bodies (html_body, text_body, to_email,
@@ -859,18 +859,15 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         }
 
         // DERIVED FROM email_logs, not from the `email_analytics` table.
-        //
         // `email_analytics` has ZERO writers — no code, no trigger, no cron (repo grep: the
         // generated types, this read, and reset-platform's truncate; pg_trigger and
         // pg_proc: nothing). So every rate here read 0% forever while email_logs actually
         // held 134 `failed` / 2 `queued` / 1 `delivered`. An operator watching this
         // dashboard would conclude email was healthy DURING A TOTAL OUTAGE — the exact
         // silent-zero shape the platform has probes for.
-        //
         // Deriving live rather than adding a writer, per the one-derivation rule: a cached
         // copy is a second source that can drift, and email_logs already carries every
         // metric as a timestamp column. (audit #306 finding 11)
-        //
         // Also scoped to the caller's workspaces — this ran service-role and unfiltered,
         // the same shape as the `logs` action that was removed for leaking cross-tenant.
         let query = supabaseClient

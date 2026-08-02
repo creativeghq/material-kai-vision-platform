@@ -90,7 +90,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
   }
 
   // Secret/service callers (agent-chat) auth at 'secret' level (userId null) + pass user_id in body.
-  // #250 C31: only a secret-level caller may specify user_id in the body.
+  // Only a secret-level caller may specify user_id in the body.
   const userId = auth.userId ?? (auth.level === 'secret' ? body.user_id : null);
   if (!userId) {
     return jsonResponse({ success: false, error: 'user_id is required' }, 400);
@@ -118,7 +118,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     // `seo_articles_ws_select` RLS predicate (is_workspace_member(workspace_id)), so no
     // colleague could see it, and resolveWebsite(null) could not pick the workspace's
     // default site either. Prefer an explicit body.workspace_id reconciled against
-    // membership; otherwise take the caller's most recent active membership. (audit #306)
+    // membership; otherwise take the caller's most recent active membership.
     const requestedWs = typeof body.workspace_id === 'string' ? body.workspace_id : null;
     let memberQuery = supabase
       .from('workspace_members')
@@ -380,7 +380,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       .from('seo_articles')
       // `overall_score` is not a column and was never read from this result anyway — its
       // presence alone got the select rejected, so existingArticlesRaw was always null and
-      // interlinking never found a single existing article. (audit #298/#306)
+      // interlinking never found a single existing article.
       .select('id, title, slug, target_keyword')
       .eq('user_id', userId)
       .eq('status', 'completed')
@@ -487,7 +487,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     // reading_time_minutes, content_analysis, overall_score, keyword_density, schema_markup,
     // faq_schema, optimize_data, brief_data, gaps_gains_data, research_tab_data,
     // fix_iterations, geo_score, credits_used, processing_time_ms) are preserved in
-    // stages_data.extra instead of taking the whole statement down with them. (audit #298/#306)
+    // stages_data.extra instead of taking the whole statement down with them.
     await updateArticle(supabase, articleId, {
       markdown_content: finalMarkdown,
       html_content: htmlContent,
@@ -560,7 +560,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       // rejected too, so a failed article was indistinguishable from a running one and
       // spun at its last current_stage forever. Written directly (not via updateArticle)
       // because this is the error path: it must not throw, and it must not depend on the
-      // read-modify-write that updateArticle performs. (audit #298/#306)
+      // read-modify-write that updateArticle performs.
       const { error: failErr } = await supabase
         .from('seo_articles')
         .update({
@@ -597,7 +597,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
  * when any one column is unknown, so those updates landed nothing — and took the REAL
  * columns in the same payload down with them. That is why finished articles had
  * `title = NULL`, `slug = NULL`, no markdown and a status stuck mid-pipeline, while the
- * endpoint returned `{success: true}` and the credits were already spent. (audit #298/#306)
+ * endpoint returned `{success: true}` and the credits were already spent.
  */
 const ARTICLE_COLUMNS = new Set([
   'target_keyword', 'content_type', 'content_brief', 'status', 'progress_percentage',

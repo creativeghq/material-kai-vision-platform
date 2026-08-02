@@ -1,5 +1,5 @@
 /**
- * #185 — offline-MARK recovery. When AADE is down the connector accepts a document
+ * offline-MARK recovery. When AADE is down the connector accepts a document
  * "offline" and the final MARK is assigned later. This cron re-queries the connector for
  * any invoice/credit-note still in fiscal_status='offline' and stamps the final MARK once
  * available. Safe to schedule continuously; no-ops when there's nothing pending.
@@ -86,7 +86,6 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   // Online payments generate their receipt in a post-response background task, which
   // gives immediacy but not durability: if the worker dies mid-task the receipt is lost
   // with no retry. Sweep any recent CARD payment that still has no receipt PDF and mint it.
-  //
   // Scoped to stripe_payment_intent_id IS NOT NULL on purpose: a MANUALLY recorded payment
   // may legitimately have no receipt because the user un-ticked "Send receipt to customer",
   // and silently generating one would override that choice.

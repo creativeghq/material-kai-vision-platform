@@ -32,7 +32,7 @@ export const UserProfilePage: React.FC = () => {
   // the write RPCs re-check the same thing server-side.
   const showTeam = workspaceRole === 'owner' || workspaceRole === 'admin' || isPlatformOperator;
   // Modules tab is visible to every workspace member: owners activate/purchase; non-owners
-  // see the catalog and can request activation from the owner (#251).
+  // see the catalog and can request activation from the owner.
   const showModules = !!workspaceRole || isPlatformOperator;
   // Supplier-only participation: a workspace can claim a (VAT, country) supplier identity
   // and receive purchase orders WITHOUT enabling the Finance module. Finance-enabled workspaces

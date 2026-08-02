@@ -1,4 +1,4 @@
-// Docs module (#254) — per-workspace internal documentation, searchable by the KAI agent via
+// Docs module — per-workspace internal documentation, searchable by the KAI agent via
 // Postgres FTS (no embeddings). Surfaces in the App Launcher (location:'workspace'), NOT the top nav.
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { BookText } from 'lucide-react';

@@ -1,10 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
-//
 // Platform-wide Data Integrity runner.
 //   • Cron path  (x-cron-secret / service-role Bearer) → runs the full battery with auto-heal
 //     for every check whose `autoheal_enabled = true`.
 //   • Admin path (session JWT, admin/super_admin/owner) → run on demand + manage checks/findings.
-//
 // All the heavy lifting lives in Postgres (run_data_integrity_checks / heal_data_integrity_check);
 // this function is the auth boundary + thin dispatcher. See migration data_integrity_framework_core.
 

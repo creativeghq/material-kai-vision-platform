@@ -51,7 +51,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   const sender = fs?.business_name || 'our company';
   const number = inv.legal_number || inv.internal_number;
   const total = money(Number(inv.total ?? 0), inv.currency);
-  // Pentest #250 J2: escape any tenant/customer-supplied value interpolated into the email HTML.
+  // Escape any tenant/customer-supplied value interpolated into the email HTML.
   const esc = escapeHtml; // shared canonical escaper (was an identical local copy)
   const mark = inv.fiscal_mark ? `<p style="margin:4px 0;color:#666">myDATA MARK: <strong>${esc(inv.fiscal_mark)}</strong></p>` : '';
   // The fiscal QR/URL proves the document to the tax authority — label it as such, not as a

@@ -63,7 +63,7 @@ export async function fetchQuoteData(
     throw new HttpError(400, 'Cannot generate PDF: quote has no items.');
   }
 
-  // #237 Phase 4: "call for price" / awaiting-supplier lines legitimately carry a NULL
+  // "call for price" / awaiting-supplier lines legitimately carry a NULL
   // price and render as "Call for price" (excluded from totals). Only a line that claims
   // to be `priced` yet has no unit_price is a genuine data error worth blocking on.
   const brokenPricedItems = items.filter(

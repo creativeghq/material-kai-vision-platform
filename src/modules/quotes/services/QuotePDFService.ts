@@ -98,10 +98,8 @@ class QuotePDFService {
     vatRate: number,
   ): Promise<{ success: boolean; error?: string }> {
     // ONE statement, ONE transaction, and the totals come back DERIVED.
-    //
     // This used to update quote_items in a loop and then compute subtotal / cash discount /
-    // VAT / grand total in TypeScript. Two things were wrong with that (audit #307):
-    //
+    // VAT / grand total in TypeScript. Two things were wrong with that:
     //  - finding 19: the first failing item `return`ed mid-loop, leaving earlier lines
     //    repriced, later lines stale, and the quotes totals row untouched. No transaction,
     //    no rollback, and the operator could not tell how far it got.
@@ -110,7 +108,6 @@ class QuotePDFService {
     //    renders with, so `priceAfterDiscount + vat` and `final` could disagree by a cent.
     //    It also resolved the cash-discount rule with a second copy of the query in
     //    financeService.getActiveCashDiscountPct, and folded in no extras at all.
-    //
     // reprice_quote_items applies every line or none, then restamps the quote from
     // get_quote_totals() — the single SQL source. TypeScript no longer derives any of it.
     const { data, error } = await supabase.rpc('reprice_quote_items', {

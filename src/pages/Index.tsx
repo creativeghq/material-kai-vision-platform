@@ -5,7 +5,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 
 const Index = () => {
   const { loading, persona } = usePermissions();
-  // #201 — invited sales reps land directly on their Sales portal, not the full dashboard.
+  // Invited sales reps land directly on their Sales portal, not the full dashboard.
   if (loading) return null;
   if (persona === 'sales' || persona === 'sales_manager') return <Navigate to="/sales" replace />;
   return (

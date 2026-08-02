@@ -1,5 +1,5 @@
 /**
- * #255 — Resend Audience / Contacts. Shows the contacts already in the workspace's Resend audience,
+ * Resend Audience / Contacts. Shows the contacts already in the workspace's Resend audience,
  * a toggle to auto-sync CRM contacts to Resend daily, a manual "Sync now" button, and the last-sync
  * status. Sync is additive (never deletes / never touches unsubscribed contacts).
  */

@@ -1,5 +1,5 @@
 /**
- * #273 Phase 2 — Viva.com as a `PaymentProvider` (per-tenant BYOK).
+ * Viva.com as a `PaymentProvider` (per-tenant BYOK).
  *
  * Unlike Stripe (platform key + Connect destination), every tenant brings their OWN Viva
  * merchant account and funds settle directly to their wallet. We never fall back to the
@@ -249,7 +249,6 @@ export const vivaProvider: PaymentProvider = {
     }
     // BYOK: no row, disabled, or incomplete credentials → this tenant cannot charge.
     // We deliberately do NOT fall back to any operator-level Viva account.
-    //
     // CRITICAL (settlement invariant): this gate is the AUTHORITATIVE "can Viva be offered?" check —
     // the customer pay page offers a provider purely on resolveContext≠null. It MUST require everything
     // the settlement loop needs, or a customer can pay a charge that can never be recorded:

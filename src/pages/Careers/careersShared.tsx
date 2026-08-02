@@ -1,4 +1,4 @@
-// #252 — presentation helpers shared by the public careers board and the job detail page.
+// Presentation helpers shared by the public careers board and the job detail page.
 import { Building2 } from 'lucide-react';
 import type { CareersJobSummary, CompanyProfile, CompensationBand } from '@/services/publicCareersService';
 

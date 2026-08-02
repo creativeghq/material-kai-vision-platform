@@ -1,5 +1,5 @@
 /**
- * real-estate-buyer-digests (#281) — saved-search email digests for buyers.
+ * real-estate-buyer-digests — saved-search email digests for buyers.
  *
  * For every active buyer requirement with digest_enabled + a portal_token + a contact email,
  * finds listings that (a) match the saved criteria and (b) were published/created since the last

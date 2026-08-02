@@ -1,5 +1,5 @@
 /**
- * #255 — workspace-scoped email campaign list. Only channel_type='email' campaigns for the active
+ * workspace-scoped email campaign list. Only channel_type='email' campaigns for the active
  * workspace (RLS + explicit filter, so WhatsApp/messaging campaigns never appear here). Start/pause/
  * resume/cancel/delete drive the campaign-processor cron; a paused campaign with a blocked_reason
  * surfaces the "configure Resend" state.

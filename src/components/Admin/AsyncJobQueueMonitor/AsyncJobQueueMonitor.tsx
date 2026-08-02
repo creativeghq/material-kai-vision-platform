@@ -265,7 +265,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       }
 
       // Update selected job with fresh data using deep comparison to prevent modal blinking.
-      //
       // last_heartbeat MUST be in the comparison set — without it, silent
       // post-processing phases (heartbeat ticks but status/progress/metadata
       // stay constant) keep returning the stale reference, and the heartbeat
@@ -360,7 +359,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       setError(null);
 
       // The two sources are INDEPENDENT, so they run concurrently.
-      //
       // They used to be awaited in sequence, which meant this screen — one admins leave open all
       // day — did two serial round trips for up to 1,000 rows every 10 seconds (`setInterval`
       // below), paying the sum of both latencies on every tick instead of the larger of the two.

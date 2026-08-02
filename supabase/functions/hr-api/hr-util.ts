@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — small pure helpers shared across the hr-api handlers (index.ts + expansion.ts) so the two
+// Small pure helpers shared across the hr-api handlers (index.ts + expansion.ts) so the two
 // copies can't drift.
 
 /** Business days (Mon–Fri) between two ISO dates inclusive. Weekends excluded (v1; holidays later). */

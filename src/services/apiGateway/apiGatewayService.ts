@@ -130,7 +130,6 @@ class ApiGatewayService {
     // holding 216,737 rows / 50 MB — so a bare call pulled the whole table, ordered, through
     // PostgREST AND the RLS predicate on the VOLATILE has_role overload. (audit #301
     // finding 15, and the worst pairing of it with finding 7.)
-    //
     // One row over the cap is fetched so the caller can tell "exactly N" from "more than N"
     // and SAY SO in the UI. A silently truncated list is the same silent-zero shape the
     // platform guards against everywhere else.

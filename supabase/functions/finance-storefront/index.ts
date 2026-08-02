@@ -4,15 +4,13 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
-// #207 — Public online storefront (public link / mini-store).
-//
+// Public online storefront (public link / mini-store).
 // Anonymous, no auth. Three actions (discriminated by `action`):
 //   • meta     {slug}                         → storefront config + workspace branding
 //   • products {slug}                         → published products with gross prices
 //   • checkout {slug, items[], customer}      → recompute server-side, create a DRAFT 11.1
 //                                               retail receipt + items, mint a pay token,
 //                                               return /pay/:token (existing Stripe flow).
-//
 // Prices are ALWAYS recomputed from product_prices server-side — the client cart is never
 // trusted for amounts. The order is a draft until the buyer pays (existing stripe-webhooks
 // flips it to paid), so abandoned carts never burn a legal receipt number.
@@ -75,7 +73,7 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
         .from('product_prices')
         .select('product_id, list_price, currency, unit, product:products(id, name, description, metadata, item_type)')
         .eq('workspace_id', ws.id).eq('storefront_published', true).not('list_price', 'is', null);
-      // #227 — list_price is NET (ex-VAT) everywhere; the consumer storefront shows the
+      // list_price is NET (ex-VAT) everywhere; the consumer storefront shows the
       // VAT-inclusive price, so add VAT here for display.
       const { data: fsP } = await supabase.from('finance_settings').select('default_vat_rate').eq('workspace_id', ws.id).maybeSingle();
       const vatP = Number(fsP?.default_vat_rate ?? 24);
@@ -101,7 +99,7 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       if (clean.length === 0) return json({ error: 'cart is empty' }, 400);
       if (!customer?.email || !customer?.name) return json({ error: 'name and email are required' }, 400);
 
-      // #212 — checkout creates a fiscal retail receipt, so the selling workspace must own the
+      // Checkout creates a fiscal retail receipt, so the selling workspace must own the
       // Finance module. (Browse actions above stay open so a store can showcase products.)
       const ent = await assertEntitled(supabase, ws.id, 'sales-finance');
       if (!ent.ok) return ent.response;
@@ -126,7 +124,7 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
         if (!pr || pr.list_price == null) return json({ error: 'a product is no longer available' }, 409);
         currency = pr.currency ?? currency;
         const qty = Math.min(Number(it.qty), 9999);
-        // #227 — list_price is NET (ex-VAT); add VAT to get the consumer gross, keep net per line for myDATA.
+        // list_price is NET (ex-VAT); add VAT to get the consumer gross, keep net per line for myDATA.
         const unitNet = Number(pr.list_price);
         const unitGross = round2(unitNet * (1 + vatRate / 100));
         totalGross += round2(unitGross * qty);

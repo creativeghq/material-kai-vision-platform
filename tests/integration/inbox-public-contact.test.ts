@@ -4,7 +4,6 @@ import { hasCreds, serviceClient, createUser, teardown, runId, SUPABASE_URL, typ
 
 // Public "Hire me" contact form (PublicProfilePage → HireMeModal → inbox-api `profile_contact`).
 // Called with the ANON key only — exactly what a logged-out visitor's browser sends.
-//
 // This path existed as a direct client insert into profile_contact_requests, which is
 // authenticated-only, so every anonymous submission failed with 42501 while the modal rendered
 // happily on a public page. It was moved server-side; these assertions pin the properties that

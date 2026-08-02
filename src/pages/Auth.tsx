@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { inboxApi } from '@/services/inboxApi';
 
-// #209 — a tokenized inbox customer who signs up adopts their thread post-auth. The token is
+// A tokenized inbox customer who signs up adopts their thread post-auth. The token is
 // stashed so it survives an email-confirmation round trip that strips the query string.
 const INBOX_CLAIM_KEY = 'inbox_claim_token';
 import { Button } from '@/components/core/ui/button';

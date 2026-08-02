@@ -1,5 +1,5 @@
 /**
- * #196 — supplier-facing entry point to request access to a factory's catalog. Renders on a
+ * supplier-facing entry point to request access to a factory's catalog. Renders on a
  * verified-factory profile (not your own). Submits a factory_access_request from your active
  * workspace; the operator reviews it. Reflects the current state (request / pending / granted).
  */

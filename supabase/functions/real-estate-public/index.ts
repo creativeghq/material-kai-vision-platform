@@ -1,7 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
-// #249 — Real Estate PUBLIC listing page (anonymous, token-gated). Serves the `/p/:token` page and
+// Real Estate PUBLIC listing page (anonymous, token-gated). Serves the `/p/:token` page and
 // accepts the anonymous inquiry POST. Separate from real-estate-api so no authed surface is exposed.
-//
 // SECURITY:
 //  • Service-role client, but access is bound to the opaque public_listing_token (anti-IDOR — the
 //    token IS the capability; there is no id-addressable public read).
@@ -28,7 +27,6 @@ const PUBLIC_LEAD_HOURLY_LIMIT = 8;
 async function enforceLeadRateLimit(supabase: any, req: Request, action: string, workspaceId: string | null): Promise<Response | null> {
   // The two halves have DIFFERENT failure policies, and collapsing them into one
   // `catch { return null }` is what made this brake fail open (audit #303 finding 5):
-  //
   //   - The COUNT is the enforcement decision. If it cannot be answered we do not know
   //     whether the caller is over budget, so we must refuse. Failing open here hands an
   //     attacker an unlimited channel the moment they can induce an error in this query,
@@ -93,7 +91,7 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     return out;
   }
 
-  // ── Buyer portal (#281) — a saved search's shareable matches page + favourites + viewing request.
+  // ── Buyer portal — a saved search's shareable matches page + favourites + viewing request.
   async function loadRequirement(token: string): Promise<any> {
     if (!token) throw new HttpError(400, 'token is required');
     const { data } = await supabase.from('property_buyer_requirements')
@@ -199,13 +197,12 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     }
     if (!workspaceId) return json({ error: 'workspace_id or user_id is required' }, 400);
 
-    // SECURITY (audit #294/#303): workspace_id/user_id arrive in the BODY, and everything below
+    // SECURITY: workspace_id/user_id arrive in the BODY, and everything below
     // writes with the service-role client — a crm_contacts row plus a crm_contact_created flow
     // event to that workspace's owners/admins. Without this gate any unauthenticated caller who
     // knew (or enumerated) a workspace uuid could inject attacker-controlled contacts into a
     // stranger's CRM and push a bell + email to their owners: a spam/phishing channel into
     // another tenant, no account required.
-    //
     // The rest of this function derives everything from an opaque token; this action cannot,
     // because the valuation widget is rendered before any listing is chosen. So instead we require
     // the target workspace to actually BE a public agency — it must expose at least one public
@@ -251,7 +248,6 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     }
 
     // Capture the seller lead (crm_contact + real-estate extension). property_id/workspace are server-set.
-    //
     // The error MUST be checked (audit #303 finding 6). This used to destructure only `data`, so a
     // failed insert left `contact` null, skipped the property_contacts_ext upsert AND the
     // crm_contact_created event, and still returned 200 with the estimate — while

@@ -37,7 +37,6 @@ const QUOTED_RE = /'([a-z][a-z0-9_]+)'/g;
 // from the ToolkitPickerModal. Each one is a missing ToolkitDefinition in
 // agentToolsCatalog.ts, NOT a missing tool. SHRINK by adding the picker entry;
 // never grow (a newly-orphaned cluster should fail the build). See #266.
-//
 // Emptied 2026-07-16: flows-toolkit / knowledge-graph / social / tech-radar were
 // all given picker entries. Keep at zero.
 const KNOWN_PICKERLESS_CLUSTERS = new Set<string>([]);
@@ -78,7 +77,7 @@ const KNOWN_UNCLUSTERED = new Set([
   // send_purchase_order, source_product), trip-expenses (add_trip_expense, create_trip_card,
   // list_trip_cards, submit_trip_card), expenses (record_expense, list_recent_expenses),
   // real-estate (manage_real_estate), docs (search_workspace_docs).
-  // ─── Cleared 2026-07-16 (#266) ───────────────────────────────────────
+  // ─── Cleared 2026-07-16 ───────────────────────────────────────
   // 18 entries were removed here, not by 18 separate judgement calls but by
   // adding the 4 ToolkitDefinitions the SERVER already defined + the 2 tools
   // the picker's projects cluster omitted:
@@ -121,7 +120,6 @@ function clusteredTools(): Set<string> {
 // comment even says "mirrored from agentToolsCatalog.ts". Only the frontend copy
 // drives the picker; only the server copy drives what load_toolkit binds. They
 // are held together by nothing, so we diff them here.
-//
 // Both are parsed by brace-matching the value AFTER the `=` — anchoring on the
 // first `{` instead grabs the TYPE annotation (`Record<string, { ... }>`) and
 // silently yields zero clusters, i.e. a green build that checks nothing.

@@ -1,5 +1,5 @@
 /**
- * #227 — Layer B custom pricing rules. Applied at quote-time on top of the level discount
+ * Layer B custom pricing rules. Applied at quote-time on top of the level discount
  * (multiplicative). v1 ships the two rule types with full line context:
  *   • volume_category — ≥ N units of a category → % off
  *   • category_extra  — a blanket extra % off a category, any customer

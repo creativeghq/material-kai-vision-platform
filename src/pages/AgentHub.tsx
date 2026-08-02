@@ -15,12 +15,12 @@ const AgentHubPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   // `q` is honored as an alias of `prompt` — ~8 handoff call sites across the app
   // (dashboard hero, SEO dashboard, catalogs, Pinterest import, …) navigate with
-  // `?q=…`, which was silently dropped before. Rail #1 of the Capability Fabric (#275):
+  // `?q=…`, which was silently dropped before. Rail #1 of the Capability Fabric:
   // every page→agent handoff carries its seed text reliably.
   const initialPrompt = searchParams.get('prompt') ?? searchParams.get('q') ?? undefined;
   const initialConversationId = searchParams.get('conversation') ?? undefined;
   const initialMoodboardId = searchParams.get('moodboard') ?? undefined;
-  // Capability Fabric (#275) rail: `?capability=<id>` resolves the owning agent + a toolkit
+  // Capability Fabric rail: `?capability=<id>` resolves the owning agent + a toolkit
   // quick-start from the shared registry, so every capability has ONE uniform handoff into the
   // agent instead of each call site hand-rolling ?agent=/?quickstart=. Explicit params still win.
   const capabilityParam = searchParams.get('capability') ?? undefined;

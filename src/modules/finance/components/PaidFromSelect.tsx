@@ -1,14 +1,11 @@
 // The single "where did the money move" picker used by every finance dialog.
-//
 // ONE control: the account. Accounts are grouped by what they ARE (Banks / Cash / Cards /
 // Online / Other) and each shows its live running balance, so you pick knowing what's in it.
-//
 // There is deliberately NO method select. The account already answers it — a cash account IS
 // cash, a card account IS card, a bank account books as a transfer — and asking again produced
 // a second control that could contradict the first. `method` is still reported to the caller
 // (payments.method is constrained), derived from the account's kind. Manage the accounts, and
 // the method follows.
-//
 // There is also no "unassigned" option: money that moved, moved somewhere.
 import React, { useEffect, useMemo } from 'react';
 import { Label } from '@/components/core/ui/label';

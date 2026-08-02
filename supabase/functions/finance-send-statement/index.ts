@@ -20,13 +20,11 @@ import { getStripe } from '../_shared/stripe-clients.ts';
 
 // Sales/Finance — render and email a party (customer or supplier) running ledger
 // statement (Καρτέλα) PDF.
-//
 // The PDF is a full account ledger for a date range: header (issuer + recipient
 // identity, period, currency), an opening-balance carry-forward line (Προηγούμενα
 // Σύνολα), one row per transaction with debit/credit + progressive (running)
 // debit/credit totals + running balance, and a totals/closing-balance footer.
 // Mailed via the platform email-api edge function.
-//
 // Two modes:
 //   • Single (default): { party_type, party_id, email?, dry_run?, side?, from?, to?, lang? }
 //     — user/role auth, scoped to the party's workspace.
@@ -540,7 +538,7 @@ async function sendOneStatement(
 
   const subject = settings.statement_email_subject ?? 'Your account statement';
   const bodyText = settings.statement_email_body ?? `Please find your account statement attached. Closing balance: ${fmtMoney(closing, ledger.currency, opts.lang)}.`;
-  // Pentest #250 J2: escape party name + the tenant-configured statement body before
+  // Escape party name + the tenant-configured statement body before
   // interpolating into HTML (escape first, THEN turn newlines into <br>).
   const esc = escapeHtml; // shared canonical escaper (was an identical local copy)
   // Logo header (public URL — generation-images bucket is public-read).

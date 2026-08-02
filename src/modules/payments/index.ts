@@ -31,7 +31,6 @@ const definition: ModuleDefinition = {
   // The Module Settings page auto-mounts a Keys tab (SecretsManagerCard for
   // any secret linked to this module via platform_secret_module_links — Stripe
   // keys appear here as informational; the primary location is payments-stripe).
-  //
   // Business — legal entity printed on invoices + used as Stripe statement
   //   descriptor source. Single source of truth on finance_settings.
   // Providers — lists every enabled module with provides.payments=true.

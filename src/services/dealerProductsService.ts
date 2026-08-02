@@ -1,5 +1,5 @@
 /**
- * #174 — dealer/supplier "Add Product".
+ * dealer/supplier "Add Product".
  *
  * Creates a product in the dealer's workspace through the SAME MIVAA ingest core as
  * catalog/XML (facet canonicalization → Voyage text embedding → full image suite). The

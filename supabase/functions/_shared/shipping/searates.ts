@@ -1,11 +1,9 @@
 // deno-lint-ignore-file no-explicit-any
 // SeaRates (DP World) freight-rate adapter — "Get Quote" for inbound shipping.
-//
 // How SeaRates works: it AGGREGATES freight rates from 100+ forwarders/carriers across 190+ countries
 // (ocean FCL/LCL/Bulk, land FTL/LTL, air) and returns multiple competing offers with price + transit
 // time. Auth is a Bearer token obtained from the SeaRates platform-token endpoint using the account's
 // id + api_key.
-//
 // ⚠️ VERIFY BEFORE ACTIVATION: SeaRates' exact rates request/response schema (and whether the live
 // endpoint is REST or GraphQL on your plan) needs confirmation against your SeaRates account docs /
 // manager. Everything here is best-effort + defensive + endpoint-overridable, so it's a one-file fix.

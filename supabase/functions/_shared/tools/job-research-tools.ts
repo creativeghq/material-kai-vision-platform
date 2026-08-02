@@ -397,15 +397,12 @@ export const createFindJobsTool = (
 
 // ───────────────────────────────────────────────────────────────────────────
 // 5) manage_job_sites — admin tool to curate the platform-wide job-board list
-//
 // Three site types:
 //   - perplexity_domain     → Sonar search_domain_filter (cap 10)
 //   - rss_feed_default      → suggested RSS feeds for new tracked_jobs
 //   - careers_page_default  → suggested career pages for new tracked_jobs
-//
 // Lives in the 'Job Sources' KB category (access_level='agent' — agent reads
 // it, public KB hides it). Writes are admin-gated via RLS at the DB level.
-//
 // When the user asks generically ("add a job site" with no fields), the tool
 // emits a `job_sites_form_open` chunk so AgentHub can render a modal. When
 // they give specifics ("add kariera.gr to the perplexity filter"), the tool

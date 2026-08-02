@@ -1,7 +1,5 @@
 // Unified Stripe API (admin/customer-facing actions).
-//
 // Body: { action: 'checkout' | 'customer_portal', ...params }
-//
 // stripe-webhooks stays separate — it's the public webhook receiver registered
 // in the Stripe dashboard; that URL must not change.
 // crm-stripe-api is reachable through crm-api as { resource: 'stripe' }.

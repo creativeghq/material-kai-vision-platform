@@ -1,5 +1,5 @@
 /**
- * ActionConfirmationCard — human-in-the-loop gate for sensitive agent actions (#275).
+ * ActionConfirmationCard — human-in-the-loop gate for sensitive agent actions.
  *
  * A sensitive tool (issue invoice, send WhatsApp/campaign, contract e-sign) previews instead of
  * mutating and emits an `action_confirmation` chunk. AgentHub renders this card inline. Approve

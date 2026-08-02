@@ -1,7 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 // Stock Management module API. Promotes the warehouse/inventory feature (previously a Finance tab)
-// into a first-class PAID ADD-ON, mirroring hr-api (#252).
-//
+// into a first-class PAID ADD-ON, mirroring hr-api.
 // SECURITY (pen-test #250 baseline):
 //  • authenticate() yields the caller's user id; the gate chain runs on a SERVICE-ROLE client so it
 //    can't be spoofed by RLS: userCanAccessWorkspace() (no body-trust tenancy bind, 404 on mismatch),
@@ -33,7 +32,7 @@ const DIRECTIONS = ['in', 'out', 'adjust'];
 // rejects the WHOLE statement on one unknown column, `create-item` failed 100% of the time
 // and `update-item` failed for any client that sent one of them. Fiscal identity belongs on
 // the PRODUCT (see warehouseService.updateProductFiscal), not on the stock row — the two
-// were conflated here. (audit #298 / #307)
+// were conflated here.
 const ITEM_WRITABLE = [
   'name', 'sku', 'unit', 'reorder_point', 'location', 'serial_number',
   'width_mm', 'length_mm', 'thickness_mm', 'weight_kg',

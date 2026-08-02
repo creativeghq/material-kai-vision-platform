@@ -1,5 +1,4 @@
 // Unified Pinterest API.
-//
 // Inner action determines which handler runs:
 //   - Import-side actions:  extract_pin, import_pin, import_pins_bulk
 //   - OAuth-side actions:   get_auth_url, callback, get_boards, get_board_pins, disconnect

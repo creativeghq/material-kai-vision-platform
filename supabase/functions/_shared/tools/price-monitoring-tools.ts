@@ -48,7 +48,7 @@ async function getProductRow(productId: string) {
     .from('products')
     // `products.manufacturer` does not exist (brand is the `brand_company_id` FK) and was
     // never read from this result — but it made PostgREST reject the whole select, so the
-    // tool reported every product as missing. (audit #298)
+    // tool reported every product as missing.
     .select('id, name')
     .eq('id', productId)
     .maybeSingle();

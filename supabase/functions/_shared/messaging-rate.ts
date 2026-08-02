@@ -6,7 +6,7 @@
  * instead — `setTimeout(res, 100)` in messaging-processor (600/min) and `setTimeout(res, 50)`
  * in messaging-api's send-bulk (1200/min). An admin who lowered the rate to 10/min after a
  * Meta throttling warning changed nothing at all. Its sibling on the same row,
- * `daily_quota`, IS enforced — which is what made the gap easy to miss. (audit #306)
+ * `daily_quota`, IS enforced — which is what made the gap easy to miss.
  *
  * One derivation, used by both loops, so they cannot drift apart again.
  */

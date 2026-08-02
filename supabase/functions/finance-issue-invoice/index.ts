@@ -9,7 +9,6 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 // Sales/Finance — issue an invoice from an accepted quote.
-//
 // Flow:
 //   1. Call `issue_invoice_from_quote(quote_id)` RPC. Creates a draft invoice + items
 //      with cost_snapshot copied from quote_items. Idempotent — returns existing invoice
@@ -17,7 +16,6 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 //   2. If body.issue_now=true, flip status draft → issued (stamps issued_at + due_at).
 //   3. If body.submit_fiscal=true, transmit to the workspace's legal_invoice connector
 //      (Novus → myDATA).
-//
 // Auth: admin / super_admin / owner / finance.
 
 interface RequestBody {
@@ -294,7 +292,7 @@ async function emitDocumentIssued(supabase: any, invoiceId: string): Promise<voi
 }
 
 /**
- * #202 — is this user a FINANCE MANAGER (not just an allowed-in accountant) for the
+ * Is this user a FINANCE MANAGER (not just an allowed-in accountant) for the
  * workspace that owns this quote? Managers = workspace owner/admin OR a global
  * admin/super_admin/finance role. Runs under service role (auth.uid() is null), so we
  * resolve membership + global role by the authenticated user id directly.
@@ -324,7 +322,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
     const auth = await authenticate(req, {
       requireUser: true,
       // 'accountant' is allowed in so they can SUBMIT/transmit existing documents to myDATA
-      // (#202). The privileged CREATE path (issue a new invoice from a quote) is guarded
+      // . The privileged CREATE path (issue a new invoice from a quote) is guarded
       // separately below to managers only — an accountant can transmit + pay, never create.
       allowedRoles: ['admin', 'super_admin', 'owner', 'finance', 'accountant'],
     });
@@ -693,7 +691,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         .eq('id', invoiceId)
         .single();
 
-      // Monetization gate (#181/#212): the workspace must own the Finance (sales-finance) module.
+      // Monetization gate: the workspace must own the Finance (sales-finance) module.
       const { data: entitled } = await supabase.rpc('is_workspace_entitled', {
         p_workspace_id: invRow!.workspace_id,
         p_module_slug: 'sales-finance',

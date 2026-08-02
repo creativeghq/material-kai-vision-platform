@@ -100,7 +100,7 @@ async function resolveLine(
     unpriced = p.unpriced === true;
   }
 
-  // #237 Phase 4: a catalog product the resolver can't price becomes a "call for price"
+  // A catalog product the resolver can't price becomes a "call for price"
   // line (NULL price, excluded from totals, RFQ-able) rather than a hard error.
   const callForPrice = item.product_id != null && (unitPrice == null || Number.isNaN(unitPrice)) && (unpriced || item.unit_price == null);
 

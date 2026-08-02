@@ -121,7 +121,7 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
 
       // Where Zernio sends the browser after OAuth completes. Default to the app's
       // profile page; the frontend passes its own URL so it can process the callback.
-      // #250 C30: a caller-supplied redirect_url is an open-redirect/phishing vector —
+      // A caller-supplied redirect_url is an open-redirect/phishing vector —
       // require it to be same-origin as the app before forwarding it to Zernio.
       let appRedirect = `${publicAppUrl()}/profile`;
       if (redirect_url) {

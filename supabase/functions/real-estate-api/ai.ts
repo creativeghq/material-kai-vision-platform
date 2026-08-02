@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #249 P2 — Real Estate AI: listing-copy generation, credit-metered. Mirrors hr-api/ai-meter:
+// Real Estate AI: listing-copy generation, credit-metered. Mirrors hr-api/ai-meter:
 // reserve a credit ceiling BEFORE the Claude call (invariant #10), settle the difference after,
 // and log to ai_usage_logs (module_slug='real-estate') so the op shows on the Operations dashboard.
 import { HttpError } from '../_shared/api-logger.ts';

@@ -12,7 +12,7 @@ import { PropertyFormDialog, type PropertyFormValues } from './PropertyFormDialo
 import { scoreLead } from '@/modules/crm/services/leadScoring';
 import { statusTone } from '@/utils/statusTone';
 
-// #249 — real-estate panel on the CRM contact page: the person's PROPERTIES (own as many as they
+// real-estate panel on the CRM contact page: the person's PROPERTIES (own as many as they
 // like — each a real listing record), their buyer profile (budget / pre-approval) and saved
 // searches with an on-demand match against the workspace inventory.
 export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: string | null }> = ({ contactId, workspaceId: ws }) => {

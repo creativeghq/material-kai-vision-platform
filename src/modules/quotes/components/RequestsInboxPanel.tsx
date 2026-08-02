@@ -1,5 +1,5 @@
 /**
- * #177 — master-request inbox, rendered as a tab inside the Quotes page (`/quotes?tab=requests`).
+ * master-request inbox, rendered as a tab inside the Quotes page (`/quotes?tab=requests`).
  * Procurement quotes routed up from child nodes land here; the parent prices + returns them,
  * or escalates upward. Also shows the requests this workspace has sent up. Network-node only —
  * the tab that mounts this is gated on `network.manage`, and we re-check here as a safety net.

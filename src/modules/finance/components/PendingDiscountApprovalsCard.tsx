@@ -1,5 +1,5 @@
 /**
- * #227 — Finance approval inbox for customer discount/level changes proposed by the
+ * Finance approval inbox for customer discount/level changes proposed by the
  * sales team. Approve applies the change to the CRM record; reject discards it. Both
  * emit a Flows event so the requester is notified.
  */

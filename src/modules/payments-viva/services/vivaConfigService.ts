@@ -1,5 +1,5 @@
 /**
- * #273 — per-workspace Viva BYOK configuration client.
+ * per-workspace Viva BYOK configuration client.
  *
  * Asymmetric by design, and deliberately so:
  *   - WRITES go straight to `workspace_viva_config` (RLS: is_workspace_finance_manager).

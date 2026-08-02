@@ -8,7 +8,7 @@ import { PropertyCardGrid } from './PropertyCardGrid';
 const TX = ['', 'sale', 'rent', 'short_let', 'business_transfer'];
 const TYPES = ['', 'residential', 'commercial', 'land', 'other'];
 
-// #249 — cross-workspace property Discovery (Discover → Properties). Reads the same toPublic()
+// cross-workspace property Discovery (Discover → Properties). Reads the same toPublic()
 // projection the public listing page uses; only active + public + in_discovery listings surface.
 export const PropertyDiscoveryTab: React.FC = () => {
   const [filters, setFilters] = useState<DiscoverFilters>({});

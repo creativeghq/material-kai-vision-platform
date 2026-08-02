@@ -1,12 +1,10 @@
 // Safe parametric-formula evaluator for the Blueprint estimating engine.
-//
 // A blueprint/plan line may carry a `quantity_formula` like `= floor_area + wall_area`
 // or `= n_points * 1.1`. We evaluate it against the plan's named dimensions
 // ({floor_area: 6, wall_area: 24, ...}). NO arbitrary JS — only numbers, the named
 // dimensions, parentheses, the operators + - * / and a small whitelist of functions
 // (min, max, ceil, floor, round, abs, sqrt). Anything else, or a missing variable,
 // fails closed to `ok:false` and the caller falls back to a stored default.
-//
 // This file is the single source of the math. The Vite frontend keeps a byte-identical
 // mirror at src/utils/blueprintFormula.ts for optimistic preview; the edge function
 // (project-plan-engine) is the authoritative writer of persisted prices.

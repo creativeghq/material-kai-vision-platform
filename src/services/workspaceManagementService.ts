@@ -77,7 +77,7 @@ export const workspaceManagementService = {
     return data as any;
   },
 
-  /** Owner/admin mints a role-carrying invite (#201/#202); returns the code.
+  /** Owner/admin mints a role-carrying invite; returns the code.
    *  Passing `email` binds the invite to that address — redeem_workspace_invite then refuses a
    *  forwarded link claimed by anyone else, and the address is what the invite email goes to. */
   async createInvite(
@@ -188,7 +188,7 @@ export const workspaceManagementService = {
     return data as any;
   },
 
-  /** Operator/ancestor grants or revokes a module entitlement for a workspace (#181). */
+  /** Operator/ancestor grants or revokes a module entitlement for a workspace. */
   async setEntitlement(workspaceId: string, moduleSlug: string, enabled: boolean): Promise<void> {
     const { error } = await supabase.rpc('set_workspace_entitlement', {
       p_workspace_id: workspaceId, p_module_slug: moduleSlug, p_enabled: enabled,

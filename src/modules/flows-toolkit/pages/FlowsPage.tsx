@@ -1,5 +1,5 @@
 /**
- * Automations — the workspace-owner surface for the Flows toolkit (#256).
+ * Automations — the workspace-owner surface for the Flows toolkit.
  *
  * Two views: a LIST of the workspace's own automations, and the VISUAL BUILDER (the same
  * xyflow builder the admin uses, in `tenantMode` so the palette is trimmed to the safe subset).

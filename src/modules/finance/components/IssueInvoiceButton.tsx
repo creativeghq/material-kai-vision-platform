@@ -3,7 +3,6 @@
 // an ERP module winning the invoice-provider lookup — see
 // useInvoiceProvider). When an ERP wins, this button hides for new quotes,
 // since the ERP module's own button takes over.
-//
 // Calls the finance-issue-invoice edge function (which creates the invoice row
 // + items via the issue_invoice_from_quote RPC) and then navigates to the
 // invoice detail page.

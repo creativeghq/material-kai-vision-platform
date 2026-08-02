@@ -44,7 +44,7 @@ const SLOT_TO_CONFIG_KEY: Record<TemplateSlot, keyof PDFTemplateConfig> = {
  * This used to write `finance_settings.quote_template_*_path` — a second, parallel vault
  * that NOTHING reads (`grep quote_template supabase/functions/` → zero hits). Templates
  * uploaded here therefore never appeared on a quote, and the natural response is to upload
- * them again and blame the renderer. One store, one writer. (audit #298)
+ * them again and blame the renderer. One store, one writer.
  */
 const SLOT_TO_TEMPLATE_COL: Record<TemplateSlot, string> = {
   cover: 'cover_path',

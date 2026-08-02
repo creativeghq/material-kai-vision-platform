@@ -74,7 +74,7 @@ type PayMethod = 'cash' | 'card' | 'iris';
  * the card code, while the terminal call correctly used `method === 'iris' ? 8 : 7`. The
  * wrong one was the one persisted on the fiscal document, so **every IRIS receipt was
  * declared to AADE as a card payment**, and the Z-report payment-method breakdown was wrong
- * for that channel. (audit #307)
+ * for that channel.
  *
  *   3 = cash · 7 = card / e-POS · 8 = IRIS
  */
@@ -216,7 +216,7 @@ const PosPage: React.FC = () => {
    * arithmetic. Every rate in the basket was taxed at whatever `vatRate` the keypad happened
    * to be showing at the end. So ringing up a 24% item and then switching to 6% printed
    * "24%" beside line 1 while the ΑΝΑΛΥΣΗ ΦΠΑ block below declared the whole sale at 6% —
-   * wrong VAT remitted, on a document that contradicts itself in print. (audit #307)
+   * wrong VAT remitted, on a document that contradicts itself in print.
    *
    * `byRate` also gives the receipt a real per-rate VAT analysis, which is what a mixed-rate
    * Greek retail receipt is required to show.
@@ -401,12 +401,12 @@ const PosPage: React.FC = () => {
           customer_company_id: customer?.type === 'company' ? customer.id : null,
           customer_contact_id: customer?.type === 'contact' ? customer.id : null,
           // ONE derivation — see AADE_PAYMENT_CODE. Was `method === 'cash' ? 3 : 7`, which
-          // declared every IRIS receipt to AADE as a card payment. (audit #307)
+          // declared every IRIS receipt to AADE as a card payment.
           payment_method_code: AADE_PAYMENT_CODE[method],
           currency,
           subtotal_net: totals.net,
           // Dominant rate by net — a mixed basket has no single truthful rate, and this
-          // column is NOT NULL. Per-rate truth is on invoice_items. (audit #307)
+          // column is NOT NULL. Per-rate truth is on invoice_items.
           vat_rate: totals.dominantRate,
           vat_amount: totals.vat,
           total: totals.total,
@@ -423,7 +423,7 @@ const PosPage: React.FC = () => {
       const itemsPayload = cart.map((l) => {
         // Net is extracted at the LINE's own rate, not the register's current one — see the
         // note on `totals`. Also persists net_value and vat_amount, which exist on
-        // invoice_items and were previously left null by this page. (audit #307)
+        // invoice_items and were previously left null by this page.
         const lineRate = Number.isFinite(l.line_vat) ? l.line_vat : vatRate;
         const unitNet = vatInclusive ? round2(extractNet(l.unit_price, lineRate)) : l.unit_price;
         const lineNet = round2(unitNet * l.qty);
@@ -449,7 +449,7 @@ const PosPage: React.FC = () => {
         number: num?.formatted as string, total: totals.total, currency,
         net: totals.net, vat: totals.vat, vatRate, docType, customerName: customer?.name ?? null,
         // Per-rate buckets so the receipt can print a real ΑΝΑΛΥΣΗ ΦΠΑ for a mixed basket
-        // instead of one row at whatever rate the keypad last showed. (audit #307)
+        // instead of one row at whatever rate the keypad last showed.
         vatBreakdown: totals.byRate,
         lines: cart.map((l) => ({ name: l.name, qty: l.qty, unit_price: l.unit_price, line_vat: l.line_vat })),
       };
@@ -505,7 +505,7 @@ const PosPage: React.FC = () => {
     if (!activeWorkspaceId) return;
     // Whether the two side-effects that MUST happen actually did. A receipt handed to a
     // customer while either of these silently failed is worse than a visible error, because
-    // nothing downstream ever reports the gap. (audit #307)
+    // nothing downstream ever reports the gap.
     let paymentRecorded = true;
     let paymentError: string | null = null;
     let stockMoved = true;
@@ -519,7 +519,7 @@ const PosPage: React.FC = () => {
       await financeService.recordPayment({
         workspaceId: activeWorkspaceId, direction: 'in', amount: snapshot.total, currency: snapshot.currency,
         // IRIS is its own method — recording it as 'card' made the ledger disagree with the
-        // fiscal document and skewed the Z-report breakdown. (audit #307)
+        // fiscal document and skewed the Z-report breakdown.
         method: LEDGER_METHOD[paidMethod],
         bankAccountId: acct?.bank_account_id ?? null,
         allocations: [{ target_id: invoiceId, target_type: 'invoice', amount: snapshot.total }],
@@ -529,7 +529,7 @@ const PosPage: React.FC = () => {
       // it meant the customer walked out with a printed, myDATA-marked receipt while the
       // invoice stayed amount_due = total forever — and the cashier's Z report reconciled
       // expected cash against a `payments` row that does not exist, so the variance was
-      // wrong every time and nothing said so. (audit #307)
+      // wrong every time and nothing said so.
       paymentRecorded = false;
       paymentError = e instanceof Error ? e.message : String(e);
       console.error('[pos] recordPayment failed', e);
@@ -547,7 +547,7 @@ const PosPage: React.FC = () => {
     // compensate: it runs only on status='draft' invoices and this page inserts 'issued'
     // directly, and invoices.move_stock defaults false and is never set here. Swallowing a
     // failure left stock on hand high after the goods physically left the shop, which then
-    // feeds reorder points, the low-stock KPI and forecast_demand. (audit #307)
+    // feeds reorder points, the low-stock KPI and forecast_demand.
     try {
       const { error: orderErr } = await supabase.rpc('generate_order_from_invoice', { p_invoice_id: invoiceId, p_mark_delivered: true });
       if (orderErr) throw new Error(orderErr.message);
@@ -1097,7 +1097,7 @@ const PosPage: React.FC = () => {
             {/* One row PER RATE. A mixed-rate basket previously printed a single row at
                 whatever rate the keypad last showed, contradicting the per-line VAT% printed
                 above it. Falls back to the single-rate row for receipts issued before this
-                change, whose snapshot has no breakdown. (audit #307) */}
+                change, whose snapshot has no breakdown. */}
             {(result.vatBreakdown?.length
               ? result.vatBreakdown
               : [{ rate: result.vatRate, net: result.net, vat: result.vat, gross: result.total }]

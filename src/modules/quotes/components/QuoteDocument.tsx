@@ -358,7 +358,7 @@ const ItemsPage: React.FC<{
 };
 
 const TotalsBlock: React.FC<{ data: QuoteDocumentData }> = ({ data }) => {
-  // #227 — universal 5-line breakdown (Price / Discount / Price after Discount / VAT / Final).
+  // Universal 5-line breakdown (Price / Discount / Price after Discount / VAT / Final).
   const rows = totalsRows(computeTotalsBreakdown({
     subtotal: data.subtotal, cashDiscountPct: data.cash_discount_pct,
     vatAmount: data.vat_amount, vatRate: data.vat_rate, grandTotal: data.grand_total,

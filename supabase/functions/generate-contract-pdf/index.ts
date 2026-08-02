@@ -1,6 +1,5 @@
 // generate-contract-pdf — renders a contract (title + terms + signature block) to a PDF and returns a
 // signed URL. Closes the "a signed contract exists only as DB rows, nothing to download" gap.
-//
 // Auth: session JWT; the caller must be a member of the contract's workspace (userCanAccessWorkspace).
 // The PDF is stored (overwritten) at pdf-documents/contract-output/{contract_id}.pdf (private bucket) and
 // returned as a 7-day signed URL. Regenerated on demand — no stale persisted URL (invariant #8).

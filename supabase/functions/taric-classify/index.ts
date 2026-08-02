@@ -1,9 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
-//
 // Proposes an EU TARIC commodity code for a catalog product.
-//
 // Three stages, cheapest first, and only the last one costs money:
-//
 //   A. The supplier already told us. Import XML, supplier PDFs and price lists routinely carry
 //      an HS/CN/TARIC field. A code the supplier declared is the normal basis for a customs
 //      declaration and is far more trustworthy than any inference, so a valid one is applied
@@ -13,7 +10,6 @@
 //      ~30 real codes instead of trying to recall 20,000 from memory.
 //   C. Claude picks one, through a forced tool call so the verdict is schema-shaped rather than
 //      parsed out of prose.
-//
 // Stage C NEVER writes `products.taric_code`. It writes `taric_code_suggested` + a confidence
 // and leaves `taric_status='suggested'` for a human to confirm. A misclassification is a
 // customs liability that surfaces months later at a border, not a bad label in a UI — the one
@@ -222,7 +218,6 @@ async function classifyOne(
   }
 
   // ── Stage B: the RULES. Category (+ material) -> heading, attribute -> declarable code ──
-  //
   // This is the axis that actually determines a tariff position. A tile is 6907 because it is a
   // ceramic tile, and 6907 21 because its water absorption is ≤ 0,5 % — neither fact is in
   // "AMALFI GRIS 80X80". Resolving from the category means one human decision is inherited by
@@ -287,7 +282,6 @@ async function classifyOne(
   }
 
   // ── Stage C: shortlist, NARROWED by whatever the rules did establish ────────────────────
-  //
   // Even when the rules cannot reach a declarable code they usually reach the heading, and that
   // is the single most valuable thing to hand the model: picking among the children of 6907 is a
   // different problem from picking among 22,000 codes. Falling back to a name search happens

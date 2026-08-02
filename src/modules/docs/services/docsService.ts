@@ -1,4 +1,4 @@
-// Docs module (#254) — client for workspace_docs. All calls are RLS-gated: any member reads;
+// Docs module — client for workspace_docs. All calls are RLS-gated: any member reads;
 // the doc creator or workspace owner edits/deletes (members otherwise propose — follow-up).
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';

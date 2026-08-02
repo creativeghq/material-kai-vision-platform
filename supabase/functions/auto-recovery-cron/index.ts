@@ -35,7 +35,7 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Pentest #250 C2: this cron drives privileged RPCs (fail_exhausted_pdf_jobs,
+  // This cron drives privileged RPCs (fail_exhausted_pdf_jobs,
   // detect_stuck_pdf_jobs) + re-dispatches jobs under the service-role key. It was
   // reachable with zero auth. Gate on the same service-role / x-cron-secret check
   // every sibling cron uses (fails closed).

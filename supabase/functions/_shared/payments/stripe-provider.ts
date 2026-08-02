@@ -1,5 +1,5 @@
 /**
- * #273 — Stripe as a `PaymentProvider`.
+ * Stripe as a `PaymentProvider`.
  *
  * Wraps the Checkout-session logic that `finance-pay-invoice` has always used, with no
  * behaviour change: the PLATFORM's Stripe key creates the session and the tenant is paid

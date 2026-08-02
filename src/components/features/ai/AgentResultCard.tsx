@@ -8,7 +8,7 @@ import { RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, buildPageUrl, capabilityHubL
  * job-research, misc). One card, consistent layout, handles arbitrary JSON
  * payloads so all 19 chunk types become visible without 19 bespoke cards.
  *
- * #275 rail-3 — when the result maps to a page-backed capability, it also
+ * When the result maps to a page-backed capability, it also
  * renders a reverse "Open in {Hub}" handoff (deep-links to the record when the
  * payload carries its id), so any capability tool's card can jump to its page.
  */

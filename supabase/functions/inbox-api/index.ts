@@ -1,15 +1,12 @@
 // inbox-api — Issue #209 Multi-Tenant Inbox (P1: schema + directional ACL + channel send-router).
-//
 // One action-discriminated edge function (merge rule). Two auth branches in one function
 // (precedent: moodboard-sheet-share resolves both a JWT and a token path):
 //   • JWT actions  — authenticated member/operator/customer-account flows.
 //   • Token actions — service-role, unauthenticated; a tokenized customer with scoped
 //                     read/reply to ONE thread, plus the token_claim conversion handshake.
-//
 // All directional ACL walls (operator↔everyone, dealer↔customer, sales jump-in, etc.) are
 // enforced HERE at thread-create / participant-add time — never at read time. RLS on the
 // tables only gates direct client reads/realtime to "active participant OR platform operator".
-//
 // Channel send-router: an `internal` thread stores only; a `whatsapp` thread stores AND
 // relays via Zernio (Meta 24h service window applies — freeform in-window).
 
@@ -711,7 +708,6 @@ async function insertMessageAndNotify(
     .eq('id', threadId);
 
   // Channel relay (notes never leave the inbox). Member replies + agent replies both relay.
-  //
   // The guard used to end in `&& body`, so an ATTACHMENT-ONLY message skipped the relay
   // entirely — even though the caller explicitly permits `body === null` when attachments
   // exist. Combined with the hardcoded `attachmentUrl: undefined`, an operator could attach a
@@ -794,7 +790,7 @@ async function insertMessageAndNotify(
     for (const p of (parts || []) as Array<{ user_id: string; participant_type: string }>) {
       if (p.user_id === opts.senderUserId) continue;
       if (messageType === 'note' && p.participant_type !== 'member') continue;
-      // Resolve the recipient's email so the general inbox flow can email + bell (#224).
+      // Resolve the recipient's email so the general inbox flow can email + bell.
       let email: string | undefined;
       try { const { data: u } = await db.auth.admin.getUserById(p.user_id); email = u?.user?.email ?? undefined; }
       catch { /* email is optional; the bell still fires */ }
@@ -807,7 +803,7 @@ async function insertMessageAndNotify(
         body: preview,
         action_url: `/inbox?thread=${threadId}`,
         thread_id: threadId,
-        // #256 — carry the thread's workspace so tenant flows can scope to it.
+        // Carry the thread's workspace so tenant flows can scope to it.
         workspace_id: (thread as { workspace_id?: string }).workspace_id,
       }).catch(() => {});
     }
@@ -1343,7 +1339,7 @@ async function handleJwtAction(
         qty_wanted: qtyWanted,
         message: customMsg || null,
         status: 'open',
-        // #247 A5p2 — carry the sourcing demand so accept can materialize an allocation
+        // Carry the sourcing demand so accept can materialize an allocation
         demand_type: (payload.demand_type === 'order_item' || payload.demand_type === 'quote_item') ? payload.demand_type : null,
         demand_id: payload.demand_id ? String(payload.demand_id) : null,
       }).select('id').single();
@@ -1398,7 +1394,7 @@ async function handleJwtAction(
     }
 
     case 'accept_marketplace_inquiry': {
-      // #247 A5p2 — SELLER accepts a surplus inquiry → materialize a DRAFT purchase
+      // SELLER accepts a surplus inquiry → materialize a DRAFT purchase
       // order (+ an on_order allocation, if the inquiry carried a sourcing demand) in
       // the BUYER's workspace. Cross-tenant write under the service role; the caller
       // must be a business member of the SELLER's (listing's) workspace.
@@ -1932,7 +1928,6 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
     case 'token_claim': {
       // Conversion handshake: a freshly-signed-up user adopts the token's thread and becomes a
       // `client` member of the dealer's workspace.
-      //
       // ONE RPC, ONE transaction. This used to be four separate writes — crm_contacts link,
       // inbox_participants, workspace_members, token claim — with NONE of their errors checked,
       // returning { ok: true } regardless. A partial conversion is the damaging case: the
@@ -2075,7 +2070,7 @@ async function handler(req: Request): Promise<Response> {
     return json({ ok: true });
   }
 
-  // Pentest #250 C17: token_claim is the POST-signup conversion handshake — it enrolls a
+  // token_claim is the POST-signup conversion handshake — it enrolls a
   // user into the dealer workspace and links their account to the CRM contact. It must be
   // AUTHENTICATED and adopt the caller's OWN id; previously it took user_id from the body
   // on the unauthenticated token path, letting anyone with the invite token force-enroll an

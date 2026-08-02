@@ -684,7 +684,6 @@ let modelOpus: any;
 // Two-tier router: route simple queries to Haiku (~15× cheaper than Opus),
 // reserve Opus for complex reasoning. Heuristic gate — no extra LLM call,
 // no added latency. Errs toward Opus when uncertain (recall over precision).
-//
 // Routes to Haiku when ALL of:
 //   - last user message ≤ 80 chars
 //   - no images attached on this turn
@@ -808,7 +807,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       // Core tools (all users)
       'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url',
-      // Docs module (#254) — internal workspace docs FTS. Currently a free tool for all workspaces
+      // Docs module — internal workspace docs FTS. Currently a free tool for all workspaces
       // (the push site has NO entitlement gate); the docs UI is entitlement-gated but the agent tool
       // is not. If Docs becomes a paid/gated module, add an is_workspace_entitled('docs') check at
       // the push site. Tenancy is safe either way: workspaceId is server-derived + the FTS is scoped.
@@ -975,7 +974,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     ],
     // systemPrompt loaded from the database (prompts.category = 'property-advisor')
   },
-  // ── Agent Fabric specialists (#132) — curated views over the proven tool
+  // ── Agent Fabric specialists — curated views over the proven tool
   // catalog, each with its own persona (prompts.category = slug). JARVIS
   // (orchestrator) routes to these; users can also pick them directly. Every
   // tool id below already exists on the generalist, so binding is regression-safe.
@@ -1163,20 +1162,16 @@ async function executeAgent(
   }
 
   // ─── Per-turn tool gating ────────────────────────────────────────────────
-  //
   // The frontend sends `selected_toolkits` — the user's currently-active
   // toolkit IDs from the visual ToolkitPickerModal (always includes the Core
   // toolkit). We resolve those to a set of tool IDs server-side using the
   // SERVER_TOOLKITS map below (mirrored from agentToolsCatalog.ts).
-  //
   // Default behavior (selected_toolkits empty or missing): bind only the Core
   // toolkit's tools (lean ~1.5k tokens) PLUS the `load_toolkit` meta-tool, so
   // the agent can request more capabilities mid-conversation if the user's
   // request needs them.
-  //
   // RBAC gating still applies AFTER this filter — admin-only tools won't
   // bind for viewers/members even if they're in an active toolkit.
-  //
   // The legacy per-tool restriction picker (selectedTools) was removed
   // 2026-05-09. Toolkits + load_toolkit are now the single source of truth
   // for tool-binding.
@@ -1376,7 +1371,7 @@ async function executeAgent(
   // the regular tools.
   for (const m of META_TOOLS) toolkitToolIds.add(m);
 
-  // Curated specialists (#132) bind their WHOLE toolkit by default — the point of a
+  // Curated specialists bind their WHOLE toolkit by default — the point of a
   // specialist is that its focused kit is ready without a load_toolkit hop. The
   // generalist (kai) stays lean (core + load_toolkit) to keep context small.
   const CURATED_SPECIALISTS = new Set(['erp', 'product-business', 'marketing', 'social-media', 'property-advisor']);
@@ -1800,7 +1795,7 @@ async function executeAgent(
     tools.push(createReadDocumentSectionTool(workspaceId, isAdmin, agentId));
   }
 
-  // Docs module (#254) — internal workspace docs via Postgres FTS (no embeddings). The tool is
+  // Docs module — internal workspace docs via Postgres FTS (no embeddings). The tool is
   // workspace-scoped + RLS-safe; docs is a free module available to all workspaces. For a future
   // paid/gated module, add an is_workspace_entitled check here.
   if (config.tools.includes('search_workspace_docs') && createDocsSearchTool) {
@@ -3274,7 +3269,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                 if (!streamClosed) {
                   safeEnqueue(chunk);
                 }
-                // Secondary confirmation channel (#275): mirror any staged
+                // Secondary confirmation channel: mirror any staged
                 // human-in-the-loop action into the EXISTING notification bell so a
                 // pending Approve/Decline isn't lost if the user navigates away (and so
                 // background/tool-result-triggered confirmations — invariant #9 — surface

@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — HR AI metering. Every HR AI operation (accounting OCR, reconciliation, CV screening,
+// HR AI metering. Every HR AI operation (accounting OCR, reconciliation, CV screening,
 // job-description generation) runs through here so it is:
 //   1. LOGGED to `ai_usage_logs` (module_slug='hr') → surfaces on the Operations dashboard with
 //      real model + token counts + raw/billed cost, exactly like every other platform AI op.

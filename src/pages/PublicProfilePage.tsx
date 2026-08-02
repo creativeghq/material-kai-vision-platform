@@ -178,7 +178,7 @@ function ServiceRow({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export const PublicProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
-  // #249 — live property listings for this profile's owner (agency Listings tab); shows only when the
+  // Live property listings for this profile's owner (agency Listings tab); shows only when the
   // Real Estate module is enabled AND the profile owner has published listings.
   const { enabled: realEstateEnabled } = useModule('real-estate');
   const [propertyListings, setPropertyListings] = useState<PublicListingCard[]>([]);

@@ -22,7 +22,7 @@ export async function handleCustomerPortal(req: Request, body: any): Promise<Res
       );
     }
 
-    // Subscriptions/credits live on the platform-billing account (#200); manage them there.
+    // Subscriptions/credits live on the platform-billing account; manage them there.
     const stripe = getPlatformBillingStripe();
     const supabase = getSupabase();
     if (!stripe || !supabase) return noPaymentProviderResponse(corsHeaders);

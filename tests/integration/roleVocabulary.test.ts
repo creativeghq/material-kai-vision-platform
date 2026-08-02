@@ -3,12 +3,10 @@
 // the allowlists inside `create_workspace_invite` / `set_workspace_member_role`. The unit test
 // (tests/unit/workspaceRoles.test.ts) can only see the TypeScript side, which is exactly how two
 // real bugs survived it:
-//
 //   • `sales` / `realestate_agent` / `employee` were invitable but NOT storable, so every one of
 //     those invites threw a CHECK violation at redemption. Three personas unreachable for months.
 //   • `workspace_members` accepted `finance` as a second name for `accountant` — a value absent from
 //     the catalog with no resolvePersona branch, so a member stored with it resolved to `staff`.
-//
 // Both are DB-side drift, invisible to a test that reads only TypeScript. This suite PROBES the live
 // database: it does not parse constraint text, it tries the operation and checks what happens, so it
 // fails the same way production would.

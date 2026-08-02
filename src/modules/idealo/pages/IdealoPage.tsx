@@ -319,7 +319,7 @@ const IdealoPage: React.FC = () => {
 
                 {/* overflow-x-auto, not overflow-hidden: <main> already clips, so a table
                     wider than the phone viewport would lose its right-hand columns with no
-                    scrollbar and no swipe to recover them. (audit #299) */}
+                    scrollbar and no swipe to recover them. */}
                 <div className="border border-white/10 rounded-lg overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-white/5 text-xs text-muted-foreground">

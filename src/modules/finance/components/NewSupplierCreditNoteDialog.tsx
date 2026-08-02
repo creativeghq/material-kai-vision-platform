@@ -1,5 +1,5 @@
 /**
- * #207 — record a SUPPLIER credit note (πιστωτικό προμηθευτή):
+ * Record a SUPPLIER credit note (πιστωτικό προμηθευτή):
  * full line items (product/description/qty/unit price/VAT), keyed either to a recorded
  * supplier bill (nets its payable) OR standalone to a supplier directly, with issue date,
  * category, mark-as-paid and the supplier's myDATA MARK for reconciliation. The supplier

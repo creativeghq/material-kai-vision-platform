@@ -1,11 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
-//
 // Platform-wide secret resolver.
-//
 // Priority is ALWAYS env-var first, DB fallback second:
 //   1. Deno.env.get(key) — wins if set, even when DB has a value.
 //   2. platform_secrets.value — fallback for admin-managed config.
-//
 // Env-first matters because env represents an explicit deployer choice that should never be
 // silently overridden by an admin clicking around in the UI. The DB store is for self-service:
 // it makes a key configurable without a redeploy, but env always trumps it when present.

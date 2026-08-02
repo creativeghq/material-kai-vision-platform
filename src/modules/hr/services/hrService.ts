@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 
-// #252 — client for the `hr-api` edge function. Every call passes the active workspace_id; the
+// Client for the `hr-api` edge function. Every call passes the active workspace_id; the
 // edge function re-derives access from the caller (JWT) and enforces entitlement + hr.view/hr.manage.
 
 export type EmploymentType = 'full_time' | 'part_time' | 'contractor';
@@ -302,7 +302,6 @@ async function call<T>(workspaceId: string, action: string, extra: Record<string
 // is_platform_operator()`, i.e. the IDENTICAL owner/admin-only gate resolveHrAccess enforces on the
 // edge, so a direct client read is equally safe AND runs at always-warm PostgREST speed (~100ms).
 // Writes + computed/credit-metered/external endpoints stay on `call()`.
-//
 // hr_* tables post-date the last `supabase gen types` run so they're absent from the generated
 // Database type; `sb` is a thin untyped handle for those reads. Rows are cast to the exported
 // interfaces below — the same type-safety level `call<T>()` had (neither validates at runtime).

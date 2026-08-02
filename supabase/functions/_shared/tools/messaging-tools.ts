@@ -1,5 +1,5 @@
 /**
- * Messaging Tools — agent-chat surface for WhatsApp (Zernio) messaging (#275).
+ * Messaging Tools — agent-chat surface for WhatsApp (Zernio) messaging.
  *
  * ONE tool, actions:
  *   - list_channels — the workspace's connected WhatsApp channels (senders)

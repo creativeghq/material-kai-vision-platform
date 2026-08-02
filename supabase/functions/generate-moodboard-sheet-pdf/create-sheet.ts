@@ -6,7 +6,6 @@
 //   - the SheetWizardModal (frontend) invokes it via moodboardSheetsService.
 // Previously this logic lived ONLY in the agent tool, so the client path
 // silently skipped credits + auto-extract. Now it lives here, beside the render.
-//
 // This module does NOT render the PDF. The handler renders passive types via its
 // existing render block (so there's one renderer); interactive types return for
 // the canvas. Refund-on-render-failure is handled by the handler.

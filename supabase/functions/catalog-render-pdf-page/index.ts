@@ -44,7 +44,7 @@ Deno.serve(withApiLogging('catalog-render-pdf-page', async (req) => {
     return jsonResponse({ success: false, error: 'CRON_SECRET not configured on edge function' }, 500);
   }
 
-  // Pentest #250 H9: this proxy forwards to MIVAA's internal rasterizer under the
+  // This proxy forwards to MIVAA's internal rasterizer under the
   // platform cron secret; it previously only checked that CRON_SECRET was *set*, never
   // that the CALLER presented valid auth — so anyone could rasterize any tenant's PDF
   // page and get a signed PNG URL. Its only legit callers (catalog-extract-from-pdfs /

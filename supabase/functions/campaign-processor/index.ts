@@ -3,7 +3,7 @@
  * Processes scheduled + sending EMAIL campaigns and dispatches to recipients via email-api.
  * Runs via cron every minute.
  *
- * #255 — this only handles `channel_type='email'` campaigns (WhatsApp/messaging campaigns are
+ * This only handles `channel_type='email'` campaigns (WhatsApp/messaging campaigns are
  * driven by messaging-processor). Every send is workspace-scoped and BYOK-only:
  *   • passes `workspace_id` so email-api resolves the workspace's OWN Resend key + verified sender
  *     AND enforces the platform-controlled per-workspace daily cap (checkWorkspaceSendQuota).

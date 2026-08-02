@@ -215,7 +215,6 @@ export async function resolveInboundIssuerNames(
     // throttled rather than retrying. Retrying inside a run cannot help — the budget is
     // per-minute and already spent — it just burns the function's wall clock. The backlog
     // drains across runs instead, which is what the cache exists for.
-    //
     // Measured the hard way: an unpaced backfill of 166 ΑΦΜ needed ~600 requests to resolve
     // 162 because ~75% came back throttled.
     const PACE_MS = 8000;

@@ -269,7 +269,6 @@ export async function getExternalServiceNames(supabase: DbClient): Promise<strin
 // platform credits when individual tool calls debit. Partner kai_* keys pay
 // a flat fee per turn ON TOP of the underlying tool/AI usage. This matches
 // the pattern in mention_cost_logger.MENTION_OP_CREDIT_COST.
-//
 // 10 credits = $0.10 raw equivalent (1 credit = $0.01). Adjustable per-agent.
 // Refund on hard pre-execution failure (e.g. agent crashed before producing
 // a single chunk). NO refund once the agent has started streaming — the

@@ -6,7 +6,6 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 // a quote to `accepted` with an e-signature. That makes it the highest-consequence public path in
 // the platform after payments: the token is the ONLY thing standing between a stranger and a
 // legally-meaningful state change on someone else's commercial document.
-//
 // Called with the anon key only, exactly as PublicQuotePage does.
 const suite = hasCreds ? describe : describe.skip;
 

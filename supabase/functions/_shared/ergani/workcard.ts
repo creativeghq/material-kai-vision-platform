@@ -1,7 +1,6 @@
 // Shared Work Card punch logic — records an arrival/departure punch and (when the workspace has
 // Ergani configured) files it as WRKCardSE. Extracted to _shared so BOTH the authenticated hr-api
 // (admin action + employee self-service) and the PUBLIC hr-kiosk function use one implementation.
-//
 // The punch row is ALWAYS written (works as internal attendance even before Ergani is set up):
 //   - Ergani configured + employee has VAT → filed, punch.status='submitted' + protocol.
 //   - otherwise → punch.status='pending', filed=false, `reason` explains why.

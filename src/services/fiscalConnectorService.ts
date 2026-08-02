@@ -126,7 +126,7 @@ export const fiscalConnectorService = {
   },
 
   /** Submit an existing invoice to its workspace's legal_invoice connector (Novus → myDATA).
-   *  When `posPayment` is supplied (#185), the receipt is issued as a card(7)/IRIS(8) payment on
+   *  When `posPayment` is supplied, the receipt is issued as a card(7)/IRIS(8) payment on
    *  a registered EFT-POS terminal: the connector signs it (skipSignature=false) and returns a
    *  provider signature with status 'awaiting_payment'. Charge the terminal, then completePos(). */
   async submitInvoice(
@@ -150,7 +150,7 @@ export const fiscalConnectorService = {
     return data;
   },
 
-  /** #185 — finalize a held POS/IRIS receipt after the terminal charge succeeded. */
+  /** Finalize a held POS/IRIS receipt after the terminal charge succeeded. */
   async completePos(input: {
     pos_signature_id?: string; invoice_id?: string;
     transaction_id: string; payment_amount?: number; tip_amount?: number;

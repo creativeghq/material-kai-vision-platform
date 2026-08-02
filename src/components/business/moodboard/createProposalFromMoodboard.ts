@@ -1,7 +1,6 @@
 // Single source of truth for "generate a quote from a moodboard", shared by the detail page and
 // the list-page card so the two surfaces can't drift (they did: the list page dropped the project,
 // the client and every non-catalog item, producing orphaned + duplicate quotes).
-//
 // Re-fetches the board's full items (getMoodBoardItems carries media_url/media_title for non-catalog
 // items, which the list-page's cached items don't), resolves the owning project's client, links the
 // quote back via moodboard_id, and adds EVERY item (catalog → product line, media → custom line).

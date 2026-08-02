@@ -122,7 +122,7 @@ const WORKSPACE_TOOLS: ToolEntry[] = [
 /**
  * Agent tools — capabilities that live in the KAI studio (chat + canvas) rather than as a standalone
  * page: the monitors and marketing toolkits. Each card deep-links to `/agent-hub?capability=<id>`,
- * which primes the owning agent + toolkit so the user lands on "here's what you can do" (#275). Shown
+ * which primes the owning agent + toolkit so the user lands on "here's what you can do". Shown
  * to signed-in users only.
  */
 const AGENT_TOOLS: ToolEntry[] = [

@@ -357,7 +357,7 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
     }
   };
 
-  // #256 — operator "Global action" toggle. Global flows fire for ALL workspaces; turning it
+  // Operator "Global action" toggle. Global flows fire for ALL workspaces; turning it
   // off scopes a flow to its own workspace_id (tenant flows are created off, via the agent).
   const handleToggleGlobal = async (flow: Flow) => {
     const nextGlobal = !flow.is_global;

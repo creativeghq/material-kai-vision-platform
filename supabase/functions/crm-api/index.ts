@@ -1,10 +1,8 @@
 // Unified CRM API — REST resource routing.
-//
 //   POST /crm-api/companies/...   → handleCompanies
 //   POST /crm-api/contacts/...    → handleContacts
 //   POST /crm-api/users/...       → handleUsers
 //   POST /crm-api/stripe/...      → handleCrmStripe
-//
 // HTTP method (POST/GET/PUT/DELETE) and remaining path segments are preserved.
 // Each handler does its own auth + RLS.
 

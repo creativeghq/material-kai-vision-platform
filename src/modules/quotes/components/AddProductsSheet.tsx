@@ -137,7 +137,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
 
-  // Sellable services (item_type='service') for the quick-add picker (#203).
+  // Sellable services (item_type='service') for the quick-add picker.
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [addingService, setAddingService] = useState(false);
   useEffect(() => {
@@ -390,7 +390,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
 
           {/* ── Catalog Search Tab ── */}
           <TabsContent value="search" className="flex-1 flex flex-col gap-4 min-h-0 mt-0">
-            {/* Quick-add a service (#203) */}
+            {/* Quick-add a service */}
             {services.length > 0 && (
               <div className="flex items-center gap-2">
                 <Select value="" onValueChange={addServiceToQuote} disabled={addingService}>

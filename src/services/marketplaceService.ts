@@ -6,7 +6,7 @@ import {
 } from '@/utils/productMetadata';
 
 /**
- * Surplus / Last-Stock Marketplace client (#219 / #221).
+ * Surplus / Last-Stock Marketplace client.
  *
  * The marketplace_* tables + RPCs were applied to the DB via MCP migrations; the generated
  * Supabase types (`src/integrations/supabase/types.ts`) don't include them yet (regen tracked
@@ -102,7 +102,7 @@ export interface MarketPriceCheck {
   from_cache: boolean;
 }
 
-/** A buyer's saved surplus alert (#225). A matching new listing emails + bells them. */
+/** A buyer's saved surplus alert. A matching new listing emails + bells them. */
 export interface WantList {
   id: string;
   label: string | null;
@@ -190,7 +190,7 @@ export const marketplaceService = {
       p_image_urls: i.imageUrls ?? [],
     });
     if (error) throw error;
-    // #225 — "saved surplus alert" fan-out to matching buyers is handled at the data layer
+    // "saved surplus alert" fan-out to matching buyers is handled at the data layer
     // by the `_notify_want_match` AFTER INSERT trigger on marketplace_listings (cross-tenant,
     // catches every insert path). No app-layer call needed here.
     return data as string;
@@ -305,7 +305,7 @@ export const marketplaceService = {
         buyer_workspace_id: input.buyerWorkspaceId,
         qty_wanted: input.qtyWanted ?? null,
         message: input.message ?? null,
-        // #247 A5p2 — when sourcing a specific demand line, carry it so accept can allocate
+        // When sourcing a specific demand line, carry it so accept can allocate
         demand_type: input.demandType ?? null,
         demand_id: input.demandId ?? null,
       },
@@ -314,7 +314,7 @@ export const marketplaceService = {
     return data as { inquiry_id: string; thread_id: string };
   },
 
-  // #247 A5p2 — SELLER accepts a surplus inquiry → materializes a draft purchase order
+  // SELLER accepts a surplus inquiry → materializes a draft purchase order
   // (+ on_order allocation if the inquiry carried a sourcing demand) in the BUYER's workspace.
   async acceptInquiry(inquiryId: string, opts?: { acceptedQty?: number; unitPrice?: number }): Promise<{ inquiry_id: string; order_id: string; already?: boolean }> {
     const { data, error } = await supabase.functions.invoke('inbox-api', {
@@ -333,7 +333,7 @@ export const marketplaceService = {
     try { await sb.rpc('increment_listing_view', { p_id: id }); } catch { /* analytics-only */ }
   },
 
-  // ── Want lists / saved surplus alerts (#225) ──────────────────────────────
+  // ── Want lists / saved surplus alerts ──────────────────────────────
   async listWantLists(): Promise<WantList[]> {
     const { data, error } = await sb
       .from('marketplace_want_lists')

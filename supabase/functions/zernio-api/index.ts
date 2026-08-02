@@ -1,12 +1,9 @@
 // Unified Zernio (social posting) API.
-//
 // POST { action, ... } — action determines which handler runs.
 // GET — proxies to oauth handler (used by the account-listing flow).
-//
 // Analytics:  get_best_time, get_post_analytics, get_account_insights
 // OAuth:      connect, callback, list_accounts (via GET), disconnect
 // Publish:    schedule, publish_now
-//
 // zernio-webhook-handler stays separate (Zernio's outbound webhook URL).
 
 import { corsHeaders } from '../_shared/cors.ts';

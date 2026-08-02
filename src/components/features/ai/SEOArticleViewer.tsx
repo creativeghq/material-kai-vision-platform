@@ -1173,7 +1173,6 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
 // ─── Article Content Viewer ─────────────────────────────────────
 
 // ─── Custom Article Renderer ────────────────────────────────────
-//
 // The seo-write prompt produces markdown with a strict structure + custom callout
 // blockquotes (`> [!tldr]`, `> [!key]`, `> [!definition]`, `> [!example]`,
 // `> [!info]`, `> [!warning]`, `> [!quote]`). We parse the markdown into
@@ -1444,7 +1443,6 @@ function parseArticle(markdown: string): ArticleBlock[] {
 }
 
 // ─── Custom Markdown Renderer ───────────────────────────────────
-//
 // We hand-roll every markdown element instead of leaning on Tailwind prose,
 // so the article reads like a polished editorial post: serif body, generous
 // rhythm, and section dividers that feel intentional.

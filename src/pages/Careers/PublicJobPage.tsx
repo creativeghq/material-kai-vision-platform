@@ -1,4 +1,4 @@
-// #252 — PUBLIC job detail + application at /careers/:slug/:job. Anonymous.
+// PUBLIC job detail + application at /careers/:slug/:job. Anonymous.
 // Layout mirrors a modern ATS posting: sticky facts rail on the left, Overview / Application
 // tabs on the right. Emits JobPosting JSON-LD so the role is indexable by job search engines.
 import { useCallback, useEffect, useRef, useState } from 'react';

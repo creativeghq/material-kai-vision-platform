@@ -84,12 +84,12 @@ interface Company {
   discount_percent?: number | null;
   discount_notes?: string | null;
   credit_limit?: number | null;
-  user_level_key?: string | null; // #227 — pricing level
-  prices_vat_inclusive?: boolean | null; // #227 — gross display for this customer
+  user_level_key?: string | null; // Pricing level
+  prices_vat_inclusive?: boolean | null; // Gross display for this customer
   is_supplier?: boolean | null;
   is_customer?: boolean | null;
   factory_names?: string[] | null; // supplier↔factory pin (ingested metadata.factory_name values)
-  // #207 — commercial depth
+  // Commercial depth
   contact_group?: string | null;
   include_in_myf?: boolean | null;
   vat_exemption_reason?: string | null;
@@ -256,7 +256,7 @@ export const CompanyDetailPage: React.FC = () => {
     }
   };
 
-  /** #227 — pricing level/discount route through the approval RPC, not patchInline. */
+  /** Pricing level/discount route through the approval RPC, not patchInline. */
   const savePricing = async (updates: { user_level_key?: string | null; discount_percent?: number | null }) => {
     if (!company) return;
     const next = { ...company, ...updates };
@@ -286,7 +286,7 @@ export const CompanyDetailPage: React.FC = () => {
     }
   };
 
-  // #227 — load this workspace's pricing levels for the customer-level dropdown.
+  // Load this workspace's pricing levels for the customer-level dropdown.
   useEffect(() => {
     if (!activeWorkspaceId) return;
     financeService.listUserLevels(activeWorkspaceId)

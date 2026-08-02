@@ -180,7 +180,7 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'order_dispatched', group: 'Finance',
     label: 'Order Dispatched', description: 'A dispatch note is issued (order shipped) — notify the customer', icon: 'Truck', color: 'emerald',
     defaultData: { label: 'Order Dispatched', category: 'trigger', triggerType: 'order_dispatched', config: {} } as TriggerNodeData },
-  // #209 — multi-tenant inbox
+  // multi-tenant inbox
   { type: 'triggerNode', category: 'trigger', subType: 'inbox.message_received', group: 'Inbox',
     label: 'Inbox Message Received', description: 'A new message lands in an inbox thread', icon: 'Inbox', color: 'emerald',
     defaultData: { label: 'Inbox Message Received', category: 'trigger', triggerType: 'inbox.message_received', config: {} } as TriggerNodeData },
@@ -188,7 +188,7 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Inbox Thread Assigned', description: 'A thread is assigned/handed to a member', icon: 'UserPlus', color: 'emerald',
     defaultData: { label: 'Inbox Thread Assigned', category: 'trigger', triggerType: 'inbox.thread_assigned', config: {} } as TriggerNodeData },
 
-  // #249 — real estate
+  // Real estate
   { type: 'triggerNode', category: 'trigger', subType: 'realestate.buyer_matches_found', group: 'Real Estate',
     label: 'Buyer Matches Found', description: 'A new/updated listing matches a buyer\'s saved search — alert the agent', icon: 'Home', color: 'emerald',
     defaultData: { label: 'Buyer Matches Found', category: 'trigger', triggerType: 'realestate.buyer_matches_found', config: {} } as TriggerNodeData },
@@ -196,7 +196,7 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'New Listing for Buyer', description: 'A new listing matches a consented buyer\'s saved search — alert the buyer', icon: 'Home', color: 'emerald',
     defaultData: { label: 'New Listing for Buyer', category: 'trigger', triggerType: 'realestate.new_listing_for_buyer', config: {} } as TriggerNodeData },
 
-  // #225 — surplus marketplace
+  // Surplus marketplace
   { type: 'triggerNode', category: 'trigger', subType: 'marketplace_want_match', group: 'Marketplace',
     label: 'Surplus Match', description: 'A new surplus listing matched a buyer\'s saved alert', icon: 'Package', color: 'emerald',
     defaultData: { label: 'Surplus Match', category: 'trigger', triggerType: 'marketplace_want_match', config: {} } as TriggerNodeData },
@@ -236,7 +236,7 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'pricing_change_decided', group: 'Finance',
     label: 'Discount Approval Decided', description: 'A finance approver approved or declined a discount change', icon: 'CheckCircle2', color: 'blue',
     defaultData: { label: 'Discount Approval Decided', category: 'trigger', triggerType: 'pricing_change_decided', config: {} } as TriggerNodeData },
-  // #237 — sourcing / purchase orders to suppliers
+  // Sourcing / purchase orders to suppliers
   { type: 'triggerNode', category: 'trigger', subType: 'purchase_order.sent', group: 'Finance',
     label: 'Purchase Order Sent', description: 'A purchase order was emailed to a supplier', icon: 'Send', color: 'emerald',
     defaultData: { label: 'Purchase Order Sent', category: 'trigger', triggerType: 'purchase_order.sent', config: {} } as TriggerNodeData },
@@ -247,7 +247,7 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'invoice_paid', group: 'Finance',
     label: 'Invoice Paid (card)', description: 'A Stripe card payment settled an invoice', icon: 'CheckCircle2', color: 'emerald',
     defaultData: { label: 'Invoice Paid (card)', category: 'trigger', triggerType: 'invoice_paid', config: {} } as TriggerNodeData },
-  // #251 — a workspace member requested activation of a module; the owner is notified.
+  // A workspace member requested activation of a module; the owner is notified.
   { type: 'triggerNode', category: 'trigger', subType: 'module_access_requested', group: 'Modules',
     label: 'Module Activation Requested', description: 'A member asked the workspace owner to activate a module', icon: 'LayoutGrid', color: 'violet',
     defaultData: { label: 'Module Activation Requested', category: 'trigger', triggerType: 'module_access_requested', config: {} } as TriggerNodeData },
@@ -263,7 +263,7 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'hr.applicant_stage_changed', group: 'HR',
     label: 'HR — Applicant Stage Changed', description: 'A job applicant moved through the pipeline (applied → interview → offer → hired…)', icon: 'UserPlus', color: 'violet',
     defaultData: { label: 'HR — Applicant Stage Changed', category: 'trigger', triggerType: 'hr.applicant_stage_changed', config: {} } as TriggerNodeData },
-  // #252 — HR lifecycle
+  // HR lifecycle
   { type: 'triggerNode', category: 'trigger', subType: 'hr.employee_added', group: 'HR',
     label: 'HR — Employee Added', description: 'A new employee was created in the HR module', icon: 'UserPlus', color: 'violet',
     defaultData: { label: 'HR — Employee Added', category: 'trigger', triggerType: 'hr.employee_added', config: {} } as TriggerNodeData },
@@ -280,14 +280,14 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'order_status_changed', group: 'Finance',
     label: 'Order Status Changed', description: 'An order moved to a new status (confirmed / fulfilled / cancelled…)', icon: 'Package', color: 'emerald',
     defaultData: { label: 'Order Status Changed', category: 'trigger', triggerType: 'order_status_changed', config: {} } as TriggerNodeData },
-  // #254 — Docs module
+  // Docs module
   { type: 'triggerNode', category: 'trigger', subType: 'document_published', group: 'Docs',
     label: 'Document Published', description: 'A workspace document was published', icon: 'BookOpen', color: 'emerald',
     defaultData: { label: 'Document Published', category: 'trigger', triggerType: 'document_published', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'doc_suggestion_submitted', group: 'Docs',
     label: 'Doc Edit Proposed', description: 'A member proposed an edit to a workspace document', icon: 'FilePlus2', color: 'emerald',
     defaultData: { label: 'Doc Edit Proposed', category: 'trigger', triggerType: 'doc_suggestion_submitted', config: {} } as TriggerNodeData },
-  // #255 — Email Marketing lifecycle
+  // Email Marketing lifecycle
   { type: 'triggerNode', category: 'trigger', subType: 'campaign_sent', group: 'Email Marketing',
     label: 'Campaign Sent', description: 'An email campaign finished sending', icon: 'Megaphone', color: 'emerald',
     defaultData: { label: 'Campaign Sent', category: 'trigger', triggerType: 'campaign_sent', config: {} } as TriggerNodeData },
@@ -496,7 +496,7 @@ export const conditionPaletteItems = paletteItems.filter(i => i.category === 'co
 export const actionPaletteItems = paletteItems.filter(i => i.category === 'action');
 
 /**
- * #256 — the tenant-safe subset a workspace user may drop in the visual builder. MUST mirror the
+ * The tenant-safe subset a workspace user may drop in the visual builder. MUST mirror the
  * DB `flows_tenant_allowlist_guard` trigger (which is the real enforcer; this only trims the UI).
  * Condition nodes are pure logic and always allowed — only trigger/action subtypes are listed.
  */

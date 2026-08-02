@@ -76,7 +76,7 @@ export interface SidebarNavItem {
   /** One-line description shown on the App Launcher / Profile → Modules cards (surface:'app'). */
   description?: string;
   /**
-   * Which Hub this app belongs to in the App Launcher / Profile → Modules grouping (#251).
+   * Which Hub this app belongs to in the App Launcher / Profile → Modules grouping.
    * Only meaningful for `surface:'app'` items; `top` surfaces stay in the lean top bar.
    * Apps with no `hub` land in the launcher's catch-all "More" group.
    */
@@ -108,9 +108,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // moodboards/quotes). The marketplace-only tabs (Profiles/Brand/Marketplace) self-gate inside.
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireAnyCapability: PRODUCT_BROWSE_ANY },
 
-  // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar (#251),
+  // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar,
   //    grouped into Hubs (#251 follow-up) via the `hub` field. ──
-  // #209 — Multi-tenant inbox (directional messaging + WhatsApp channel + agent takeover P2).
+  // Multi-tenant inbox (directional messaging + WhatsApp channel + agent takeover P2).
   { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app', hub: 'service', description: 'Shared inbox for customer conversations.' },
   // WhatsApp + Reviews — agent-driven comms/reputation (Hermes), same launcher pattern; the send /
   // public reply are confirm-gated inside the tools. All-users via agent.use + their module.
@@ -130,7 +130,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // the existing generation engine; opens the studio with the image pipeline (image-edit) primed.
   { id: 'image-studio', label: 'Image Studio', path: '/agent-hub?capability=image-studio&generation_mode=image-edit', icon: ImagePlus, requireCapability: 'agent.use', surface: 'app', hub: 'studio', description: 'Generate & edit product shots and marketing visuals — in the AI studio.' },
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app', hub: 'sales', description: 'Build and send client quotes.' },
-  // #201 — Sales portal for invited reps (persona 'sales').
+  // Sales portal for invited reps (persona 'sales').
   { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app', hub: 'sales', description: 'Sales-rep portal for quotes.' },
   // Business-workspace surfaces — gated through the #195 capability layer, so end-users
   // (project clients / referral members) never see CRM or Finance. Part of #174.
@@ -140,7 +140,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // All-users via agent.use + module gate; the full admin dashboard stays at /admin/monitoring.
   // Appointments — agent-driven scheduling over CRM Meetings (self-reminders); page is the Calendar tab.
   { id: 'appointments', label: 'Appointments', path: '/agent-hub?capability=appointments', icon: CalendarClock, requireCapability: 'agent.use', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'List & schedule appointments with reminders — in the AI studio.' },
-  // #249 — Real Estate module: appears only when the workspace is entitled to 'real-estate' AND the
+  // Real Estate module: appears only when the workspace is entitled to 'real-estate' AND the
   // persona holds realestate.view (owner/admin at P0; P1 adds the scoped realestate_agent persona).
   { id: 'real-estate', label: 'Real Estate', path: '/properties', icon: Building2, requireCapability: 'realestate.view', moduleSlug: 'real-estate', surface: 'app', hub: 'sales', description: 'List, manage and publish properties.' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', hub: 'finance', description: 'Invoices, payments, and reports.' },
@@ -149,20 +149,20 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'stock', label: 'Warehouse', path: '/warehouse', icon: Package, requireCapability: 'warehouse.manage', moduleSlug: 'stock', surface: 'app', hub: 'finance', description: 'Inventory, dispatch, movements & stocktake.' },
   // Contracts & e-signature — agent-driven (Trinity); the send-for-signature is confirm-gated.
   { id: 'contracts', label: 'Contracts', path: '/agent-hub?capability=contract', icon: FileSignature, requireCapability: 'agent.use', moduleSlug: 'contracts', surface: 'app', hub: 'finance', description: 'List contracts and send drafts for e-signature — in the AI studio.' },
-  // #252 — HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
+  // HR module: appears only when the workspace is entitled to 'hr' AND the persona holds
   // hr.view (owner/admin, not plain members — employee salary/absence data is sensitive).
   { id: 'hr', label: 'HR', path: '/hr', icon: Users, requireCapability: 'hr.view', moduleSlug: 'hr', surface: 'app', hub: 'people', description: 'Employees, absences, and HR documents.' },
-  // #252 — employee self-service. hr.self is held ONLY by the 'employee' persona, so this shows
+  // Employee self-service. hr.self is held ONLY by the 'employee' persona, so this shows
   // for invited employees (never owners/admins, who use the full HR above).
   { id: 'my-hr', label: 'My HR', path: '/my-hr', icon: UserCircle, requireCapability: 'hr.self', surface: 'app', hub: 'people', description: 'Your payslips, absences, and requests.' },
-  // #255 — Email Marketing: appears only when the workspace is entitled to 'email-marketing' AND
+  // Email Marketing: appears only when the workspace is entitled to 'email-marketing' AND
   // the persona holds marketing.email (owner/admin of a business node).
   { id: 'email-marketing', label: 'Email Marketing', path: '/marketing/email', icon: Megaphone, requireCapability: 'marketing.email', moduleSlug: 'email-marketing', surface: 'app', hub: 'marketing', description: 'Design templates and send bulk email campaigns.' },
-  // #256 — Flows toolkit: appears when the workspace owns 'flows-toolkit' AND the user can use
+  // Flows toolkit: appears when the workspace owns 'flows-toolkit' AND the user can use
   // the agent (Flows are agent-built). The page is the management view; chat is the create surface.
   { id: 'automations', label: 'Automations', path: '/automations', icon: Workflow, requireCapability: 'agent.use', moduleSlug: 'flows-toolkit', surface: 'app', hub: 'marketing', description: 'Automate actions when things happen in your workspace.' },
   // Social + SEO are agent-first toolkits (Hermes / Edith), so they deep-link through the
-  // capability registry (#275) into the agent with the right toolkit primed — same "one capability,
+  // capability registry into the agent with the right toolkit primed — same "one capability,
   // every surface" pattern. moduleSlug gates them into the launcher (active if entitled, else an
   // "available to add" upsell card).
   { id: 'social', label: 'Social Media', path: '/agent-hub?capability=social-post', icon: Share2, requireCapability: 'agent.use', moduleSlug: 'social-media', surface: 'app', hub: 'marketing', description: 'Publish & schedule social posts with the AI studio.' },
@@ -180,7 +180,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     hub: 'sales',
     description: 'Supplier demand and engagement analytics.',
   },
-  // Blueprints (#242) live under Projects. Supplier portal (#247) lives under Finance → Payables /
+  // Blueprints live under Projects. Supplier portal lives under Finance → Payables /
   // Profile → Supplier Portal. Admin moved to the profile menu (operator-only). Network is on the
   // workspace switcher.
 ];
@@ -216,7 +216,7 @@ export function filterNavItems(
     // so omitting it here made the "Sales" entry unreachable for everyone — reps landed on /sales
     // only via the Index redirect and had no way back to it.
     if (ctx.isSalesRep) return item.id === 'dashboard' || item.id === 'sales' || item.id === 'quotes';
-    // #249 — Estate Agent: Real Estate surface only (their own listings/leads + open-for-all).
+    // Estate Agent: Real Estate surface only (their own listings/leads + open-for-all).
     if (ctx.isRealEstateAgent) return item.id === 'dashboard' || item.id === 'real-estate';
     if (item.requirePlatform && !ctx.isPlatformOperator) return false;
     // Factory analytics is for verified factories only — not dealers/operators.

@@ -1,4 +1,4 @@
-// #281 — Buyer portal: a saved search's shareable matches page. The buyer opens /buyer/:token
+// Buyer portal: a saved search's shareable matches page. The buyer opens /buyer/:token
 // (no login), sees listings that match their criteria, favourites them, and requests viewings.
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';

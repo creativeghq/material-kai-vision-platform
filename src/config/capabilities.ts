@@ -1,11 +1,9 @@
-// Capability Registry — the single source of truth for the Agent⇄Page Capability Fabric (#275).
-//
+// Capability Registry — the single source of truth for the Agent⇄Page Capability Fabric.
 // A "capability" is one business action that should work identically on its PAGE and via the
 // AGENT (chat + canvas), staying in sync. Today the same feature is described in up to three
 // scattered, drifting places — SIDEBAR_NAV_ITEMS (nav/launcher), agentToolsCatalog.TOOLKITS
 // (toolkit picker), and agent-chat AGENT_CONFIGS (tool→agent binding). This registry declares
 // each capability ONCE so every surface reads the same definition and can hand off between them.
-//
 // Rail #2 of the fabric. It is deliberately additive: it does not replace the three lists yet —
 // it links them by id so we can migrate capabilities onto shared rails one at a time. The first
 // consumer is the `?capability=<id>` deep-link in the Agent Hub page (rail #3) which resolves the

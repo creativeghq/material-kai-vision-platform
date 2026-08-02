@@ -1,8 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — Ergani II (Ergani) integration actions for the HR module. Dispatched from index.ts
+// Ergani II (Ergani) integration actions for the HR module. Dispatched from index.ts
 // after the caller is bound to the workspace + entitlement + hr.view. Every submission requires
 // hr.manage. All calls run under the workspace's OWN Ergani credentials (workspace_ergani_credentials).
-//
 // Coverage vs the API guide (§6):
 //  • Work Card (WRKCardSE) — fully modelled (the guide documents its exact JSON schema).
 //  • Backbone — submissions list, live document schema, cancel, PDF download, employer info (EX_BASE_01),

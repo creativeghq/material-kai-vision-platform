@@ -1,9 +1,7 @@
 // Sales/Finance module — single service surface.
-//
 // Owns everything finance-related: invoices, payments, allocations,
 // purchase orders, supplier bills, credit notes, quote activities,
 // and report aggregations (AR/AP aging, P&L, cash flow, follow-up queue).
-//
 // Heavy mutations go through Postgres SECURITY DEFINER RPCs so that:
 //   - Sequential number generation stays race-free
 //   - Status transitions are atomic
@@ -44,7 +42,7 @@ async function resolvePartyContactInfo(
 
 /**
  * Fire the invoice_issued / receipt_issued flow (notify workspace + email customer) for a
- * freshly-issued document. These are SERVER_ONLY_EVENTS in flow-engine (#256) — the browser is
+ * freshly-issued document. These are SERVER_ONLY_EVENTS in flow-engine — the browser is
  * forbidden from emitting them (a client emit 403s and is silently dropped), so we relay through
  * the finance-issue-invoice edge function, which emits from trusted server code. Fire-and-forget:
  * a flow hiccup must never break issuance.
@@ -123,7 +121,7 @@ export interface InvoiceWithItems extends Invoice {
 
 export type PaymentDirection = 'in' | 'out';
 /**
- * Mirrors `payments_method_check`. `iris` was added 2026-07-31 (audit #307): the POS offers
+ * Mirrors `payments_method_check`. `iris` was added 2026-07-31: the POS offers
  * cash / card / IRIS and stamps the right AADE code (3 / 7 / 8) on the fiscal document, but
  * the ledger had no IRIS member, so the register recorded it as `card` — making the ledger
  * disagree with the filed document and collapsing IRIS into card in the Z-report breakdown.
@@ -1011,7 +1009,7 @@ const _financeServiceCore = {
 
   // -------- Pricing rules (#176 markup overrides) --------
 
-  // #227 — ordered category tree (parents + subcategories) for pricing pickers; children
+  // Ordered category tree (parents + subcategories) for pricing pickers; children
   // get an indented label so the hierarchy is visible in a flat <Select>.
   async listMaterialCategoryTree(workspaceId: string): Promise<Array<{ key: string; label: string; level: number }>> {
     const { data, error } = await supabase.rpc('finance_list_category_tree', { p_workspace_id: workspaceId });
@@ -1059,7 +1057,7 @@ const _financeServiceCore = {
     if (error) throw error;
   },
 
-  // ── Pricing pyramid (#227): customer levels + level×category discounts ──
+  // ── Pricing pyramid: customer levels + level×category discounts ──
   async listUserLevels(workspaceId: string): Promise<Array<{
     id: string; level_key: string; label: string; default_discount_pct: number;
     is_default: boolean; sort_order: number; is_active: boolean;
@@ -1145,7 +1143,7 @@ const _financeServiceCore = {
     if (error) throw error;
   },
 
-  // #227 — Layer B custom pricing rules (volume_category / category_extra / cash_payment).
+  // Layer B custom pricing rules (volume_category / category_extra / cash_payment).
   async listCustomRules(workspaceId: string): Promise<Array<{
     id: string; rule_type: string; category_key: string | null; params: any;
     discount_pct: number; label: string | null; is_active: boolean; sort_order: number;
@@ -1183,7 +1181,7 @@ const _financeServiceCore = {
     if (error) throw error;
   },
 
-  // #227 — the workspace's active paid-upfront (cash) discount %, applied at the order level.
+  // The workspace's active paid-upfront (cash) discount %, applied at the order level.
   async getActiveCashDiscountPct(workspaceId: string): Promise<number> {
     const { data, error } = await supabase
       .from('pricing_custom_rules')
@@ -1197,7 +1195,7 @@ const _financeServiceCore = {
     return data && data[0] ? Number(data[0].discount_pct) || 0 : 0;
   },
 
-  // #227 — customer discount/level change: applied directly for finance/admin, or routed to
+  // Customer discount/level change: applied directly for finance/admin, or routed to
   // a pending approval request for the 'sales' persona (enforced server-side in the RPC).
   async proposeOrApplyCustomerPricing(input: {
     subjectType: 'company' | 'contact'; subjectId: string;
@@ -1213,7 +1211,7 @@ const _financeServiceCore = {
     return (data ?? { status: 'unchanged' }) as any;
   },
 
-  // #227 — finance approvers (owner/admin) of a workspace, for fanning out approval notifications.
+  // Finance approvers (owner/admin) of a workspace, for fanning out approval notifications.
   async listWorkspaceApproverIds(workspaceId: string): Promise<string[]> {
     const { data, error } = await supabase
       .from('workspace_members')
@@ -1752,7 +1750,6 @@ const _financeServiceCore = {
   },
 
   // -------- Payment ↔ expense, both directions --------
-  //
   // An expense IS a supplier bill, and `payment_allocations.supplier_bill_id` is the ONE
   // settlement ledger for it: a BEFORE trigger guards over-allocation and an AFTER trigger
   // derives the bill's amount_paid / status / paid_at from the allocation rows. So every
@@ -1947,7 +1944,6 @@ const _financeServiceCore = {
     }));
 
     // HARD-FILTER to the expense's own supplier, not merely sort them first.
-    //
     // Sorting left every unallocated money-out payment in the workspace selectable, so attaching
     // the wrong row settled this supplier's bill with ANOTHER supplier's cash — the exact
     // cross-party reattribution that RecordPaymentDialog hard-scopes against on the customer
@@ -2174,7 +2170,7 @@ const _financeServiceCore = {
   },
 
   /**
-   * #207 — record a SUPPLIER credit note (πιστωτικό προμηθευτή) against a supplier bill.
+   * Record a SUPPLIER credit note (πιστωτικό προμηθευτή) against a supplier bill.
    * The supplier issues + transmits these to myDATA; we only record them to relieve our
    * payable. `issue_supplier_credit_note` writes the note + a netting allocation, so the
    * bill's amount_due drops via the shared recompute trigger. `externalMark` captures the
@@ -2396,7 +2392,6 @@ const _financeServiceCore = {
     // and label the result with `rows[0].currency` — whichever the NEWEST deposit happened to be —
     // so the "Received, not yet invoiced" card and the AR credit netting presented a mixed sum
     // under one symbol, and the resulting credit rows netted against euro receivables.
-    //
     // `total`/`currency` are kept for callers that have not been updated, but they now describe
     // only the LARGEST single-currency bucket rather than a meaningless cross-currency sum.
     const byCurrency = new Map<string, number>();
@@ -2559,7 +2554,7 @@ export interface FinanceSettings {
   digest_hour_utc: number;
   digest_recipients: string[];
   digest_last_sent_at: string | null;
-  /** #207 — automatic per-customer statement (Καρτέλα) schedule. Off by default. */
+  /** Automatic per-customer statement (Καρτέλα) schedule. Off by default. */
   auto_statement_enabled: boolean;
   auto_statement_frequency: 'every_n_days' | 'weekly' | 'monthly';
   auto_statement_interval_days: number | null;
@@ -2578,7 +2573,7 @@ export interface FinanceSettings {
   /**
    * Quote governance. Both are enforced by QuoteDetailAdminPage but had no writer anywhere,
    * so every workspace sat on the DB defaults ('warn' / true) with no way to change them.
-   * (audit #298)
+   *
    */
   negative_margin_policy: 'warn' | 'block';
   sales_can_see_cost: boolean;
@@ -2867,7 +2862,7 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as SalesPerDayRow[];
   },
-  /** #207 — VAT analysis (ΦΠΑ): output by rate + input, each net of credit notes. */
+  /** VAT analysis (ΦΠΑ): output by rate + input, each net of credit notes. */
   async getVatReport(workspaceId: string, from: string, to: string): Promise<VatReportRow[]> {
     const { data, error } = await supabase.rpc('finance_vat_report', {
       p_workspace_id: workspaceId, p_from: from, p_to: to,
@@ -2875,7 +2870,7 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as VatReportRow[];
   },
-  /** #207 — VAT analysis by myDATA classification CODE (complements VAT-by-rate). */
+  /** VAT analysis by myDATA classification CODE (complements VAT-by-rate). */
   async getVatByCode(workspaceId: string, from: string, to: string): Promise<VatByCodeRow[]> {
     const { data, error } = await supabase.rpc('finance_vat_by_code', {
       p_workspace_id: workspaceId, p_from: from, p_to: to,
@@ -2883,7 +2878,7 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as VatByCodeRow[];
   },
-  /** #207 — myDATA reconciliation: every issued legal doc bucketed by its AADE state. */
+  /** myDATA reconciliation: every issued legal doc bucketed by its AADE state. */
   async getMyDataReconciliation(workspaceId: string, from: string, to: string): Promise<MyDataReconRow[]> {
     const { data, error } = await supabase.rpc('finance_mydata_reconciliation', {
       p_workspace_id: workspaceId, p_from: from, p_to: to,
@@ -2891,7 +2886,7 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as MyDataReconRow[];
   },
-  /** #207 — customer/supplier running ledger (καρτέλα): chronological debit/credit entries. */
+  /** customer/supplier running ledger (καρτέλα): chronological debit/credit entries. */
   async getPartyLedger(input: {
     workspaceId: string; side: 'customer' | 'supplier';
     companyId?: string | null; contactId?: string | null; from: string; to: string;
@@ -2904,7 +2899,7 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as PartyLedgerRow[];
   },
-  /** #207 — carry-forward balance (Προηγούμενα Σύνολα): net debit-credit of all entries before `before`. */
+  /** carry-forward balance (Προηγούμενα Σύνολα): net debit-credit of all entries before `before`. */
   async getPartyOpeningBalance(input: {
     workspaceId: string; side: 'customer' | 'supplier';
     companyId?: string | null; contactId?: string | null; before: string;
@@ -3003,7 +2998,7 @@ const _financeServiceV2 = {
     if (error) throw error;
     return (data ?? []) as SalesPerDesignerRow[];
   },
-  /** #201 — a customer's most-bought catalog products ("items to push"). Membership-gated RPC. */
+  /** A customer's most-bought catalog products ("items to push"). Membership-gated RPC. */
   async reportCustomerTopProducts(input: {
     workspaceId: string; companyId?: string | null; contactId?: string | null; limit?: number;
   }): Promise<CustomerTopProductRow[]> {
@@ -3202,7 +3197,7 @@ const _financeServiceV2 = {
       infoOnly?: boolean;
       /** Requested amount (deposit / part payment). Re-validated + clamped server-side. */
       amount?: number;
-      /** #273 — which provider to charge with. Defaults server-side to 'stripe'. */
+      /** Which provider to charge with. Defaults server-side to 'stripe'. */
       provider?: string;
       /** 'card' (hosted redirect) or 'bank_reference' (Viva RF code). Defaults to 'card'. */
       method?: 'card' | 'bank_reference';
@@ -3252,7 +3247,7 @@ const _financeServiceV2 = {
   },
 
   /**
-   * #273 — resolve a provider order code back to the invoice's pay link.
+   * Resolve a provider order code back to the invoice's pay link.
    *
    * Viva takes the customer's return URL from the payment SOURCE configured in the
    * merchant's dashboard (it cannot be set per call) and sends them back with
@@ -3311,7 +3306,6 @@ export function ageBucketLabel(b: AgeBucket): string {
 // =============================================================================
 // myDATA VAT categories + money/VAT math (canonical — single source of truth)
 // =============================================================================
-//
 // AADE standard VAT categories. cat↔percent pairs MUST match exactly or myDATA
 // rejects the document — categories 4/5/6 are the reduced island rates and were
 // previously omitted in some pickers (ServicesCard / the product fiscal card). Do NOT

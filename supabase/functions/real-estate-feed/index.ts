@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #249 P3 — Real Estate syndication PULL feed. A portal fetches a tokenized XML feed of a workspace's
+// Real Estate syndication PULL feed. A portal fetches a tokenized XML feed of a workspace's
 // live public listings (GET .../real-estate-feed?token=...&format=kyero|generic). This is the in-repo
 // half of syndication; FTP/POST push to specific portals lives on the MIVAA backend. Exposes ONLY
 // toPublic() fields for active + public listings; the token gates cross-workspace enumeration.

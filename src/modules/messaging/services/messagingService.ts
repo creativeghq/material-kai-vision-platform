@@ -434,7 +434,7 @@ export class MessagingService {
     }
   }
 
-  // Inbound WhatsApp replies are captured into the unified inbox (#209) by the
+  // Inbound WhatsApp replies are captured into the unified inbox by the
   // zernio-webhook-handler (inbox_threads / inbox_participants / inbox_messages) and read
   // through inboxApi + the /inbox UI. The former messaging_conversations holding pen was
   // dropped — no separate conversation methods live here anymore.

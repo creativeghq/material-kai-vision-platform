@@ -1,5 +1,5 @@
 /**
- * #273 — payment provider registry + per-workspace resolution.
+ * Payment provider registry + per-workspace resolution.
  *
  * A provider is usable by a workspace only when THREE things hold:
  *   1. **Published** — `modules.enabled` for `payments-<slug>`: the operator's

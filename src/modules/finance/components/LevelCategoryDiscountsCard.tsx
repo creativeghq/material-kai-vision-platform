@@ -1,5 +1,5 @@
 /**
- * #227 — Per-(level, category) discount overrides. An extra discount a given level gets
+ * Per-(level, category) discount overrides. An extra discount a given level gets
  * on a specific material category, overriding that level's default discount for that
  * category only. "All categories" is handled by the level's default (Customer Pricing
  * Levels card), so this card is category-specific overrides only.

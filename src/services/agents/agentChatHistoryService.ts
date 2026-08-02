@@ -281,7 +281,7 @@ export class AgentChatHistoryService {
 
   /**
    * Pin or unpin a conversation. Pinned conversations sort to the top of the
-   * Studio conversation manager (issue #253). Passing `pinned=false` clears it.
+   * Studio conversation manager. Passing `pinned=false` clears it.
    */
   async togglePin(conversationId: string, pinned: boolean): Promise<boolean> {
     try {

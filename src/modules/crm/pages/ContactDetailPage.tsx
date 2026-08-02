@@ -85,12 +85,12 @@ interface Contact {
   discount_percent?: number | null;
   discount_notes?: string | null;
   credit_limit?: number | null;
-  user_level_key?: string | null; // #227 — pricing level
-  prices_vat_inclusive?: boolean | null; // #227 — gross display for this customer
+  user_level_key?: string | null; // Pricing level
+  prices_vat_inclusive?: boolean | null; // Gross display for this customer
   is_supplier?: boolean | null;
   is_client?: boolean | null;
   contact_type?: string | null;
-  // #207 — commercial depth
+  // Commercial depth
   contact_group?: string | null;
   include_in_myf?: boolean | null;
   vat_exemption_reason?: string | null;
@@ -125,7 +125,7 @@ export const ContactDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
-  const { enabled: realEstateEnabled } = useModule('real-estate'); // #249 — Property tab when module on
+  const { enabled: realEstateEnabled } = useModule('real-estate'); // Property tab when module on
   const [pricingLevels, setPricingLevels] = useState<Array<{ level_key: string; label: string }>>([]);
   const isNew = id === 'new';
   const [loading, setLoading] = useState(false);
@@ -265,7 +265,7 @@ export const ContactDetailPage: React.FC = () => {
   };
 
   /**
-   * #227 — pricing level/discount must NOT be patched directly: route through the
+   * Pricing level/discount must NOT be patched directly: route through the
    * approval RPC (sales → pending approval, others → applied immediately). Optimistic
    * local update; on a pending verdict, fan out a notify event to finance approvers.
    */
@@ -299,7 +299,7 @@ export const ContactDetailPage: React.FC = () => {
   };
 
 
-  // #227 — load this workspace's pricing levels for the customer-level dropdown.
+  // Load this workspace's pricing levels for the customer-level dropdown.
   useEffect(() => {
     if (!activeWorkspaceId) return;
     financeService.listUserLevels(activeWorkspaceId)
@@ -855,7 +855,7 @@ export const ContactDetailPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        {/* #279 — platform lead score (shared crm_contacts columns; scored generically + property-enriched) */}
+                        {/* Platform lead score (shared crm_contacts columns; scored generically + property-enriched) */}
                         {!isNew && (
                           <div className="mb-3 flex flex-wrap items-center gap-2">
                             <span className="text-xs text-muted-foreground">Lead score</span>

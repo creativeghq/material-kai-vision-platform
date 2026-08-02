@@ -166,7 +166,7 @@ export async function fetchProductChips(
 ): Promise<ProductChip[]> {
   if (productIds.length === 0) return [];
 
-  // Pentest #250 H3: when a caller scope is supplied (non-service path), only include
+  // When a caller scope is supplied (non-service path), only include
   // products in the caller's own workspaces — an embedded foreign product_id can't leak.
   let productQuery = supabase
     .from('products')
@@ -210,7 +210,7 @@ export async function fetchQuoteFfeItems(
   quoteId: string,
   scope?: { userId: string; workspaceIds: string[] } | null,
 ): Promise<FfeItem[]> {
-  // Pentest #250 H3: verify the caller owns the quote before reading its items,
+  // Verify the caller owns the quote before reading its items,
   // else an embedded foreign quote_id would leak that tenant's FF&E pricing.
   if (scope) {
     const { data: q } = await supabase
@@ -228,7 +228,7 @@ export async function fetchQuoteFfeItems(
   // `custom_product_name` (or the linked product's name), `quantity` and `added_at`.
   // Three unknown columns meant PostgREST rejected the whole statement, so every
   // client-facing sheet printed an EMPTY FF&E schedule — and the designer sent it
-  // without knowing, because the error was only console.warn'd. (audit #298)
+  // without knowing, because the error was only console.warn'd.
   const { data, error } = await supabase
     .from('quote_items')
     .select('room, custom_product_name, dimensions, installation_requirements, delivery_date, quantity, unit_price, products(name)')
@@ -259,7 +259,7 @@ export async function fetchSheets(
   scopeUserId?: string | null,
 ): Promise<SheetRow[]> {
   if (sheetIds.length === 0) return [];
-  // Pentest #250 H3: only include sub-sheets owned by the caller — an embedded foreign
+  // Only include sub-sheets owned by the caller — an embedded foreign
   // included_sheet_id can't pull another user's sheet content into the deck.
   let sheetsQuery = supabase
     .from('moodboard_presentation_sheets')

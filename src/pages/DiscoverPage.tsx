@@ -433,7 +433,7 @@ export const DiscoverPage: React.FC = () => {
   // reliable here (no default-tab flicker).
   const { can } = usePermissions();
   const canMarketplace = can('marketplace.browse');
-  // #249 — Properties discovery tab shows only when the platform has the Real Estate module enabled.
+  // Properties discovery tab shows only when the platform has the Real Estate module enabled.
   const { enabled: realEstateEnabled } = useModule('real-estate');
 
   // Profiles
@@ -469,7 +469,7 @@ export const DiscoverPage: React.FC = () => {
   const [modalProduct, setModalProduct] = useState<Product | null>(null);
 
   const [loading, setLoading] = useState(true);
-  // #225 — product_id → cheapest active surplus listing, for the "Surplus €X" badge.
+  // product_id → cheapest active surplus listing, for the "Surplus €X" badge.
   const [surplus, setSurplus] = useState<Record<string, { price: number; currency: string }>>({});
 
   useEffect(() => {

@@ -23,7 +23,7 @@ import { WorkspaceSwitcher } from '@/components/core/WorkspaceSwitcher';
 import { AppLauncher } from '@/components/core/AppLauncher';
 import { GlobalSearch } from '@/components/core/GlobalSearch';
 
-/** #227 — header toggle to hide/show all prices across browse surfaces (demos / material research). */
+/** Header toggle to hide/show all prices across browse surfaces (demos / material research). */
 const ShowPricesToggle: React.FC = () => {
   const { showPrices, toggle } = useShowPrices();
   return (
@@ -67,7 +67,7 @@ export const Sidebar: React.FC = () => {
   );
 
   const navigationItems = filterNavItems(SIDEBAR_NAV_ITEMS, { isFactory, isAdmin, isPlatformOperator, isAccountant, isSalesRep, isRealEstateAgent, isModuleAvailable, can });
-  // #251 — items marked surface:'app' render in the App Launcher, not the top bar / drawer.
+  // Items marked surface:'app' render in the App Launcher, not the top bar / drawer.
   const topNav = navigationItems.filter((item) => item.surface !== 'app');
 
   const isActive = (path: string) => {
@@ -114,7 +114,7 @@ export const Sidebar: React.FC = () => {
           <Wrench className="mr-3 h-4 w-4" />
           <span className="text-sm">Tools</span>
         </DropdownMenuItem>
-        {/* Operator-only: Admin moved off the top nav into the profile menu (#251). */}
+        {/* Operator-only: Admin moved off the top nav into the profile menu. */}
         {isPlatformOperator && (
           <DropdownMenuItem onClick={() => navigate('/admin')} className="py-3">
             <Settings className="mr-3 h-4 w-4" />
@@ -196,7 +196,7 @@ export const Sidebar: React.FC = () => {
             <span className="font-light">{item.label}</span>
           </Link>
         ))}
-        {/* #251 — App Launcher sits at the end of the nav row (after Discover), not in the
+        {/* App Launcher sits at the end of the nav row (after Discover), not in the
             right-side controls, so optional workspace apps read as part of navigation. */}
         <AppLauncher />
       </nav>

@@ -130,11 +130,10 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
     if (pdfErr) return jsonResponse({ success: false, error: pdfErr.message }, 500);
     if (!pdfs || pdfs.length === 0) return jsonResponse({ success: false, error: 'No source PDFs found' }, 404);
 
-    // Pentest #250 H6: authenticate() proves only that the caller is *some* user; the
+    // authenticate() proves only that the caller is *some* user; the
     // service-role load bypasses RLS. Without this, any authenticated user could pass
     // another tenant's source_pdf_ids and exfiltrate their private catalog PDFs. Bind
     // the caller to every referenced PDF's workspace before downloading any bytes.
-    //
     // "Act on behalf of": agent-chat invokes this server-to-server with the platform
     // service key, so authenticate() resolves to level 'secret' with userId=null — the
     // real acting user rides in body.caller_user_id. Honor it ONLY at secret level (a

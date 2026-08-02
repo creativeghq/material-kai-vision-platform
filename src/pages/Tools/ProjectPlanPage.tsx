@@ -1,5 +1,5 @@
 /**
- * Project plan estimator (/tools/project-plan) — anonymous lead-gen tool (#242).
+ * Project plan estimator (/tools/project-plan) — anonymous lead-gen tool.
  *
  * Value-first AND editable: pick a project type → the full scope of works shows
  * immediately, priced; then edit every row, add tasks, add whole sections from the

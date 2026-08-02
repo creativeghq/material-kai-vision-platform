@@ -1,7 +1,7 @@
 /**
- * #207 — Accounting export bridge (γέφυρα λογιστικής). Pick a period, download the sales /
+ * Accounting export bridge (γέφυρα λογιστικής). Pick a period, download the sales /
  * purchases journals + a myDATA-classification summary as CSV for the accountant to import.
- * Reads RLS-scoped finance tables directly; works for the invited `accountant` persona (#202).
+ * Reads RLS-scoped finance tables directly; works for the invited `accountant` persona.
  */
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

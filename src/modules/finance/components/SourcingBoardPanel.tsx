@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 
 /**
- * #237 A4 — Finance procurement board off the stock_allocations ledger.
+ * Finance procurement board off the stock_allocations ledger.
  * Three lanes: Needs ordering (committed demand, no supply) / On order (awaiting
  * supplier, with ETA) / Arrived-reserved (held for the customer, ready to dispatch).
  */

@@ -2,7 +2,6 @@
 // Renders a customer-facing legal invoice/receipt PDF (A4) with full myDATA fields:
 // issuer + establishment, customer, line items, VAT breakdown, totals, the MARK and a
 // scannable QR. The field-label language is per-invoice (invoices.doc_language 'el'|'en').
-//
 // NOTE ON GREEK STRINGS: the label dictionary below intentionally contains Greek. This is
 // a legal tax document (παραστατικό) the customer/accountant files — NOT the app UI. The
 // English-only-UI rule applies to the interface, not to this generated document; the user
@@ -196,7 +195,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     return json({ ok: true, pdf_url: signed?.signedUrl, pdf_storage_path: row.pdf_storage_path, cached: true });
   }
 
-  // #280 — a payment receipt (απόδειξη είσπραξης) is a proof-of-payment the customer already
+  // A payment receipt (απόδειξη είσπραξης) is a proof-of-payment the customer already
   // holds. Once one has been issued (receipt_number assigned + PDF stored), never silently
   // re-render it for a DIFFERENT amount — that would hand the customer a second receipt whose
   // figure no longer matches the one they have. Applying credit no longer mutates payment
@@ -246,7 +245,6 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       // New balance = the party's AR position after this payment. Positive = still owes;
       // negative = in credit. Delegated to get_customer_open_balance so there is exactly ONE
       // definition of a customer balance in the platform.
-      //
       // Only ever computed for direction='in'. A receipt for money we paid OUT (an expense,
       // a supplier bill) is an AP event: it moves the bank account, never the customer's
       // receivable. The previous hand-rolled sum here counted BOTH directions, so paying a
@@ -773,7 +771,7 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
   };
   const fees = Number(inv.total_fees_amount ?? 0), stamp = Number(inv.total_stamp_duty_amount ?? 0);
   const otherTax = Number(inv.total_other_taxes_amount ?? 0), deductions = Number(inv.total_deductions_amount ?? 0);
-  // #227 — universal breakdown: Price / Discount / Price after Discount / VAT. The paid-upfront
+  // Universal breakdown: Price / Discount / Price after Discount / VAT. The paid-upfront
   // (cash) discount scales the net + VAT so they foot to the stored grand total.
   const cashPct = Number(inv.cash_discount_pct ?? 0);
   const cashFactor = cashPct > 0 && cashPct < 100 ? 1 - cashPct / 100 : 1;

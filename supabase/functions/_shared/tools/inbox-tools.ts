@@ -1,5 +1,5 @@
 /**
- * Inbox Tools — agent-chat surface for the multi-tenant customer Inbox (#209 / #275).
+ * Inbox Tools — agent-chat surface for the multi-tenant customer Inbox.
  *
  * ONE tool, actions:
  *   - list     — recent customer conversations (optionally by status)

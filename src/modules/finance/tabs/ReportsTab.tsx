@@ -186,7 +186,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
 
   return (
     <div className="space-y-4">
-      {/* #207 — accounting export bridges (γέφυρες): download journals for the accountant. */}
+      {/* Accounting export bridges (γέφυρες): download journals for the accountant. */}
       <AccountingExportCard workspaceId={workspaceId} />
 
       {/* Filter bar */}

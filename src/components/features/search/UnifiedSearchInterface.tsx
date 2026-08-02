@@ -217,7 +217,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         limit: 15,
         image_base64: imageBase64,
         enableQueryUnderstanding: true,
-        // Aspect modes (#277) bias retrieval toward that per-aspect vector; text/image/hybrid
+        // Aspect modes bias retrieval toward that per-aspect vector; text/image/hybrid
         // stay full-fusion (aspect undefined).
         aspect: (['color', 'texture', 'style', 'material'] as const).includes(searchType as any)
           ? (searchType as 'color' | 'texture' | 'style' | 'material')

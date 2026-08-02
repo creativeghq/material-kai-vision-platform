@@ -217,7 +217,7 @@ async function validateUserToken(
     }
 
     // Check roles if specified.
-    // #195 — reconcile edge auth with the frontend persona model. Authority comes from
+    // Reconcile edge auth with the frontend persona model. Authority comes from
     // TWO sources that must agree: the GLOBAL role (`user_profiles.role_id → roles`) AND
     // the WORKSPACE role (`workspace_members.role`). A dealer/architect who OWNS a
     // workspace can hold global role 'user' yet must be allowed business ops — the

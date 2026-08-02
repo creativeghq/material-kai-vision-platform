@@ -278,7 +278,7 @@ export const PartyAccountSummary: React.FC<{
 };
 
 /**
- * #201 — consolidated account overview for the CRM party page: the shared PartyAccountSummary
+ * Consolidated account overview for the CRM party page: the shared PartyAccountSummary
  * (customer + supplier net position) + open orders / last payment meta + the customer's top
  * products to push + email-statement + an optional "View ledger in Finance" cross-link.
  */

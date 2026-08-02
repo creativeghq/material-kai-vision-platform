@@ -676,7 +676,7 @@ class ProjectsService {
     return data || [];
   }
 
-  // ---------- BILLING: project → invoice(s) (#177) ----------
+  // ---------- BILLING: project → invoice(s) ----------
 
   async listProjectInvoices(projectId: string) {
     const { data, error } = await (supabase as any)

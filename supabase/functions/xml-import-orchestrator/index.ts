@@ -13,7 +13,6 @@ import {
 
 // ---------------------------------------------------------------------------
 // XML parser setup
-//
 // The previous implementation relied on deno_dom's DOMParser in `text/html`
 // mode, which silently accepted malformed XML and normalized all tag names to
 // lowercase. fast-xml-parser gives us a proper XML parser with explicit
@@ -26,14 +25,12 @@ const CATEGORIES_CATEGORY_JPATH_SUFFIX = '.categories.category';
 
 // ---------------------------------------------------------------------------
 // Safety envelope
-//
 // Supabase Edge Functions run on Deno Deploy with a 256 MB memory cap and ~2 s
 // of synchronous CPU per invocation. fast-xml-parser builds a full DOM in JS
 // memory (~2–5× the XML byte size) and holds the parsed products array until
 // they've been chunk-inserted into data_import_job_products. That's the true
 // memory ceiling here; after chunk-insert the edge function is done and the
 // Python side page-reads products by index without ever holding all of them.
-//
 // Tunable via env vars (set on the Supabase edge-function deployment):
 //   XML_IMPORT_MAX_MB          — raw decoded XML size cap
 //   XML_IMPORT_MAX_PRODUCTS    — product count cap per import

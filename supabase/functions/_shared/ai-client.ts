@@ -13,7 +13,6 @@
  */
 
 // ── Environment setup (MUST run before npm imports) ──
-//
 // We seed globalThis.process.env at module-load with whatever Deno.env currently has so npm
 // packages that read process.env at import time see the expected keys. The providers themselves
 // are constructed LAZILY below so that any platform_secrets values bootstrapped into Deno.env
@@ -128,7 +127,6 @@ async function _logTrackedCall(opts: {
 }
 
 // ── Provider instances ──
-//
 // Lazy: constructed on FIRST USE (not at module load) so that platform_secrets values
 // bootstrapped into Deno.env inside the request handler are reflected in apiKey.
 // Existing call sites (`google(modelId)`, `google.image(modelId)`, `anthropic(modelId)`,
@@ -398,7 +396,6 @@ export async function generateWithClaude(
 }
 
 // ── Claude: multi-step tool-using generation (agentic loop) ──
-//
 // Runs an agentic tool-call loop: Claude may call the provided `tools` (AI SDK `tool(...)`
 // definitions), the SDK executes each and feeds the result back, repeating up to `maxSteps`
 // before producing the final text. Tool execution + scoping is the caller's responsibility —

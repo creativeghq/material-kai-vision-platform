@@ -60,16 +60,16 @@ export type TriggerType =
   | 'inventory_low_stock'
   | 'freight_quote_requested'
   | 'order_dispatched'
-  // #209 — multi-tenant inbox (dotted keys; payload-only, no custom config UI)
+  // multi-tenant inbox (dotted keys; payload-only, no custom config UI)
   | 'inbox.message_received'
   | 'inbox.thread_assigned'
-  // #225 — surplus marketplace: a new listing matched a buyer's saved alert
+  // Surplus marketplace: a new listing matched a buyer's saved alert
   | 'marketplace_want_match'
   // Expense cards (trip / monthly / …): submit→finance, review→rep, request→rep
   | 'expense_card_submitted'
   | 'expense_card_reviewed'
   | 'expense_card_requested'
-  // #227 — pricing-pyramid discount-approval workflow
+  // pricing-pyramid discount-approval workflow
   | 'pricing_change_requested'
   | 'pricing_change_decided'
   // Account receivable/payable: finance asked to issue a receipt/invoice
@@ -80,7 +80,7 @@ export type TriggerType =
   | 'payment_received'
   | 'payment_reversed'
   | 'payment_sent'
-  // Sourcing / purchase orders (#237)
+  // Sourcing / purchase orders
   | 'purchase_order.sent'
   | 'purchase_order.received'
   // Flows governance — automated paths routed through Flows (#245 D)
@@ -88,21 +88,21 @@ export type TriggerType =
   | 'finance_follow_up'
   | 'invoice_paid'
   | 'module_access_requested'
-  // #252 — HR: an employee has not clocked in past their start time + grace (payload-only)
+  // HR: an employee has not clocked in past their start time + grace (payload-only)
   | 'hr_late_checkin'
-  // #252 — HR recruiting: a job applicant moved through the pipeline (payload-only, dotted key)
+  // HR recruiting: a job applicant moved through the pipeline (payload-only, dotted key)
   | 'hr.applicant_stage_changed'
-  // #252 — HR lifecycle (payload-only, dotted keys)
+  // HR lifecycle (payload-only, dotted keys)
   | 'hr.employee_added'
   | 'hr.absence_requested'
   | 'hr.absence_reviewed'
   // Finance — order lifecycle (sales/purchase orders)
   | 'order_created'
   | 'order_status_changed'
-  // #254 — Docs module: a workspace doc was published, or a member proposed an edit
+  // Docs module: a workspace doc was published, or a member proposed an edit
   | 'document_published'
   | 'doc_suggestion_submitted'
-  // #255 — Email Marketing: a campaign finished sending; a recipient bounced or complained
+  // Email Marketing: a campaign finished sending; a recipient bounced or complained
   | 'campaign_sent'
   | 'email_bounced'
   | 'email_complained'
@@ -130,7 +130,7 @@ export type TriggerType =
   // its supplier/parent for pricing; the supplier returned prices (payload-only, dotted-free keys)
   | 'rfq_lines_requested'
   | 'rfq_lines_priced'
-  // #237 — a reseller accepted a quote with operator-catalog lines, auto-creating a mirrored
+  // A reseller accepted a quote with operator-catalog lines, auto-creating a mirrored
   // SALES order + draft invoice in the supplier/operator workspace (notify the supplier admins)
   | 'upstream_order_created'
   | 'realestate.buyer_matches_found'
@@ -193,7 +193,7 @@ export interface FinanceDocumentRequestedTriggerConfig {}
 export interface InvoiceIssuedTriggerConfig {}
 export interface ReceiptIssuedTriggerConfig {}
 export interface PaymentReceivedTriggerConfig {}
-/** Refund or chargeback. Emitted by stripe-webhooks. (audit #307) */
+/** Refund or chargeback. Emitted by stripe-webhooks. */
 export interface PaymentReversedTriggerConfig {}
 export interface PaymentSentTriggerConfig {}
 export interface PurchaseOrderSentTriggerConfig {}
@@ -521,7 +521,7 @@ export interface SendWhatsAppConfig {
   from?: string;
 }
 
-/** Email Marketing module (#255) — flips an existing draft/paused/scheduled campaign
+/** Email Marketing module — flips an existing draft/paused/scheduled campaign
  *  (owned by the flow's workspace) to 'sending' so campaign-processor fans it out via
  *  the workspace's BYOK Resend. Tenant-scoped flows only. */
 export interface SendCampaignConfig {
@@ -760,9 +760,9 @@ export interface Flow {
   tags: string[];
   /** When true, the flow cannot be deleted (also enforced by a DB trigger). */
   is_locked?: boolean;
-  /** #256 — owning workspace of a tenant flow; NULL for a platform/operator flow. */
+  /** Owning workspace of a tenant flow; NULL for a platform/operator flow. */
   workspace_id?: string | null;
-  /** #256 — true = operator flow that fires across ALL workspaces (operator-only toggle);
+  /** True = operator flow that fires across ALL workspaces (operator-only toggle);
    *  false = tenant flow scoped to workspace_id. */
   is_global?: boolean;
   created_by: string | null;

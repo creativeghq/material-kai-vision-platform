@@ -95,9 +95,9 @@ export const QuoteDetailPage: React.FC = () => {
   const [itemDiscounts, setItemDiscounts] = useState<Record<string, string>>({});
   const [vatRate, setVatRate] = useState<string>('24');
   const [savingPrices, setSavingPrices] = useState(false);
-  // #237 — per-line "save this typed price to the workspace catalog" so it's pulled next time.
+  // per-line "save this typed price to the workspace catalog" so it's pulled next time.
   const [savingCatalogId, setSavingCatalogId] = useState<string | null>(null);
-  // #227 — order-level paid-upfront (cash) discount
+  // order-level paid-upfront (cash) discount
   const [paidUpfront, setPaidUpfront] = useState(false);
   const [cashPct, setCashPct] = useState(0);
   const [negMarginPolicy, setNegMarginPolicy] = useState<string>('warn');
@@ -390,7 +390,7 @@ export const QuoteDetailPage: React.FC = () => {
   }, 0);
 
   const pricingVatRate = parseDecimalOr(vatRate, 0);
-  // #227 — paid-upfront (cash) discount applies to the net subtotal before VAT.
+  // paid-upfront (cash) discount applies to the net subtotal before VAT.
   const pricingCashPct = paidUpfront ? cashPct : 0;
 
   // Accepted upsells only, honouring metadata.custom_price / metadata.quantity — the same
@@ -426,7 +426,7 @@ export const QuoteDetailPage: React.FC = () => {
       return price !== null && price > 0;
     });
 
-  // #237 — remember a typed unit price in the workspace catalog (product_prices.list_price),
+  // Remember a typed unit price in the workspace catalog (product_prices.list_price),
   // so the resolver pulls it automatically on the next quote. Saves the pre-discount unit
   // price (the list anchor) — customer discounts still apply on top per-customer.
   const handleSaveToCatalog = async (item: QuoteItemWithProduct, listPrice: number) => {
@@ -446,7 +446,7 @@ export const QuoteDetailPage: React.FC = () => {
 
   const handleSavePrices = async () => {
     if (!quote?.id || !quote.items) return;
-    // #227 — negative-margin guardrail (block / require_approval prevent saving below cost)
+    // negative-margin guardrail (block / require_approval prevent saving below cost)
     if (negMarginPolicy === 'block' || negMarginPolicy === 'require_approval') {
       const neg = (quote.items || []).filter((item) => {
         const price = getItemEffectivePrice(item.id);
@@ -477,7 +477,7 @@ export const QuoteDetailPage: React.FC = () => {
           line_total: effectivePrice * item.quantity,
         };
       });
-      // #227 — persist the paid-upfront flag first so saveItemPrices applies the cash discount.
+      // Persist the paid-upfront flag first so saveItemPrices applies the cash discount.
       await supabase.from('quotes').update({ paid_upfront: paidUpfront }).eq('id', quote.id);
       const result = await quotePDFService.saveItemPrices(quote.id, items, pricingVatRate);
       if (result.success) {
@@ -1023,7 +1023,7 @@ export const QuoteDetailPage: React.FC = () => {
                                         onChange={(e) => setItemPrices(prev => ({ ...prev, [item.id]: e.target.value }))}
                                       />
                                     </div>
-                                    {/* #237 — save this typed price to the catalog so it's pulled next time (catalog products only). */}
+                                    {/* Save this typed price to the catalog so it's pulled next time (catalog products only). */}
                                     {item.product_id && unitPrice > 0 && (
                                       <Button
                                         variant="ghost"
@@ -1080,7 +1080,7 @@ export const QuoteDetailPage: React.FC = () => {
                           <span className="text-muted-foreground">Subtotal</span>
                           <span className="font-medium">€{pricingSubtotal.toFixed(2)}</span>
                         </div>
-                        {/* #227 — paid-upfront (cash) discount */}
+                        {/* paid-upfront (cash) discount */}
                         <div className="flex items-center justify-between text-sm">
                           <label className="flex items-center gap-2 text-muted-foreground">
                             <Switch checked={paidUpfront} onCheckedChange={setPaidUpfront} />

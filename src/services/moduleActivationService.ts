@@ -1,6 +1,5 @@
 // #251 module framework — client for owner self-serve module activation + add-on billing.
 // The workspace OWNER activates/purchases optional modules from Profile → Modules.
-//
 // Free (plan-covered) path and paid (Stripe add-on) path both go through the
 // `stripe-api` edge function's `activate-module` action, which decides which
 // applies and either grants the entitlement or returns a Stripe checkout URL.

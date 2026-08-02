@@ -134,7 +134,7 @@ export interface MessagingOptout {
   created_at: string;
 }
 
-// Inbound WhatsApp replies now live in the unified inbox (#209) — inbox_threads /
+// Inbound WhatsApp replies now live in the unified inbox — inbox_threads /
 // inbox_participants / inbox_messages, read via src/services/inboxApi.ts. The former
 // MessagingConversation / MessagingConversationMessage holding-pen types were removed.
 

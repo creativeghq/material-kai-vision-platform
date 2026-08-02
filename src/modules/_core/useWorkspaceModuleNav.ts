@@ -1,4 +1,4 @@
-// #251 — the App Launcher's data source. Returns the launcher entries for the
+// The App Launcher's data source. Returns the launcher entries for the
 // active workspace: registered modules that (a) are globally published AND
 // (b) are entitled to the active workspace AND (c) declare a `location:'workspace'`
 // navItem. This is how optional modules surface WITHOUT a top-nav item.

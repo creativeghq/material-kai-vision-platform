@@ -25,12 +25,11 @@ export interface EntityResult {
 // GENERATED from scripts/edge-endpoints.json — the same catalogue that builds the public
 // OpenAPI spec. Do not hand-edit: tests/unit/edgeFunctionPickerCoverage.test.ts fails when
 // this drifts from that file.
-//
 // Previously 16 hand-maintained entries against 107 real functions, stale in BOTH
 // directions — it omitted every finance, HR, stock, CRM, real-estate and catalog endpoint,
 // so a flow author could not pick any of them. The catalogue is read by the TEST only, never
 // at runtime: it is 311 KB where this projection is 16 KB, and shipping the former to every
-// browser to populate a picker is not a trade worth making (see #308). (audit #298)
+// browser to populate a picker is not a trade worth making.
 const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'agent-chat', label: 'agent-chat', sublabel: 'Multi-agent LangGraph chat with tool execution and SSE streaming' },
   { id: 'agent-scheduler-cron', label: 'agent-scheduler-cron', sublabel: 'Every-minute cron: dispatch background agents whose cron schedule is due' },

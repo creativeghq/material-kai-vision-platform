@@ -1,12 +1,10 @@
 // marketplace-price-check — resolves the MARKET price of an item (Perplexity + DataForSEO +
 // Firecrawl, via MIVAA's market-check engine) and tells the seller whether a proposed surplus
 // listing price is within the Operator's cap (market_median × (1 + cap%), cap default 20%).
-//
 // It also POPULATES `marketplace_market_reference` (service-role, 24h TTL) so that
 // `create_marketplace_listing` can enforce the SAME cap server-side against a value the client
 // cannot forge. The market-check upstream is admin-gated in MIVAA, so we call it with the platform
 // mk_ key here rather than exposing it to the seller directly.
-//
 // POST { workspace_id, product_id?, product_name, manufacturer?, dimensions?, price?, currency? }
 //   → { success, market_median, market_min, market_max, currency, cap_pct, max_allowed,
 //       allowed, unverified, from_cache }

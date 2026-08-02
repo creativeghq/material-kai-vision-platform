@@ -95,7 +95,7 @@ export const AuthCallbackPage: React.FC = () => {
 
           // Workspace assignment is handled by the DB trigger
           // `handle_new_user_workspace_assignment`, which creates a personal OWNED
-          // workspace for every new user (#194). The previous app-side block here added
+          // workspace for every new user. The previous app-side block here added
           // the user to the oldest/root workspace as a plain member — the "single shared
           // workspace" bug — so it's intentionally removed. Invites (?invite=) are redeemed
           // separately after auth via workspaceManagementService.redeemInvite.

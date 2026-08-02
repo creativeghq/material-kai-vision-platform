@@ -1,5 +1,5 @@
 /**
- * #195 — the single capability hook. Resolves the current persona from the active
+ * The single capability hook. Resolves the current persona from the active
  * workspace and exposes `can(capability)`. Replaces ad-hoc `isAdmin()` / role-string
  * checks across the app.
  *
@@ -25,13 +25,13 @@ export interface PermissionsApi {
   //    the single permission source — #208). These depend on the marketplace RANK and the raw
   //    workspace role, which the coarse persona capabilities intentionally collapse, so they
   //    live as explicit booleans rather than persona capabilities. ──
-  /** Invited accountant (#202): Finance only — operate, never manage settings. */
+  /** Invited accountant: Finance only — operate, never manage settings. */
   isAccountant: boolean;
   /** On the Sales portal (rep OR manager) — drives the focused nav subset for both. */
   isSalesRep: boolean;
   /** Sales manager: same portal, but the whole team's book (RLS: is_workspace_sales_manager). */
   isSalesManager: boolean;
-  /** Invited estate agent (#249): Real Estate surface only — own listings/leads + open-for-all. */
+  /** Invited estate agent: Real Estate surface only — own listings/leads + open-for-all. */
   isRealEstateAgent: boolean;
   /** Owner/admin of the ACTIVE workspace (vs. a plain member). */
   isWorkspaceManager: boolean;
@@ -54,7 +54,6 @@ export function usePermissions(): PermissionsApi {
     // Finer axes are derived from the resolved persona (which the account role
     // drives), so a Supplier/Architect/Finance/Sales account role grants the right
     // gates even without a workspace-tree node. operator stays root-only.
-    //
     // `isAccountant` = the INVITED EXTERNAL accountant (workspace role) — a RESTRICT
     // flag (#202: no expense approval / no settings). The internal `finance` account
     // role also resolves to the accountant persona (Finance surface) but is NOT

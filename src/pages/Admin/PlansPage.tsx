@@ -1,5 +1,5 @@
 /**
- * #214 — operator console for plans × modules + per-plan quotas.
+ * Operator console for plans × modules + per-plan quotas.
  *  • Grid: each module's plan tier (the lowest plan that unlocks it) — writes modules.price_tier.
  *  • Quota editor: per-plan limits (max_contacts, …) — writes subscription_plans.features. -1 = ∞.
  * Dependency-aware: warns when a prerequisite is tiered above its dependent.

@@ -7,7 +7,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { marketplaceService, type MarketplaceParticipation } from '@/services/marketplaceService';
 
 /**
- * Owner/admin surface to join & toggle the surplus marketplace (#219). Enabling raises an
+ * Owner/admin surface to join & toggle the surplus marketplace. Enabling raises an
  * application → the Operator approves in Admin → Operations → Onboarding → Marketplace. Only an
  * approved + enabled workspace can list/browse; listings are capped at `cap`% over market price.
  */

@@ -95,7 +95,6 @@ export function invalidateInvoiceProviderCache(): void {
 // =====================================================
 // PAYMENT PROVIDERS — multi-provider registry
 // =====================================================
-//
 // Different from invoicing: multiple payment providers can coexist (an
 // operator may take Stripe AND PayPal AND bank-transfer simultaneously and
 // offer the customer a choice at checkout). So the API returns an array, not
@@ -111,7 +110,7 @@ export interface PaymentProvider {
 /**
  * Resolve the payment providers available to the ACTIVE WORKSPACE.
  *
- * TWO gates, both required (#273) — this is the same intersection
+ * TWO gates, both required — this is the same intersection
  * `useWorkspaceModuleNav` applies, and the same one the server-side
  * `_shared/payments/registry.ts` enforces:
  *

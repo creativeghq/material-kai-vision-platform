@@ -20,7 +20,7 @@ export interface SessionPathCtx {
 }
 
 /**
- * #250 I4: strip path separators / `..` traversal from a caller-supplied filename so it
+ * Strip path separators / `..` traversal from a caller-supplied filename so it
  * can't escape its intended prefix in the storage key. Keeps the base name only.
  */
 export function safeStorageName(filename: string): string {

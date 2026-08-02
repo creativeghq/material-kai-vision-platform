@@ -42,9 +42,9 @@ export const stripeWebhookSecret = () => Deno.env.get('STRIPE_WEBHOOK_SECRET') |
 export const supabaseUrlEnv = () => Deno.env.get('SUPABASE_URL') || '';
 export const supabaseServiceKeyEnv = () => Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-// #200 — platform-billing (operator SaaS revenue: subscriptions / credits / API) is collected
+// platform-billing (operator SaaS revenue: subscriptions / credits / API) is collected
 // on a DEDICATED Stripe account, separate from the default key (tenant invoice payments) and
-// from per-tenant Connect (#182). These are optional — everything falls back to the default
+// from per-tenant Connect. These are optional — everything falls back to the default
 // key until the operator configures a separate billing account, so existing deploys are
 // unaffected.
 export const platformBillingSecretKey = () => Deno.env.get('STRIPE_BILLING_SECRET_KEY') || '';

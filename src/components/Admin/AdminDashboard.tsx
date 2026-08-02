@@ -206,7 +206,7 @@ const adminSections = {
 
 const AdminDashboard: React.FC = () => {
   const moduleCards = useAdminDashboardCards();
-  // Open data-integrity findings — rendered as a red count on the Data Health tile (#293).
+  // Open data-integrity findings — rendered as a red count on the Data Health tile.
   const [openFindings, setOpenFindings] = useState(0);
   useEffect(() => {
     void dataIntegrityService.listFindings({ status: 'open' })
@@ -436,7 +436,7 @@ const AdminDashboard: React.FC = () => {
                             </p>
                           </div>
                           <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                            {/* #293 Layer 1 — a nightly probe nobody can see is a probe nobody acts
+                            {/* A nightly probe nobody can see is a probe nobody acts
                                 on. Open integrity findings surface as a red count on the tile so a
                                 live problem is visible from the admin landing page, not only to
                                 whoever thinks to open Data Health. */}

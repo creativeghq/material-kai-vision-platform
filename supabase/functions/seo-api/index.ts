@@ -1,5 +1,4 @@
 // Unified SEO API — single function, action routing.
-//
 // Body: { action: 'research' | 'plan' | 'write' | 'analyze' | 'pipeline'
 //                | 'toolkit_audit' | 'toolkit_research', ...params }
 

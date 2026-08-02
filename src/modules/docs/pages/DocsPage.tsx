@@ -1,4 +1,4 @@
-// Docs module (#254) — internal documentation. List + editor. The doc creator and the workspace
+// Docs module — internal documentation. List + editor. The doc creator and the workspace
 // owner can edit; other members read (and, as a follow-up, will propose edits). The KAI agent
 // searches published docs via FTS (no embeddings).
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 
-// #254 — lazy-load the MarkdownEditor (MDXEditor) so its ~400KB chunk loads only when a doc is
+// lazy-load the MarkdownEditor (MDXEditor) so its ~400KB chunk loads only when a doc is
 // actually opened, not on the docs list view.
 // lazyWithRetry (not raw React.lazy): after a frontend deploy, a client on the previous
 // build holds stale chunk URLs; the dynamic import then rejects / resolves undefined and

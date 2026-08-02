@@ -109,7 +109,7 @@ function vatCategory(pct: number): number {
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 function partyFromCrm(c: any): FiscalParty {
-  // #207 — a party may be invoiced under a SEPARATE billing identity (different
+  // A party may be invoiced under a SEPARATE billing identity (different
   // legal entity / ΑΦΜ / address than the contact card). When any billing_* field
   // is set we prefer it for the myDATA counterpart; otherwise fall back to the
   // party's own identity. This keeps the CRM "separate billing identity" non-inert.
@@ -222,7 +222,7 @@ export async function buildInvoiceInputFromDb(
   const incType = overrides.incomeClassificationType ?? fs?.default_income_classification_type ?? 'E3_561_001';
   const incCat = overrides.incomeClassificationCategory ?? fs?.default_income_classification_category ?? 'category1_1';
 
-  // Pull per-product myDATA defaults (#178) for income classification + vat category.
+  // Pull per-product myDATA defaults for income classification + vat category.
   const productIds = [...new Set((items ?? []).map((it: any) => it.product_id).filter(Boolean))];
   const prodMap: Record<string, any> = {};
   if (productIds.length) {
@@ -338,7 +338,7 @@ export async function buildInvoiceInputFromDb(
       })()
     : null;
 
-  // #207 — B2G (public sector). The operator-entered b2g_details ride alongside the
+  // B2G (public sector). The operator-entered b2g_details ride alongside the
   // standard envelope; delivery falls back to the counterpart address when unset.
   const b2gRaw = inv.is_b2g ? (inv.b2g_details ?? {}) : null;
   const b2g = b2gRaw
@@ -374,7 +374,7 @@ export async function buildInvoiceInputFromDb(
     },
     ...(b2g ? { b2g } : {}),
     // Payment method captured on the invoice (myDATA requires at least one).
-    // A POS/IRIS override (#185) wins — it carries the EFT-POS terminal + NSP for the signature.
+    // A POS/IRIS override wins — it carries the EFT-POS terminal + NSP for the signature.
     paymentMethods: overrides.posPayment
       ? [{ type: overrides.posPayment.type, amount: grossTotal, terminalId: overrides.posPayment.terminalId, posNspId: overrides.posPayment.posNspId } as any]
       : inv.payment_method_code

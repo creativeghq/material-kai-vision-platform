@@ -23,7 +23,7 @@ export async function handleCheckout(req: Request, body: any): Promise<Response>
       );
     }
 
-    // #200 — platform revenue (credits/subscriptions) is collected on the dedicated billing
+    // Platform revenue (credits/subscriptions) is collected on the dedicated billing
     // account when configured (falls back to the default key otherwise). Resolve AFTER auth →
     // bootstrap has run. If Stripe still isn't configured, the canonical 503 routes the admin
     // to the right settings page.

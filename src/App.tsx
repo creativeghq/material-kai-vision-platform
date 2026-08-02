@@ -78,7 +78,7 @@ const LogViewer = lazy(() => import('./components/Admin/LogViewer').then(m => ({
 const DataHealthPage = lazy(() => import('./components/Admin/DataHealthPage'));
 const AgentConfigsPage = lazy(() => import('./components/Admin/AgentConfigs').then(m => ({ default: m.AgentConfigsPage })));
 // ApiGatewayAdmin, ModelDebuggingPanel, AIDataPage, BackgroundAgentsPage moved into
-// AI Configurations tabs (2026-07-15); their old routes now redirect there.
+// AI Configurations tabs; their old routes now redirect there.
 const OperationsDashboard = lazy(() => import('./components/Admin/OperationsDashboard').then(m => ({ default: m.OperationsDashboard })));
 const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueueMonitor').then(m => ({ default: m.AsyncJobQueueMonitor })));
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
@@ -173,16 +173,16 @@ const App = () => (
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
                 <Route path="/q/:token" element={<PageErrorBoundary name="Public Quote"><PublicQuotePage /></PageErrorBoundary>} />
                 <Route path="/cv/:token" element={<PageErrorBoundary name="Client View"><PublicClientViewPage /></PageErrorBoundary>} />
-                {/* #249 — public property listing page (anonymous, token-gated) */}
+                {/* Public property listing page (anonymous, token-gated) */}
                 <Route path="/p/:token" element={<PageErrorBoundary name="Property Listing"><PublicListingPage /></PageErrorBoundary>} />
-                {/* #281 — buyer portal: a saved search's shareable matches page (anonymous, token-gated) */}
+                {/* Buyer portal: a saved search's shareable matches page (anonymous, token-gated) */}
                 <Route path="/buyer/:token" element={<PageErrorBoundary name="Buyer Portal"><BuyerPortalPage /></PageErrorBoundary>} />
                 <Route path="/sign/:token" element={<PageErrorBoundary name="Contract Signing"><PublicContractSignPage /></PageErrorBoundary>} />
-                {/* #209 — public customer inbox thread (tokenized, no auth) */}
+                {/* Public customer inbox thread (tokenized, no auth) */}
                 <Route path="/i/:token" element={<PageErrorBoundary name="Inbox Thread"><PublicInboxThreadPage /></PageErrorBoundary>} />
                 <Route path="/careers/:slug" element={<PageErrorBoundary name="Careers"><PublicCareersPage /></PageErrorBoundary>} />
                 <Route path="/careers/:slug/:job" element={<PageErrorBoundary name="Job posting"><PublicJobPage /></PageErrorBoundary>} />
-                {/* #252 — public workspace clock-in kiosk: app.materialshub.gr/{workspace-slug}/clockin */}
+                {/* Public workspace clock-in kiosk: app.materialshub.gr/{workspace-slug}/clockin */}
                 <Route path="/:slug/clockin" element={<PageErrorBoundary name="Clock-in Kiosk"><ClockInKioskPage /></PageErrorBoundary>} />
                 <Route path="/tools" element={<PageErrorBoundary name="Tools Hub"><ToolsHubPage /></PageErrorBoundary>} />
                 <Route path="/tools/product-search" element={<PageErrorBoundary name="Material Search"><ProductSearchPage /></PageErrorBoundary>} />
@@ -310,7 +310,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* #252 — employee HR self-service. Gated by hr.self (persona 'employee' only),
+                {/* Employee HR self-service. Gated by hr.self (persona 'employee' only),
                     so an invited employee sees ONLY their own record and never CRM/sales/finance. */}
                 <Route
                   path="/my-hr"
@@ -351,7 +351,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* #177 — the procurement inbox merged into the Quotes page as a tab.
+                {/* The procurement inbox merged into the Quotes page as a tab.
                     Keep the old path alive as a redirect for bookmarks/notifications. */}
                 <Route path="/requests" element={<Navigate to="/quotes?tab=requests" replace />} />
                 {/* Workspace Settings retired — its content merged into Finance → Settings
@@ -513,13 +513,13 @@ const App = () => (
                 {/* Redirect old routes to new routes */}
                 <Route path="/admin/agent-configs" element={<Navigate to="/admin/ai-configs" replace />} />
                 <Route path="/tasks" element={<Navigate to="/admin/operations" replace />} />
-                {/* Relocated into AI Configurations tabs (2026-06-09) — keep deep-links alive. */}
+                {/* Relocated into AI Configurations tabs — keep deep-links alive. */}
                 <Route path="/admin/prompt-templates" element={<Navigate to="/admin/ai-configs?tab=templates" replace />} />
                 <Route path="/admin/extraction-prompts" element={<Navigate to="/admin/ai-configs?tab=extraction" replace />} />
                 <Route path="/admin/material-analysis" element={<Navigate to="/admin/ai-configs?tab=sandbox" replace />} />
-                {/* Retired (2026-06-09): misnamed "training" panel. Factory approvals moved to Operations. */}
+                {/* Retired: misnamed "training" panel. Factory approvals moved to Operations. */}
                 <Route path="/admin/training-models" element={<Navigate to="/admin/operations?tab=factory-onboarding" replace />} />
-                {/* Folded into Operations → Performance tab (2026-06-09). */}
+                {/* Folded into Operations → Performance tab. */}
                 <Route path="/admin/performance" element={<Navigate to="/admin/operations?tab=performance" replace />} />
                 <Route
                   path="/admin/logs"
@@ -547,7 +547,7 @@ const App = () => (
                   }
                 />
 
-                {/* Relocated into AI Configurations → API Gateway tab (2026-07-15). */}
+                {/* Relocated into AI Configurations → API Gateway tab. */}
                 <Route path="/admin/api-gateway" element={<Navigate to="/admin/ai-configs?tab=api-gateway" replace />} />
 
                 {/* Material Search moved under Discover → Products ("Smart search" mode). The
@@ -603,7 +603,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Relocated into AI Configurations → AI Data / 3D Debugging tabs (2026-07-15). */}
+                {/* Relocated into AI Configurations → AI Data / 3D Debugging tabs. */}
                 <Route path="/admin/batch-categorization" element={<Navigate to="/admin/ai-configs?tab=ai-data" replace />} />
                 <Route path="/admin/3d-suggestions" element={<Navigate to="/admin/ai-configs?tab=3d-debug" replace />} />
                 <Route path="/admin/3d-model-debugging" element={<Navigate to="/admin/ai-configs?tab=3d-debug" replace />} />
@@ -682,7 +682,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Blueprint Estimating Engine (#242) — reusable scope-of-works library. */}
+                {/* Blueprint Estimating Engine — reusable scope-of-works library. */}
                 <Route
                   path="/blueprints"
                   element={
@@ -723,7 +723,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Relocated into AI Configurations → Background Agents tab (2026-07-15). */}
+                {/* Relocated into AI Configurations → Background Agents tab. */}
                 <Route path="/admin/background-agents" element={<Navigate to="/admin/ai-configs?tab=background-agents" replace />} />
                 {/* #244 B — unified monitoring (Price / Mention / Job) */}
                 <Route
@@ -870,7 +870,7 @@ const App = () => (
 
                 {/* Public invoice payment (token-gated, no auth, no layout) */}
                 <Route path="/pay/:token" element={<PageErrorBoundary name="Pay invoice"><PayInvoicePage /></PageErrorBoundary>} />
-                {/* #273 — providers whose return URL is account-configured (Viva) land here
+                {/* Providers whose return URL is account-configured (Viva) land here
                     with ?t=&s=; we map the order code back to the right invoice. */}
                 <Route path="/pay/return" element={<PageErrorBoundary name="Payment return"><ProviderReturnPage /></PageErrorBoundary>} />
 
@@ -894,7 +894,7 @@ const App = () => (
                   }
                 />
 
-                {/* Admin: Plans & Pricing — module→plan grid + per-plan quotas (#214) */}
+                {/* Admin: Plans & Pricing — module→plan grid + per-plan quotas */}
                 <Route
                   path="/admin/plans"
                   element={

@@ -90,7 +90,7 @@ function orderedTemplateParams(template: any, variables: Record<string, string>)
  * Resolve a WhatsApp channel by sender_id, else the default active one — WITHIN the
  * caller's workspaces.
  *
- * SECURITY (audit #294/#306): this had no workspace predicate at all. It runs on the
+ * SECURITY: this had no workspace predicate at all. It runs on the
  * service-role client, so RLS does not apply, and it returned the globally-first default
  * channel — or, with `from`, ANY channel matching that sender_id. `send` then derived
  * `tenantWsId` from the RESOLVED channel and gated entitlement on that, so the tenancy
@@ -291,7 +291,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           if (result.success) {
             await supabaseClient.from('messaging_logs').insert({
               created_by: billingUserId,
-              workspace_id: tenantWsId, // #250 B6: tenant scope
+              workspace_id: tenantWsId, // Tenant scope
               channel_id: channel.id,
               channel_type: 'whatsapp',
               template_id: template?.id ?? null,
@@ -378,7 +378,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           } catch (sendErr) {
             if (billingUserId && debit.credits_debited) await refundWhatsAppCredits(supabaseClient, billingUserId, debit.credits_debited, to);
             results.push({ to, success: false, error: sendErr instanceof Error ? sendErr.message : String(sendErr) });
-            // Pace from the channel's configured rate, not a constant. (audit #306)
+            // Pace from the channel's configured rate, not a constant.
           await new Promise((res) => setTimeout(res, sendDelayMs(channel.max_send_rate)));
             continue;
           }
@@ -387,7 +387,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           if (result.success) {
             await supabaseClient.from('messaging_logs').insert({
               created_by: billingUserId,
-              workspace_id: tenantWsId, // #250 B6: tenant scope
+              workspace_id: tenantWsId, // Tenant scope
               channel_id: channel.id,
               channel_type: 'whatsapp',
               template_id: template?.id ?? null,
@@ -403,7 +403,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
             // Soft failure — refund the pre-charged credit for this recipient.
             await refundWhatsAppCredits(supabaseClient, user.id, debit.credits_debited, to);
           }
-          // Pace from the channel's configured rate, not a constant. (audit #306)
+          // Pace from the channel's configured rate, not a constant.
           await new Promise((res) => setTimeout(res, sendDelayMs(channel.max_send_rate)));
         }
 
@@ -420,7 +420,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           throw new Error('accessToken, wabaId and phoneNumberId are required (from Meta Business Suite)');
         }
 
-        // #250 C27: operator roles are workspace-scoped — the caller must be an active member
+        // Operator roles are workspace-scoped — the caller must be an active member
         // of the target workspace before attaching a WhatsApp account (else operator-of-A could
         // connect an account to workspace-B by passing its id). resolveTargetWorkspaceId does
         // that check (403 on non-member) and falls back to the caller's sole workspace when the
@@ -473,7 +473,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
           const { data, error } = await supabaseClient
             .from('messaging_channels')
             .insert({
-              workspace_id: wsId, // #250 B6: bind the channel to the caller's workspace
+              workspace_id: wsId, // Bind the channel to the caller's workspace
               channel_type: 'whatsapp',
               provider: 'zernio',
               sender_id: senderId,
@@ -529,7 +529,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
               .from('messaging_channels').select('*', { count: 'exact', head: true })
               .eq('channel_type', 'whatsapp');
             await supabaseClient.from('messaging_channels').insert({
-              workspace_id: syncWsId, // #250 B6: bind to the caller's workspace
+              workspace_id: syncWsId, // Bind to the caller's workspace
               channel_type: 'whatsapp',
               provider: 'zernio',
               sender_id: senderId,

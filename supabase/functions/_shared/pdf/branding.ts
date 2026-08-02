@@ -129,7 +129,7 @@ export async function applyWorkspaceBranding(
     // BrandingConfig field it feeds). Getting this backwards made PostgREST reject the
     // WHOLE select, so `fs` came back null and the `if (!fs)` below returned the
     // OPERATOR's identity — every tenant's quote/catalog/proforma PDF carried our
-    // company name, address and VAT number instead of their own. (audit #298)
+    // company name, address and VAT number instead of their own.
     const { data: fs, error } = await supabase
       .from('finance_settings')
       .select('business_name, business_address, business_street_number, business_city, business_postal_code, business_phone, business_email, business_vat, contact_phone, contact_email, default_vat_rate')

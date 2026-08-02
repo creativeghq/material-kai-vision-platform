@@ -5,7 +5,6 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 // Cross-workspace isolation on crm_companies — the exact table + RLS path of the recurring
 // cross-tenant leak class (latest: SupplierProductsTab, commit 06db9eb5). Two real users in
 // two distinct workspaces; we assert each user's signed-in client sees ONLY its own rows.
-//
 // We deliberately do NOT assert "every visible row is in wsA": signup auto-joins a shared
 // workspace, so a user legitimately sees more than wsA. The leak signature is CONTAINMENT —
 // seeing the OTHER tenant's row — so we assert positive (sees own) + negative (never theirs).

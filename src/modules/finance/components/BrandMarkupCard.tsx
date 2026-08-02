@@ -1,5 +1,5 @@
 /**
- * #227 — per-brand markup overrides on resold catalog products. Sits alongside the
+ * per-brand markup overrides on resold catalog products. Sits alongside the
  * per-category rules (PricingRulesCard) and the blanket default_markup_pct. Precedence
  * the resolver applies: per-product → per-brand → per-category → default. This card
  * manages the brand-level rules only (the default markup lives on the category card).

@@ -1,4 +1,4 @@
-// #252 — client for the PUBLIC careers page (anonymous). Talks to the `hr-careers` edge function.
+// Client for the PUBLIC careers page (anonymous). Talks to the `hr-careers` edge function.
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 

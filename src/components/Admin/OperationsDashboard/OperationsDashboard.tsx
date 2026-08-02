@@ -62,9 +62,9 @@ import { PipelineStrategyMetricsPanel } from './PipelineStrategyMetricsPanel';
 import { CatalogOperationsTab } from './CatalogOperationsTab';
 import { SystemHealthMonitor } from '../SystemHealthMonitor';
 import { StorageAuditPanel } from '../StorageAuditPanel';
-// Relocated here (2026-06-09) from the orphaned /admin/performance route.
+// Relocated here from the orphaned /admin/performance route.
 import { SystemPerformance } from '../SystemPerformance';
-// Relocated here (2026-06-09) from the misnamed /admin/training-models grab-bag.
+// Relocated here from the misnamed /admin/training-models grab-bag.
 import { FactoryRegistrationsTab } from '../FactoryRegistrationsTab';
 import { ResellerApplicationsTab } from '../ResellerApplicationsTab';
 import { MarketplaceApprovalsTab } from '../MarketplaceApprovalsTab';
@@ -658,7 +658,7 @@ const OperationsDashboardInner: React.FC = () => {
 
           {/* Onboarding — brand/manufacturer registration approvals + access requests
               (salvaged from the retired /admin/training-models panel, 2026-06-09) merged with
-              VAT + ΑΑΔΕ-verified self-serve reseller applications (2026-07-15). */}
+              VAT + ΑΑΔΕ-verified self-serve reseller applications. */}
           <TabsContent value="factory-onboarding" className="space-y-4">
             <Tabs defaultValue="registrations" className="space-y-4">
               <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">

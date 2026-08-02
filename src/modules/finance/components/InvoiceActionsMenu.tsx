@@ -1,5 +1,5 @@
 /**
- * #204 — per-document action menu (the timologisi-style 3-dots). Reuses the actions that
+ * per-document action menu (the timologisi-style 3-dots). Reuses the actions that
  * already have implementations; the detail page hosts the heavier dialogs (payment /
  * credit note) so those entries deep-link there. myDATA submit + Copy MARK act inline.
  *
@@ -45,7 +45,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
   const { isAccountant, canOperateFinance } = usePermissions();
   const { activeWorkspaceId } = useWorkspace();
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
-  // Accountant (#202): may record payments, submit to myDATA, PDF — but not edit/create
+  // Accountant: may record payments, submit to myDATA, PDF — but not edit/create
   // documents (new invoice, credit note, template, change description/category).
   const [mark, setMark] = useState<string | null>(fiscalMark ?? null);
   const [fStatus, setFStatus] = useState<string | null>(fiscalStatus ?? null);

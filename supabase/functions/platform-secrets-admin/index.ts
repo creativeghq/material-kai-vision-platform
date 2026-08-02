@@ -1,7 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-//
 // Admin-only CRUD + masking + connection-test for the `platform_secrets` registry.
-//
 // Resolution priority observed everywhere: ENV first, DB second. Edits via this function
 // only affect the DB fallback — they never override an existing env var.
 

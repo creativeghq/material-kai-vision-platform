@@ -86,7 +86,7 @@ export const createManageFinanceTool = (
           // present; `legal_number` is assigned only once the invoice is issued to ΑΑΔΕ.
           // Naming the phantom column made PostgREST reject the whole select, so `inv` was
           // null and this tool answered "invoice not found in this workspace" for EVERY
-          // invoice — blaming the user's data for a query bug. (audit #298)
+          // invoice — blaming the user's data for a query bug.
           .select('id, legal_number, internal_number, status, total, currency')
           .eq('id', invoice_id).eq('workspace_id', workspaceId).maybeSingle();
         if (!inv) return JSON.stringify({ success: false, error: 'invoice not found in this workspace' });

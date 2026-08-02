@@ -83,7 +83,6 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
     // direct identity predicate, not one of the declared filter groups. Callers
     // (AsyncJobQueueMonitor's "open this product", the mention dashboard's "Open") used to
     // pass this param to a page that never read it, so it silently showed ALL products.
-    // (audit #298 / #305)
     if (productIdFilter?.trim()) query = query.eq('id', productIdFilter.trim());
 
     return query;

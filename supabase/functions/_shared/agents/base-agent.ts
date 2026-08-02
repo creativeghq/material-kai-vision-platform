@@ -50,7 +50,6 @@ export function createLogHelper(supabase: DbClient, runId: string) {
 // but historically never wrote to ai_usage_logs, so the Operations dashboard
 // underreported background-agent spend by 100%. Helper centralizes the insert
 // and is fire-and-forget — never blocks or breaks the agent's hot path.
-//
 // Pricing: callers pass the model name; the helper looks up the per-1M-token
 // cost from a small static table. Unknown models are logged at $0 to avoid
 // guessing — admin can backfill via the model-pricing curation tool.

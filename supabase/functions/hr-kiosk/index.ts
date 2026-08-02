@@ -1,8 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — PUBLIC workspace clock-in kiosk (anonymous). A shared-device / mobile page at
+// PUBLIC workspace clock-in kiosk (anonymous). A shared-device / mobile page at
 // /{workspace-slug}/clockin where an employee identifies by VAT (VAT) — optionally a PIN —
 // and clocks arrival/departure. No session; resolves the workspace from `slug`.
-//
 // SECURITY POSTURE (deliberate speed/security trade-off, opt-in):
 //  • Kiosk is OFF by default — a workspace must set hr_settings.kiosk_enabled=true.
 //  • Identity = VAT (the employee must already exist as an active employee of THIS workspace).

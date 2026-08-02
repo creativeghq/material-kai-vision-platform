@@ -1,5 +1,5 @@
 /**
- * Email Marketing Tools — agent-chat surface for the tenant email-marketing add-on (#255/#275).
+ * Email Marketing Tools — agent-chat surface for the tenant email-marketing add-on.
  *
  * ONE tool, actions:
  *   - list           — recent email campaigns in the workspace

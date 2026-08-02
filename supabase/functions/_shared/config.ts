@@ -341,7 +341,6 @@ export class AuthUtils {
         // line: `api_keys` has no `usage_count` column, and `supabase.raw()` does not exist
         // in supabase-js v2. The statement was rejected outright, so `last_used_at` never
         // landed either and there was no way to tell a dead partner key from a busy one.
-        // (audit #298)
         const { error: touchErr } = await supabase
           .from('api_keys')
           .update({ last_used_at: new Date().toISOString() })

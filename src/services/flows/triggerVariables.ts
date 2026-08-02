@@ -269,7 +269,7 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'requester_workspace_id', label: 'Requester workspace ID', note: 'The workspace that asked for pricing.' },
     { key: 'priced_count', label: 'Priced count', note: 'How many lines the supplier priced.' },
   ]),
-  // #237 — reseller quote acceptance mirrored an order into the supplier/operator workspace.
+  // Reseller quote acceptance mirrored an order into the supplier/operator workspace.
   // The delivering payload (admin_ids + envelope) is enriched by the finance_orders DB bridge.
   upstream_order_created: withStandard([
     { key: 'admin_ids', label: 'Admin IDs', note: 'Array of SUPPLIER-workspace admins to notify — iterate with a Loop ({{item}} = each admin id).' },

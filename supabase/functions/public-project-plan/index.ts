@@ -1,5 +1,4 @@
-// public-project-plan — anonymous lead-gen estimator for /tools/project-plan (#242).
-//
+// public-project-plan — anonymous lead-gen estimator for /tools/project-plan.
 // In-repo public path for the Blueprint engine. The compute is PURE (no paid
 // upstream APIs) so it lives here, not in MIVAA. Turnstile-gated + metered against
 // the same `public_lookup_log` table the other public tools use (combined 2/day per
@@ -8,7 +7,6 @@
 // save, no workspace data. Actions:
 //   starters  {}                                        -> { starters: [...] }
 //   estimate  {blueprint_id, dimensions, turnstile_token} -> { result }
-//
 // Frontend re-reads the shared MIVAA quota after a successful estimate; this fn
 // enforces the IP limit itself and logs a success row so the counts stay consistent.
 

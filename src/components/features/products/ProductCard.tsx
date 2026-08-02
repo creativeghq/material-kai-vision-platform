@@ -42,7 +42,7 @@ interface ProductCardProps {
   onViewDetails: (product: Product) => void;
   categoryColor?: string;
   showActions?: boolean;
-  /** #227 — the viewer's own resolved price (reseller buy price + discount, or retail).
+  /** The viewer's own resolved price (reseller buy price + discount, or retail).
    *  Supplied by the parent grid via the bulk catalog-price RPC to avoid an N+1.
    *  `kind` ('your_price' | 'retail' | 'seller') drives the label authoritatively. */
   viewerPrice?: { price: number | null; discount_pct: number; currency: string; kind?: string } | null;

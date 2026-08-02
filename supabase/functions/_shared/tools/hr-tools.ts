@@ -1,13 +1,11 @@
-// #252 — HR agent toolkit. Lets a workspace owner/admin ask the KAI agent natural-language HR
+// HR agent toolkit. Lets a workspace owner/admin ask the KAI agent natural-language HR
 // questions ("who's on leave this week?", "record a sick day for John", "add an employee",
 // "HR overview") from chat, instead of navigating the /hr module UI.
-//
 // DESIGN: the tool is a thin natural-language front-end over the existing `hr-api` edge function.
 // It calls hr-api over HTTP with the CALLER'S JWT, so hr-api authenticates AS the user and applies
 // its full security stack (workspace binding via userCanAccessWorkspace, isModuleEnabled('hr'),
 // assertEntitled(ws,'hr') 402, and the owner/admin-only RBAC — reads need hr.view, writes need
 // hr.manage). We re-implement NONE of that here; workspace_id is server-derived (never model-supplied).
-//
 // SECURITY:
 //  • Gated on isModuleEnabled('hr') + is_workspace_entitled('hr') for a clean upsell message; hr-api
 //    is the real enforcer (a plain member calling a write still gets 403 from hr-api regardless).

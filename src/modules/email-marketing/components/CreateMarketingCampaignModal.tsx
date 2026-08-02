@@ -1,5 +1,5 @@
 /**
- * #255 — create a workspace-scoped email campaign. Audience = CRM categories (resolved via the
+ * Create a workspace-scoped email campaign. Audience = CRM categories (resolved via the
  * membership-guarded RPC) + optional manual emails. Recipients are de-duped by email before insert.
  * Sending is BYOK-only, so "Send now" is disabled until the workspace Resend is configured.
  */

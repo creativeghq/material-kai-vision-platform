@@ -941,7 +941,6 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
     }).then(() => {}, () => {});
 
     // Persist to generation_3d.
-    //
     // `request_type` is CHECK-constrained to exactly 'text_to_image' | 'image_to_image' |
     // 'hybrid'. This used to write the raw `mode` — 'text-to-image', 'image-edit',
     // 'product-shot', or 'materials_selection_board_<board_mode>' — none of which satisfy it.
@@ -952,10 +951,8 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
     // reaper and moodboardAPI.markGenerationSaved() both operated on a row that did not
     // exist. Corroborating: ai_usage_logs held interior_design_generation rows while
     // generation_3d held zero.
-    //
     // MIVAA's writer already gets this right and says so — interior_design_routes.py:698
     // carries the comment "use underscores to match DB constraint".
-    //
     // The specific mode is NOT lost: it is preserved in models_results below.
     const REQUEST_TYPE_BY_MODE: Record<string, 'text_to_image' | 'image_to_image' | 'hybrid'> = {
       'text-to-image': 'text_to_image',

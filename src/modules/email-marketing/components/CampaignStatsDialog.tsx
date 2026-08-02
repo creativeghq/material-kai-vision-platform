@@ -1,5 +1,5 @@
 /**
- * #255 — per-campaign delivery stats. Aggregates from campaign_recipients (workspace-readable) and
+ * per-campaign delivery stats. Aggregates from campaign_recipients (workspace-readable) and
  * offers a "Refresh from Resend" pull that polls the workspace's OWN Resend account for the latest
  * delivered/opened/clicked/bounced status (marketing sends go out under the tenant's Resend, so
  * their events don't reach our webhook).

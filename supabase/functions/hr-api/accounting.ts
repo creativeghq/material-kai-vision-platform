@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — accounting documents. The accounting team uploads the monthly statutory docs (EFKA/tax
+// Accounting documents. The accounting team uploads the monthly statutory docs (EFKA/tax
 // payment slips, APD, …) that carry the real Payment ID / payment number for a payroll period.
 // Claude OCR identifies the doc + extracts the fields (credit-metered); a "prepare" step reconciles
 // the extracted payments against the payroll run and stamps the payment IDs onto its Finance lines.

@@ -1,5 +1,4 @@
 // Shared presentation metadata for a module slug — icon, Hub grouping, and a human description.
-//
 // The `modules` table carries catalog columns (summary/description/icon) but they're sparsely
 // filled and `icon` is a bare string. The curated sources of truth for how a module LOOKS in the
 // product are already in the codebase: SIDEBAR_NAV_ITEMS (icon + hub + description for every app)

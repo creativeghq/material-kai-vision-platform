@@ -979,7 +979,6 @@ export function findTool(toolId: string): AgentToolEntry | undefined {
 // gets only the LEAN core toolkit by default (massive token savings) and can
 // either (a) call the `load_toolkit` meta-tool mid-conversation if it needs
 // more, or (b) the user can pre-enable toolkits from the visual picker.
-//
 // Token estimate: ~250 tokens per tool definition. Cards in the picker show
 // the rough cost so users can see what they're spending.
 // ═════════════════════════════════════════════════════════════════════════════

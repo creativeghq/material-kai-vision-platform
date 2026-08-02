@@ -239,13 +239,11 @@ const HEAP_MB = [4096, 12288];
   }
 
   // ── Coverage assertion: the whole point of this script ────────────────────
-  //
   // A `Check <file>` line proves deno did the work. Its ABSENCE proves nothing, because deno is
   // silent on a cache hit: run the sweep twice and the second run reports zero coverage on
   // identical, fully-checked code. That is not a theoretical edge — it made a local run report
   // "20 entrypoints never reported" while every one of them was checked and clean, which is the
   // precise false alarm this assertion exists to avoid raising.
-  //
   // So silence is not a verdict, it is a question, and it gets answered rather than guessed:
   // re-run the quiet file on its own and read its exit status. 0 means deno validated the graph
   // (cached or not) and found nothing; non-zero means it has errors, which harvest() then records.

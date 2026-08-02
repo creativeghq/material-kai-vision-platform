@@ -34,7 +34,7 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { activeWorkspaceId } = useWorkspace();
   const { showPrices } = useShowPrices();
-  // #227 — resolve each viewer's OWN price (reseller buy price + discount, end-user retail)
+  // Resolve each viewer's OWN price (reseller buy price + discount, end-user retail)
   // in one bulk call rather than the raw catalog retail shown to everyone.
   const [viewerPrices, setViewerPrices] = useState<Record<string, ViewerPrice>>({});
   // Stable key so the fetch fires on the actual product set, not on every parent re-render

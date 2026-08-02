@@ -35,12 +35,12 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
   // Active marketplace listings keyed by warehouse_item_id — drives the "Listed" row badge.
   const [listings, setListings] = useState<Record<string, ActiveListingSummary>>({});
   const [listItem, setListItem] = useState<WarehouseItem | null>(null);
-  // #207 — editing the catalog-depth fields (codes / myDATA classification) of an item.
+  // Editing the catalog-depth fields (codes / myDATA classification) of an item.
   const [editItem, setEditItem] = useState<WarehouseItem | null>(null);
 
   const [page, setPage] = useState(1);
 
-  // #223 — stock filters, on the shared filter model. `listings` is keyed by item id, so the
+  // Stock filters, on the shared filter model. `listings` is keyed by item id, so the
   // marketplace dimension is an accessor over the loaded map rather than a column on the row.
   const filterGroups = useMemo<FilterGroupDef[]>(() => {
     const maxQty = items.reduce((m, i) => Math.max(m, Number(i.qty_on_hand) || 0), 0);
@@ -128,7 +128,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
-  // #207 — move stock of this item's product into another warehouse.
+  // Move stock of this item's product into another warehouse.
   const transfer = async (item: WarehouseItem) => {
     const others = warehouses.filter((w) => w.id !== selectedWh);
     if (others.length === 0) { toast({ title: 'No other warehouse', description: 'Create a second warehouse first.' }); return; }
@@ -192,7 +192,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
           <Button size="sm" onClick={() => setAddOpen(true)} className="rounded-full" disabled={!selectedWh}><Plus className="h-4 w-4 mr-1" /> Add item</Button>
         </div>
       </CardHeader>
-      {/* #223 — stock filters */}
+      {/* Stock filters */}
       {!loading && items.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border/60 bg-muted/10">
           <FilterBar
@@ -408,7 +408,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
   const [qty, setQty] = useState('0');
   const [reorder, setReorder] = useState('0');
   const [location, setLocation] = useState('');
-  // #207 — catalog depth
+  // Catalog depth
   const [barcode, setBarcode] = useState('');
   const [serial, setSerial] = useState('');
   const [cpv, setCpv] = useState('');
@@ -440,7 +440,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
           .from('products')
           .select('id, name, external_sku, metadata, properties')
           .eq('workspace_id', workspaceId)
-          // #207 — warehouse stock is for the workspace's OWN products, never operator-catalog
+          // Warehouse stock is for the workspace's OWN products, never operator-catalog
           // reference items (supply_mode='reference_only' are cost-basis references, not held stock).
           .or('supply_mode.is.null,supply_mode.neq.reference_only')
           .or(`name.ilike.%${q}%,external_sku.ilike.%${q}%`)
@@ -557,7 +557,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
                 <div className="space-y-1"><Label>Unit</Label><Input value={unit} onChange={(e) => setUnit(e.target.value)} /></div>
               </div>
               <div className="space-y-1"><Label>Location</Label><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="optional — e.g. Aisle 3 / Shelf B" /></div>
-              {/* #207 — codes & myDATA classification (optional) */}
+              {/* Codes & myDATA classification (optional) */}
               <details className="rounded-md border border-border/60 px-3 py-2">
                 <summary className="cursor-pointer text-xs text-muted-foreground select-none">Codes &amp; myDATA classification (optional)</summary>
                 <div className="grid grid-cols-2 gap-3 pt-3">
@@ -584,7 +584,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
   );
 };
 
-// #207 — create an additional warehouse.
+// Create an additional warehouse.
 const AddWarehouseDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => void; workspaceId: string; onAdded: (id: string) => void }> = ({ open, onOpenChange, workspaceId, onAdded }) => {
   const { toast } = useToast();
   const [name, setName] = useState('');
@@ -625,7 +625,7 @@ const AddWarehouseDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) =
   );
 };
 
-// #207 — edit an existing item's catalog-depth fields (codes + myDATA classification).
+// Edit an existing item's catalog-depth fields (codes + myDATA classification).
 const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange: (v: boolean) => void; onSaved: () => void }> = ({ item, onOpenChange, onSaved }) => {
   const { toast } = useToast();
   const open = !!item;
@@ -717,7 +717,7 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
 };
 
 /**
- * #221 — "List to Marketplace". Auto-fills title / category / photos / specs / suggested price
+ * "List to Marketplace". Auto-fills title / category / photos / specs / suggested price
  * from the warehouse item's linked catalog product, so the seller realistically only confirms
  * price (and maybe qty). Creating the listing reserves `qty_reserved` via the RPC.
  */

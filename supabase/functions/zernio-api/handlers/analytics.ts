@@ -42,7 +42,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
     if (!membership) return jsonResponse({ success: false, error: 'Not a member of this workspace' }, 403);
   }
 
-  // Pentest #250 M12: the check above only runs when workspace_id is passed. Precompute
+  // The check above only runs when workspace_id is passed. Precompute
   // the caller's accessible workspaces so account/post lookups BY ID can't leak another
   // tenant's analytics when workspace_id is omitted. (Secret/admin callers are unbounded.)
   const isSecretCaller = auth.level === 'secret';
@@ -71,7 +71,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
           .select('zernio_account_id, workspace_id')
           .eq('id', social_account_id)
           .single();
-        // Pentest #250 M12: bind a by-id account lookup to the caller's workspaces.
+        // Bind a by-id account lookup to the caller's workspaces.
         if (acct && !isSecretCaller && !callerWorkspaceIds.includes(acct.workspace_id)) {
           return jsonResponse({ success: false, error: 'Not authorized for this account' }, 403);
         }
@@ -123,7 +123,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
       }
 
       let { data: posts } = await postsQuery.limit(50);
-      // Pentest #250 M12: a by-id post lookup must not expose posts from another tenant.
+      // A by-id post lookup must not expose posts from another tenant.
       if (posts?.length && !isSecretCaller) {
         posts = posts.filter((p: { workspace_id: string }) => callerWorkspaceIds.includes(p.workspace_id));
       }
@@ -189,7 +189,7 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
       }
 
       let { data: accounts } = await accountsQuery;
-      // Pentest #250 M12: a by-id account lookup must not expose another tenant's insights.
+      // A by-id account lookup must not expose another tenant's insights.
       if (accounts?.length && !isSecretCaller) {
         accounts = accounts.filter((a: { workspace_id: string }) => callerWorkspaceIds.includes(a.workspace_id));
       }

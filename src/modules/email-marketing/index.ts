@@ -2,7 +2,7 @@ import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
-// #255 — Email Marketing (tenant-facing add-on on the #251 framework). Routes carry NO requireAdmin,
+// Email Marketing (tenant-facing add-on on the #251 framework). Routes carry NO requireAdmin,
 // so buildModuleRoutes() wraps them in EntitlementGuard: the active workspace must own the
 // 'email-marketing' module, else an upsell is shown. The nav entry lives in SIDEBAR_NAV_ITEMS
 // (moduleSlug:'email-marketing', requireCapability:'marketing.email'), so navItems is empty here.

@@ -55,7 +55,7 @@ const OUTLET_ICON: Record<string, React.ReactNode> = {
 
 export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) => {
   const { toast } = useToast();
-  // #195 — admin-only diagnostic actions (force-refresh, classifier correction, promote) are
+  // admin-only diagnostic actions (force-refresh, classifier correction, promote) are
   // operator-level platform controls. Resolved from the unified capability layer.
   const { can } = usePermissions();
   const admin = can('platform.admin');

@@ -1,5 +1,5 @@
 /**
- * #212 — module entitlement layer (the third gate, alongside tenancy + role/capability).
+ * Module entitlement layer (the third gate, alongside tenancy + role/capability).
  *
  * A feature is usable only if its **module** is available to the ACTIVE workspace:
  *   available = workspace is root (operator) OR the module is a free baseline tier

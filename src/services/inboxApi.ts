@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * #209 — Multi-Tenant Inbox client. Thin wrapper over the single `inbox-api` edge function
+ * Multi-Tenant Inbox client. Thin wrapper over the single `inbox-api` edge function
  * (action-discriminated). JWT actions use the caller's session; token actions (the public
  * customer thread) send the anon key — the function's token branch is service-role and
  * short-circuits before JWT auth.

@@ -1,5 +1,5 @@
 /**
- * ConversationManagerModal — the Agent Studio conversation manager (issue #253).
+ * ConversationManagerModal — the Agent Studio conversation manager.
  *
  * Replaces the persistent left `w-72` conversation sidebar + the mobile Sheet
  * drawer with a single ⌘K modal: pinned group, date-grouped history, search,

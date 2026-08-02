@@ -1,5 +1,5 @@
 /**
- * #273 Phase 0 — provider-neutral payment ingestion.
+ * provider-neutral payment ingestion.
  *
  * ONE path writes an inbound customer payment into the books, whatever provider
  * collected it. Extracted verbatim-in-behaviour from `stripe-webhooks`
@@ -289,10 +289,9 @@ export async function recordStatementPayment(
       // Stripe/Viva, the `payments` row would land, NO payment_allocations rows would land,
       // and the webhook reported success — leaving every invoice open and AR aging wrong,
       // with the only trace an edge-function log line nobody reads.
-      //
       // recordInvoicePayment treats the identical failure as fatal, with the comment "loud,
       // because it needs a human". Same here. The payment row is already written, so the
-      // caller gets its id back and can retry allocation without double-recording. (#307)
+      // caller gets its id back and can retry allocation without double-recording.
       console.error('[payments] statement allocations insert failed', allocErr.message);
       return {
         ok: false,

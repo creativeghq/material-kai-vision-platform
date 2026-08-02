@@ -15,12 +15,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AIModelPricingTab } from './AIModelPricingTab';
 import { ChatStartersTab } from './ChatStartersTab';
-// Relocated here (2026-06-09) from their own orphaned /admin routes so all AI-dev
+// Relocated here from their own orphaned /admin routes so all AI-dev
 // surfaces live under one page. Old routes redirect into these tabs via ?tab=.
 import { ExtractionPromptsPage } from '@/components/Admin/ExtractionPrompts/ExtractionPromptsPage';
 import { PromptTemplatesPage } from '@/components/Admin/PromptTemplates/PromptTemplatesPage';
 import { AITestingPanel } from '@/components/Admin/AITestingPanel';
-// Relocated here (2026-07-15) so every AI ops/monitoring surface lives under one page.
+// Relocated here so every AI ops/monitoring surface lives under one page.
 // Old standalone routes (/admin/api-gateway, /admin/ai-data, /admin/background-agents,
 // /admin/3d-model-debugging) + the Operations "AI Performance" tab redirect into these.
 import { AIPerformanceTab } from '@/components/Admin/AIPerformanceTab';
@@ -785,7 +785,7 @@ export const AgentConfigsPage: React.FC = () => {
             <AIModelPricingTab />
           </TabsContent>
 
-          {/* AI Performance — relocated from the Operations "AI Performance" tab (2026-07-15) */}
+          {/* AI Performance — relocated from the Operations "AI Performance" tab */}
           <TabsContent value="performance">
             <AIPerformanceTab />
           </TabsContent>

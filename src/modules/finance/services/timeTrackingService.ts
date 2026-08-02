@@ -1,5 +1,5 @@
 /**
- * #207 — Time-tracking & billing. Log billable
+ * Time-tracking & billing. Log billable
  * hours against a customer, then turn the unbilled entries into a draft invoice (one line per
  * entry) that flows through the normal issue → myDATA path.
  */

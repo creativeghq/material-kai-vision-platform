@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — Late check-in cron. For every workspace with late alerts on, finds active employees who
+// Late check-in cron. For every workspace with late alerts on, finds active employees who
 // are scheduled to work today, were due to clock in by (work_start_time + grace), and haven't — then
 // fires ONE `hr_late_checkin` flow event per resolved recipient (bell + email via the seeded default
 // flow). Deduped to one alert per employee per day via hr_checkin_alerts. Runs every few minutes.

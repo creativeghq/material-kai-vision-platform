@@ -53,7 +53,7 @@ Deno.serve(withApiLogging('catalog-image-search', async (req) => {
 
   await bootstrapForFunction();
 
-  // Pentest #250 C22: this spends DataForSEO SERP credits per call. It was open to ANY
+  // This spends DataForSEO SERP credits per call. It was open to ANY
   // authenticated user (cost-abuse via looping). Restrict to business roles (secret /
   // service-role backend callers bypass the role check); a full rate limit is a Wave-3 item.
   const auth = await authenticate(req, { allowedRoles: ['admin', 'super_admin', 'owner'] });
@@ -165,7 +165,7 @@ async function searchPlatformDb(supabase: any, query: string, limit: number): Pr
       // a usable `image_url` (pdf-tiles is a public-read bucket — no signing needed).
       // The previous query named BOTH missing columns, so PostgREST rejected it outright
       // and this internal path returned nothing 100% of the time — meaning every image
-      // search silently escalated to the billed provider. (audit #298)
+      // search silently escalated to the billed provider.
       const { data: assoc, error: assocErr } = await supabase
         .from('image_product_associations')
         .select('overall_score, document_images!inner(image_url)')

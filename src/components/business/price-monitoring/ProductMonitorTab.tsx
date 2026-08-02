@@ -134,7 +134,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [showAddSource, setShowAddSource] = useState(false);
-  // #195 — admin overrides (force-refresh, promote/demote, exclusions) are operator controls.
+  // Admin overrides (force-refresh, promote/demote, exclusions) are operator controls.
   const { can } = usePermissions();
   const isAdmin = can('platform.admin');
   const [summary, setSummary] = useState<string | null>(null);
@@ -796,7 +796,6 @@ toast({ title: 'Could not re-include retailer', description: String((e as Error)
 };
 
 // ─── SimilarProductsSection — shows family rows (different SKU, same series) ──
-//
 // Family rows are rendered separately so they don't pollute the price chart /
 // median / alerts. Admin can promote a family row to tracked if the classifier
 // was wrong. Internal product flow (competitor_sources); the tracked-query

@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #249 P2 — Property brochure PDF. Folded into generate-moodboard-sheet-pdf (merge-functions rule)
+// Property brochure PDF. Folded into generate-moodboard-sheet-pdf (merge-functions rule)
 // so it reuses the same pdf-lib + layout stack the moodboard sheets / client views use. A3 landscape:
 // cover (hero photo + title + price + location + agent block) → facts + description → photo gallery.
 // Output lands in the protected `property-media` bucket (private; signed URL returned).

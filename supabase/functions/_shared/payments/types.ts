@@ -1,5 +1,5 @@
 /**
- * #273 — payment-provider abstraction (server side).
+ * payment-provider abstraction (server side).
  *
  * Mirrors `_shared/fiscal/types.ts`, with one deliberate difference: fiscal picks ONE
  * winning connector per capability, whereas payments are **multi-select** — a seller may

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 
 /**
  * WorkspaceContext — the single source of truth for the *active* workspace and
- * the current user's standing within the marketplace tree (#194 / #195).
+ * the current user's standing within the marketplace tree.
  *
  * Three role axes, kept deliberately distinct (this is the fix for the
  * "every owner looked like a platform admin" conflation):

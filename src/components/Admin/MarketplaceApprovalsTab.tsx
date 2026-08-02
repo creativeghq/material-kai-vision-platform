@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { marketplaceService, type MarketplaceApplication } from '@/services/marketplaceService';
 
 /**
- * Operator surface for the surplus marketplace (#219). Workspaces opt in (owner enables) → an
+ * Operator surface for the surplus marketplace. Workspaces opt in (owner enables) → an
  * application lands here → the operator approves/rejects. Only approved+enabled workspaces can
  * list or browse. Mirrors ResellerApplicationsTab.
  */

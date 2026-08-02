@@ -34,7 +34,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';
-// Relocated here (2026-06-09) from its orphaned /admin/3d-suggestions route.
+// Relocated here from its orphaned /admin/3d-suggestions route.
 import { MaterialSuggestionsPanel } from './MaterialSuggestionsPanel';
 
 interface ModelLog {

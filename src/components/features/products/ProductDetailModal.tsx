@@ -208,7 +208,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onUseIn3DScene,
   vrGenerating,
 }) => {
-  // #195 — admin diagnostic surfaces (embeddings/relevances, myDATA card, price lookup) gate on
+  // Admin diagnostic surfaces (embeddings/relevances, myDATA card, price lookup) gate on
   // node-admin via the unified capability layer (replaces the per-mount workspace_members fetch).
   // pricing.manage is granted to exactly the owner/admin personas (operator/dealer/architect),
   // preserving the old `workspace_members.role IN (owner,admin)` behaviour for the active workspace.
@@ -438,12 +438,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   if (!product) return null;
 
   // ── Who sees what ──────────────────────────────────────────────────────────────────────
-  //
   // This modal is mounted on a lot of different surfaces (admin catalog, Discover, dashboard
   // widgets, moodboards, quote lines, agent results, the 3D designer), so the viewer can be an
   // operator, a warehouse hand, a sales rep or a project client. Two axes decide, and BOTH must
   // pass — a capability alone is not enough:
-  //
   //   1. OWNERSHIP. Business data only ever concerns a product in the viewer's ACTIVE
   //      workspace. Operator-catalog reference items and other nodes' products have no stock,
   //      cost or listing that means anything here, and asking for them would be a cross-tenant
@@ -453,7 +451,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   //      nothing about stock. `staff` and `warehouse_staff` run the warehouse and hold
   //      `warehouse.manage`; neither holds `pricing.manage`, so gating stock on the latter
   //      would hide the warehouse from the warehouse team.
-  //
   // Personas that hold none of these — `end_user` (project clients), `employee`, `hr_*`,
   // `marketing_staff`, `accountant`, `realestate_agent` — see the product and nothing else.
   // Note `end_user` DOES hold `quotes.use`, which is why availability keys off `sales.portal`
@@ -913,7 +910,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
 
   // Extract product variants using the new commercial schema.
-  //
   // Data sources, in priority order:
   //   1. commercial.vision_variants  — Structured array produced by the Claude
   //      Vision spec extractor: [{sku, name, color, format, pattern?}].
@@ -921,12 +917,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   //   2. commercial.sku_codes        — Legacy dict keyed by variant slug
   //      ("valenova_blue_30x60": "V2BL3060"). Parsed into the same shape
   //      when vision_variants is absent.
-  //
   // Grout code lookup per variant:
   //   - commercial.grout_details     — [{supplier, product, code, for_variant}]
   //     from the vision extractor. Match by for_variant (name or color).
   //   - commercial.grout_color_codes — Dict keyed by variant/color name.
-  //
   // We return ONE row per variant with an object of grout codes keyed by
   // supplier ({mapei: "M142", kerakoll: "K05", ...}) so the table can render
   // whatever suppliers are present without hard-coding a single column.
@@ -1276,7 +1270,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   // Helper function to render metadata category.
-  //
   // `lowConfidenceKeys` — optional set of display keys whose values were
   // extracted with confidence < LOW_CONFIDENCE_THRESHOLD. Populated by the
   // dynamic-discovery sections that have direct access to wrappers.

@@ -52,7 +52,7 @@ interface BucketStat {
   error?: string;
 }
 
-// Post-consolidation (2026-05-23): 5 anchor buckets. The 12 absorbed buckets
+// Post-consolidation: 5 anchor buckets. The 12 absorbed buckets
 // (3d-models, agent-files, catalog-*, designer-assets, moodboard-sheets,
 // product-images, quote-documents) were dropped — their content lives under
 // path prefixes inside the anchors. Grace seconds use the most conservative
@@ -229,7 +229,7 @@ serve(withApiLogging('storage-orphan-cleanup-cron', async (req) => {
   // once the secrets-bootstrap started injecting CRON_SECRET the nightly cron
   // (which sends no x-cron-secret) 401'd and stopped cleaning storage entirely.
   const cronSecret = () => Deno.env.get('CRON_SECRET') || '';
-  // #250 C25: fail CLOSED. The nightly cron authenticates as service-role; any other
+  // Fail CLOSED. The nightly cron authenticates as service-role; any other
   // caller MUST present a matching x-cron-secret. Previously the secret check was
   // skipped when CRON_SECRET was unset, leaving the endpoint open to anyone.
   if (!isServiceRoleRequest(req)) {

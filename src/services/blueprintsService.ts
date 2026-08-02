@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Blueprints — reusable, versioned scope-of-works templates (#242). A blueprint is
+ * Blueprints — reusable, versioned scope-of-works templates. A blueprint is
  * a tree of sections + tasks with parametric quantity formulas and rates that may
  * link to the finance services catalog. Workspace-owned rows are editable; platform
  * starters (is_platform_starter, workspace_id NULL) are read-only and importable by

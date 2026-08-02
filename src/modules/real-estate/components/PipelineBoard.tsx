@@ -1,4 +1,4 @@
-// #281 — Deal pipeline board. Stage columns with cards; a deal moves via a stage <Select>
+// Deal pipeline board. Stage columns with cards; a deal moves via a stage <Select>
 // (the app's established "board" pattern — see HR RecruitmentSection — not drag-and-drop).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';

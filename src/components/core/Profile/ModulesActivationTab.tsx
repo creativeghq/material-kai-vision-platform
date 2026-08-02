@@ -1,6 +1,5 @@
-// #251 — Profile → Modules. The workspace OWNER activates / purchases optional modules here.
+// Profile → Modules. The workspace OWNER activates / purchases optional modules here.
 // Free (plan-covered) modules activate instantly; add-ons redirect to Stripe checkout.
-//
 // This is the ONLY module storefront — the standalone /apps page was folded in here and now
 // redirects. Modules are grouped into the same Hubs the top-bar App Launcher uses, carry the same
 // icons + copy (see `resolveModuleMeta`), and each card states what it costs and what happens if

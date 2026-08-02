@@ -67,7 +67,7 @@ class FlowService {
         trigger_type: flow.trigger_type || 'manual',
         trigger_config: {},
         graph_definition: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
-        // #256 — flows built through this admin surface are OPERATOR flows: global by default
+        // Flows built through this admin surface are OPERATOR flows: global by default
         // (fire across all workspaces, today's behavior). Tenant flows are created only via the
         // agent's create_simple_flow RPC, never here. The editor exposes the global toggle.
         is_global: true,
@@ -82,7 +82,7 @@ class FlowService {
   }
 
   /**
-   * #256 — create an empty WORKSPACE (tenant) flow for the visual builder. Unlike createFlow
+   * Create an empty WORKSPACE (tenant) flow for the visual builder. Unlike createFlow
    * (which makes operator/global flows on the admin surface), this sets workspace_id + is_global
    * false so it's owned by the workspace and subject to the tenant allowlist guard. Tenant write
    * RLS + the flows_tenant_allowlist_guard trigger enforce scope + safe nodes at the DB.
@@ -309,7 +309,7 @@ class FlowService {
         trigger_type: triggerType,
         trigger_config: {},
         graph_definition: graph as unknown as Record<string, unknown>,
-        is_global: true, // #256 — duplicating an operator flow stays operator/global
+        is_global: true, // Duplicating an operator flow stays operator/global
         created_by: user?.id,
         updated_by: user?.id,
       })

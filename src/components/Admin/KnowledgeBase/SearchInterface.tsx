@@ -78,7 +78,7 @@ export const SearchInterface: React.FC<SearchInterfaceProps> = ({ onOpen }) => {
         // embedding path for that; anything else falls back to ILIKE substring).
         (async (): Promise<KBDocument[]> => {
           try {
-            // Pentest #250 A1: MIVAA now enforces JWT on /api/kb — send the admin's
+            // MIVAA now enforces JWT on /api/kb — send the admin's
             // session token (this is an authenticated admin surface).
             const { data: { session } } = await supabase.auth.getSession();
             const response = await fetch('https://v1api.materialshub.gr/api/kb/search', {

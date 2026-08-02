@@ -40,7 +40,7 @@ export function buildModuleRoutes(): React.ReactElement[] {
 
       // Admin routes are operator platform-management surfaces → gated by AdminGuard only.
       // Tenant-facing module routes additionally require the ACTIVE workspace to OWN the module
-      // (#212/#214) — EntitlementGuard shows an upsell otherwise. (The operator root is entitled
+      //  — EntitlementGuard shows an upsell otherwise. (The operator root is entitled
       // to everything, and free-tier modules are available to all, so neither is affected.)
       const tree = (
         <AuthGuard>

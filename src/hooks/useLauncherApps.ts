@@ -1,4 +1,4 @@
-// #251 — App Launcher data source (rich variant). Splits the workspace's optional modules into
+// App Launcher data source (rich variant). Splits the workspace's optional modules into
 //  • active     — entitled + persona-usable → click to open.
 //  • available  — persona-usable but NOT entitled → click to enable (owner) / request (member).
 // Gating reuses the canonical filterNavItems(): once with real entitlements (active), once with

@@ -1,5 +1,5 @@
 /**
- * #214 — operator console data layer for plans × modules + per-plan quotas.
+ * Operator console data layer for plans × modules + per-plan quotas.
  * - Module → plan tier is the `modules.price_tier` field (the lowest plan that unlocks it).
  * - Per-plan quotas live in `subscription_plans.features` jsonb.
  * Both are platform-wide config; writes are admin/operator-gated by RLS.

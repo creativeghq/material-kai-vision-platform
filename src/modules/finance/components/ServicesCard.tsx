@@ -1,5 +1,5 @@
 /**
- * #203 — manage sellable services (products with item_type='service'). Add/edit name,
+ * Manage sellable services (products with item_type='service'). Add/edit name,
  * unit, price, VAT category + myDATA income classification; these feed quote/invoice/
  * receipt lines and transmit to myDATA with the right classification.
  */

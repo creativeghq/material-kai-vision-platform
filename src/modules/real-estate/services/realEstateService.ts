@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 
-// #249 — client for the `real-estate-api` (authed) + `real-estate-public` (token page) edge functions.
+// Client for the `real-estate-api` (authed) + `real-estate-public` (token page) edge functions.
 // Every management call passes the active workspace_id; the edge fn re-derives access from the caller
 // (JWT) and enforces entitlement + realestate.* RBAC. `properties` post-dates the last gen-types run,
 // so rows are loosely typed here (same safety level hrService uses for its post-types tables).
@@ -83,7 +83,7 @@ export interface SellerLead {
 }
 export interface ValuationResult { estimate: number | null; range_low: number | null; range_high: number | null; currency: string; comps_count: number; median_per_sqm: number | null }
 
-// ── Lettings / property management (#281) ──
+// ── Lettings / property management ──
 export type RentFrequency = 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 export interface Tenancy {
   id: string; property_id: string; tenant_contact_id: string | null; landlord_contact_id: string | null;
@@ -109,7 +109,7 @@ export interface LandlordStatement {
   summary: { rent_charged: number; rent_received: number; rent_outstanding: number; maintenance_spend: number; net_to_landlord: number };
 }
 
-// ── Sale completion + commission (#281) ──
+// ── Sale completion + commission ──
 export interface PropertySale {
   id: string; property_id: string; offer_id: string | null; sale_price: number; currency: string;
   commission_pct: number; commission_fixed: number; vat_pct: number; commission_base: number; commission_total: number;
@@ -135,7 +135,7 @@ export interface RealEstateDashboard {
   upcoming_viewings: (PropertyViewing & { property?: { title: string | null } | null })[];
 }
 
-// ── Investments add-on (#281) ──
+// ── Investments add-on ──
 export interface InvestmentInputs {
   purchase_price: number; acquisition_costs: number; renovation_costs: number;
   loan_amount: number; interest_rate_pct: number; loan_term_years: number;
@@ -158,7 +158,7 @@ export interface InvestmentPortfolio {
   annual_cash_flow: number; monthly_cash_flow: number; blended_net_yield_pct: number; currency: string;
 }
 
-// ── CMA report (#281) ──
+// ── CMA report ──
 export interface CmaComp { id: string; title: string | null; town: string | null; price: number; area: number | null; bedrooms: number | null; price_per_sqm: number | null; listing_status: string; days_on_market: number | null; currency: string }
 export interface CmaReport {
   subject: { property_id: string | null; title: string | null; property_type: string; town: string; area: number | null; price: number | null; currency: string };
@@ -168,7 +168,7 @@ export interface CmaReport {
   generated_at: string;
 }
 
-// ── Deal pipeline (#281) ──
+// ── Deal pipeline ──
 export type DealStage = 'lead' | 'viewing' | 'offer' | 'under_offer' | 'conveyancing' | 'exchanged' | 'completed';
 export interface PropertyDeal {
   id: string; property_id: string; buyer_contact_id: string | null; stage: DealStage;
@@ -237,7 +237,7 @@ export const realEstateService = {
     call<{ offer: PropertyOffer }>(ws, 'update-offer', { offer_id: offerId, ...fields }).then((r) => r.offer),
   acceptOffer: (ws: string, offerId: string) => call<{ ok: true; cancelled_viewings: number }>(ws, 'accept-offer', { offer_id: offerId }),
 
-  // Sale completion + commission (#281)
+  // Sale completion + commission
   completeSale: (ws: string, fields: { offer_id?: string; property_id?: string; sale_price: number; currency?: string; commission_pct?: number; commission_fixed?: number; vat_pct?: number; completed_at?: string; buyer_contact_id?: string; notes?: string }) =>
     call<{ sale: PropertySale }>(ws, 'complete-sale', fields).then((r) => r.sale),
   listSales: (ws: string, propertyId?: string) =>
@@ -245,7 +245,7 @@ export const realEstateService = {
   linkSaleInvoice: (ws: string, saleId: string, invoiceId: string, invoiceStatus = 'issued') =>
     call<{ sale: PropertySale }>(ws, 'link-sale-invoice', { sale_id: saleId, invoice_id: invoiceId, invoice_status: invoiceStatus }).then((r) => r.sale),
 
-  // Investments add-on (#281)
+  // Investments add-on
   getInvestment: (ws: string, propertyId: string) =>
     call<{ investment: PropertyInvestment | null; metrics: InvestmentMetrics | null }>(ws, 'get-investment', { property_id: propertyId }),
   upsertInvestment: (ws: string, propertyId: string, fields: Partial<InvestmentInputs>) =>
@@ -253,11 +253,11 @@ export const realEstateService = {
   listInvestments: (ws: string) =>
     call<{ investments: PropertyInvestment[]; portfolio: InvestmentPortfolio }>(ws, 'list-investments'),
 
-  // CMA report (#281)
+  // CMA report
   cmaReport: (ws: string, params: { property_id?: string; property_type?: string; town?: string; area?: number }) =>
     call<CmaReport>(ws, 'cma-report', params),
 
-  // Deal pipeline (#281)
+  // Deal pipeline
   listDeals: (ws: string) => call<{ deals: PropertyDeal[] }>(ws, 'list-deals').then((r) => r.deals),
   upsertDeal: (ws: string, fields: { deal_id?: string; property_id?: string; buyer_contact_id?: string | null; stage?: DealStage; status?: string; value?: number | null; currency?: string; expected_close_date?: string | null; notes?: string; lost_reason?: string }) =>
     call<{ deal: PropertyDeal }>(ws, 'upsert-deal', fields).then((r) => r.deal),
@@ -310,7 +310,7 @@ export const realEstateService = {
   updateViewing: (ws: string, viewingId: string, fields: { status?: string; scheduled_at?: string; feedback?: string }) =>
     call<{ viewing: PropertyViewing }>(ws, 'update-viewing', { viewing_id: viewingId, ...fields }).then((r) => r.viewing),
 
-  // ── Lettings / property management (#281) ──
+  // ── Lettings / property management ──
   listTenancies: (ws: string, propertyId?: string) =>
     call<{ tenancies: Tenancy[] }>(ws, 'list-tenancies', propertyId ? { property_id: propertyId } : {}).then((r) => r.tenancies),
   upsertTenancy: (ws: string, fields: { tenancy_id?: string; property_id: string; tenant_contact_id?: string | null; landlord_contact_id?: string | null; rent_amount: number; currency?: string; rent_frequency?: RentFrequency; deposit?: number | null; start_date: string; end_date?: string | null; status?: string; notes?: string }) =>
@@ -382,7 +382,7 @@ export const realEstatePublic = {
     return data as ValuationResult;
   },
 
-  // Buyer portal (#281) — token-scoped, no auth
+  // Buyer portal — token-scoped, no auth
   async buyerPortal(token: string): Promise<{ requirement: { label: string | null; criteria: Record<string, any> }; agency: string | null; favorites: string[]; listings: PublicListingCard[] }> {
     const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'buyer-portal', token } });
     if (error) throw await edgeError(error);

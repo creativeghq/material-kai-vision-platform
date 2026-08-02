@@ -1,12 +1,10 @@
 // deno-lint-ignore-file no-explicit-any
 // ShipsGo container-tracking adapter for inbound shipments (W4).
-//
 // ⚠️ VERIFY BEFORE ACTIVATION: ShipsGo exposes several tracking products and API versions. The exact
 // endpoint paths + JSON field names below are a best-effort against ShipsGo v2 and MUST be confirmed
 // against your live ShipsGo API docs/plan before go-live. To make that a one-file change, the base URL
 // and the two paths are env-overridable, and the response parser is defensive (it reads whichever of
 // several common field names is present) so it degrades gracefully rather than throwing on shape drift.
-//
 // Contract this module exposes to the rest of the platform (stable, provider-agnostic):
 //   trackShipment(key, { reference, tracking_type, carrier? }) -> NormalizedShipment
 // The stock-api shipment actions only ever see NormalizedShipment, so swapping ShipsGo for Vizion/

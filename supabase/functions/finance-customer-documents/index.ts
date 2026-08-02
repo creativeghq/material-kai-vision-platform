@@ -2,7 +2,6 @@
 // Customer self-service document list. A buyer who has an app account (their auth
 // user_id is linked to one or more crm_contacts) can see THEIR OWN issued invoices /
 // retail receipts and payment receipts, with fresh signed PDF download links.
-//
 // Why an edge function (not direct table reads): the invoices RLS is
 // `is_workspace_member(workspace_id)` — a customer is NOT a workspace member, so they
 // can't read the table directly. The overview lists come from `my_customer_*` RPCs that
@@ -25,7 +24,6 @@ const isReceiptDoc = (dt: string | null) => String(dt ?? '').startsWith('11');
 // Each of the three lists (orders / invoices / receipts) is paged independently by the client.
 // Paging is PRESENTATION ONLY: it never touches the scoping, which the RPCs derive from
 // auth.uid() server-side (the caller's own crm_contacts + the companies those contacts link to).
-//
 // The lists come from `my_customer_*` RPCs that do the contact-OR-company union in SQL, so
 // LIMIT/OFFSET are exact and there is no scan cap: we fetch exactly one page of metadata rows
 // (`total_count` rides along on every row) and sign PDF URLs for that page ONLY. Signing is one

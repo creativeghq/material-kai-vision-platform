@@ -1,5 +1,5 @@
 /**
- * real-estate-rent-invoicing (#281) — recurring rent → Finance.
+ * real-estate-rent-invoicing — recurring rent → Finance.
  *
  * Daily, for every rent charge coming due within the window that has no invoice yet (on an active
  * tenancy with a tenant), creates a DRAFT Finance invoice to the tenant and links it back on the

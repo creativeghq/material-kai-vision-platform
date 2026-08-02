@@ -1,5 +1,5 @@
 /**
- * Email Marketing service — workspace-scoped campaigns + templates for the tenant module (#255).
+ * Email Marketing service — workspace-scoped campaigns + templates for the tenant module.
  *
  * All reads/writes carry the active workspace_id; RLS (is_workspace_member) enforces tenancy.
  * Audience resolution goes through the membership-guarded crm_categories_resolve_recipients_ws RPC.

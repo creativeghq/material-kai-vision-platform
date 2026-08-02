@@ -1,5 +1,5 @@
 /**
- * #273 — Viva.com BYOK setup card.
+ * Viva.com BYOK setup card.
  *
  * Mounted in Profile → Keys (WorkspaceKeysTab) alongside the other per-workspace BYOK
  * cards, and on the payments-viva module settings page.

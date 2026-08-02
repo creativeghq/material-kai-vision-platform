@@ -43,7 +43,7 @@ interface QuoteItemsListProps {
   editPricing?: boolean;
   /** When false, price/total columns are hidden entirely (e.g. customer view before quote is priced). Defaults to true. */
   showPricing?: boolean;
-  /** #227 — when false AND the viewer is a sales rep, the per-line margin is hidden. Defaults to true. */
+  /** When false AND the viewer is a sales rep, the per-line margin is hidden. Defaults to true. */
   salesCanSeeCost?: boolean;
   /** When true, unit column is editable via dropdown (admin only). Defaults to false. */
   editUnits?: boolean;
@@ -61,7 +61,6 @@ interface QuoteItemsListProps {
 }
 
 // Convert quote product to display product format.
-//
 // SimpleProduct.metadata is typed as ProductMetadata where every field is
 // `unknown` (wrapper-or-primitive polymorphism). Coerce each field to its
 // destination type before assigning so we get a properly-typed Product
@@ -112,7 +111,7 @@ const convertToDisplayProduct = (product: SimpleProduct): Product => {
     specifications: asObj(md.specifications),
     pricing: {
       retail: asNum(md.price),
-      wholesale: 0, // #227 — never carry procurement cost into a display product (was leaking products.cost)
+      wholesale: 0, // Never carry procurement cost into a display product (was leaking products.cost)
       currency: product.cost_currency || 'EUR',
     },
     stock: {
@@ -197,7 +196,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   // Price lookup drawer state — one instance, reused for any row the admin clicks.
   const [lookupItem, setLookupItem] = useState<QuoteItemWithProduct | null>(null);
-  // #227 — hide the per-line margin from a sales rep when sales_can_see_cost is off.
+  // Hide the per-line margin from a sales rep when sales_can_see_cost is off.
   const { isSalesRep, can } = usePermissions();
   const { toast } = useToast();
   const [rfqBusy, setRfqBusy] = useState(false);
@@ -231,7 +230,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
 
   // A sales MANAGER owns the team's numbers, so the per-rep cost blind is not theirs to wear.
   const showMargin = can('sales.team.view') || !(isSalesRep && !salesCanSeeCost);
-  // #227 — per-line margin (cost → price spread) is internal-only: pricing managers/admins,
+  // per-line margin (cost → price spread) is internal-only: pricing managers/admins,
   // and even then hidden from a sales rep who isn't cleared to see cost.
   const canSeeLineMargin = can('pricing.manage') && showMargin;
 
@@ -368,7 +367,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                   const hasDiscount = (item as any).discounted_price != null &&
                     (item as any).discounted_price !== item.unit_price;
 
-                  // #237 Phase 4: unpriced line — "call for price" (needs pricing) or
+                  // Unpriced line — "call for price" (needs pricing) or
                   // "awaiting supplier" (RFQ sent upstream). Rendered in place of a price.
                   const pricingStatus = ((item as any).pricing_status ?? 'priced') as string;
                   const callForPrice = pricingStatus !== 'priced';
@@ -521,7 +520,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                             ) : (
                               <span className="text-sm">{fmtPrice(item.unit_price)}</span>
                             )}
-                            {/* #227 — seller-only breakdown: retail anchor, discount off retail, margin (ex-VAT). */}
+                            {/* seller-only breakdown: retail anchor, discount off retail, margin (ex-VAT). */}
                             {editPricing && (() => {
                               const retail = (item as any).retail_price != null ? Number((item as any).retail_price) : null;
                               const cost = (item as any).cost_snapshot != null ? Number((item as any).cost_snapshot)
@@ -585,7 +584,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 {fmtPrice(Number(item.unit_price) * item.quantity)}
                               </div>
                             )}
-                            {/* #227 — internal-only per-line margin: (price − cost) × qty. */}
+                            {/* internal-only per-line margin: (price − cost) × qty. */}
                             {canSeeLineMargin && (() => {
                               const cost = (item as any).cost_snapshot != null ? Number((item as any).cost_snapshot) : null;
                               const finalUnit = effectivePrice != null ? Number(effectivePrice) : null;

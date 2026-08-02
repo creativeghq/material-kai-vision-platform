@@ -1,5 +1,5 @@
 /**
- * Contracts Tools — agent-chat surface for the Contracts & e-Signature module (#275).
+ * Contracts Tools — agent-chat surface for the Contracts & e-Signature module.
  *
  * ONE tool, actions:
  *   - list — recent contracts (optionally by status/context)

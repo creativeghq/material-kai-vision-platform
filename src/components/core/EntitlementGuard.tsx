@@ -1,5 +1,5 @@
 /**
- * #212 — route-level entitlement gate. Renders children only when the active workspace owns
+ * route-level entitlement gate. Renders children only when the active workspace owns
  * (or gets free) the module; otherwise shows an UPSELL (not a bare "restricted" wall), because
  * the right action for a paid module is "purchase it", not "go away". URL-level half of module
  * gating — hiding the nav item isn't enough, a user could type `/finance` directly.
@@ -8,7 +8,7 @@
  *
  * Fails OPEN while loading (returns null → no flash) and never blocks the operator root.
  *
- * #256 — when the module is a purchasable add-on with a price, the upsell shows the price and a
+ * When the module is a purchasable add-on with a price, the upsell shows the price and a
  * direct Buy button (owner → Stripe checkout via activate-module) or a "request" button
  * (non-owner → notify the owner), in addition to the plan-upgrade path.
  */

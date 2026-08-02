@@ -1,5 +1,5 @@
 /**
- * #214 — turn the DB `quota_exceeded` error into a friendly "Plan limit reached → Upgrade" toast.
+ * Turn the DB `quota_exceeded` error into a friendly "Plan limit reached → Upgrade" toast.
  * The quota cap is enforced at the database (a trigger raises `quota_exceeded: …`), so every
  * create path surfaces the same error; wrap the catch with this to route it to the upsell.
  *

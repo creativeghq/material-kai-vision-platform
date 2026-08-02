@@ -7,7 +7,7 @@ import { realEstatePublic, type ValuationResult } from '../services/realEstateSe
 
 const money = (n: number | null, ccy = 'EUR') => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy, maximumFractionDigits: 0 }).format(n));
 
-// #249 — public seller lead-magnet on the agency profile: instant comps-based valuation + captures
+// Public seller lead-magnet on the agency profile: instant comps-based valuation + captures
 // the visitor as a seller lead. Estimate comes from the agency's own comparable listings.
 export const ValuationWidget: React.FC<{ userId: string }> = ({ userId }) => {
   const [open, setOpen] = useState(false);

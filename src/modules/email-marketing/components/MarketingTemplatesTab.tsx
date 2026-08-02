@@ -1,5 +1,5 @@
 /**
- * #255 — workspace-scoped marketing template list. Create → auto-slugged workspace template →
+ * workspace-scoped marketing template list. Create → auto-slugged workspace template →
  * open the shared GrapesJS builder. Reuses email_templates (workspace_id set, is_system=false).
  */
 import React, { useEffect, useState } from 'react';

@@ -6,7 +6,6 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 // (which only catches white-screens) nor the plpgsql lint (which only catches broken refs) says
 // anything about whether the ARITHMETIC and the TENANCY GUARDS are right — and these are the
 // paths where being silently wrong costs real money.
-//
 // record_payment_fx is called with a REAL user JWT (it reads auth.uid() and calls
 // assert_workspace_member). The credit RPCs are service-role-by-design, so those run on the
 // service client — that IS their production caller.

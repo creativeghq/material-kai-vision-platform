@@ -488,7 +488,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       );
     }
 
-    // Pentest #250 C1: platform-admin actions (path under /api/admin) must require an
+    // platform-admin actions (path under /api/admin) must require an
     // admin/super_admin role. Previously the only gate was "authenticated", so ANY
     // logged-in user could invoke admin_delete_job / admin_cleanup_data /
     // admin_backup_data / admin_prompts_update etc. under the gateway's trusted

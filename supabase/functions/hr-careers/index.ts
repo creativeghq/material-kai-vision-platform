@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — PUBLIC careers page API (anonymous). Lists a workspace's OPEN job postings by public
+// PUBLIC careers page API (anonymous). Lists a workspace's OPEN job postings by public
 // slug and accepts applications. No session; resolves the workspace from `slug` (mirrors
 // finance-storefront). Apply is Turnstile-gated when TURNSTILE_SECRET_KEY is configured
 // (fail-open when not, so it works out of the box). Writes only hr_candidates + hr_applications
@@ -74,10 +74,8 @@ Deno.serve(withApiLogging('hr-careers', async (req) => {
   // Greenhouse (/v1/boards/{board}/jobs), Lever and Ashby: a plain GET a human can
   // curl and an aggregator / no-code tool can poll. The POST+action envelope those
   // actions use is unusable for those consumers, which is the whole reason this exists.
-  //
   //   GET ?slug=<company>             → { company, count, jobs: [...] }
   //   GET ?slug=<company>&job=<slug>  → { company, job: {...} }  (adds description/requirements)
-  //
   // Deliberately jobs-only: no turnstile_site_key and no apply_config — those are UI
   // concerns for our own careers page, noise (and needless surface) for an integrator.
   // Each job carries `absolute_url` so a consumer can link straight to the posting and

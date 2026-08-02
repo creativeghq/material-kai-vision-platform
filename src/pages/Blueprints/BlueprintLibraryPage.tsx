@@ -17,7 +17,7 @@ import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { blueprintsService, type Blueprint } from '@/services/blueprintsService';
 
 /**
- * Blueprint Library (#242) — workspace-owned reusable scope-of-works templates +
+ * Blueprint Library — workspace-owned reusable scope-of-works templates +
  * platform starters. Create, edit (→ editor page), duplicate a starter into your
  * workspace, delete. Importing into a project happens from the project Plan tab.
  */

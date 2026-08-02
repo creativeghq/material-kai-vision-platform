@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #249 — Real Estate API: RBAC, write allowlist (anti-BOPLA), and the publish compliance gate.
+// Real Estate API: RBAC, write allowlist (anti-BOPLA), and the publish compliance gate.
 
 /** Access for the caller in this workspace (mirrors the frontend persona model, §11 / D7).
  *  - broker: owner/admin (or global admin) → manage listings + see ALL leads/viewings.

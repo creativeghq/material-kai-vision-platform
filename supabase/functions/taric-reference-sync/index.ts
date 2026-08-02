@@ -1,13 +1,10 @@
 // deno-lint-ignore-file no-explicit-any
-//
 // Imports the EU TARIC goods nomenclature into `public.taric_codes`.
-//
 // The nomenclature is published as spreadsheet extractions (CIRCABC, "TARIC & Quota Data and
 // Information") and changes monthly, so this is a recurring load rather than a one-off seed.
 // We take CSV/TSV text rather than xlsx: the platform has no spreadsheet parser and adding one
 // to an edge function to read a file an admin can "Save as CSV" in one click is not a trade
 // worth making.
-//
 // Column names differ between the EU extraction, the Greek national extraction and whatever an
 // admin re-exports, so headers are matched against an alias table instead of being hardcoded to
 // one file layout. A file whose code column cannot be found fails loudly with the headers it
@@ -105,7 +102,6 @@ Deno.serve(withApiLogging(
     if (body.action === 'stats') return json(await stats(supabase));
 
     // ── Resolve WHAT to import ──────────────────────────────────────────────────────────────
-    //
     // Preference order, most automatic first:
     //   1. a CIRCABC library — the current month is discovered on every run, which is the only
     //      option that stays correct, because the extraction moves to a new folder monthly;
@@ -190,13 +186,11 @@ Deno.serve(withApiLogging(
 ));
 
 // ── CIRCABC discovery ──────────────────────────────────────────────────────────────────────
-//
 // The nomenclature is republished EVERY MONTH into a NEW folder, so a pinned file URL is right
 // for exactly one month and then silently serves stale codes. CIRCABC's own Angular client
 // reads `GET /service/circabc/spaces/{id}/children`, and that endpoint honours `guest=true` for
 // public libraries — so the folder tree can be walked without credentials and the current
 // month resolved on every run.
-//
 // (`/api/-default-/public/alfresco/…` answers 401 and `/api/nodes/…` 404s; this is the path the
 // product actually uses.)
 
@@ -613,7 +607,6 @@ async function importGrid(
     // Both halves must be split BEFORE normalising: the concatenated digits are 12 long and
     // `normalizeCode` — correctly — rejects that, so splitting afterwards would have skipped
     // every row in the file.
-    //
     // The suffix is not cosmetic. 80 is a declarable line; 10 is an intermediate one that exists
     // only to carry the hierarchy and is rejected on a customs declaration. Defaulting it to 80
     // would publish thousands of unusable codes into the picker as if they were valid.

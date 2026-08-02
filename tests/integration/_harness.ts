@@ -2,7 +2,6 @@
 // scripts/smoke). A service-role key creates throwaway users / workspaces / rows; each test
 // user gets a REAL signed-in client (anon key + signInWithPassword) so queries run under that
 // user's JWT and exercise the actual RLS policies — not a service-role bypass.
-//
 // All test users use an `e2e-…@materialshub.gr` email so cleanup_test_artifacts reaps any
 // leftover if afterAll cleanup is interrupted (see [[project_test_artifact_cleanup_2026_06_22]]).
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -94,7 +93,6 @@ async function step(
 
 // Best-effort teardown. Data first (FK), then memberships, workspaces, users. Never throws —
 // the email-prefix cron is the backstop if anything here fails.
-//
 // It must never throw, but it MUST NOT be silent. Every delete here used to be
 // `.then(() => {}, () => {})`, which discarded the error object as well as the exception — so
 // when a BEFORE DELETE guard on a cascaded child (finance_categories' system-category trigger)

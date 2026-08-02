@@ -30,7 +30,7 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
   const internalKey = req.headers.get('x-internal-key') || '';
   const isInternalCall = supabaseServiceKey && internalKey === supabaseServiceKey;
 
-  // Pentest #250 C20: capture whether the caller is a trusted backend (pg_net trigger /
+  // Capture whether the caller is a trusted backend (pg_net trigger /
   // service-role / admin-secret) vs a specific user, so a user caller can be bound to the
   // doc's workspace below (otherwise any authenticated user could re-embed/overwrite any
   // tenant's KB doc by id — integrity + Voyage cost).
@@ -85,7 +85,7 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
       );
     }
 
-    // Pentest #250 C20: a user caller may only re-embed docs in their own workspace.
+    // A user caller may only re-embed docs in their own workspace.
     if (!isTrustedBackend && !(await userCanAccessWorkspace(supabaseAdmin, callerUserId, doc.workspace_id))) {
       return new Response(
         JSON.stringify({ error: 'Document not found' }),

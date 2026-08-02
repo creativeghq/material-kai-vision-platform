@@ -217,7 +217,7 @@ serve(withApiLogging('messaging-processor', async (req) => {
           // (audit #306 finding 21)
           const { data: messageLog, error: logErr } = await supabase.from('messaging_logs').insert({
             channel_type: 'whatsapp',
-            workspace_id: channel.workspace_id, // #250 B6: tenant scope
+            workspace_id: channel.workspace_id, // Tenant scope
             template_id: template.id,
             channel_id: channel.id,
             provider_message_id: result.messageId,
@@ -266,7 +266,7 @@ serve(withApiLogging('messaging-processor', async (req) => {
           console.error(`Failed to send to ${recipient.phone_number}:`, errorMessage);
         }
 
-        // Pace from the channel's configured rate, not a constant. (audit #306)
+        // Pace from the channel's configured rate, not a constant.
         await new Promise((res) => setTimeout(res, sendDelayMs(channel.max_send_rate)));
       }
     }

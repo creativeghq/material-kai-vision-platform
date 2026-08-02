@@ -1,4 +1,4 @@
-// #252 — PUBLIC careers board at /careers/:slug. Anonymous; data from the `hr-careers` edge fn.
+// PUBLIC careers board at /careers/:slug. Anonymous; data from the `hr-careers` edge fn.
 // Each role links to its own shareable URL (/careers/:slug/:job) — see PublicJobPage.
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';

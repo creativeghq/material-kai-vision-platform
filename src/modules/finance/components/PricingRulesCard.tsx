@@ -1,5 +1,5 @@
 /**
- * #176 — per-category markup overrides on resold catalog products. Sits on top of the
+ * per-category markup overrides on resold catalog products. Sits on top of the
  * blanket default_markup_pct (Finance → Settings). Precedence the resolver applies:
  * per-product > per-category > default. Per-product overrides are set from the product
  * card; this card manages the category-level rules.

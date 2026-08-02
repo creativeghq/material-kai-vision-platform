@@ -5,15 +5,12 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 // Sales/Finance PR-A — Supplier Cost List parser
-//
 // Reads a kb_docs row with price_doc_type='supplier_cost_list' and materializes
 // the SKU → cost rows it contains onto products.cost. This is the operator-facing
 // surface for maintaining procurement costs: an admin uploads a supplier price
 // list as a KB doc, then triggers this function to apply it to the catalog.
-//
 // Input:  { kb_doc_id: uuid, dry_run?: boolean }
 // Output: { ok, parsed_rows, matched, updated, unmatched, errors, dry_run }
-//
 // Match key: products.sku (then products.external_sku as fallback) within the
 // same workspace as the KB doc.
 
@@ -166,7 +163,7 @@ Deno.serve(withApiLogging('parse-supplier-cost-list', async (req) => {
 
     if (docErr || !doc) return json({ error: `KB doc not found: ${docErr?.message ?? body.kb_doc_id}` }, 404);
 
-    // Pentest #250 H2: the role gate above only proves the caller is an owner of SOME
+    // The role gate above only proves the caller is an owner of SOME
     // workspace; the service-role load bypasses RLS. Without this, an owner of tenant A
     // could pass tenant B's kb_doc_id and both leak B's SKU→cost table AND overwrite
     // B's products.cost. Bind the caller to the doc's workspace (404 to avoid id enum).

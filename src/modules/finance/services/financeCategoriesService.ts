@@ -7,7 +7,7 @@ export interface FinanceCategory {
   kind: 'income' | 'expense' | 'both';
   color: string | null;
   is_active: boolean;
-  /** #207 — default sell margin % for products in this category; auto-prices received goods. */
+  /** Default sell margin % for products in this category; auto-prices received goods. */
   margin_pct: number | null;
   /** Protected built-in: every workspace has one of each; can't be renamed/re-kinded/deactivated/
    *  deleted. Enforced by the guard_system_finance_category DB trigger. */

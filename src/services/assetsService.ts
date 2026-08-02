@@ -3,7 +3,6 @@
 // who currently holds each. Leased/financed assets link to a finance_recurring_expenses template so
 // the recurring cost flows through the existing expense → supplier_bill machinery (we don't
 // re-implement payments here).
-//
 // Follows the finance convention: direct RLS-gated supabase.from() reads/writes (see financeService).
 // company_assets / asset_assignments aren't in the generated types yet, so we cast the client.
 import { supabase } from '@/integrations/supabase/client';

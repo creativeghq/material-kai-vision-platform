@@ -1,5 +1,5 @@
 /**
- * #206 — per-workspace myDATA received-docs (inbound) credentials. Manager-only; the
+ * per-workspace myDATA received-docs (inbound) credentials. Manager-only; the
  * subscription key is stored in workspace_inbound_credentials (not finance_settings) so
  * the read-only accountant never sees it. Once set + enabled, the finance-inbound-sync
  * poller pulls this workspace's received documents into the Expenses Inbox.

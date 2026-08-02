@@ -85,7 +85,7 @@ serve(withApiLogging('canonicalize-attributes', async (req) => {
     });
   }
 
-  // Pentest #250 C21: this proxy forwards to MIVAA's admin /facets/canonicalize under
+  // This proxy forwards to MIVAA's admin /facets/canonicalize under
   // the platform mk_ key and previously had NO caller auth — anyone could canonicalize
   // arbitrary attributes (Voyage embedding cost + open admin proxy). All real callers
   // (material-tagger / product-enrichment agents, catalog-tools) invoke it with the

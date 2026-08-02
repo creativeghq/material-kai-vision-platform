@@ -416,7 +416,7 @@ export class QuotesService {
           quote_id: quote.id,
           user_id: quote.user_id,
           // Without workspace_id the flow-engine can only match GLOBAL flows for a user caller, so a
-          // tenant's own quote_approved/rejected automation would silently never fire. (#256)
+          // tenant's own quote_approved/rejected automation would silently never fire.
           workspace_id: quote.workspace_id,
           admin_ids: adminIds,
           type: accepted ? 'quote_accepted' : 'quote_rejected',
@@ -484,7 +484,7 @@ export class QuotesService {
       productCategory = product?.metadata?.material_category ?? null;
     } catch { /* non-fatal — falls back to null (displays as pcs) */ }
 
-    // #176: pre-fill the line from the cascade resolver so catalog lines aren't blank.
+    // pre-fill the line from the cascade resolver so catalog lines aren't blank.
     // For an OWN product the resolved figure IS the sell price; for an operator-catalog
     // product it's the seller's COST (snapshotted so margin is computable) and seeds the
     // unit_price as a starting sell the seller marks up.
@@ -493,7 +493,7 @@ export class QuotesService {
     let costSnapshot: number | null = null;
     let retailPrice: number | null = null;
     let quoteWorkspaceId: string | null = null;
-    // #237 Phase 4: line pricing state. Unpriced operator-catalog lines become
+    // Line pricing state. Unpriced operator-catalog lines become
     // "call for price" (rendered as such, excluded from totals, RFQ-able upstream)
     // instead of a silently-broken NULL-priced line.
     let pricingStatus: 'priced' | 'call_for_price' = 'priced';
@@ -505,7 +505,7 @@ export class QuotesService {
         .single();
       if (quote?.workspace_id) {
         quoteWorkspaceId = quote.workspace_id;
-        // #227: pass the quote's customer so the resolver applies their pricing-level discount.
+        // Pass the quote's customer so the resolver applies their pricing-level discount.
         // audience='seller' → staff get cost_basis + margin (never exposed to the buyer).
         const { data: priced } = await supabase.rpc('get_product_price_for_workspace', {
           p_workspace_id: quote.workspace_id,
@@ -534,7 +534,7 @@ export class QuotesService {
     // Any catalog line we couldn't price is a call-for-price candidate.
     if (unitPrice == null) pricingStatus = 'call_for_price';
 
-    // Layer B (#227): quote-time custom rules (volume per category, category extra) applied on
+    // Layer B: quote-time custom rules (volume per category, category extra) applied on
     // top of the level discount, with category-tree inheritance (most-specific-wins).
     if (unitPrice != null && quoteWorkspaceId && productCategory) {
       try {
@@ -751,7 +751,7 @@ export class QuotesService {
       }
     }
 
-    // #237 Phase 4: once a real sell price lands (manual entry, market-check accept, or a
+    // Once a real sell price lands (manual entry, market-check accept, or a
     // successful qty re-resolve) an unpriced "call for price" line becomes priced, so the
     // quote can be accepted. A resolver that still can't price it stays call_for_price.
     if (payload.unit_price != null) payload.pricing_status = 'priced';
@@ -1619,7 +1619,7 @@ export class QuotesService {
       return { success: false, error: 'This quote has expired. Please request an updated quote.' };
     }
 
-    // #237 Phase 4: a quote with unpriced ("call for price" / awaiting-supplier) lines
+    // A quote with unpriced ("call for price" / awaiting-supplier) lines
     // cannot be accepted — there is no sale price. Resolve every line first (manual,
     // market-check, or upstream RFQ) before acceptance.
     const { count: unpricedCount } = await supabase
@@ -1652,7 +1652,7 @@ export class QuotesService {
     // Initialize timeline for the quote
     await this.initializeQuoteTimeline(quoteId);
 
-    // #237 Phase 7: acceptance may materialize an upstream purchase order + mirrored parent sales
+    // Acceptance may materialize an upstream purchase order + mirrored parent sales
     // order (resale tree) via the accept trigger. The supplier workspace is notified server-side
     // by the _notify_upstream_order_created DB trigger (on the mirrored sales-order insert) — no
     // client-side emit needed here.
@@ -1767,7 +1767,7 @@ export class QuotesService {
    * The revision becomes the new "live" doc; the original is kept untouched
    * so the audit trail of what was sent + accepted remains intact.
    */
-  /** Derive an end-user (client) quote from this quote at +margin% (#177). Returns the new quote id. */
+  /** Derive an end-user (client) quote from this quote at +margin%. Returns the new quote id. */
   async generateClientQuote(sourceQuoteId: string, marginPct: number): Promise<string> {
     const { data, error } = await supabase.rpc('generate_client_quote', {
       p_source_quote_id: sourceQuoteId,

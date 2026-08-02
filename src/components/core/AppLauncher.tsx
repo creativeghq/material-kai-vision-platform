@@ -1,4 +1,4 @@
-// #251 — top-bar App Launcher, three-pane layout. Hubs-first (2026-07-19): the LEFT rail lists the
+// top-bar App Launcher, three-pane layout. Hubs-first: the LEFT rail lists the
 // Hubs; clicking a Hub fills the MIDDLE with every app in that hub AND each app's inner links
 // (sections + create actions), so e.g. Sales → Quotes (New Quote · Open), CRM (Users · Contacts …).
 // The RIGHT rail keeps cross-app shortcuts + recent. Data comes from useLauncherApps

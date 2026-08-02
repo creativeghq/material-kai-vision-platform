@@ -2,12 +2,10 @@
 // persona: an invited employee who has NEITHER hr.view NOR hr.manage and therefore cannot call
 // `manage_hr` at all (hr-api 403s them). This tool lets that employee ask about THEIR OWN record
 // from chat — "how much leave do I have left?", "request 3 days off next week", "my documents".
-//
 // DESIGN: a thin natural-language front-end over hr-api's existing `self-*` actions. It calls
 // hr-api over HTTP with the CALLER'S JWT, so hr-api authenticates AS the user and runs its own
 // self-service gate (hr-api/index.ts §2.5): it looks up the hr_employees row where
 // `user_id = caller` and hard-scopes every self- handler to that ONE employee id.
-//
 // SECURITY — this is the whole point of the tool, do not weaken it:
 //  • There is NO employee_id/employee_name parameter, by design. The target employee is resolved
 //    SERVER-SIDE from the caller's JWT inside hr-api; the model cannot address another person.

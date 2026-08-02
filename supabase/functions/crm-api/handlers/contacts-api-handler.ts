@@ -495,7 +495,7 @@ export async function handleContacts(req: Request): Promise<Response> {
         );
       }
 
-      // Pentest #250 C18: only link a user who is an active member of the caller's
+      // Only link a user who is an active member of the caller's
       // workspace(s) — otherwise an admin could bind an arbitrary platform user_id to a
       // contact (granting that user the contact's inbox/finance scope).
       if (!scope.isGlobalOperator) {
@@ -680,7 +680,7 @@ export async function handleContacts(req: Request): Promise<Response> {
             continue;
           }
 
-          // Pentest #250 C18: only link a user who is a member of the caller's workspace.
+          // Only link a user who is a member of the caller's workspace.
           if (!scope.isGlobalOperator) {
             const { data: targetMem } = await supabase
               .from('workspace_members')

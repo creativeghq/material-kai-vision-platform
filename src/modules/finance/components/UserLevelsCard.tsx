@@ -1,5 +1,5 @@
 /**
- * #227 — Customer pricing levels. Each level = a discount off this workspace's retail
+ * Customer pricing levels. Each level = a discount off this workspace's retail
  * price (ex-VAT). The default level applies to customers with no level set. Assign a
  * level per customer in CRM. Read by the pricing resolver (get_product_price_for_workspace).
  */

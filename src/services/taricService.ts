@@ -121,7 +121,6 @@ export const taricService = {
 
 
   // ── Category rules ──────────────────────────────────────────────────────────────────────
-  //
   // The classification axis: category (+ material) picks the heading, a measured attribute picks
   // the declarable code. Confirming a rule is a ONE-TIME act that every product in the category
   // inherits — which is the whole reason this exists rather than a guess per product.

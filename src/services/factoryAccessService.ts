@@ -1,5 +1,5 @@
 /**
- * #196 — Supplier→Factory access requests. A supplier (business workspace) requests access to a
+ * Supplier→Factory access requests. A supplier (business workspace) requests access to a
  * factory's catalog; the operator (root-workspace admin) approves/rejects. An approved request is
  * the grant — products from granted factories are read via get_accessible_factory_products (a
  * dedicated SECURITY DEFINER path, so core products RLS is untouched).

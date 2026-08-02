@@ -1,5 +1,5 @@
 /**
- * #195 — capability layer (single source of truth for "what can this user do here?").
+ * Capability layer (single source of truth for "what can this user do here?").
  *
  * The platform has historically gated on ad-hoc `isAdmin()` string checks scattered
  * across components, plus three disconnected role sources. This file collapses gating
@@ -20,15 +20,15 @@ export type Persona =
   | 'dealer'     // owner/admin of a supplier node (sells catalog downstream)
   | 'architect'  // owner/admin of an architect node (sells to end users with margin)
   | 'staff'      // team member of a business node (member role)
-  | 'accountant' // invited external accountant — Finance surface only (#202)
-  | 'sales'      // invited sales rep — Sales portal only: build quotes/orders for customers (#201)
+  | 'accountant' // invited external accountant — Finance surface only
+  | 'sales'      // invited sales rep — Sales portal only: build quotes/orders for customers
   | 'sales_manager' // sales lead — same portal as a rep, but across the whole team's book
   | 'hr_staff'      // HR officer — reads the HR module, changes nothing
   | 'hr_manager'    // HR lead — runs the HR module end to end
   | 'warehouse_staff' // warehouse team — the stock module only
   | 'marketing_staff' // marketing team — the email-marketing module only
-  | 'employee'   // invited staff member — HR self-service ONLY (#252): their own record, nothing else
-  | 'realestate_agent' // invited property agent — Real Estate portal only (#249): manage listings +
+  | 'employee'   // invited staff member — HR self-service ONLY: their own record, nothing else
+  | 'realestate_agent' // invited property agent — Real Estate portal only: manage listings +
                        // own leads/viewings (scoped via responsible_sales_user_ids / listing_agent_id)
   | 'end_user';  // project client / referral-joined member — restricted surface
 
@@ -45,7 +45,7 @@ export type Capability =
   | 'downstream.view'       // operator: see procurement quotes escalated from children
   | 'marketplace.browse'    // browse the upstream catalog to buy/quote
   | 'quotes.use'            // create + manage quotes
-  | 'sales.portal'          // simplified Sales portal — reps build quotes/orders for customers (#201)
+  | 'sales.portal'          // simplified Sales portal — reps build quotes/orders for customers
   | 'sales.team.view'       // sales manager: the WHOLE team's quote book, not just own rows.
                             // Backed server-side by is_workspace_sales_manager(workspace_id) in
                             // consolidated_quotes_select_public — this flag only unhides the UI.
@@ -100,9 +100,9 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   staff: ['finance.manage', 'invoice.issue', 'crm.view', 'warehouse.manage', 'marketplace.browse', 'quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use'],
   // Invited accountant: ONLY the Finance surface (nav + route). Within finance, settings
   // stay gated on `isWorkspaceManager` and write-ops on `canOperateFinance` (usePermissions),
-  // so they get read + record-payment + myDATA submit but no settings/pricing/CRM (#202).
+  // so they get read + record-payment + myDATA submit but no settings/pricing/CRM.
   accountant: ['finance.manage'],
-  // Invited sales rep (#201): Sales portal + CRM (manage their customers) + per-customer
+  // Invited sales rep: Sales portal + CRM (manage their customers) + per-customer
   // account overview (balance owed, total sales/revenue, open orders, last payment, top items
   // to push, email account info — all read-only via membership-gated RPCs). NO finance module
   // settings/issuing, pricing, network, or warehouse. Reps see only their OWN quotes (RLS on
@@ -123,11 +123,10 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   hr_manager: ['hr.view', 'hr.manage', 'agent.use'],
   warehouse_staff: ['warehouse.manage', 'agent.use'],
   marketing_staff: ['marketing.email', 'agent.use'],
-  // Invited employee (#252): HR self-service ONLY — their own profile, onboarding, time off and
+  // Invited employee: HR self-service ONLY — their own profile, onboarding, time off and
   // documents. Deliberately NO crm.view / sales.portal / finance / anything else, so an employee
   // can never see another person's (e.g. a sales rep's) details. Data is further self-scoped in
   // hr-api's self- endpoints (the caller's own linked hr_employees row).
-  //
   // `agent.use` is granted so the employee can reach My HR from chat via the self-scoped
   // `manage_my_hr` tool ("how much leave do I have left?", "request 3 days off"). It opens the
   // Agent Hub surface, NOT data: every toolkit is independently gated (module slug / adminOnly /
@@ -135,7 +134,7 @@ export const PERSONA_CAPABILITIES: Record<Persona, Capability[]> = {
   // employee_id — hr-api resolves the subject from their own JWT. Note the cost side: agent use
   // draws on the workspace's pooled credits, so an employee can spend the owner's balance.
   employee: ['hr.self', 'agent.use'],
-  // Invited property agent (#249): the Real Estate surface only. Manages listings (shared team asset,
+  // Invited property agent: the Real Estate surface only. Manages listings (shared team asset,
   // D1) and works their own leads/viewings (self-scoped via responsible_sales_user_ids / listing_agent_id
   // in real-estate-api, D7). Gets crm.view (leads ARE crm_contacts, D9) + agent.use (reach listings from
   // chat), but NO finance/pricing/network/warehouse. Broker (owner/admin) holds the full realestate.* set.
@@ -183,7 +182,6 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accoun
   // a user whose tier is `sales` would be downgraded to a plain rep despite being invited as the
   // manager. Safe to check first — every value here was introduced after the account-tier switch, so
   // no existing membership carries one.
-  //
   // Adding a role? Put it HERE, not in a new `if`. A workspace role with no branch falls through to
   // `staff` and silently inherits finance/CRM/warehouse — the failure this whole model prevents.
   const teamPersona = TEAM_ROLE_PERSONA[workspaceRole ?? ''];
@@ -208,13 +206,13 @@ export function resolvePersona({ isPlatformOperator, rank, workspaceRole, accoun
   const role = workspaceRole ?? '';
   if (role === 'client') return 'end_user';
   if (role === 'accountant') return 'accountant';
-  // Invited employee (#252) — HR self-service only. Must precede the member/staff fallback so an
+  // Invited employee — HR self-service only. Must precede the member/staff fallback so an
   // 'employee' role never inherits staff finance/CRM/warehouse capabilities.
   if (role === 'employee') return 'employee';
-  // Invited property agent (#249) — Real Estate portal only. Before the member/staff fallback so a
+  // Invited property agent — Real Estate portal only. Before the member/staff fallback so a
   // 'realestate_agent' role never inherits staff finance/warehouse capabilities.
   if (role === 'realestate_agent') return 'realestate_agent';
-  // Invited sales rep (#201) — Sales portal only. Must come BEFORE the member/staff fallback,
+  // Invited sales rep — Sales portal only. Must come BEFORE the member/staff fallback,
   // otherwise a 'sales' role falls through to 'staff' and wrongly inherits finance/CRM/invoice.
   if (role === 'sales') return 'sales';
   if (role === 'owner' || role === 'admin') {

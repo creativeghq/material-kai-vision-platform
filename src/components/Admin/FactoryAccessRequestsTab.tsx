@@ -1,5 +1,5 @@
 /**
- * #196 — operator review queue for Supplier→Factory access requests. The operator
+ * Operator review queue for Supplier→Factory access requests. The operator
  * (root-workspace admin) approves/rejects a supplier's request to access a factory's catalog.
  * Mirrors FactoryRegistrationsTab. Approval is the grant (get_accessible_factory_products).
  */

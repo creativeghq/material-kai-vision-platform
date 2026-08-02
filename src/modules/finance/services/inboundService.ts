@@ -1,5 +1,5 @@
 /**
- * #206 — received (inbound) myDATA documents: the expenses Inbox. The live pull is
+ * Received (inbound) myDATA documents: the expenses Inbox. The live pull is
  * wired in the finance-inbound-sync poller (activates with per-tenant AADE creds); this
  * client reads what's been pulled and turns a doc into a supplier bill / warehouse intake.
  */

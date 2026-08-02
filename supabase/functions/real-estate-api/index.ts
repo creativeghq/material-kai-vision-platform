@@ -1,7 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
-// #249 — Real Estate module API (P1). Authed CRUD/publish/media/inquiry/viewing router for the
+// Real Estate module API (P1). Authed CRUD/publish/media/inquiry/viewing router for the
 // `real-estate` add-on. The public token page lives in a SEPARATE fn (real-estate-public).
-//
 // SECURITY (pen-test #250 baseline — cloned from hr-api):
 //  • authenticate() yields a SERVICE-ROLE client (RLS bypassed) → every action re-derives the
 //    workspace from the caller and calls userCanAccessWorkspace() (systemic root #2, no body trust).
@@ -99,7 +98,7 @@ async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property:
       reason,
     });
 
-    // Direct-to-buyer (#281): notify each CONSENTED matching buyer that a new listing fits their
+    // Direct-to-buyer: notify each CONSENTED matching buyer that a new listing fits their
     // search. GDPR — only contacts with marketing_consent=true. Public listing page as the link.
     if (property.is_public && property.public_listing_token) {
       const pubUrl = `/p/${property.public_listing_token}`;
@@ -219,7 +218,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
     return p;
   }
 
-  // Sub-module entitlement gates (#281): Property Management + Investments are add-ons on top of
+  // Sub-module entitlement gates: Property Management + Investments are add-ons on top of
   // Real Estate. A workspace without the add-on gets 402 on those actions (root workspace is entitled).
   const PM_ACTIONS = new Set(['list-tenancies', 'upsert-tenancy', 'list-rent-charges', 'generate-rent-schedule', 'mark-rent-paid', 'list-maintenance', 'upsert-maintenance', 'landlord-statement', 'invoice-rent-charge', 'renew-tenancy']);
   const INVEST_ACTIONS = new Set(['get-investment', 'upsert-investment', 'list-investments']);
@@ -452,7 +451,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const photoId = String(body.photo_id ?? '');
         if (!photoId) return json({ error: 'photo_id is required' }, 400);
         // Resolve the parent property and prove agent ownership before deleting — workspace
-        // scope alone does not separate two agents. (audit #294/#303)
+        // scope alone does not separate two agents.
         const { data: photo } = await supabase.from('property_photos').select('storage_path, property_id').eq('id', photoId).eq('workspace_id', workspaceId).maybeSingle();
         if (!photo) return json({ error: 'not found' }, 404);
         await loadEditable(String((photo as any).property_id));
@@ -467,7 +466,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const photoId = String(body.photo_id ?? '');
         const id = String(body.property_id ?? '');
         if (!photoId || !id) return json({ error: 'photo_id and property_id are required' }, 400);
-        // SECURITY (audit #294/#303): scoping by workspace_id alone is not enough. requireManage()
+        // SECURITY: scoping by workspace_id alone is not enough. requireManage()
         // is true for `realestate_agent`, so agent-ownership is the ONLY thing separating agents —
         // and without this, agent B could re-cover agent A's listing, including listings A has not
         // flagged open_for_all (ones B cannot even read via get-property). Every other photo action
@@ -483,7 +482,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const orderedIds: string[] = Array.isArray(body.photo_ids) ? body.photo_ids : [];
         if (orderedIds.length === 0) return json({ ok: true });
-        // SECURITY (audit #294/#303): same gap as set-cover — workspace scope alone let one agent
+        // SECURITY: same gap as set-cover — workspace scope alone let one agent
         // reorder another's gallery. The photo ids are caller-supplied, so resolve them to their
         // parent properties and prove ownership of each before writing.
         const { data: owning, error: ownErr } = await supabase
@@ -519,7 +518,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'convert-inquiry': {
-        // SECURITY (audit #294/#303): this is a WRITE — inserts a crm_contacts row. It had no
+        // SECURITY: this is a WRITE — inserts a crm_contacts row. It had no
         // guard at all, so the documented read-only Member persona could reach it. RLS
         // cannot help: this function runs service-role.
         requireManage();
@@ -547,7 +546,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'update-inquiry': {
-        // SECURITY (audit #294/#303): this is a WRITE — edits buyer PII. It had no
+        // SECURITY: this is a WRITE — edits buyer PII. It had no
         // guard at all, so the documented read-only Member persona could reach it. RLS
         // cannot help: this function runs service-role.
         requireManage();
@@ -583,7 +582,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'create-inquiry': {
-        // SECURITY (audit #294/#303): this is a WRITE — inserts a crm_contacts row. It had no
+        // SECURITY: this is a WRITE — inserts a crm_contacts row. It had no
         // guard at all, so the documented read-only Member persona could reach it. RLS
         // cannot help: this function runs service-role.
         requireManage();
@@ -681,7 +680,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'create-viewing': {
-        // SECURITY (audit #294/#303): this is a WRITE — inserts a crm_meetings row. It had no
+        // SECURITY: this is a WRITE — inserts a crm_meetings row. It had no
         // guard at all, so the documented read-only Member persona could reach it. RLS
         // cannot help: this function runs service-role.
         requireManage();
@@ -743,7 +742,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'update-viewing': {
-        // SECURITY (audit #294/#303): this is a WRITE — reschedules/cancels a viewing. It had no
+        // SECURITY: this is a WRITE — reschedules/cancels a viewing. It had no
         // guard at all, so the documented read-only Member persona could reach it. RLS
         // cannot help: this function runs service-role.
         requireManage();
@@ -787,7 +786,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
       // ── Interests (contact ↔ property) ─────────────────────────────────
       case 'add-interest': {
-        // SECURITY (audit #294/#303): this is a WRITE — writes property_interests. It had no
+        // SECURITY: this is a WRITE — writes property_interests. It had no
         // guard at all, so the documented read-only Member persona could reach it. RLS
         // cannot help: this function runs service-role.
         requireManage();
@@ -868,7 +867,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ ok: true, cancelled_viewings: (fv ?? []).length });
       }
 
-      // ── Sale completion + commission (#281) ────────────────────────────
+      // ── Sale completion + commission ────────────────────────────
       // Captures the agreed sale price, computes commission (price × pct + fixed, + VAT),
       // marks the listing sold, and (if from an offer) runs the accept-cascade. The commission
       // invoice is issued deliberately from Finance later (link-sale-invoice stamps it back).
@@ -1046,7 +1045,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       }
 
       case 'upsert-contact-ext': {
-        // SECURITY (audit #294/#303): this is a WRITE — writes buyer/seller contact extension. It had no
+        // SECURITY: this is a WRITE — writes buyer/seller contact extension. It had no
         // guard at all, so the documented read-only Member persona could reach it. RLS
         // cannot help: this function runs service-role.
         requireManage();
@@ -1094,7 +1093,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ settings: data });
       }
 
-      // ── Lettings / property management (#281) — tenancies → rent ledger → maintenance ──
+      // ── Lettings / property management — tenancies → rent ledger → maintenance ──
       // A tenancy hangs off a rental property; its rent charges are the ledger; maintenance
       // work-orders are per property. Landlord statement = rent received − maintenance cost.
       case 'list-tenancies': {
@@ -1240,7 +1239,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         });
       }
 
-      // ── Investments add-on (#281) — per-property analysis + portfolio ──────
+      // ── Investments add-on — per-property analysis + portfolio ──────
       case 'get-investment': {
         const propertyId = String(body.property_id ?? '');
         if (!propertyId) return json({ error: 'property_id is required' }, 400);
@@ -1286,7 +1285,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ investments: rows, portfolio });
       }
 
-      // ── Rent → Finance (#281) — draft invoice per rent charge, to the tenant ──
+      // ── Rent → Finance — draft invoice per rent charge, to the tenant ──
       case 'invoice-rent-charge': {
         requireManage();
         const chargeId = String(body.charge_id ?? '');
@@ -1330,7 +1329,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ tenancy: data });
       }
 
-      // ── CMA / listing-pitch report (#281) — comps from own stock ──────────
+      // ── CMA / listing-pitch report — comps from own stock ──────────
       case 'cma-report': {
         const propertyId = String(body.property_id ?? '');
         let subject: any = null;
@@ -1376,7 +1375,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         });
       }
 
-      // ── Deal pipeline (#281) — stage board + per-deal tasks ────────────────
+      // ── Deal pipeline — stage board + per-deal tasks ────────────────
       case 'list-deals': {
         const { data, error } = await supabase.from('property_deals')
           .select('*, property:properties!property_deals_property_id_fkey ( id, title, reference_code, town, listing_agent_id, created_by, open_for_all ), buyer:crm_contacts!property_deals_buyer_contact_id_fkey ( id, name ), tasks:property_deal_tasks ( id, done )')

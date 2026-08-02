@@ -10,7 +10,7 @@ import {
 import { inboxApi, signInboxAttachment, type InboxMessage } from '@/services/inboxApi';
 
 /**
- * #209 — Public customer thread (`/i/:token`). Minimal chrome: one thread, reply box,
+ * Public customer thread (`/i/:token`). Minimal chrome: one thread, reply box,
  * attachment upload. A "Create an account to continue" modal intercepts any attempt to
  * navigate beyond this thread; signup carries the token so the account can adopt the
  * thread via token_claim (the conversion handshake). Anonymous reads go through the

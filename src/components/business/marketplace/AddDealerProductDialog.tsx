@@ -1,5 +1,5 @@
 /**
- * #174 — dealer/supplier "Add Product" dialog.
+ * dealer/supplier "Add Product" dialog.
  *
  * Creates a product in the dealer's workspace through the shared MIVAA ingest core. The
  * attribute form is category-driven: descriptive facets (whitelist) + spec fields pulled

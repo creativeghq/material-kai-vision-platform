@@ -1,5 +1,5 @@
 /**
- * Docs module (#254) agent tool: search_workspace_docs.
+ * Docs module agent tool: search_workspace_docs.
  *
  * Reads the workspace's internal documentation via Postgres full-text search
  * (search_workspace_docs_fts RPC) — NO embeddings, no vector store, no MIVAA.

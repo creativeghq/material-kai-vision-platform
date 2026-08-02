@@ -1,5 +1,5 @@
 /**
- * #255 — workspace-scoped wrapper around the shared GrapesJS EmailTemplateBuilder. Passes the
+ * workspace-scoped wrapper around the shared GrapesJS EmailTemplateBuilder. Passes the
  * active workspace so "Send Test" goes out via the workspace's own Resend (BYOK, strict, marketing),
  * and routes "Back" to the module's Templates tab.
  */

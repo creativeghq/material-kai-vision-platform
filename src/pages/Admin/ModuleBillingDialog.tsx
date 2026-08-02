@@ -1,4 +1,4 @@
-// #251 A2 — operator binds a module 1:1 to a Stripe PRODUCT (not a bare price). The charge uses
+// Operator binds a module 1:1 to a Stripe PRODUCT (not a bare price). The charge uses
 // the product's default_price (resolved at activation), so two modules can never collide on a
 // shared price id. The plan tier that INCLUDES a module for free is set separately on /admin/plans.
 import React, { useEffect, useState } from 'react';
@@ -54,7 +54,7 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
   // costs live as hardcoded constants across the TS/Python services and aren't derivable per-module.
   const [consumesCredits, setConsumesCredits] = useState(false);
   const [creditNote, setCreditNote] = useState('');
-  // #256 — one-click "create & attach" a Stripe product so the operator never leaves the app.
+  // one-click "create & attach" a Stripe product so the operator never leaves the app.
   const [creating, setCreating] = useState(false);
   const [newAmount, setNewAmount] = useState(''); // major units, e.g. "9.00"
   const [newInterval, setNewInterval] = useState<'month' | 'year'>('month');

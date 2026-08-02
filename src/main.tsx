@@ -46,7 +46,6 @@ Sentry.init({
   // below. vendor-sentry was 135 KiB gzip / 406 KiB raw, the largest chunk in the initial payload
   // and bigger than React itself (59 KiB), loading on every page including anonymous ones
   // (/, /tools/*, /quote/:id, /storefront). See audit #308 finding 2.
-  //
   // The core error handler stays synchronous ON PURPOSE: errors thrown during initial render are
   // the hardest to reproduce and the most worth catching, so nothing that reports them is deferred.
   integrations: [

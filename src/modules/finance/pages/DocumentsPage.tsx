@@ -1,5 +1,5 @@
 /**
- * #204 — dedicated Finance documents list with a document-type left nav, mirroring the
+ * Dedicated Finance documents list with a document-type left nav, mirroring the
  * operator's accounting tool. Invoices / Receipts (11.x) come from `invoices`; Credit
  * notes from `credit_notes`. Each row carries status + an mD (myDATA transmitted) flag +
  * the shared 3-dots action menu. Delivery/goods-receipt notes (`delivery_notes`) and the

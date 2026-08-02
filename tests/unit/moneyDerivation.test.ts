@@ -83,12 +83,9 @@ describe('order settlement has exactly one derivation', () => {
   it('never recomputes outstanding as total − settled in TypeScript', () => {
     const offenders: string[] = [];
     // THIS TEST HAD A PROVEN FALSE NEGATIVE (audit #309 item 5).
-    //
     // The old pattern ended `[-−]\s*(settled|paid|net)\b`, requiring the word to start right
     // after the minus. A live reintroduction at OrdersPanel.tsx:1778 read
-    //
     //     Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100)
-    //
     // and sailed straight through, because `\bsettled` does not match inside the identifier
     // `orderSettled`. A text-pattern rule is only ever as strong as the names people happen to
     // pick — and whoever wrote the sixth derivation naturally named the helper after the thing
@@ -213,7 +210,6 @@ describe('quote totals have exactly one derivation', () => {
   it('computes VAT from a net base in exactly one place', () => {
     const offenders: string[] = [];
     // `<net|taxable|afterDiscount…> * (vatRate / 100)` — the VAT step itself.
-    //
     // Case-insensitive and WITHOUT a leading \b on purpose. Both were wrong in the first
     // draft of this test, which then passed against the very line it was written to catch:
     // `pricingNetAfterCash * (pricingVatRate / 100)` carries its "net" mid-identifier, so

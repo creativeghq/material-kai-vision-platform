@@ -1,5 +1,5 @@
 /**
- * #255 — Email Marketing module page (tenant-facing, EntitlementGuard-wrapped). Three tabs:
+ * Email Marketing module page (tenant-facing, EntitlementGuard-wrapped). Three tabs:
  *   Setup     — workspace BYOK Resend config (required before sending).
  *   Templates — workspace-scoped GrapesJS templates.
  *   Campaigns — bulk email campaigns to CRM audiences, BYOK-only.
@@ -61,7 +61,7 @@ export default function EmailMarketingPage() {
   const ws = activeWorkspaceId;
   if (!ws) return <div className="p-6 text-sm text-muted-foreground">No active workspace.</div>;
 
-  // BYOK is a HARD prerequisite (#255): Email Marketing sends only from the workspace's own Resend.
+  // BYOK is a HARD prerequisite: Email Marketing sends only from the workspace's own Resend.
   // Until it's configured, show ONLY the setup prompt — no campaigns/templates surface — so
   // activating the module lands the owner straight in "add your Resend keys".
   if (!byokReady) {

@@ -1,12 +1,9 @@
 // deno-lint-ignore-file no-explicit-any
-//
 // One-shot bootstrap that pre-populates Deno.env from platform_secrets for the lifetime of
 // the worker. This lets every existing `Deno.env.get('XXX')` call in the codebase transparently
 // pick up admin-saved DB values — without touching the 50+ functions that read env directly.
-//
 // Priority is preserved: env-first. If the env var is already set (real deployment secret), the
 // DB row is NEVER overwritten into env. The DB only fills in keys that the deployer left blank.
-//
 // Call this ONCE per worker, as early as possible in the request lifecycle. The recommended hook
 // is _shared/auth.ts → authenticate(), which is already called at the top of nearly every
 // function. For functions that don't use authenticate(), call bootstrapSecretsFromDb(supabase)

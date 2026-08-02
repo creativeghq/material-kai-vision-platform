@@ -132,7 +132,7 @@ const FinancePage: React.FC = () => {
   // Same page is mounted at /admin/finance (operator) and /finance (business owner).
   const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   // Operate on the ACTIVE workspace (WorkspaceContext) — replaces the old
-  // oldest-membership query so Finance follows the workspace switcher (#194).
+  // oldest-membership query so Finance follows the workspace switcher.
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { isAccountant } = usePermissions(); // read-only role hides write actions
   const workspaceId = activeWorkspaceId;

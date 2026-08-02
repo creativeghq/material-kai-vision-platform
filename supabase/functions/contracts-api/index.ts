@@ -1,13 +1,10 @@
 // deno-lint-ignore-file no-explicit-any
 // Contracts & e-signature API. One entity, three contexts (hr | finance | project).
-//
 // PUBLIC (token, no auth) — the signer's page:
 //   { action:'resolve_token', token }                         → { contract } | { not_found } | { signed }
 //   { action:'sign', token, signer_name, signer_email?, signature_image? } → { success, contract_id }
-//
 // AUTHED (session JWT) — management:
 //   create | list | get | update | send | void
-//
 // SECURITY: verify_jwt is disabled so the public sign path works; management actions call
 // authenticate() + the module/entitlement gates, then perform the actual writes through a
 // USER-context client so the context-branched RLS (hr→admin, finance→finance-manager,

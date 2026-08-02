@@ -720,7 +720,6 @@ export const NewOrderModal: React.FC<{
     }, 200);
     return () => clearTimeout(t);
     // Depends on the DESCRIPTION of the active line, not on the whole `items` array.
-    //
     // `setItem` replaces the array on every field edit, so depending on `items` re-ran this on
     // every keystroke in quantity, price, cost, unit or VAT — each run issuing 1–3 Supabase
     // queries (products, the widened products retry, warehouse_items) for a search term that had
@@ -954,7 +953,6 @@ export const NewOrderModal: React.FC<{
           const billId = await linkOrderToDocument({ id: prefill.inboundDocumentId }, orderId);
           if (paidNow && status !== 'draft') {
             // Pay what the BILL says, not what this form recomputed.
-            //
             // The bill is created from the DOCUMENT by inbound_doc_to_supplier_bill, while
             // `grossTotal` is recomputed from the form's lines — and orderLinesFromDoc rounds
             // net/qty per line and defaults vat_code to 24% when myDATA omits vat_category, so the
@@ -1820,7 +1818,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
           : (did || 'Everything on this order was already received.'),
         variant: received + services === 0 && skipped > 0 ? 'destructive' : undefined,
       });
-      // #237 — notify via Flows that the PO arrived (allocations flipped to reserved).
+      // Notify via Flows that the PO arrived (allocations flipped to reserved).
       if (order.order_type === 'purchase') {
         const { data: u } = await supabase.auth.getUser();
         void flowEventService.emit('purchase_order.received', {
@@ -1892,7 +1890,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     finally { setSaving(false); }
   };
 
-  // #237 A3 — email the purchase order to the supplier (PDF), mark it placed.
+  // Email the purchase order to the supplier (PDF), mark it placed.
   const sendToSupplier = async () => {
     if (!order) return;
     if (!order.supplier_company_id && !order.supplier_contact_id) {

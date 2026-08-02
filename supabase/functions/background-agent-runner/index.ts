@@ -55,7 +55,6 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
   // emitter, chain triggers, and agent-chat — all of which present the project
   // service-role key as `Authorization: Bearer <service_role_key>`. Accept that
   // directly; any other caller must carry a valid user/secret credential.
-  //
   // CRITICAL: authenticate() returns { success:false } (it does NOT throw) for a
   // service-role bearer — it falls through to validateUserToken() and getUser()
   // resolves to "no user" without raising. So the service-role check MUST run on
@@ -463,7 +462,7 @@ async function postResultToChat(
 
     const content = `**Background task complete** — *${taskPreview}*\n\n${report}`;
 
-    // Shared async-completion primitive (#275) — inserts the background_task assistant message the
+    // Shared async-completion primitive — inserts the background_task assistant message the
     // Agent Hub `background-results:{conversation_id}` channel injects into the live conversation.
     await emitBackgroundResult(supabase, { conversationId, content, runId, taskPreview });
 

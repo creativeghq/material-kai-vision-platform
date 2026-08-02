@@ -633,7 +633,7 @@ export default function PropertyWorkbench() {
 
 const offerMoney = (n: number, ccy: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n);
 
-// ── Lettings / property management (#281) ──
+// ── Lettings / property management ──
 const Stat: React.FC<{ label: string; value: string; accent?: boolean }> = ({ label, value, accent }) => (
   <div className={`dashboard-card p-3 ${accent ? 'ring-1 ring-primary/30' : ''}`}>
     <div className="text-[11px] text-muted-foreground">{label}</div>
@@ -839,7 +839,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
 };
 
 // Offer ledger for a property — competing bids with qualification + accept/reject/counter cascade.
-// ── Investments add-on (#281) — per-property analysis ──
+// ── Investments add-on — per-property analysis ──
 const INVEST_FIELDS: [string, string, string?][] = [
   ['purchase_price', 'Purchase price'], ['acquisition_costs', 'Acquisition costs', 'transfer tax, legal, fees'],
   ['renovation_costs', 'Renovation'], ['loan_amount', 'Loan amount'],
@@ -928,7 +928,7 @@ const Detail: React.FC<{ label: string; value: string }> = ({ label, value }) =>
   <div className="flex items-center justify-between gap-2"><span className="text-muted-foreground">{label}</span><span className="font-medium">{value}</span></div>
 );
 
-// ── Sale completion + commission (#281) ──
+// ── Sale completion + commission ──
 const CommissionPanel: React.FC<{ ws: string | null; propertyId: string; property: Property | null; canManage: boolean; onCompleted: () => void }> = ({ ws, propertyId, property, canManage, onCompleted }) => {
   const { toast } = useToast();
   const [sale, setSale] = useState<PropertySale | null | undefined>(undefined); // undefined = loading

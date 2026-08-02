@@ -176,7 +176,7 @@ export default function PublicQuotePage() {
   }
 
   const currency = quote.currency || 'EUR';
-  // #227 — universal 5-line totals breakdown (Price / Discount / Price after Discount / VAT / Final).
+  // Universal 5-line totals breakdown (Price / Discount / Price after Discount / VAT / Final).
   const breakdown = computeTotalsBreakdown({
     subtotal: quote.subtotal ?? itemsTotal,
     cashDiscountPct: quote.cash_discount_pct,
@@ -292,7 +292,7 @@ export default function PublicQuotePage() {
           </div>
         </Card>
 
-        {/* Totals — universal 5-line breakdown (#227) */}
+        {/* Totals — universal 5-line breakdown */}
         <div className="flex justify-end">
           <div className="w-64 space-y-2 text-sm">
             {rows.map((row, i) => row.kind === 'final' ? (

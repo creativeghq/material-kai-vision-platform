@@ -98,7 +98,7 @@ import {
 } from './agentToolsCatalog';
 import { ToolkitOnboardingCard } from './workflows/ToolkitOnboardingCard';
 import { WorkflowWizardCard } from './workflows/WorkflowWizardCard';
-// PromptBuilderModal removed (2026-06-21) — Interior processes + discovery now
+// PromptBuilderModal removed — Interior processes + discovery now
 // live entirely under the toolkit picker. The separate ✨ "prompts" surface is gone.
 import { useEnabledModules } from '@/modules/_core';
 import { WorkflowTracker } from './workflows/WorkflowTracker';
@@ -337,7 +337,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Reviews
   reviews_list: 'Reviews about you',
   review_reply_posted: 'Reply posted',
-  // Real Estate (#249)
+  // Real Estate
   real_estate_properties: 'Property listings',
   real_estate_property: 'Property',
   real_estate_leads: 'Property leads',
@@ -542,7 +542,7 @@ interface Message {
     initial_data: Record<string, any>;
     title?: string;
   }; // Interactive presentation sheet awaiting canvas input
-  // Human-in-the-loop approval for a sensitive agent action (#275). The tool previewed instead
+  // Human-in-the-loop approval for a sensitive agent action. The tool previewed instead
   // of mutating; Approve re-invokes it with confirm:true via the direct_tool path.
   actionConfirmationData?: {
     tool: string;
@@ -573,7 +573,7 @@ interface Message {
       latest_at: string | null;
     };
   };
-  // #237 A6 — sourcing
+  // Sourcing
   sourcingOptionsData?: {
     product_id: string;
     quantity: number;
@@ -958,7 +958,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return null;
   }, [attachedImages, messages]);
 
-  // Human-in-the-loop confirmation (#275): Approve re-invokes the sensitive tool with confirm:true
+  // Human-in-the-loop confirmation: Approve re-invokes the sensitive tool with confirm:true
   // through the deterministic direct_tool path; Decline just marks the card and runs nothing.
   const handleActionApprove = useCallback((messageId: string, data: NonNullable<Message['actionConfirmationData']>) => {
     setMessages(prev => prev.map(m =>
@@ -1238,7 +1238,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     //     the step with form values, no LLM ambiguity.
     //   • Free-form prose — when the user used the "in your own words" override,
     //     the agent reads it normally and runs the step using its own judgment.
-    //
     // The prefix includes the run_id so the agent can preserve it across the
     // remaining steps. Agent prompt addendum instructs: extract run_id from
     // the prefix, pass it to every tool as `_workflow_run_id`, and emit all
@@ -2684,7 +2683,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   metadata: { sheet_id: chunk.sheet_id, sheet_type: chunk.sheet_type, credits_used: chunk.credits_used },
                 });
               } else if (chunk.type === 'action_confirmation') {
-                // Human-in-the-loop gate (#275): a sensitive tool previewed instead of mutating.
+                // Human-in-the-loop gate: a sensitive tool previewed instead of mutating.
                 // Render an inline Approve/Decline card; Approve re-invokes the tool with confirm:true.
                 const confirmMsg: Message = {
                   id: `msg-confirm-${Date.now()}`,
@@ -3081,7 +3080,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 }
               } else if (chunk.type === 'workflow_plan') {
                 // Boot the tracker. Chunk shape: { run_id, definition_id, title?, subtitle?, metadata?, step_overrides? }
-                //
                 // run_id correlation: when bootWorkflowLocally was used (the
                 // wizard kicked off without a server round-trip), the local
                 // run_id is a UUID generated on the frontend. The server-side
@@ -6116,7 +6114,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <TooltipContent side="left"><p>Design inspiration from URL</p></TooltipContent>
                   </Tooltip>
 
-                  {/* ✨ Prompt Builder button removed (2026-06-21). Starter
+                  {/* ✨ Prompt Builder button removed. Starter
                        processes now live inside the Toolkits picker (below),
                        each launchable as a guided process. One surface. */}
 

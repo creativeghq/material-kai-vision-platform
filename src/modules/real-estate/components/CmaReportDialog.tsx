@@ -1,4 +1,4 @@
-// #281 — Comparative Market Analysis: a client-facing listing-pitch report built from the
+// Comparative Market Analysis: a client-facing listing-pitch report built from the
 // agency's own comparable stock (active + sold). In-app preview + a self-contained print/PDF
 // (opens a styled window → browser "Save as PDF"), so no server-side pdf-lib build needed.
 import React, { useCallback, useEffect, useState } from 'react';

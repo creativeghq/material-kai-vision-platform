@@ -24,7 +24,7 @@ import type { FlowNodeData } from '@/services/flows/types';
 
 interface FlowBuilderTabProps {
   flowId: string | null;
-  /** #256 — workspace (tenant) builder: restrict the palette to the tenant-safe node subset.
+  /** Workspace (tenant) builder: restrict the palette to the tenant-safe node subset.
    *  The DB guard trigger enforces it regardless; this trims the UI. Admin surface leaves it off. */
   tenantMode?: boolean;
 }

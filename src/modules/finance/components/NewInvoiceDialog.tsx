@@ -179,7 +179,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // Buyer risk-gate (finance_settings) + the buyer's current open balance for the credit-limit check.
   const [riskRules, setRiskRules] = useState({ block_inactive: true, block_unvalidated: false, warn_over: true, block_over: false });
   const [buyerOutstanding, setBuyerOutstanding] = useState(0);
-  // #227 — order-level paid-upfront (cash) discount
+  // order-level paid-upfront (cash) discount
   const [paidUpfront, setPaidUpfront] = useState(false);
   const [cashPct, setCashPct] = useState(0);
   useEffect(() => {
@@ -187,7 +187,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     financeService.getActiveCashDiscountPct(workspaceId).then(setCashPct).catch(() => {});
   }, [workspaceId]);
 
-  // #193 — validate the counterpart's VAT via VIES before invoicing (caches onto crm_companies).
+  // Validate the counterpart's VAT via VIES before invoicing (caches onto crm_companies).
   const validateCounterpartVat = async () => {
     if (!customer || customer.type !== 'company' || !customerAddr?.vat_number) return;
     try {
@@ -289,7 +289,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [responsible, setResponsible] = useState('');
   const [movePurpose, setMovePurpose] = useState('1');
 
-  // #207 — B2G (public-sector) invoicing. Same myDATA envelope + a B2G reference block.
+  // B2G (public-sector) invoicing. Same myDATA envelope + a B2G reference block.
   const [isB2g, setIsB2g] = useState(false);
   const [b2gContractRef, setB2gContractRef] = useState('');
   const [b2gBuyerRef, setB2gBuyerRef] = useState('');
@@ -433,7 +433,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const table = customer.type === 'company' ? 'crm_companies' : 'crm_contacts';
       const { data } = await supabase.from(table).select('*').eq('id', customer.id).maybeSingle();
       setCustomerAddr(data ?? null);
-      // #207 — adopt the party's commercial defaults: ΜΥΦ inclusion preference and
+      // Adopt the party's commercial defaults: ΜΥΦ inclusion preference and
       // (for 0%-VAT lines) the party's default myDATA VAT-exemption category.
       if (data && (data as any).include_in_myf === false) setIncludeInMyf(false);
       // Public-sector segment → default to B2G issuance + prefill the buyer registration id.
@@ -586,7 +586,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       other += taxAmountOf(otherTaxRefs, l.other_taxes_category, l.other_taxes, lineNet);
       deduct += parseDecimalOr(l.deductions, 0);
     }
-    // #227 — paid-upfront (cash) discount: scale net + vat proportionally (preserves per-line VAT rates).
+    // paid-upfront (cash) discount: scale net + vat proportionally (preserves per-line VAT rates).
     const cashFactor = paidUpfront ? (1 - cashPct / 100) : 1;
     const cashDiscount = net * (1 - cashFactor);
     net = net * cashFactor;
@@ -740,7 +740,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         transport_date: hasShipping && transportDate ? transportDate : null, transport_time: hasShipping ? (transportTime || null) : null,
         vehicle_number: hasShipping ? (vehicleNumber || null) : null, responsible: hasShipping ? (responsible || null) : null,
         move_purpose: hasShipping ? movePurpose : null,
-        // #207 — B2G (public-sector) flag + reference block (consumed by the connector).
+        // B2G (public-sector) flag + reference block (consumed by the connector).
         is_b2g: isB2g,
         b2g_details: isB2g ? {
           contractReference: b2gContractRef || null,
@@ -783,7 +783,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           unit_cost_snapshot: l.unit_cost.trim() ? parseDecimalOr(l.unit_cost, 0) : null,
           selected_color: l.color || null, selected_size: l.size || null,
           vat_category: l.vat_category ? parseInt(l.vat_category, 10) : null,
-          // #207 — 0%-VAT lines fall back to the customer's default myDATA exemption
+          // 0%-VAT lines fall back to the customer's default myDATA exemption
           // category (crm party.vat_exemption_reason) when the line leaves it blank.
           vat_exemption_category: l.vat_exemption
             ? parseInt(l.vat_exemption, 10)
@@ -819,7 +819,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       if (submitNow && issueNow) {
         try {
           const sub = await fiscalConnectorService.submitInvoice(invoice.id);
-          // #193 — credit exhaustion at issue: the invoice is issued but the myDATA transmission
+          // Credit exhaustion at issue: the invoice is issued but the myDATA transmission
           // was blocked for lack of credits. Surface a top-up CTA; retransmit from the invoice page.
           const fr = sub?.fiscal;
           if (fr && fr.ok === false && fr.code === 'insufficient_credits') {
@@ -1173,7 +1173,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     <Checkbox className="h-3.5 w-3.5 rounded" checked={pricesIncludeVat} onCheckedChange={(v) => setPricesIncludeVat(v === true)} />
                     Prices include VAT
                   </label>
-                  {/* #227 — paid-upfront (cash) discount; disabled until a cash rule exists */}
+                  {/* paid-upfront (cash) discount; disabled until a cash rule exists */}
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer" title={cashPct === 0 ? 'Set a Paid-upfront rule in Finance → Settings → Pricing' : `${cashPct}% off when paid upfront`}>
                     <Checkbox className="h-3.5 w-3.5 rounded" checked={paidUpfront} disabled={cashPct === 0} onCheckedChange={(v) => setPaidUpfront(v === true)} />
                     Paid upfront{cashPct > 0 ? ` (−${cashPct}%)` : ''}
@@ -1414,7 +1414,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes shown on the invoice" />
             </section>
 
-            {/* #207 — B2G (public-sector e-invoicing). Hidden for retail (11.x) docs. */}
+            {/* B2G (public-sector e-invoicing). Hidden for retail (11.x) docs. */}
             {!documentType.startsWith('11') && (
               <section className="border-t border-border/40 pt-4 space-y-2">
                 <label htmlFor="newinvoice-b2g" className="flex items-center justify-between cursor-pointer">

@@ -131,7 +131,7 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
               query,
               workspace_id: workspaceId,
               top_k: limit,
-              // Aspect bias (#277): when the user asks for similar color/texture/style/material,
+              // Aspect bias: when the user asks for similar color/texture/style/material,
               // MIVAA weights that per-aspect embedding collection. Omitted = full 7-vector fusion.
               ...(aspect ? { aspect } : {}),
             }),
@@ -232,7 +232,7 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
               workspace_id: workspaceId,
               image_base64: base64Data,
               top_k: 10,
-              // Aspect bias (#277) — e.g. "find the same COLOUR as this photo".
+              // Aspect bias — e.g. "find the same COLOUR as this photo".
               ...(aspect ? { aspect } : {}),
             }),
             signal: controller.signal,

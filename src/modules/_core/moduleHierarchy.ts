@@ -1,11 +1,9 @@
 // Module parent/child hierarchy — the ONE derivation of `manifest.parent`.
-//
 // A sub-module (payments-stripe → payments, real-estate-management → real-estate) is still its own
 // catalog row with its own entitlement; `parent` only says where it BELONGS, so every surface
 // renders it under its parent instead of as a loose sibling card. Both the operator catalog
 // (/admin/modules) and the tenant storefront (Profile → Modules) group through this file — do not
 // re-walk `manifest.parent` anywhere else.
-//
 // Resolution is by SLUG, never by registered module: a parent may exist only as a `modules` row with
 // no `src/modules/<slug>/` folder (e.g. `price-monitoring`).
 import { registeredModules } from './registry';

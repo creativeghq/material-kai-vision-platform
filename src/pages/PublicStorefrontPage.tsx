@@ -1,5 +1,5 @@
 /**
- * #207 — Public online storefront at /store/:slug (no auth). Browse a workspace's published
+ * Public online storefront at /store/:slug (no auth). Browse a workspace's published
  * products, add to cart, check out → a draft order + pay token → redirect to the existing
  * /pay/:token Stripe-Connect flow.
  */

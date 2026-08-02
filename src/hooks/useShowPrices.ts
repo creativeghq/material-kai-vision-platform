@@ -1,5 +1,5 @@
 /**
- * #227 — global "Show Prices" toggle. Lets anyone hide every price across the browsing
+ * Global "Show Prices" toggle. Lets anyone hide every price across the browsing
  * surfaces (catalog/search/agent/quote-add/public catalog/recommendations) during a demo
  * or material-research session, then flip them back. Finance/quote-editing screens ignore
  * it (pricing is the point there).

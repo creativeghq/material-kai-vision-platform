@@ -1,5 +1,5 @@
 /**
- * #214 — "X / Y used" badge for a per-plan quota on the active workspace. Hidden when the limit
+ * "X / Y used" badge for a per-plan quota on the active workspace. Hidden when the limit
  * is unlimited (-1, incl. the operator root) so it only nags plans that actually have a cap.
  *
  *   <WorkspaceQuotaBadge table="crm_contacts" quotaKey="max_contacts" label="contacts" />

@@ -5,19 +5,17 @@ import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { getStripe, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-// #273 — multi-provider dispatch. Every gate (published ∧ entitled ∧ configured) is
+// multi-provider dispatch. Every gate (published ∧ entitled ∧ configured) is
 // re-checked server-side at charge time; the client only expresses an intent.
 import { dispatchToProvider, resolveWorkspacePaymentProviders } from '../_shared/payments/registry.ts';
 
 // Sales/Finance — create a Stripe Checkout session for an invoice.
-//
 // Two entry modes:
 //   1. Authenticated admin/finance: body { invoice_id }
 //      Mints (or rotates) a pay_token first if missing; returns checkout URL + pay link.
 //   2. Public unauth: body { pay_token, success_url, cancel_url }
 //      Resolves the token via SECURITY DEFINER RPC, refuses if expired or already paid,
 //      and returns a hosted Stripe Checkout URL.
-//
 // Stripe webhook (stripe-webhooks/handlePaymentSucceeded) consumes the metadata
 // and creates a `payments` row + `payment_allocations` row, which fires the
 // status-keeper trigger and flips the invoice to paid / partially_paid.
@@ -161,7 +159,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
         .maybeSingle();
       if (invErr || !inv) return json({ error: 'invoice not found or not accessible' }, 404);
 
-      // Pentest #250 H1: authenticate() returns the SERVICE-ROLE client, so the SELECT
+      // authenticate() returns the SERVICE-ROLE client, so the SELECT
       // above does NOT enforce RLS (the "caller's JWT gates access" comment was wrong).
       // Bind the caller to this invoice explicitly: an active member of its workspace
       // (or global admin), OR the linked customer (crm_contacts.user_id). 404 on

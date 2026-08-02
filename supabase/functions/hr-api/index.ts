@@ -1,8 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 — HR module API. Employees are CRM contacts (crm_contacts) tagged with the global
+// HR module API. Employees are CRM contacts (crm_contacts) tagged with the global
 // "Employee" category, plus a companion hr_employees row for HR-only data. Absences live in
 // hr_absences with an approval workflow.
-//
 // SECURITY (pen-test #250 baseline + HR PII sharp edges):
 //  • authenticate() yields a SERVICE-ROLE client (RLS bypassed) → every action re-derives the
 //    workspace from the caller and calls userCanAccessWorkspace() (systemic root #2, no body trust).

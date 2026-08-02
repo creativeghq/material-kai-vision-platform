@@ -1,5 +1,4 @@
-// project-plan-engine — authoritative compute for the Blueprint estimating engine (#242).
-//
+// project-plan-engine — authoritative compute for the Blueprint estimating engine.
 // The ONLY writer of persisted plan-line prices, plan versions, and plan→quote items.
 // The frontend may edit plan_items directly (RLS-gated) for labels/quantities, then calls
 // this function to (re)compute authoritative money. Actions:
@@ -9,7 +8,6 @@
 //   save-version           {plan_id, note?}                                 -> {version}
 //   restore-version        {plan_id, version}                              -> {plan, items}
 //   create-quote-from-plan {plan_id}                                        -> {quote_id}
-//
 // Auth: user JWT (or service role). Every write is bound to the caller's workspace via
 // userCanAccessWorkspace — the service-role client bypasses RLS, so we re-check membership.
 

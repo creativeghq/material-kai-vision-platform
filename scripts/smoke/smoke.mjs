@@ -176,7 +176,7 @@ await check('mivaa.price-cron-refresh', ['MIVAA_CRON_SECRET'], async () => {
   return 'ok';
 });
 
-// 6. Blueprint public estimator (#242) — the anonymous /tools/project-plan path.
+// 6. Blueprint public estimator — the anonymous /tools/project-plan path.
 //   We hit the `starters` action (NOT `estimate`): starters needs no Turnstile token and
 //   burns no quota, yet it still exercises the deployed edge fn + the service-role read of
 //   `blueprints` + `blueprint_items` + the shared blueprint/formula module import. If the fn

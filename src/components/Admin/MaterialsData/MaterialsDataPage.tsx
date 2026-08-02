@@ -21,7 +21,7 @@ export const MaterialsDataPage: React.FC = () => {
   const [jobIdFilter, setJobIdFilter] = useState<string>(searchParams.get('jobId') || '');
   // `?productId=` — several places link here to open ONE product (AsyncJobQueueMonitor's
   // per-product row, the mention dashboard's "Open"). The param was never read, so every
-  // one of those links silently showed the entire catalog instead. (audit #298 / #305)
+  // one of those links silently showed the entire catalog instead.
   const productIdFilter = searchParams.get('productId') || '';
   const [stats, setStats] = useState({
     products: 0,

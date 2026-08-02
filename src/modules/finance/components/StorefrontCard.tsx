@@ -1,5 +1,5 @@
 /**
- * #207 — Storefront admin: enable the public /store/:slug page, set its copy, and pick which
+ * Storefront admin: enable the public /store/:slug page, set its copy, and pick which
  * priced products are published. The buyer flow lands on the existing /pay token → Stripe Connect.
  */
 import React, { useEffect, useState } from 'react';
