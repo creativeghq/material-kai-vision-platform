@@ -199,11 +199,40 @@ const CIRCABC_BASE = 'https://circabc.europa.eu';
 const CIRCABC_MAX_DEPTH = 4;
 const DEFAULT_LANGUAGE = 'EN';
 
-/** Every outbound fetch in this function goes through here: SSRF-guarded and size-capped. */
+/**
+ * Every outbound fetch in this function goes through here: SSRF-guarded, size-capped, and
+ * redirect-aware.
+ *
+ * Redirects are followed BY HAND, re-running the SSRF guard on each hop. `redirect: 'follow'`
+ * would let the first hop send us anywhere; `redirect: 'manual'` — the previous behaviour —
+ * yields an opaque response whose body cannot be read at all, which surfaced as
+ * "error reading a body from connection" the moment the CIRCABC listing endpoint redirected.
+ * Neither is right on its own.
+ */
+async function fetchGuarded(rawUrl: string, accept?: string): Promise<Response> {
+  let target = rawUrl;
+  for (let hop = 0; hop <= 3; hop++) {
+    const safe = await assertSafeUrl(target, { allowSchemes: ['https:'] });
+    const res = await fetch(safe, {
+      redirect: 'manual',
+      headers: accept ? { Accept: accept } : undefined,
+    });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) throw new HttpError(502, `Redirect without a Location from ${target}`);
+      // Cancel the body so the connection is released before the next hop.
+      await res.body?.cancel();
+      target = new URL(location, safe).toString();
+      continue;
+    }
+    if (!res.ok) throw new HttpError(502, `Fetching ${target} failed: ${res.status}`);
+    return res;
+  }
+  throw new HttpError(502, `Too many redirects starting at ${rawUrl}`);
+}
+
 async function fetchBinary(rawUrl: string): Promise<Uint8Array> {
-  const safe = await assertSafeUrl(rawUrl, { allowSchemes: ['https:'] });
-  const res = await fetch(safe, { redirect: 'manual' });
-  if (!res.ok) throw new HttpError(502, `Fetching ${rawUrl} failed: ${res.status}`);
+  const res = await fetchGuarded(rawUrl);
   const bytes = new Uint8Array(await res.arrayBuffer());
   if (bytes.byteLength > MAX_CONTENT_BYTES) {
     throw new HttpError(413, 'TARIC file is larger than 40 MB — import it by chapter');
@@ -225,9 +254,7 @@ async function circabcChildren(nodeId: string): Promise<CircabcNode[]> {
     throw new HttpError(400, `Not a CIRCABC node id: ${nodeId}`);
   }
   const url = `${CIRCABC_BASE}/service/circabc/spaces/${nodeId}/children?guest=true&limit=500`;
-  const safe = await assertSafeUrl(url, { allowSchemes: ['https:'] });
-  const res = await fetch(safe, { headers: { Accept: 'application/json' }, redirect: 'manual' });
-  if (!res.ok) throw new HttpError(502, `CIRCABC listing failed for ${nodeId}: ${res.status}`);
+  const res = await fetchGuarded(url, 'application/json');
   const body = await res.json();
   const list = Array.isArray(body) ? body : (body?.data ?? body?.nodes ?? []);
   if (!Array.isArray(list)) throw new HttpError(502, 'CIRCABC listing was not a list');
