@@ -251,6 +251,42 @@ export class QuotesService {
   }
 
   /**
+   * Create a quote OWNED BY another member of the workspace.
+   *
+   * Not a variant of `createQuote` with a `user_id` argument: the RLS INSERT policy on
+   * `quotes` checks only `is_workspace_member(workspace_id)` and never binds `user_id`, so
+   * a client-side insert would let any member attribute a quote to anyone. The RPC verifies
+   * the caller administers the workspace AND that the target is an active member of it.
+   */
+  async createQuoteForMember(data: {
+    ownerUserId: string;
+    workspaceId: string;
+    name?: string;
+    notes?: string;
+    custom_request_text?: string;
+  }): Promise<Quote> {
+    const { data: quote, error } = await supabase.rpc('create_quote_for_member', {
+      p_workspace_id: data.workspaceId,
+      p_owner_user_id: data.ownerUserId,
+      p_name: data.name ?? null,
+      p_notes: data.notes ?? null,
+      p_custom_request_text: data.custom_request_text ?? null,
+    });
+
+    if (error) throw error;
+    const created = quote as unknown as Quote;
+
+    flowEventService.emit('quote_requested', {
+      quote_id: created.id,
+      user_id: data.ownerUserId,
+      name: created.name,
+      status: created.status,
+    });
+
+    return created;
+  }
+
+  /**
    * Get all quotes for the current user
    */
   async getQuotes(filters?: {

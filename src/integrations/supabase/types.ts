@@ -30532,6 +30532,16 @@ export type Database = {
         }
         Returns: string
       }
+      create_quote_for_member: {
+        Args: {
+          p_custom_request_text?: string
+          p_name?: string
+          p_notes?: string
+          p_owner_user_id: string
+          p_workspace_id: string
+        }
+        Returns: Database["public"]["Tables"]["quotes"]["Row"]
+      }
       create_marketplace_listing: {
         Args: {
           p_batch_lot?: string

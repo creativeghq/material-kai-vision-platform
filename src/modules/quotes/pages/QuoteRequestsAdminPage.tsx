@@ -40,10 +40,9 @@ import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildQuoteRequestFilters } from '../components/quoteFilters';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag } from '../services/QuotesService';
-import { usersAPI } from '@/services/crm.service';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
-import { useAuth } from '@/contexts/AuthContext';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { TimelineStepsManagement } from './TimelineStepsManagementPage';
 import { UpsellsManagement } from './UpsellsManagementPage';
@@ -59,7 +58,7 @@ interface UserProfile {
 
 export const QuoteRequestsAdmin: React.FC = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [quoteRequests, setQuoteRequests] = useState<QuoteWithItems[]>([]);
@@ -112,42 +111,35 @@ export const QuoteRequestsAdmin: React.FC = () => {
     }
   };
 
+  // Only ACTIVE members of the active workspace can own a quote in it, so only they are
+  // offered here — create_quote_for_member rejects anyone else, and a picker that lists
+  // people the server will refuse is a trap.
   const loadUsers = async () => {
+    if (!activeWorkspaceId) { setUsers([]); return; }
     try {
-      const usersList: UserProfile[] = [];
+      const { data: members, error: membersError } = await supabase
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', activeWorkspaceId)
+        .eq('status', 'active');
+      if (membersError) throw membersError;
 
-      // Always add current user first
-      if (user) {
-        const { data: currentUserProfile, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('id, user_id, role_id, subscription_tier, status, created_at, full_name, email')
-          .eq('user_id', user.id)
-          .maybeSingle(); // Use maybeSingle to avoid 406 error when no profile exists
+      const ids = (members ?? []).map((m) => m.user_id).filter(Boolean);
+      if (ids.length === 0) { setUsers([]); return; }
 
-        if (currentUserProfile && !profileError) {
-          usersList.push({
-            ...currentUserProfile,
-            email: currentUserProfile.email || user.email || '',
-          });
-        }
-      }
+      const { data: profiles, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('id, user_id, status, full_name, email')
+        .in('user_id', ids);
+      if (profilesError) throw profilesError;
 
-      // Try to load all users from CRM (admin only)
-      try {
-        const { data } = await usersAPI.listUsers(100, 0);
-        if (data) {
-          // Add other users, avoiding duplicates
-          const otherUsers = data.filter((u: UserProfile) => u.user_id !== user?.id);
-          usersList.push(...otherUsers);
-        }
-      } catch {
-        // Silently handle CRM access errors - current user already added
-        // This is expected for non-admin users
-      }
-
-      setUsers(usersList);
-    } catch {
-      // Silently handle any errors - users list will just be empty
+      // A member with no user_profiles row still owns quotes, so keep them in the list
+      // under their id rather than dropping them from the picker.
+      const byId = new Map((profiles ?? []).map((pr) => [pr.user_id, pr as UserProfile]));
+      setUsers(ids.map((id) => byId.get(id) ?? { id, user_id: id, status: 'active' }));
+    } catch (error) {
+      console.error('Error loading workspace members:', error);
+      setUsers([]);
     }
   };
 
@@ -184,11 +176,20 @@ export const QuoteRequestsAdmin: React.FC = () => {
       });
       return;
     }
+    if (!activeWorkspaceId) {
+      toast({
+        title: 'Error',
+        description: 'No active workspace \u2014 pick one before creating a quote.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       setCreating(true);
-      // Create quote for the selected user
-      const quote = await quotesService.createQuote({
+      const quote = await quotesService.createQuoteForMember({
+        ownerUserId: selectedUserId,
+        workspaceId: activeWorkspaceId!,
         name: quoteName || undefined,
         notes: quoteNotes || undefined,
         custom_request_text: customRequest || undefined,
@@ -217,8 +218,8 @@ export const QuoteRequestsAdmin: React.FC = () => {
     }
   };
 
-  // Requester ids only resolve to a name once the CRM user list has loaded; fall back to a
-  // truncated id so the option is still selectable for non-admins who can't list users.
+  // Requester ids only resolve to a name once the member list has loaded; fall back to a
+  // truncated id so the row still reads for a requester outside this workspace.
   const requesterName = React.useCallback((userId: string) => {
     const u = users.find((x) => x.user_id === userId);
     return u?.full_name?.trim() || u?.email || `${userId.substring(0, 8)}…`;
@@ -479,7 +480,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Create Quote for User</DialogTitle>
             <DialogDescription>
-              Create a new quote request and assign it to a user from CRM
+              Create a draft quote owned by a member of this workspace
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
