@@ -111,9 +111,12 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
 
       if (usersError) throw usersError;
 
-      // Load contacts
+      // Load contacts.
+      // `contacts` does not exist — it is `crm_contacts`. PostgREST rejected every call and the
+      // error was thrown, so the whole recipient picker failed rather than half-loading; the
+      // users half above never rendered either. (audit #270)
       const { data: contacts, error: contactsError } = await supabase
-        .from('contacts')
+        .from('crm_contacts')
         .select('id, email, name')
         .ilike('email', `%${searchQuery}%`)
         .limit(50);
@@ -155,7 +158,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
         count = userCount || 0;
       } else if (formData.audience_type === 'all_contacts') {
         const { count: contactCount, error } = await supabase
-          .from('contacts')
+          .from('crm_contacts')
           .select('*', { count: 'exact', head: true });
 
         if (error) throw error;
@@ -163,7 +166,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
       } else if (formData.audience_type === 'both') {
         const [usersResult, contactsResult] = await Promise.all([
           supabase.from('user_profiles').select('*', { count: 'exact', head: true }),
-          supabase.from('contacts').select('*', { count: 'exact', head: true }),
+          supabase.from('crm_contacts').select('*', { count: 'exact', head: true }),
         ]);
 
         if (usersResult.error) throw usersResult.error;
@@ -320,7 +323,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
       } else if (formData.audience_type === 'all_contacts') {
         // Get all contacts
         const { data: contacts, error } = await supabase
-          .from('contacts')
+          .from('crm_contacts')
           .select('id, email');
 
         if (error) throw error;
@@ -332,7 +335,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
         // Get both users and contacts
         const [usersResult, contactsResult] = await Promise.all([
           supabase.from('user_profiles').select('user_id, email:users(email)'),
-          supabase.from('contacts').select('id, email'),
+          supabase.from('crm_contacts').select('id, email'),
         ]);
 
         if (usersResult.error) throw usersResult.error;

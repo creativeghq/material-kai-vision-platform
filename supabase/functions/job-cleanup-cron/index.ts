@@ -6,8 +6,7 @@
  *
  * Cleans:
  * - background_jobs         completed/failed > 5 days old
- * - scraping_sessions       completed/failed > 5 days old
- * - data_import_jobs        completed/failed, non-scheduled > 5 days old
+ *  * - data_import_jobs        completed/failed, non-scheduled > 5 days old
  * - job_checkpoints         (legacy, dropped — history now on background_jobs.stage_history)
  * - data_import_history     > 30 days old
  * - agent_checkpoints       > 30 days old  (conversation snapshots, not needed after)
@@ -113,19 +112,8 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
       console.log(`[JobCleanupCron] background_jobs: ${stats.backgroundJobs} deleted`);
     }
 
-    // ── 2. scraping_sessions ────────────────────────────────────────────────
-    {
-      const { data, error } = await supabase
-        .from('scraping_sessions')
-        .delete()
-        .in('status', ['completed', 'failed'])
-        .lt('updated_at', fiveDaysAgo)
-        .limit(1000)
-        .select('id');
-      if (error) console.error('[JobCleanupCron] scraping_sessions error:', error);
-      else stats.scrapingSessions = data?.length ?? 0;
-      console.log(`[JobCleanupCron] scraping_sessions: ${stats.scrapingSessions} deleted`);
-    }
+    // `scraping_sessions` cleanup was here. The table does not exist and has no
+    // successor, so the delete matched nothing on every run. (audit #270)
 
     // ── 3. data_import_jobs ─────────────────────────────────────────────────
     {

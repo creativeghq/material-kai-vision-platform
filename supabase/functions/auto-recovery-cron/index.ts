@@ -19,7 +19,7 @@ import { isCronAuthorized } from '../_shared/auth.ts';
 
 interface StuckJob {
   id: string;
-  type: 'pdf_processing' | 'xml_import' | 'web_scraping';
+  type: 'pdf_processing' | 'xml_import';
   status: string;
   lastHeartbeat: string | null;
   stuckDuration: number;
@@ -136,14 +136,22 @@ serve(withApiLogging('auto-recovery-cron', async (req) => {
 }));
 
 async function detectAllStuckJobs(supabase: any): Promise<StuckJob[]> {
-  const [pdfJobs, scrapingJobs, xmlJobs, agentRunJobs] = await Promise.all([
+  // `web_scraping` was a fourth branch here, over a `scraping_sessions` table that DOES NOT
+  // EXIST and has no successor — neither `scraping_sessions` nor `web_scraping_sessions` is in
+  // pg_class. Every 5-minute tick queried it, PostgREST rejected the call, the error was
+  // console.error'd and the branch returned [], so the cron reported success forever.
+  //
+  // It was visible once: job_monitor_service logged the same failure 4,494 times into
+  // system_logs between 2026-07-03 and 07-06 before that emitter was changed. These edge
+  // functions log to the function console instead, which is why it went quiet without being
+  // fixed. Removed rather than repointed — there is nothing to point it at. (audit #270)
+  const [pdfJobs, xmlJobs, agentRunJobs] = await Promise.all([
     detectStuckPdfJobs(supabase),
-    detectStuckScrapingJobs(supabase),
     detectStuckXmlJobs(supabase),
     detectStuckAgentRuns(supabase),
   ]);
 
-  return [...pdfJobs, ...scrapingJobs, ...xmlJobs, ...agentRunJobs];
+  return [...pdfJobs, ...xmlJobs, ...agentRunJobs];
 }
 
 async function detectStuckAgentRuns(supabase: any): Promise<StuckJob[]> {
@@ -234,32 +242,6 @@ async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
   }));
 }
 
-async function detectStuckScrapingJobs(supabase: any): Promise<StuckJob[]> {
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabase
-    .from('scraping_sessions')
-    .select('*')
-    .eq('status', 'processing')
-    .lt('last_heartbeat_at', fiveMinutesAgo)
-    .limit(100);
-
-  if (error) {
-    console.error('[AutoRecoveryCron] Error detecting stuck scraping jobs:', error);
-    return [];
-  }
-
-  return (data || []).map((job: any) => ({
-    id: job.id,
-    type: 'web_scraping' as const,
-    status: job.status,
-    lastHeartbeat: job.last_heartbeat_at,
-    stuckDuration: calculateStuckDuration(job.last_heartbeat_at),
-    recoveryAttempts: job.recovery_attempts || 0,
-    canRecover: (job.recovery_attempts || 0) < 3,
-    metadata: { url: job.url, background_job_id: job.background_job_id, last_recovery_at: job.last_recovery_at },
-  }));
-}
 
 async function detectStuckXmlJobs(supabase: any): Promise<StuckJob[]> {
   const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
@@ -319,10 +301,7 @@ async function recoverJob(supabase: any, job: StuckJob): Promise<any> {
       case 'pdf_processing':
         success = await recoverPdfJob(supabase, job);
         break;
-      case 'web_scraping':
-        success = await recoverScrapingJob(supabase, job);
-        break;
-      case 'xml_import':
+case 'xml_import':
         success = await recoverXmlJob(supabase, job);
         break;
     }
@@ -607,29 +586,11 @@ async function resolveLastCheckpointStage(supabase: any, job: StuckJob): Promise
   return null;
 }
 
-async function recoverScrapingJob(supabase: any, job: StuckJob): Promise<boolean> {
-  // Audit fix (this PR): bump recovery_attempts + last_recovery_at on the
-  // SAME UPDATE that flips status. Previously the success path skipped the
-  // bump (incrementRecoveryAttempts is called only on the catch branch in
-  // recoverJob), so a flapping scraping session could be "recovered"
-  // indefinitely without ever hitting the 3-attempt cap.
-  const nowIso = new Date().toISOString();
-  const { error } = await supabase
-    .from('scraping_sessions')
-    .update({
-      status: 'pending',
-      last_heartbeat_at: nowIso,
-      recovery_attempts: (job.recoveryAttempts || 0) + 1,
-      last_recovery_at: nowIso,
-      updated_at: nowIso,
-    })
-    .eq('id', job.id)
-    .eq('status', 'processing'); // idempotent guard — don't double-flip if another tick already claimed
-  return !error;
-}
 
 async function recoverXmlJob(supabase: any, job: StuckJob): Promise<boolean> {
-  // Audit fix (this PR): same recovery_attempts bump rationale as recoverScrapingJob.
+  // Audit fix: bump recovery_attempts + last_recovery_at on the SAME UPDATE that flips
+  // status, so a flapping job cannot be "recovered" indefinitely without hitting the 3-attempt
+  // cap. (The sibling this comment used to reference, recoverScrapingJob, is gone — audit #270.)
   // Also: the 'progress: 0' reset is preserved but should be revisited — XML import
   // doesn't have a checkpoint-resume mechanism, so a stuck job restarts from scratch.
   // That's intentional for now (XML jobs are short-lived); flag for a future audit.
@@ -653,14 +614,7 @@ async function incrementRecoveryAttempts(supabase: any, job: StuckJob): Promise<
   // Audit fix (this PR): agent runs live in the agent_runs table, not background_jobs.
   // Previously this function targeted background_jobs unconditionally, so an agent run
   // exception path here matched 0 rows and silently dropped the increment.
-  let table: string;
-  if (job.metadata?._is_agent_run) {
-    table = 'agent_runs';
-  } else if (job.type === 'web_scraping') {
-    table = 'scraping_sessions';
-  } else {
-    table = 'background_jobs';
-  }
+  const table = job.metadata?._is_agent_run ? 'agent_runs' : 'background_jobs';
   await supabase
     .from(table)
     .update({ recovery_attempts: job.recoveryAttempts + 1, last_recovery_at: new Date().toISOString() })
@@ -672,14 +626,7 @@ async function markAsFailed(supabase: any, job: StuckJob): Promise<void> {
   // in agent_runs (not background_jobs), so previously markAsFailed was writing
   // status='failed' to background_jobs with id=agent_run_id (0 rows matched —
   // the agent run stayed at 'processing' forever).
-  let table: string;
-  if (job.metadata?._is_agent_run) {
-    table = 'agent_runs';
-  } else if (job.type === 'web_scraping') {
-    table = 'scraping_sessions';
-  } else {
-    table = 'background_jobs';
-  }
+  const table = job.metadata?._is_agent_run ? 'agent_runs' : 'background_jobs';
   const errorMessage = `Job stuck for ${job.stuckDuration} minutes. Max recovery attempts (3) exceeded.`;
   const nowIso = new Date().toISOString();
 
@@ -733,7 +680,8 @@ async function markAsFailed(supabase: any, job: StuckJob): Promise<void> {
     updatePayload.error_message = errorMessage;
     updatePayload.completed_at = nowIso;
   } else {
-    // scraping_sessions
+    // background_jobs. (The `scraping_sessions` arm that used to live here went with the rest
+    // of the web_scraping branch — that table does not exist. audit #270)
     updatePayload.error = errorMessage;
   }
   await supabase

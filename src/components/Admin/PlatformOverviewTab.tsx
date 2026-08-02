@@ -369,13 +369,17 @@ export function PlatformOverviewTab() {
         { data: hireMe }, { data: agentRuns }, { data: vrWorlds },
         { data: moodboards }, { data: moodboardItems },
         { data: projects },
-        { data: searches }, { data: searchLogs },
+        { data: searches }, { data: _searchLogs },
       ] = await Promise.all([
         supabase.from('quote_requests').select('id,status,created_at').gte('created_at', ago12.toISOString()),
-        supabase.from('profiles').select('id,professional_type,created_at').gte('created_at', ago12.toISOString()),
+        // `profiles` does not exist — it is `user_profiles`. Same columns. (audit #270)
+        supabase.from('user_profiles').select('id,professional_type,created_at').gte('created_at', ago12.toISOString()),
         // `quote_request_id` does not exist — the FK is `quote_id`.
         supabase.from('quote_items').select('product_id,quote_id').gte('created_at', ago12.toISOString()).limit(3000),
-        supabase.from('hire_me_requests').select('id,services,status,created_at').gte('created_at', ago12.toISOString()),
+        // `hire_me_requests` does not exist — the successor is `profile_contact_requests`,
+        // where the column is `services_requested` and there is NO `status` at all. The funnel
+        // that consumed `status` is removed below rather than faked. (audit #270)
+        supabase.from('profile_contact_requests').select('id,services_requested,created_at').gte('created_at', ago12.toISOString()),
         supabase.from('agent_runs').select('created_at,status,execution_time_ms,credits_debited,background_agents(agent_type)').gte('created_at', ago12.toISOString()),
         // vr_worlds has no `quality_preset` and no `credits_used` — the tier is `model` and
         // the charge is `credits_charged`. moodboard_items timestamps on `added_at`, not
@@ -384,8 +388,15 @@ export function PlatformOverviewTab() {
         supabase.from('moodboards').select('id,created_at').gte('created_at', ago12.toISOString()),
         supabase.from('moodboard_items').select('added_at,material_id').gte('added_at', ago12.toISOString()).limit(3000),
         supabase.from('projects').select('id,status,deadline,budget_amount,budget_currency,created_at,last_activity_at'),
-        supabase.from('search_queries').select('query,created_at,result_count,strategy,execution_time_ms,agent_id,results_clicked').gte('created_at', ago12.toISOString()).limit(5000),
-        supabase.from('search_feedback').select('rating,created_at').gte('created_at', ago12.toISOString()),
+        // `search_queries` does not exist. Real searches land in `search_query_tracking`,
+        // written by MIVAA /api/rag/search. Column names differ (`query_text`, `timestamp`,
+        // `response_time_ms`) and it carries NO `agent_id` and NO `results_clicked` — the charts
+        // that consumed those are removed below rather than fabricated. (audit #270)
+        supabase.from('search_query_tracking').select('query_text,timestamp,result_count,strategy,response_time_ms').gte('timestamp', ago12.toISOString()).limit(5000),
+        // `search_feedback` does not exist and has no successor — nothing in the platform records
+        // a search rating. Kept as a null-yielding placeholder so avgSatisfaction reads "not
+        // tracked" instead of a number nobody measured.
+        Promise.resolve({ data: null }),
       ]);
 
       const total = (quotes ?? []).length;
@@ -435,13 +446,14 @@ export function PlatformOverviewTab() {
 
       // Hire Me breakdown
       const hireSvcMap = new Map<string, number>();
-      const hireFunnelMap = new Map<string, number>();
       (hireMe ?? []).forEach((h: any) => {
-        (h.services ?? []).forEach((s: string) => hireSvcMap.set(s.replace(/_/g, ' '), (hireSvcMap.get(s.replace(/_/g, ' ')) ?? 0) + 1));
-        hireFunnelMap.set(h.status, (hireFunnelMap.get(h.status) ?? 0) + 1);
+        (h.services_requested ?? []).forEach((s: string) => hireSvcMap.set(s.replace(/_/g, ' '), (hireSvcMap.get(s.replace(/_/g, ' ')) ?? 0) + 1));
       });
       setHireMeServices(Array.from(hireSvcMap.entries()).sort((a, b) => b[1] - a[1]).map(([service, count]) => ({ service, count })));
-      setHireMeFunnel(Array.from(hireFunnelMap.entries()).map(([status, count]) => ({ status, count })));
+      // `profile_contact_requests` has no status column — a contact request is either made or it
+      // is not; there is no pipeline behind it. The funnel keyed on `h.status` was grouping
+      // `undefined`. Emptied rather than relabelled. (audit #270)
+      setHireMeFunnel([]);
 
       // Moodboard activity
       const mbMap = new Map<string, { boards: number; items: number }>(wks12.map(w => [w, { boards: 0, items: 0 }]));
@@ -511,33 +523,36 @@ export function PlatformOverviewTab() {
       // Search intelligence
       const sMap = new Map<string, number>(wks12.map(w => [w, 0]));
       const stratMap = new Map<string, number>();
-      const agSrchMap = new Map<string, number>();
       const latMap = new Map<string, { sum: number; count: number }>(wks12.map(w => [w, { sum: 0, count: 0 }]));
-      const ctrMap = new Map<string, { clicks: number; searches: number }>(wks12.map(w => [w, { clicks: 0, searches: 0 }]));
       const termMap = new Map<string, number>();
       const zeroMap = new Map<string, number>();
       (searches ?? []).forEach((s: any) => {
-        const l = weekLabel(new Date(s.created_at));
+        const l = weekLabel(new Date(s.timestamp));
         if (sMap.has(l)) sMap.set(l, (sMap.get(l) ?? 0) + 1);
         if (s.strategy) stratMap.set(s.strategy, (stratMap.get(s.strategy) ?? 0) + 1);
-        if (s.agent_id) agSrchMap.set(s.agent_id, (agSrchMap.get(s.agent_id) ?? 0) + 1);
-        if (latMap.has(l) && s.execution_time_ms) { latMap.get(l)!.sum += s.execution_time_ms; latMap.get(l)!.count++; }
-        if (ctrMap.has(l)) { ctrMap.get(l)!.searches++; if (s.results_clicked) ctrMap.get(l)!.clicks += s.results_clicked; }
-        if (s.query) termMap.set(s.query, (termMap.get(s.query) ?? 0) + 1);
-        if ((s.result_count ?? 1) === 0 && s.query) zeroMap.set(s.query, (zeroMap.get(s.query) ?? 0) + 1);
+        if (latMap.has(l) && s.response_time_ms) { latMap.get(l)!.sum += s.response_time_ms; latMap.get(l)!.count++; }
+        if (s.query_text) termMap.set(s.query_text, (termMap.get(s.query_text) ?? 0) + 1);
+        if ((s.result_count ?? 1) === 0 && s.query_text) zeroMap.set(s.query_text, (zeroMap.get(s.query_text) ?? 0) + 1);
       });
       setSearchVolume(Array.from(sMap.entries()).map(([week, searches]) => ({ week, searches })));
       setSearchStrategyDist(Array.from(stratMap.entries()).map(([name, value]) => ({ name, value })));
-      setSearchAgentDist(Array.from(agSrchMap.entries()).map(([name, value]) => ({ name, value })));
+      // Per-agent split and click-through are NOT measured: search_query_tracking has neither
+      // `agent_id` nor `results_clicked`, and nothing else records which result a user opened.
+      // Emptied rather than filled with a guess — an empty chart says "no data", a guessed one
+      // lies with a straight face. (audit #270)
+      setSearchAgentDist([]);
+      setSearchCTRTrend([]);
       setSearchLatencyTrend(Array.from(latMap.entries()).map(([week, d]) => ({ week, avgMs: d.count > 0 ? Math.round(d.sum / d.count) : 0 })));
-      setSearchCTRTrend(Array.from(ctrMap.entries()).map(([week, d]) => ({ week, ctr: d.searches > 0 ? +(d.clicks / d.searches).toFixed(2) : 0 })));
       const totalS = (searches ?? []).length;
       const zeroS = Array.from(zeroMap.values()).reduce((a, b) => a + b, 0);
       setTopSearches(Array.from(termMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([term, count]) => ({ term, count })));
       setZeroResultTerms(Array.from(zeroMap.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([term, count]) => ({ term, count })));
-      setSearchFunnel([{ stage: 'Searches', count: totalS }, { stage: 'Clicked', count: Math.floor(totalS * 0.72) }, { stage: 'Saved', count: Math.floor(totalS * 0.32) }, { stage: 'Quoted', count: Math.floor(totalS * 0.12) }]);
-      const avgSat = (searchLogs ?? []).length > 0 ? +((searchLogs ?? []).reduce((s: number, l: any) => s + l.rating, 0) / (searchLogs ?? []).length).toFixed(1) : null;
-      setSearchKpis({ totalSearches: totalS, searchToSaveRate: totalS > 0 ? `${Math.round(0.32 * 100)}%` : '—', avgSatisfaction: avgSat ? `${avgSat}` : '—', zeroResultRate: totalS > 0 ? `${((zeroS / totalS) * 100).toFixed(1)}%` : '—' });
+      // The funnel was FABRICATED: Clicked/Saved/Quoted were `totalS * 0.72 / 0.32 / 0.12`,
+      // hardcoded multipliers rendered as a measured chart — and searchToSaveRate was literally
+      // always "32%". Nothing records a click, a save or a quote against a search. Only the one
+      // stage we actually measure is reported; the rest is not invented. (audit #270)
+      setSearchFunnel(totalS > 0 ? [{ stage: 'Searches', count: totalS }] : []);
+      setSearchKpis({ totalSearches: totalS, searchToSaveRate: '—', avgSatisfaction: '—', zeroResultRate: totalS > 0 ? `${((zeroS / totalS) * 100).toFixed(1)}%` : '—' });
 
       // Review velocity placeholder (real data loaded in secondary block)
       setReviewVelocity(wks12.map(week => ({ week, count: 0, avgRating: 0 })));
@@ -578,7 +593,9 @@ export function PlatformOverviewTab() {
         ]),
         // Pipeline health
         Promise.all([
-          supabase.from('pdf_batch_jobs').select('created_at,status').gte('created_at', ago12.toISOString()),
+          // `pdf_batch_jobs` does not exist; the real table is `pdf_processing_results` and its
+          // column is `processing_status`. Aliased so the consumer below is unchanged. (audit #270)
+          supabase.from('pdf_processing_results').select('created_at,status:processing_status').gte('created_at', ago12.toISOString()),
           // `status` is `processing_status`; `records_imported` does not exist — each row IS
           // one imported product record, so the consumer counts rows.
           supabase.from('data_import_history').select('created_at,processing_status').gte('created_at', ago12.toISOString()),
@@ -587,7 +604,10 @@ export function PlatformOverviewTab() {
         // Factory engagement + pipeline
         Promise.all([
           supabase.from('products').select('id,metadata,created_at').gte('created_at', ago12.toISOString()).limit(2000),
-          supabase.from('factory_registrations').select('status,company_name,type,created_at').order('created_at', { ascending: false }).limit(50),
+          // `factory_registrations` does not exist — it is `factory_registration_requests`, and
+          // the column is `professional_type`, not `type`. Aliased to keep the consumer intact.
+          // (audit #270)
+          supabase.from('factory_registration_requests').select('status,company_name,type:professional_type,created_at').order('created_at', { ascending: false }).limit(50),
         ]),
       ]);
 
