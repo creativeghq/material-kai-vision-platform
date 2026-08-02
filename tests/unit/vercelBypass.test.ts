@@ -47,6 +47,19 @@ describe('vercel protection bypass', () => {
     expect(bypassHeaders('https://x.vercel.app')['x-vercel-protection-bypass']).toBe('a'.repeat(32));
   });
 
+  it('trims surrounding whitespace off the secret', () => {
+    // A secret piped into `gh secret set` from a Windows shell arrives with a trailing CRLF.
+    // A header value ending in CR is a different credential — the bypass fails and the browser
+    // lands on Vercel's login page, where every route assertion passes against the wrong site.
+    process.env[VAR] = `  ${'c'.repeat(32)}\r\n`;
+    expect(bypassHeaders('https://x.vercel.app')['x-vercel-protection-bypass']).toBe('c'.repeat(32));
+  });
+
+  it('treats a whitespace-only secret as missing rather than sending it', () => {
+    process.env[VAR] = '   \r\n';
+    expect(() => bypassHeaders('https://x.vercel.app')).toThrow(/is not set/);
+  });
+
   it('does NOT ask Vercel to set a bypass cookie', () => {
     // This is a regression pin, not a style preference. Sending `x-vercel-set-bypass-cookie`
     // makes Vercel answer 307 + Set-Cookie; measured against a real candidate the header alone

@@ -49,7 +49,11 @@ const isProtectedHost = (rawUrl: string): boolean => {
 export function bypassHeaders(baseURL: string): Record<string, string> {
   if (!isProtectedHost(baseURL)) return {};
 
-  const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  // Trim. A secret piped into `gh secret set` from a Windows shell picks up a trailing CRLF,
+  // and a header value ending in CR is not the same credential: measured 2026-08-02, the clean
+  // value returns 200 while the same value with a trailing CR returns 400 — and in Chromium it
+  // simply fails the bypass, so the run lands on Vercel's login page and every route "passes".
+  const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
   if (!secret) {
     throw new Error(
       `[smoke] ${baseURL} is behind Vercel deployment protection but ` +
