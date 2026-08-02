@@ -5,11 +5,14 @@
 //      an HS/CN/TARIC field. A code the supplier declared is the normal basis for a customs
 //      declaration and is far more trustworthy than any inference, so a valid one is applied
 //      directly with source='supplier'.
-//   B. Shortlist. `search_taric_codes` ranks the nomenclature by full-text + trigram match on
-//      the product's own words. This is what makes stage C affordable: the model chooses among
-//      ~30 real codes instead of trying to recall 20,000 from memory.
-//   C. Claude picks one, through a forced tool call so the verdict is schema-shaped rather than
-//      parsed out of prose.
+//   B. The RULES. `resolve_taric_for_product` maps the article's own facts — category, material,
+//      form — onto a heading, then an attribute (water absorption) onto the declarable code.
+//      A confirmed rule APPLIES; an unconfirmed one suggests. No model, no credits.
+//   B2. A fact the rules needed was missing, so ask the model for THE FACT (what is it, what is
+//      it made of), store it, and re-resolve. Perceivable facts only — never a code, never a
+//      lab measurement.
+//   C. Shortlist + Claude, narrowed to whatever heading the rules did establish, through a
+//      forced tool call so the verdict is schema-shaped rather than parsed out of prose.
 // Stage C NEVER writes `products.taric_code`. It writes `taric_code_suggested` + a confidence
 // and leaves `taric_status='suggested'` for a human to confirm. A misclassification is a
 // customs liability that surfaces months later at a border, not a bad label in a UI — the one
@@ -111,15 +114,21 @@ Deno.serve(withApiLogging('taric-classify', async (req) => {
 
   if (cron && body.mode === 'backfill') {
     const limit = Math.min(Math.max(body.limit ?? 50, 1), 200);
-    const { data, error } = await supabase
-      .from('products')
-      .select(PRODUCT_COLUMNS)
-      .eq('taric_status', 'pending')
-      .is('taric_code', null)
-      .is('taric_classified_at', null)
-      .limit(limit);
-    if (error) throw new Error(`Loading pending products failed: ${error.message}`);
-    products = data ?? [];
+    // Eligibility lives in SQL because it is not a plain column filter: a product must come back
+    // when the RULES change, not only when it has never been seen. Filtering on
+    // `taric_classified_at is null` here meant a product examined once was abandoned — and the
+    // rules change precisely when someone confirms a seeded proposal, which is the normal first
+    // run. The catalog would have looked classified while most of it was not.
+    const { data: due, error: dueErr } = await supabase
+      .rpc('taric_products_needing_classification', { p_limit: limit });
+    if (dueErr) throw new Error(`Selecting products to classify failed: ${dueErr.message}`);
+    const ids = (due ?? []).map((r: { id: string }) => r.id);
+    if (ids.length === 0) { products = []; }
+    else {
+      const { data, error } = await supabase.from('products').select(PRODUCT_COLUMNS).in('id', ids);
+      if (error) throw new Error(`Loading pending products failed: ${error.message}`);
+      products = data ?? [];
+    }
   } else {
     const auth = await authenticate(req, { requireUser: true });
     if (!auth.success) throw new HttpError(401, auth.error ?? 'Unauthorized');
@@ -394,7 +403,8 @@ async function classifyOne(
     return { product_id: product.id, stage: 'shortlist', status: 'failed', reason: 'no candidates' };
   }
 
-  // Stage C — the only paid step, so the gate goes here and nowhere earlier.
+  // The second paid step (fact extraction above is the first). Both sit AFTER the `!allowLlm`
+  // return, so the free hourly sweep can never spend a credit.
   const reserved = userId ? CREDITS_PER_PRODUCT : 0;
   if (reserved > 0) {
     const res = await reserveCredits(supabase, userId!, product.workspace_id, reserved, 'taric_classify');
