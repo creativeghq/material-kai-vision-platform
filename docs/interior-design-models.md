@@ -97,7 +97,7 @@ These are called by the agent independently and do **not** participate in the va
 | Tool | Backing model | Cost | Purpose |
 |---|---|---|---|
 | `virtual_staging` | `proplabs/virtual-staging` | per-generation Replicate billing | Stage an empty room with AI furniture (uses `room` + `furniture_style` enums). Triggered when the user has an empty room photo. |
-| `generate_pbr_maps` | Replicate (multi-step) | 8 cr | Generate PBR texture maps (albedo, normal, roughness, metalness) for AR / 3D viewer. |
+| ~~`generate_pbr_maps`~~ | — | — | **REMOVED.** The edge function was deleted and `products.metadata.pbr_maps` has never been written for any product, so this tool charged nobody and produced nothing. `ARPreviewModal` falls back to the plain product image — its `normalMap`/`roughnessMap`/`metalnessMap` slots are wired and simply never receive anything. Rebuilding the producer is audit #310 item 2. (audit #286 doc drift) |
 | `generate_vr_world` | WorldLabs Marble | 18 cr (`marble-1.0-draft`, ~30-45s) / 190 cr (`marble-1.1`, ~5min) | 3D Gaussian Splat VR world from a room image. |
 | Lighting Variants (in ProgressiveImageGrid) | Gemini (same edit pipeline) | per-edit | Re-renders the same room under 6 lighting presets (Natural Daylight, Golden Hour, Overcast, Showroom Spots, Warm Evening, Night). |
 
