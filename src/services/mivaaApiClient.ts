@@ -519,7 +519,7 @@ export class MivaaApiClient {
     });
   }
 
-  // extractSvbrdf() removed 2026-07-31 (audit #304 finding 8). Nothing in the platform
+  // extractSvbrdf() removed 2026-07-31. Nothing in the platform
   // could produce PBR maps: MIVAA registers no /api/svbrdf router, the svbrdf-extractor
   // edge function it claimed to replace does not exist, generate-pbr-maps was deleted,
   // and this method had zero callers. `metadata.pbr_maps` is never written — the same

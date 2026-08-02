@@ -203,7 +203,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
       // This branch creates a Stripe session directly, so Stripe specifically must exist.
       if (!stripe) return noPaymentProviderResponse(corsHeaders);
 
-      // #182 route funds to the workspace's connected Stripe account when configured.
+      // Route funds to the workspace's connected Stripe account when configured.
       const { data: destAcct } = await supabase.rpc('get_workspace_payout_account', { p_workspace_id: inv.workspace_id });
 
       // Create a Stripe Checkout session right now and return its URL too (so admin can paste either).

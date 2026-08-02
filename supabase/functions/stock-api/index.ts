@@ -266,7 +266,6 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
         // two `mydata_classification_*` fields — none of which are columns — did not
         // merely go unwritten, they made create-item fail 100% of the time. The
         // allowlist above was already corrected; this payload still named them.
-        // (audit #307 finding 16)
         const { data, error } = await usr.from('warehouse_items').insert({
           workspace_id: workspaceId, warehouse_id: warehouseId, name,
           product_id: body?.product_id ? String(body.product_id) : null,

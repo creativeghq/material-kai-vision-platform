@@ -26,7 +26,7 @@ function json(body: any, status = 200): Response {
 const PUBLIC_LEAD_HOURLY_LIMIT = 8;
 async function enforceLeadRateLimit(supabase: any, req: Request, action: string, workspaceId: string | null): Promise<Response | null> {
   // The two halves have DIFFERENT failure policies, and collapsing them into one
-  // `catch { return null }` is what made this brake fail open (audit #303 finding 5):
+  // `catch { return null }` is what made this brake fail open:
   //   - The COUNT is the enforcement decision. If it cannot be answered we do not know
   //     whether the caller is over budget, so we must refuse. Failing open here hands an
   //     attacker an unlimited channel the moment they can induce an error in this query,
@@ -248,7 +248,7 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     }
 
     // Capture the seller lead (crm_contact + real-estate extension). property_id/workspace are server-set.
-    // The error MUST be checked (audit #303 finding 6). This used to destructure only `data`, so a
+    // The error MUST be checked. This used to destructure only `data`, so a
     // failed insert left `contact` null, skipped the property_contacts_ext upsert AND the
     // crm_contact_created event, and still returned 200 with the estimate — while
     // ValuationWidget flips to its success screen on any resolved promise. The seller saw

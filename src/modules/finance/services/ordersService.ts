@@ -1385,7 +1385,7 @@ export const ordersService = {
    * line 3 left lines 1 and 2 already delivered — stock moved out of the warehouse,
    * `quantity_delivered` written, allocations dispatched — and the operator was told only that
    * the save failed, with no way to know how far it got. That is pipeline convention #3, "no
-   * two-call patterns that can crash mid-way". (audit #307 finding 20)
+   * two-call patterns that can crash mid-way".
    *
    * `deliver_order_lines` runs the same per-line function inside a single transaction, so an
    * exception on any line rolls the whole delivery back. Note the old comment here claimed

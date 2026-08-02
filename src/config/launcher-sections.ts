@@ -1,4 +1,4 @@
-// #251 App Launcher (three-pane) — the center "inner links" per module + the right-column
+// App Launcher (three-pane) — the center "inner links" per module + the right-column
 // quick-CREATE triggers + jump-to shortcuts. EVERY path is a real route or a ?tab= value copied
 // DIRECTLY from the target page's own <TabsTrigger> list (verified 2026-07-18) — never guessed.
 // Only ALWAYS-available tabs are listed; role/BYOK-gated tabs are omitted so a link never lands on

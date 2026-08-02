@@ -1,5 +1,5 @@
 /**
- * #207/#185 — cloud vPOS shifts. Open/close a cashier session, record cash-drawer movements,
+ * Cloud vPOS shifts. Open/close a cashier session, record cash-drawer movements,
  * and pull the X (live) / Z (close-out) report. Issued receipts carry pos_session_id so the
  * Z report can total the shift per payment method + per VAT rate with cash reconciliation.
  */

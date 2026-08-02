@@ -115,7 +115,7 @@ Deno.serve(withApiLogging('check-material-alerts', async (req: Request) => {
 
       const newAlerts = insertedAlerts ?? [];
 
-      // 4. Notify for each truly new alert — routed through Flows (#245 D) so the
+      // 4. Notify for each truly new alert — routed through Flows so the
       //    bell is governable. The seeded `material_alert` system-default flow runs
       //    create_notification from this payload.
       if (newAlerts.length > 0) {

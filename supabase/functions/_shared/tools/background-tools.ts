@@ -222,7 +222,7 @@ Returns video_url when complete, or prediction_id if still processing (poll gene
         // These MUST be generate-interior-video-v2's VideoModel keys — the value is
         // forwarded to it verbatim. 'kling-3.0', 'kling-1.6-pro' and 'wan2.1-i2v'
         // were none of them, so any agent that took the description at its word got
-        // a failed generation. (audit #304 finding 4)
+        // a failed generation.
         model: z.enum(['veo-2', 'kling-v3.0', 'wan2.1-i2v-720p', 'runway-gen4-turbo']).optional()
           .describe('Override model selection: veo-2 30cr, kling-v3.0 20cr, wan2.1-i2v-720p 12cr, runway-gen4-turbo 40cr (default: auto based on video_type)'),
         prompt: z.string().optional().describe('Additional prompt for the video generation'),

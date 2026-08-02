@@ -21,7 +21,7 @@ export interface MasterRequest {
   quote?: { name: string | null; quote_number: string | null } | null;
 }
 
-/** #237 Phase 4.4 — a single unpriced quote line routed upstream for pricing. */
+/** A single unpriced quote line routed upstream for pricing. */
 export interface MasterRequestLine {
   id: string;
   master_request_id: string;

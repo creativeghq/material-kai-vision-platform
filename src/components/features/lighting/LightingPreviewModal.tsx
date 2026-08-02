@@ -44,8 +44,7 @@ export default function LightingPreviewModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-6xl h-[85vh] p-4 flex flex-col gap-0 overflow-hidden">
         <div className="mb-2 flex items-center justify-between">
-          {/* DialogTitle, not a raw h2 — Radix needs it to supply the accessible name.
-              (audit #302 finding 5) */}
+          {/* DialogTitle, not a raw h2 — Radix needs it to supply the accessible name. */}
           <DialogTitle className="text-lg font-semibold text-foreground">
             Lighting Preview
             {productName && (

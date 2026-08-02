@@ -100,8 +100,8 @@ export default function PropertyWorkbench() {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { can } = usePermissions();
   const { isModuleAvailable } = useEntitlements();
-  const pmEnabled = isModuleAvailable('real-estate-management');   // #281 Property Management add-on
-  const investEnabled = isModuleAvailable('real-estate-investments'); // #281 Investments add-on
+  const pmEnabled = isModuleAvailable('real-estate-management');   // Property Management add-on
+  const investEnabled = isModuleAvailable('real-estate-investments'); // Investments add-on
   const { toast } = useToast();
   const navigate = useNavigate();
   const canManage = can('realestate.listings.manage');
@@ -222,7 +222,7 @@ export default function PropertyWorkbench() {
   const isRental = form.transaction_type === 'rent' || form.listing_status === 'rented';
   // The tabs actually rendered below. Kept next to the value passed to <Tabs> so the two cannot
   // drift: a conditional trigger added without a matching entry here would silently reintroduce
-  // the blank-page state this exists to prevent (audit #303 finding 8).
+  // the blank-page state this exists to prevent.
   const availableTabs = [
     'overview', 'media', 'inquiries', 'offers', 'viewings',
     ...(canManage && isRental && pmEnabled ? ['lettings'] : []),
@@ -270,7 +270,7 @@ export default function PropertyWorkbench() {
             of these tabs are conditional. Requesting one that is not rendered — e.g. Add tenancy
             on a SALE listing, since PropertySelect lists every property — left Radix with a value
             matching no trigger and no content: a blank page with no tab selected and no error
-            (audit #303 finding 8). Clamping to the tabs actually present covers every conditional
+            Clamping to the tabs actually present covers every conditional
             tab, not just lettings, and keeps the deep link working whenever it is legitimate. */}
         <Tabs value={activeTab} onValueChange={(v) => setSp((p) => { const n = new URLSearchParams(p); n.set('tab', v); return n; }, { replace: true })}>
           <TabsList className="mb-4 h-auto w-full flex-wrap justify-start gap-2 bg-transparent p-0">

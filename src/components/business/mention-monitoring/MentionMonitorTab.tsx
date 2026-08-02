@@ -81,7 +81,6 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
       if (t?.id) {
         // getProductSummary was fetched on every tab open and its result never read — the KPI
         // strip renders from `tracked.current_*`. A paid round-trip per open, discarded.
-        // (audit #305 finding 13)
         const [f, v] = await Promise.all([
           getProductFeed(productId, { limit: 100 }),
           getProductLlmVisibility(productId),

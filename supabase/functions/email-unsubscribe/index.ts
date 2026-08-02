@@ -89,7 +89,6 @@ serve(withApiLogging('email-unsubscribe', async (req) => {
     // confirmation on the next line regardless. A recipient was told the opt-out worked and
     // kept receiving marketing mail: the road to a spam complaint and, under CAN-SPAM/GDPR, a
     // compliance incident that nothing would have surfaced (email_unsubscribes had 0 rows).
-    // (audit #306 finding 14)
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!UUID_RE.test(ws)) {
       console.error('[email-unsubscribe] malformed workspace id:', ws);

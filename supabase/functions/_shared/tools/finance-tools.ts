@@ -1,5 +1,5 @@
 /**
- * Finance Tools — agent-chat READ surface for invoices + customer balances (#275 rail 4).
+ * Finance Tools — agent-chat READ surface for invoices + customer balances.
  *
  * ONE tool, actions:
  *   - list_invoices     — recent invoices (optionally for one customer / unpaid only)

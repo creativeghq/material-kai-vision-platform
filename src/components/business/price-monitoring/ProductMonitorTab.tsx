@@ -975,7 +975,7 @@ const dismissAnomalyReading = async (
 ) => {
   // Checks the error, like its sibling trustAnomalyReading above. Without it a denied update
   // resolved quietly, the caller ran onChange() regardless, and the row looked dismissed until
-  // the next refresh brought it straight back. (audit #305 finding 15)
+  // the next refresh brought it straight back.
   const { error } = await supabase
     .from('tracked_query_price_history')
     .update({ is_anomaly: false, manual_override: false })
@@ -996,7 +996,7 @@ const RetailerTable: React.FC<{
 }> = ({ rows, priceDiff, isAdmin, productId, trackedQueryId, onChange }) => {
   // RetailerTable never imported useToast, so seven admin actions had console.error as their
   // ENTIRE user feedback: clicking "Exclude this retailer" on a row that failed looked exactly
-  // like one that succeeded, until the next refresh brought the row back. (audit #305 finding 15)
+  // like one that succeeded, until the next refresh brought the row back.
   const { toast } = useToast();
   return (
   <div className="divide-y">

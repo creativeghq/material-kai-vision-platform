@@ -230,7 +230,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                     className="border-b border-border/30 hover:bg-muted/30 cursor-pointer"
                     // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                     // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
-                    // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                    // row is invalid ARIA and yields a focus stop with no name.
                     onClick={() => setSelected(r)}
                   >
                     <td className="px-4 py-2">

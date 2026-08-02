@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 
-// MIVAA's /api/rag/* search endpoints now require authentication (audit #217 C4).
+// MIVAA's /api/rag/* search endpoints now require authentication.
 // The agent is trusted infrastructure: it authenticates as the Material Kai platform
 // service with MIVAA_API_KEY and passes the user's workspace_id, which MIVAA trusts
 // for the service identity. Without this header these calls 401.

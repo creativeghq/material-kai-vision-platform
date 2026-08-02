@@ -58,7 +58,7 @@ export const QuotesPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [page, setPage] = useState(1);
 
-  // #251 App Launcher deep-link: /quotes?new=quote opens the Create Quote modal.
+  // App Launcher deep-link: /quotes?new=quote opens the Create Quote modal.
   useEffect(() => {
     if (searchParams.get('new') === 'quote') {
       setShowCreateModal(true);
@@ -277,7 +277,7 @@ export const QuotesPage: React.FC = () => {
                       className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
                       // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                       // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
-                      // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                      // row is invalid ARIA and yields a focus stop with no name.
                       onClick={() => handleViewQuote(quote.id)}
                     >
                       <td className="px-6 py-2.5 font-medium">

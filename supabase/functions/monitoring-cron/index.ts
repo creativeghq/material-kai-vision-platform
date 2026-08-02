@@ -63,7 +63,7 @@ const json = (body: unknown, status = 200) =>
 // a single name their outcomes are indistinguishable in api_usage_logs, and the
 // module_disabled skip below (a 200) diluted the real 5xx rate to ~74% — under every
 // threshold ops.silent_zero applies, which is how a dead feature stayed invisible for three
-// months. Per-task paths let each be judged on its own. (audit #305 finding 3)
+// months. Per-task paths let each be judged on its own.
 Deno.serve(withApiLogging(
   (req) => {
     const t = new URL(req.url).searchParams.get('task');
@@ -86,7 +86,7 @@ Deno.serve(withApiLogging(
   }
 
   // Honor the module toggle: a disabled module must not run paid refreshes/probes.
-  // Answers success:false, NOT success:true (audit #305 finding 2). A deliberate no-op and a
+  // Answers success:false, NOT success:true. A deliberate no-op and a
   // completed refresh used to be the same response, so mention monitoring reported healthy
   // every hour for three months after being switched off on 2026-05-03.
   // Deliberately still HTTP 200: a skip is not a server error and must not burn the error

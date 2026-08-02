@@ -396,7 +396,7 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         }
 
         // Per-doc isolation: a single doc's extraction failure must (a) refund THAT
-        // doc's credit and (b) not abort the whole batch (audit #217 H14). Previously
+        // doc's credit and (b) not abort the whole batch. Previously
         // the catch was outside the loop → charged-but-not-delivered + lost intake.
         try {
           const suggestions = await extractProductsFromLines(

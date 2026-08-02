@@ -31,7 +31,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
   const [page, setPage] = useState(1);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // #251 App Launcher deep-link: /warehouse?tab=counts&new=count opens the New stocktake dialog.
+  // App Launcher deep-link: /warehouse?tab=counts&new=count opens the New stocktake dialog.
   useEffect(() => {
     if (searchParams.get('new') === 'count') {
       setNewOpen(true);

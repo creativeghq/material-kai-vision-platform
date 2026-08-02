@@ -122,7 +122,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone }: { workspaceId: 
   const [searchParams, setSearchParams] = useSearchParams();
   const [f, setF] = useState({ name: '', email: '', position: '', department_id: '', employment_type: 'full_time' as EmploymentType, start_date: '', allowance: '20', pay_basis: 'monthly' as PayBasis, salary: '', hourly: '', weekly: '40', vat: '', amka: '', children: '0', workStart: '', workEnd: '' });
 
-  // #251 App Launcher deep-link: /hr?tab=employees&new=employee opens this Add-employee dialog.
+  // App Launcher deep-link: /hr?tab=employees&new=employee opens this Add-employee dialog.
   useEffect(() => {
     if (searchParams.get('new') === 'employee') {
       setOpen(true);

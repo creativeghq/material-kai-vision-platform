@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #252 HR expansion — org, recruitment/ATS (+ AI job descriptions), onboarding, documents,
+// HR expansion — org, recruitment/ATS (+ AI job descriptions), onboarding, documents,
 // payroll (+ Finance link via planned_payments), analytics. Dispatched from index.ts AFTER the
 // caller is bound to the workspace + entitlement + hr.view is confirmed. Writes require hr.manage.
 import { corsHeaders } from '../_shared/cors.ts';

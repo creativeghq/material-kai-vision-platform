@@ -31,7 +31,7 @@ export interface ApiUsageLog {
 }
 
 /** Cap for an unfiltered api_usage_logs read. The table is 216,737 rows / 50 MB and grows on
- *  every request; no admin view needs more than this at once. (audit #301 finding 15) */
+ *  every request; no admin view needs more than this at once. */
 const DEFAULT_USAGE_LOG_LIMIT = 500;
 
 class ApiGatewayService {

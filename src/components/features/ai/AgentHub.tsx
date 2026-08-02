@@ -282,7 +282,7 @@ const AGENTS: AgentDefinition[] = [
   },
 ];
 
-// #245 E — chunk types that were emitted but rendered as plain text. Routed
+// Chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
 const AGENT_RESULT_TITLES: Record<string, string> = {
   // My HR (employee self-service). These MUST be registered: a quick-start with `run` is a
@@ -591,7 +591,7 @@ interface Message {
     recipient: string | null;
     pdf_url: string | null;
   };
-  // #245 E — generic structured result card for previously-unrendered chunks
+  // Generic structured result card for previously-unrendered chunks
   agentResultData?: { title: string; data: Record<string, any>; resultType?: string };
   llmVisibilityData?: {
     product_id: string;
@@ -797,7 +797,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return () => { cancelled = true; };
   }, [initialMoodboardId]);
   const [convManagerOpen, setConvManagerOpen] = useState(false);
-  // Studio canvas (issue #253 P2): artifacts (moodboard sheet / products /
+  // Studio canvas: artifacts (moodboard sheet / products /
   // virtual staging) render full-width in a left-docked panel; the chat sits on
   // the right. Off by default — opening it collapses the matching chat cards to
   // chips so each artifact lives in exactly one place.
@@ -2187,7 +2187,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
         // Tell the agent which workspace to act in — the switcher-active one — so a
         // multi-workspace user's chat writes land in the workspace they're viewing.
-        // The server validates this against membership before trusting it (#275 per-workspace).
+        // The server validates this against membership before trusting it.
         requestBody.workspace_id = getActiveWorkspaceId(session.user?.id)
           ?? workspaceId
           ?? session.user?.user_metadata?.workspace_id;
@@ -2889,7 +2889,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   });
                 }
               } else if (AGENT_RESULT_TITLES[chunk.type]) {
-                // #245 E — generic structured render for previously-plain-text result chunks
+                // Generic structured render for previously-plain-text result chunks
                 const { type: _t, timestamp: _ts, ...payload } = chunk as Record<string, any>;
                 const title = AGENT_RESULT_TITLES[chunk.type];
                 const m: Message = {
@@ -3483,7 +3483,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Deep-link: arrived via `?capability=` with no specific action → enable that capability's
   // toolkit + surface its quick-starts (onboarding card) so the user sees what they can do
-  // instead of a blank chat (#275 onboarding). Skipped when a quick-start is firing.
+  // instead of a blank chat. Skipped when a quick-start is firing.
   const toolkitOnboardLaunched = useRef(false);
   useEffect(() => {
     if (toolkitOnboardLaunched.current || !userId || !initialToolkitId || initialQuickStart) return;
@@ -3699,7 +3699,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           seoResearchData: msg.metadata?.seoResearchData as any | undefined,
           seoGenericData: msg.metadata?.seoGenericData as any | undefined,
           // Agent-streamed sheet/catalog cards are saved to metadata but were omitted
-          // from this restore map, so they vanished on conversation reload (audit #217 H13).
+          // from this restore map, so they vanished on conversation reload.
           sheetCanvasData: msg.metadata?.sheetCanvasData as any | undefined,
           actionConfirmationData: msg.metadata?.actionConfirmationData as any | undefined,
           sheetPdfData: msg.metadata?.sheetPdfData as any | undefined,
@@ -3945,7 +3945,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   );
 
   // Bespoke "data cards" (jobs / sourcing / POs / mentions / SEO / catalog). Extracted so the
-  // SAME markup renders on the canvas AND inline (#253 P4). The trailing markdown content stays in
+  // SAME markup renders on the canvas AND inline. The trailing markdown content stays in
   // the chat rail; this returns only the card body.
   const renderDataCardBody = (message: Message): React.ReactNode => {
     if (message.jobFindingsData) {
@@ -4435,7 +4435,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (message.materialData?.products && message.materialData.products.length > 0) {
       return (
         <div className="space-y-4">
-          {/* Explainable search spec rides with the products artifact (issue #253) */}
+          {/* Explainable search spec rides with the products artifact */}
           {message.searchSpec && (
             <SearchSpecCard spec={message.searchSpec} query={message.searchSpec.query || ''} />
           )}
@@ -4576,7 +4576,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return renderDataCardBody(message);
   };
 
-  // Contextual inspector for the active canvas artifact (issue #253 P3).
+  // Contextual inspector for the active canvas artifact.
   const renderCanvasInspector = (message: Message): React.ReactNode => {
     if (message.generation_job) return <RenderInspector data={message.generation_job} />;
     if (message.sheetPdfData) return <SheetInspector data={message.sheetPdfData} />;
@@ -6562,7 +6562,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               // Persist it. This branch talks to generate-region-edit directly rather
               // than going through the agent stream, so it never hit the saveMessage
               // calls in the chunk handlers — the result lived in local state only and
-              // a 20-credit edit vanished on reload. (audit #304 finding 13)
+              // a 20-credit edit vanished on reload.
               const regionConversationId = conversationIdRef.current;
               if (regionConversationId) {
                 await agentChatHistoryService.saveMessage({

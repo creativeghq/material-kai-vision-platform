@@ -1,5 +1,5 @@
 /**
- * #205 / #207 — cloud POS (Ταμειακή Online): a two-panel cash register (left =
+ * Cloud POS (Ταμειακή Online): a two-panel cash register (left =
  * transaction + numeric keypad, right = product/category catalog). Issues a myDATA
  * retail receipt — ΑΛΠ (11.1 Απόδειξη Λιανικής Πώλησης) or ΑΠΥ (11.2 Απόδειξη Παροχής
  * Υπηρεσιών) — records the cash/card/IRIS payment and prints. Reuses the existing
@@ -104,7 +104,7 @@ const PosPage: React.FC = () => {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [method, setMethod] = useState<'cash' | 'card' | 'iris'>('cash');
   const [branches, setBranches] = useState<FinanceBranch[]>([]);
-  // #185 EFT-POS terminals for the Law-5155 card/IRIS signature flow.
+  // EFT-POS terminals for the Law-5155 card/IRIS signature flow.
   const [terminals, setTerminals] = useState<PosTerminal[]>([]);
   const [terminalId, setTerminalId] = useState<string>('');
   // Treasury accounts, so a POS sale is attributed to the cash drawer (cash) / acquirer (card).
@@ -456,7 +456,7 @@ const PosPage: React.FC = () => {
 
       setIssueOpen(false);
 
-      // #185 Law 5155 — card/IRIS on a registered terminal must be SIGNED, charged, then finalized.
+      // Law 5155 — card/IRIS on a registered terminal must be SIGNED, charged, then finalized.
       if (method !== 'cash' && selectedTerminal) {
         const res = await fiscalConnectorService.submitInvoice(invoice.id, {
           posPayment: { terminal_id: selectedTerminal.terminal_id, pos_nsp_id: selectedTerminal.pos_nsp_id, payment_type: AADE_PAYMENT_CODE[method] },

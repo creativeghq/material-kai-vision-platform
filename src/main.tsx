@@ -146,7 +146,7 @@ root.render(
 );
 
 /**
- * Attach the HEAVY Sentry integrations after first paint (audit #308 finding 2).
+ * Attach the HEAVY Sentry integrations after first paint.
  *
  * Browser tracing and session replay are the two expensive parts of the SDK and neither is needed
  * to report an error — `Sentry.init` above already captures exceptions, unhandled rejections and

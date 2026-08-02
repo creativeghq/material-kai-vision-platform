@@ -409,7 +409,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
                     className="cursor-pointer hover:bg-muted/50"
                     // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                     // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
-                    // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                    // row is invalid ARIA and yields a focus stop with no name.
                     onClick={() => handleViewQuote(quote.id)}
                   >
                     <TableCell className="font-medium">

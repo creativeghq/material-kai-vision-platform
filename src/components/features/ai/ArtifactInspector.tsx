@@ -217,7 +217,7 @@ export const ProductsInspector: React.FC<{ data: any }> = ({ data }) => {
   );
 };
 
-// ── Data-card inspectors (#253 P4) ─────────────────────────────────────────
+// ── Data-card inspectors ─────────────────────────────────────────
 export const JobFindingsInspector: React.FC<{ data: any }> = ({ data }) => {
   const listings: any[] = Array.isArray(data?.listings) ? data.listings : [];
   const remote = listings.filter((l) => l?.is_remote).length;

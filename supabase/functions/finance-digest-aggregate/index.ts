@@ -355,7 +355,7 @@ async function dispatchFollowUps(supabase: any): Promise<{ dispatched: number; s
       : `No activity in ${r.days_since_activity} days. Worth a nudge to the customer?`;
 
     if (r.owner_user_id) {
-      // Routed through Flows (#245 D): the seeded `finance_follow_up` system-default
+      // Routed through Flows: the seeded `finance_follow_up` system-default
       // flow turns this into the owner's bell notification (governable/retargetable).
       await emitFlowEvent('finance_follow_up', {
         user_id: r.owner_user_id,

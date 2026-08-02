@@ -725,7 +725,7 @@ const App = () => (
                 />
                 {/* Relocated into AI Configurations → Background Agents tab. */}
                 <Route path="/admin/background-agents" element={<Navigate to="/admin/ai-configs?tab=background-agents" replace />} />
-                {/* #244 B — unified monitoring (Price / Mention / Job) */}
+                {/* Unified monitoring (Price / Mention / Job) */}
                 <Route
                   path="/admin/monitoring"
                   element={
@@ -738,7 +738,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* #247 F — operator review queue for supplier identity claims */}
+                {/* Operator review queue for supplier identity claims */}
                 <Route
                   path="/admin/supplier-claims"
                   element={
@@ -764,7 +764,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* #247 F — supplier portal (claimed suppliers; RPC-gated, not admin) */}
+                {/* Supplier portal (claimed suppliers; RPC-gated, not admin) */}
                 <Route
                   path="/supplier-portal"
                   element={

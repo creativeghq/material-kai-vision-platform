@@ -296,7 +296,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             <Filter className="h-4 w-4 text-muted-foreground" />
             {/* DialogTitle, not a raw h2: Radix wires aria-labelledby from it, which a plain
                 heading does not. This is the shared filter modal on every list view, so it was
-                the most-used unnamed dialog in the app. (audit #302 finding 5) */}
+                the most-used unnamed dialog in the app. */}
             <DialogTitle className="text-sm font-semibold">{title}</DialogTitle>
             {total > 0 && <Badge variant="secondary" className="h-5 text-[10px]">{total} active</Badge>}
           </div>

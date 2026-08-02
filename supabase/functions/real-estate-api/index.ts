@@ -24,7 +24,7 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 /** Does a buyer requirement's saved-search criteria match a listing? (deterministic facets) */
 
-/** #281 Investments: derive yield/cap-rate/cash-flow metrics from the stored inputs. */
+/** Investments: derive yield/cap-rate/cash-flow metrics from the stored inputs. */
 function computeInvestmentMetrics(r: any) {
   const num = (x: any) => Number(x ?? 0);
   const round = (x: number, d = 2) => (Number.isFinite(x) ? Math.round(x * 10 ** d) / 10 ** d : 0);
@@ -144,7 +144,7 @@ function json(body: any, status = 200): Response {
 
 const INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'viewing_booked', 'closed', 'spam'];
 const VIEWING_STATUSES = ['scheduled', 'completed', 'cancelled', 'no_show'];
-// `virtual` added 2026-08-01 (audit #303 finding 2). The scheduling dialog has always offered
+// `virtual` added 2026-08-01. The scheduling dialog has always offered
 // in_person | virtual | open_house, but the allowlist held viewing | tour | open_house and
 // SUBSTITUTED rather than rejected — so `in_person` and `virtual`, two of the three options and
 // including the default, were both silently written as `viewing`. property_viewings has no CHECK
@@ -197,7 +197,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
     if (!access.canManage) throw new HttpError(403, 'You need the listings-manage role for this action.');
   };
 
-  // #249 agent scoping: a non-broker (realestate_agent) owns a listing when they're its listing agent
+  // Agent scoping: a non-broker (realestate_agent) owns a listing when they're its listing agent
   // or its creator; "open_for_all" makes a listing VIEWABLE (not editable) by all agents. Brokers see all.
   const ownsProperty = (p: any) => access.isBroker || p.listing_agent_id === userId || p.created_by === userId;
   const canViewProperty = (p: any) => ownsProperty(p) || !!p.open_for_all;
@@ -356,7 +356,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           is_public: true,
           published_at: new Date().toISOString(),
           public_listing_token: property.public_listing_token ?? newToken(),
-          // `in_discovery` had NO writer anywhere in the platform (audit #303 finding 1). The
+          // `in_discovery` had NO writer anywhere in the platform. The
           // column stayed at its `false` default forever, while `real-estate-feed` filters
           // `.eq('in_discovery', true)` and the cross-workspace Properties tab gates on it. So a
           // broker could enable syndication, copy the feed URL, hand it to Kyero or an OpenImmo
@@ -697,7 +697,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
 
         // `agent_id` is body-supplied and used as crm_meetings.owner_user_id. Unvalidated it
         // could point at anyone — a plausible cause of the very insert failure the code below
-        // could not see (audit #303 finding 7). Must be an active member of THIS workspace.
+        // could not see. Must be an active member of THIS workspace.
         const agentId = String(body.agent_id ?? userId);
         if (agentId !== userId) {
           const { data: member } = await supabase.from('workspace_members')
@@ -710,7 +710,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const location = type === 'virtual'
           ? null
           : [prop.hide_exact_address ? null : prop.address, prop.town, prop.region].filter(Boolean).join(', ') || null;
-        // The error MUST be checked (audit #303 finding 7). This discarded it, so on failure
+        // The error MUST be checked. This discarded it, so on failure
         // `meeting` was null, `meeting_id` stored null, the viewing was created anyway and the
         // action returned 200 — leaving a viewing that appears in the Real Estate list but never
         // in the agent's calendar and never fires the 60-minute reminder, so the agent misses the

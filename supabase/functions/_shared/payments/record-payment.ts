@@ -171,7 +171,7 @@ export async function recordInvoicePayment(
     `[payments] recorded ${src.provider} payment ${paymentRow.id} for invoice ${inv.internal_number} (${src.amount} ${currency}, allocated ${applied})`,
   );
 
-  // Owner-facing bell, routed through Flows (#245 D) so admins can pause/retarget.
+  // Owner-facing bell, routed through Flows so admins can pause/retarget.
   if (inv.created_by) {
     await emitFlowEvent('invoice_paid', {
       user_id: inv.created_by,

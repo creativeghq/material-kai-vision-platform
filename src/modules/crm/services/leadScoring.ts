@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 
-// #249/#279 — canonical platform lead scorer. ONE score (crm_contacts.lead_score / health_score)
+// Canonical platform lead scorer. ONE score (crm_contacts.lead_score / health_score)
 // used by CRM, Sales, and Real Estate. Generic CRM signals + property enrichment when real-estate
 // is enabled — all resolved server-side in the crm-lead-score edge function.
 export interface LeadScore { lead_score: number; health_score: number; rationale?: string; credits: number }

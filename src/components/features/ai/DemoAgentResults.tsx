@@ -215,7 +215,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
                   </div>
                 </div>
 
-                {/* Pricing — demo data, but still respects the Show Prices toggle (#227 review). */}
+                {/* Pricing — demo data, but still respects the Show Prices toggle. */}
                 {showPrices && (
                   <div className="grid grid-cols-2 gap-3 pb-3 border-b border-border">
                     <div>

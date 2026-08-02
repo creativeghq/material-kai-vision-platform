@@ -41,7 +41,7 @@ export default function RealEstatePage() {
   const ws = activeWorkspaceId;
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') || 'overview'; // deep-linkable from the App launcher
-  // #281 add-on entitlements (Property Management + Investments). Tabs stay visible so the add-on
+  // add-on entitlements (Property Management + Investments). Tabs stay visible so the add-on
   // is discoverable; when not entitled they render an Enable card instead of the (402-gated) panel.
   const pmEnabled = isModuleAvailable('real-estate-management');
   const investEnabled = isModuleAvailable('real-estate-investments');
@@ -380,7 +380,7 @@ const ScheduleViewingButton: React.FC<{ ws: string; onAdded: () => void }> = ({ 
             <div><span className="mb-1 block text-xs text-muted-foreground">Property</span><PropertySelect ws={ws} value={propertyId} onChange={setPropertyId} /></div>
             <div className="grid grid-cols-2 gap-2">
               <div><label htmlFor="viewing-when" className="mb-1 block text-xs text-muted-foreground">When</label><input id="viewing-when" type="datetime-local" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={when} onChange={(e) => setWhen(e.target.value)} /></div>
-              <div><label htmlFor="viewing-type" className="mb-1 block text-xs text-muted-foreground">Type</label><select id="viewing-type" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>{/* These values are real-estate-api's VIEWING_TYPES. The select used to emit 'in_person' and 'virtual', neither of which the allowlist knew, and the API SUBSTITUTED rather than rejected — so two of three options, including the default, were silently stored as an ordinary viewing (audit #303 finding 2). */}
+              <div><label htmlFor="viewing-type" className="mb-1 block text-xs text-muted-foreground">Type</label><select id="viewing-type" className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>{/* These values are real-estate-api's VIEWING_TYPES. The select used to emit 'in_person' and 'virtual', neither of which the allowlist knew, and the API SUBSTITUTED rather than rejected — so two of three options, including the default, were silently stored as an ordinary viewing. */}
                 {([['viewing', 'in person'], ['virtual', 'virtual'], ['tour', 'tour'], ['open_house', 'open house']] as const).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</select></div>
             </div>
             <div><span className="mb-1 block text-xs text-muted-foreground">Attendee (optional)</span><ContactSearchDropdown selectedContactId={contactId} onSelect={setContactId} placeholder="Link a CRM contact…" /></div>

@@ -153,7 +153,7 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
         break;
 
       // ============================================
-      // Reversals (audit #307 finding 10)
+      // Reversals
       // ============================================
       // These were entirely absent — `grep "refund\|dispute"` over this 715-line file
       // returned ZERO matches — so they fell into `default:` and were logged as
@@ -558,7 +558,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
  *
  * The actual bookkeeping (payments + payment_allocations + receipt + notifications)
  * lives in `_shared/payments/record-payment.ts` so every provider ingests identically
- * (#273 Phase 0). This function's only job is to translate Stripe's event shape into
+ * This function's only job is to translate Stripe's event shape into
  * the shared `PaymentSource`.
  */
 async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {

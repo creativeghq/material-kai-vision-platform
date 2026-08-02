@@ -64,7 +64,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
     (async () => {
       // A discarded error made every row silently fall back to rendering the raw
       // search_query instead of the product name — an outage that looks like a naming
-      // quirk, so nobody reports it. (audit #305 finding 17)
+      // quirk, so nobody reports it.
       const { data, error } = await supabase
         .from('products')
         .select('id, name')

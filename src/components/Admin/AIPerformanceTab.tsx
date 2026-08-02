@@ -116,7 +116,7 @@ export const AIPerformanceTab: React.FC = () => {
         setModelUsage(modelUsageArray);
 
         // Interior Design generation stats.
-        // Three separate reasons this panel read zero on every metric (audit #304 finding 9):
+        // Three separate reasons this panel read zero on every metric:
         //  1. `generation_3d.total_cost` has no writer — generate-interior-gemini, the only
         //     inserter, never sets it. `.not('total_cost','is',null)` therefore matched zero
         //     rows FOREVER, so the generation count, image count and user count were zeroed

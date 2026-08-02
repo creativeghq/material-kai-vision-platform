@@ -34,11 +34,11 @@ interface RequestBody {
   skip_signature?: boolean;
   /** Per-call myDATA overrides (invoice type, series/aa, income classification). */
   fiscal_overrides?: FiscalOverrides;
-  /** #185 Law 5155 — issue this invoice as a card(7)/IRIS(8) receipt on a registered EFT-POS
+  /** Law 5155 — issue this invoice as a card(7)/IRIS(8) receipt on a registered EFT-POS
    *  terminal. Forces skipSignature=false; the response carries the provider signature and the
    *  doc is held (fiscal_status='awaiting_payment') until pos_complete finalizes it. */
   pos_payment?: { terminal_id: string; pos_nsp_id: number; payment_type?: number };
-  /** #185 Law 5155 — finalize a held POS/IRIS receipt after the terminal charge succeeded.
+  /** Law 5155 — finalize a held POS/IRIS receipt after the terminal charge succeeded.
    *  Calls Novus CompletionPosInvoices → transmits to AADE → returns MARK. */
   pos_complete?: { pos_signature_id?: string; invoice_id?: string; transaction_id: string; payment_amount?: number; tip_amount?: number };
   /** Read-only: report whether the master e-invoicing connector key is configured for this
@@ -717,7 +717,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           fiscalResult = { ok: false, code: reserve!.code, balance: reserve!.balance, error: reserve!.error };
         } else {
           try {
-            // #185 POS/IRIS receipt — merge the EFT-POS terminal into the overrides and force
+            // POS/IRIS receipt — merge the EFT-POS terminal into the overrides and force
             // signing so Novus returns a provider signature instead of transmitting to AADE.
             const effOverrides: FiscalOverrides = { ...(body.fiscal_overrides ?? {}) };
             if (body.pos_payment) {
@@ -756,7 +756,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
               error_message: result.errorMessage ?? null,
             });
 
-            // #185 Held card/IRIS receipt: persist the signature for the terminal charge, mark the
+            // Held card/IRIS receipt: persist the signature for the terminal charge, mark the
             // invoice awaiting_payment, and refund the reservation — AADE transmission happens at
             // pos_complete (which reserves its own credits).
             if (result.status === 'awaiting_payment') {
@@ -799,7 +799,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
               await supabase.from('invoices').update({ fiscal_status: result.status }).eq('id', invoiceId);
             }
 
-            // #181 the transmission was reserved (debited) up-front. Operator root reserves
+            // The transmission was reserved (debited) up-front. Operator root reserves
             // free; sub-tenants keep the debit on an accepted/offline doc and get it back if
             // the document did not transmit.
             if (!accepted) await reserve!.refund();

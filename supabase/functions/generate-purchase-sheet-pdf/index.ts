@@ -93,7 +93,7 @@ Deno.serve(withApiLogging('generate-purchase-sheet-pdf', async (req: Request) =>
     ? admin
     : createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } } });
 
-  // ---- purchase-order mode (#237 A3) ----
+  // ---- purchase-order mode ----
   if (body.order_id) {
     return await handlePurchaseOrder(body, admin, reader);
   }
@@ -704,7 +704,7 @@ function json(body: any, status = 200): Response {
 }
 
 // =====================================================================
-// Purchase-order mode (#237 A3) — render a purchase ORDER + optionally
+// Purchase-order mode — render a purchase ORDER + optionally
 // email it to the supplier and mark the order placed.
 // =====================================================================
 async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise<Response> {

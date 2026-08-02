@@ -853,7 +853,7 @@ const _financeServiceCore = {
       notes: patch.notes,
       status: patch.status,
     };
-    // #204 Tools → Change category. Only set when explicitly provided (incl. null to clear),
+    // Tools → Change category. Only set when explicitly provided (incl. null to clear),
     // so a generic patch never accidentally nulls the category. (Financial fields stay
     // locked by the DB immutability guard regardless.)
     if ('category_id' in patch) allowed.category_id = (patch as any).category_id;
@@ -2546,7 +2546,7 @@ export interface FinanceSettings {
   statement_template_footer_path: string | null;
   default_payment_terms_days: number;
   default_vat_rate: number;
-  /** #176 blanket sell uplift on catalog products this workspace resells. */
+  /** Blanket sell uplift on catalog products this workspace resells. */
   default_markup_pct: number;
   digest_enabled: boolean;
   digest_frequency: 'daily' | 'weekly' | 'monthly';

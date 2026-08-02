@@ -197,7 +197,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                         className="cursor-pointer"
                         // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                         // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
-                        // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                        // row is invalid ARIA and yields a focus stop with no name.
                         onClick={() => setOpenArticleId(a.id)}
                       >
                         <TableCell className="font-medium max-w-[280px] truncate">

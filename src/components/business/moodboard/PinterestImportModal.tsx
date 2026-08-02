@@ -410,7 +410,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                           className="aspect-square rounded-lg overflow-hidden bg-muted relative group"
                         >
                           {/* The pin thumbnail IS the content here — with no alt the picker reads as a list of
-    URLs. (audit #302 finding 6) */}
+    URLs. */}
                           {pin.image_url && <img src={pin.image_url} alt={pin.title || 'Pinterest pin'} className="w-full h-full object-cover" />}
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                             <Plus className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -431,7 +431,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                       className="flex items-center gap-2 p-2 rounded-xl border border-border/60 hover:border-primary/40 hover:bg-muted/50 transition-colors text-left"
                     >
                       <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden flex-shrink-0">
-                        {/* Decorative: the board name is rendered in the sibling block. (audit #302 finding 6) */}
+                        {/* Decorative: the board name is rendered in the sibling block. */}
                         {board.image_url ? <img src={board.image_url} alt="" className="w-full h-full object-cover" /> : <Image className="w-full h-full p-2 text-muted-foreground" />}
                       </div>
                       <div className="min-w-0">

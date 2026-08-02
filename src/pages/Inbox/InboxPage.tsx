@@ -180,7 +180,7 @@ const InboxPage: React.FC = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
-  // #251 App Launcher deep-link: /inbox?new=conversation opens the New (internal) thread dialog.
+  // App Launcher deep-link: /inbox?new=conversation opens the New (internal) thread dialog.
   useEffect(() => {
     if (activeWorkspaceId && searchParams.get('new') === 'conversation') {
       setShowNew(true);
@@ -304,7 +304,7 @@ const InboxPage: React.FC = () => {
 
   useEffect(() => { if (activeId) openThread(activeId); /* eslint-disable-next-line */ }, []);
 
-  // #209 fallback: claim an inbox-conversion token that survived an email-confirmation round trip.
+  // Fallback: claim an inbox-conversion token that survived an email-confirmation round trip.
   useEffect(() => {
     const pending = localStorage.getItem('inbox_claim_token');
     if (!pending) return;
@@ -937,8 +937,7 @@ const InboxPage: React.FC = () => {
             className={`p-0 bg-card overflow-hidden flex flex-col ${isMobile ? 'h-[85vh] rounded-t-2xl' : 'h-full w-full sm:max-w-md'}`}
           >
             {/* sr-only: this panel has no visible heading, and without a SheetTitle Radix
-                logs a warning and a screen reader announces it with no name at all.
-                (audit #302 finding 5) */}
+                logs a warning and a screen reader announces it with no name at all. */}
             <SheetTitle className="sr-only">Conversation details</SheetTitle>
             {memberControls && (
               <div className="md:hidden flex flex-wrap items-center gap-1.5 px-4 py-3 border-b border-white/10 shrink-0">

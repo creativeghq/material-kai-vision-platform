@@ -44,7 +44,7 @@ interface RequestBody {
   metadata?: Record<string, any>;
 }
 
-// #174 Option A — workspace identity is canonical in finance_settings. Branding is resolved
+// Option A — workspace identity is canonical in finance_settings. Branding is resolved
 // from the catalog's OWN workspace_id (same as the quote path resolves quote.workspace_id) —
 // NOT by guessing the owner's primary membership, which gives the wrong company's branding
 // for a multi-membership owner sharing a catalog. The owner-membership guess is kept only as

@@ -635,7 +635,7 @@ export class QuotesService {
   }
 
   /**
-   * #227 Layer B — combined quote-time custom-rule factor for a product category, with tree
+   * Layer B — combined quote-time custom-rule factor for a product category, with tree
    * inheritance + most-specific-wins. For each category-scoped rule type (category_extra,
    * volume_category) the rule on the most-specific ancestor of the product's category applies
    * (a subcategory rule beats its parent's; a global/null-category rule is least specific).

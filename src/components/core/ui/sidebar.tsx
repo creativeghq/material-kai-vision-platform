@@ -214,7 +214,7 @@ const Sidebar = React.forwardRef<
           >
             {/* sr-only: the mobile sidebar is a Sheet with no visible heading. Without a
                 SheetTitle Radix logs a warning and a screen reader announces an unnamed
-                dialog — on the app's primary navigation. (audit #302 finding 5) */}
+                dialog — on the app's primary navigation. */}
             <SheetTitle className="sr-only">Navigation</SheetTitle>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>

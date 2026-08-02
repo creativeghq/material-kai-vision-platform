@@ -24,7 +24,7 @@ import { MARKUP_MULTIPLIER } from '../_shared/pricing-constants.ts';
  * Replicate's output URLs expire within about an hour, so the user paid 15-20 credits, saw
  * the video once, and the stored link 404'd by the time the post was scheduled or published.
  * generate-interior-video-v2 already downloads before persisting; this path did not.
- * (audit #304 finding 11)
+ * 
  *
  * Returns null on failure so the caller can refuse to persist an expiring URL rather than
  * silently storing one — the mistake generate-social-image's storeImage() still makes by
@@ -141,7 +141,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     post_id,
   } = body;
 
-  // SECURITY (audit #294/#306 finding 3): `workspace_id` and `post_id` arrive in the request
+  // SECURITY: `workspace_id` and `post_id` arrive in the request
   // BODY and everything below runs on the service-role client. Unguarded, a user in
   // workspace A could spend workspace B's pooled credits (the debit is routed by this very
   // id), plant drafts in B's queue, and overwrite the caption/hashtags/images of any of B's
@@ -240,7 +240,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     const { sufficient, balance } = await checkCreditBalance(supabase, userId, model, 1, workspace_id ?? null);
     // Was hardcoded 'kling-3.0' regardless of the model actually requested, so a user
     // with 15-19 credits passed the preflight and then got a 402 from the debit for a
-    // 20- or 30-credit model. Check the model being bought. (audit #304 finding 12)
+    // 20- or 30-credit model. Check the model being bought.
     if (!sufficient) {
       return jsonResponse({ success: false, error: 'Insufficient credits', balance, required: creditCost }, 402);
     }
@@ -261,7 +261,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
       return jsonResponse({ success: false, error: debit?.error_message || 'Credit debit failed' }, 402);
     }
     // Credits are now spent; refund on any failure path so we don't charge for a video
-    // that was never produced (audit #217 H4). Mirrors generate-interior-video-v2.
+    // that was never produced. Mirrors generate-interior-video-v2.
     creditsDebited = true;
 
     replicateModel = REPLICATE_MODELS[model] || REPLICATE_MODELS['kling-3.0'];
@@ -279,7 +279,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
 
     if (pollResult.status === 'succeeded') {
       const rawVideoUrl = Array.isArray(pollResult.output) ? pollResult.output[0] : pollResult.output;
-      // Persist OUR copy, never Replicate's expiring URL. (audit #304 finding 11)
+      // Persist OUR copy, never Replicate's expiring URL.
       const videoUrl = rawVideoUrl
         ? await storeVideo(supabase, rawVideoUrl, `video-${Date.now()}.mp4`)
         : null;

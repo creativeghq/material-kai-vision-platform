@@ -358,7 +358,6 @@ const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
   // told the user "No catalog products are linked to this company yet" — presenting a broken
   // query as a FACT ABOUT THEIR DATA, which is the failure mode most likely to be acted on
   // incorrectly (someone goes and re-links a factory that was never unlinked).
-  // (audit #305 finding 16)
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
@@ -481,7 +480,6 @@ const ProductPriceIntelCard: React.FC<CompanyMarketTabProps> = ({ companyId, wor
       // workspaceId was passed in and dropped on the floor, so this listed products across
       // every tenant that RLS happened to expose — unlike the sibling cards, which scope.
       // The error was discarded too, so a failure rendered as an empty catalogue.
-      // (audit #305 finding 16)
       let pq = supabase
         .from('products')
         .select('id, name, cost, cost_currency')

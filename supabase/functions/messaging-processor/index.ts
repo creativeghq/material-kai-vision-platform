@@ -214,7 +214,6 @@ serve(withApiLogging('messaging-processor', async (req) => {
           // daily_quota is silently exceeded. The receipt webhook cannot find the row either.
           // The WhatsApp send already SUCCEEDED here, so this throws into the per-recipient
           // catch below, which records the recipient as failed rather than silently 'sent'.
-          // (audit #306 finding 21)
           const { data: messageLog, error: logErr } = await supabase.from('messaging_logs').insert({
             channel_type: 'whatsapp',
             workspace_id: channel.workspace_id, // Tenant scope

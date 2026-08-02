@@ -1,5 +1,5 @@
 /**
- * Appointments Tools — agent-chat surface over the existing CRM Meetings infra (#275 rail 4).
+ * Appointments Tools — agent-chat surface over the existing CRM Meetings infra.
  *
  * ONE tool, actions:
  *   - list     — upcoming appointments (crm_meetings, meeting_at >= now), workspace-scoped

@@ -185,7 +185,7 @@ class FlowService {
     // top-level `flows.trigger_config` — that's what flow-scheduler-cron reads for the
     // cron and what flow-webhook reads for the secret. Previously only the graph was
     // saved, so scheduled flows never fired and webhook secrets were never enforced
-    // (audit #217 H1).
+    // .
     const triggerNode = graph.nodes.find(n => n.type === 'triggerNode');
     const triggerIsTrigger = triggerNode?.data.category === 'trigger';
     const triggerType = triggerIsTrigger
@@ -237,7 +237,7 @@ class FlowService {
     if (error) throw new Error(`Failed to execute flow: ${error.message}`);
     // flow-engine returns { success, data: {...run} }. The run lives under `.data`,
     // not the outer envelope — casting the wrapper left run.status/id undefined and
-    // the Flow Builder always toasted "status: unknown" (audit #217 H12).
+    // the Flow Builder always toasted "status: unknown".
     const env = data as { success?: boolean; error?: string; data?: FlowRun };
     if (env?.success === false) throw new Error(env.error || 'Flow execution failed');
     return (env?.data ?? env) as FlowRun;

@@ -49,7 +49,7 @@ const EDIT_CATEGORIES = [
   // Region Edit skips steps 2+3, so the user never reaches the 6/15/15 model-tier
   // picker — it goes straight to generate-region-edit, which is a fixed 20-credit
   // inpaint. Say so on the card; the price was previously invisible until the
-  // failure toast quoted it. (audit #304 finding 6)
+  // failure toast quoted it.
   { id: 'region',    label: 'Region Edit',      icon: Crop,       description: 'Draw on image & change that area — 20 credits' },
   { id: 'custom',    label: 'Custom Edit',      icon: PencilLine, description: 'Describe anything freely' },
 ] as const;
@@ -314,7 +314,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
     // and AgentHub's regionEdit branch discards it: generate-region-edit is a fixed
     // 20-credit inpaint with no tier. Passed only to satisfy the shared onApply
     // contract — do not add a tier UI to this path without also plumbing it through
-    // generate-region-edit's CREDITS_REQUIRED. (audit #304 finding 6)
+    // generate-region-edit's CREDITS_REQUIRED.
     if (id === 'region') {
       onClose();
       onApply({ prompt: '', modelTier, regionEdit: true });
@@ -378,7 +378,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
             {/* Step dots. Current-vs-done was carried by colour alone (WCAG 1.4.1) with no
                 "Step 2 of 3" anywhere, so a screen reader announced nothing and a
                 colour-blind user could not tell position. The dots are decorative; the
-                sr-only text is the actual announcement. (audit #302 finding 7) */}
+                sr-only text is the actual announcement. */}
             <div className="flex items-center gap-1.5" role="group" aria-label={`Step ${step} of 3`}>
               <span className="sr-only">{`Step ${step} of 3`}</span>
               {[1, 2, 3].map((s) => (

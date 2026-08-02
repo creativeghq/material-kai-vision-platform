@@ -50,7 +50,7 @@ export interface HubGroup {
 }
 
 /**
- * Group launcher apps into Hubs (#251 follow-up), preserving HUBS order. Within each hub,
+ * Group launcher apps into Hubs, preserving HUBS order. Within each hub,
  * active apps sort before available (add-on) apps, then alphabetically. Empty hubs are dropped.
  * Apps with no `hub` (e.g. registry workspace nav items) collect into a trailing "More" group.
  */

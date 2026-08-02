@@ -26,7 +26,7 @@ export const MarketingCampaignsTab: React.FC<{ workspaceId: string; byokReady: b
   const [page, setPage] = useState(1);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // #251 App Launcher deep-link: /marketing/email?new=campaign opens the Create Campaign modal.
+  // App Launcher deep-link: /marketing/email?new=campaign opens the Create Campaign modal.
   useEffect(() => {
     if (searchParams.get('new') === 'campaign') {
       setShowCreate(true);

@@ -3,7 +3,7 @@ import { ShieldCheck, Mail, Globe, Clock, Hash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Operator-side e-sign audit trail for a quote (#242 Phase 2b).
+ * Operator-side e-sign audit trail for a quote.
  *
  * Surfaces every `quote_approvals` row (RLS: workspace members read) so the
  * operator sees exactly who signed, when, from where, and the content hash that

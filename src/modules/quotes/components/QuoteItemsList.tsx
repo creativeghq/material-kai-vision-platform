@@ -56,7 +56,7 @@ interface QuoteItemsListProps {
   customerCompanyId?: string | null;
   /** B2C / private customer of the parent quote — same role as customerCompanyId. */
   customerContactId?: string | null;
-  /** #237 Phase 4.4 — reload the items after an upstream RFQ is sent (lines flip to awaiting_supplier). */
+  /** Reload the items after an upstream RFQ is sent (lines flip to awaiting_supplier). */
   onRefresh?: () => void | Promise<void>;
 }
 
@@ -200,7 +200,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   const { isSalesRep, can } = usePermissions();
   const { toast } = useToast();
   const [rfqBusy, setRfqBusy] = useState(false);
-  // #237 Phase 4.4 — catalog lines still needing a price that we can route upstream.
+  // Catalog lines still needing a price that we can route upstream.
   const callForPriceItems = items.filter(
     (i) => ((i as any).pricing_status ?? 'priced') === 'call_for_price' && i.product_id,
   );
@@ -301,7 +301,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* #237 Phase 4.4 — route all unpriced catalog lines to the supplier for pricing. */}
+            {/* Route all unpriced catalog lines to the supplier for pricing. */}
             {can('pricing.manage') && callForPriceItems.length > 0 && (
               <Button
                 onClick={handleRequestSupplierPrices}
@@ -384,7 +384,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                         className={`hover:bg-muted/20 transition-colors group ${isCustom || editPricing ? 'cursor-default' : 'cursor-pointer'}`}
                         // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                         // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
-                        // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                        // row is invalid ARIA and yields a focus stop with no name.
                         onClick={() => !isCustom && !editPricing && item.product && handleViewProduct(item.product)}
                       >
                         {/* Product + Dimensions */}

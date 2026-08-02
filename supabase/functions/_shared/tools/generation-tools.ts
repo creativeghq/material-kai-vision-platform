@@ -682,7 +682,7 @@ export const createGenerationStatusTool = () => {
         // `generation_3d` has NO `metadata` column — models_results is a TOP-LEVEL column.
         // Naming the phantom column made PostgREST reject the whole select, so `error` was
         // always truthy and this tool answered "Job not found" for EVERY job that exists,
-        // telling users their in-flight generation had vanished. (audit #304 finding 5)
+        // telling users their in-flight generation had vanished.
         const { data, error } = await supabase
           .from('generation_3d')
           .select('generation_status, progress_percentage, models_results, created_at')

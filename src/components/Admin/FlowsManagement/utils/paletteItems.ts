@@ -243,7 +243,7 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'purchase_order.received', group: 'Finance',
     label: 'Purchase Order Received', description: 'A purchase order was received into the warehouse', icon: 'Package', color: 'emerald',
     defaultData: { label: 'Purchase Order Received', category: 'trigger', triggerType: 'purchase_order.received', config: {} } as TriggerNodeData },
-  // #245 D — automated paths routed through Flows
+  // Automated paths routed through Flows
   { type: 'triggerNode', category: 'trigger', subType: 'invoice_paid', group: 'Finance',
     label: 'Invoice Paid (card)', description: 'A Stripe card payment settled an invoice', icon: 'CheckCircle2', color: 'emerald',
     defaultData: { label: 'Invoice Paid (card)', category: 'trigger', triggerType: 'invoice_paid', config: {} } as TriggerNodeData },
@@ -350,7 +350,7 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'SEO Site Health Changed', description: 'A connected website\'s on-page health score regressed (or recovered) week-over-week', icon: 'Search', color: 'blue',
     defaultData: { label: 'SEO Site Health Changed', category: 'trigger', triggerType: 'seo.site_health_changed', config: {} } as TriggerNodeData },
 
-  // #237 Phase 4.4 — upstream line-level RFQ between networked workspaces
+  // Upstream line-level RFQ between networked workspaces
   { type: 'triggerNode', category: 'trigger', subType: 'rfq_lines_requested', group: 'Quotes',
     label: 'RFQ Lines Requested', description: 'A downstream workspace routed unpriced quote lines up to its supplier/parent for pricing (notify the parent admins)', icon: 'Send', color: 'emerald',
     defaultData: { label: 'RFQ Lines Requested', category: 'trigger', triggerType: 'rfq_lines_requested', config: {} } as TriggerNodeData },

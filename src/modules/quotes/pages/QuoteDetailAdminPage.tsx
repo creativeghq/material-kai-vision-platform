@@ -407,7 +407,7 @@ export const QuoteDetailPage: React.FC = () => {
   // The operator approves THIS preview, so it has to agree to the cent with what
   // reprice_quote_items will persist. previewTotalsBreakdown mirrors get_quote_totals
   // step for step; the arithmetic that used to live here was the second of three
-  // divergent implementations (audit #307 finding 17) and folded in no extras, so the
+  // divergent implementations and folded in no extras, so the
   // operator approved a Final that excluded upsells the customer had already accepted
   // (finding 18).
   const pricingPreview = previewTotalsBreakdown({

@@ -170,7 +170,7 @@ export const OrdersPanel: React.FC<{
 
   const openCreate = (orderType: OrderType, draft: boolean) => { setCreatePreset({ orderType, draft }); setCreateOpen(true); };
 
-  // #251 App Launcher deep-link: /finance?tab=orders&new=order opens the New (sales) order flow.
+  // App Launcher deep-link: /finance?tab=orders&new=order opens the New (sales) order flow.
   // Only in the standalone finance list — never when embedded in a project/party tab.
   useEffect(() => {
     if (embedded) return;
@@ -357,7 +357,7 @@ export const OrdersPanel: React.FC<{
                     className="border-b border-border/30 hover:bg-muted/30 cursor-pointer"
                     // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                     // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
-                    // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                    // row is invalid ARIA and yields a focus stop with no name.
                     onClick={() => setOpenId(r.id)}
                   >
                     <td className="px-4 py-2 font-mono text-xs">
@@ -1390,7 +1390,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const { toast } = useToast();
   const navigate = useNavigate();
   // Mirror the mount point. Hardcoded '/finance/...' links threw an admin-shell user out of the
-  // shell the moment they created an invoice or followed a covered-by link (#297 finding 26).
+  // shell the moment they created an invoice or followed a covered-by link.
   const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [loading, setLoading] = useState(false);
@@ -1925,7 +1925,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    *
    * deliver_order_line writes quantity_delivered but explicitly skips stock movement and status
    * recomputation for those statuses, so the editor happily turned a line green with no ledger
-   * row and no stock change behind it (#297 finding 18).
+   * row and no stock change behind it.
    */
   const deliveryLocked = order?.status === 'draft' || order?.status === 'cancelled';
   /**
@@ -1958,7 +1958,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // moneyDerivation.test.ts exists to prevent. It slipped past that guard because the guard
   // pattern-matched `total - settled` and the local helper is named `orderSettled`, so
   // `settled` never matched. get_order_settlements already returns `outstanding`,
-  // direction-resolved. (audit #309 item 5)
+  // direction-resolved.
   const outstanding = fin?.outstanding ?? 0;
   // B2B issues an invoice, a consumer a retail receipt. Derived from the buyer's VAT identity via
   // the SHARED rule — this used to be `order?.customer_company_id ? 'invoice' : 'receipt'`, which
@@ -2828,7 +2828,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
           ? { companyId: order.supplier_company_id, contactId: order.supplier_contact_id }
           : { companyId: order.customer_company_id, contactId: order.customer_contact_id }}
         // The ORDER's currency. Without this the dialog reset to EUR and record_payment_fx
-        // silently refused to allocate the remainder onto a non-EUR order (#297 finding 1).
+        // silently refused to allocate the remainder onto a non-EUR order.
         orderCurrency={order.currency}
         payableBills={(fin?.supplierBills ?? []).filter((b) => Number(b.amount_due) > 0)}
         defaultAmount={payInOpen?.amount}

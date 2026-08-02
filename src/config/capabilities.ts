@@ -180,7 +180,7 @@ const DETAIL_ROUTE_CAPABILITIES = new Set(['quote', 'project']);
 
 /** Resolve the agent + toolkit + quick-start a `?capability=<id>` deep-link should open on the
  *  Agent Hub. `toolkitId` lets the Hub auto-open that toolkit's onboarding (quick-starts) so the
- *  user lands on "here's what you can do" instead of a blank chat (#275 onboarding). */
+ *  user lands on "here's what you can do" instead of a blank chat. */
 export function resolveCapabilityHandoff(id: string): {
   agentId?: string;
   toolkitId?: string;

@@ -42,7 +42,7 @@ interface SendEmailRequest {
   /** When set, the send uses this workspace's BYOK Resend key + sender (workspace_email_config)
    *  and counts against its platform-controlled daily cap. Omit for platform/system sends. */
   workspace_id?: string;
-  /** #255 marketing sends: require the resolved sender to be the workspace's OWN Resend (BYOK) —
+  /** Marketing sends: require the resolved sender to be the workspace's OWN Resend (BYOK) —
    *  NO platform-key fallback. Returns 503 (code=workspace_sender_required) when the workspace has
    *  no verified BYOK config, so the campaign never goes out from the platform domain. */
   requireWorkspaceSender?: boolean;
@@ -317,7 +317,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // otherwise the platform key + global email_settings sender.
         const sender = await resolveWorkspaceEmailSender(supabaseClient, body.workspace_id);
 
-        // #255 marketing BYOK-only gate: fail closed when strict and the resolved sender fell back
+        // Marketing BYOK-only gate: fail closed when strict and the resolved sender fell back
         // to the platform key/domain. A workspace that hasn't configured its own verified Resend
         // MUST NOT send marketing from the shared platform domain — EXCEPT the operator's ROOT
         // workspace, which legitimately sends from the platform default (BYOK-only is a tenant rule).
@@ -867,7 +867,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // silent-zero shape the platform has probes for.
         // Deriving live rather than adding a writer, per the one-derivation rule: a cached
         // copy is a second source that can drift, and email_logs already carries every
-        // metric as a timestamp column. (audit #306 finding 11)
+        // metric as a timestamp column.
         // Also scoped to the caller's workspaces — this ran service-role and unfiltered,
         // the same shape as the `logs` action that was removed for leaking cross-tenant.
         let query = supabaseClient

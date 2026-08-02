@@ -112,16 +112,21 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId, tier = 
       setAvailableKeys(sortedKeys);
       if (sortedKeys.length > 0 && !attributeKey) setAttributeKey(sortedKeys[0]);
 
-      // 2. Factory name searches
-      const { data: searchRows } = await supabase
+      // 2. Factory name searches.
+      // The column is `query_text`; there is no `query` column on search_analytics. PostgREST
+      // rejected both the select and the ilike, and `error` was discarded, so this panel showed
+      // an empty state instead of a failure — and would have kept showing it after the table
+      // started receiving rows.
+      const { data: searchRows, error: searchErr } = await supabase
         .from('search_analytics')
-        .select('query')
-        .ilike('query', `%${factoryName}%`)
+        .select('query_text')
+        .ilike('query_text', `%${factoryName}%`)
         .gte('created_at', ago12.toISOString());
+      if (searchErr) console.error('factory search analytics failed:', searchErr);
 
       const termMap = new Map<string, number>();
       (searchRows ?? []).forEach((s) => {
-        const t = String(s.query ?? '').toLowerCase().trim().slice(0, 50);
+        const t = String(s.query_text ?? '').toLowerCase().trim().slice(0, 50);
         if (t) termMap.set(t, (termMap.get(t) ?? 0) + 1);
       });
       setFactorySearchCount((searchRows ?? []).length);

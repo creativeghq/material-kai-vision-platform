@@ -76,7 +76,7 @@ export const RegionEditCanvas: React.FC<RegionEditCanvasProps> = ({
 
   // Hand-rolled overlay, not a Radix Dialog: Escape, the Tab trap and focus restore all have
   // to be wired explicitly. Without them focus stayed on the trigger BEHIND this, and Tab
-  // walked the page underneath. (audit #302 finding 4)
+  // walked the page underneath.
   useEscapeKey(true, onClose);
   useFocusTrap(overlayRef, true);
 

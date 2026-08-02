@@ -119,7 +119,6 @@ async function handleBatchCreate(req: Request, supabase: any, startTime: number)
     // caller got 400 'documents array is required and must not be empty' — learning the payload
     // contract of a service-role-capable endpoint without holding a credential. No data leaked
     // and no work was done, but an anonymous caller should learn nothing beyond 401.
-    // (audit #298 finding 24)
     const authResult = await AuthUtils.checkAuthentication(req, supabase);
     if (!authResult.success) {
       return Utils.createErrorResponse(authResult.error || 'Authentication failed', 401, startTime);

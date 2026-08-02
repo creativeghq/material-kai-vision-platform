@@ -253,7 +253,7 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'cron', label: 'Cron expression', note: 'The schedule that fired.' },
     { key: 'timestamp', label: 'Fire time', note: 'ISO timestamp of the run.' },
   ],
-  // #237 Phase 4.4 — upstream line-level RFQ. The delivering payload (with admin_ids + the
+  // Upstream line-level RFQ. The delivering payload (with admin_ids + the
   // notification envelope) is enriched server-side by the master_requests DB bridge; the
   // frontend also emits a lightweight signal carrying just the ids below.
   rfq_lines_requested: withStandard([

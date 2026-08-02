@@ -75,7 +75,7 @@ export interface FiscalOverrides {
   incomeClassificationType?: string;
   incomeClassificationCategory?: string;
   documentLabel?: string;
-  /** #185 Law 5155 — card(7)/IRIS(8) receipt on a registered EFT-POS terminal. When present,
+  /** Law 5155 — card(7)/IRIS(8) receipt on a registered EFT-POS terminal. When present,
    *  the payment method is forced to this type with the terminal id + NSP so Novus returns a
    *  provider signature (skipSignature=false) instead of transmitting straight to AADE. */
   posPayment?: { type: number; terminalId: string; posNspId: number };

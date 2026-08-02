@@ -481,7 +481,7 @@ export const PublicProfilePage: React.FC = () => {
             )}
           </div>
 
-          {/* #249 — seller lead-magnet: instant valuation (agencies with the Real Estate module) */}
+          {/* Seller lead-magnet: instant valuation (agencies with the Real Estate module) */}
           {realEstateEnabled && profile.show_listings !== false && userId && (
             <div className="mt-5"><ValuationWidget userId={userId} /></div>
           )}
@@ -755,7 +755,7 @@ export const PublicProfilePage: React.FC = () => {
               />
             </TabsContent>
 
-            {/* #249 — public property listings for this agency/profile */}
+            {/* Public property listings for this agency/profile */}
             {profile.show_listings !== false && propertyListings.length > 0 && (
               <TabsContent value="listings" className="mt-5">
                 <PropertyCardGrid listings={propertyListings} />

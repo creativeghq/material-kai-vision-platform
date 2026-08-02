@@ -88,7 +88,7 @@ export const SocialAccountsTab: React.FC = () => {
         // toast fired on 403 ('Not a member of this workspace'), 500 (upsert failure) and 503
         // (ZERNIO_API_KEY missing). The user was told the account connected, loadAccounts()
         // then showed nothing, and no error existed anywhere to explain it. The same file
-        // does this correctly 70 lines down. (audit #306 finding 17)
+        // does this correctly 70 lines down.
         const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/zernio-api`, {
           method: 'POST',
           headers: {

@@ -9,7 +9,7 @@ import MentionMonitoringDashboard from '@/components/business/mention-monitoring
 import { SectionHeader } from '@/components/shared/SectionHeader';
 
 /**
- * #244 B — one monitoring home. Three tabs (Price / Mention / Job Research)
+ * One monitoring home. Three tabs (Price / Mention / Job Research)
  * over the existing surfaces; each tab's content is gated by its module flag
  * (`isModuleEnabled`), so a disabled module shows a hint instead of the dashboard.
  */

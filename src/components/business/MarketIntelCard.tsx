@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { LineChart, MessageSquare } from 'lucide-react';
 
 /**
- * #244 C — surface monitoring intel where a product is quoted/viewed.
+ * Surface monitoring intel where a product is quoted/viewed.
  * Reads the denormalized snapshot off the product's internal tracked_queries
  * (price) + tracked_mentions (mentions/sentiment) rows. Renders nothing when the
  * product isn't monitored or RLS doesn't expose the rows — purely additive.

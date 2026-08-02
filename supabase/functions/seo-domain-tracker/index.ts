@@ -131,7 +131,6 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
     // `.catch(() => [])` on each call makes an upstream FAILURE indistinguishable from an empty
     // result. That mattered below, where a failed ranked-keywords call produced kws=[] and the
     // unconditional DELETE then wiped the stored set. `rankedFailed` keeps the two apart.
-    // (audit #306 finding 7)
     let rankedFailed = false;
     const [overview, backlinks, ranked] = await Promise.all([
       dfs('labs_domain_rank_overview', { target: domain, country_code: country, language_code: language }).catch(() => []),
@@ -171,7 +170,6 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
     // DataForSEO failure wiped every stored keyword and wrote nothing back, and the run still
     // returned { ok: true } with the snapshot recording error: null. The 'Rankings & Links'
     // panel went empty and STAYED empty until the next weekly run, with nothing reporting it.
-    // (audit #306 finding 7)
     if (rankedFailed) {
       console.warn('[seo-domain-tracker] keeping the existing keyword set — upstream fetch failed for', domain);
     } else {

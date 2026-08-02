@@ -65,7 +65,7 @@ const KNOWN_UNCLUSTERED = new Set([
   // virtual_staging ARE bound — they piggyback on the generate_3d branch — they just
   // have no cluster of their own. generate_video was cleared 2026-07-31: it wasn't
   // merely unclustered, it was never instantiated at all, so the tool was unreachable
-  // from any agent (audit #304 finding 15). It now sits in the `generation` cluster in
+  // from any agent. It now sits in the `generation` cluster in
   // both mirrors and is pushed alongside generate_vr_world.
   'generate_gemini', 'virtual_staging',
   // HVAC / energy calculators

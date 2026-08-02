@@ -83,7 +83,7 @@ export type TriggerType =
   // Sourcing / purchase orders
   | 'purchase_order.sent'
   | 'purchase_order.received'
-  // Flows governance — automated paths routed through Flows (#245 D)
+  // Flows governance — automated paths routed through Flows
   | 'material_alert'
   | 'finance_follow_up'
   | 'invoice_paid'
@@ -126,7 +126,7 @@ export type TriggerType =
   | 'price_alert_triggered'
   | 'mention_alert_triggered'
   | 'job_alert_triggered'
-  // #237 Phase 4.4 — upstream line-level RFQ: a workspace routed unpriced quote lines up to
+  // Upstream line-level RFQ: a workspace routed unpriced quote lines up to
   // its supplier/parent for pricing; the supplier returned prices (payload-only, dotted-free keys)
   | 'rfq_lines_requested'
   | 'rfq_lines_priced'

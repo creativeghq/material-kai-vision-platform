@@ -24,7 +24,6 @@ const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 // money quantity (anti-regression rule #1): a caption is actually billed 0.3 and was reported
 // as 2 — a 6.7x overstatement that could never reconcile against credit_transactions or
 // ai_usage_logs, and that any future "what did this post cost" rollup would inherit.
-// (audit #306 finding 20)
 const CREDIT_COST = 2;
 
 const PLATFORM_SPECS: Record<string, { max_chars: number; hashtag_style: string; tone_notes: string }> = {
@@ -68,7 +67,7 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
     post_id,
   } = body;
 
-  // SECURITY (audit #294/#306 finding 3): `workspace_id` and `post_id` arrive in the request
+  // SECURITY: `workspace_id` and `post_id` arrive in the request
   // BODY and everything below runs on the service-role client. Unguarded, a user in
   // workspace A could spend workspace B's pooled credits (the debit is routed by this very
   // id), plant drafts in B's queue, and overwrite the caption/hashtags/images of any of B's

@@ -57,7 +57,7 @@ export const InboundDocPreviewDialog: React.FC<{
   /**
    * Hydrate the TOASTed columns on open. The list query no longer selects `lines` / `raw` /
    * `delivery_addresses` — detoasting them for every row cost ~1 s per list paint to render a
-   * table that shows none of them (#301 finding 8). Falls back to the list row, so a failed
+   * table that shows none of them. Falls back to the list row, so a failed
    * hydrate degrades to an empty line table rather than a blank dialog.
    */
   const [full, setFull] = React.useState<InboundDocument | null>(null);

@@ -74,7 +74,7 @@ export const ProjectsListPage: React.FC = () => {
   const [showCreate, setShowCreate] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // #251 App Launcher deep-link: /projects?new=project opens the New Project modal.
+  // App Launcher deep-link: /projects?new=project opens the New Project modal.
   useEffect(() => {
     if (searchParams.get('new') === 'project') {
       setShowCreate(true);

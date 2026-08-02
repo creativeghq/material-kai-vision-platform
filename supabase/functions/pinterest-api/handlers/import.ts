@@ -188,7 +188,7 @@ async function importSinglePin(
     let matches: unknown[] = [];
     if (autoMatch) {
       try {
-        // MIVAA /api/rag/search now requires auth (audit #217 C4) — authenticate as the platform service.
+        // MIVAA /api/rag/search now requires auth — authenticate as the platform service.
         const mivaaKey = Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
         const searchRes = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search`, {
           method: 'POST',

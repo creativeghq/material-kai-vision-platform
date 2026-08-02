@@ -286,7 +286,7 @@ export function JobResearchSitesEditor() {
                               form, but shown nowhere else — so a curation note ("why added, who
                               curated") was invisible exactly when scanning the list, which is when
                               it is useful. Surfaced here rather than dropping a field that has a
-                              real purpose. (audit #305 finding 19) */}
+                              real purpose. */}
                           {s.notes && (
                             <span className="mt-0.5 block text-xs italic text-muted-foreground break-words">{s.notes}</span>
                           )}

@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-// #249/#279 — CANONICAL platform lead scorer. Scores ANY crm_contacts lead (not real-estate-only)
+// CANONICAL platform lead scorer. Scores ANY crm_contacts lead (not real-estate-only)
 // from generic CRM signals, enriched with property signals when the real-estate module is enabled.
 // Writes the shared crm_contacts.lead_score / health_score so CRM, Sales, and Real Estate all show
 // the SAME score. Credit-metered (reserve → settle). Not module-gated — it's a CRM-wide capability.

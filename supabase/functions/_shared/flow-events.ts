@@ -115,7 +115,7 @@ export async function emitFlowEventToWorkspaceRoles(
  * flow could possibly match. Two of the hottest paths in the platform emit into nothing:
  * `search_executed` (every search, from agent-chat and unifiedSearchService) and
  * `user_login` (every sign-in) — neither has a flow row, so each was a full function
- * invocation whose only outcome was "matched 0 flows". (audit #298 finding 27)
+ * invocation whose only outcome was "matched 0 flows".
  *
  * TTL is deliberately short: activating a flow in the builder takes effect within it.
  */

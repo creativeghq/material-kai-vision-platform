@@ -144,7 +144,7 @@ export const createManageStockTool = (
           // Prefer the server's value and only fall back to computing it here, so the two
           // cannot disagree the moment that definition changes — e.g. if reservations start
           // excluding dispatched allocations. The old unconditional subtraction also produced
-          // NaN rather than null when either column arrived null. (audit #307 finding 14)
+          // NaN rather than null when either column arrived null.
           available: i.available ?? (
             i.qty_on_hand == null || i.qty_reserved == null
               ? null
@@ -225,7 +225,7 @@ export const createManageStockTool = (
           // key made the property `undefined` on every candidate, and JSON.stringify drops
           // undefined — so the free preview silently reported NO consumption rate at all,
           // pushing users onto the 5-credit AI forecast for information this path already
-          // had. `trend` was dropped the same way. (audit #307 finding 15)
+          // had. `trend` was dropped the same way.
           days_of_cover: c.days_of_cover, velocity_per_day: c.velocity_per_day,
           trend: c.trend, below_reorder: c.below_reorder,
           warehouse_item_id: c.warehouse_item_id,

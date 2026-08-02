@@ -574,7 +574,7 @@ export async function handleContacts(req: Request): Promise<Response> {
         .update({
           user_id: null,
           linked_at: null,
-          linked_by: scope.callerUserId ?? 'system', // Track who unlinked (pentest #250 C18)
+          linked_by: scope.callerUserId ?? 'system', // Track who unlinked
         })
         .eq('id', contactId)
         .select();

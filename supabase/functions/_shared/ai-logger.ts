@@ -35,7 +35,7 @@ const AI_PRICING = {
   },
 };
 
-// ── DB-driven token pricing overlay (audit #217 H5) ───────────────────────────
+// ── DB-driven token pricing overlay ───────────────────────────
 // The `ai_model_pricing` admin table is authoritative; AI_PRICING above is the
 // fallback used only when a model row is missing or the DB is unreachable. Cached
 // per-worker for 5 minutes so per-call logging stays cheap.
@@ -115,7 +115,7 @@ export class AICallLogger {
   ): Promise<number> {
     const modelLower = model.toLowerCase();
 
-    // DB-driven overlay first (audit #217 H5) — admin-edited prices win over the
+    // DB-driven overlay first — admin-edited prices win over the
     // hardcoded AI_PRICING fallback below.
     try {
       const dbPricing = await getDbTokenPricing(this.supabase);

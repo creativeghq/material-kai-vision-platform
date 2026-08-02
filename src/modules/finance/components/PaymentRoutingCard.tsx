@@ -1,5 +1,5 @@
 /**
- * #182 per-workspace payout routing. When a workspace connects its own Stripe
+ * per-workspace payout routing. When a workspace connects its own Stripe
  * account (Express, via Connect), invoice payments are routed there as destination
  * charges; otherwise the platform collects. Mounted in Finance → Settings.
  */

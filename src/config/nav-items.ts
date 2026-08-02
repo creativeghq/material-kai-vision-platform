@@ -32,7 +32,7 @@ import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
 export type NavRoleRequirement = 'factory' | 'admin';
 
 /**
- * HubSpot-style "Hubs" (#251 follow-up): the App Launcher and Profile → Modules group the
+ * HubSpot-style "Hubs": the App Launcher and Profile → Modules group the
  * workspace's business modules into a small, organized set of Hubs instead of a flat list.
  * A Hub is purely an IA/grouping layer over the existing `surface:'app'` items — routes,
  * module slugs, capabilities, and entitlements are unchanged. Each app declares its `hub`;
@@ -67,7 +67,7 @@ export interface SidebarNavItem {
   requireRole?: NavRoleRequirement;
   /** Platform-operator only (owner/admin of the root workspace). Hides from dealers/architects/end-users. */
   requirePlatform?: boolean;
-  /** #195 capability gate — hide unless the active persona holds this capability. */
+  /** Capability gate — hide unless the active persona holds this capability. */
   requireCapability?: Capability;
   /** OR-gate — hide unless the active persona holds ANY of these (e.g. catalog browse). */
   requireAnyCapability?: Capability[];
@@ -109,7 +109,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireAnyCapability: PRODUCT_BROWSE_ANY },
 
   // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar,
-  //    grouped into Hubs (#251 follow-up) via the `hub` field. ──
+  //    grouped into Hubs via the `hub` field. ──
   // Multi-tenant inbox (directional messaging + WhatsApp channel + agent takeover P2).
   { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app', hub: 'service', description: 'Shared inbox for customer conversations.' },
   // WhatsApp + Reviews — agent-driven comms/reputation (Hermes), same launcher pattern; the send /
@@ -117,7 +117,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'messaging', label: 'WhatsApp', path: '/agent-hub?capability=messaging', icon: MessageCircle, requireCapability: 'agent.use', moduleSlug: 'messaging', surface: 'app', hub: 'service', description: 'Message customers on WhatsApp — in the AI studio.' },
   { id: 'reviews', label: 'Reviews', path: '/agent-hub?capability=reviews', icon: Star, requireCapability: 'agent.use', moduleSlug: 'reviews', surface: 'app', hub: 'service', description: 'Read reviews about you and reply — in the AI studio.' },
   { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects', surface: 'app', hub: 'studio', description: 'Plan and manage design projects.' },
-  // MoodBoards moved off the lean top bar into Studio Hub (#251 follow-up) — it's creative
+  // MoodBoards moved off the lean top bar into Studio Hub — it's creative
   // delivery work, grouped alongside Projects and client presentations.
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette, surface: 'app', hub: 'studio', description: 'Curate materials and design inspiration.' },
   // Interior Design is agent-first (the Vision agent + generation toolkit on the canvas), so the
@@ -222,11 +222,11 @@ export function filterNavItems(
     // Factory analytics is for verified factories only — not dealers/operators.
     if (item.requireRole === 'factory' && !ctx.isFactory) return false;
     if (item.requireRole === 'admin' && !ctx.isAdmin) return false;
-    // #195 capability gate (the unified persona model — drives end-user restriction).
+    // Capability gate (the unified persona model — drives end-user restriction).
     if (item.requireCapability && !ctx.can(item.requireCapability)) return false;
     // OR-gate — visible if the persona holds ANY of the listed capabilities.
     if (item.requireAnyCapability && !item.requireAnyCapability.some(ctx.can)) return false;
-    // #212 entitlement gate — hide a paid module unless the active workspace owns it.
+    // Entitlement gate — hide a paid module unless the active workspace owns it.
     if (item.moduleSlug && !ctx.isModuleAvailable(item.moduleSlug)) return false;
     return true;
   });

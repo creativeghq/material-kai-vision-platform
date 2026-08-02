@@ -1,5 +1,5 @@
 /**
- * #206/#207 — per-row 3-dots action menu for the Expenses (myDATA inbound) inbox. Folds the
+ * per-row 3-dots action menu for the Expenses (myDATA inbound) inbox. Folds the
  * loose row buttons (Create bill / Receive stock / Dismiss) into one menu and adds two
  * "turn this received document into platform data" actions:
  *   • Add issuer → CRM supplier (with optional registry + business research when the issuer is

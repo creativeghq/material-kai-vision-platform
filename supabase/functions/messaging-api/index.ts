@@ -184,7 +184,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       if (!op.success) return jsonResponse({ error: 'Operator role required for this action' }, 403);
     }
 
-    // #212 entitlement: WhatsApp is a paid ('messaging') feature. Gate the credit-spending /
+    // Entitlement: WhatsApp is a paid ('messaging') feature. Gate the credit-spending /
     // config-mutating actions on the TARGET workspace's entitlement (operator root bypasses inside
     // isWorkspaceEntitled). Skips when no workspace is resolvable so the action's own guards + RLS
     // still apply — never fail-closed on a null workspace and break a legit send.

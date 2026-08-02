@@ -166,7 +166,7 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
             </div>
             {/* Step indicators. Current-vs-done was carried by colour alone (WCAG 1.4.1) with
                 no "Step 2 of 3" anywhere. The dots are decorative; the sr-only text is the
-                actual announcement. (audit #302 finding 7) */}
+                actual announcement. */}
             <div className="flex items-center gap-1.5" role="group" aria-label={`Step ${step} of 3`}>
               <span className="sr-only">{`Step ${step} of 3`}</span>
               {[1, 2, 3].map((s) => (

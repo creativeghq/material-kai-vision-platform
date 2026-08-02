@@ -1515,7 +1515,7 @@ async function handleExecuteFlow(
     return jsonResponse({ success: false, error: 'Flow not found' }, 404);
   }
 
-  // #256 SECURITY (BOLA): the direct execute-flow / test-flow entrypoints run under the service role,
+  // SECURITY (BOLA): the direct execute-flow / test-flow entrypoints run under the service role,
   // so without this check any authenticated user could run ANOTHER tenant's flow by id — billing their
   // credit pool and sending mail/WhatsApp from their BYOK sender. A caller may run a workspace flow
   // only if they belong to that workspace; a global/operator flow only if they are a platform admin
@@ -1685,7 +1685,7 @@ async function handleExecuteFlow(
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// #256 SECURITY: these events assert a financial/trust/system fact (payment settled, role approved,
+// SECURITY: these events assert a financial/trust/system fact (payment settled, role approved,
 // invoice issued, a backend job finished). They are emitted ONLY by trusted server code
 // (emitFlowEvent from edge functions / DB triggers), NEVER by the browser. A plain authenticated
 // user must not be able to POST trigger-event with one of these and drive a global notification/email

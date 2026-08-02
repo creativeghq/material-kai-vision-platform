@@ -52,14 +52,14 @@ export type Capability =
   | 'projects.use'          // projects + client views
   | 'moodboards.use'        // moodboards / design surfaces
   | 'agent.use'             // KAI agent / chat
-  | 'inbox.use'             // #209 multi-tenant inbox (directional messaging)
-  | 'hr.view'               // #252 HR module: see employees + absences (sensitive PII)
-  | 'hr.manage'             // #252 HR module: create/edit employees, approve/reject absences
-  | 'hr.self'               // #252 HR self-service: an employee sees/acts on ONLY their own record
-  | 'marketing.email'       // #255 Email Marketing module: design templates + send bulk campaigns
-  | 'realestate.view'           // #249 Real Estate: see the module + listings (owner/admin + agent)
-  | 'realestate.listings.manage' // #249 create/edit/publish listings (owner/admin + realestate_agent)
-  | 'realestate.leads.view';     // #249 property leads/viewings pipeline (owner/admin see all; agent own)
+  | 'inbox.use'             // multi-tenant inbox (directional messaging)
+  | 'hr.view'               // HR module: see employees + absences (sensitive PII)
+  | 'hr.manage'             // HR module: create/edit employees, approve/reject absences
+  | 'hr.self'               // HR self-service: an employee sees/acts on ONLY their own record
+  | 'marketing.email'       // Email Marketing module: design templates + send bulk campaigns
+  | 'realestate.view'           // Real Estate: see the module + listings (owner/admin + agent)
+  | 'realestate.listings.manage' // create/edit/publish listings (owner/admin + realestate_agent)
+  | 'realestate.leads.view';     // Property leads/viewings pipeline (owner/admin see all; agent own)
 
 const ALL_BUSINESS: Capability[] = [
   'network.manage', 'pricing.manage', 'finance.manage', 'invoice.issue', 'crm.view',
@@ -69,10 +69,10 @@ const ALL_BUSINESS: Capability[] = [
   // deliberately NOT in the `staff` list below, so plain members don't see HR. Module ENTITLEMENT
   // (workspace owns 'hr') is enforced separately by EntitlementGuard + assertEntitled.
   'hr.view', 'hr.manage',
-  // #255 Email Marketing — sending from the company's own verified domain is an owner/admin
+  // Email Marketing — sending from the company's own verified domain is an owner/admin
   // function (BYOK config is finance-manager-gated). Module entitlement gates it per-workspace.
   'marketing.email',
-  // #249 Real Estate — owner/admin (broker) get the full surface: view + manage listings + all leads.
+  // Real Estate — owner/admin (broker) get the full surface: view + manage listings + all leads.
   // Module entitlement gates it per-workspace; the invited realestate_agent persona gets a scoped subset.
   'realestate.view', 'realestate.listings.manage', 'realestate.leads.view',
 ];

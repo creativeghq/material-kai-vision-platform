@@ -749,7 +749,7 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
           subject: subject || `[Test] ${template?.name}`,
           html,
           emailType: marketing ? 'marketing' : 'transactional',
-          // #255 marketing test sends use the workspace's own Resend (BYOK), strictly — same path
+          // Marketing test sends use the workspace's own Resend (BYOK), strictly — same path
           // the campaign takes — so the test proves the real sender is configured.
           ...(marketing ? { workspace_id: workspaceId, requireWorkspaceSender: true } : {}),
           tags: { test: 'true', template_id: id },

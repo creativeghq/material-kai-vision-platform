@@ -133,7 +133,7 @@ function buildCmaHtml(r: CmaReport): string {
   // CLAUDE.md invariant #11: use the CANONICAL escaper, never a local copy. The copy that was
   // here escaped only & < > " — four of the five — leaving the single quote unescaped, and this
   // output goes to `w.document.write(...)`, a genuine HTML sink. `real-estate-buyer-digests`
-  // already imports the shared one for the same job. (audit #303 finding 10)
+  // already imports the shared one for the same job.
   const esc = escapeHtml;
   const subjectTitle = esc(r.subject.title || `${r.subject.property_type} in ${r.subject.town || '—'}`);
   const rows = r.comps.map((c) => `<tr>

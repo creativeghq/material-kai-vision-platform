@@ -71,7 +71,7 @@ export const CatalogBuilderPage: React.FC = () => {
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('builder');
   // Fresh signed URL re-derived from pdf_storage_path. The persisted catalog.pdf_url is
-  // a 7-day signed URL that 403s once expired (audit #217 H16) — never serve it directly.
+  // a 7-day signed URL that 403s once expired — never serve it directly.
   const [pdfSignedUrl, setPdfSignedUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {

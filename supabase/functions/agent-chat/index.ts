@@ -957,7 +957,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     // NOTE: generate_3d triggers async generation and returns job ID immediately
     // NOTE: material_search is only injected when user message contains keywords like "find materials"
   },
-  // #249/#281 — Estate: the real-estate specialist. Every tool self-gates on the real-estate
+  // Estate: the real-estate specialist. Every tool self-gates on the real-estate
   // module + entitlement, so binding is safe even for workspaces without the module.
   'property-advisor': {
     id: 'property-advisor',
@@ -2264,7 +2264,7 @@ async function executeAgent(
   // the generator shipped but was never pushed onto any agent, so `generate_video` was
   // unreachable and AgentHub's `video_generated` chunk handler had nothing that could
   // ever emit it. Deliberately NOT inside the isAdmin block below: this is a Generation
-  // cluster tool like generate_3d, not an operator tool. (audit #304 finding 15)
+  // cluster tool like generate_3d, not an operator tool.
   if (config.tools.includes('generate_video') && createInteriorVideoV2Tool) {
     tools.push(createInteriorVideoV2Tool(userId, workspaceId, onChunk));
   }

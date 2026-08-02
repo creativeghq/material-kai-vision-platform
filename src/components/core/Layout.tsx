@@ -21,8 +21,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Skip link — the platform had none anywhere across 640 components, so a keyboard user
           tabbed the ENTIRE sidebar on every route change before reaching content. Visually
           hidden until focused, which is the point: invisible to mouse users, the first stop for
-          a keyboard user. Placed before <Sidebar /> so it is genuinely first in DOM order.
-          (audit #302 finding 9) */}
+          a keyboard user. Placed before <Sidebar /> so it is genuinely first in DOM order. */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg"

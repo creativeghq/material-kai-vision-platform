@@ -1,5 +1,5 @@
 /**
- * Reviews Tools — agent-chat surface for professional/profile reviews (#275 rail 4).
+ * Reviews Tools — agent-chat surface for professional/profile reviews.
  *
  * ONE tool, actions:
  *   - list  — reviews written ABOUT the caller (profile_reviews.to_user_id = me), newest first

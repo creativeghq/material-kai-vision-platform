@@ -169,7 +169,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     prices_vat_inclusive = !!c?.prices_vat_inclusive;
   }
 
-  // #177 white-label: render the public quote under the seller workspace's identity
+  // white-label: render the public quote under the seller workspace's identity
   // (business name + logo + contact) instead of the platform default.
   let seller: any = null;
   if (quote.workspace_id) {

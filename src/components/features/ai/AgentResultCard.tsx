@@ -3,7 +3,7 @@ import { ExternalLink } from 'lucide-react';
 import { RESULT_TYPE_CAPABILITY, RESULT_RECORD_KEY, buildPageUrl, capabilityHubLabel } from '@/config/capabilities';
 
 /**
- * #245 E — generic structured renderer for agent result chunks that were
+ * Generic structured renderer for agent result chunks that were
  * previously emitted but shown as plain text (graph tools, trip-expense,
  * job-research, misc). One card, consistent layout, handles arbitrary JSON
  * payloads so all 19 chunk types become visible without 19 bespoke cards.

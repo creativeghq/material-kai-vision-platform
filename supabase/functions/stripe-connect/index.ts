@@ -6,7 +6,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getStripe, noPaymentProviderResponse } from '../_shared/stripe-clients.ts';
 
-// #182 Stripe Connect onboarding for per-workspace payouts (destination charges).
+// Stripe Connect onboarding for per-workspace payouts (destination charges).
 // Actions: onboard (get-or-create Express account + account link), status (refresh flags).
 // Funds routing lives in finance-pay-invoice via get_workspace_payout_account().
 

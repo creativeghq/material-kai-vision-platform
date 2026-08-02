@@ -50,7 +50,7 @@ serve(withApiLogging('email-contacts-sync-cron', async (req) => {
         // The 3 credits were already taken. email-api 503s when this workspace has no usable
         // Resend key (non-root + no BYOK), which is a PERMANENT condition — so without this the
         // tenant is billed every day, forever, for a sync that can never run. Refund whatever
-        // was charged. (audit #306 finding 23)
+        // was charged.
         if (gate.charged > 0) {
           await refundCronWorkspace(supabase, row.workspace_id, 'email-contacts-sync', gate.charged,
             `Contacts sync could not run (HTTP ${res.status})`);

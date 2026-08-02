@@ -82,7 +82,7 @@ describe('order settlement has exactly one derivation', () => {
    */
   it('never recomputes outstanding as total − settled in TypeScript', () => {
     const offenders: string[] = [];
-    // THIS TEST HAD A PROVEN FALSE NEGATIVE (audit #309 item 5).
+    // THIS TEST HAD A PROVEN FALSE NEGATIVE.
     // The old pattern ended `[-−]\s*(settled|paid|net)\b`, requiring the word to start right
     // after the minus. A live reintroduction at OrdersPanel.tsx:1778 read
     //     Math.max(0, Math.round((Number(order.total) - orderSettled()) * 100) / 100)

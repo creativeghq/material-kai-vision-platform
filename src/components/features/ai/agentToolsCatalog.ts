@@ -1744,7 +1744,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // ToolkitFormModal takes the DETERMINISTIC branch — promptTemplate is never used, so
         // the LLM never got a chance to remap it. The user typed their post, hit go, and got
         // "caption is required" every single time. This is the only Publish control in the
-        // product. (audit #306 finding 16)
+        // product.
         run: { tool: 'manage_social', fixedArgs: { action: 'publish' }, argMap: { content: 'caption' } },
         form: [
           { key: 'content', label: 'Post content', kind: 'text', required: true, placeholder: 'Our new porcelain range just landed…' },

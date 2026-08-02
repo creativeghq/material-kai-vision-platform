@@ -183,7 +183,7 @@ export const CRMManagement: React.FC = () => {
   const [selCompanies, setSelCompanies] = useState<Set<string>>(new Set());
   const [showAddCompany, setShowAddCompany] = useState(false);
 
-  // #251 App Launcher deep-links: /crm?new=contact | /crm?new=company open the create flow.
+  // App Launcher deep-links: /crm?new=contact | /crm?new=company open the create flow.
   useEffect(() => {
     const n = searchParams.get('new');
     if (n !== 'contact' && n !== 'company') return;

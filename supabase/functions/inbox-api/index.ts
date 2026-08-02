@@ -521,7 +521,7 @@ async function getOrCreateShareLink(
     .maybeSingle();
   let token = (existing as { token?: string } | null)?.token;
   if (!token) {
-    // SECURITY (audit #294/#306 finding 6): `expires_at` was NEVER written by any code path.
+    // SECURITY: `expires_at` was NEVER written by any code path.
     // The column is nullable, so `t.expires_at` was always NULL and resolveToken's expiry
     // guard — and the "This link has expired" copy — were unreachable decoration. One
     // forwarded /i/:token URL was a permanent, unauthenticated read+write handle on a
@@ -712,7 +712,7 @@ async function insertMessageAndNotify(
   // entirely — even though the caller explicitly permits `body === null` when attachments
   // exist. Combined with the hardcoded `attachmentUrl: undefined`, an operator could attach a
   // spec sheet, see it in their own transcript, and the customer would receive the text alone
-  // or nothing at all, with no indication either way. (audit #306 finding 22)
+  // or nothing at all, with no indication either way.
   if (thread.channel === 'whatsapp' && (messageType === 'text' || messageType === 'agent')
       && (body || attachments.length > 0)) {
     const meta = (thread.metadata as Json) || {};
@@ -768,7 +768,6 @@ async function insertMessageAndNotify(
       // (expired token, missing add-on, closed 24h window, rate limit) still produced a
       // message bubble in the operator's thread and a cleared composer, while the customer
       // received nothing. The failure text sat in metadata.relay.error with no reader.
-      // (audit #306 finding 4)
       if (!relayOk) {
         const detail = String((res as { error?: unknown })?.error ?? 'WhatsApp relay failed');
         throw new HttpError(502, `Message stored but NOT delivered to WhatsApp: ${detail}`);
@@ -1084,7 +1083,7 @@ async function handleJwtAction(
       // "Handled by: AI Assistant" while agent_state was unchanged — and maybeRunAgentReply's
       // `if (thread.agent_state !== 'active') return` then silently declined to answer a
       // conversation the operator believed the AI owned. remove_participant, in this same
-      // file, has always done `if (error) throw`. (audit #306 finding 19)
+      // file, has always done `if (error) throw`.
       const { error: threadErr } = await db.from('inbox_threads')
         .update({ agent_state: state, agent_id: agentId }).eq('id', threadId);
       if (threadErr) throw new HttpError(500, `Could not change agent state: ${threadErr.message}`);
@@ -1859,7 +1858,7 @@ async function resolveToken(db: DbClient, token: string, allowClaimed = false) {
   if (t.expires_at && new Date(String(t.expires_at)) < new Date()) {
     throw new HttpError(403, 'This link has expired');
   }
-  // SECURITY (audit #294/#306 finding 6): `claimed_by_user_id` was checked ONLY inside
+  // SECURITY: `claimed_by_user_id` was checked ONLY inside
   // token_claim. token_get_thread and token_send_message ignored it entirely, so a link
   // stayed live after the intended customer had claimed it and converted to an account —
   // anyone still holding the URL kept full read+write access to that conversation.
@@ -1932,7 +1931,7 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
       // inbox_participants, workspace_members, token claim — with NONE of their errors checked,
       // returning { ok: true } regardless. A partial conversion is the damaging case: the
       // contact links, the workspace_members row does not, and the customer lands in an inbox
-      // they cannot read, having been told signup completed. (audit #306 finding 19)
+      // they cannot read, having been told signup completed.
       const claimUserId = String(payload.user_id || '');
       if (!claimUserId) throw new HttpError(400, 'user_id is required');
 

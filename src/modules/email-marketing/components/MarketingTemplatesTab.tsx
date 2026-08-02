@@ -27,7 +27,7 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
   const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
 
-  // #251 App Launcher deep-link: /marketing/email?tab=templates&new=template opens the create modal.
+  // App Launcher deep-link: /marketing/email?tab=templates&new=template opens the create modal.
   useEffect(() => {
     if (searchParams.get('new') === 'template') {
       setShowCreate(true);

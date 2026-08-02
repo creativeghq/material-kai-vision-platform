@@ -26,7 +26,7 @@ export const PriceMonitoringDashboard: React.FC = () => {
   // The Price History tab mounted <PriceHistoryChart /> with NO props while the dashboard held
   // no selection state at all, so the chart hit its `if (!productId)` guard and rendered
   // "Select a product to view its price trends" — with no selector anywhere on the page to
-  // satisfy it. The tab could never draw a chart. (audit #305 finding 11)
+  // satisfy it. The tab could never draw a chart.
   const [historyProductId, setHistoryProductId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({

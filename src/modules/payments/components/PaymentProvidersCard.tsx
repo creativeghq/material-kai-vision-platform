@@ -1,4 +1,4 @@
-// Tenant-facing payment-providers surface for Finance → Settings → Payments (#273 follow-up).
+// Tenant-facing payment-providers surface for Finance → Settings → Payments.
 // Fixes the gap where provider submodules were only reachable under /admin: here a tenant sees
 // every `provides.payments` add-on, enables the ones they want (each independently priced), and
 // configures their own merchant account in-place. Mirrors the admin ProvidersPanel but is

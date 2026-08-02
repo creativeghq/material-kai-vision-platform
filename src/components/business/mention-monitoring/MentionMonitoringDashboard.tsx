@@ -40,7 +40,7 @@ const MentionMonitoringDashboard: React.FC = () => {
       if (productIds.length) {
       // A discarded error made every row silently fall back to rendering the raw
       // search_query instead of the product name — an outage that looks like a naming
-      // quirk, so nobody reports it. (audit #305 finding 17)
+      // quirk, so nobody reports it.
         const { data: prods, error: prodErr } = await supabase
           .from('products')
           .select('id, name')

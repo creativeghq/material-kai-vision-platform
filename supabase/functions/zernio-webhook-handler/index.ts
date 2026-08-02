@@ -71,7 +71,7 @@ async function verifySignature(rawBody: ArrayBuffer, signature: string): Promise
   }
 }
 
-/** Constant-time hex string comparison (#250 C29). */
+/** Constant-time hex string comparison. */
 function timingSafeEqualHex(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -400,7 +400,7 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
   // entire column, deleting `wamid`, `channel` and `relay` — so the first receipt (normally
   // `delivered`) recorded itself AND made the row permanently unmatchable. Every later `read` or
   // `failed` receipt matched zero rows forever: read receipts never worked, and a message Meta
-  // later reported as FAILED stayed displayed as delivered. (audit #306 finding 5)
+  // later reported as FAILED stayed displayed as delivered.
   const { data: receiptRows, error: receiptErr } = await supabase.rpc('apply_inbox_delivery_receipt', {
     p_wamid: wamid,
     p_status: status,

@@ -184,7 +184,7 @@ const FinancePage: React.FC = () => {
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
 
-  // #251 App Launcher deep-link: /finance?new=invoice opens the New Invoice modal.
+  // App Launcher deep-link: /finance?new=invoice opens the New Invoice modal.
   useEffect(() => {
     if (isAccountant) return; // read-only role cannot create
     if (searchParams.get('new') === 'invoice') {
@@ -913,7 +913,7 @@ const FinancePage: React.FC = () => {
                         className={`border-b border-border/30 hover:bg-muted/30 ${onRowClick ? 'cursor-pointer' : ''}`}
                         // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                         // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
-                        // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                        // row is invalid ARIA and yields a focus stop with no name.
                         onClick={onRowClick}
                       >
                         <td className="px-4 py-2">
@@ -1050,7 +1050,7 @@ const FinancePage: React.FC = () => {
                         className={`border-b border-border/30 hover:bg-muted/30 ${isOrder ? 'cursor-pointer' : ''}`}
                         // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                         // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
-                        // row is invalid ARIA and yields a focus stop with no name. (audit #302 finding 3)
+                        // row is invalid ARIA and yields a focus stop with no name.
                         onClick={isOrder ? () => openOrder(r.id) : undefined}
                       >
                         <td className="px-4 py-2">

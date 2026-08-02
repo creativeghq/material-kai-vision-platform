@@ -62,7 +62,7 @@ export async function chargeCronWorkspace(
  *
  *  Invariant #10 requires the debit BEFORE the upstream call, which means some charges land for
  *  work that then cannot run — a precondition checked downstream, a provider outage. Without a
- *  refund path those become a standing daily charge for nothing (audit #306 finding 23).
+ *  refund path those become a standing daily charge for nothing.
  *  Best-effort: a failed refund must never break the cron. */
 export async function refundCronWorkspace(
   supabase: SupabaseLike,

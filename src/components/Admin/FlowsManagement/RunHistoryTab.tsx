@@ -217,8 +217,7 @@ export function RunHistoryTab() {
                                 status), so colour was the sole carrier — WCAG 1.4.1. Worse,
                                 `pending` and `skipped` are gray-400 and gray-300, which are
                                 indistinguishable to a SIGHTED user too. Rendered as a visible
-                                word rather than sr-only for exactly that reason.
-                                (audit #302 finding 7) */}
+                                word rather than sr-only for exactly that reason. */}
                             <div
                               className={`w-2 h-2 rounded-full flex-shrink-0 ${stepStatusColors[step.status] || 'bg-gray-400'}`}
                               aria-hidden="true"

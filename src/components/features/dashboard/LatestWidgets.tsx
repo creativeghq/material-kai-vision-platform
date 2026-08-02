@@ -337,7 +337,7 @@ function FactoryDetailModal({
         <DialogContent hideClose className="max-w-2xl p-0 overflow-hidden rounded-2xl gap-0 max-h-[85vh] flex flex-col">
           {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
               warning without one and, more importantly, a screen reader announces the dialog with
-              no name at all. (audit #302 finding 5) */}
+              no name at all. */}
           <DialogTitle className="sr-only">Details</DialogTitle>
           {/* Banner */}
           <div

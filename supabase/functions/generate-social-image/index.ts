@@ -214,7 +214,7 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     post_id,
   } = body;
 
-  // SECURITY (audit #294/#306 finding 3): `workspace_id` and `post_id` arrive in the request
+  // SECURITY: `workspace_id` and `post_id` arrive in the request
   // BODY and everything below runs on the service-role client. Unguarded, a user in
   // workspace A could spend workspace B's pooled credits (the debit is routed by this very
   // id), plant drafts in B's queue, and overwrite the caption/hashtags/images of any of B's
@@ -261,13 +261,13 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     // 7th arg. Omitting it sent p_workspace_id: null, so the debit ALWAYS hit the caller's
     // personal wallet — a workspace with a funded shared pool still drained individual
     // members' credits, and the per-member monthly cap never applied. Every other generator
-    // in this family passes it. (audit #304 finding 12)
+    // in this family passes it.
     workspace_id ?? null,
   );
   // What was ACTUALLY charged, derived from ai_model_pricing inside the debit. `creditCost` is
   // a pre-flight estimate and drifts from it — xai-aurora bills 10.5 and was reported as 10,
   // flux-2-pro bills 6.0 and was reported as 5. Persisting the estimate was a second
-  // derivation of a money quantity (anti-regression rule #1). (audit #306 finding 20)
+  // derivation of a money quantity (anti-regression rule #1).
   if (!debitResult.success) {
     return jsonResponse({ success: false, error: debitResult.error || 'Insufficient credits', required: creditCost }, 402);
   }

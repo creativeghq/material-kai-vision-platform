@@ -116,7 +116,7 @@ function isThrottled(key: string): boolean {
  * its own failure rate below every threshold `ops.silent_zero` applies. `monitoring-cron`
  * did exactly that: 261 real 5xx sat at ~74% of its calls because the disabled-module skip
  * kept answering 200, so neither the endpoint branch nor the cron branch ever flagged it
- * while a feature was dead for three months (audit #305 finding 3).
+ * while a feature was dead for three months.
  *
  * Resolve to `<fn>?task=<task>` and each task is measured on its own.
  */

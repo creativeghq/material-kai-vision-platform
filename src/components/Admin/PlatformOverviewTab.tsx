@@ -119,7 +119,6 @@ export function PlatformOverviewTab() {
   // SVBRDF state removed 2026-07-31: `svbrdf_extractions` is not a table in this
   // database and no SVBRDF producer exists (no MIVAA route, no svbrdf-extractor edge
   // function, generate-pbr-maps deleted). The KPIs read a permanent 0 / '—'.
-  // (audit #304 finding 8)
   const [canvasKpis, setCanvasKpis] = useState({ gen3dJobs: 0, gen3dSegments: 0 });
   const [gen3dRoomTypes, setGen3dRoomTypes] = useState<{ name: string; value: number }[]>([]);
   const [gen3dStatusTrend, setGen3dStatusTrend] = useState<{ week: string; completed: number; failed: number; pending: number }[]>([]);
@@ -848,7 +847,7 @@ export function PlatformOverviewTab() {
         supabase.from('tracked_query_price_history').select('source, scraped_at').gte('scraped_at', ago12.toISOString()).limit(10000),
         supabase.from('tracked_query_price_history').select('source, scraped_at').in('source', MARKETPLACE_SOURCES).gte('scraped_at', ago12.toISOString()).limit(5000),
         // `greek-marketplaces` is not a module_slug any row has ever carried, so this KPI was a
-        // hardcoded 0 (audit #305 finding 5). The price pipeline stamps `price-monitoring` —
+        // hardcoded 0. The price pipeline stamps `price-monitoring` —
         // see perplexity_price_search_service.py:1115 and :1520. Live distribution when checked:
         // (null) 2908 · job-research 2066 · mention-monitoring 820 · crm 23.
         supabase.from('ai_usage_logs').select('credits_debited, created_at').eq('module_slug', 'price-monitoring').gte('created_at', ago12.toISOString()).limit(5000),

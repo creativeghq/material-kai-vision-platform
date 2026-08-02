@@ -132,7 +132,7 @@ export async function getGenerationPrompt(
 
   const dbText = data?.prompt_text || data?.system_prompt;
 
-  // Distinguish "row genuinely missing" from "transient fetch failure" (audit #217 M10).
+  // Distinguish "row genuinely missing" from "transient fetch failure".
   // A real error other than PGRST116 (0-rows from .single()) means the DB was unreachable
   // — return the fallback for THIS call but do NOT cache it, so the next call retries the
   // DB instead of being stuck on the fallback for the full TTL after the DB recovers.

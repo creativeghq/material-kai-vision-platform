@@ -4,7 +4,7 @@
  * or escalates upward. Also shows the requests this workspace has sent up. Network-node only —
  * the tab that mounts this is gated on `network.manage`, and we re-check here as a safety net.
  *
- * #237 Phase 4.4 — line-level upstream RFQ: each request expands to its individual lines so the
+ * line-level upstream RFQ: each request expands to its individual lines so the
  * owner prices/declines per line and the requester folds the returned costs back into the quote.
  */
 import React, { useCallback, useEffect, useState } from 'react';
@@ -40,7 +40,7 @@ export const RequestsInboxPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
-  // #237 Phase 4.4 — per-request expand + lazy-loaded lines, per-line cost drafts + busy, per-request save-back.
+  // per-request expand + lazy-loaded lines, per-line cost drafts + busy, per-request save-back.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [linesById, setLinesById] = useState<Record<string, MasterRequestLine[]>>({});
   const [linesLoading, setLinesLoading] = useState<Record<string, boolean>>({});

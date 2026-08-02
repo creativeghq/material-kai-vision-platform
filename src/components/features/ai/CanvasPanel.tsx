@@ -85,7 +85,7 @@ interface CanvasPanelProps {
   onSelect: (id: string) => void;
   onClose: () => void;
   children?: React.ReactNode;
-  /** Contextual detail panel for the active artifact (issue #253 P3). */
+  /** Contextual detail panel for the active artifact. */
   inspector?: React.ReactNode;
   /**
    * Single-pane (mobile) mode. The canvas takes the whole screen instead of

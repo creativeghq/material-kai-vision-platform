@@ -516,7 +516,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
   // Live per-model prices from ai_model_pricing — the SAME rows sam_routes meters against,
   // so what this modal prints is what the backend debits. The imported constants are only
   // the first-paint fallback; they used to be the hand-maintained 40/20/10 ladder that the
-  // backend had never charged (audit #304 finding 6).
+  // backend had never charged.
   const [inpaintCosts, setInpaintCosts] = useState<Record<InpaintingModel, number>>(INPAINTING_CREDIT_COSTS);
   useEffect(() => {
     let cancelled = false;

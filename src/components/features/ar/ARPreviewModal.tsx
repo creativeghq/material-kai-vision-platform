@@ -237,7 +237,7 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
       <DialogContent className="flex h-[95vh] max-w-[95vw] flex-col gap-0 overflow-hidden p-0 sm:h-[90vh] sm:max-w-4xl">
         {/* sr-only because the design has no room for a visible heading. Radix logs a runtime
             warning without one and, more importantly, a screen reader announces the dialog with
-            no name at all. (audit #302 finding 5) */}
+            no name at all. */}
         <DialogTitle className="sr-only">Material preview</DialogTitle>
         {/* Hidden download anchor. Not a link in the accessibility sense — it is a DOM handle whose
             href is assigned at runtime through the ref and then clicked programmatically. It is
@@ -316,8 +316,7 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
               previously offered only the 3D turntable with no way to get there. The QR
               points at /ar/:productId (App.tsx), the same route ARPage already serves.
               This is the one behaviour the orphaned ViewInARButton had that the modal
-              did not — folded in here rather than left as a second, unreachable door.
-              (audit #304 finding 14) */}
+              did not — folded in here rather than left as a second, unreachable door. */}
           {!isMobile && productId && (
             <div className="absolute right-4 top-4 flex flex-col items-center gap-2 rounded-lg bg-background/90 p-3 shadow-lg backdrop-blur-sm">
               <QRCodeSVG value={`${window.location.origin}/ar/${productId}`} size={96} />

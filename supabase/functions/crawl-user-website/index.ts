@@ -374,7 +374,7 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
     .maybeSingle();
 
   if (error || !website) return jsonResponse({ success: false, error: 'Website not found' }, 404);
-  // #250 invariant #1 (BOLA): user_websites is workspace-shared. The service-role client
+  // Invariant #1 (BOLA): user_websites is workspace-shared. The service-role client
   // above bypasses RLS, so reconcile the caller against the row's workspace by MEMBERSHIP,
   // not the body-supplied id. Return 404 (not 403) on mismatch to avoid id enumeration.
   if (!isCron && !(await userCanAccessWorkspace(supabase, userId, website.workspace_id))) {

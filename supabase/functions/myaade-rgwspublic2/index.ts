@@ -294,7 +294,7 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
       return jsonResponse({ error: 'invalid_afm', message: 'Greek ΑΦΜ must be exactly 9 digits.' }, 400);
     }
 
-    // Pentest #250 H8/C10: the live lookup runs on the target workspace's regulated
+    // H8/C10: the live lookup runs on the target workspace's regulated
     // ΑΑΔΕ Special Access Codes — consuming that tenant's TAXISnet monthly quota and
     // firing the mandatory audit notification under their identity. Require the caller
     // to be a finance-manager of that workspace (mirror the creds-status gate) before

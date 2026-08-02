@@ -57,7 +57,7 @@ const AgentHubPage: React.FC = () => {
       }
     : capHandoff.quickStart;
   // When arriving via `?capability=` with NO specific action, hand the capability's toolkit to the
-  // Hub so it auto-enables it and shows its quick-starts (onboarding) — never a blank chat (#275 UX).
+  // Hub so it auto-enables it and shows its quick-starts (onboarding) — never a blank chat.
   const initialToolkitId = initialQuickStart ? undefined : capHandoff.toolkitId;
   const [userRole, setUserRole] = useState<'viewer' | 'member' | 'admin' | 'owner'>('member');
   const [isLoading, setIsLoading] = useState(true);

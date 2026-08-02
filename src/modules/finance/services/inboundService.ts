@@ -108,7 +108,7 @@ export const inboundService = {
    * `raw` (535 B avg), `lines` (238 B) and `delivery_addresses` (292 B) are TOASTed, and
    * `select('*')` detoasted all of them for every row just to paint a table that shows none of
    * them — 1,424 kB of TOAST per list render, measured at 982 ms mean against 2.7 ms with RLS
-   * bypassed (#301 finding 8). They are fetched by `getFull()` when a row is actually opened.
+   * bypassed. They are fetched by `getFull()` when a row is actually opened.
    */
   LIST_COLUMNS: [
     'id', 'workspace_id', 'mark', 'issuer_vat', 'issuer_name', 'issue_date', 'dispatch_date',

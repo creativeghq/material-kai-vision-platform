@@ -54,7 +54,7 @@ const InvoiceDetailPage: React.FC = () => {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   /**
-   * Consume `?action=` from InvoiceActionsMenu (#296 finding 25).
+   * Consume `?action=` from InvoiceActionsMenu.
    *
    * Those menu items — "Record payment", "Issue credit note" — used to run the identical
    * navigation as "View", so choosing one landed on this page with nothing open and the menu

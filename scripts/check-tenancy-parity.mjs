@@ -3,13 +3,13 @@
  * Tenancy parity check — the "two doors" detector.
  *
  * WHAT IT LOOKS FOR
- * The recurring root cause across #250, #257 and #294 is not a missing check in the abstract.
- * It is TWO DOORS TO THE SAME DATA where only one of them checks:
+ * The recurring root cause behind this platform's tenancy holes is not a missing check in the
+ * abstract. It is TWO DOORS TO THE SAME DATA where only one of them checks:
  *
- *   • #294 S1: `buildClientViewPdf` called fetchSheets/fetchProductChips/fetchQuoteFfeItems with
+ *   • `buildClientViewPdf` called fetchSheets/fetchProductChips/fetchQuoteFfeItems with
  *     no scope argument, while the sibling sheet path passed scopeUserId / scopeWorkspaceIds /
  *     quoteScope. Same helpers, same data, one door scoped and one not.
- *   • #294 S1: `catalog-translate-pdf` fetched catalog_source_pdfs by a body-supplied id with a
+ *   • `catalog-translate-pdf` fetched catalog_source_pdfs by a body-supplied id with a
  *     service-role client and no ownership check — while TWO sibling doors for the same action
  *     (catalog-tools.ts:250 workspace match, :500 uploader match) did check.
  *
@@ -31,7 +31,7 @@
  * WHY A SCRIPT AND NOT A SEMGREP RULE
  * Semgrep matches one site at a time. "This door checks and that one doesn't" is a comparison
  * ACROSS sites, and the absence of a filter somewhere in a fluent chain is awkward to assert in a
- * pattern. Both #294 S1 findings would have been invisible to a per-site rule.
+ * pattern. Both of the findings above would have been invisible to a per-site rule.
  *
  * BASELINE
  * Same ratchet as the edge typecheck and the a11y gate: `.github/tenancy-parity-baseline.json`
@@ -87,8 +87,7 @@ const BINDS_TENANT = [
 /**
  * Ownership is not always spelled `workspace_id`. `catalog-tools.ts` pulls the row then checks
  * `pdf.uploaded_by !== userId`; `vies-validate` checks `company.created_by === user.id` and only
- * then writes. Both are correct — in fact catalog-tools.ts:500 is the sibling door #294 cites as
- * the one that DOES check.
+ * then writes. Both are correct — in fact catalog-tools.ts:500 is the sibling door that DOES check.
  *
  * A write guarded by such a check sits inside an `if` block the chain scan cannot see, so this is
  * resolved per FILE+TABLE: if a file verifies ownership of a table anywhere, its queries on that
@@ -109,7 +108,7 @@ const VERIFIES_OWNERSHIP = /\.(uploaded_by|created_by|owner_id|user_id|workspace
  * updates a subject row it already loaded. The id is not attacker-controlled in either, so no
  * workspace filter is needed — the row was already reached through a scoped path.
  *
- * #294 names the real root cause exactly: "service-role client + trust a BODY-SUPPLIED id". So the
+ * The real root cause, stated exactly: "service-role client + trust a BODY-SUPPLIED id". So the
  * id expression has to trace to the request — `input.x`, `body.x`, `args.x`, `params.x`, `query.x`
  * — for the site to be a hole. A locally-derived id is not.
  */
@@ -202,9 +201,9 @@ function scan() {
  * rule scoped to path globs that no filename matched, and one whose pattern failed to parse). A
  * clean run is only evidence if the detector is known to still fire.
  *
- * MUST_FLAG below is #294 S1 as it was actually written before the fix: catalog-translate-pdf
+ * MUST_FLAG below is catalog-translate-pdf as it was actually written before the fix:
  * fetching catalog_source_pdfs on the service-role client by a body-supplied id, with no ownership
- * check anywhere in the file. MUST_NOT_FLAG is the sibling door that #294 confirms is correct.
+ * check anywhere in the file. MUST_NOT_FLAG is the sibling door that is correct.
  * If a future edit makes the detector stop catching the first, or start catching the second, this
  * fails — regardless of what the codebase scan says.
  */
@@ -228,7 +227,7 @@ function selfTest() {
     if (pdf.uploaded_by !== userId) return json({ error: 'Not authorized' }, 404);
   `;
   const cases = [
-    ['#294 S1 catalog-translate-pdf (unscoped body id)', MUST_FLAG, true],
+    ['catalog-translate-pdf (unscoped body id)', MUST_FLAG, true],
     ['the sibling door that checks uploaded_by', MUST_NOT_FLAG, false],
   ];
   let ok = true;

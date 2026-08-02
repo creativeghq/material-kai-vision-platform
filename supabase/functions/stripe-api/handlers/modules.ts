@@ -1,4 +1,4 @@
-// #251 module framework — owner self-serve module activation + add-on billing.
+// Module framework — owner self-serve module activation + add-on billing.
 // Actions (dispatched from stripe-api/index.ts):
 //   activate-module    { workspace_id, module_slug, successUrl?, cancelUrl? }
 //   deactivate-module  { workspace_id, module_slug }

@@ -53,7 +53,7 @@ export const VR_CREDIT_COSTS: Record<string, number> = {
  *
  * These numbers used to be hand-maintained here at 40 / 20 / 10 while the backend metered
  * EVERY inpaint through one flat `image-inpaint` key at 3.00 credits, ignoring the user's
- * choice entirely (audit #304 finding 6). The displayed price was fiction in both
+ * choice entirely. The displayed price was fiction in both
  * directions and the platform lost money on every Pro run.
  *
  * `ai_model_pricing` is now the single source: sam_routes meters the `inpaint-*` key for

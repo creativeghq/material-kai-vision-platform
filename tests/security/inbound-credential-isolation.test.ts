@@ -1,5 +1,5 @@
 /**
- * #183 acceptance guard — the master AADE key must be UNREACHABLE from any tenant
+ * Acceptance guard — the master AADE key must be UNREACHABLE from any tenant
  * inbound operation. `finance-inbound-sync` pulls received documents per-workspace using
  * each tenant's OWN myDATA credentials (`workspace_inbound_credentials`); it must never
  * fall back to the platform master AADE Special-Access-Codes (`AADE_USERNAME` /

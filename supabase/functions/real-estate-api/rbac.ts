@@ -43,7 +43,7 @@ export const PROPERTY_WRITABLE = [
   // agent & branding
   'agent_license_no', 'agency_logo_url',
   // lifecycle switches (publish state is set via publish/unpublish actions, not free-write)
-  // `syndicate_to` REMOVED from the allowlist 2026-08-01 (audit #303 finding 9). It is typed
+  // `syndicate_to` REMOVED from the allowlist 2026-08-01. It is typed
   // string[] and looks like a per-listing portal switch, but it has no reader and no writer
   // anywhere: real-estate-feed decides membership purely from feed_enabled + in_discovery.
   // Leaving it writable let any manager put arbitrary strings into a column with no defined

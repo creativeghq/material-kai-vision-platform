@@ -504,7 +504,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
           // "Price confirmed" toast below and close the drawer — the user saw a price they
           // believed was saved, the catalog was unchanged, and no second signal existed
           // anywhere. The enclosing try/catch could not help: nothing threw. The other two
-          // product_prices call sites both check. (audit #305 finding 14)
+          // product_prices call sites both check.
           const { error: priceErr } = await supabase.from('product_prices').upsert(
             {
               workspace_id: activeWorkspaceId,

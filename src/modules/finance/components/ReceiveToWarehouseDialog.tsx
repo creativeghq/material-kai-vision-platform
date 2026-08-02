@@ -1,5 +1,5 @@
 /**
- * #206/#207 — turn a myDATA inbound document's lines into stock.
+ * Turn a myDATA inbound document's lines into stock.
  *
  * A supplier line is one free-text string plus a quantity and a net value. Everything a
  * stock item needs is in there — "AMALFI GRIS 80X80 A' -3 -1", qty 17.92, net €295.86 is an
@@ -162,7 +162,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
   const [productCategories, setProductCategories] = useState<{ id: string; name: string }[]>([]);
 
   /**
-   * Hydrate the TOASTed `lines` on open — the list query omits them (#301 finding 8). This dialog
+   * Hydrate the TOASTed `lines` on open — the list query omits them. This dialog
    * cannot work without them, so a failed hydrate must be VISIBLE rather than silently rendering
    * the 'no goods on this document' empty state.
    */

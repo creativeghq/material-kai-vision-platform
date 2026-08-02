@@ -35,7 +35,7 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  * The step order and per-step rounding here mirror get_quote_totals EXACTLY, including
  * folding extras into the taxable base before VAT and summing rounded parts rather than
  * re-rounding a product. If you change one, change both: the reason quote totals were
- * wrong (audit #307 finding 17) is that three implementations rounded differently and
+ * wrong is that three implementations rounded differently and
  * `priceAfterDiscount + vat` disagreed with `final` by a cent.
  */
 export function previewTotalsBreakdown(input: {

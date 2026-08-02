@@ -40,7 +40,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 // Takes NO argument on purpose: `/sites/_resync` has no body and no query string, and the
 // backend re-syncs ALL sections. It previously accepted a `_siteType` it never used, which
 // cost deleteSite an entire pre-delete round-trip to produce — and, worse, gated the resync
-// on that read succeeding. (audit #305 finding 18)
+// on that read succeeding.
 async function _kickSitesKbSync(): Promise<void> {
   try {
     await api('/api/v1/job-research/sites/_resync', { method: 'POST' });
