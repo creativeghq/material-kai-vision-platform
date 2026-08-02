@@ -119,4 +119,33 @@ export const taricService = {
     if (error) throw await edgeError(error);
     return data;
   },
+
+  /**
+   * Import by URL instead of upload — the server fetches it through the SSRF guard.
+   *
+   * CIRCABC file links are unauthenticated, so a pasted link removes the download-then-upload
+   * round trip entirely. It is also the same value the monthly cron uses, which is why
+   * `remember` exists: one paste turns a manual import into a recurring one.
+   */
+  async importReferenceFromUrl(
+    url: string,
+    source: 'taric_eu' | 'gr_national',
+    opts: { remember?: boolean } = {},
+  ): Promise<any> {
+    const { data, error } = await supabase.functions.invoke('taric-reference-sync', {
+      body: { action: 'import', source, url },
+    });
+    if (error) throw await edgeError(error);
+
+    if (opts.remember) {
+      // Best-effort: the import already succeeded, and failing to persist the URL must not be
+      // reported as an import failure. It only costs the operator the automation, not the data.
+      const { error: saveErr } = await supabase.functions.invoke('platform-secrets-admin', {
+        body: { action: 'save', key: 'TARIC_REFERENCE_URL', value: url },
+      });
+      if (saveErr) return { ...data, remembered: false };
+      return { ...data, remembered: true };
+    }
+    return data;
+  },
 };

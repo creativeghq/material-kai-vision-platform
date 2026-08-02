@@ -37,7 +37,7 @@ interface RequestBody {
 type Field =
   | 'code' | 'product_line_suffix' | 'indent'
   | 'description_en' | 'description_el'
-  | 'national_additional_code' | 'valid_from' | 'valid_to';
+  | 'national_additional_code' | 'valid_from' | 'valid_to' | 'language';
 
 // Header aliases, lower-cased and stripped of punctuation before comparison. Greek headers are
 // included because the EL extraction ships localised column names.
@@ -53,6 +53,7 @@ const HEADER_ALIASES: Record<Field, string[]> = {
   national_additional_code: ['national additional code', 'additional code', 'national code'],
   valid_from: ['start date', 'validity start date', 'valid from', 'date de debut'],
   valid_to: ['end date', 'validity end date', 'valid to', 'date de fin'],
+  language: ['language', 'lang', 'language code'],
 };
 
 const BATCH_SIZE = 1000;
@@ -106,23 +107,134 @@ Deno.serve(withApiLogging(
       }
     }
 
+    // Rows arrive either as pasted delimited text or as the published spreadsheet. The
+    // spreadsheet is the canonical artefact — CIRCABC publishes xlsx and nothing else — so a
+    // fetched URL is read as a workbook when it looks like one, which is what lets the monthly
+    // cron run with no human in the loop.
+    let grid: string[][] | null = null;
     let text = body.content ?? '';
+
     if (!text && url) {
       const safe = await assertSafeUrl(url, { allowSchemes: ['https:'] });
       const res = await fetch(safe, { redirect: 'manual' });
       if (!res.ok) throw new HttpError(502, `Fetching the TARIC file failed: ${res.status}`);
-      text = await res.text();
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.byteLength > MAX_CONTENT_BYTES) {
+        throw new HttpError(413, 'TARIC file is larger than 40 MB — import it by chapter');
+      }
+      // A xlsx is a zip; every zip starts "PK\x03\x04". Sniffing the bytes beats trusting a
+      // Content-Type header that CIRCABC does not always set correctly.
+      if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
+        grid = await parseXlsx(bytes);
+      } else {
+        text = new TextDecoder().decode(bytes);
+      }
     }
-    if (!text.trim()) throw new HttpError(400, 'Provide `content` (CSV/TSV text) or `url`');
-    if (new Blob([text]).size > MAX_CONTENT_BYTES) {
-      throw new HttpError(413, 'TARIC file is larger than 40 MB — split it or import by chapter');
+
+    if (!grid) {
+      if (!text.trim()) throw new HttpError(400, 'Provide `content` (CSV/TSV text) or `url`');
+      if (new Blob([text]).size > MAX_CONTENT_BYTES) {
+        throw new HttpError(413, 'TARIC file is larger than 40 MB — split it or import by chapter');
+      }
+      grid = parseDelimited(text, detectDelimiter(text));
     }
 
     const source: Source = body.source === 'gr_national' ? 'gr_national' : 'taric_eu';
-    const result = await importCsv(supabase, text, source, body.mapping ?? {});
+    const result = await importGrid(supabase, grid, source, body.mapping ?? {});
     return json(result);
   },
 ));
+
+// ── XLSX ───────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Minimal xlsx reader: enough of the format to turn the published TARIC extraction into a grid,
+ * and nothing more. No formulas, no styles, no dates-as-serial-numbers (the extraction writes
+ * dates as text).
+ *
+ * The one subtlety that matters, and the reason a naive reader silently corrupts this file:
+ * **empty cells are simply absent from the XML.** The extraction leaves `End date` blank on most
+ * rows, so reading `<c>` elements in order shifts every later column left by one — descriptions
+ * land in the language column and dates land in the description. Cells are therefore placed by
+ * their `r="H1234"` reference, not by their position in the stream.
+ */
+async function parseXlsx(bytes: Uint8Array): Promise<string[][]> {
+  const { unzipSync, strFromU8 } = await import('npm:fflate@0.8.2');
+
+  let files: Record<string, Uint8Array>;
+  try {
+    files = unzipSync(bytes);
+  } catch (err) {
+    throw new HttpError(400, `Not a readable spreadsheet: ${(err as Error)?.message ?? 'unzip failed'}`);
+  }
+
+  // Older producers intern every string in a shared table; this extraction inlines them. Support
+  // both — an unresolved index would otherwise import as a number.
+  const shared: string[] = [];
+  const sharedXml = files['xl/sharedStrings.xml'];
+  if (sharedXml) {
+    for (const si of strFromU8(sharedXml).match(/<si>[\s\S]*?<\/si>/g) ?? []) {
+      shared.push(decodeXmlText([...si.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((m) => m[1]).join('')));
+    }
+  }
+
+  const sheetName = Object.keys(files).find((n) => /^xl\/worksheets\/sheet1\.xml$/.test(n))
+    ?? Object.keys(files).find((n) => /^xl\/worksheets\/.*\.xml$/.test(n));
+  if (!sheetName) throw new HttpError(400, 'Spreadsheet has no worksheet');
+
+  const xml = strFromU8(files[sheetName]);
+  const grid: string[][] = [];
+
+  for (const rowXml of xml.match(/<row[\s\S]*?<\/row>/g) ?? []) {
+    const cells: string[] = [];
+    for (const m of rowXml.matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
+      const attrs = m[1];
+      const body = m[2];
+      const col = columnIndex(/\br="([A-Z]+)\d+"/.exec(attrs)?.[1] ?? '');
+      const type = /\bt="([^"]+)"/.exec(attrs)?.[1];
+
+      let value = '';
+      if (type === 's') {
+        const idx = Number(/<v>([\s\S]*?)<\/v>/.exec(body)?.[1] ?? '-1');
+        value = shared[idx] ?? '';
+      } else if (type === 'inlineStr') {
+        value = decodeXmlText([...body.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((x) => x[1]).join(''));
+      } else {
+        const t = /<t[^>]*>([\s\S]*?)<\/t>/.exec(body)?.[1];
+        value = decodeXmlText(t ?? /<v>([\s\S]*?)<\/v>/.exec(body)?.[1] ?? '');
+      }
+      if (col >= 0) {
+        while (cells.length < col) cells.push('');
+        cells[col] = value;
+      } else {
+        cells.push(value);
+      }
+    }
+    if (cells.some((c) => c.trim() !== '')) grid.push(cells);
+  }
+  if (grid.length < 2) throw new HttpError(400, 'Spreadsheet has no data rows');
+  return grid;
+}
+
+/** "A" → 0, "H" → 7, "AA" → 26. Returns -1 when the reference is missing. */
+function columnIndex(ref: string): number {
+  if (!ref) return -1;
+  let n = 0;
+  for (const ch of ref) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+}
+
+function decodeXmlText(s: string): string {
+  return s
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
+    .replace(/&amp;/g, '&')
+    // The extraction uses a pipe where a non-breaking space belongs ("50|kg"). Left alone it
+    // survives into descriptions and into the search vector.
+    .replace(/\|/g, ' ')
+    .trim();
+}
 
 // ── CSV ────────────────────────────────────────────────────────────────────────────────────
 
@@ -230,13 +342,12 @@ interface ImportResult {
   declarable_total: number;
 }
 
-async function importCsv(
+async function importGrid(
   supabase: any,
-  text: string,
+  rows: string[][],
   source: Source,
   override: Partial<Record<Field, string>>,
 ): Promise<ImportResult> {
-  const rows = parseDelimited(text, detectDelimiter(text));
   if (rows.length < 2) throw new HttpError(400, 'File has no data rows');
 
   const headers = rows[0];
@@ -262,20 +373,51 @@ async function importCsv(
   let skipped = 0;
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
-    const code = normalizeCode(at(r, 'code') ?? '');
+    // The published extraction writes code and product line suffix in ONE cell: "0101210000 10".
+    // Both halves must be split BEFORE normalising: the concatenated digits are 12 long and
+    // `normalizeCode` — correctly — rejects that, so splitting afterwards would have skipped
+    // every row in the file.
+    //
+    // The suffix is not cosmetic. 80 is a declarable line; 10 is an intermediate one that exists
+    // only to carry the hierarchy and is rejected on a customs declaration. Defaulting it to 80
+    // would publish thousands of unusable codes into the picker as if they were valid.
+    // Split ONLY when the part before the trailing pair is itself a full 10-digit code, which is
+    // the published form. Without that guard a hand-spaced code — "6907 21 00 90" — loses its
+    // last pair to the suffix and silently imports as heading 6907210000.
+    const rawCode = (at(r, 'code') ?? '').trim();
+    const split = /^([0-9\s]+?)\s+(\d{2})$/.exec(rawCode);
+    const splitCodeDigits = split ? split[1].replace(/[^0-9]/g, '') : '';
+    const useSplit = splitCodeDigits.length === 10;
+    const codePart = useSplit ? split![1] : rawCode;
+    const suffixFromCode = useSplit ? split![2] : undefined;
+
+    const code = normalizeCode(codePart);
     if (!code) { skipped++; continue; }
-    const indentRaw = (at(r, 'indent') ?? '').replace(/[^0-9]/g, '');
+
+    const suffixCell = (at(r, 'product_line_suffix') ?? '').replace(/[^0-9]/g, '');
+    const suffix = suffixCell || suffixFromCode || '80';
+
+    // Indent is published as dashes ("- - -"), not a number.
+    const indentCell = (at(r, 'indent') ?? '').trim();
+    const indent = /^[-\s]+$/.test(indentCell) && indentCell
+      ? (indentCell.match(/-/g) ?? []).length
+      : (indentCell.replace(/[^0-9]/g, '') ? Number(indentCell.replace(/[^0-9]/g, '')) : null);
+
+    // One description column plus a Language column is how the extraction ships. Route by the
+    // row's own language rather than by which file we think we are reading.
+    const lang = (at(r, 'language') ?? '').trim().toUpperCase();
+    const single = at(r, 'description_en') ?? null;
+    const isGreekRow = lang === 'EL' || (lang === '' && source === 'gr_national');
     parsed.push({
       code,
-      product_line_suffix: ((at(r, 'product_line_suffix') ?? '').replace(/[^0-9]/g, '') || '80'),
-      indent: indentRaw ? Number(indentRaw) : null,
-      // A Greek extraction's single description column is Greek, not English.
-      description_en: source === 'gr_national' && cols.description_el === undefined
-        ? null
-        : (at(r, 'description_en') ?? null),
-      description_el: source === 'gr_national' && cols.description_el === undefined
-        ? (at(r, 'description_en') ?? null)
-        : (at(r, 'description_el') ?? null),
+      product_line_suffix: suffix,
+      indent,
+      description_en: cols.description_el !== undefined
+        ? single
+        : (isGreekRow ? null : single),
+      description_el: cols.description_el !== undefined
+        ? (at(r, 'description_el') ?? null)
+        : (isGreekRow ? single : null),
       national_additional_code: at(r, 'national_additional_code') ?? null,
       source,
       valid_from: parseDate(at(r, 'valid_from')),
