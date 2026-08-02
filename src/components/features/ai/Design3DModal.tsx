@@ -252,9 +252,6 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, 
           product={selectedProduct}
           isOpen={isProductModalOpen}
           onClose={handleProductModalClose}
-          categoryColor={
-            categoryColors[selectedProduct.category] || categoryColors[selectedProduct.type]
-          }
         />
       )}
     </>

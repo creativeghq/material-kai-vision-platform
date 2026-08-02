@@ -92,11 +92,6 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           onGenerateVideo={onGenerateVideo}
           onUseIn3DScene={onUseIn3DScene}
           vrGenerating={vrGenerating}
-          categoryColor={
-            selectedProduct
-              ? categoryColors[selectedProduct.category] || categoryColors[selectedProduct.type]
-              : undefined
-          }
         />
       </div>
     );

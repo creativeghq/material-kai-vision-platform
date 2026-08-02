@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Sparkles,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';

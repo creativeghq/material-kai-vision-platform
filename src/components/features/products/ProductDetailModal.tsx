@@ -18,10 +18,10 @@ import { Badge } from '@/components/core/ui/badge';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Package, Layers, ShieldCheck, Wand2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { buildTestOnRoomUrl } from '@/utils/testOnRoom';
-import { Product, getMaterialCategory, MaterialCategory } from './types';
+import { Product } from './types';
 import { formatMaterialCategory } from '@/utils/productMetadata';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,7 +53,6 @@ interface ProductDetailModalProps {
   product: Product | null;
   isOpen: boolean;
   onClose: () => void;
-  categoryColor?: string;
   onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   onGenerateVideo?: (imageUrl: string) => void;
   onUseIn3DScene?: (imageUrl: string, productName: string) => void;
@@ -199,37 +198,11 @@ const safeString = (val: unknown, fallback = ''): string => {
   return String(val);
 };
 
-// Get category-specific color theme — supports all 10 DB categories + legacy display categories
-const getCategoryTheme = (category: MaterialCategory): { primary: string; secondary: string } => {
-  const themes: Record<string, { primary: string; secondary: string }> = {
-    // DB categories (10)
-    tiles:             { primary: '#3b82f6', secondary: '#dbeafe' },
-    wood:              { primary: '#92400e', secondary: '#fef3c7' },
-    decor:             { primary: '#8b5cf6', secondary: '#ede9fe' },
-    furniture:         { primary: '#d97706', secondary: '#fef3c7' },
-    general_materials: { primary: '#6b7280', secondary: '#f3f4f6' },
-    paint_wall_decor:  { primary: '#10b981', secondary: '#d1fae5' },
-    heating:           { primary: '#ef4444', secondary: '#fee2e2' },
-    sanitary:          { primary: '#06b6d4', secondary: '#cffafe' },
-    kitchen:           { primary: '#f59e0b', secondary: '#fef3c7' },
-    lighting:          { primary: '#eab308', secondary: '#fef9c3' },
-    // Legacy display categories
-    stone:             { primary: '#6b7280', secondary: '#f3f4f6' },
-    paint:             { primary: '#10b981', secondary: '#d1fae5' },
-    fabric:            { primary: '#db2777', secondary: '#fce7f3' },
-    metal:             { primary: '#374151', secondary: '#e5e7eb' },
-    glass:             { primary: '#0891b2', secondary: '#cffafe' },
-    composite:         { primary: '#059669', secondary: '#d1fae5' },
-    other:             { primary: '#6b7280', secondary: '#f3f4f6' },
-  };
-  return themes[category] || themes.other;
-};
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product,
   isOpen,
   onClose,
-  categoryColor,
   onGenerateVR,
   onGenerateVideo,
   onUseIn3DScene,
@@ -495,9 +468,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   /** Fiscal identity is set by whoever does intake or invoicing, so it is not pricing-only. */
   const canSeeFiscal = isOwnProduct && canAny('pricing.manage', 'warehouse.manage', 'finance.manage');
 
-  const materialCategory = getMaterialCategory(product);
-  const theme = getCategoryTheme(materialCategory);
-  const effectiveColor = categoryColor || theme.primary;
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) =>
@@ -846,42 +816,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Visual Effect': extractValue(appearanceData?.visual_effect),
     'Visual Description': extractValue(appearanceData?.vision_description),
   };
-
-
-  // Pretty-print recommended_use arrays as "Wall, Floor, Shower Wall".
-  // Filters sentinels, dedups case-insensitively, sorts for stable rendering.
-  const fmtList = (v: unknown): string | undefined => {
-    if (!v) return undefined;
-    const items: string[] = Array.isArray(v)
-      ? (v as unknown[]).map(x => String(x))
-      : typeof v === 'string'
-        ? [v]
-        : [String(v)];
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const raw of items) {
-      const s = raw.replace(/_/g, ' ').trim();
-      if (!s || isSentinel(s)) continue;
-      const t = titleCaseDisplay(s);
-      const k = t.toLowerCase();
-      if (seen.has(k)) continue;
-      seen.add(k);
-      out.push(t);
-    }
-    return out.length ? out.sort().join(', ') : undefined;
-  };
-
-  // Joint width: if the schema-locked `_mm` variant is present, append "mm".
-  // Otherwise fall back to the raw field — append "mm" only when the raw
-  // value is a bare number (avoids "8 mm mm" double-suffix).
-  const formatJointWidth = (): string | undefined => {
-    const mm = extractValue(applicationData?.joint_width_mm);
-    if (mm) return `${mm} mm`;
-    const raw = extractValue(applicationData?.joint_width) || extractValue(allData?.joint_width);
-    if (!raw) return undefined;
-    return /^\d+(?:[.,]\d+)?$/.test(raw.trim()) ? `${raw.trim()} mm` : raw;
-  };
-
 
 
 

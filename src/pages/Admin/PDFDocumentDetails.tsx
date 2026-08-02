@@ -487,7 +487,7 @@ export const PDFDocumentDetails: React.FC = () => {
                                       variant="secondary"
                                       className="text-xs"
                                     >
-                                      {key}
+                                      {key}: {String(value)}
                                     </Badge>
                                   ))}
                               </div>

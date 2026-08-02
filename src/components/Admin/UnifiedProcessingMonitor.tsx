@@ -60,11 +60,6 @@ export const UnifiedProcessingMonitor: React.FC = () => {
           ? await supabase.from('document_chunks').select('*', { count: 'exact', head: true }).in('product_id', xmlProductIds)
           : { count: 0 };
 
-        const { data: xmlChunks } = xmlProductIds.length > 0
-          ? await supabase.from('document_chunks').select('id').in('product_id', xmlProductIds)
-          : { data: [] };
-
-        const xmlChunkIds = xmlChunks?.map((c: any) => c.id) || [];
         // Embeddings are 1:1 with chunks (stored in VECS, not Supabase table)
         const totalXMLEmbeddings = totalXMLChunks;
 
@@ -87,11 +82,6 @@ export const UnifiedProcessingMonitor: React.FC = () => {
           ? await supabase.from('document_chunks').select('*', { count: 'exact', head: true }).in('product_id', scrapedProductIds)
           : { count: 0 };
 
-        const { data: scrapedChunks } = scrapedProductIds.length > 0
-          ? await supabase.from('document_chunks').select('id').in('product_id', scrapedProductIds)
-          : { data: [] };
-
-        const scrapedChunkIds = scrapedChunks?.map((c: any) => c.id) || [];
         // Embeddings are 1:1 with chunks (stored in VECS, not Supabase table)
         const totalScrapedEmbeddings = totalScrapedChunks;
 

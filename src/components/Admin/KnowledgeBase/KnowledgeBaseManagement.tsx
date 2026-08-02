@@ -20,7 +20,6 @@ import { DocumentEditor } from './DocumentEditor';
 import { CategoryManager } from './CategoryManager';
 import { ProductAttachments } from './ProductAttachments';
 import { SearchInterface } from './SearchInterface';
-import { KnowledgeBaseService } from '@/services/knowledgeBaseService';
 
 export const KnowledgeBaseManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState('documents');
@@ -37,7 +36,6 @@ export const KnowledgeBaseManagement: React.FC = () => {
   });
 
   const { toast } = useToast();
-  const kbService = KnowledgeBaseService.getInstance();
 
   useEffect(() => {
     loadStats();
@@ -121,7 +119,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Documents</p>
-                <p className="text-lg font-semibold">{stats.totalDocs}</p>
+                <p className="text-lg font-semibold">{isLoading ? '—' : stats.totalDocs}</p>
               </div>
             </div>
           </div>
@@ -133,7 +131,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Categories</p>
-                <p className="text-lg font-semibold">{stats.totalCategories}</p>
+                <p className="text-lg font-semibold">{isLoading ? '—' : stats.totalCategories}</p>
               </div>
             </div>
           </div>
@@ -145,7 +143,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Product Links</p>
-                <p className="text-lg font-semibold">{stats.totalAttachments}</p>
+                <p className="text-lg font-semibold">{isLoading ? '—' : stats.totalAttachments}</p>
               </div>
             </div>
           </div>
@@ -157,7 +155,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Searches</p>
-                <p className="text-lg font-semibold">{stats.totalSearches}</p>
+                <p className="text-lg font-semibold">{isLoading ? '—' : stats.totalSearches}</p>
               </div>
             </div>
           </div>

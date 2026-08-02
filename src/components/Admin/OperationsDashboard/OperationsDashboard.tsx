@@ -23,7 +23,7 @@ import {
   BookOpen,
   KeyRound,
 } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import {
   PieChart,
@@ -79,10 +79,7 @@ import type {
   UsageAnalytics,
   AgentChatMessage,
   ApiUsageLog,
-  SubscriptionStats,
-  UserProfile,
   DataProcessingStats,
-  AIUsageLog,
   ExternalServiceUsageData,
   ResendEmailStats,
   NotificationChannelStats,
@@ -145,16 +142,6 @@ const OperationsDashboardInner: React.FC = () => {
   const [agentChatTotal, setAgentChatTotal] = useState(0);
   // Single all-time aggregate row feeding the summary tiles.
   const [agentStats, setAgentStats] = useState<AgentChatStats | null>(null);
-  const [subscriptionStats, setSubscriptionStats] = useState<SubscriptionStats>({
-    totalUsers: 0,
-    freeUsers: 0,
-    proUsers: 0,
-    totalRevenue: 0,
-    totalCreditsUsed: 0,
-  });
-  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
-  // AI model usage + Interior Design stats relocated to AI Configurations → Performance
-  // (2026-07-15). Only the credits total derived from ai_usage_logs is still used here.
   const [dataProcessingStats, setDataProcessingStats] = useState<DataProcessingStats>({
     pdf: { total: 0, completed: 0, failed: 0, processing: 0, avgProcessingTime: 0 },
     xml: { total: 0, completed: 0, failed: 0, processing: 0, totalProducts: 0 },
@@ -331,90 +318,6 @@ const OperationsDashboardInner: React.FC = () => {
         });
       }
 
-      // Fetch subscription and credits data
-      const { data: profiles, error: profilesError } = await supabase
-        .from('user_profiles')
-        .select('id, email, subscription_tier, subscription_status, credits_balance, created_at')
-        .order('created_at', { ascending: false });
-
-      if (profilesError) {
-        console.error('❌ Error fetching user profiles:', profilesError);
-        if (profilesError.message?.includes('JWT') || profilesError.message?.includes('401')) {
-          toast({
-            title: 'Session Expired',
-            description: 'Your session has expired. Please refresh the page and log in again.',
-            variant: 'destructive',
-          });
-          return;
-        }
-      } else if (profiles) {
-        setUserProfiles(profiles);
-
-        // Calculate subscription stats
-        const totalUsers = profiles.length;
-        const freeUsers = profiles.filter((p: UserProfile) => p.subscription_tier === 'free').length;
-        const proUsers = profiles.filter((p: UserProfile) => p.subscription_tier === 'pro').length;
-        const totalRevenue = proUsers * 29; // Monthly revenue (Pro only)
-
-        setSubscriptionStats({
-          totalUsers,
-          freeUsers,
-          proUsers,
-          totalRevenue,
-          totalCreditsUsed: 0, // Will be calculated from AI usage logs
-        });
-      }
-
-      // Fetch AI usage logs
-      const { data: aiLogs, error: aiLogsError } = await supabase
-        .from('ai_usage_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (aiLogsError) {
-        console.error('❌ Error fetching AI usage logs:', aiLogsError);
-        if (aiLogsError.message?.includes('JWT') || aiLogsError.message?.includes('401')) {
-          toast({
-            title: 'Session Expired',
-            description: 'Your session has expired. Please refresh the page and log in again.',
-            variant: 'destructive',
-          });
-          return;
-        }
-      } else if (aiLogs) {
-        // Also fetch agent_usage_logs (agent chat usage — stored separately by log_agent_usage RPC)
-        const { data: agentLogs } = await supabase
-          .from('agent_usage_logs')
-          .select('id, user_id, agent_type, model_name, input_tokens, output_tokens, billed_cost_usd, raw_cost_usd, credits_debited, created_at')
-          .order('created_at', { ascending: false })
-          .limit(500);
-
-        // Normalize agent_usage_logs rows to AIUsageLog shape and merge
-        const normalizedAgentLogs: AIUsageLog[] = (agentLogs || []).map((row: any) => ({
-          id: row.id,
-          user_id: row.user_id,
-          operation_type: `agent_chat:${row.agent_type || 'kai'}`,
-          model_name: row.model_name,
-          input_tokens: row.input_tokens || 0,
-          output_tokens: row.output_tokens || 0,
-          billed_cost_usd: row.billed_cost_usd || 0,
-          credits_debited: row.credits_debited || 0,
-          created_at: row.created_at,
-        }));
-
-        const combinedLogs: AIUsageLog[] = [...aiLogs, ...normalizedAgentLogs];
-        console.log(`✅ AI Usage Logs: ${aiLogs.length} from ai_usage_logs + ${normalizedAgentLogs.length} from agent_usage_logs`);
-
-        // Total credits used — the only AI-usage figure still surfaced on this
-        // dashboard (per-model breakdown moved to AI Configurations → Performance).
-        const totalCreditsUsed = combinedLogs.reduce((sum: number, log: AIUsageLog) => sum + (log.credits_debited || 0), 0);
-
-        setSubscriptionStats(prev => ({
-          ...prev,
-          totalCreditsUsed,
-        }));
-      }
 
       // Fetch Data Processing Stats (PDF, XML, Scraping)
       console.log('🔄 Fetching data processing stats...');

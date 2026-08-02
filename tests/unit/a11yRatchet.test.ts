@@ -59,36 +59,14 @@ describe('accessibility ratchet', () => {
   });
 
   /**
-   * `npm run lint --max-warnings N` and this baseline count the SAME eslint run, so N has to
-   * account for the a11y backlog or the build is red for warnings the a11y ratchet already owns.
-   * That is exactly what happened: enabling the rules as `warn` added ~408 warnings on top of a
-   * cap set at 316, and `unit-tests` went red on every commit from that day — while
-   * `npm run lint:a11y`, the gate that actually owns those warnings, was never wired into CI at
-   * all. A permanently-red gate teaches people to ignore it.
-   *
-   * So N is DERIVED, not chosen: the a11y backlog (ratcheted per-rule, here) plus the non-a11y
-   * debt below. Neither term may rise. When you fix a11y issues and regenerate the baseline, this
-   * test fails until N comes down with it — the cap cannot be left slack for new warnings to hide
-   * in, and it cannot be raised without moving one of two numbers that are each guarded.
+   * `npm run lint --max-warnings N` and this baseline count the SAME eslint run, so N is DERIVED,
+   * not chosen: the a11y backlog (ratcheted per-rule, here) plus the non-a11y debt below. Neither
+   * term may rise. Both are currently zero — the cap cannot be left slack for new warnings to
+   * hide in, and it cannot be raised without moving a number that is guarded.
    */
   it('the lint budget is the a11y baseline plus the declared non-a11y debt', () => {
-    /**
-     * Remaining `no-unused-vars` warnings, all of which need a human.
-     *
-     * 310 -> 48 on 2026-08-02: 172 unused imports deleted, 52 unused args/catch-bindings given
-     * the `_` prefix the rule sanctions, 38 dead locals removed via the TypeScript AST (only
-     * where the initializer was provably side-effect-free — `const x = doTheThing()` was left,
-     * because deleting the binding deletes the call), then 10 more removed by hand.
-     *
-     * That last batch is the point of keeping this number visible: every one of the "half a
-     * useState pair" cases turned out to be a DEAD FEATURE, not untidiness — a searchQuery
-     * threaded into a list that nothing could ever set, a viewMode whose 'list' branch had no
-     * toggle, an "Integration Tests" tab whose own button had been deleted, and a statusTags
-     * fetch firing on every mount whose result nothing read.
-     *
-     * DRIVE THIS TO ZERO. NEVER RAISE IT.
-     */
-    const NON_A11Y_DEBT = 48;
+    /** Remaining `no-unused-vars` warnings. Never raise this. */
+    const NON_A11Y_DEBT = 0;
 
     const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
       scripts: Record<string, string>;

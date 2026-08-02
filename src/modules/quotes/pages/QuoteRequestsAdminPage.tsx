@@ -196,7 +196,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
       toast({
         title: 'Success',
-        description: 'Quote created for user',
+        description: `Quote "${quote.name || quote.id.slice(0, 8)}" created`,
       });
 
       setShowCreateModal(false);

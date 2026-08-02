@@ -38,6 +38,7 @@ export interface XMLImportJob {
 interface XMLImportJobCardProps {
   job: XMLImportJob;
   onRetry?: (jobId: string) => void;
+  retrying?: boolean;
   onViewDetails?: (jobId: string) => void;
   onCancel?: (jobId: string) => void;
   onDelete?: (jobId: string) => void;
@@ -46,6 +47,7 @@ interface XMLImportJobCardProps {
 export const XMLImportJobCard: React.FC<XMLImportJobCardProps> = ({
   job,
   onRetry,
+  retrying = false,
   onViewDetails,
   onCancel,
   onDelete,
@@ -206,10 +208,11 @@ export const XMLImportJobCard: React.FC<XMLImportJobCardProps> = ({
               variant="outline"
               size="sm"
               onClick={() => onRetry(job.id)}
+              disabled={retrying}
               className="flex-1"
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
+              <RefreshCw className={`h-4 w-4 mr-2 ${retrying ? 'animate-spin' : ''}`} />
+              {retrying ? 'Retrying…' : 'Retry'}
             </Button>
           )}
 

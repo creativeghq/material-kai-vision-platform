@@ -293,6 +293,9 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                       </span>
                     </TableCell>
                     <TableCell>
+                      <span className="text-xs text-muted-foreground">{manufacturer}</span>
+                    </TableCell>
+                    <TableCell>
                       {product.text_embedding_1024 ? (
                         <span className="text-xs text-emerald-600 dark:text-emerald-400">Embedded</span>
                       ) : (

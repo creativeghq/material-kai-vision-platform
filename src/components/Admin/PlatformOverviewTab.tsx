@@ -108,7 +108,6 @@ export function PlatformOverviewTab() {
   const [creditKpis2, setCreditKpis2] = useState({ totalCostUsd: 0, uniqueUsers: 0 });
 
   // ── VR Worlds ─────────────────────────────────────────────────
-  const [vrTrend, setVrTrend] = useState<{ week: string; count: number }[]>([]);
   const [vrQualitySplit, setVrQualitySplit] = useState<{ name: string; value: number }[]>([]);
   const [vrStatusTrend, setVrStatusTrend] = useState<{ week: string; completed: number; failed: number }[]>([]);
   const [vrTotalCredits, setVrTotalCredits] = useState(0);
@@ -131,7 +130,6 @@ export function PlatformOverviewTab() {
   // ── AI Agents ─────────────────────────────────────────────────
   const [agentsByType, setAgentsByType] = useState<{ week: string; [key: string]: number | string }[]>([]);
   const [topAgentTypes, setTopAgentTypes] = useState<string[]>([]);
-  const [agentTrend, setAgentTrend] = useState<{ week: string; count: number }[]>([]);
   const [agentOutcomePie, setAgentOutcomePie] = useState<{ name: string; value: number }[]>([]);
   const [agentSuccessTrend, setAgentSuccessTrend] = useState<{ week: string; completed: number; failed: number }[]>([]);
   const [agentAvgTime, setAgentAvgTime] = useState<{ type: string; avgMs: number }[]>([]);
@@ -140,7 +138,6 @@ export function PlatformOverviewTab() {
   // ── Community & Social ────────────────────────────────────────
   const [reviewVelocity, setReviewVelocity] = useState<{ week: string; count: number; avgRating: number }[]>([]);
   const [creatorGrowth, setCreatorGrowth] = useState<{ week: string; suppliers: number; architects_designers: number }[]>([]);
-  const [socialEngagement, setSocialEngagement] = useState<{ week: string; hires: number; reviews: number; boards: number; follows: number }[]>([]);
   const [moodboardActivity, setMoodboardActivity] = useState<{ week: string; boards: number; items: number }[]>([]);
   const [followsGrowth, setFollowsGrowth] = useState<{ week: string; count: number }[]>([]);
   const [totalFollowers, setTotalFollowers] = useState(0);
@@ -267,7 +264,6 @@ export function PlatformOverviewTab() {
     setCreditKpis2({ totalCostUsd:18.40, uniqueUsers:28 });
 
     // VR Worlds
-    setVrTrend(wks.map((week,i) => ({ week, count: b[i] })));
     setVrQualitySplit([{name:'mini (50cr)',value:52},{name:'plus (200cr)',value:14}]);
     setVrStatusTrend(wks.map((week,i) => ({ week, completed: b[i], failed: Math.max(0,Math.floor(b[i]*0.08)) })));
     setVrTotalCredits(5400);
@@ -298,7 +294,6 @@ export function PlatformOverviewTab() {
 
     // AI Agents
     const arB=[8,12,10,15,14,18,16,21,19,24,22,27];
-    setAgentTrend(wks.map((week,i) => ({ week, count:arB[i] })));
     setAgentsByType(wks.map((week,i) => ({
       week, kai:Math.floor(arB[i]*0.5), 'product-enrichment':Math.floor(arB[i]*0.3), 'material-tagger':Math.floor(arB[i]*0.2),
     })));
@@ -314,7 +309,6 @@ export function PlatformOverviewTab() {
     const rB=[8,12,10,15,14,18,16,21,19,24,22,27];
     const bsB=[5,8,7,10,9,12,11,14,13,16,15,18];
     const itB=[15,24,20,30,27,35,32,42,38,48,44,52];
-    const hB=[3,5,4,7,6,8,9,7,11,9,12,14];
     const fB=[12,18,15,22,20,25,23,28,26,31,29,34];
     setMoodboardActivity(wks.map((week,i) => ({ week, boards:bsB[i], items:itB[i] })));
     setReviewVelocity(wks.map((week,i) => ({ week, count:rB[i], avgRating:4.1+(i%3)*0.1 })));
@@ -323,7 +317,6 @@ export function PlatformOverviewTab() {
       suppliers: Math.floor(f[i]*0.37),
       architects_designers: Math.floor(f[i]*0.63),
     })));
-    setSocialEngagement(wks.map((week,i) => ({ week, hires:hB[i], reviews:rB[i], boards:bsB[i], follows:fB[i] })));
     setFollowsGrowth(wks.map((week,i) => ({ week, count:fB[i] })));
     setTotalFollowers(342);
     setReviewRatingDist([{rating:'1★',count:4},{rating:'2★',count:8},{rating:'3★',count:18},{rating:'4★',count:52},{rating:'5★',count:45}]);
@@ -451,12 +444,6 @@ export function PlatformOverviewTab() {
       setHireMeServices(Array.from(hireSvcMap.entries()).sort((a, b) => b[1] - a[1]).map(([service, count]) => ({ service, count })));
       setHireMeFunnel(Array.from(hireFunnelMap.entries()).map(([status, count]) => ({ status, count })));
 
-      // Engagement mix
-      const engMap = new Map<string, { hires: number; reviews: number; boards: number; follows: number }>(wks12.map(w => [w, { hires: 0, reviews: 0, boards: 0, follows: 0 }]));
-      (hireMe ?? []).forEach((h: any) => { const l = weekLabel(new Date(h.created_at)); if (engMap.has(l)) engMap.get(l)!.hires++; });
-      (moodboards ?? []).forEach((b: any) => { const l = weekLabel(new Date(b.created_at)); if (engMap.has(l)) engMap.get(l)!.boards++; });
-      setSocialEngagement(Array.from(engMap.entries()).map(([week, d]) => ({ week, ...d })));
-
       // Moodboard activity
       const mbMap = new Map<string, { boards: number; items: number }>(wks12.map(w => [w, { boards: 0, items: 0 }]));
       (moodboards ?? []).forEach((b: any) => { const l = weekLabel(new Date(b.created_at)); if (mbMap.has(l)) mbMap.get(l)!.boards++; });
@@ -478,19 +465,16 @@ export function PlatformOverviewTab() {
       setProjectKpis({ total: allProjects.length, active: activeProjects.length, withDeadline, budgetSumUsd });
 
       // VR worlds
-      const vrMap = new Map<string, number>(wks12.map(w => [w, 0]));
       const vrQMap = new Map<string, number>();
       const vrStatusMap = new Map<string, { completed: number; failed: number }>(wks12.map(w => [w, { completed: 0, failed: 0 }]));
       let vrCreditsTotal = 0;
       (vrWorlds ?? []).forEach((v: any) => {
         const l = weekLabel(new Date(v.created_at));
-        if (vrMap.has(l)) vrMap.set(l, (vrMap.get(l) ?? 0) + 1);
         const q = v.model ?? ((v.credits_charged ?? 0) >= 200 ? 'plus (200cr)' : 'mini (50cr)');
         vrQMap.set(q, (vrQMap.get(q) ?? 0) + 1);
         if (vrStatusMap.has(l)) { v.status === 'completed' ? vrStatusMap.get(l)!.completed++ : v.status === 'failed' && vrStatusMap.get(l)!.failed++; }
         vrCreditsTotal += v.credits_charged ?? 0;
       });
-      setVrTrend(Array.from(vrMap.entries()).map(([week, count]) => ({ week, count })));
       setVrQualitySplit(Array.from(vrQMap.entries()).map(([name, value]) => ({ name, value })));
       setVrStatusTrend(Array.from(vrStatusMap.entries()).map(([week, d]) => ({ week, ...d })));
       setVrTotalCredits(vrCreditsTotal);
@@ -503,13 +487,11 @@ export function PlatformOverviewTab() {
       const agTimeMap = new Map<string, { sum: number; count: number }>();
       const agCredMap = new Map<string, number>();
       const allAgTypes = new Set<string>();
-      const agTrendMap = new Map<string, number>(wks12.map(w => [w, 0]));
       (agentRuns ?? []).forEach((ar: any) => {
         const agType = (ar.background_agents as any)?.agent_type ?? 'unknown';
         allAgTypes.add(agType);
         const l = weekLabel(new Date(ar.created_at));
         if (agTypeWeekMap.has(l)) { const m = agTypeWeekMap.get(l)!; m.set(agType, (m.get(agType) ?? 0) + 1); }
-        if (agTrendMap.has(l)) agTrendMap.set(l, (agTrendMap.get(l) ?? 0) + 1);
         agStatusMap.set(ar.status, (agStatusMap.get(ar.status) ?? 0) + 1);
         if (agSuccMap.has(l)) { ar.status === 'completed' ? agSuccMap.get(l)!.completed++ : ['failed','timed_out'].includes(ar.status) && agSuccMap.get(l)!.failed++; }
         if (ar.execution_time_ms) { const e = agTimeMap.get(agType) ?? { sum: 0, count: 0 }; e.sum += ar.execution_time_ms; e.count++; agTimeMap.set(agType, e); }
@@ -522,7 +504,6 @@ export function PlatformOverviewTab() {
         agTypesArr.forEach(t => { entry[t] = byType.get(t) ?? 0; });
         return entry;
       }));
-      setAgentTrend(Array.from(agTrendMap.entries()).map(([week, count]) => ({ week, count })));
       setAgentOutcomePie(Array.from(agStatusMap.entries()).map(([name, value]) => ({ name, value })));
       setAgentSuccessTrend(Array.from(agSuccMap.entries()).map(([week, d]) => ({ week, ...d })));
       setAgentAvgTime(Array.from(agTimeMap.entries()).map(([type, d]) => ({ type, avgMs: Math.round(d.sum / d.count) })));

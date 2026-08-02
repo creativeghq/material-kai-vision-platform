@@ -250,6 +250,7 @@ const ImportHistoryTab: React.FC = () => {
           key={job.id}
           job={job as XMLImportJob}
           onRetry={handleManualRerun}
+          retrying={isRerunning === job.id}
           onViewDetails={(jobId) => {
             navigate(`/admin/async-queue-monitor?jobId=${jobId}`);
           }}

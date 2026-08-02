@@ -11,7 +11,6 @@ import {
   FileText,
   Layers,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';

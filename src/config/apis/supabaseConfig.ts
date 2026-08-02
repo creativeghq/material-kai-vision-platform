@@ -9,14 +9,6 @@ import { z } from 'zod';
 
 import { SupabaseApiConfig } from '../apiConfig';
 
-// Common schemas for Supabase functions
-const commonErrorSchema = z.object({
-  error: z.string(),
-  details: z.string().optional(),
-  hint: z.string().optional(),
-  code: z.string().optional(),
-});
-
 // CrewAI 3D Generation function schema - UX validation only
 // Schema matches the actual data structure sent by ApiIntegrationService
 const crewai3DGenerationInputSchema = z.object({

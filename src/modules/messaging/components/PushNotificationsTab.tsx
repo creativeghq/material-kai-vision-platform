@@ -221,9 +221,14 @@ export const PushNotificationsTab: React.FC = () => {
 
       if (error) throw await edgeError(error);
 
+      const sent = typeof data?.success === 'number' ? data.success : subs.length;
+      const failed = typeof data?.failed === 'number' ? data.failed : 0;
       toast({
-        title: 'Test Notification Sent',
-        description: `Sent to ${subs.length} active subscription(s)`,
+        title: failed > 0 ? 'Test Notification Partially Sent' : 'Test Notification Sent',
+        description: failed > 0
+          ? `Delivered to ${sent} of ${subs.length} subscription(s); ${failed} failed`
+          : `Sent to ${sent} active subscription(s)`,
+        variant: failed > 0 ? 'destructive' : undefined,
       });
 
       setTestDialogOpen(false);

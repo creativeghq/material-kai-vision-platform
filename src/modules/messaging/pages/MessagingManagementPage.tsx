@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Send, FileText, BarChart3, Settings, Users, TestTube, Bell } from 'lucide-react';
+import { MessageCircle, Send, FileText, BarChart3, Settings, Users, TestTube, Bell, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -99,7 +99,12 @@ export const MessagingManagement: React.FC = () => {
       {/* Main Content */}
       <div className="p-3 sm:p-6 space-y-6">
         {/* Header Actions */}
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end items-center gap-2">
+          {loading && (
+            <span className="flex items-center gap-2 text-xs text-muted-foreground mr-auto">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading messaging data…
+            </span>
+          )}
           <Button onClick={handleTestMessage}>
             <TestTube className="mr-2 h-4 w-4" />
             Send test message

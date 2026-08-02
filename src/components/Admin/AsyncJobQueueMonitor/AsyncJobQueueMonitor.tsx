@@ -81,7 +81,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [cancellingJob, setCancellingJob] = useState<string | null>(null);
   const [clearingQueue, setClearingQueue] = useState(false);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
-  const [expandedStages, setExpandedStages] = useState<Set<number>>(new Set());
   const [selectedTab, setSelectedTab] = useState<'all' | 'pdf_processing' | 'web_scraping' | 'xml_import'>('all');
   // Each tab keeps its own page so switching tabs doesn't lose your place in the others.
   const [allPage, setAllPage] = useState(1);
@@ -3722,6 +3721,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         label="products"
                       />
                       </>
+                    ) : loadingProducts ? (
+                      <div className="p-12 text-center text-muted-foreground">
+                        <RefreshCw className="h-12 w-12 mx-auto mb-3 opacity-20 animate-spin" />
+                        <p className="text-sm font-medium">Loading products…</p>
+                      </div>
                     ) : (
                       <div className="p-12 text-center text-muted-foreground">
                         <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
@@ -4202,9 +4206,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               {(() => {
 
                 // Calculate costs from checkpoints and metadata
-                const aiTracking = selectedJob?.metadata?.ai_tracking || {};
-                const stageSummary = aiTracking.ai_stage_summary || {};
-
                 // Estimate costs based on usage
                 const calculateModelCosts = () => {
                   const costs: Record<string, {
@@ -4217,18 +4218,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     description: string;
                   }> = {};
 
-                  // Get data from checkpoints for more accurate metrics
-                  const warmupCheckpoint = jobCheckpoints.find(cp => cp.stage === 'warmup_complete');
-                  const discoveryCheckpoint = jobCheckpoints.find(cp => cp.stage === 'products_detected');
                   const productsCreated = selectedJob?.metadata?.result?.products_discovered || productProgress.length || 0;
                   const chunksCreated = selectedJob?.metadata?.chunks_created || 0;
                   const imagesProcessed = selectedJob?.metadata?.images_stored || selectedJob?.metadata?.result?.images_processed || 0;
                   const totalPages = selectedJob?.metadata?.total_pages || selectedJob?.metadata?.extracted_pages || 0;
-
-                  // Calculate processing time
-                  const startTime = selectedJob?.started_at ? new Date(selectedJob.started_at).getTime() : 0;
-                  const endTime = selectedJob?.completed_at ? new Date(selectedJob.completed_at).getTime() : Date.now();
-                  const totalTimeSeconds = (endTime - startTime) / 1000;
 
                   // Vision/Discovery runs on Claude Opus 4.8 and is captured under
                   // the claude-opus row of `model_versions` aggregated below

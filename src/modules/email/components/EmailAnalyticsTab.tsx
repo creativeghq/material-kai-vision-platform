@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Mail, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Mail, MailOpen, MousePointerClick, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -15,9 +15,13 @@ export const EmailAnalyticsTab: React.FC = () => {
     totalDelivered: 0,
     totalBounced: 0,
     totalComplained: 0,
+    totalOpened: 0,
+    totalClicked: 0,
     deliveryRate: 0,
     bounceRate: 0,
     complaintRate: 0,
+    openRate: 0,
+    clickRate: 0,
   });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -54,9 +58,14 @@ export const EmailAnalyticsTab: React.FC = () => {
         totalDelivered,
         totalBounced,
         totalComplained,
+        totalOpened,
+        totalClicked,
         deliveryRate: totalSent > 0 ? parseFloat(((totalDelivered / totalSent) * 100).toFixed(2)) : 0,
         bounceRate: totalSent > 0 ? parseFloat(((totalBounced / totalSent) * 100).toFixed(2)) : 0,
         complaintRate: totalSent > 0 ? parseFloat(((totalComplained / totalSent) * 100).toFixed(2)) : 0,
+        // Opens and clicks are measured against delivered mail, not everything submitted.
+        openRate: totalDelivered > 0 ? parseFloat(((totalOpened / totalDelivered) * 100).toFixed(2)) : 0,
+        clickRate: totalDelivered > 0 ? parseFloat(((totalClicked / totalDelivered) * 100).toFixed(2)) : 0,
       });
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -79,6 +88,8 @@ export const EmailAnalyticsTab: React.FC = () => {
 
   const rateData = [
     { name: 'Delivery Rate', value: analytics.deliveryRate, color: '#10b981' },
+    { name: 'Open Rate', value: analytics.openRate, color: '#3b82f6' },
+    { name: 'Click Rate', value: analytics.clickRate, color: '#8b5cf6' },
     { name: 'Bounce Rate', value: analytics.bounceRate, color: '#ef4444' },
     { name: 'Complaint Rate', value: analytics.complaintRate, color: '#f59e0b' },
   ];
@@ -96,7 +107,7 @@ export const EmailAnalyticsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
         {/* Delivery Rate Card */}
         <div className="dashboard-card">
           <div className="flex items-center justify-between mb-3">
@@ -182,6 +193,58 @@ export const EmailAnalyticsTab: React.FC = () => {
             {analytics.complaintRate > 0.1 && (
               <p className="text-xs text-red-500 mt-1">⚠️ High complaint rate</p>
             )}
+          </div>
+        </div>
+
+        {/* Open Rate Card */}
+        <div className="dashboard-card">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
+                }}
+              >
+                <MailOpen className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Open Rate</p>
+            <p className="text-2xl font-bold">{analytics.openRate.toFixed(2)}%</p>
+            <p className="text-xs text-muted-foreground">
+              {analytics.totalOpened.toLocaleString()} of {analytics.totalDelivered.toLocaleString()} delivered
+            </p>
+          </div>
+        </div>
+
+        {/* Click Rate Card */}
+        <div className="dashboard-card">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
+                }}
+              >
+                <MousePointerClick className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Click Rate</p>
+            <p className="text-2xl font-bold">{analytics.clickRate.toFixed(2)}%</p>
+            <p className="text-xs text-muted-foreground">
+              {analytics.totalClicked.toLocaleString()} of {analytics.totalDelivered.toLocaleString()} delivered
+            </p>
           </div>
         </div>
       </div>

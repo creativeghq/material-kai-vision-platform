@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { edgeErrorMessage } from '@/utils/edgeError';
-import { MoreVertical, Eye, CreditCard, FileText, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download } from 'lucide-react';
+import { MoreVertical, Eye, CreditCard, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,

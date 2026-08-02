@@ -6,7 +6,6 @@
  * 2. Sentry (for advanced error tracking)
  */
 
-import * as Sentry from '@sentry/react';
 import { logger } from '@/services/logger.service';
 
 /**

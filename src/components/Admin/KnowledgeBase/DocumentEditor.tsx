@@ -42,15 +42,12 @@ import {
   KBDocument,
   KBCategory,
   KBFaqItem,
-  KnowledgeBaseService,
   PRICE_DOC_TYPE_LABELS,
   PriceDocType,
   parseSupplierCostListDoc,
 } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 import { slugifyKbTitle } from '@/utils/kbSlug';
-
-const knowledgeBaseService = KnowledgeBaseService.getInstance();
 
 // Agents that consume the Knowledge Base via agent KB search. Used by the
 // per-doc "Agent access" allow-list. Empty selection = all agents (default).
@@ -336,8 +333,9 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           }}
         >
           <DialogHeader>
-            <DialogTitle className="font-bold">
+            <DialogTitle className="font-bold flex items-center gap-2">
               {documentId ? 'Edit Document' : 'Create New Document'}
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             </DialogTitle>
           </DialogHeader>
         </div>
@@ -857,7 +855,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
               <Button variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={isSaving}>
+              <Button onClick={handleSave} disabled={isSaving || isLoading}>
                 {isSaving ? (
                   <>Saving...</>
                 ) : (

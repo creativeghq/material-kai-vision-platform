@@ -42,7 +42,6 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
   // ── Core data (both modes)
   const [kpis, setKpis] = useState({ activeDemandSignals: 0, topDemandedMaterial: '—', topCategory: '—', totalCategorySaves: 0, topBuyerType: '—' });
   const [topDemands, setTopDemands] = useState<{ name: string; mentions: number; saves: number; in3d: number; momentum: string }[]>([]);
-  const [trendingAttributes, setTrendingAttributes] = useState<{ attribute: string; count: number }[]>([]);
   const [discoveryChannels, setDiscoveryChannels] = useState<{ name: string; value: number }[]>([]);
   const [topMoodboardItems, setTopMoodboardItems] = useState<{ name: string; category: string; materialType?: string; boardCount: number }[]>([]);
   const [topQuotedItems, setTopQuotedItems] = useState<{ name: string; category: string; materialType?: string; quoteCount: number; addedFrom: string }[]>([]);
@@ -150,14 +149,6 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
       { name: 'Travertine Stone', mentions: 35, saves: 18, in3d: 8, momentum: 'cool' },
       { name: 'Smoked Glass', mentions: 28, saves: 15, in3d: 4, momentum: 'cool' },
       { name: 'Terrazzo', mentions: 22, saves: 19, in3d: 6, momentum: 'cool' },
-    ]);
-    setTrendingAttributes([
-      { attribute: 'natural', count: 485 }, { attribute: 'matte finish', count: 362 },
-      { attribute: 'sustainable', count: 318 }, { attribute: 'textured', count: 275 },
-      { attribute: 'warm tones', count: 241 }, { attribute: 'recycled', count: 198 },
-      { attribute: 'handcrafted', count: 165 }, { attribute: 'organic', count: 142 },
-      { attribute: 'minimalist', count: 128 }, { attribute: 'earthy palette', count: 105 },
-      { attribute: 'bold pattern', count: 88 }, { attribute: 'translucent', count: 72 },
     ]);
     setDiscoveryChannels([
       { name: 'Search', value: 45 }, { name: 'AI Agent', value: 28 },
@@ -387,14 +378,6 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
         }));
         void now;
         setTopDemands(demands);
-
-        // Trending attributes from search intent
-        const attrCount = new Map<string, number>();
-        (popularSearches ?? []).forEach((ps: any) => {
-          const mentions: string[] = ps.all_material_mentions ?? [];
-          mentions.forEach((m: string) => { if (m) attrCount.set(m, (attrCount.get(m) ?? 0) + (ps.search_count ?? 1)); });
-        });
-        setTrendingAttributes(Array.from(attrCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([attribute, count]) => ({ attribute, count })));
 
         // Metadata attribute aggregation from moodboard product metadata (for attribute picker)
         const skipKeys = new Set(['factory_name', 'created_at', 'updated_at', 'id', 'image_url', 'url', 'description', 'category', 'name']);
@@ -694,12 +677,10 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           { data: mbItemsRaw },
           { data: qItemsRaw },
           { data: demandData },
-          { data: popularSearches },
         ] = await Promise.all([
           supabase.from('moodboard_items').select('moodboard_id, material_id, created_at, products(name, metadata)').in('material_id', effectiveIds).limit(1000),
           supabase.from('quote_items').select('quote_id, product_id, added_from, products(name, metadata)').in('product_id', effectiveIds).limit(500),
           supabase.from('material_demand_analytics').select('material_name, mention_count, times_saved, times_used_in_3d, last_requested').order('mention_count', { ascending: false }).limit(30),
-          supabase.from('popular_searches').select('all_material_mentions, search_count').order('search_count', { ascending: false }).limit(30),
         ]);
 
         const hasRealData = (mbItemsRaw ?? []).length > 0 || (qItemsRaw ?? []).length > 0;
@@ -715,17 +696,11 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           in3d: d.times_used_in_3d ?? 0, momentum: getMomentum(d.last_requested ?? null),
         }));
 
-        // For products not in demand analytics, fill from moodboard/quote activity
         const mbCount = new Map<string, number>();
         const qCount = new Map<string, number>();
         (mbItemsRaw ?? []).forEach((i: any) => mbCount.set(i.material_id, (mbCount.get(i.material_id) ?? 0) + 1));
         (qItemsRaw ?? []).forEach((i: any) => qCount.set(i.product_id, (qCount.get(i.product_id) ?? 0) + 1));
         const pNameMap = new Map<string, string>((factoryProducts ?? []).map((p) => [String(p.id), String(p.name ?? '').slice(0, 35)]));
-        const demandNames = new Set(factoryDemands.map((d) => d.name.toLowerCase()));
-        const notInDemand = ids
-          .filter((id) => { const n = (pNameMap.get(id) ?? '').toLowerCase(); return !demandNames.has(n) && ((mbCount.get(id) ?? 0) + (qCount.get(id) ?? 0)) > 0; })
-          .map((id) => ({ name: pNameMap.get(id) ?? id, mentions: 0, saves: mbCount.get(id) ?? 0, in3d: 0, momentum: 'cool' }))
-          .sort((a, b) => b.saves - a.saves).slice(0, 5);
         // B3: Buyer type (factory-scoped → factoryBuyerTypeData)
         let buyerArr: { type: string; saves: number; quotes: number }[] = [];
         try {

@@ -6,7 +6,6 @@
  * invoice + fiscal-submit + payment + cashier-shift (X/Z) machinery.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import {
   Loader2, Trash2, Search, Printer, CheckCircle2, Wrench, Package,
   Delete, User, Wifi, CreditCard, ScanLine, X as XIcon, Plus, Minus,
@@ -95,7 +94,6 @@ const Row: React.FC<{ label: string; value: string; muted?: boolean; danger?: bo
 
 const PosPage: React.FC = () => {
   const { toast } = useToast();
-  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
 

@@ -58,7 +58,6 @@ export const ProjectPickerInline: React.FC<ProjectPickerInlineProps> = ({
   }, [projectId, hideRoomPicker]);
 
   const selected = projects.find(p => p.id === projectId);
-  const selectedRoom = rooms.find(r => r.id === roomId);
 
   return (
     <div className="space-y-2">

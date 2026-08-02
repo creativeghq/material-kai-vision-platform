@@ -21,7 +21,6 @@ import { getManufacturer } from '@/utils/productMetadata';
 // ─────────────────────────────────────────────────────────────
 export const MyFactoryTab = function MyFactoryTab({ factoryName, userId, tier = 'free' }: { factoryName: string; userId: string; tier?: 'free' | 'pro' | 'enterprise' }) {
   const isPro = tier === 'pro' || tier === 'enterprise';
-  const isEnterprise = tier === 'enterprise';
   const [loading, setLoading] = useState(true);
   const [productIds, setProductIds] = useState<string[]>([]);
   const [moodboardSaves, setMoodboardSaves] = useState<{ week: string; saves: number }[]>([]);
@@ -373,8 +372,6 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId, tier = 
               .contains('metadata', { category: cat })
               .limit(500);
 
-            // Count saves per factory in this category
-            const factorySaves = new Map<string, number>();
             const catProductIds = (catProducts ?? []).map(p => p.id);
 
             if (catProductIds.length > 0) {

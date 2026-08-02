@@ -68,7 +68,6 @@ function AppointmentDetailDrawer({
   onClose: () => void;
   onUpdated: () => void;
 }) {
-  const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [notes, setNotes] = useState('');
