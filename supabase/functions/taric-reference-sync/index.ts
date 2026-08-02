@@ -214,13 +214,52 @@ const DEFAULT_LANGUAGE = 'EN';
  * "error reading a body from connection" the moment the CIRCABC listing endpoint redirected.
  * Neither is right on its own.
  */
+/**
+ * Drain a response body through the stream reader rather than `.text()` / `.arrayBuffer()`.
+ *
+ * The edge runtime throws Deno's opaque "error reading a body from connection" on CIRCABC's
+ * chunked listing response when the convenience methods are used — the identical fetch succeeds
+ * in stock Deno, so this is a runtime quirk, not a server one. Pulling the chunks manually works.
+ */
+async function readBodyBytes(res: Response, whatFor: string): Promise<Uint8Array> {
+  if (!res.body) throw new HttpError(502, `${whatFor}: response had no body (status ${res.status})`);
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = res.body.getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > MAX_CONTENT_BYTES) {
+          throw new HttpError(413, `${whatFor}: larger than 40 MB`);
+        }
+        chunks.push(value);
+      }
+    }
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    throw new HttpError(
+      502,
+      `${whatFor}: could not read the body (status ${res.status}): ${(err as Error)?.message ?? 'unknown'}`,
+    );
+  } finally {
+    reader.releaseLock();
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) { out.set(c, at); at += c.byteLength; }
+  return out;
+}
+
 async function fetchGuarded(rawUrl: string, accept?: string): Promise<Response> {
   let target = rawUrl;
   for (let hop = 0; hop <= 3; hop++) {
     const safe = await assertSafeUrl(target, { allowSchemes: ['https:'] });
     const res = await fetch(safe, {
       redirect: 'manual',
-      headers: accept ? { Accept: accept } : undefined,
+      headers: accept ? { Accept: accept, 'Accept-Encoding': 'identity' } : { 'Accept-Encoding': 'identity' },
     });
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get('location');
@@ -238,17 +277,7 @@ async function fetchGuarded(rawUrl: string, accept?: string): Promise<Response> 
 
 async function fetchBinary(rawUrl: string): Promise<Uint8Array> {
   const res = await fetchGuarded(rawUrl);
-  let buf: ArrayBuffer;
-  try {
-    buf = await res.arrayBuffer();
-  } catch (err) {
-    throw new HttpError(502, `Could not read ${rawUrl}: ${(err as Error)?.message ?? 'unknown'}`);
-  }
-  const bytes = new Uint8Array(buf);
-  if (bytes.byteLength > MAX_CONTENT_BYTES) {
-    throw new HttpError(413, 'TARIC file is larger than 40 MB — import it by chapter');
-  }
-  return bytes;
+  return await readBodyBytes(res, `Download ${rawUrl}`);
 }
 
 interface CircabcNode {
@@ -271,16 +300,9 @@ async function circabcChildren(nodeId: string): Promise<CircabcNode[]> {
   // drain a chunked body through the JSON path with Deno's opaque "error reading a body from
   // connection" — a message that names neither the URL nor the stage, and cost several deploys
   // to localise. Buffering the bytes first works, and any future failure now says where.
-  let raw: string;
-  try {
-    raw = await res.text();
-  } catch (err) {
-    throw new HttpError(
-      502,
-      `Could not read the CIRCABC listing for ${nodeId} (status ${res.status}): ` +
-      `${(err as Error)?.message ?? 'unknown'}`,
-    );
-  }
+  const raw = new TextDecoder().decode(
+    await readBodyBytes(res, `CIRCABC listing for ${nodeId}`),
+  );
 
   let body: unknown;
   try {
