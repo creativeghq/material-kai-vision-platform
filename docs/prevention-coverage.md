@@ -67,6 +67,18 @@ from the day it shipped.
 - **Note:** the **<5%** success-rate threshold matters. An exact-zero test reported this platform clean while two endpoints sat at 0.8% and 4.5%.
 - **Blind spot:** `ops.silent_zero` probes are hardcoded (deliberately — admin-editable SQL run by a SECURITY DEFINER function would be a privilege-escalation surface). A new metric gets no probe until someone writes a migration.
 
+### 4c. Queue that never drains — items enqueued, nothing consuming them
+The `messaging-processor` cron sat `active:false` and nothing noticed. `email_logs` held 134
+`failed` / 2 `queued` / 1 `delivered` while the Email Analytics dashboard read a **0% bounce
+rate**, because nothing writes `email_analytics` at all — an operator watching that dashboard
+would have concluded email was healthy during a total outage.
+
+- **Guarded by:** `ops.unsent_queue_backlog` over `email_logs`, `messaging_logs`, `campaign_recipients`, `background_jobs`
+- **Proven to fire:** 2026-08-02 — and it fired on **live production data** the moment it was created: `email_logs`, 123 failures, 0 successes, 100%, last success 2026-07-15. That outage is real and was unreported. The `stuck_backlog` branch was watched separately, by planting six 2-day-old pending jobs inside a rolled-back transaction.
+- **Why two branches:** `stuck_backlog` measures queue *depth*; `delivery_collapse` measures *outcome*. A fast-failing queue never accumulates depth, so a depth check alone is blind to exactly the shape that actually happened here.
+- **Deliberately not auto-healed:** re-queueing a message whose failure cause is unknown risks duplicate sends to real recipients.
+- **Blind spot:** the status vocabularies are hardcoded per table. A queue that invents a new status string lands in none of the three buckets and is silently under-counted.
+
 ### 4b. Resume gap — a partial run recorded as a finished one
 A worker dies partway through a stage. The rows it managed to write are non-zero, so the resume
 path reads "already done" and short-circuits the stage on every future run — the product stays
@@ -85,8 +97,13 @@ Any `total`, `status` or count stored alongside the data it summarises.
 - **Blind spot:** only finance quantities. A cached count anywhere else has no drift check.
 
 ### 6. Money without currency — an amount compared or summed across currencies
-- **Guarded by:** nothing yet. **#309 item 1, open.**
-- **Blind spot:** total.
+`AgingRow` carried no currency field, so AR/AP totalled every row as EUR whatever the document
+actually said.
+
+- **Guarded by:** `ops.money_without_currency` — three branches: a quote total with no currency; a payment settling a document in a *different* currency at an absent or identity `fx_rate`; a workspace holding open balances in more than one currency.
+- **Proven to fire:** 2026-08-02 — all three branches watched, each inside a transaction that was rolled back: nulled a quote's currency, flipped one open payable to USD, set a cross-currency allocation to `fx_rate = 1`. Verified afterwards that nothing survived the rollbacks.
+- **The first version of this probe was wrong, and that is worth recording.** It checked `currency IS NULL` across six money tables. **Five of the six columns are `NOT NULL`**, so five sixths of it could never fire — it would have sat in this table looking like coverage. Worse, NULL was the wrong thing to look for at all: those columns are `NOT NULL DEFAULT 'EUR'`, so a document created without an explicit currency does not arrive NULL and get noticed — **it arrives silently, confidently EUR.** That default *is* the AgingRow bug one level down, and no NULL check can ever see it. Caught only because step 2 below forced an attempt to make it fail.
+- **Blind spot:** the `DEFAULT 'EUR'` itself. Nothing distinguishes "the user chose EUR" from "nobody chose anything", so a wrong single-currency figure stays invisible. Closing that needs a nullable column and an explicit choice at write time — a schema change, not a probe.
 
 ### 7. Direction-blind roll-up — a sum that ignores in/out
 Closely related to shape 1, but at the aggregate rather than the row.
@@ -108,20 +125,21 @@ Closely related to shape 1, but at the aggregate rather than the row.
 | `npm run lint:a11y` | CI | jsx-a11y, per-rule ratchet | partly — [tests/unit/a11yRatchet.test.ts](../tests/unit/a11yRatchet.test.ts) fails if a rule returns to `'off'` |
 | `npm run lint:tenancy` | CI | invariant 1, two-doors | **yes** — self-test runs before every scan |
 | `ops.silent_zero` | nightly | shape 4 | no |
+| `ops.money_without_currency` | nightly | shape 6 | no — but all three branches were watched to fire before shipping |
+| `ops.unsent_queue_backlog` | nightly | shape 4c | no — but it fired on real production data on introduction |
 | `pdf.product_resume_incomplete` | nightly | shape 4b | no — but it was watched to fire on a planted marker before shipping |
 
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
-what it found. Three of eight qualify. That is the gap.
+what it found. Three of eleven qualify. That is the gap.
 
 ---
 
 ## Known gaps, in priority order
 
-1. **Shape 6 (money without currency)** — no mechanism at all. #309 item 1.
-2. **Shape 3 (dead input)** — covered only for agent toolkits. The broadest untested surface.
-3. **Semgrep rules cannot prove they match.** The ruleset test verifies patterns *parse*; it cannot verify they *fire*. Every rule in the table at the top of this file parsed fine. Closing this means fixture files a rule must match, scanned in CI — the same trick `check-tenancy-parity.mjs` already uses.
-4. **Shapes 5 and 7 are finance-only.** Both rules generalise; neither mechanism does.
-5. **41 files partially unparsed by semgrep** — its TSX parser chokes on raw `&` in JSX text (`&mode=smart`, `& business platform`) and on `export type *`. It skips the region and scans the rest, so coverage is reduced, not absent. No action available beyond avoiding raw `&`.
+1. **Shape 3 (dead input)** — covered only for agent toolkits. Now the broadest untested surface, since shape 6 has a probe.
+2. **Semgrep rules cannot prove they match.** The ruleset test verifies patterns *parse*; it cannot verify they *fire*. Every rule in the table at the top of this file parsed fine. Closing this means fixture files a rule must match, scanned in CI — the same trick `check-tenancy-parity.mjs` already uses.
+3. **Shapes 5 and 7 are finance-only.** Both rules generalise; neither mechanism does.
+4. **41 files partially unparsed by semgrep** — its TSX parser chokes on raw `&` in JSX text (`&mode=smart`, `& business platform`) and on `export type *`. It skips the region and scans the rest, so coverage is reduced, not absent. No action available beyond avoiding raw `&`.
 
 ---
 
