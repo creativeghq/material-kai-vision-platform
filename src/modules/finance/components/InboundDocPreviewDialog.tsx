@@ -54,7 +54,23 @@ export const InboundDocPreviewDialog: React.FC<{
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }> = ({ doc, open, onOpenChange }) => {
-  const lines = doc.lines ?? [];
+  /**
+   * Hydrate the TOASTed columns on open. The list query no longer selects `lines` / `raw` /
+   * `delivery_addresses` — detoasting them for every row cost ~1 s per list paint to render a
+   * table that shows none of them (#301 finding 8). Falls back to the list row, so a failed
+   * hydrate degrades to an empty line table rather than a blank dialog.
+   */
+  const [full, setFull] = React.useState<InboundDocument | null>(null);
+  React.useEffect(() => {
+    if (!open) { setFull(null); return; }
+    let live = true;
+    void inboundService.getFull(doc.id)
+      .then((d) => { if (live && d) setFull(d); })
+      .catch(() => { /* keep the list row; the line table simply renders empty */ });
+    return () => { live = false; };
+  }, [open, doc.id]);
+
+  const lines = (full ?? doc).lines ?? [];
   const number = [doc.series, doc.aa].filter(Boolean).join(' ');
 
   // The issuer's business identity, which myDATA does not transmit — resolved from their CRM

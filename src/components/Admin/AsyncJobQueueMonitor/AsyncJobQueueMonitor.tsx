@@ -98,19 +98,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   // Populated alongside fetchProductProgress by summing ai_usage_logs.
   const [productCosts, setProductCosts] = useState<Record<string, number>>({});
 
-  // Debug log
-
-  const toggleStage = (stageId: number) => {
-    setExpandedStages(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(stageId)) {
-        newSet.delete(stageId);
-      } else {
-        newSet.add(stageId);
-      }
-      return newSet;
-    });
-  };
 
   // Fetch product progress for a job directly from Supabase.
   // Runs in parallel with a per-product cost aggregation from ai_usage_logs
@@ -809,48 +796,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     return 'N/A';
   };
 
-  // Helper function to format values for display (handles arrays and objects)
-  const formatValue = (value: any, key?: string): string | JSX.Element => {
-    if (value === null || value === undefined) {
-      return 'N/A';
-    }
-
-    // Handle arrays - convert to comma-separated string
-    if (Array.isArray(value)) {
-      if (value.length === 0) return '[]';
-
-      // Special handling for chunk_ids - show total count instead of IDs
-      if (key === 'chunk_ids') {
-        return `${value.length} chunks`;
-      }
-
-      // Special handling for product_names - show count with tooltip
-      if (key === 'product_names') {
-        return 'PRODUCT_NAMES_TOOLTIP'; // Marker for special rendering
-      }
-
-      // For arrays of primitives, join with commas (but limit length)
-      if (value.every(item => typeof item !== 'object')) {
-        const joined = value.join(', ');
-        if (joined.length > 100) {
-          return `${value.length} items`;
-        }
-        return joined;
-      }
-      // For arrays of objects, show count
-      return `[${value.length} items]`;
-    }
-
-    // Handle objects - show key count or stringify if small
-    if (typeof value === 'object') {
-      const str = JSON.stringify(value);
-      if (str.length <= 50) return str;
-      return `{${Object.keys(value).length} fields}`;
-    }
-
-    // Handle primitives
-    return String(value);
-  };
 
   /**
    * Delete a job and EVERYTHING tied to it via the backend cleanup service.
@@ -1241,32 +1186,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   };
 
-  // Helper function to calculate stage duration
-  const getStageDuration = (currentCheckpoint: any, previousCheckpoint: any | null): string => {
-    if (!currentCheckpoint) return 'N/A';
-
-    try {
-      const currentTime = new Date(currentCheckpoint.created_at).getTime();
-
-      // If there's a previous checkpoint, calculate duration from it
-      if (previousCheckpoint) {
-        const previousTime = new Date(previousCheckpoint.created_at).getTime();
-        const durationSeconds = Math.floor((currentTime - previousTime) / 1000);
-        return formatTime(durationSeconds);
-      }
-
-      // If this is the first checkpoint, calculate from job start
-      if (selectedJob?.started_at) {
-        const startTime = new Date(selectedJob.started_at).getTime();
-        const durationSeconds = Math.floor((currentTime - startTime) / 1000);
-        return formatTime(durationSeconds);
-      }
-
-      return 'N/A';
-    } catch (_error) {
-      return 'N/A';
-    }
-  };
 
   // ============================================================================
   // PIPELINE ACTION HANDLERS
@@ -4236,19 +4155,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
               {/* AI Model Cost & Usage Analytics */}
               {(() => {
-                // AI Model pricing configuration (per 1M tokens or per operation)
-                const AI_PRICING = {
-                  // Claude models (per 1M tokens)
-                  'claude-haiku': { input: 0.80, output: 4.00, type: 'token' },
-                  'claude-opus': { input: 15.00, output: 75.00, type: 'token' },
-                  'claude-vision': { input: 3.00, output: 15.00, type: 'token' },
-                  // Modal GPU endpoints (per GPU hour). Vision discovery is not here —
-                  // it runs on Claude Opus 4.8 and is token-priced above.
-                  'slig-embeddings': { gpuHourly: 0.45, type: 'gpu', description: 'SLIG-768D Visual Embeddings (Modal)' },
-                  'paddleocr': { gpuHourly: 0.80, type: 'gpu', description: 'PaddleOCR-VL Structural Pass (layout + OCR + figure boxes)' },
-                  // Free/bundled models
-                  'clip': { perImage: 0.0, type: 'free', description: 'OpenAI CLIP (open-source)' },
-                };
 
                 // Calculate costs from checkpoints and metadata
                 const aiTracking = selectedJob?.metadata?.ai_tracking || {};

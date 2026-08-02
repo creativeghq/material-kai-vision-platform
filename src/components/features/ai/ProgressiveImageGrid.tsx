@@ -1786,28 +1786,6 @@ async function cropZone(
   });
 }
 
-/** Convert a public image URL to base64 via Canvas2D (requires CORS headers on the image). */
-async function imageUrlToBase64(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { reject(new Error('No canvas context')); return; }
-      ctx.drawImage(img, 0, 0);
-      try {
-        resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
-      } catch (e) {
-        reject(e);
-      }
-    };
-    img.onerror = () => reject(new Error('Failed to load image for base64 conversion'));
-    img.src = url;
-  });
-}
 
 /** Create a simple white-on-black bbox mask PNG as a base64 string (client-side fallback). */
 async function createBboxMask(

@@ -102,14 +102,49 @@ export interface InboundDocument {
 }
 
 export const inboundService = {
-  async list(workspaceId: string): Promise<InboundDocument[]> {
+  /**
+   * Columns the LIST needs. Deliberately not `*`.
+   *
+   * `raw` (535 B avg), `lines` (238 B) and `delivery_addresses` (292 B) are TOASTed, and
+   * `select('*')` detoasted all of them for every row just to paint a table that shows none of
+   * them — 1,424 kB of TOAST per list render, measured at 982 ms mean against 2.7 ms with RLS
+   * bypassed (#301 finding 8). They are fetched by `getFull()` when a row is actually opened.
+   */
+  LIST_COLUMNS: [
+    'id', 'workspace_id', 'mark', 'issuer_vat', 'issuer_name', 'issue_date', 'dispatch_date',
+    'vehicle_number', 'doc_type', 'series', 'aa', 'uid', 'authentication_code', 'download_url',
+    'issuer_country', 'issuer_branch', 'counterpart_vat', 'counterpart_name', 'is_delivery_note',
+    'move_purpose', 'vat_payment_suspension', 'total_withheld', 'total_fees', 'total_stamp_duty',
+    'total_other_taxes', 'total_deductions', 'currency', 'total_net', 'total_vat', 'total_gross',
+    'status', 'created_supplier_bill_id', 'category_id', 'created_at', 'updated_at',
+  ].join(', '),
+
+  async list(workspaceId: string, limit = 500): Promise<InboundDocument[]> {
+    const { data, error } = await supabase
+      .from('inbound_documents')
+      .select(this.LIST_COLUMNS)
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      // Bounded. The list had no LIMIT at all, so it grew linearly with inbound myDATA volume.
+      .limit(limit);
+    if (error) throw error;
+    // The heavy columns are absent by design — `lines` defaults to [] so a consumer that reads it
+    // before hydrating renders empty rather than crashing.
+    return (data ?? []).map((d: any) => ({ lines: [], ...d })) as InboundDocument[];
+  },
+
+  /**
+   * The FULL row, including the TOASTed columns the list omits. Call this when a document is
+   * actually OPENED (preview, receive-to-warehouse) rather than paying for it on every list paint.
+   */
+  async getFull(id: string): Promise<InboundDocument | null> {
     const { data, error } = await supabase
       .from('inbound_documents')
       .select('*')
-      .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false });
+      .eq('id', id)
+      .maybeSingle();
     if (error) throw error;
-    return (data ?? []) as InboundDocument[];
+    return (data ?? null) as InboundDocument | null;
   },
 
 

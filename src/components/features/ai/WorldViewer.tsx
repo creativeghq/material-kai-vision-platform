@@ -59,9 +59,7 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sceneRef = useRef<any>(null); // Three.js scene objects
-  const animFrameRef = useRef<number>(0);
-  const isVisibleRef = useRef(true);
+  const sceneRef = useRef<any>(null);  const isVisibleRef = useRef(true);
 
   const [status, setStatus] = useState(initialStatus || 'pending');
   const [splatUrls, setSplatUrls] = useState(initialSplatUrls || {});

@@ -64,7 +64,6 @@ export const QuoteDetailPage: React.FC = () => {
   const [upsells, setUpsells] = useState<Upsell[]>([]);
   const [quoteUpsells, setQuoteUpsells] = useState<QuoteUpsell[]>([]);
   const [loadingUpsells, setLoadingUpsells] = useState(false);
-  const [showTimelineModal, setShowTimelineModal] = useState(false);
 
   // Timeline state
   const [timelineSteps, setTimelineSteps] = useState<TimelineStep[]>([]);
@@ -361,24 +360,6 @@ export const QuoteDetailPage: React.FC = () => {
     }
   };
 
-  const handleAddUpsell = async (upsellId: string) => {
-    if (!id) return;
-    try {
-      await quotesService.addUpsellToQuote(id, upsellId);
-      toast({
-        title: 'Success',
-        description: 'Upsell added to quote',
-      });
-      await loadQuoteUpsells();
-    } catch (error) {
-      console.error('Error adding upsell:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to add upsell',
-        variant: 'destructive',
-      });
-    }
-  };
 
   const handleRemoveUpsell = async (quoteUpsellId: string) => {
     try {
@@ -524,41 +505,7 @@ export const QuoteDetailPage: React.FC = () => {
     }
   };
 
-  const handleGeneratePDF = async () => {
-    if (!quote?.id) return;
-    try {
-      setGeneratingPDF(true);
-      const regenerate = !!quote.pdf_storage_path;
-      const result = await quotePDFService.generatePDF(quote.id, regenerate);
-      if (result.success) {
-        toast({ title: 'PDF Generated', description: `Quote ${result.quote_number || ''} PDF is ready.` });
-        await loadQuoteDetails();
-      } else {
-        toast({ title: 'PDF Generation Failed', description: result.error || 'Unknown error', variant: 'destructive' });
-      }
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast({ title: 'Error', description: 'Failed to generate PDF', variant: 'destructive' });
-    } finally {
-      setGeneratingPDF(false);
-    }
-  };
 
-  const handleDownloadPDF = async () => {
-    if (!quote?.id) return;
-    try {
-      setDownloadingPDF(true);
-      const downloaded = await quotePDFService.downloadPDF(quote.id);
-      if (!downloaded) {
-        toast({ title: 'Error', description: 'PDF not available. Generate it first.', variant: 'destructive' });
-      }
-    } catch (error) {
-      console.error('Error downloading PDF:', error);
-      toast({ title: 'Error', description: 'Failed to download PDF', variant: 'destructive' });
-    } finally {
-      setDownloadingPDF(false);
-    }
-  };
 
   const handleSendQuote = async () => {
     if (!quote) return;
@@ -578,43 +525,7 @@ export const QuoteDetailPage: React.FC = () => {
     }
   };
 
-  const handleStatusTagChange = async (tagId: string) => {
-    if (!quote) return;
 
-    try {
-      setUpdatingStatus(true);
-      // '__none__' is the sentinel value for clearing the tag
-      await quotesService.updateQuoteStatusTag(quote.id, tagId === '__none__' ? null : tagId);
-      await loadQuoteDetails();
-      if (quote.user_id) {
-        const tagLabel = tagId === '__none__' ? 'updated' : (statusTags.find((t) => t.id === tagId)?.name ?? 'updated');
-        sendQuoteNotification(quote.user_id, `Your quote "${quote.name || 'Quote'}" status changed to: ${tagLabel}`, quote.id);
-      }
-      toast({
-        title: 'Success',
-        description: 'Status tag updated successfully',
-      });
-    } catch (error) {
-      console.error('Error updating status tag:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update status tag',
-        variant: 'destructive',
-      });
-    } finally {
-      setUpdatingStatus(false);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
 
   if (loading) {

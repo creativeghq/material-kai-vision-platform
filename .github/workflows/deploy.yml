@@ -244,18 +244,26 @@ jobs:
       - name: 🏥 Health check
         run: |
           set -euo pipefail
-          URL="${{ steps.deploy.outputs.url }}"
-          sleep 10
-          # This step used to only WARN on a bad status, so a deploy serving 500s (or a URL that
-          # never got captured) reported green — the same "looks checked, isn't" shape as the
-          # semgrep `|| true`. It gates now. 302 is the normal response for the prod URL.
-          if [ -z "$URL" ]; then
+          # Check the CUSTOM DOMAIN, not the deployment URL.
+          #
+          # The project has Vercel SSO protection on `all_except_custom_domains`, so every
+          # *.vercel.app deployment URL answers 302 to an auth wall. This step curled that URL
+          # and accepted 302, so it was really only asserting "Vercel's login redirect responds"
+          # — it never reached the app and would have passed on a completely broken build. That
+          # is the exact "looks checked, isn't" shape the note here used to claim it had fixed.
+          # Measured 2026-08-02: deployment URL -> 302, app.materialshub.gr -> 200.
+          #
+          # The custom domain is exempt from SSO, serves the just-promoted build, and is what
+          # users actually load — so only a real 2xx passes now.
+          URL="https://app.materialshub.gr"
+          if [ -z "${{ steps.deploy.outputs.url }}" ]; then
             echo "❌ Deployment URL not captured — cannot verify the deploy"; exit 1
           fi
+          sleep 10
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" --connect-timeout 30 --max-time 60 || echo "000")
           echo "📊 HTTP $HTTP_STATUS — $URL"
           case "$HTTP_STATUS" in
-            200|301|302|307|308) echo "✅ Healthy" ;;
+            200) echo "✅ Healthy" ;;
             *) echo "❌ Unhealthy: HTTP $HTTP_STATUS"; exit 1 ;;
           esac
 
@@ -406,6 +414,19 @@ jobs:
   # Front-end route-load smoke — drives the deployed app in a headless browser and asserts
   # every top route renders (no white-screen / chunk-load failure / error boundary). Catches
   # the exact class that took down /quotes /finance /discover after a deploy.
+  #
+  # NOTE it runs AFTER production is serving the new build, so it DETECTS breakage rather than
+  # preventing it. On 2026-08-01 it correctly caught an error boundary on `/` and `/discover` —
+  # but only after ~6 users had already hit it.
+  #
+  # Making it a true gate means: deploy WITHOUT --prod (a preview), smoke that preview URL, then
+  # `vercel promote` it. The blocker is deployment protection: ssoProtection is enabled for
+  # `all_except_custom_domains`, so a preview URL answers 302 to an auth wall and Playwright
+  # would smoke the login page instead of the app. The supported fix is a "Protection Bypass for
+  # Automation" secret (Vercel → Project → Settings → Deployment Protection), sent as the
+  # `x-vercel-protection-bypass` header and stored here as VERCEL_AUTOMATION_BYPASS_SECRET.
+  # That secret can only be minted in the Vercel dashboard, so this is left as an explicit
+  # follow-up rather than half-wired — a gate that looks connected and isn't is worse than none.
   fe-smoke:
     needs: [deploy-frontend]
     if: ${{ always() && needs.deploy-frontend.result == 'success' }}

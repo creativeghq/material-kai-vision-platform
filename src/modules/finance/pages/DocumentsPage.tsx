@@ -1032,7 +1032,7 @@ const IssuerCell: React.FC<{ doc: InboundDocument; crmCompanyId?: string }> = ({
   );
 };
 
-const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string; onOpenExpense: (billId: string) => void }> = ({ rows, financeBase, workspaceId, readOnly, onChanged, categories, categoryName }) => {
+const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; workspaceId: string | null; readOnly: boolean; onChanged: () => void; categories: FinanceCategory[]; categoryName: (id: any) => string; onOpenExpense: (billId: string) => void }> = ({ rows, financeBase, workspaceId, readOnly, onChanged, categories, categoryName, onOpenExpense }) => {
   const { toast } = useToast();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [receiveDoc, setReceiveDoc] = React.useState<InboundDocument | null>(null);
@@ -1176,6 +1176,10 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
                     onRecordPayment={() => openPayments(d)}
                     onCreateOrder={() => setOrderDoc(d)}
                     hasOrder={ordered.has(d.id)}
+                    // The inbox half of the link described on `paymentsExpenseId`. It was passed
+                    // down but never called, so the balance behind the bronze Gross column was
+                    // unreachable from this table — the menu item simply did not exist.
+                    onOpenPayments={d.created_supplier_bill_id ? () => onOpenExpense(d.created_supplier_bill_id!) : undefined}
                     onReceiveStock={() => setReceiveDoc(d)}
                     onDismiss={() => dismiss(d.id)}
                     onChanged={onChanged}

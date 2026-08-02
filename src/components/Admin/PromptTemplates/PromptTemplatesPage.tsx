@@ -56,7 +56,6 @@ interface PromptTemplate {
 }
 
 export const PromptTemplatesPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [templates, setTemplates] = useState<PromptTemplate[]>([]);
   const [loading, setLoading] = useState(true);

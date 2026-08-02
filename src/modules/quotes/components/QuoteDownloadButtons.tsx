@@ -28,8 +28,6 @@ interface QuoteDownloadButtonsProps {
   data?: QuoteDocumentData | null;
   /** Called when the user clicks "Preview" — defaults to window.open */
   onPreview?: () => void;
-  /** When true, applies glass/white-tinted styling for use on dark primary headers */
-  headerMode?: boolean;
   /** Who is downloading — used for analytics attribution. */
   viewContext?: 'customer' | 'admin';
 }
@@ -123,8 +121,10 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
     }
   };
 
+  // One pill treatment for both buttons. These were two names for the same string, left over
+  // from a `headerMode ? tinted : plain` branch that was flattened when the design system
+  // dropped the special-cased header styling — the prop outlived the styling it selected.
   const btnBase = 'rounded-full';
-  const btnPrimary = 'rounded-full';
 
   return (
     <>
@@ -155,7 +155,7 @@ export const QuoteDownloadButtons: React.FC<QuoteDownloadButtonsProps> = ({
           onClick={handleDownloadPDF}
           disabled={!data || generating}
           title={!data ? 'Loading quote data…' : undefined}
-          className={btnPrimary}
+          className={btnBase}
         >
           {generating ? (
             <>

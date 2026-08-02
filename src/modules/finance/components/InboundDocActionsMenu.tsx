@@ -14,7 +14,7 @@
  */
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, PackagePlus, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet, ShoppingCart } from 'lucide-react';
+import { MoreVertical, Building2, PackagePlus, Trash2, Loader2, ExternalLink, Sparkles, Eye, Wallet, ShoppingCart, Receipt } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -46,6 +46,16 @@ interface Props {
   onCreateOrder?: () => void;
   /** This document already produced an order — offered as done rather than repeated. */
   hasOrder?: boolean;
+  /**
+   * Open the payments/balance ledger for the expense this document became. Read-only: it shows
+   * what has settled and what is still owed, and never converts the document.
+   *
+   * The other half of "Record payment". The Gross column is a BRONZE myDATA fact that never
+   * moves, so a fully-settled document still shows its whole amount there — what is actually
+   * outstanding lives on the bill's derived `amount_due`, and this is the only way to reach it
+   * from the inbox. Absent → the entry isn't offered.
+   */
+  onOpenPayments?: () => void;
   onReceiveStock: () => void;
   onDismiss: () => void;
   onChanged?: () => void;
@@ -54,7 +64,7 @@ interface Props {
 /** A bare 9-digit number is a Greek ΑΦΜ — only those are resolvable via the ΑΑΔΕ / ΓΕΜΗ registries. */
 const isGreekVat = (vat: string | null | undefined) => !!greekAfm(vat);
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onReceiveStock, onDismiss, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onCreateOrder, hasOrder, onOpenPayments, onReceiveStock, onDismiss, onChanged }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -217,6 +227,11 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay}>
             <Wallet className="h-4 w-4 mr-2" /> Record payment
+          </DropdownMenuItem>
+          {/* Viewing is read-only, so it stays available even for a dismissed document — the
+              money that moved is still a fact worth reading back. */}
+          <DropdownMenuItem onClick={onOpenPayments} disabled={!onOpenPayments || !doc.created_supplier_bill_id}>
+            <Receipt className="h-4 w-4 mr-2" /> View payments
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onDismiss} disabled={!canDismiss}>
             <Trash2 className="h-4 w-4 mr-2" /> Dismiss

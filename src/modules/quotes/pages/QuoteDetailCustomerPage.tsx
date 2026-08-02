@@ -320,14 +320,12 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                   enabled={quote.public_share_enabled ?? false}
                   token={quote.public_share_token ?? null}
                   onChange={loadQuoteDetails}
-                  headerMode
                 />
                 <QuoteEmailButton quoteId={quote.id} onSent={loadQuoteDetails} />
                 <QuoteDownloadButtons
                   quoteId={quote.id}
                   quoteNumber={quote.quote_number}
                   data={docData}
-                  headerMode
                   viewContext="customer"
                 />
               </>

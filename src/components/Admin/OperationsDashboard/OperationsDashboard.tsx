@@ -114,7 +114,6 @@ const VALID_OPERATIONS_TABS = new Set([
 ]);
 
 const OperationsDashboardInner: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Initial tab from ?tab= query param so other admin pages can deep-link
@@ -131,7 +130,6 @@ const OperationsDashboardInner: React.FC = () => {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const [activeTab, setActiveTab] = useState('overview');
   const [analytics, setAnalytics] = useState<UsageAnalytics>({
     total_searches: 0,
     total_api_calls: 0,

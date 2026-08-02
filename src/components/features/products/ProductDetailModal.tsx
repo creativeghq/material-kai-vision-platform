@@ -692,22 +692,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const performanceData = allData?.performance || {};
   const complianceData = allData?.compliance || {};
 
-  const materialProperties = {
-    'Material Category': material,
-    'Materials': extractValue(allData?.materials),
-    'Composition': extractValue(materialPropsData?.composition),
-    'Body Type': extractValue(materialPropsData?.body_type),
-    'Finish': finish,
-    'Finishes': extractValue(allData?.finishes),
-    'Patterns': extractValue(materialPropsData?.patterns) || extractValue(appearanceData?.patterns),
-    'Surface': extractValue(materialPropsData?.surface),
-    'Thickness': thickness,
-  };
 
-  const dimensions = {
-    'Available Sizes': size !== 'N/A' ? size : undefined,
-    'Thickness': thickness,
-  };
 
   // Smart color extraction — prefers product-specific available_colors, then tries to match by name.
   // Output is title-cased and deduped (case-insensitive) so "warm white" / "Warm White" /
@@ -793,17 +778,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       .split(',').map(c => c.trim().toLowerCase()).filter(Boolean).sort().join('|');
   const showObservedShades = visionColors && colorSetKey(visionColors) !== colorSetKey(primaryColors);
 
-  // Helper: pretty-print numeric/string values with optional unit suffix
-  const pickPackagingValue = (obj: Record<string, unknown> | undefined, key: string): string | undefined => {
-    if (!obj) return undefined;
-    const v = obj[key];
-    if (v === null || v === undefined || v === '') return undefined;
-    if (typeof v === 'object' && 'value' in (v as Record<string, unknown>)) {
-      const inner = (v as Record<string, unknown>).value;
-      return inner != null ? String(inner) : undefined;
-    }
-    return String(v);
-  };
 
   // ─── Patterns aggregated across variants (chip list) ──────────────
   // Vision rollup writes every unique pattern it saw on each variant image
@@ -873,23 +847,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Visual Description': extractValue(appearanceData?.vision_description),
   };
 
-  const performance = {
-    'Traffic Level': extractValue(performanceData?.traffic_level) || extractValue(applicationData?.traffic_level),
-    'Slip Resistance': extractValue(performanceData?.slip_resistance) || extractValue(materialPropsData?.slip_resistance),
-    'PEI Rating': extractValue(performanceData?.pei_rating),
-    'Water Absorption': extractValue(performanceData?.water_absorption_class)
-      || extractValue(performanceData?.water_absorption)
-      || extractValue(materialPropsData?.water_absorption),
-    'Water Absorption %': extractValue(performanceData?.water_absorption_pct),
-    'Fire Rating': extractValue(performanceData?.fire_rating)
-      || extractValue(materialPropsData?.fire_rating)
-      || extractValue(complianceData?.fire_rating),
-    'Abrasion Resistance': extractValue(performanceData?.abrasion_resistance),
-    'Wear Rating': extractValue(performanceData?.wear_rating) || extractValue(materialPropsData?.wear_rating),
-    'Surface Hardness': extractValue(performanceData?.surface_hardness) || extractValue(materialPropsData?.surface_hardness),
-    'Shade Variation': extractValue(performanceData?.shade_variation),
-    'Frost Resistance': extractValue(performanceData?.frost_resistance),
-  };
 
   // Pretty-print recommended_use arrays as "Wall, Floor, Shower Wall".
   // Filters sentinels, dedups case-insensitively, sorts for stable rendering.
@@ -925,42 +882,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return /^\d+(?:[.,]\d+)?$/.test(raw.trim()) ? `${raw.trim()} mm` : raw;
   };
 
-  const application = {
-    // Single key — fmtList chains the three possible sources and dedups.
-    'Recommended Use': fmtList([
-      ...((Array.isArray(applicationData?.recommended_use) ? applicationData.recommended_use : [applicationData?.recommended_use]) as unknown[]),
-      ...((Array.isArray(allData?.applications) ? allData.applications : [allData?.applications]) as unknown[]),
-      ...((Array.isArray(allData?.recommended_use) ? allData.recommended_use : [allData?.recommended_use]) as unknown[]),
-    ].filter(Boolean)),
-    'Installation Method': extractValue(applicationData?.installation_method) || extractValue(applicationData?.installation),
-    'Joint Width': formatJointWidth(),
-    'Room Type': fmtList([
-      ...((Array.isArray(applicationData?.room_type) ? applicationData.room_type : [applicationData?.room_type]) as unknown[]),
-      ...((Array.isArray(applicationData?.suitable_rooms) ? applicationData.suitable_rooms : [applicationData?.suitable_rooms]) as unknown[]),
-      ...((Array.isArray(allData?.room_type) ? allData.room_type : [allData?.room_type]) as unknown[]),
-    ].filter(Boolean)),
-  };
 
-  const design = {
-    'Designer': Array.isArray(designData?.designers)
-      ? designData.designers.join(', ')
-      : extractValue(designData?.designers) || extractValue(designData?.studio),
-    'Studio': extractValue(designData?.studio),
-    'Collection': collection,
-    'Brand': extractValue(designData?.brand),
-    // Style: prefer schema-locked `style`, fall back to legacy `design_style`. Title-cased.
-    'Design Style': normFinish(extractValue(designData?.style) || extractValue(designData?.design_style)),
-    'Material Subtype': normFinish(extractValue(materialPropsData?.material_subtype)),
-    'Inspiration': extractValue(designData?.inspiration) || extractValue(allData?.inspiration),
-    'Philosophy': extractValue(designData?.philosophy),
-    'Studio Founded': extractValue(designData?.studio_founded),
-  };
 
-  const manufacturing = {
-    'Factory': factory,
-    'Factory Group': extractValue(allData?.factory_group_name) || undefined,
-    'Country of Origin': origin || undefined,
-  };
 
   // Extract a value that may be keyed by product/variant names — returns undefined if no match for this product
   const extractProductValue = (val: unknown): string | undefined => {
@@ -1054,14 +977,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Grout Color Codes': extractProductValue(commercialData?.grout_color_codes),
   };
 
-  const packaging = {
-    'Pieces per Box': extractProductValue(packagingData?.pieces_per_box),
-    'Boxes per Pallet': extractProductValue(packagingData?.boxes_per_pallet),
-    'Weight per Box (kg)': extractProductValue(packagingData?.weight_per_box) || extractValue(packagingData?.weight_kg),
-    'Weight per Box (lb)': extractProductValue(packagingData?.weight_per_box_lb) || extractValue(packagingData?.weight_lb),
-    'Coverage per Box (m²)': extractProductValue(packagingData?.coverage_per_box) || extractValue(packagingData?.coverage_m2),
-    'Coverage per Box (sqft)': extractProductValue(packagingData?.coverage_per_box_sqft) || extractValue(packagingData?.coverage_sqft),
-  };
 
   // Extract product variants using the new commercial schema.
   //
@@ -1288,11 +1203,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const productVariants = extractVariants();
 
-  const careAndMaintenance = {
-    'Care Instructions': extractValue(applicationData?.care_instructions) || extractValue(allData?.care_instructions),
-    'Maintenance': extractValue(applicationData?.maintenance) || extractValue(allData?.maintenance),
-    'Cleaning': extractValue(allData?.cleaning),
-  };
 
   // ─── Certifications as chip list ──────────────────────────────────
   // Certifications come from multiple sources and may live on either
@@ -1590,98 +1500,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     );
   };
 
-  // Packaging-per-variant table. The vision extractor emits
-  // `packaging.per_variant` when the catalog's packing table has different
-  // pieces/box or weight per format. We render one row per variant here;
-  // when only scalar packaging exists the table is hidden (scalar values
-  // already live in the Key Specs sidebar Packaging block).
-  const renderPackagingPerVariantTable = () => {
-    const packagingRaw = allData?.packaging;
-    const packaging = (packagingRaw && typeof packagingRaw === 'object' && 'value' in packagingRaw)
-      ? (packagingRaw as Record<string, unknown>).value
-      : packagingRaw;
-    const perVariantRaw = packaging && typeof packaging === 'object'
-      ? (packaging as Record<string, unknown>).per_variant
-      : undefined;
-    const perVariant = (perVariantRaw && typeof perVariantRaw === 'object' && 'value' in (perVariantRaw as Record<string, unknown>))
-      ? (perVariantRaw as Record<string, unknown>).value
-      : perVariantRaw;
-
-    if (!Array.isArray(perVariant) || perVariant.length === 0) return null;
-
-    // Filter to rows belonging to this product if the extractor tagged them.
-    const rows = (perVariant as Array<Record<string, unknown>>).filter(r => {
-      const vProduct = r.product || r.product_name;
-      if (!vProduct) return true; // untagged rows assumed for this product
-      return normalizeMatch(String(vProduct)) === productNameNorm ||
-             normalizeMatch(String(vProduct)).includes(productNameNorm);
-    });
-    if (rows.length === 0) return null;
-
-    const cell = (v: unknown): string => {
-      if (v === null || v === undefined || v === '') return '—';
-      return String(v);
-    };
-
-    return (
-      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-        <div className="mb-4">
-          <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Packaging per Variant ({rows.length})
-          </h3>
-        </div>
-        <div className="overflow-hidden -mx-6 -mb-6 mt-2">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                <tr className="text-xs font-semibold text-muted-foreground">
-                  <th className="text-left px-6 py-2.5 font-medium">Variant</th>
-                  <th className="text-left px-3 py-2.5 font-medium">Format</th>
-                  <th className="text-left px-3 py-2.5 font-medium">Pcs / Box</th>
-                  <th className="text-left px-3 py-2.5 font-medium">m² / Box</th>
-                  <th className="text-left px-3 py-2.5 font-medium">Weight / Box</th>
-                  <th className="text-left px-3 py-2.5 font-medium">Boxes / Pallet</th>
-                  <th className="text-left px-6 py-2.5 font-medium">Pallet Weight</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => {
-                  const weightBoxKg = r.weight_box_kg ?? r.weight_per_box_kg;
-                  const weightBoxLb = r.weight_box_lb ?? r.weight_per_box_lb;
-                  const weightBox = weightBoxKg
-                    ? (weightBoxLb ? `${weightBoxKg} kg (${weightBoxLb} lb)` : `${weightBoxKg} kg`)
-                    : '—';
-                  const m2Box = r.m2_box ?? r.m2_per_box;
-                  const sqftBox = r.sqft_box ?? r.sqft_per_box;
-                  const coverage = m2Box
-                    ? (sqftBox ? `${m2Box} (${sqftBox} sqft)` : String(m2Box))
-                    : '—';
-                  const palletWeight = r.weight_pallet_kg ?? r.weight_per_pallet_kg;
-                  return (
-                    <tr
-                      key={`pkgv-${i}`}
-                      className="border-b border-border/30 hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="px-6 py-2 font-medium">{cell(r.variant ?? r.name)}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{cell(r.format ?? r.size)}</td>
-                      <td className="px-3 py-2">{cell(r.pcs_box ?? r.pieces_per_box)}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{coverage}</td>
-                      <td className="px-3 py-2">{weightBox}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{cell(r.boxes_pallet ?? r.boxes_per_pallet)}</td>
-                      <td className="px-6 py-2 text-muted-foreground">
-                        {palletWeight ? `${palletWeight} kg` : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   // ─── Completeness infrastructure (category-agnostic) ────────────────────────
   // The Details tab must surface EVERY metadata field that has a value,

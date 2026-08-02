@@ -205,7 +205,6 @@ const adminSections = {
 };
 
 const AdminDashboard: React.FC = () => {
-  const navigate = useNavigate();
   const moduleCards = useAdminDashboardCards();
   // Open data-integrity findings — rendered as a red count on the Data Health tile (#293).
   const [openFindings, setOpenFindings] = useState(0);
@@ -284,14 +283,6 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const getMetricColor = (value: number, type: string) => {
-    if (type === 'cpu' || type === 'memory') {
-      if (value > 80) return 'text-red-600';
-      if (value > 60) return 'text-yellow-600';
-      return 'text-green-600';
-    }
-    return 'text-blue-600';
-  };
 
   return (
     <div>

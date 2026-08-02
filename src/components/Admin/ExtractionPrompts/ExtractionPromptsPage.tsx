@@ -77,7 +77,6 @@ interface PromptHistory {
 }
 
 export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [prompts, setPrompts] = useState<ExtractionPrompt[]>([]);
   const [loading, setLoading] = useState(true);

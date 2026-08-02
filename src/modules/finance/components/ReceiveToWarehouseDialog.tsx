@@ -161,7 +161,23 @@ export const ReceiveToWarehouseDialog: React.FC<{
   const [incomeTypes, setIncomeTypes] = useState<RefRow[]>([]);
   const [productCategories, setProductCategories] = useState<{ id: string; name: string }[]>([]);
 
-  const lines = doc.lines ?? [];
+  /**
+   * Hydrate the TOASTed `lines` on open — the list query omits them (#301 finding 8). This dialog
+   * cannot work without them, so a failed hydrate must be VISIBLE rather than silently rendering
+   * the 'no goods on this document' empty state.
+   */
+  const [fullDoc, setFullDoc] = useState<InboundDocument | null>(null);
+  const [linesFailed, setLinesFailed] = useState(false);
+  useEffect(() => {
+    if (!open) { setFullDoc(null); setLinesFailed(false); return; }
+    let live = true;
+    void inboundService.getFull(doc.id)
+      .then((d) => { if (live) { if (d) setFullDoc(d); else setLinesFailed(true); } })
+      .catch(() => { if (live) setLinesFailed(true); });
+    return () => { live = false; };
+  }, [open, doc.id]);
+
+  const lines = (fullDoc ?? doc).lines ?? [];
   // A line only becomes stock if it says WHAT was supplied. myDATA omits item descriptions on
   // most service invoices (type 2.x carry value lines only), so this is the common case, not
   // an edge case — see the empty state below.
@@ -601,6 +617,17 @@ export const ReceiveToWarehouseDialog: React.FC<{
 
         {loading ? (
           <div className="py-10 text-center"><Loader2 className="h-5 w-5 animate-spin inline text-muted-foreground" /></div>
+        ) : linesFailed ? (
+          /* The lines could not be loaded. Rendering 'no goods on this document' here would be a
+             lie that ends with the operator receiving nothing and believing there was nothing to
+             receive. */
+          <div className="space-y-2 py-10 text-center text-sm">
+            <p className="font-medium text-destructive">Could not load this document&rsquo;s lines.</p>
+            <p className="text-muted-foreground">
+              This is a loading failure, not an empty document — do <strong>not</strong> treat it as
+              nothing to receive. Close and reopen, or reload the page.
+            </p>
+          </div>
         ) : receivable.length === 0 ? (
           <NoGoodsState doc={doc} lineCount={lines.length} />
         ) : (

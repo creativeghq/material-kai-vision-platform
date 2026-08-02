@@ -73,12 +73,23 @@ describe('accessibility ratchet', () => {
    */
   it('the lint budget is the a11y baseline plus the declared non-a11y debt', () => {
     /**
-     * Unused locals that need a human: an unused `const navigate = useNavigate()`, a dead helper,
-     * a `useState` pair nobody reads. Deleting them is right (dead code does not stay) but each
-     * needs eyes. 310 -> 86 on 2026-08-02 by removing 172 unused imports and giving 52 unused
-     * args/catch-bindings the `_` prefix the rule sanctions. DRIVE THIS TO ZERO. NEVER RAISE IT.
+     * Remaining `no-unused-vars` warnings, all of which need a human.
+     *
+     * 310 -> 58 on 2026-08-02: 172 unused imports deleted, 52 unused args/catch-bindings given
+     * the `_` prefix the rule sanctions, and 38 dead locals removed via the TypeScript AST —
+     * but only where the initializer was provably side-effect-free (a literal, an arrow, or a
+     * pure hook). `const x = doTheThing()` was deliberately left: deleting the binding deletes
+     * the call.
+     *
+     * What is left is two shapes, both of which can be REAL BUGS rather than mere untidiness,
+     * which is exactly why they are not machine-removable:
+     *   - "sibling still used": half a `useState` pair, e.g. a `setSearchQuery` nobody calls —
+     *     a filter that can never change is an inert control, not dead code.
+     *   - a binding whose initializer performs work whose result is then discarded.
+     *
+     * DRIVE THIS TO ZERO. NEVER RAISE IT.
      */
-    const NON_A11Y_DEBT = 86;
+    const NON_A11Y_DEBT = 58;
 
     const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
       scripts: Record<string, string>;

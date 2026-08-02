@@ -57,7 +57,6 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
 }) => {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(false);
-  const [currentStep, setCurrentStep] = useState(1);
   const [estimatedRecipients, setEstimatedRecipients] = useState(0);
   const [formData, setFormData] = useState({
     name: '',

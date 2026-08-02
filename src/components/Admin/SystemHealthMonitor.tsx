@@ -324,23 +324,6 @@ export const SystemHealthMonitor: React.FC = () => {
     return `${hours}h ${minutes}m`;
   };
 
-  const formatLastChecked = (isoString?: string) => {
-    if (!isoString) return null;
-    try {
-      const date = new Date(isoString);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      const diffHours = Math.floor(diffMins / 60);
-      if (diffHours < 24) return `${diffHours}h ago`;
-      return `${Math.floor(diffHours / 24)}d ago`;
-    } catch {
-      return null;
-    }
-  };
 
   if (loading && !health) {
     return (

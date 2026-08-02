@@ -45,8 +45,6 @@ const topicOf = (slug: string): string => {
   return hit?.id ?? 'other';
 };
 
-const topicLabelOf = (topicId: string): string =>
-  TOPIC_GROUPS.find((g) => g.id === topicId)?.label ?? 'Other';
 
 interface EmailTemplate {
   id: string;

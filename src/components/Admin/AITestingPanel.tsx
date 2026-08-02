@@ -203,10 +203,6 @@ interface SimilarityTestResult {
 }
 
 export const AITestingPanel: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
-  const navigate = useNavigate();
-  const [testPrompt, setTestPrompt] = useState(
-    'Analyze this modern kitchen with marble countertops and stainless steel appliances',
-  );
   const [testImageUrl, setTestImageUrl] = useState('');
   const [testing, setTesting] = useState(false);
   const [results, setResults] = useState<TestResult[]>([]);

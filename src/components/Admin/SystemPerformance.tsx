@@ -115,7 +115,6 @@ interface DocumentAnalysisMetrics {
 }
 
 export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
-  const navigate = useNavigate();
   const [metrics, setMetrics] = useState<SystemMetrics>({
     total_processing_jobs: 0,
     ai_events_sampled: 0,

@@ -45,29 +45,7 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
   external_service: ExternalLink,
 };
 
-const CATEGORY_COLORS: Record<string, string> = {
-  llm: 'bg-violet-500/10 text-violet-600 border-violet-500/20',
-  embedding: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-  vision: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-  generation: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-  external_service: 'bg-slate-500/10 text-slate-600 border-slate-500/20',
-};
 
-const PROVIDER_COLORS: Record<string, string> = {
-  anthropic: 'bg-orange-100 text-orange-700',
-  openai: 'bg-green-100 text-green-700',
-  voyage: 'bg-purple-100 text-purple-700',
-  huggingface: 'bg-yellow-100 text-yellow-700',
-  replicate: 'bg-pink-100 text-pink-700',
-  zernio: 'bg-red-100 text-red-700',
-  apollo: 'bg-cyan-100 text-cyan-700',
-  hunter: 'bg-yellow-100 text-yellow-700',
-  zerobounce: 'bg-blue-100 text-blue-700',
-  firecrawl: 'bg-orange-100 text-orange-700',
-  xai: 'bg-slate-100 text-slate-700',
-  runway: 'bg-pink-100 text-pink-700',
-  late: 'bg-emerald-100 text-emerald-700',
-};
 
 // Display names for categories (handles acronyms properly)
 const CATEGORY_DISPLAY_NAMES: Record<string, string> = {

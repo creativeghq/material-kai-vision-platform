@@ -1683,11 +1683,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     setExpenseOpen(true);
   };
 
-  // How much of this order is settled, per the allocation ledger (NOT `fin.received`, which only
-  // sees cash tagged with `payments.order_id` and misses credit re-homed from an on-account
-  // payment). Already direction-resolved by `get_order_settlements` — do not re-apply the
-  // sales→in / purchase→out rule here; that duplication is what produced the €945 bug.
-  const orderSettled = () => fin?.settled ?? 0;
 
   /**
    * Spending the customer's money on the customer's job draws their held balance down.

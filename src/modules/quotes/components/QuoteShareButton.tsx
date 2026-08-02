@@ -19,8 +19,6 @@ interface Props {
   token: string | null;
   /** Reload the parent quote after the share state changes. */
   onChange?: () => void;
-  /** Header styling on the dark primary header (matches QuoteDownloadButtons headerMode). */
-  headerMode?: boolean;
 }
 
 export const QuoteShareButton: React.FC<Props> = ({ quoteId, enabled, token, onChange }) => {
