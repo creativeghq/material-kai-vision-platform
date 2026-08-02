@@ -1002,7 +1002,35 @@ const _financeServiceCore = {
         } catch { /* best-effort */ }
       })();
     }
+    // Place whatever this payment did NOT settle explicitly onto what is still owed. Without this
+    // call the sweep existed but nothing invoked it, so cash recorded against no document sat as
+    // on-account credit forever next to the very order it had paid for (ORD-2026-0002: €2,854
+    // received, €0 allocated, until a migration and a since-removed button placed it by hand).
+    //
+    // Deliberately AFTER the RPC rather than a trigger on `payments`: the sweep places only each
+    // payment's REMAINDER, so it is safe to run at any point and finds nothing on a second pass —
+    // whereas an AFTER INSERT trigger fires before the client's explicit allocations exist and
+    // would swallow the whole payment onto the wrong target.
+    await financeService.sweepUnallocated(input.workspaceId);
     return data as string;
+  },
+
+  /**
+   * Settle every unallocated payment remainder in the workspace against what is open — invoices
+   * first (a formal debt outranks an un-invoiced order), then same-currency orders, oldest first.
+   * Idempotent, and best-effort by design: the money is already committed by the time this runs,
+   * so a failure here must not surface as "the payment failed". It leaves the remainder visible as
+   * on-account credit, which is the honest fallback.
+   */
+  async sweepUnallocated(workspaceId: string): Promise<number> {
+    try {
+      const { data, error } = await supabase.rpc('auto_allocate_workspace', { p_workspace_id: workspaceId });
+      if (error) throw error;
+      return Number((data as any)?.placed) || 0;
+    } catch (err) {
+      console.error('auto-allocation sweep failed; remainder stays on account', err);
+      return 0;
+    }
   },
 
   // -------- Manual (un-invoiced) receivables / payables --------

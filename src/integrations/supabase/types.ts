@@ -30349,6 +30349,10 @@ export type Database = {
         Args: { p_amount?: number; p_order_id: string; p_workspace_id: string }
         Returns: Json
       }
+      auto_allocate_workspace: {
+        Args: { p_workspace_id: string }
+        Returns: Json
+      }
       release_customer_credit: {
         Args: {
           p_amount?: number
