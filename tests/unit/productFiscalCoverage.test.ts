@@ -81,3 +81,28 @@ describe('product fiscal identity is editable where it is stored', () => {
     }
   });
 });
+
+/**
+ * Two regressions of the same shape, both introduced by features added AFTER the fiscal card
+ * closed the original write-only path. Neither errored; both simply showed nothing.
+ */
+describe('customs data written by the pipeline is readable on the product page', () => {
+  it('the Details tab reads products.attributes', () => {
+    // The catch-all renderer walks `allData`. When `attributes` was not spread into it, the
+    // normalised product_type / material the classifier perceives had nowhere to appear.
+    const modal = readFileSync(join(ROOT, 'src/components/features/products/ProductDetailModal.tsx'), 'utf8');
+    const decl = modal.slice(modal.indexOf('const allData = {'), modal.indexOf('};', modal.indexOf('const allData = {')));
+    expect(decl).toContain('attributes');
+    expect(decl).toContain('product.metadata');
+  });
+
+  it('an APPLIED taric code shows where it came from, not just the number', () => {
+    // A code applied automatically by a confirmed rule is the case least likely to have been
+    // read by a human and most likely to be questioned at a border.
+    const card = readFileSync(FISCAL_CARD, 'utf8');
+    expect(card).toContain('taric_source');
+    expect(card).toMatch(/provenance/);
+    // It must not depend on there being a pending suggestion.
+    expect(card).toMatch(/provenance && !suggestion/);
+  });
+});

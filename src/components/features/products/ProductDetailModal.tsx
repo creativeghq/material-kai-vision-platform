@@ -482,6 +482,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   // Extract key metadata from all possible sources
   const allData = {
+    // `attributes` FIRST, so curated metadata still wins on a key both carry. It is included at
+    // all because facts written there — the normalised product_type / material the classifier
+    // perceives, and anything the XML importer lands — were invisible on this tab otherwise:
+    // the catch-all below walks `allData`, and `attributes` was simply not in it. That is the
+    // same write-only shape this modal was rebuilt to remove, reintroduced by a later feature.
+    ...(product as unknown as { attributes?: Record<string, unknown> }).attributes,
     ...product.metadata,
     ...product.properties,
     ...product.specifications,

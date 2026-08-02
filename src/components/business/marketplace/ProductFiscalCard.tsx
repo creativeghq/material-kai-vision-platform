@@ -12,7 +12,7 @@
  * Supersedes `ProductMydataCard`, which covered VAT category + wholesale classification only.
  */
 import React, { useEffect, useState } from 'react';
-import { Loader2, Save, Receipt, Ship, Tag, Sparkles, Check, X, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, Receipt, Ship, Tag, Sparkles, Check, X, AlertTriangle, Info } from 'lucide-react';
 import { Label } from '@/components/core/ui/label';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -80,6 +80,13 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
   const [suggestion, setSuggestion] = useState<{
     code: string; confidence: number | null; reasoning: string | null; status: string;
   } | null>(null);
+  /**
+   * Where an ALREADY-APPLIED code came from. Previously only a pending suggestion carried its
+   * reasoning, so a code applied automatically by a confirmed rule appeared as a bare number
+   * with nothing saying why — the one case where "why is this code this code" is least likely
+   * to have been read by a human, and most likely to be asked at a border.
+   */
+  const [provenance, setProvenance] = useState<{ source: string; reasoning: string | null } | null>(null);
 
   const set = (patch: Partial<State>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -115,6 +122,11 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         taric: (row?.taric_code ?? '').replace(/[^0-9]/g, ''),
         origin: row?.country_of_origin ?? '',
       });
+      setProvenance(
+        row?.taric_code && row?.taric_source
+          ? { source: row.taric_source as string, reasoning: (row.taric_reasoning as string) ?? null }
+          : null,
+      );
       setSuggestion(
         row?.taric_code_suggested
           ? {
@@ -162,7 +174,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         ...(form.taric ? { taric_status: 'confirmed', taric_source: 'manual', taric_code_suggested: null } : {}),
       }).eq('id', productId);
       if (error) throw error;
-      if (form.taric) setSuggestion(null);
+      if (form.taric) { setSuggestion(null); setProvenance({ source: 'manual', reasoning: null }); }
       toast({ title: 'Product data saved' });
     } catch (err: any) {
       toast({ title: 'Save failed', description: err?.message, variant: 'destructive' });
@@ -341,6 +353,20 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
             </Button>
           </div>
         </Grid>
+
+        {/* Provenance of a code that is already applied. */}
+        {provenance && !suggestion && (
+          <p className="mt-2 text-[11px] text-muted-foreground flex items-start gap-1.5">
+            <Info className="h-3 w-3 mt-0.5 shrink-0" />
+            <span>
+              {provenance.source === 'category_rule' ? 'Applied automatically from a confirmed classification rule'
+                : provenance.source === 'supplier' ? 'Taken from the supplier’s own declaration'
+                : provenance.source === 'classifier' ? 'Accepted from an AI suggestion'
+                : 'Set by hand'}
+              {provenance.reasoning ? <> — {provenance.reasoning}</> : null}
+            </span>
+          </p>
+        )}
 
         {suggestion && (
           <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5 space-y-2">
