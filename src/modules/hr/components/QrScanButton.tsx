@@ -9,6 +9,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { QrCode, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 // BarcodeDetector isn't in the TS DOM lib yet.
 // deno-lint-ignore no-explicit-any
@@ -23,6 +25,7 @@ function extractVat(raw: string): string | null {
 export function QrScanButton({ onVat }: { onVat: (vat: string) => void }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -33,6 +36,13 @@ export function QrScanButton({ onVat }: { onVat: (vat: string) => void }) {
     streamRef.current = null;
   };
   useEffect(() => () => stop(), []);
+
+  // Hand-rolled overlay, not a Radix Dialog: Escape, the Tab trap and focus restore all have
+  // to be wired explicitly. Without them focus stayed on the trigger BEHIND this, and Tab
+  // walked the page underneath. (audit #302 finding 4)
+  // A full-screen camera view with no Escape was the worst of the four to be stuck inside.
+  useEscapeKey(open, () => { stop(); setOpen(false); });
+  useFocusTrap(overlayRef, open);
 
   const start = async () => {
     setError(null); setOpen(true);
@@ -68,7 +78,13 @@ export function QrScanButton({ onVat }: { onVat: (vat: string) => void }) {
     <>
       <Button variant="outline" onClick={start} className="w-full h-12 rounded-full"><QrCode className="h-5 w-5 mr-2" />Scan QR code</Button>
       {open && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4">
+        <div
+          ref={overlayRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Scan a work-card QR code"
+          className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4"
+        >
           <div className="relative w-full max-w-sm aspect-square rounded-2xl overflow-hidden bg-black">
             <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
             <div className="absolute inset-8 border-2 border-white/70 rounded-xl pointer-events-none" />

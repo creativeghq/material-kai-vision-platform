@@ -33,6 +33,8 @@ import React, {
 import { Button } from '@/components/core/ui/button';
 import { Brush, Eraser, Trash2, Sparkles, X, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 type Tool = 'brush' | 'eraser';
 
 export interface RegionEditResult {
@@ -59,6 +61,7 @@ export const RegionEditCanvas: React.FC<RegionEditCanvasProps> = ({
   onApply,
   onClose,
 }) => {
+  const overlayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -70,6 +73,12 @@ export const RegionEditCanvas: React.FC<RegionEditCanvasProps> = ({
   const [prompt, setPrompt] = useState('');
   const [applying, setApplying] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
+
+  // Hand-rolled overlay, not a Radix Dialog: Escape, the Tab trap and focus restore all have
+  // to be wired explicitly. Without them focus stayed on the trigger BEHIND this, and Tab
+  // walked the page underneath. (audit #302 finding 4)
+  useEscapeKey(true, onClose);
+  useFocusTrap(overlayRef, true);
 
   // Load image and size canvas to match
   useEffect(() => {
@@ -214,7 +223,13 @@ export const RegionEditCanvas: React.FC<RegionEditCanvasProps> = ({
   const canApply = hasMask && prompt.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm">
+    <div
+      ref={overlayRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Region edit"
+      className="fixed inset-0 z-50 flex flex-col bg-background/95 backdrop-blur-sm"
+    >
       {/* ── Top bar ── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/80">
         <div className="flex items-center gap-2">

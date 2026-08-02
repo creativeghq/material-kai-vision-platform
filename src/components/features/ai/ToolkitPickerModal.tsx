@@ -21,7 +21,7 @@
  *   Old default (all 50+ KAI tools bound) = ~12-15k tokens. Same cost only
  *   if the user actively asks for it.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   X, Check, Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe,
   Link2, FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Lock,
@@ -42,6 +42,8 @@ import {
 } from './agentToolsCatalog';
 import { HUBS } from '@/config/nav-items';
 import { Play } from 'lucide-react';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 // Every `icon:` referenced by TOOLKITS (cluster + quick_start) must resolve here —
 // an unknown name silently degrades to a generic Wrench rather than failing, so
@@ -77,6 +79,13 @@ export const ToolkitPickerModal: React.FC<Props> = ({
   open, onClose, role, enabledModules, activeToolkitIds, onChange,
   currentAgentId, onLaunchQuickStart,
 }) => {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  // Hand-rolled overlay, not a Radix Dialog: Escape, the Tab trap and focus restore all have
+  // to be wired explicitly. Without them focus stayed on the trigger BEHIND this, and Tab
+  // walked the page underneath. (audit #302 finding 4)
+  useEscapeKey(open, onClose);
+  useFocusTrap(overlayRef, open);
+
   const accessible = useMemo(
     () => {
       const byRoleAndModule = getAccessibleToolkits(role, enabledModules);
@@ -151,7 +160,13 @@ export const ToolkitPickerModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-      <div className="dashboard-card w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl">
+      <div
+        ref={overlayRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Choose toolkits"
+        className="dashboard-card w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl"
+      >
         {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-border">
           <div className="flex items-start gap-3">

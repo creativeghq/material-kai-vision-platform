@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, GitBranch, Loader2, CheckCircle2, Circle, Clock, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
@@ -13,6 +13,8 @@ import {
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteTimeline, TimelineStep } from '../services/QuotesService';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface ProjectTimelineModalProps {
   quoteId: string;
@@ -35,6 +37,13 @@ export const ProjectTimelineModal: React.FC<ProjectTimelineModalProps> = ({
   const [editStatus, setEditStatus] = useState<string>('');
   const [editNotes, setEditNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Hand-rolled overlay, not a Radix Dialog: Escape, the Tab trap and focus restore all have
+  // to be wired explicitly. Without them focus stayed on the trigger BEHIND this, and Tab
+  // walked the page underneath. (audit #302 finding 4)
+  useEscapeKey(true, onClose);
+  useFocusTrap(overlayRef, true);
 
   useEffect(() => {
     loadTimeline();
@@ -123,7 +132,13 @@ export const ProjectTimelineModal: React.FC<ProjectTimelineModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-end">
-      <div className="bg-white h-full w-full max-w-2xl shadow-2xl flex flex-col animate-in slide-in-from-right">
+      <div
+        ref={overlayRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Project timeline"
+        className="bg-white h-full w-full max-w-2xl shadow-2xl flex flex-col animate-in slide-in-from-right"
+      >
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 flex items-center justify-between">
           <div>
