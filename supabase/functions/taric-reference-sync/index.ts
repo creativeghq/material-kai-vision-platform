@@ -119,19 +119,24 @@ Deno.serve(withApiLogging(
 
     if (libraryId) {
       const language = (body.language ?? DEFAULT_LANGUAGE).toUpperCase();
+      console.log(`[taric] resolving ${language} under ${libraryId}`);
       const files = await resolveNomenclatureFiles(libraryId, [language]);
       const file = files[0];
+      console.log(`[taric] resolved ${file.name} (${file.id}) in "${file.folder}"`);
 
       // Each edition carries its own Language column, so the importer routes it into
       // description_en / description_el and the coalesce-based upsert merges the editions onto
       // one row across separate invocations.
       const bytes = await fetchBinary(circabcDownloadUrl(file.id, file.name));
+      console.log(`[taric] downloaded ${bytes.byteLength} bytes`);
       const g = bytes[0] === 0x50 && bytes[1] === 0x4b
         ? await parseXlsx(bytes)
         : parseDelimited(new TextDecoder().decode(bytes), detectDelimiter(new TextDecoder().decode(bytes)));
+      console.log(`[taric] parsed ${g.length} rows`);
       const res = await importGrid(
         supabase, g, language === 'EL' ? 'gr_national' : 'taric_eu', body.mapping ?? {},
       );
+      console.log('[taric] import complete');
       return json({
         ...res,
         resolved_from: 'circabc', library_id: libraryId,
