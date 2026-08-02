@@ -719,7 +719,14 @@ export const NewOrderModal: React.FC<{
       setLineProdOpts(prods.map((p) => ({ ...p, free: isSales ? (freeByProduct.get(p.id) ?? 0) : null })));
     }, 200);
     return () => clearTimeout(t);
-  }, [activeLine, items, open, isSales, workspaceId, party?.type, party?.id, locked, linkSearch]);
+    // Depends on the DESCRIPTION of the active line, not on the whole `items` array.
+    //
+    // `setItem` replaces the array on every field edit, so depending on `items` re-ran this on
+    // every keystroke in quantity, price, cost, unit or VAT — each run issuing 1–3 Supabase
+    // queries (products, the widened products retry, warehouse_items) for a search term that had
+    // not changed. Editing a quantity should not search the catalog.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLine, items[activeLine ?? -1]?.description, open, isSales, workspaceId, party?.type, party?.id, locked, linkSearch]);
 
   const setItem = (i: number, patch: Partial<Line>) => setItems((ls) => ls.map((l, idx) => idx === i ? { ...l, ...patch } : l));
   const addLine = () => setItems((ls) => [...ls, blankLine()]);

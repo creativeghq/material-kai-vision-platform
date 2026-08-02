@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import {
   Dialog,
   DialogContent,
@@ -1093,9 +1094,17 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                         {/* Material thumbnail */}
                         <div className="aspect-square bg-muted relative">
                           {mat.imageUrl ? (
+                            /* Thumbnail preset + lazy. This rendered the FULL-RESOLUTION original
+                               into a 3-column grid cell — a catalog image is routinely 2–4 MB, and
+                               a 30-result search pulled every one of them at full size. The
+                               transform is server-side (Supabase render endpoint) and
+                               getOptimizedImageUrl passes non-storage URLs straight through, so
+                               this is safe for external sources too. */
                             <img
-                              src={mat.imageUrl}
+                              src={getOptimizedImageUrl(mat.imageUrl, 'thumbnail')}
                               alt={mat.name}
+                              loading="lazy"
+                              decoding="async"
                               className="w-full h-full object-cover"
                               onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                             />

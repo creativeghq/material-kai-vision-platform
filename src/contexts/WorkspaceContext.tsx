@@ -154,13 +154,26 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     await redeemPending(REFERRAL_STORAGE_KEY, (c) => workspaceManagementService.redeemReferral(c), 'referral');
     await redeemPending(INVITE_STORAGE_KEY, (c) => workspaceManagementService.redeemInvite(c), 'invitation');
 
-    const { data, error } = await supabase
-      .from('workspace_members')
-      .select(
-        'role, status, workspace:workspaces(id, name, slug, is_root, parent_workspace_id, can_supply_products, catalog_access)',
-      )
-      .eq('user_id', user.id)
-      .eq('status', 'active');
+    // These two are INDEPENDENT, and both gate `loading`, which every route sits behind via
+    // AuthGuard — so awaiting them in sequence added a full round trip to the first paint of every
+    // authenticated page. The account role additionally used to be a SECOND hop (user_profiles →
+    // roles); `roles(name)` embeds it, so what was three serial queries is now one round trip.
+    const [membersRes, profileRes] = await Promise.all([
+      supabase
+        .from('workspace_members')
+        .select(
+          'role, status, workspace:workspaces(id, name, slug, is_root, parent_workspace_id, can_supply_products, catalog_access)',
+        )
+        .eq('user_id', user.id)
+        .eq('status', 'active'),
+      supabase
+        .from('user_profiles')
+        .select('role_id, roles(name)')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ]);
+
+    const { data, error } = membersRes;
 
     if (error) {
       // Fail soft: no memberships rather than a hard crash. RLS or a transient
@@ -174,15 +187,14 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const rows = (data ?? []).map(mapMembership).filter(Boolean) as WorkspaceMembership[];
     setMemberships(rows);
 
-    // Account role (the access tier set under Users) — roles has no FK from
-    // user_profiles, so resolve the name in a second cheap lookup.
+    // Account role (the access tier set under Users), already resolved by the embed in the
+    // Promise.all above — no second hop. Kept fail-soft: an unreadable profile means "no account
+    // role", never a blocked app.
     try {
-      const { data: prof } = await supabase
-        .from('user_profiles').select('role_id').eq('user_id', user.id).maybeSingle();
+      const prof = profileRes.data as { role_id?: string | null; roles?: { name?: string } | { name?: string }[] | null } | null;
+      const embedded = Array.isArray(prof?.roles) ? prof?.roles[0] : prof?.roles;
       if (prof?.role_id) {
-        const { data: r } = await supabase
-          .from('roles').select('name').eq('id', prof.role_id).maybeSingle();
-        setAccountRole((r as { name?: string } | null)?.name ?? null);
+        setAccountRole(embedded?.name ?? null);
       } else {
         setAccountRole(null);
       }

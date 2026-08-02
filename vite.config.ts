@@ -68,10 +68,25 @@ export default defineConfig(({ mode }) => {
           manualChunks: (id) => {
             if (!id.includes('node_modules')) return undefined;
 
-            // Extract "pkg" or "@scope/pkg" from the resolved path
-            const m = id.match(/node_modules[\\/](@[^\\/]+[\\/][^\\/]+|[^\\/]+)/);
+            // Extract "pkg" or "@scope/pkg" from the resolved path.
+            //
+            // Split on the LAST `node_modules/`, not the first. Nested package stores put a second
+            // one in the path — Deno vendors as
+            //   .../node_modules/.deno/react@18.3.1/node_modules/react/index.js
+            // and pnpm as  .../node_modules/.pnpm/.../node_modules/react/... — so matching the
+            // FIRST segment yields `.deno` (or `.pnpm`) for every package, CHUNK[pkg] is undefined
+            // for all of them, and manualChunks silently assigns nothing.
+            //
+            // That failure is invisible: the build still succeeds and emits a working bundle, just
+            // with a completely different chunk shape from CI. It is what produced the retracted
+            // "every visitor downloads 1.37 MB of three.js" claim in audit #308 — a conclusion
+            // drawn from a local artifact that is not the one we ship. Taking the last segment is
+            // correct for a flat tree too, so this is strictly more robust, not a special case.
+            const norm = id.replace(/\\/g, '/'); // normalise Windows separators
+            const tail = norm.split('node_modules/').pop();
+            const m = tail?.match(/^(@[^/]+\/[^/]+|[^/]+)/);
             if (!m) return undefined;
-            const pkg = m[1].replace(/\\/g, '/'); // normalise Windows separators
+            const pkg = m[1];
 
             // Chunk assignments — mirrors the old array-based config exactly,
             // with @sparkjsdev/spark added to vendor-3d.

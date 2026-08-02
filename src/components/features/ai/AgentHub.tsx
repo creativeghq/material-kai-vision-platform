@@ -3,7 +3,7 @@
  * Replaces SearchHub with comprehensive agent orchestration
  */
 
-import React, { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo, memo, lazy, Suspense } from 'react';
 import { getErrorMessage } from '@/core/errors/utils';
 import {
   Bot,
@@ -123,7 +123,14 @@ import type { SheetType } from '@/services/moodboardSheetsService';
 // Agent response caching removed 2026-07-06 (see the send handler) — it replayed stale
 // full-text answers and short-circuited the live agent. Do not reintroduce for KAI.
 import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
-import { WorldViewer } from './WorldViewer';
+/**
+ * Lazy. WorldViewer statically imports `three` and `@sparkjsdev/spark`, so a plain import pulled
+ * the entire 3D runtime (1.4 MB raw) into the Agent Hub chunk — loaded whenever anyone opens
+ * /agents, whether or not a world is ever viewed. It renders at exactly two call sites, both
+ * behind a flow most sessions never reach. Sibling components already do this
+ * (LightingPreviewModal, ProductCard).
+ */
+const WorldViewer = lazy(() => import('./WorldViewer').then((m) => ({ default: m.WorldViewer })));
 import { vrWorldService } from '@/services/vrWorldService';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 import { moodboardAPI } from '@/services/moodboardAPI';
@@ -4445,22 +4452,25 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (message.worldData) {
       return (
         <div className="space-y-4">
-          <WorldViewer
-            vrWorldId={message.worldData.vrWorldId}
-            initialStatus={message.worldData.status}
-            splatUrls={{
-              draft: message.worldData.splatUrl100k,
-              standard: message.worldData.splatUrl500k,
-              full: message.worldData.splatUrlFull,
-            }}
-            colliderUrl={message.worldData.colliderGlbUrl}
-            caption={message.worldData.caption}
-            onRetry={() => {
-              if (message.worldData?.sourceImageUrl) {
-                handleGenerateVR(message.worldData.sourceImageUrl, { prompt: message.worldData.prompt }, message);
-              }
-            }}
-          />
+          {/* A lazy component MUST have a Suspense boundary above it. */}
+          <Suspense fallback={<div className="flex h-64 items-center justify-center rounded-md border border-border/60 bg-muted/20 text-xs text-muted-foreground">Loading 3D viewer…</div>}>
+            <WorldViewer
+              vrWorldId={message.worldData.vrWorldId}
+              initialStatus={message.worldData.status}
+              splatUrls={{
+                draft: message.worldData.splatUrl100k,
+                standard: message.worldData.splatUrl500k,
+                full: message.worldData.splatUrlFull,
+              }}
+              colliderUrl={message.worldData.colliderGlbUrl}
+              caption={message.worldData.caption}
+              onRetry={() => {
+                if (message.worldData?.sourceImageUrl) {
+                  handleGenerateVR(message.worldData.sourceImageUrl, { prompt: message.worldData.prompt }, message);
+                }
+              }}
+            />
+          </Suspense>
           {message.worldData.splatUrl100k && (
             <div className="flex justify-end">
               <MoodboardSavePopover
@@ -5379,26 +5389,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         {canvasShown ? (
                           <ArtifactChip kind="world" title={message.worldData.caption || message.worldData.prompt || 'VR world'} active={activeCanvasId === message.id} onOpen={() => focusCanvas(message.id)} />
                         ) : (<>
-                        <WorldViewer
-                          vrWorldId={message.worldData.vrWorldId}
-                          initialStatus={message.worldData.status}
-                          splatUrls={{
-                            draft: message.worldData.splatUrl100k,
-                            standard: message.worldData.splatUrl500k,
-                            full: message.worldData.splatUrlFull,
-                          }}
-                          colliderUrl={message.worldData.colliderGlbUrl}
-                          caption={message.worldData.caption}
-                          onRetry={() => {
-                            if (message.worldData?.sourceImageUrl) {
-                              handleGenerateVR(
-                                message.worldData.sourceImageUrl,
-                                { prompt: message.worldData.prompt },
-                                message,
-                              );
-                            }
-                          }}
-                        />
+                        {/* A lazy component MUST have a Suspense boundary above it. */}
+                        <Suspense fallback={<div className="flex h-64 items-center justify-center rounded-md border border-border/60 bg-muted/20 text-xs text-muted-foreground">Loading 3D viewer…</div>}>
+                          <WorldViewer
+                            vrWorldId={message.worldData.vrWorldId}
+                            initialStatus={message.worldData.status}
+                            splatUrls={{
+                              draft: message.worldData.splatUrl100k,
+                              standard: message.worldData.splatUrl500k,
+                              full: message.worldData.splatUrlFull,
+                            }}
+                            colliderUrl={message.worldData.colliderGlbUrl}
+                            caption={message.worldData.caption}
+                            onRetry={() => {
+                              if (message.worldData?.sourceImageUrl) {
+                                handleGenerateVR(
+                                  message.worldData.sourceImageUrl,
+                                  { prompt: message.worldData.prompt },
+                                  message,
+                                );
+                              }
+                            }}
+                          />
+                        </Suspense>
                         {message.worldData.splatUrl100k && (
                           <div className="flex justify-end">
                             <MoodboardSavePopover

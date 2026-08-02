@@ -35,7 +35,6 @@ import { PageHeader } from '@/components/shared/PageHeader';
 
 export const MoodBoardPage = () => {
   const [moodboards, setMoodboards] = useState<MoodBoard[]>([]);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -197,13 +196,12 @@ export const MoodBoardPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <div
-          className={
-            viewMode === 'grid'
-              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-              : 'space-y-4'
-          }
-        >
+        /* Grid only. This was a `viewMode === 'grid' ? … : 'space-y-4'` ternary, but nothing
+           ever called setViewMode, so the list branch was unreachable and the toggle that
+           would have selected it does not exist.
+           NB: a `{/* … *\/}` JSX comment cannot go here — a ternary branch takes ONE expression,
+           and the comment counts as a second child. Plain block comment instead. */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {moodboards.map((board) => (
             <DashboardCard
               key={board.id}

@@ -349,24 +349,33 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     try {
       setError(null);
 
-      // Fetch background jobs (PDF, Web Scraping, Product Discovery, and Image Embedding Regeneration)
-      const { data: bgJobsData, error: bgJobsError } = await supabase
-        .from('background_jobs')
-        .select('*')
-        .in('job_type', ['pdf_processing', 'web_scraping', 'product_discovery_upload', 'image_embedding_regeneration'])
-        .order('created_at', { ascending: false })
-        // Both job sources are merged and filtered per-tab client-side, so server-side paging
-        // isn't available here; the cap is raised instead so pagination isn't paging a truncation.
-        .limit(500);
+      // The two sources are INDEPENDENT, so they run concurrently.
+      //
+      // They used to be awaited in sequence, which meant this screen — one admins leave open all
+      // day — did two serial round trips for up to 1,000 rows every 10 seconds (`setInterval`
+      // below), paying the sum of both latencies on every tick instead of the larger of the two.
+      const [bgJobsRes, xmlJobsRes] = await Promise.all([
+        // Fetch background jobs (PDF, Web Scraping, Product Discovery, Image Embedding Regeneration)
+        supabase
+          .from('background_jobs')
+          .select('*')
+          .in('job_type', ['pdf_processing', 'web_scraping', 'product_discovery_upload', 'image_embedding_regeneration'])
+          .order('created_at', { ascending: false })
+          // Both job sources are merged and filtered per-tab client-side, so server-side paging
+          // isn't available here; the cap is raised instead so pagination isn't paging a truncation.
+          .limit(500),
+        // XML import jobs from data_import_jobs
+        supabase
+          .from('data_import_jobs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(500),
+      ]);
+
+      const { data: bgJobsData, error: bgJobsError } = bgJobsRes;
+      const { data: xmlJobsData, error: xmlJobsError } = xmlJobsRes;
 
       if (bgJobsError) throw bgJobsError;
-
-      // 🆕 Fetch XML import jobs from data_import_jobs table
-      const { data: xmlJobsData, error: xmlJobsError } = await supabase
-        .from('data_import_jobs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
 
       if (xmlJobsError) {
         console.warn('⚠️ Failed to fetch XML import jobs:', xmlJobsError);
