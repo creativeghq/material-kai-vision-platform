@@ -1,43 +1,27 @@
 // Global type declarations.
 //
-// Only add module declarations here for libraries that genuinely ship no types.
-// Do NOT stub third-party libraries as `unknown` — that overrides their real
-// typings and silently breaks every downstream consumer. If a library has a
-// DefinitelyTyped package (@types/foo) installed, trust it.
+// Only add a module declaration here for a library that genuinely ships no types.
+// Do NOT stub a third-party library — that overrides its real typings and silently breaks every
+// downstream consumer. If a library has a DefinitelyTyped package (@types/foo) installed, trust it.
+//
+// This file used to break its own rule. It declared:
+//
+//     declare module '@tanstack/react-query' { export * from 'react-query'; }
+//
+// which pointed @tanstack/react-query (v5) at `react-query` — a DIFFERENT package, and one that is
+// not even installed. The only thing resolving that name was @types/react-query@1.2.8: typings for
+// v1 of the predecessor library, against a v5 runtime. Anyone writing useQuery would have been
+// type-checked against `useQuery('key', fn)` (v1) while the runtime expected
+// `useQuery({ queryKey, queryFn })` (v5). That is very likely WHY nothing ever used it — the first
+// person to try would have hit nonsense errors and reached for useEffect instead.
+//
+// React Query has since been removed entirely (it was mounted app-wide with zero call sites), so
+// the declaration, the two @tanstack packages and @types/react-query are all gone.
+//
+// Also removed: 28 empty `declare module 'x' {}` stubs for transitive @types packages. They were
+// suppressing errors that no longer occur — verified by deleting them and running the full
+// typecheck clean. An empty stub that suppresses nothing is indistinguishable from one that is
+// load-bearing, which is exactly how this file accumulated a rule-breaking declaration in the
+// middle of it without anyone noticing.
 
-declare module '@tanstack/react-query' {
-  export * from 'react-query';
-}
-
-// Tell TypeScript to ignore these transitive `@types` packages that don't
-// need to participate in the project's type graph. Empty `declare module`
-// body is a supported way to suppress "missing type declaration" errors
-// without pretending the module has a specific shape.
-declare module 'babel__core' {}
-declare module 'babel__generator' {}
-declare module 'babel__template' {}
-declare module 'babel__traverse' {}
-declare module 'd3-array' {}
-declare module 'd3-color' {}
-declare module 'd3-ease' {}
-declare module 'd3-interpolate' {}
-declare module 'd3-path' {}
-declare module 'd3-scale' {}
-declare module 'd3-shape' {}
-declare module 'd3-time' {}
-declare module 'd3-timer' {}
-declare module 'draco3d' {}
-declare module 'history' {}
-declare module 'istanbul-lib-coverage' {}
-declare module 'istanbul-lib-report' {}
-declare module 'istanbul-reports' {}
-declare module 'json5' {}
-declare module 'offscreencanvas' {}
-declare module 'phoenix' {}
-declare module 'prop-types' {}
-declare module 'react-reconciler' {}
-declare module 'stack-utils' {}
-declare module 'stats.js' {}
-declare module 'use-sync-external-store' {}
-declare module 'webxr' {}
-declare module 'yargs-parser' {}
+export {};

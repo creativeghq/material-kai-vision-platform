@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 // @ts-ignore - QueryClient types are available at runtime (react-query version conflict with React 18 types)
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HelmetProvider } from 'react-helmet-async';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
@@ -155,21 +154,9 @@ const CoveragePage = () => (
   </div>
 );
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes — avoid redundant refetches on mount
-      gcTime: 10 * 60 * 1000, // 10 minutes garbage collection
-      refetchOnWindowFocus: false, // don't refetch on tab switch
-      retry: 1, // single retry on failure
-    },
-  },
-});
-
 const App = () => (
   <CriticalErrorBoundary name="Application Root">
     <HelmetProvider>
-    <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <WorkspaceProvider>
         <ThemeProvider>
@@ -949,7 +936,6 @@ const App = () => (
         </ThemeProvider>
         </WorkspaceProvider>
       </AuthProvider>
-    </QueryClientProvider>
     </HelmetProvider>
   </CriticalErrorBoundary>
 );

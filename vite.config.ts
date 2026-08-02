@@ -126,8 +126,6 @@ export default defineConfig(({ mode }) => {
               // Left to Rollup, the eagerly-reachable core lands with the entry and the
               // lazily-reached tracing/replay code becomes its own chunk. See audit #308 finding 2.
               // Data layer
-              '@tanstack/react-query': 'vendor-query',
-              '@tanstack/query-core': 'vendor-query',
               // Flow builder — Rollup import ordering guarantees React loads first
               '@xyflow/react': 'vendor-flow',
               '@xyflow/system': 'vendor-flow',
