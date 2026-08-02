@@ -33,6 +33,27 @@ rules:
       - pattern: import 'rehype-raw'
       - pattern: import $X from 'rehype-raw'
 
+  # Invariant 11 says "do NOT hand-roll a local copy — the old per-file copies drifted to 3
+  # different strengths", but nothing enforced that half of it: the three rules above cover how
+  # HTML is RENDERED, none covered how it is ESCAPED. A fourth copy had duly reappeared in
+  # _shared/react-email-renderer.ts. It escaped the full set, so it was not a hole — which is the
+  # point: a drifted copy is only dangerous later, and by then nobody re-reads it.
+  - id: no-local-escape-html
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >
+      XSS (invariant 11): hand-rolled HTML escaper. Import `escapeHtml` from
+      `_shared/html.ts` (edge) or `@/utils/escapeHtml` (frontend) — both escape the full
+      & < > " ' set and are attribute-safe. Local copies drift.
+    paths:
+      exclude:
+        - "src/utils/escapeHtml.ts"
+        - "supabase/functions/_shared/html.ts"
+    pattern-either:
+      - pattern: function escapeHtml(...) { ... }
+      - pattern: const escapeHtml = (...) => { ... }
+      - pattern: const escapeHtml = function (...) { ... }
+
   # ── A · Auth (invariant 1/5) ────────────────────────────────────────────────
   - id: no-jwt-verification-disabled
     languages: [python]

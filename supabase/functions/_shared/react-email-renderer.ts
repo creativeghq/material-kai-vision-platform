@@ -6,6 +6,7 @@
 import { render } from 'npm:@react-email/render@1.0.0';
 import * as React from 'npm:react@18.2.0';
 import * as ReactEmailComponents from 'npm:@react-email/components@0.0.25';
+import { escapeHtml } from './html.ts';
 
 /**
  * Renders a React Email template to HTML
@@ -74,18 +75,10 @@ function transformReactCode(code: string, variables: Record<string, any>): strin
   return transformed;
 }
 
-/**
- * Renders a React Email template with simple variable replacement
- * This is a fallback for when the React rendering fails
- */
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+// escapeHtml is imported from _shared/html.ts, never hand-rolled here — CLAUDE.md invariant 11.
+// This local copy happened to escape the same full set, so it was not a hole, but it is exactly
+// the shape that let the earlier per-file copies drift to three different strengths. The canonical
+// one also takes `unknown` and null-guards, where this took a bare `string`.
 
 export function renderTemplateWithVariables(
   template: string,
