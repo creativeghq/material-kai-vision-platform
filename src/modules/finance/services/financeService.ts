@@ -2607,6 +2607,18 @@ export interface PartyLedgerRow { entry_date: string | null; doc_kind: string; d
 export type MyDataBucket = 'accepted' | 'offline_pending' | 'rejected' | 'failed' | 'not_transmitted';
 export interface MyDataReconRow { doc_kind: 'invoice' | 'credit_note' | 'delivery_note'; doc_id: string; doc_number: string | null; issued_at: string | null; total: number | null; currency: string | null; fiscal_status: string | null; fiscal_mark: string | null; bucket: MyDataBucket }
 export interface SalesPerCustomerRow { party_type: 'company'|'contact'; party_id: string; display_name: string; invoice_count: number; revenue_net: number; gross_margin: number }
+/** One Intrastat declaration line: commodity code x partner country x country of origin. */
+export interface IntrastatRow {
+  cn8: string;
+  description: string | null;
+  partner_country: string;
+  country_of_origin: string | null;
+  net_mass_kg: number | null;
+  invoiced_value: number | null;
+  currency: string | null;
+  lines: number;
+}
+
 export interface MyfRow { direction: 'sales' | 'purchases'; counterparty_name: string; vat_number: string | null; doc_count: number; net: number; vat: number; gross: number }
 export interface SalesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; revenue_net: number; gross_margin: number }
 export interface CustomerTopProductRow { product_id: string; description: string; sku: string | null; total_quantity: number; revenue_net: number; order_count: number; last_ordered: string | null; on_hand: number }
@@ -2912,6 +2924,29 @@ const _financeServiceV2 = {
     if (error) throw error;
     return Number(data ?? 0);
   },
+  /**
+   * Intrastat — the monthly statistical return for goods crossing an intra-EU border.
+   *
+   * Flattened to one row per commodity code / partner / origin so it drops straight into the
+   * generic report table and its CSV export. The RPC also returns how many in-scope lines had NO
+   * commodity code or NO weight; those are surfaced as a warning rather than dropped, because a
+   * return that is quietly short is worse than one that says what it is missing.
+   */
+  async reportIntrastat(
+    workspaceId: string, from: string, to: string, direction: 'dispatch' | 'arrival',
+  ): Promise<{ rows: IntrastatRow[]; unclassified: number; unweighed: number }> {
+    const { data, error } = await supabase.rpc('get_intrastat_lines', {
+      p_workspace_id: workspaceId, p_from: from, p_to: to, p_direction: direction,
+    });
+    if (error) throw error;
+    const r = (data ?? {}) as Record<string, unknown>;
+    return {
+      rows: (r.rows ?? []) as IntrastatRow[],
+      unclassified: Number(r.unclassified_lines ?? 0),
+      unweighed: Number(r.unweighed_lines ?? 0),
+    };
+  },
+
   async reportMyf(workspaceId: string, from: string, to: string): Promise<MyfRow[]> {
     const { data, error } = await supabase.rpc('report_myf', { p_workspace_id: workspaceId, p_from: from, p_to: to });
     if (error) throw error;

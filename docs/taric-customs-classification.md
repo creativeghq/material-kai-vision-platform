@@ -242,6 +242,67 @@ Intrastat consumer that needs it.
 
 Neither auto-heals. Guessing a replacement tariff code is the thing this system refuses to do.
 
+## What consumes the code
+
+Classification is only worth doing if something downstream reads it. Four consumers, in
+dependency order.
+
+### 1. The line snapshot — everything else rests on this
+
+`invoice_items`, `order_items` and `delivery_note_items` each carry `taric_code`,
+`country_of_origin` and `net_mass_kg`, stamped **at INSERT by a trigger**
+(`stamp_customs_snapshot`) rather than by each writer. Invoice lines alone are written by
+`NewInvoiceDialog`, `delivery_note_to_invoice`, `finance-customer-documents` and the quote
+conversion; six writers is six chances to forget, and the one that forgets produces a line that
+looks complete and declares nothing. The trigger only fills what the caller left NULL, so an
+explicit override always wins.
+
+**Why snapshot at all:** `products.taric_code` is a *current* value; a declaration is a
+*historical statement*. The EU republishes the nomenclature monthly, so a report joining back to
+the product would restate a past period every time a code was renumbered — wrong with no error
+and no symptom until an audit. `invoice_items` already snapshots `unit_cost_snapshot` and
+`measurement_unit_code` for the same reason.
+
+`product_net_mass_kg(product, qty, unit)` converts the line quantity to the product's base unit
+and multiplies by `kg_per_piece` (falling back to the stock row's measured weight). NULL when
+neither is known — a fabricated mass on a declaration is worse than a blank one.
+
+### 2. Landed cost on the order — the €3 rule made visible
+
+`get_order_customs_preview(order)` groups the order's lines by **6-digit HS sub-heading** and
+returns `€3 × distinct sub-headings`. Shown on the order detail as *Customs*.
+
+This is the commercial point of the whole feature: the charge is per sub-heading, not per parcel,
+so consolidating goods into fewer sub-headings is a real saving that is invisible unless
+something counts them. The card states its own assumptions — `subheading_level: 6`, because the
+published rule text does not name the level — and turns the estimate off above €150 with an
+explicit note, rather than printing a number that does not hold.
+
+Lines with no code or no weight are counted and shown, never silently excluded: an unclassified
+line is precisely the one that holds up a clearance.
+
+### 3. Intrastat
+
+`get_intrastat_lines(workspace, from, to, direction)` returns one row per
+(CN-8 × partner country × country of origin) with net mass and invoiced value. Surfaced as two
+reports in **Finance → Reports** — *Intrastat — dispatches (sales)* and *— arrivals (purchases)* —
+which inherits the period picker, sorting and CSV export rather than being a new screen.
+
+- **Dispatches** = issued sales invoices to a customer in another EU member state.
+- **Arrivals** = purchase orders from a supplier in another EU member state.
+- Greece is excluded on both sides; Intrastat is cross-border only. Non-EU trade is a customs
+  declaration, not Intrastat.
+
+The report reports **its own gaps**: in-scope lines with no commodity code or no weight are
+counted and shown above the table, because a statutory return that is quietly short is worse than
+one that declares what it is missing. Known limit: an inbound myDATA document whose lines were
+never received into the warehouse has no product link and therefore no code, so it cannot appear.
+
+### 4. The invoice line
+
+`FiscalLine` carries `commodityCode` and `countryOfOrigin`, read from the line snapshot. A
+cross-border commercial invoice is expected to show the commodity code per line.
+
 ## Not built
 
 - **Duty rates, quotas, suspensions and anti-dumping measures.** `taric_codes` holds nomenclature

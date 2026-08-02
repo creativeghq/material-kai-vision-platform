@@ -49,6 +49,14 @@ export interface FiscalLine {
   description: string;
   quantity: number;
   measurementUnitLabel?: string;
+  /**
+   * Customs facts, snapshotted on the document line — never re-read from the product.
+   * A reissued or reprinted invoice must keep saying what it said, and the EU republishes the
+   * nomenclature monthly. A cross-border commercial invoice is expected to carry the commodity
+   * code per line; origin is what decides preference and anti-dumping.
+   */
+  commodityCode?: string;
+  countryOfOrigin?: string;
   unitPrice: number;
   netValue: number;
   discountValue?: number;

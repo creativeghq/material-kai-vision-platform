@@ -10,6 +10,7 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
+import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from '@/components/core/ui/dropdown-menu';
@@ -2442,6 +2443,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 the payments list. Tabbed, each is one click and the order's own summary stays put.
                 A tab appears only when it has something in it, so an order with no invoices does
                 not offer an empty Invoices tab. */}
+            {/* Rendered above the tabs rather than as one of them: the card returns null unless
+                the order actually has classified goods, so it costs nothing when irrelevant and
+                does not need a place in the orderTabs computation. */}
+            <OrderCustomsCard orderId={order.id} />
+
             {orderTabs.length > 0 && (
             <Tabs defaultValue={orderTabs[0]} className="w-full">
               <TabsList>

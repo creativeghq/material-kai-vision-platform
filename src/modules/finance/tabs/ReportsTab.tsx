@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -18,12 +18,13 @@ type ReportKind =
   | 'spend_per_supplier' | 'payments_out_per_counterparty' | 'payments_in_per_counterparty'
   | 'top_customer_outstanding' | 'top_supplier_outstanding'
   | 'vat_return' | 'vat_by_code' | 'mydata_reconciliation' | 'myf'
+  | 'intrastat_dispatch' | 'intrastat_arrival'
   | 'open_tasks';
 
 type Period = 'this_month' | 'last_month' | 'last_quarter' | 'ytd' | 'last_year' | 'custom';
 type SortDir = 'desc' | 'asc';
 
-type ReportGroup = 'overview' | 'sales' | 'purchases' | 'payments' | 'outstanding' | 'vat' | 'tasks';
+type ReportGroup = 'overview' | 'sales' | 'purchases' | 'payments' | 'outstanding' | 'vat' | 'customs' | 'tasks';
 
 const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: 'range' | 'snapshot' }[] = [
   // Overview (Oxygen Ταμείο)
@@ -48,6 +49,10 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   { value: 'vat_by_code', label: 'VAT analysis (by myDATA code)', group: 'vat', period: 'range' },
   { value: 'mydata_reconciliation', label: 'myDATA reconciliation', group: 'vat', period: 'range' },
   { value: 'myf', label: 'MYF summary (per counterparty)', group: 'vat', period: 'range' },
+  // Statutory statistical return for intra-EU goods movements. Rows come out one per
+  // commodity code / partner / origin, so the generic table and its CSV export carry them.
+  { value: 'intrastat_dispatch', label: 'Intrastat — dispatches (sales)',   group: 'customs', period: 'range' },
+  { value: 'intrastat_arrival',  label: 'Intrastat — arrivals (purchases)', group: 'customs', period: 'range' },
   // Outstanding snapshots (no period)
   { value: 'top_customer_outstanding', label: 'Top outstanding customers', group: 'outstanding', period: 'snapshot' },
   { value: 'top_supplier_outstanding', label: 'Top outstanding suppliers', group: 'outstanding', period: 'snapshot' },
@@ -61,6 +66,7 @@ const GROUP_LABELS: Record<ReportGroup, string> = {
   purchases: 'Purchases',
   payments: 'Payments (cash movements)',
   vat: 'VAT / myDATA',
+  customs: 'Customs (Intrastat)',
   outstanding: 'Outstanding (snapshot)',
   tasks: 'Tasks',
 };
@@ -104,6 +110,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<any[]>([]);
+  const [intrastatWarning, setIntrastatWarning] = useState<string | null>(null);
 
   const range = period === 'custom' ? { from: customFrom, to: customTo } : rangeForPeriod(period);
   const isSnapshot = REPORTS.find((r) => r.value === report)?.period === 'snapshot';
@@ -155,8 +162,25 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           data = await financeService.reportMyf(workspaceId, range.from, range.to); break;
         case 'open_tasks':
           data = await financeService.reportOpenTasks(workspaceId); break;
+        case 'intrastat_dispatch':
+        case 'intrastat_arrival': {
+          const res = await financeService.reportIntrastat(
+            workspaceId, range.from, range.to,
+            report === 'intrastat_dispatch' ? 'dispatch' : 'arrival',
+          );
+          data = res.rows;
+          // Never let a short return look complete: an in-scope line with no commodity code or
+          // no weight is one the declaration would silently omit.
+          setIntrastatWarning(
+            res.unclassified > 0 || res.unweighed > 0
+              ? `${res.unclassified} line(s) in scope have no commodity code and ${res.unweighed} have no weight — they are NOT in this return.`
+              : null,
+          );
+          break;
+        }
       }
       setRows(data);
+      if (!report.startsWith('intrastat')) setIntrastatWarning(null);
     } catch (err: any) {
       toast({ title: 'Report failed', description: err?.message, variant: 'destructive' });
       setRows([]);
@@ -269,6 +293,14 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
             <Download className="h-3.5 w-3.5 mr-1" /> Export CSV
           </Button>
         </div>
+        {/* What the return would silently omit. Shown above the table, not in a toast: this is a
+            property of the result, and it has to still be on screen when the CSV is exported. */}
+        {intrastatWarning && !loading && (
+          <p className="flex items-start gap-2 border-b border-border/60 px-4 py-2 text-xs text-amber-500">
+            <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            {intrastatWarning}
+          </p>
+        )}
         <CardContent className="p-0">
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>

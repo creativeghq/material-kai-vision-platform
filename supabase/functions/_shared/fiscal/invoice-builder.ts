@@ -278,6 +278,11 @@ export async function buildInvoiceInputFromDb(
       }),
       quantity: Number(it.quantity ?? 1),
       measurementUnitLabel: it.unit ?? 'ΤΜΧ',
+      // Commodity code AS SNAPSHOTTED on the line, never re-read from the product: a reissued or
+      // reprinted invoice must keep saying what it said, and the nomenclature moves monthly.
+      // Cross-border commercial invoices are expected to carry it per line.
+      commodityCode: it.taric_code ?? undefined,
+      countryOfOrigin: it.country_of_origin ?? undefined,
       unitPrice: Number(it.unit_price ?? 0),
       netValue: net,
       vatCategory: lineCat,
@@ -457,6 +462,11 @@ export async function buildCreditNoteInputFromDb(
       description: it.description ?? 'Credit',
       quantity: Number(it.quantity ?? 1),
       measurementUnitLabel: it.unit ?? 'ΤΜΧ',
+      // Commodity code AS SNAPSHOTTED on the line, never re-read from the product: a reissued or
+      // reprinted invoice must keep saying what it said, and the nomenclature moves monthly.
+      // Cross-border commercial invoices are expected to carry it per line.
+      commodityCode: it.taric_code ?? undefined,
+      countryOfOrigin: it.country_of_origin ?? undefined,
       unitPrice: Number(it.unit_price ?? 0),
       netValue: net,
       vatCategory: lineCat,
