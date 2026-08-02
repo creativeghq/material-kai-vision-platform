@@ -41,16 +41,15 @@ Sentry.init({
   // plus for 100% of sessions with an error
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
+  // Only the CHEAP integrations start eagerly. Browser tracing and session replay are the two
+  // heavy ones and neither is needed to capture an error — they are added after first paint,
+  // below. vendor-sentry was 135 KiB gzip / 406 KiB raw, the largest chunk in the initial payload
+  // and bigger than React itself (59 KiB), loading on every page including anonymous ones
+  // (/, /tools/*, /quote/:id, /storefront). See audit #308 finding 2.
+  //
+  // The core error handler stays synchronous ON PURPOSE: errors thrown during initial render are
+  // the hardest to reproduce and the most worth catching, so nothing that reports them is deferred.
   integrations: [
-    // Browser performance tracking
-    Sentry.browserTracingIntegration(),
-
-    // Session replay - records user sessions when errors occur
-    Sentry.replayIntegration({
-      maskAllText: false,
-      blockAllMedia: false,
-    }),
-
     // Automatically capture console.error() calls
     Sentry.captureConsoleIntegration({
       levels: ['error', 'assert'],
@@ -146,3 +145,37 @@ root.render(
     <App />
   </StrictMode>,
 );
+
+/**
+ * Attach the HEAVY Sentry integrations after first paint (audit #308 finding 2).
+ *
+ * Browser tracing and session replay are the two expensive parts of the SDK and neither is needed
+ * to report an error — `Sentry.init` above already captures exceptions, unhandled rejections and
+ * console.error from the first line of script. These two only add performance spans and session
+ * recording, both of which are useless before anything has rendered.
+ *
+ * Deferred behind `requestIdleCallback` so it never competes with the initial render; the timeout
+ * guarantees it still runs on a busy main thread, and the setTimeout fallback covers Safari, which
+ * has no requestIdleCallback.
+ *
+ * NOTE ON BYTES: this defers WORK reliably. Whether it also moves bytes out of the initial chunk
+ * depends on Rollup being able to split `@sentry/react` internally — measured after this change
+ * rather than assumed. If the chunk did not shrink, the win is startup CPU, not payload.
+ */
+const attachHeavySentryIntegrations = () => {
+  void import('@sentry/react')
+    .then(({ browserTracingIntegration, replayIntegration, addIntegration }) => {
+      addIntegration(browserTracingIntegration());
+      addIntegration(replayIntegration({ maskAllText: false, blockAllMedia: false }));
+    })
+    .catch(() => {
+      // Non-fatal: tracing and replay are diagnostics. Error reporting is already live and
+      // unaffected, so a failure here must never surface to the user.
+    });
+};
+
+if (typeof window.requestIdleCallback === 'function') {
+  window.requestIdleCallback(attachHeavySentryIntegrations, { timeout: 5000 });
+} else {
+  window.setTimeout(attachHeavySentryIntegrations, 2000);
+}

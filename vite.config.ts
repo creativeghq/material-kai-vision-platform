@@ -114,7 +114,17 @@ export default defineConfig(({ mode }) => {
               // Supabase
               '@supabase/supabase-js': 'vendor-supabase',
               // Sentry
-              '@sentry/react': 'vendor-sentry',
+              // '@sentry/react' is deliberately NOT mapped here.
+              //
+              // Forcing it into one manual chunk defeats the whole point of deferring its heavy
+              // integrations: main.tsx dynamically imports browserTracingIntegration and
+              // replayIntegration after first paint, but a manual assignment pulls every module of
+              // the package into the same chunk regardless, so the dynamic import resolved to
+              // bytes that were already downloaded. Measured: the chunk was byte-identical
+              // (413,748 both before and after the defer).
+              //
+              // Left to Rollup, the eagerly-reachable core lands with the entry and the
+              // lazily-reached tracing/replay code becomes its own chunk. See audit #308 finding 2.
               // Data layer
               '@tanstack/react-query': 'vendor-query',
               '@tanstack/query-core': 'vendor-query',
