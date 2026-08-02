@@ -37,8 +37,13 @@ interface RequestBody {
    * `TARIC_CIRCABC_LIBRARY_ID`. When set (or configured), neither `url` nor `content` is needed.
    */
   library_id?: string;
-  /** Which language editions to pull when resolving from CIRCABC. Defaults to EN + EL. */
-  languages?: string[];
+  /**
+   * Which language edition to pull when resolving from CIRCABC. ONE per invocation: each
+   * edition is ~25,000 rows and two in a single run exceeds the edge runtime's budget — the
+   * worker is killed mid-response and pg_net reports only "error reading a body from
+   * connection". The cron therefore issues one call per language.
+   */
+  language?: string;
 }
 
 type Field =
@@ -113,23 +118,25 @@ Deno.serve(withApiLogging(
     }
 
     if (libraryId) {
-      const languages = (body.languages ?? DEFAULT_LANGUAGES).map((l) => l.toUpperCase());
-      const files = await resolveNomenclatureFiles(libraryId, languages);
+      const language = (body.language ?? DEFAULT_LANGUAGE).toUpperCase();
+      const files = await resolveNomenclatureFiles(libraryId, [language]);
+      const file = files[0];
 
-      // Each language edition carries its own Language column, so the importer routes each into
-      // description_en / description_el and the coalesce-based upsert merges them onto one row.
-      const imported: Array<Record<string, unknown>> = [];
-      for (const f of files) {
-        const bytes = await fetchBinary(circabcDownloadUrl(f.id, f.name));
-        const g = bytes[0] === 0x50 && bytes[1] === 0x4b
-          ? await parseXlsx(bytes)
-          : parseDelimited(new TextDecoder().decode(bytes), detectDelimiter(new TextDecoder().decode(bytes)));
-        const res = await importGrid(
-          supabase, g, f.language === 'EL' ? 'gr_national' : 'taric_eu', body.mapping ?? {},
-        );
-        imported.push({ language: f.language, file: f.name, folder: f.folder, ...res });
-      }
-      return json({ ok: true, resolved_from: 'circabc', library_id: libraryId, imports: imported });
+      // Each edition carries its own Language column, so the importer routes it into
+      // description_en / description_el and the coalesce-based upsert merges the editions onto
+      // one row across separate invocations.
+      const bytes = await fetchBinary(circabcDownloadUrl(file.id, file.name));
+      const g = bytes[0] === 0x50 && bytes[1] === 0x4b
+        ? await parseXlsx(bytes)
+        : parseDelimited(new TextDecoder().decode(bytes), detectDelimiter(new TextDecoder().decode(bytes)));
+      const res = await importGrid(
+        supabase, g, language === 'EL' ? 'gr_national' : 'taric_eu', body.mapping ?? {},
+      );
+      return json({
+        ...res,
+        resolved_from: 'circabc', library_id: libraryId,
+        language, file: file.name, folder: file.folder,
+      });
     }
 
     if (cron && !body.content && !url) {
@@ -190,7 +197,7 @@ Deno.serve(withApiLogging(
 
 const CIRCABC_BASE = 'https://circabc.europa.eu';
 const CIRCABC_MAX_DEPTH = 4;
-const DEFAULT_LANGUAGES = ['EN', 'EL'];
+const DEFAULT_LANGUAGE = 'EN';
 
 /** Every outbound fetch in this function goes through here: SSRF-guarded and size-capped. */
 async function fetchBinary(rawUrl: string): Promise<Uint8Array> {
