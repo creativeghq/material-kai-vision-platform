@@ -17,7 +17,9 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const AI_PRICING = {
   // Anthropic Claude Models (per 1M tokens)
   claude: {
-    'claude-opus-4-8':            { input: 15.00, output: 75.00 },
+    // Corrected 2026-08-02: this said 15.00/75.00, which is 3x the real Opus rate.
+    // The same wrong number was in ai-client.ts and in the ai_model_pricing row.
+    'claude-opus-4-8':   { input:  5.00, output: 25.00 },
     'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
   },
   // OpenAI Embeddings (per 1M tokens) — embeddings only, chat models removed
@@ -39,7 +41,8 @@ const AI_PRICING = {
 // The `ai_model_pricing` admin table is authoritative; AI_PRICING above is the
 // fallback used only when a model row is missing or the DB is unreachable. Cached
 // per-worker for 5 minutes so per-call logging stays cheap.
-interface TokenPrice { input: number; output: number }
+export interface TokenPrice { input: number; output: number; markup: number }
+const DEFAULT_MARKUP = 1.5;
 const DB_PRICE_TTL_MS = 5 * 60 * 1000;
 let _dbPriceCache: { data: Record<string, TokenPrice>; expiresAt: number } | null = null;
 let _dbPriceFetch: Promise<Record<string, TokenPrice>> | null = null;
@@ -52,14 +55,18 @@ async function getDbTokenPricing(supabase: DbClient): Promise<Record<string, Tok
       try {
         const { data, error } = await supabase
           .from('ai_model_pricing')
-          .select('model_key, input_price_per_million, output_price_per_million')
+          .select('model_key, input_price_per_million, output_price_per_million, markup_multiplier')
           .eq('billing_type', 'token_based')
           .eq('is_active', true);
         if (error || !data) return _dbPriceCache?.data || {};
         const map: Record<string, TokenPrice> = {};
         for (const r of data) {
           const key = String(r.model_key || '').toLowerCase();
-          if (key) map[key] = { input: Number(r.input_price_per_million) || 0, output: Number(r.output_price_per_million) || 0 };
+          if (key) map[key] = {
+            input: Number(r.input_price_per_million) || 0,
+            output: Number(r.output_price_per_million) || 0,
+            markup: Number(r.markup_multiplier) || DEFAULT_MARKUP,
+          };
         }
         _dbPriceCache = { data: map, expiresAt: Date.now() + DB_PRICE_TTL_MS };
         return map;
@@ -71,6 +78,51 @@ async function getDbTokenPricing(supabase: DbClient): Promise<Record<string, Tok
     })();
   }
   return _dbPriceFetch;
+}
+
+/**
+ * THE token-price derivation for the edge runtime. Every caller that needs to turn
+ * (model, tokens) into USD goes through this — `AICallLogger.calculateCost` below and
+ * `_logTrackedCall` in `_shared/ai-client.ts`.
+ *
+ * Order: `ai_model_pricing` (admin-editable, authoritative) → the `AI_PRICING` literal
+ * above (fallback for an unreachable DB or a model with no row) → null.
+ *
+ * Returns the per-row `markup` too, so callers never re-apply a global constant that
+ * has drifted from the table.
+ *
+ * Do NOT add a second price table anywhere. ai-client.ts carried one for months — five
+ * entries, no DB lookup — and it silently priced Gemini 3.5 Flash at a third of the real
+ * rate and Opus at three times it. A wrong price is a valid number, so nothing caught it.
+ */
+export async function resolveTokenPrice(
+  supabase: DbClient,
+  model: string,
+): Promise<TokenPrice | null> {
+  const modelLower = model.toLowerCase();
+
+  try {
+    const dbPricing = await getDbTokenPricing(supabase);
+    const exact = dbPricing[modelLower];
+    if (exact) return exact;
+    for (const [key, val] of Object.entries(dbPricing)) {
+      if (modelLower.includes(key) || key.includes(modelLower)) return val;
+    }
+  } catch { /* fall through to the hardcoded table */ }
+
+  const groups: Array<[boolean, Record<string, { input: number; output: number }>]> = [
+    [modelLower.includes('claude'), AI_PRICING.claude],
+    [modelLower.includes('voyage'), AI_PRICING.voyage],
+    [modelLower.includes('embedding'), AI_PRICING.embeddings],
+    [modelLower.includes('clip'), AI_PRICING.vision],
+  ];
+  for (const [matches, table] of groups) {
+    if (!matches) continue;
+    const hit = Object.entries(table).find(([key]) => modelLower.includes(key.toLowerCase()))?.[1];
+    if (hit) return { ...hit, markup: DEFAULT_MARKUP };
+  }
+
+  return null;
 }
 
 interface ConfidenceBreakdown {
@@ -111,53 +163,16 @@ export class AICallLogger {
     model: string,
     inputTokens: number,
     outputTokens: number,
-    provider?: string
   ): Promise<number> {
-    const modelLower = model.toLowerCase();
+    const pricing = await resolveTokenPrice(this.supabase, model);
 
-    // DB-driven overlay first — admin-edited prices win over the
-    // hardcoded AI_PRICING fallback below.
-    try {
-      const dbPricing = await getDbTokenPricing(this.supabase);
-      let dbHit = dbPricing[modelLower];
-      if (!dbHit) {
-        for (const [key, val] of Object.entries(dbPricing)) {
-          if (modelLower.includes(key) || key.includes(modelLower)) { dbHit = val; break; }
-        }
-      }
-      if (dbHit) {
-        return (inputTokens / 1_000_000) * dbHit.input + (outputTokens / 1_000_000) * dbHit.output;
-      }
-    } catch { /* fall through to hardcoded */ }
-
-    // Determine provider if not specified
-    let pricing: { input: number; output: number } | undefined;
-
-    if (provider === 'anthropic' || modelLower.includes('claude')) {
-      pricing = Object.entries(AI_PRICING.claude).find(([key]) =>
-        modelLower.includes(key.toLowerCase())
-      )?.[1];
-    } else if (modelLower.includes('voyage')) {
-      pricing = Object.entries(AI_PRICING.voyage).find(([key]) =>
-        modelLower.includes(key.toLowerCase())
-      )?.[1];
-    } else if (modelLower.includes('embedding')) {
-      pricing = Object.entries(AI_PRICING.embeddings).find(([key]) =>
-        modelLower.includes(key.toLowerCase())
-      )?.[1];
-    } else if (modelLower.includes('clip')) {
-      pricing = AI_PRICING.vision.clip;
-    }
-    
     if (!pricing) {
       console.warn(`Unknown model pricing: ${model}`);
       return 0;
     }
-    
-    const inputCost = (inputTokens / 1_000_000) * pricing.input;
-    const outputCost = (outputTokens / 1_000_000) * pricing.output;
-    
-    return inputCost + outputCost;
+
+    return (inputTokens / 1_000_000) * pricing.input
+         + (outputTokens / 1_000_000) * pricing.output;
   }
 
   /**

@@ -35,6 +35,7 @@ import {
 import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
+import { getServicePricing } from '../_shared/credit-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -338,6 +339,14 @@ const CREDIT_COSTS: Record<string, number> = {
   'gemini-3-pro-image': 15,
   'flux-depth-pro': 20,
   'grok-aurora': 15,
+};
+
+// Label → `ai_model_pricing.model_key`, for the one case where the two differ.
+// Contains NO prices — it is an identity map, so there is still exactly one place
+// a USD figure is defined. Only add an entry when a label genuinely cannot be renamed
+// (here, `grok-aurora` is part of the response payload shape at the bottom of this file).
+const PRICING_KEY_BY_LABEL: Record<string, string> = {
+  'grok-aurora': 'xai-aurora',
 };
 
 type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot';
@@ -931,12 +940,32 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
       return jsonResponse({ success: false, error: `Unknown mode: ${mode}` }, 400);
     }
 
+    // Image models are priced PER IMAGE, not per token, so there is no token-cost path
+    // for them. Until 2026-08-02 this insert set no cost columns at all — every
+    // interior_design_generation row carried a NULL raw/billed cost, so image generation
+    // was invisible to every USD cost view while still debiting credits.
+    // `getServicePricing` reads the same `ai_model_pricing` table as everything else.
+    //
+    // It also logged `model` (always a Gemini id) rather than `modelLabel`, so redesign
+    // and copy-style runs — which actually invoke flux-depth-pro or Grok — were attributed
+    // to Gemini. Cost per model was wrong for exactly the modes that cost the most.
+    const pricingKey = PRICING_KEY_BY_LABEL[modelLabel] ?? modelLabel;
+    const imagePricing = await getServicePricing(supabase, pricingKey);
+    if (!imagePricing) {
+      console.warn(`[generate-interior-gemini] no ai_model_pricing row for "${pricingKey}" — cost logged as null`);
+    }
+    const rawCostUsd = imagePricing ? imagePricing.cost_per_unit : null;
+    const billedCostUsd = imagePricing ? rawCostUsd! * imagePricing.markup_multiplier : null;
+
     await supabase.from('ai_usage_logs').insert({
       user_id: resolvedUserId,
       operation_type: 'interior_design_generation',
-      model_name: model,
+      model_name: modelLabel,
       credits_debited: credits,
-      metadata: { mode, model },
+      raw_cost_usd: rawCostUsd,
+      billed_cost_usd: billedCostUsd,
+      markup_multiplier: imagePricing?.markup_multiplier ?? null,
+      metadata: { mode, model: modelLabel, billing_type: 'per_unit', units: 1 },
     }).then(() => {}, () => {});
 
     // Persist to generation_3d.

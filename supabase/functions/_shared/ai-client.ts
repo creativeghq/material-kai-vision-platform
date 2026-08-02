@@ -46,6 +46,7 @@ import { createKlingAI } from 'npm:@ai-sdk/klingai';
 import { z, type ZodType } from 'npm:zod@3';
 import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
+import { resolveTokenPrice } from './ai-logger.ts';
 
 // ── Background AI-call logger ────────────────────────────────────────────────
 // Every call through generateWithGemini / generateWithClaude is automatically
@@ -65,17 +66,14 @@ const _logSupabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
   : null;
 
-const _PRICING_PER_M_TOKENS: Record<string, { input: number; output: number }> = {
-  // Anthropic Claude
-  'claude-opus-4-8':   { input: 15.00, output: 75.00 },
-  'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
-  // Google Gemini (per Google AI Studio pricing)
-  // gemini-3.5-flash numbers carried forward from the 3-flash-preview
-  // estimate — confirm against current Google AI Studio pricing.
-  'gemini-3.5-flash':       { input: 0.50, output: 3.00 },
-  'gemini-3-flash-preview': { input: 0.50, output: 3.00 },
-  'gemini-3.1-pro':         { input: 2.00, output: 12.00 },
-};
+// Prices are NOT defined here. They live in `ai_model_pricing` and are resolved through
+// `resolveTokenPrice` (see _shared/ai-logger.ts) — one derivation, admin-editable, with
+// the hardcoded literal in ai-logger as the only fallback.
+//
+// This file used to carry its own five-entry table that never consulted the DB. It priced
+// Gemini 3.5 Flash at 0.50/3.00 (real rate: 1.50/9.00) under a comment admitting the
+// numbers were an unconfirmed guess, and Opus at 15.00/75.00 (real rate: 5.00/25.00).
+// Both fed `billed_cost_usd` at a 1.5x markup. Do not reintroduce a local price table.
 
 async function _logTrackedCall(opts: {
   task: string;
@@ -87,15 +85,18 @@ async function _logTrackedCall(opts: {
 }): Promise<void> {
   if (!_logSupabase) return;
   try {
-    const matchKey = Object.keys(_PRICING_PER_M_TOKENS).find(
-      (k) => opts.model === k || opts.model.startsWith(k),
-    );
-    const price = matchKey ? _PRICING_PER_M_TOKENS[matchKey] : null;
+    const price = await resolveTokenPrice(_logSupabase, opts.model);
+    if (!price) {
+      // Explicit marker rather than a silent 0 — an unpriced model is a gap in
+      // ai_model_pricing, not a free call. `ops.silent_zero` can then see it.
+      console.warn(`[ai-client] no price row for model "${opts.model}" — cost logged as null`);
+    }
     const rawCost = price
       ? (opts.inputTokens / 1_000_000) * price.input +
         (opts.outputTokens / 1_000_000) * price.output
-      : 0;
-    const billedCost = rawCost * _MARKUP;
+      : null;
+    const markup = price?.markup ?? _MARKUP;
+    const billedCost = rawCost === null ? null : rawCost * markup;
 
     // ai_call_logs (developer-facing detail)
     await _logSupabase.from('ai_call_logs').insert({
@@ -117,9 +118,9 @@ async function _logTrackedCall(opts: {
       output_tokens: opts.outputTokens,
       raw_cost_usd: rawCost,
       billed_cost_usd: billedCost,
-      markup_multiplier: _MARKUP,
-      input_cost_usd: price ? (opts.inputTokens / 1_000_000) * price.input * _MARKUP : 0,
-      output_cost_usd: price ? (opts.outputTokens / 1_000_000) * price.output * _MARKUP : 0,
+      markup_multiplier: markup,
+      input_cost_usd: price ? (opts.inputTokens / 1_000_000) * price.input * markup : null,
+      output_cost_usd: price ? (opts.outputTokens / 1_000_000) * price.output * markup : null,
     });
   } catch (e) {
     console.warn('[ai-client] _logTrackedCall failed (non-fatal):', e);

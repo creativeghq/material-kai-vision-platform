@@ -17,6 +17,7 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
+import { getServicePricing } from '../_shared/credit-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -130,12 +131,24 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
       return jsonResponse({ success: false, error: msg }, 402);
     }
 
+    // USD cost from `ai_model_pricing` (this insert previously set credits only, so every
+    // vr_generation row carried a NULL cost). `model` is already the pricing key.
+    const worldPricing = await getServicePricing(supabase, model);
+    if (!worldPricing) {
+      console.warn(`[generate-vr-world] no ai_model_pricing row for "${model}" — cost logged as null`);
+    }
+    const rawCostUsd = worldPricing ? worldPricing.cost_per_unit : null;
+    const billedCostUsd = worldPricing ? rawCostUsd! * worldPricing.markup_multiplier : null;
+
     await supabase.from('ai_usage_logs').insert({
       user_id: userId,
       operation_type: 'vr_generation',
       model_name: model,
       credits_debited: creditCost,
-      metadata: { model },
+      raw_cost_usd: rawCostUsd,
+      billed_cost_usd: billedCostUsd,
+      markup_multiplier: worldPricing?.markup_multiplier ?? null,
+      metadata: { model, billing_type: 'per_unit', units: 1 },
     }).then(() => {}, () => {});
 
     // Build display name from prompt

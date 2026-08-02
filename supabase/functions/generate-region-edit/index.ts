@@ -26,11 +26,15 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
+import { getServicePricing } from '../_shared/credit-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const CREDITS_REQUIRED = 20;
+// Grok masked inpainting runs on xAI Aurora — same `ai_model_pricing` row the other
+// Grok image paths bill against. Logged as model_name so usage and price share a key.
+const PRICING_KEY = 'xai-aurora';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -163,6 +167,27 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
     });
 
     const imageUrl = await uploadResult(supabase, result.base64, result.mimeType, jobId, { userId, conversationId: body.conversation_id });
+
+    // This function debited 20 credits per edit but wrote NO ai_usage_logs row at all,
+    // so region edits were entirely absent from usage and cost reporting — not a null
+    // cost, no row. Grok inpainting bills as one xai-aurora image.
+    const editPricing = await getServicePricing(supabase, PRICING_KEY);
+    if (!editPricing) {
+      console.warn(`[generate-region-edit] no ai_model_pricing row for "${PRICING_KEY}" — cost logged as null`);
+    }
+    const rawCostUsd = editPricing ? editPricing.cost_per_unit : null;
+    const billedCostUsd = editPricing ? rawCostUsd! * editPricing.markup_multiplier : null;
+
+    await supabase.from('ai_usage_logs').insert({
+      user_id: userId,
+      operation_type: 'region_edit',
+      model_name: PRICING_KEY,
+      credits_debited: CREDITS_REQUIRED,
+      raw_cost_usd: rawCostUsd,
+      billed_cost_usd: billedCostUsd,
+      markup_multiplier: editPricing?.markup_multiplier ?? null,
+      metadata: { provider_model: result.model, billing_type: 'per_unit', units: 1 },
+    }).then(() => {}, () => {});
 
     return jsonResponse({
       success: true,

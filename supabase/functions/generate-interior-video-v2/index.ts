@@ -23,6 +23,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
+import { getServicePricing } from '../_shared/credit-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -184,6 +185,40 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     }, 400);
   }
 
+  // `ai_model_pricing` keys differ from the model ids this function uses: the price
+  // table carries `kling-3.0` and `wan2.1-i2v`, here they are `kling-v3.0` and
+  // `wan2.1-i2v-720p`. Identity map only — no prices are defined here.
+  const PRICING_KEY_BY_MODEL: Record<string, string> = {
+    'kling-v3.0': 'kling-3.0',
+    'wan2.1-i2v-720p': 'wan2.1-i2v',
+  };
+
+  // This function debited credits per video but wrote NO ai_usage_logs row at all, so
+  // interior video generation was absent from usage and cost reporting entirely — not a
+  // null cost, no row. Kling/Wan rows are priced per SECOND, so units = actual duration.
+  const logVideoUsage = async (actualSeconds: number) => {
+    const key = PRICING_KEY_BY_MODEL[resolvedModel] ?? resolvedModel;
+    const pricing = await getServicePricing(supabase, key);
+    if (!pricing) {
+      console.warn(`[generate-interior-video-v2] no ai_model_pricing row for "${key}" — cost logged as null`);
+    }
+    const units = pricing?.unit === 'second' ? actualSeconds : 1;
+    const rawCostUsd = pricing ? pricing.cost_per_unit * units : null;
+    await supabase.from('ai_usage_logs').insert({
+      user_id: userId,
+      operation_type: 'interior_video_generation_v2',
+      model_name: key,
+      credits_debited: creditCost,
+      raw_cost_usd: rawCostUsd,
+      billed_cost_usd: rawCostUsd === null ? null : rawCostUsd * pricing!.markup_multiplier,
+      markup_multiplier: pricing?.markup_multiplier ?? null,
+      metadata: {
+        model: resolvedModel, video_type, billing_type: 'per_unit',
+        units, unit: pricing?.unit ?? null,
+      },
+    }).then(() => {}, () => {});
+  };
+
   // ① Debit credits upfront
   const { data: debitData, error: debitError } = await supabase.rpc('debit_credits', {
     p_user_id: userId,
@@ -252,6 +287,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       );
 
       const videoUrl = await uploadVideoToStorage(supabase, veoResult.base64, jobId, true, uploadCtx);
+      await logVideoUsage(Math.min(duration_seconds, 8));
 
       await supabase.from('generation_videos').update({
         status: 'completed',
@@ -292,6 +328,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       });
 
       const videoUrl = await uploadVideoToStorage(supabase, klingResult.base64, jobId, true, uploadCtx);
+      await logVideoUsage(klingDuration);
 
       await supabase.from('generation_videos').update({
         status: 'completed',
@@ -352,6 +389,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       if (pollResult.status === 'succeeded') {
         const rawUrl = Array.isArray(pollResult.output) ? pollResult.output[0] : pollResult.output as string;
         const videoUrl = await uploadVideoToStorage(supabase, rawUrl, jobId, false, uploadCtx);
+        await logVideoUsage(duration_seconds);
 
         await supabase.from('generation_videos').update({
           status: 'completed',

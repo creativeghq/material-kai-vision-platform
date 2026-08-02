@@ -13,9 +13,8 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
-import { checkCreditBalance } from '../_shared/credit-utils.ts';
+import { checkCreditBalance, getServicePricing } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { MARKUP_MULTIPLIER } from '../_shared/pricing-constants.ts';
 
 /**
  * Download a finished Replicate video into our own bucket and return the public URL.
@@ -300,6 +299,20 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         }
       }
 
+      // Cost comes from `ai_model_pricing`, NOT from the credit price. This used to
+      // read `creditCost * 0.01`, i.e. it derived our USD cost backwards from what we
+      // charge the tenant — a fabricated number that tracked the credit table rather
+      // than the provider. For kling-3.0 that produced $0.20 against a real cost of
+      // $0.10/second x duration (=$1.00 for a 10s clip), understating ~7x.
+      // Kling rows are priced per SECOND, so units = duration.
+      const videoPricing = await getServicePricing(supabase, model);
+      if (!videoPricing) {
+        console.warn(`[generate-social-video] no ai_model_pricing row for "${model}" — cost logged as null`);
+      }
+      const units = videoPricing?.unit === 'second' ? duration_seconds : 1;
+      const rawCostUsd = videoPricing ? videoPricing.cost_per_unit * units : null;
+      const billedCostUsd = videoPricing ? rawCostUsd! * videoPricing.markup_multiplier : null;
+
       await supabase.from('ai_usage_logs').insert({
         user_id: userId,
         operation_type: 'social_video_generation',
@@ -307,11 +320,14 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         api_provider: 'replicate',
         input_tokens: 0, output_tokens: 0,
         input_cost_usd: 0, output_cost_usd: 0,
-        raw_cost_usd: creditCost * 0.01 / MARKUP_MULTIPLIER,
-        markup_multiplier: MARKUP_MULTIPLIER,
-        billed_cost_usd: creditCost * 0.01,
+        raw_cost_usd: rawCostUsd,
+        markup_multiplier: videoPricing?.markup_multiplier ?? null,
+        billed_cost_usd: billedCostUsd,
         credits_debited: creditCost,
-        metadata: { model, duration_seconds, aspect_ratio, replicate_prediction_id: predictionId },
+        metadata: {
+          model, duration_seconds, aspect_ratio, replicate_prediction_id: predictionId,
+          billing_type: 'per_unit', units, unit: videoPricing?.unit ?? null,
+        },
       });
 
       return jsonResponse({

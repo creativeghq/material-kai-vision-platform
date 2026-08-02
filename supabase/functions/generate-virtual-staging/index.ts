@@ -17,6 +17,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
+import { getServicePricing } from '../_shared/credit-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -24,6 +25,10 @@ const replicateToken = () => Deno.env.get('REPLICATE_API_TOKEN') || '';
 
 const CREDIT_COST = 20;
 const MODEL = 'proplabs/virtual-staging';
+// `ai_model_pricing.model_key` for MODEL, slug-derived to match the table's convention
+// (`adirik/interior-design` -> `adirik-interior-design`). Also what we log as model_name,
+// so the usage row and the price row are keyed by the same string.
+const PRICING_KEY = 'proplabs-virtual-staging';
 
 interface VirtualStagingRequest {
   source_image_url: string;
@@ -216,12 +221,25 @@ async function handleRequest(
     const tempUrl = await runReplicate(body.source_image_url, room, furnitureStyle, body.furniture_items);
     const imageUrl = await uploadToStorage(supabase, tempUrl, jobId, { userId, conversationId: body.conversation_id });
 
+    // USD cost from `ai_model_pricing` (this insert previously set credits only, so every
+    // virtual_staging row carried a NULL cost). `model_name` is the pricing key, not a
+    // made-up label — a log label that doesn't match a price key can never be priced.
+    const stagingPricing = await getServicePricing(supabase, PRICING_KEY);
+    if (!stagingPricing) {
+      console.warn(`[generate-virtual-staging] no ai_model_pricing row for "${PRICING_KEY}" — cost logged as null`);
+    }
+    const rawCostUsd = stagingPricing ? stagingPricing.cost_per_unit : null;
+    const billedCostUsd = stagingPricing ? rawCostUsd! * stagingPricing.markup_multiplier : null;
+
     await supabase.from('ai_usage_logs').insert({
       user_id: userId,
       operation_type: 'virtual_staging',
-      model_name: 'replicate-virtual-staging',
+      model_name: PRICING_KEY,
       credits_debited: CREDIT_COST,
-      metadata: { room, furniture_style: furnitureStyle },
+      raw_cost_usd: rawCostUsd,
+      billed_cost_usd: billedCostUsd,
+      markup_multiplier: stagingPricing?.markup_multiplier ?? null,
+      metadata: { room, furniture_style: furnitureStyle, billing_type: 'per_unit', units: 1 },
     }).then(() => {}, () => {});
 
     // Delivered by the "Virtual Staging Done" flow (Flows dashboard).
