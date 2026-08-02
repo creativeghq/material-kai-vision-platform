@@ -1447,8 +1447,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       const supplierIds = res.items.map((it) => it.supplier_company_id).filter(Boolean) as string[];
       const partyRef = orderPartyRef(res.order);
       // Everything the panel needs, in ONE wave. `getThreeWayMatch` used to be awaited after this
-      // block and `getApplicableCredit` after that, so opening an order cost three sequential
-      // round-trips where one would do — the two stragglers depended on nothing in here.
+      // block, so opening an order cost two sequential round-trips where one would do — the
+      // straggler depended on nothing in here.
       const [finance, lp, names, exposure, accounts, audit, buyer, party, prodNames, threeWay] = await Promise.all([
         ordersService.getOrderFinance(id),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
@@ -1689,29 +1689,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     setExpenseOpen(true);
   };
 
-
-  /**
-   * Spending the customer's money on the customer's job draws their held balance down.
-   *
-   * Three things move when a cost on a SALES order is actually paid: what we owe that supplier
-   * (the rollup), the bank account it left, and — because the money we are spending is money the
-   * customer already handed us — the customer's on-account credit. The first two were already
-   * derived from the payment row; the third was not, so a customer could pay €1,373 up front,
-   * watch it fund every supplier on their order, and still show €1,373 "on account" as though we
-   * were holding it for them.
-   *
-   * It is a re-homing, not a second ledger: the SAME `apply_customer_credit_to_order` RPC the
-   * "Apply credit" banner uses, which splits payments oldest-first and never exceeds the order's
-   * outstanding. Capped by what was actually paid, so a €328 supplier payment moves €328 of
-   * credit onto the order and no more. To undo it, un-apply from the source payment.
-   */
-  const drawDownCustomerCredit = async (amountPaid: number): Promise<number> => {
-    if (!order || order.order_type !== 'sales' || amountPaid <= 0.005) return 0;
-    const available = await ordersService.getApplicableCredit(order.id, order.workspace_id).catch(() => 0);
-    const want = Math.min(available, Math.round(amountPaid * 100) / 100);
-    if (want <= 0.005) return 0;
-    return ordersService.applyCreditToOrder(order.id, order.workspace_id, want).catch(() => 0);
-  };
 
   // #3 — edit the order's line items (only while it has no invoice yet).
   // Lines are frozen once a document has been derived FROM them. This checked invoices only —
@@ -2789,16 +2766,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         onOpenChange={setExpenseOpen}
         orderId={order.id}
         prefill={expensePrefill ?? undefined}
-        onCreated={async (res) => {
+        onCreated={async () => {
           setExpenseOpen(false);
-          // Cash that actually left funds the customer's job → their held balance drops by it.
-          const drawn = await drawDownCustomerCredit(res?.amountPaid ?? 0);
-          if (drawn > 0.005) {
-            toast({
-              title: `${formatMoney(drawn, order.currency)} taken off the customer's balance`,
-              description: 'That much of the money they had on account is now applied to this order — no extra cash moved.',
-            });
-          }
+          // Recording the expense writes a payment, and every payment runs the settlement sweep —
+          // which is what draws the customer's held balance down onto this order. It used to be a
+          // second, narrower re-homing bolted on here, capped at the supplier amount rather than
+          // the order's outstanding.
           await load(order.id);
           onChanged();
         }}

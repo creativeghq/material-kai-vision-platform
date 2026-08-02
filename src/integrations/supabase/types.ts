@@ -30345,10 +30345,6 @@ export type Database = {
         }
         Returns: Json
       }
-      apply_customer_credit_to_order: {
-        Args: { p_amount?: number; p_order_id: string; p_workspace_id: string }
-        Returns: Json
-      }
       auto_allocate_workspace: {
         Args: { p_workspace_id: string }
         Returns: Json
@@ -31449,10 +31445,6 @@ export type Database = {
           total_count: number
           urls: Json
         }[]
-      }
-      get_order_applicable_credit: {
-        Args: { p_order_id: string; p_workspace_id: string }
-        Returns: number
       }
       get_order_settlements: {
         Args: { p_order_ids: string[] }

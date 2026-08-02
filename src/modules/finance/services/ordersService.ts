@@ -1138,28 +1138,12 @@ export const ordersService = {
     await supabase.rpc('recompute_order_totals', { p_order_id: orderId });
   },
 
-  /** How much of the customer's on-account credit can be applied to this (sales) order. */
-  async getApplicableCredit(orderId: string, workspaceId: string): Promise<number> {
-    const { data, error } = await supabase.rpc('get_order_applicable_credit', {
-      p_workspace_id: workspaceId, p_order_id: orderId,
-    });
-    if (error) throw error;
-    return Number(data) || 0;
-  },
-
-  /**
-   * Settle a sales order from the customer's existing on-account credit — NO new cash. Re-homes the
-   * customer's unallocated "money in" onto the order (splitting the last payment so nothing overpays);
-   * the order's payment_status recomputes via the payment trigger and any remainder stays as credit.
-   * Pass `amount` to cap it; omit to apply up to the order's outstanding.
-   */
-  async applyCreditToOrder(orderId: string, workspaceId: string, amount?: number): Promise<number> {
-    const { data, error } = await supabase.rpc('apply_customer_credit_to_order', {
-      p_workspace_id: workspaceId, p_order_id: orderId, p_amount: amount ?? null,
-    });
-    if (error) throw error;
-    return Number((data as any)?.applied) || 0;
-  },
+  // `getApplicableCredit` / `applyCreditToOrder` lived here. Settling a sales order from the
+  // customer's on-account money is now the sweep's job and only the sweep's job — it runs on every
+  // recorded payment, caps at outstanding from `get_order_settlements`, and places oldest-first.
+  // The RPCs behind them (`get_order_applicable_credit`, `apply_customer_credit_to_order`) are
+  // dropped; the latter re-derived "settled" with its own direction-filtered sum, which is exactly
+  // the duplicate-derivation shape moneyDerivation.test.ts exists to stop.
 
   /**
    * Customer-aware price for an order line, used to pre-fill it on product pick.

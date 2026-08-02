@@ -20,7 +20,13 @@ import { resolve } from 'node:path';
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 
 const financeService = read('src/modules/finance/services/financeService.ts');
+const ordersService = read('src/modules/finance/services/ordersService.ts');
+const ordersPanel = read('src/modules/finance/components/OrdersPanel.tsx');
 const types = read('src/integrations/supabase/types.ts');
+
+/** Comments describe the history on purpose; only real call sites count. */
+const stripComments = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
 
 /** `recordPayment` is the single funnel — every payment in the app is created through it. */
 function recordPaymentBody(src: string): string {
@@ -49,5 +55,28 @@ describe('payment auto-allocation sweep is wired', () => {
     const helper = financeService.slice(financeService.indexOf('async sweepUnallocated'));
     const body = helper.slice(0, helper.indexOf('\n  },'));
     expect(body, 'a throwing sweep would surface as "the payment failed"').toMatch(/catch\s*\(/);
+  });
+});
+
+/**
+ * One placer, not three. Placing money on an order was written three times — record_payment_fx's
+ * order remainder, this sweep, and `apply_customer_credit_to_order` behind a per-order button —
+ * and only the sweep read `get_order_settlements`. The other two carried their own idea of what an
+ * order still owed, which is the duplicate-derivation shape CLAUDE.md and moneyDerivation.test.ts
+ * exist to stop. Both dropped RPCs are gone from the database; a call to either now fails at
+ * runtime, so re-adding one here must fail at build time instead.
+ */
+describe('settlement has a single placer', () => {
+  const RETIRED = ['apply_customer_credit_to_order', 'get_order_applicable_credit'];
+
+  it.each(RETIRED)('%s is not called from anywhere in the app', (rpc) => {
+    for (const [name, src] of Object.entries({ financeService, ordersService, ordersPanel, types })) {
+      expect(stripComments(src), `${rpc} was dropped from the database — ${name} would fail at runtime`)
+        .not.toMatch(new RegExp(rpc));
+    }
+  });
+
+  it('no per-order credit-application helper survives on ordersService', () => {
+    expect(stripComments(ordersService)).not.toMatch(/async (applyCreditToOrder|getApplicableCredit)\b/);
   });
 });
