@@ -12,10 +12,14 @@
  * live here.
  */
 
-/** Round to 2 decimals (currency). Epsilon nudge so a binary-float 1.005 rounds up, not down. */
-export function round2(n: number): number {
-  return Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
-}
+// Canonical money rounding lives in _shared/money.ts; re-exported for this module's importers.
+// `export … from` re-exports WITHOUT creating a local binding, and this module CALLS round2
+// below — so the re-export alone left it undefined at runtime (ReferenceError: round2 is not
+// defined) while typechecking clean, because TS only verifies the re-export is valid. Import it
+// into scope first, then re-export the local binding. (audit #287 follow-up)
+import { round2 } from '../money.ts';
+
+export { round2 };
 
 export interface ExpenseSplitInput {
   /** Total amount INCLUDING VAT (what the payee charged). */

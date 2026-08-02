@@ -134,10 +134,15 @@ export function evaluateFormula(formula: string | null | undefined, vars: Record
   }
 }
 
-// Round to 2 decimals (currency)
-export function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
+// Canonical money rounding lives in _shared/money.ts; re-exported so existing importers of this
+// module keep working.
+// `export … from` re-exports WITHOUT creating a local binding, and this module CALLS round2
+// below — so the re-export alone left it undefined at runtime (ReferenceError: round2 is not
+// defined) while typechecking clean, because TS only verifies the re-export is valid. Import it
+// into scope first, then re-export the local binding. (audit #287 follow-up)
+import { round2 } from '../money.ts';
+
+export { round2 };
 
 export interface PricingInput {
   is_allowance?: boolean;
