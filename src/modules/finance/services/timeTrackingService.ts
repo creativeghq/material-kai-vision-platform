@@ -31,7 +31,8 @@ export interface NewTimeEntry {
   is_billable?: boolean;
 }
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
+import { round2 } from '@/utils/decimal';
+import { vatOf } from '@/modules/finance/lib/vatMath';
 
 // Aggregated time reports.
 export interface TimeReportUserRow {
@@ -107,7 +108,7 @@ export const timeTrackingService = {
       return { e, hours, net };
     });
     const totalNet = round2(lines.reduce((s, l) => s + l.net, 0));
-    const vatAmount = round2(totalNet * vatRate / 100);
+    const vatAmount = vatOf(totalNet, vatRate);
 
     const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: workspaceId });
     if (numErr) throw numErr;

@@ -935,16 +935,11 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
         <tr><td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">No payments recorded.</td></tr>
       )}
       {rows.map((p: any) => {
-        // `a.amount` is denominated in the TARGET's currency (RecordPaymentDialog sets
-        // amount = amt x fx, amount_doc = amt), so summing it and then formatting with the
-        // PAYMENT's currency showed a euro figure labelled USD on any cross-currency settlement —
-        // and made the on-account remainder below arithmetically meaningless. amount_doc_currency
-        // is the payment-currency figure, which is what both this column and `onAccount` need;
-        // listAttachablePayments and getDepositsOnAccount already use it.
-        const allocated = (p.allocations ?? []).reduce(
-          (s: number, a: any) => s + Number(a.amount_doc_currency ?? a.amount ?? 0), 0);
-        // On-account remainder — the credit still available on a money-in payment.
-        const onAccount = p.direction === 'in' ? Math.round((Number(p.amount ?? 0) - allocated) * 100) / 100 : 0;
+        // Both figures are DERIVED by `get_payment_remainders` and carried on the row by
+        // listPayments — this page only formats them. It used to re-sum `p.allocations` itself,
+        // which is where the "which column is the remainder in" question got a third answer.
+        const onAccount = p.direction === 'in' ? (Number(p.unallocated) || 0) : 0;
+        const allocated = Math.round((Number(p.amount ?? 0) - (Number(p.unallocated) || 0)) * 100) / 100;
         return (
           <tr key={p.id} className="border-b border-border/30">
             <td className="px-4 py-2">{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}</td>

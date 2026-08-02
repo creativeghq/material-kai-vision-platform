@@ -17,6 +17,7 @@ import { Loader2, Plus, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, VAT_CATEGORIES, type SupplierBill } from '@/modules/finance/services/financeService';
+import { vatOf } from '@/modules/finance/lib/vatMath';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimalOr } from '@/utils/decimal';
@@ -109,7 +110,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
         const qty = parseDecimalOr(l.qty, 0);
         const lineNet = round2(qty * parseDecimalOr(l.unitPrice, 0));
         const pct = pctOf(l.vatCode);
-        const lineVat = round2(lineNet * pct / 100);
+        const lineVat = vatOf(lineNet, pct);
         net = round2(net + lineNet); vat = round2(vat + lineVat);
         return {
           description: l.description.trim(), quantity: qty, unit_price: parseDecimalOr(l.unitPrice, 0),
@@ -237,7 +238,9 @@ export const NewSupplierCreditNoteDialog: React.FC<{
               </div>
               {lines.map((l) => {
                 const qty = parseDecimalOr(l.qty, 0); const up = parseDecimalOr(l.unitPrice, 0);
-                const lineNet = round2(qty * up); const lineTotal = round2(lineNet * (1 + pctOf(l.vatCode) / 100));
+                // net + the SAME rounded VAT that gets stored, so the previewed line total can no
+                // longer disagree by a cent with the payload built above.
+                const lineNet = round2(qty * up); const lineTotal = round2(lineNet + vatOf(lineNet, pctOf(l.vatCode)));
                 return (
                   <div key={l.id} className="grid grid-cols-[1fr_60px_84px_88px_84px_28px] items-center gap-2 border-t border-border/40 px-2 py-1.5">
                     <Input className="h-8 text-sm" value={l.description} onChange={(e) => setLine(l.id, { description: e.target.value })} placeholder="Item / Reason" />

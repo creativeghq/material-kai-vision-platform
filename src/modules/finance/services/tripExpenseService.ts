@@ -14,6 +14,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { formatMoney } from '@/modules/finance/services/financeService';
+import { round2 } from '@/utils/decimal';
+import { vatOf } from '@/modules/finance/lib/vatMath';
 
 export type TripStatus =
   | 'draft' | 'submitted' | 'partially_approved' | 'approved' | 'rejected' | 'reimbursed';
@@ -267,9 +269,8 @@ export const tripExpenseService = {
     const rows = (items ?? []) as TripExpenseItem[];
     if (rows.length === 0) throw new Error('Selected expenses are already billed or not billable');
 
-    const round2 = (n: number) => Math.round(n * 100) / 100;
     const totalNet = round2(rows.reduce((s, r) => s + Number(r.amount), 0));
-    const vatAmount = round2(totalNet * vatRate / 100);
+    const vatAmount = vatOf(totalNet, vatRate);
 
     const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: workspaceId });
     if (numErr) throw numErr;

@@ -30349,6 +30349,21 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: Json
       }
+      get_payment_remainders: {
+        Args: { p_payment_ids?: string[] | null }
+        Returns: {
+          allocated: number
+          amount: number
+          counterparty_company_id: string | null
+          counterparty_contact_id: string | null
+          currency: string
+          direction: string
+          paid_at: string
+          payment_id: string
+          unallocated: number
+          workspace_id: string
+        }[]
+      }
       release_customer_credit: {
         Args: {
           p_amount?: number

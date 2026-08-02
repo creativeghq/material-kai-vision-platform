@@ -29,8 +29,7 @@ interface OverviewTabProps {
   isOwner?: boolean;
 }
 
-const formatMoney = (amount: number, currency: string) =>
-  new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+import { formatMoney } from '@/utils/decimal';
 
 const formatDate = (d: string | null) => {
   if (!d) return null;

@@ -10,6 +10,7 @@
  * supplier_credit_notes.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { round2 } from '@/utils/decimal';
 
 export interface JournalRow {
   date: string;            // YYYY-MM-DD
@@ -181,7 +182,6 @@ export const accountingExportService = {
   },
 };
 
-function round2(n: number) { return Math.round(n * 100) / 100; }
 
 // ── CSV helpers ────────────────────────────────────────────────────────────
 function csvCell(v: any): string {

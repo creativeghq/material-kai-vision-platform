@@ -1,5 +1,6 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { round2 as r2 } from '@/utils/decimal';
 import { Home, ClipboardList, User, Truck } from 'lucide-react';
 
 import {
@@ -249,7 +250,6 @@ export function InvoiceDocument({
   const PriorBalance = () => {
     if (data.priorBalance == null) return null;
     const due = data.totals.amountDue;
-    const r2 = (n: number) => Math.round(n * 100) / 100;
     return (
       <div style={{ marginTop: 4, borderTop: `1px solid ${colors.line}`, paddingTop: 4 }}>
         {data.priorBalance > 0 ? (

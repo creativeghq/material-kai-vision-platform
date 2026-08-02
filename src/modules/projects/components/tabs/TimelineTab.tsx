@@ -73,14 +73,10 @@ const describe = (e: ProjectEvent): string => {
   }
 };
 
-const formatMoney = (v: any, currency: any) => {
-  if (v == null) return '—';
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR' }).format(Number(v));
-  } catch {
-    return String(v);
-  }
-};
+import { formatMoney as formatMoneyValue } from '@/utils/decimal';
+
+/** Timeline payloads are untyped JSON, so coerce before handing to the canonical formatter. */
+const formatMoney = (v: any, currency: any) => formatMoneyValue(v == null ? null : Number(v), currency || 'EUR');
 
 const formatDate = (v: any) => {
   if (!v) return '—';

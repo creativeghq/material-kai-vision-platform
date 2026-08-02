@@ -5,6 +5,8 @@ import {
   VAT_PCT_BY_CAT, UNIT_LABEL_BY_CODE, type Lang,
 } from './labels';
 import type { InvoiceRenderData, InvoiceLineRow, VatAnalysisRow, TotalsExtraRow } from './types';
+import { round2 as r2 } from '@/utils/decimal';
+import { vatOf } from '@/modules/finance/lib/vatMath';
 
 export interface BuildRenderInput {
   invoice: Record<string, any>;
@@ -93,7 +95,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     const pct = it.vat_category != null && VAT_PCT_BY_CAT[Number(it.vat_category)] !== undefined
       ? VAT_PCT_BY_CAT[Number(it.vat_category)]
       : Number(it.vat_percent ?? inv.vat_rate ?? 0);
-    const vat = Number(it.vat_amount ?? (net * pct) / 100);
+    const vat = it.vat_amount != null ? Number(it.vat_amount) : vatOf(net, pct);
     totNet += net; totVat += vat;
     const key = String(pct);
     vatByRate[key] = vatByRate[key] || { net: 0, vat: 0 };
@@ -117,7 +119,6 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   // post-discount taxable figures. "Price" = pre-discount net; "Price after Discount" = taxable.
   const cashPct = Number(inv.cash_discount_pct ?? 0);
   const cashFactor = cashPct > 0 && cashPct < 100 ? 1 - cashPct / 100 : 1;
-  const r2 = (n: number) => Math.round(n * 100) / 100;
   const priceNet = r2(totNet);
   const netAfter = r2(totNet * cashFactor);
   const cashDisc = r2(priceNet - netAfter);

@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { VAT_CATEGORIES } from '@/modules/finance/services/financeService';
+import { vatOf } from '@/modules/finance/lib/vatMath';
 
 export type OrderType = 'sales' | 'purchase';
 export type OrderStatus = 'draft' | 'confirmed' | 'partially_fulfilled' | 'fulfilled' | 'cancelled';
@@ -198,7 +199,7 @@ export type OrderLinkTarget =
   /** Book this cost as an expense ON an existing purchase order — `supplier_bills.order_id`. */
   | { kind: 'cost_of_order'; orderId: string; projectId: string | null; label: string };
 
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { round2 as r2 } from '@/utils/decimal';
 
 /**
  * Apply an order-level discount ('percent' or a flat 'amount') across the lines. The SAME effective
@@ -225,7 +226,7 @@ function computeOrderLines(
   const lines = items.map((it) => {
     const net = r2((it.quantity || 0) * (it.unit_price || 0) * factor);
     const pct = it.vat_percent ?? 0;
-    const vat = r2(net * pct / 100);
+    const vat = vatOf(net, pct);
     return { it, net, vat, pct, discountPct: Math.round(effDiscountPct * 1e6) / 1e6 };
   });
   const subtotal = r2(lines.reduce((a, l) => a + l.net, 0));

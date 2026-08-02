@@ -3,6 +3,8 @@
 // totals). The project-plan-engine edge function is the authoritative writer of
 // persisted prices — keep this logic byte-identical to the Deno copy.
 
+import { round2 } from './decimal';
+
 export interface FormulaResult {
   value: number;
   ok: boolean;
@@ -125,9 +127,9 @@ export function evaluateFormula(formula: string | null | undefined, vars: Record
   }
 }
 
-export function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
+// Canonical money rounding lives in `./decimal`. Imported for use below and re-exported so
+// `blueprintCompute` keeps importing it from this module.
+export { round2 };
 
 export interface PricingInput {
   is_allowance?: boolean;

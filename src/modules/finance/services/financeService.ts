@@ -248,6 +248,9 @@ export interface PaymentWithAllocation extends Payment {
   // Enriched by listPayments for the Payments list (party label + order number for the row).
   party_name?: string | null;
   order_number?: string | null;
+  /** Cash on this payment not settled against anything — DERIVED by `get_payment_remainders`.
+   *  Present only on rows from `listPayments`; never recompute it from `allocations`. */
+  unallocated?: number;
   /** Which account the money moved through — what the lists print instead of `method`. */
   bank_account_name?: string | null;
   /** What this payment settled, one entry per allocation — so the money ledger says which
@@ -367,6 +370,18 @@ export interface ExpenseSettlement {
   bank_account_id: string | null;
   /** The account the cash moved through — what the UI shows instead of the derived method. */
   bank_account_name: string | null;
+}
+
+/**
+ * What `get_payment_remainders` returns for one payment. `unallocated` is the canonical
+ * "how much of this cash is still free" — never recompute it from an embedded allocations array.
+ */
+export interface PaymentRemainder {
+  payment_id: string;
+  amount: number;
+  allocated: number;
+  unallocated: number;
+  currency: string;
 }
 
 /** An already-recorded money-out payment that still has room to be attached to an expense. */
@@ -1016,6 +1031,33 @@ const _financeServiceCore = {
   },
 
   /**
+   * How much of each payment is still unallocated — the ONE derivation, read from SQL.
+   *
+   * `amount − Σ allocations` was open-coded in three TypeScript sites and three SQL functions, and
+   * they disagreed on which column to sum: `amount` is denominated in the TARGET's currency,
+   * `amount_doc_currency` in the PAYMENT's, and a remainder is a payment-currency quantity. They
+   * happen to agree while every allocation is same-currency, which is exactly why the divergence
+   * survived — the data is well-formed and only the arithmetic differs, so nothing could flag it.
+   *
+   * Pass ids to scope it; omit for every payment the caller can see (RLS applies — the function is
+   * SECURITY INVOKER on purpose).
+   */
+  async paymentRemainders(paymentIds?: string[]): Promise<Map<string, PaymentRemainder>> {
+    if (paymentIds && paymentIds.length === 0) return new Map();
+    const { data, error } = await supabase.rpc('get_payment_remainders', {
+      p_payment_ids: paymentIds ?? null,
+    });
+    if (error) throw error;
+    return new Map((data ?? []).map((r) => [r.payment_id, {
+      payment_id: r.payment_id,
+      amount: Number(r.amount),
+      allocated: Number(r.allocated),
+      unallocated: Number(r.unallocated),
+      currency: r.currency,
+    }]));
+  },
+
+  /**
    * Settle every unallocated payment remainder in the workspace against what is open — invoices
    * first (a formal debt outranks an un-invoiced order), then same-currency orders, oldest first.
    * Idempotent, and best-effort by design: the money is already committed by the time this runs,
@@ -1397,9 +1439,13 @@ const _financeServiceCore = {
     ]);
     const companyName = new Map<string, string>((companies.data ?? []).map((c: any) => [c.id, c.name]));
     const contactName = new Map<string, string>((contacts.data ?? []).map((c: any) => [c.id, c.name || [c.first_name, c.last_name].filter(Boolean).join(' ')]));
+    // Carry the DERIVED remainder so the list formats it instead of re-summing the embedded
+    // allocations itself — DocumentsPage did, with its own third variant of the arithmetic.
+    const remainders = await financeService.paymentRemainders(rows.map((r) => r.id));
 
     return rows.map((r) => ({
       ...r,
+      unallocated: remainders.get(r.id)?.unallocated ?? 0,
       order_number: r.order?.order_number ?? null,
       bank_account_name: r.bank_account?.name ?? null,
       party_name: r.counterparty_company_id
@@ -1927,7 +1973,7 @@ const _financeServiceCore = {
   async listAttachablePayments(workspaceId: string, opts: { currency?: string; companyId?: string | null; contactId?: string | null; limit?: number } = {}): Promise<AttachablePayment[]> {
     let q = supabase
       .from('payments')
-      .select('id, amount, currency, paid_at, method, reference, counterparty_company_id, counterparty_contact_id, allocations:payment_allocations(amount, amount_doc_currency)')
+      .select('id, amount, currency, paid_at, method, reference, counterparty_company_id, counterparty_contact_id')
       .eq('workspace_id', workspaceId)
       .eq('direction', 'out')
       .order('paid_at', { ascending: false })
@@ -1937,11 +1983,14 @@ const _financeServiceCore = {
     if (error) throw error;
 
     const rows = (data ?? []) as any[];
+    if (rows.length === 0) return [];
+    // The remainder comes from the one SQL derivation, not from re-summing an embedded
+    // allocations array — this site and getDepositsOnAccount disagreed on the fallback.
+    const remainders = await financeService.paymentRemainders(rows.map((p) => p.id));
     const withRoom = rows
       .map((p) => {
-        const allocated = (p.allocations ?? []).reduce(
-          (s: number, a: any) => s + Number(a.amount_doc_currency ?? a.amount ?? 0), 0);
-        return { p, allocated, unallocated: Number((Number(p.amount) - allocated).toFixed(2)) };
+        const r = remainders.get(p.id);
+        return { p, allocated: r?.allocated ?? 0, unallocated: r?.unallocated ?? 0 };
       })
       .filter((r) => r.unallocated > 0.005);
     if (withRoom.length === 0) return [];
@@ -2387,12 +2436,10 @@ const _financeServiceCore = {
     if (payments.length === 0) return { total: 0, currency: 'EUR', totals: [], rows: [] };
     const ids = payments.map((p) => p.id);
 
-    // Allocated per payment (in payment currency = amount_doc_currency).
-    const { data: allocs } = await supabase.from('payment_allocations').select('payment_id, amount_doc_currency').in('payment_id', ids);
-    const allocated = new Map<string, number>();
-    for (const a of (allocs ?? []) as Array<{ payment_id: string; amount_doc_currency: number | null }>) {
-      allocated.set(a.payment_id, (allocated.get(a.payment_id) ?? 0) + Number(a.amount_doc_currency ?? 0));
-    }
+    // Remainder per payment, from the one SQL derivation. This used to sum `amount_doc_currency`
+    // with no fallback, so an older allocation row with that column NULL counted as zero settled
+    // and inflated the deposit shown here.
+    const remainders = await financeService.paymentRemainders(ids);
 
     // Order numbers + party names in batch.
     const orderIds = [...new Set(payments.map((p) => p.order_id).filter(Boolean))] as string[];
@@ -2408,7 +2455,7 @@ const _financeServiceCore = {
     const ctmap = new Map<string, string>((conts.data ?? []).map((c: any) => [c.id, c.name]));
 
     const rows = payments.map((p) => {
-      const unallocated = Math.round((Number(p.amount) - (allocated.get(p.id) ?? 0)) * 100) / 100;
+      const unallocated = remainders.get(p.id)?.unallocated ?? 0;
       return {
         payment_id: p.id, paid_at: p.paid_at, amount: Number(p.amount), unallocated, currency: p.currency,
         reference: p.reference, credit_number: p.credit_number, order_id: p.order_id, order_number: p.order_id ? (omap.get(p.order_id) ?? null) : null,
@@ -3339,14 +3386,9 @@ export const financeService: typeof _financeServiceCore & typeof _financeService
 // Formatters (shared)
 // =============================================================================
 
-export function formatMoney(value: number | null | undefined, currency = 'EUR'): string {
-  if (value == null) return '—';
-  try {
-    return new Intl.NumberFormat('en-IE', { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
-  } catch {
-    return `${currency} ${Number(value).toFixed(2)}`;
-  }
-}
+// Canonical money formatter lives in `@/utils/decimal` (money is printed well outside finance).
+// Re-exported here because most of the app imports it from this service.
+export { formatMoney } from '@/utils/decimal';
 
 export function formatPct(value: number | null | undefined): string {
   if (value == null) return '—';

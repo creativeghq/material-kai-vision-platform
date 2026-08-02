@@ -21,7 +21,8 @@ export interface TotalsBreakdown {
   hasDiscount: boolean;
 }
 
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { round2 as r2 } from '@/utils/decimal';
+import { vatOf } from '@/modules/finance/lib/vatMath';
 
 /**
  * Preview of the totals for prices the operator is still typing.
@@ -52,7 +53,7 @@ export function previewTotalsBreakdown(input: {
   const discount = r2(price * cashPct / 100);
   const priceAfterDiscount = r2(price - discount);
   const taxableBase = r2(priceAfterDiscount + extras);
-  const vat = r2(taxableBase * vatRate / 100);
+  const vat = vatOf(taxableBase, vatRate);
 
   return {
     price,

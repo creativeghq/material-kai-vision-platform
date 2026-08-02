@@ -27,6 +27,7 @@ import { formatAddressLine } from '@/services/crm.service';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeService, formatMoney, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
+import { vatOfRaw } from '@/modules/finance/lib/vatMath';
 import { buyerIsConsumer as isConsumerBuyer } from '@/modules/finance/utils/salesDocumentKind';
 import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
 import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
@@ -578,7 +579,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     for (const l of lines) {
       const lineNet = lineNetOf(l);
       const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
-      net += lineNet; vat += lineNet * (pct / 100);
+      // vatOfRaw, not vatOf: this sums every line and rounds ONCE at the end, so rounding here
+      // would shift a multi-line invoice by a cent.
+      net += lineNet; vat += vatOfRaw(lineNet, pct);
       // fees / stamp / other are category-driven: a 'percent' category computes net × rate%,
       // an 'amount' category uses the typed amount.
       fees += taxAmountOf(feesRefs, l.fees_category, l.fees, lineNet);

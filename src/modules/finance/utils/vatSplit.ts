@@ -10,13 +10,19 @@
  * These two functions are the only place that arithmetic lives.
  */
 
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { round2 as r2 } from '@/utils/decimal';
+import { vatOf } from '@/modules/finance/lib/vatMath';
 
-/** Net + VAT for a line whose net and VAT RATE are both known. */
+/**
+ * Net + VAT for a line whose net and VAT RATE are both known.
+ *
+ * The clamp at zero is specific to this entry point (it prefills an EXPENSE, and a negative cost
+ * is not a thing you can book), which is why the plain arithmetic lives in `vatMath.vatOf` — credit
+ * notes and adjustments need the same formula without the clamp.
+ */
 export function splitByVatRate(net: number, vatPercent: number | null | undefined): { net: number; vat: number } {
   const n = r2(Math.max(0, net));
-  const rate = Number(vatPercent ?? 0) || 0;
-  return { net: n, vat: r2(n * (rate / 100)) };
+  return { net: n, vat: vatOf(n, Number(vatPercent ?? 0) || 0) };
 }
 
 /**

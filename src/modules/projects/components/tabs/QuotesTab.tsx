@@ -35,10 +35,9 @@ interface ChainGroup {
   revisions: QuoteRow[];
 }
 
-const formatMoney = (amount: number | null, currency: string | null) => {
-  if (!amount) return '—';
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR' }).format(amount);
-};
+// Was `if (!amount) return '—'`, which printed a dash for a genuine zero. The canonical formatter
+// dashes only null/undefined, so €0.00 now reads as €0.00.
+import { formatMoney } from '@/utils/decimal';
 
 export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
   const { toast } = useToast();

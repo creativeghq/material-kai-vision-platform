@@ -44,8 +44,7 @@ const STATUS_TONES: Record<ProjectStatus, string> = {
   archived: 'bg-muted text-muted-foreground border-border',
 };
 
-const formatMoney = (amount: number, currency: string) =>
-  new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+import { formatMoney } from '@/utils/decimal';
 
 const daysUntil = (date: string | null) => {
   if (!date) return null;

@@ -24,6 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, extractNet, type BankAccountBalance } from '@/modules/finance/services/financeService';
+import { vatOf } from '@/modules/finance/lib/vatMath';
 import { posSessionService, type PosSession, type PosReport } from '@/modules/finance/services/posSessionService';
 import { fiscalConnectorService, posTerminalService, type PosTerminal } from '@/services/fiscalConnectorService';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
@@ -432,7 +433,7 @@ const PosPage: React.FC = () => {
           unit_price: unitNet,
           line_total: lineNet,
           net_value: lineNet,
-          vat_amount: round2(lineNet * lineRate / 100),
+          vat_amount: vatOf(lineNet, lineRate),
           vat_category: l.vat_category,
           income_classification_type: l.inc_type,
           income_classification_category: l.inc_cat,

@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { round2 as r2 } from '@/utils/decimal';
+import { vatOf } from '@/modules/finance/lib/vatMath';
 import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
@@ -776,10 +778,9 @@ export const NewOrderModal: React.FC<{
   const effDiscountPct = dv <= 0 ? 0
     : discountType === 'percent' ? Math.min(100, Math.max(0, dv))
     : (rawNet > 0 ? Math.min(100, Math.max(0, (dv / rawNet) * 100)) : 0);
-  const r2 = (n: number) => Math.round(n * 100) / 100;
   const discCalc = items.map((l) => {
     const net = r2((Number(l.quantity) || 0) * (Number(l.unit_price) || 0) * (1 - effDiscountPct / 100));
-    return { net, vat: r2(net * pctOf(l.vat_code) / 100) };
+    return { net, vat: vatOf(net, pctOf(l.vat_code)) };
   });
   const netTotal = r2(discCalc.reduce((a, c) => a + c.net, 0));
   const vatTotal = r2(discCalc.reduce((a, c) => a + c.vat, 0));

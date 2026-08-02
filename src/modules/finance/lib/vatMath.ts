@@ -15,14 +15,40 @@
  * cannot import a Vite/node module. Keep the two maps identical when either changes.
  */
 
-/** Round to 2 decimals (currency). Epsilon nudge so 1.005 → 1.01, not 1.00. */
-export function round2(n: number): number {
-  return Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
-}
+/**
+ * Round to 2 decimals (currency). Canonical implementation lives in `@/utils/decimal` — money is
+ * rounded outside finance too (quotes, blueprints, warehouse pricing), so the function cannot live
+ * in a finance-only module. Imported AND re-exported here because `extractVat` below needs it in
+ * scope, and because `financeService` re-exports it from this file for components that reach it
+ * through that chain. `@/utils/decimal` is itself pure, so the no-I/O guarantee above still holds.
+ */
+import { round2 } from '@/utils/decimal';
+
+export { round2 };
 
 /** Net value of a VAT-inclusive gross amount at the given percentage. Unrounded. */
 export function extractNet(gross: number, pct: number): number {
   return (Number(gross) || 0) / (1 + (Number(pct) || 0) / 100);
+}
+
+/**
+ * VAT ON a VAT-EXCLUSIVE net, unrounded. The opposite direction to {@link extractVat}, which pulls
+ * VAT out of a gross figure — confusing the two is a silent 24%-of-24% error, which is why both
+ * live here side by side instead of being written out at each call site.
+ *
+ * Unrounded because some totals deliberately accumulate every line and round ONCE at the end
+ * (NewInvoiceDialog does); rounding per line first shifts a multi-line invoice by a cent.
+ */
+export function vatOfRaw(net: number, pct: number): number {
+  return (Number(net) || 0) * (Number(pct) || 0) / 100;
+}
+
+/**
+ * VAT on a VAT-exclusive net, rounded to cents — what a STORED line carries in `vat_amount`.
+ * This one line of arithmetic was open-coded in nine places.
+ */
+export function vatOf(net: number, pct: number): number {
+  return round2(vatOfRaw(net, pct));
 }
 
 /** VAT portion of a VAT-inclusive gross amount at the given percentage, rounded to cents. */

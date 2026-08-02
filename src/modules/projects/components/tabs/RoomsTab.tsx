@@ -38,8 +38,7 @@ interface RoomsTabProps {
   isOwner?: boolean;
 }
 
-const formatMoney = (amount: number, currency: string) =>
-  new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+import { formatMoney } from '@/utils/decimal';
 
 export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, isOwner = true }) => {
   const { toast } = useToast();

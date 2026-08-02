@@ -99,7 +99,7 @@ interface LineRow {
   serialNumber: string;
 }
 
-const r2 = (n: number) => Math.round(n * 100) / 100;
+import { round2 as r2 } from '@/utils/decimal';
 
 /**
  * How well an existing stock item matches a supplier line, 0..1.
