@@ -631,9 +631,9 @@ ${scrapeResult.markdown.substring(0, 8000)}
               .map((b: any) => b.text)
               .join('\n');
 
-        // Cost log for Haiku ($0.80 in / $4 out / MTok) — the firecrawl scrape
-        // is debited 1 credit but the Haiku call costs ~$0.005-0.015 on top
-        // and was previously absorbed silently.
+        // Cost log for Haiku ($0.80 in / $4 out / MTok) — the firecrawl scrape is debited
+        // 1 credit, but the Haiku call costs ~$0.005-0.015 on top and must not be absorbed
+        // silently.
         try {
           const usage = (analysisResponse as any).usage_metadata
             ?? (analysisResponse as any).response_metadata?.usage
@@ -693,8 +693,8 @@ ${scrapeResult.markdown.substring(0, 8000)}
         }
 
         // Step 3: Search the catalog for matching products FIRST, so the single
-        // inspiration_analysis chunk below can carry them (previously the matches
-        // were only returned to the LLM and never shown on the card).
+        // inspiration_analysis chunk below can carry them — matches returned only to the
+        // LLM never reach the card.
         onChunk?.({ type: 'tool_progress', status: 'Searching catalog for matching materials...', timestamp: Date.now() });
 
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';

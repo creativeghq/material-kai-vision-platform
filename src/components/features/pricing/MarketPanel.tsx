@@ -14,7 +14,7 @@ import React, { useMemo, useState } from 'react';
 import { BadgeCheck, ChevronDown, ChevronRight, ExternalLink, Globe2, Star } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
-import type { MarketCheckResponse, PerplexityHit } from '@/services/priceMonitoringApi';
+import type { MarketCheckResponse, RetailerRow } from '@/services/priceMonitoringApi';
 
 interface MarketPanelProps {
   market: MarketCheckResponse;
@@ -169,7 +169,7 @@ export const MarketPanel: React.FC<MarketPanelProps> = ({ market, kbPrice }) => 
   );
 };
 
-const MarketHitRow: React.FC<{ hit: PerplexityHit }> = ({ hit }) => {
+const MarketHitRow: React.FC<{ hit: RetailerRow }> = ({ hit }) => {
   const sym = CURRENCY_SYMBOL[hit.currency ?? ''] ?? '';
   const discrepancy = hit.notes && hit.notes.includes('verify:') ? hit.notes : null;
   const viaMarketplace = hit.notes?.match(/via (Skroutz|Bestprice|Shopflix|Google Shopping)/i)?.[1] ?? null;

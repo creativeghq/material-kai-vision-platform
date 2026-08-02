@@ -120,9 +120,9 @@ interface SheetTypePreviewModalProps {
 }
 
 export function SheetTypePreviewModal({ open, sheetType, onCancel, onContinue }: SheetTypePreviewModalProps) {
-  // NOTE: every hook must run before the `if (!sheetType) return null` bail-out below.
-  // They used to sit after it, so a null→set transition changed the hook count between
-  // renders and React threw "Rendered more hooks than during the previous render".
+  // Every hook must run BEFORE the `if (!sheetType) return null` bail-out below. Place one
+  // after it and a null→set transition changes the hook count between renders, which React
+  // rejects with "Rendered more hooks than during the previous render".
   // Reference image with cache-busting. We fetch the bucket's file list once
   // per modal mount and use each file's updated_at as a `?v=` query string —
   // when admins regenerate, the URL changes and browsers refetch instantly.

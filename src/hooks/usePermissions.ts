@@ -21,8 +21,8 @@ export interface PermissionsApi {
   canAny: (...capabilities: Capability[]) => boolean;
   isOperator: boolean;
   isEndUser: boolean;
-  // ── Finer, axis-derived gates (formerly the separate useCapabilities hook, merged here as
-  //    the single permission source). These depend on the marketplace RANK and the raw
+  // ── Finer, axis-derived gates. This hook is the single permission source — never add a
+  //    second one. These depend on the marketplace RANK and the raw
   //    workspace role, which the coarse persona capabilities intentionally collapse, so they
   //    live as explicit booleans rather than persona capabilities. ──
   /** Invited accountant: Finance only — operate, never manage settings. */

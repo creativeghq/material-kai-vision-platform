@@ -51,12 +51,11 @@ export const VR_CREDIT_COSTS: Record<string, number> = {
 /**
  * Inpainting credit costs.
  *
- * These numbers used to be hand-maintained here at 40 / 20 / 10 while the backend metered
- * EVERY inpaint through one flat `image-inpaint` key at 3.00 credits, ignoring the user's
- * choice entirely. The displayed price was fiction in both
- * directions and the platform lost money on every Pro run.
+ * Never hand-maintain these numbers here. A local ladder drifts from what the backend meters
+ * — a flat `image-inpaint` key that ignores the user's model choice — and the displayed price
+ * becomes fiction in both directions, losing money on every Pro run.
  *
- * `ai_model_pricing` is now the single source: sam_routes meters the `inpaint-*` key for
+ * `ai_model_pricing` is the single source: sam_routes meters the `inpaint-*` key for
  * the model it actually runs, and `loadInpaintingCreditCosts()` below reads the same rows,
  * so display and debit cannot drift. These constants remain ONLY as the offline fallback
  * for a first paint or a failed fetch, and are kept equal to the seeded rows.

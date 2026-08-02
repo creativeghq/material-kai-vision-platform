@@ -69,8 +69,8 @@ export function LogViewer() {
   const [page, setPage] = useState(1);
   const [values, setValues] = useState<FilterValues>(() => ({ timestamp: defaultWindow() }));
 
-  // Loggers are free-form strings written by whatever module logged; the option list is
-  // derived from the rows currently loaded, which is what the old Select did too.
+  // Loggers are free-form strings written by whatever module logged, so the option list is
+  // derived from the rows currently loaded.
   const loggerOptions = useMemo(() => optionsFromRows(logs, (l) => l.logger_name), [logs]);
 
   const groups = useMemo<FilterGroupDef[]>(() => [

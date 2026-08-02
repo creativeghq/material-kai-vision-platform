@@ -242,9 +242,8 @@ export const createQueryDatabaseTool = () => {
             break;
 
           case 'embeddings':
-            // document_vectors was dropped 2026-04. VECS collections are now
-            // the source of truth for vectors themselves; presence-only
-            // metadata lives on the source rows. Surface a sample of
+            // VECS collections are the source of truth for the vectors themselves;
+            // presence-only metadata lives on the source rows. Surface a sample of
             // document_images with embedding flags as "embeddings overview".
             tableName = 'document_images';
             query = supabase

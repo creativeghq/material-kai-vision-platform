@@ -24,10 +24,9 @@ const MODULE_SLUG = 'flows-toolkit';
 
 // Curated tenant-safe vocabulary — MUST stay in sync with the allowlists in
 // create_simple_flow (the RPC is the enforcer; this is for the LLM + graceful errors).
-// NOTE: only triggers with a real workspace-scoped emitter belong here. product_added and
-// appointment_booked were removed — the former has no emitter at all, and the latter is emitted by
-// the (non-member) person booking, without a workspace_id, so a tenant flow could never match it.
-// Re-add either only once a trusted server-side emitter stamps workspace_id.
+// Only triggers with a real workspace-scoped emitter belong here. A trigger with no emitter,
+// or one emitted without a workspace_id (an appointment booked by a non-member, say), can never
+// match a tenant flow. Add a trigger only once a trusted server-side emitter stamps workspace_id.
 const TENANT_TRIGGERS = [
   'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent',
   'inbox.message_received',

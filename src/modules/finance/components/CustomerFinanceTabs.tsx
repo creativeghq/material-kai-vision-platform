@@ -91,7 +91,7 @@ export const PartyAccountSummary: React.FC<{
   );
 
   // KPI cell with a leading icon — used for the consolidated top strip (orders + balance + info),
-  // so every column reads the same way (icon · label · value), like the old Balance row did.
+  // so every column reads the same way: icon · label · value.
   const stat = (icon: React.ReactNode, label: React.ReactNode, value: React.ReactNode, opts?: { danger?: boolean; tone?: string; title?: string }) => (
     <Card className={`dashboard-card border-0 ${opts?.danger ? 'ring-1 ring-destructive/40' : opts?.tone === netTone && netRing ? netRing : ''}`} title={opts?.title}>
       <CardContent className="p-3">
@@ -143,11 +143,10 @@ export const PartyAccountSummary: React.FC<{
   }) > 1;
   const showTopStrip = !!orders || showBalance || (!!meta && meta.length > 0);
   /**
-   * How many tiles the strip will ACTUALLY render. The column count used to be a guess
-   * (`showCredit ? 6 : 5`) while the contents are four independent conditions — orders contributes
-   * three tiles, balance / credit / meta one each — so any party that didn't happen to match the
-   * guess got a hole at the end of the row. Counting what is about to render instead means the
-   * strip fills its width at 3, 4, 5 or 6 tiles, and there is no "missing last one" case left.
+   * How many tiles the strip will ACTUALLY render. Never guess the column count: the contents
+   * are four independent conditions — orders contributes three tiles, balance / credit / meta one
+   * each — so any guess leaves a hole at the end of the row for the parties it does not match.
+   * Counting what is about to render fills the width at 3, 4, 5 or 6 tiles alike.
    */
   const topTiles = (orders ? 3 : 0) + (showCredit ? 1 : 0) + (showBalance ? 1 : 0)
     + (meta && meta.length > 0 ? 1 : 0);

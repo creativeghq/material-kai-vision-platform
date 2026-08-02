@@ -21,7 +21,6 @@ const definition: ModuleDefinition = {
   ],
   // Single entry point: catalogs are surfaced under Operations → Catalogs
   // (/admin/operations?tab=catalogs), which links into the builder routes above.
-  // The standalone admin-dashboard grid item was removed to avoid a duplicate entry.
   navItems: [],
 };
 

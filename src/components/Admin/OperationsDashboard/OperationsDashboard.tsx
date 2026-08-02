@@ -293,7 +293,7 @@ const OperationsDashboardInner: React.FC = () => {
       await loadAgentChatPage(1);
 
       // One aggregate row over the FULL agent_chat_messages / analytics_events / api_usage_logs
-      // tables, replacing the old fetch-100-rows-and-reduce-in-the-browser path. Operator-gated
+      // tables — never a fetch-N-rows-and-reduce-in-the-browser sample. Operator-gated
       // server-side (is_platform_operator), so it can safely expose platform-wide usage + cost.
       const { data: statsRow, error: statsError } = await supabase.rpc('admin_agent_chat_stats');
 

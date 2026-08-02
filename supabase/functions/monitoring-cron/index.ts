@@ -86,9 +86,9 @@ Deno.serve(withApiLogging(
   }
 
   // Honor the module toggle: a disabled module must not run paid refreshes/probes.
-  // Answers success:false, NOT success:true. A deliberate no-op and a
-  // completed refresh used to be the same response, so mention monitoring reported healthy
-  // every hour for three months after being switched off on 2026-05-03.
+  // Answers success:false, NOT success:true. Report a deliberate no-op and a completed
+  // refresh with the same response and a switched-off module reports healthy every hour,
+  // indefinitely.
   // Deliberately still HTTP 200: a skip is not a server error and must not burn the error
   // budget, and 204 is not available because it forbids a response body. The status is not
   // the signal here — `success:false` plus the per-task request_path above is, and

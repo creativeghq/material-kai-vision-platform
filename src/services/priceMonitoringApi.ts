@@ -536,5 +536,3 @@ export async function checkNow(productId: string, _productName: string): Promise
   };
 }
 
-/** @deprecated PerplexityHit was the old name for RetailerRow. */
-export type PerplexityHit = RetailerRow;

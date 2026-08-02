@@ -1327,9 +1327,8 @@ const KpiCard: React.FC<{
  * Which currency an aggregate over these rows is actually denominated in.
  *
  * Bucket totals, the DSO base and the AR/AP KPI cards all sum `amount_due` across every row, so
- * they are only meaningful when the rows share a currency. They used to be rendered with
- * formatMoney's EUR default regardless — a USD invoice's 1,000 was added to the euro total and
- * shown with a euro symbol.
+ * they are only meaningful when the rows share a currency. Fall back to formatMoney's EUR
+ * default and a USD invoice's 1,000 is added to the euro total and shown with a euro symbol.
  *
  * Summing genuinely mixed rows is not something a symbol can fix, so this reports the dominant
  * currency AND whether the set is mixed; the callers label the total honestly and warn when it

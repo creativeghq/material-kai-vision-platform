@@ -1172,9 +1172,7 @@ async function executeAgent(
   // request needs them.
   // RBAC gating still applies AFTER this filter — admin-only tools won't
   // bind for viewers/members even if they're in an active toolkit.
-  // The legacy per-tool restriction picker (selectedTools) was removed
-  // 2026-05-09. Toolkits + load_toolkit are now the single source of truth
-  // for tool-binding.
+  // Toolkits + load_toolkit are the single source of truth for tool-binding.
 
   const SERVER_TOOLKITS: Record<string, { alwaysOn?: boolean; tool_ids: string[] }> = {
     'core': {

@@ -381,12 +381,11 @@ function jsonResponse(body: unknown, status = 200) {
 
 /** Fetch a remote image and return as Uint8Array.
  *
- * SSRF-guarded (invariant 7). `url` originates from
- * `body.reference_image_url`, so a raw fetch let any authenticated user reach
- * cloud metadata (169.254.169.254), loopback or RFC1918 — and the old error text
- * echoed the URL and upstream status back, making it a usable response oracle.
- * `redirect: 'error'` is required by the guard's contract (a public URL can 302
- * to a blocked address after the check). The message no longer leaks status/URL.
+ * SSRF-guarded (invariant 7). `url` originates from `body.reference_image_url`, so a raw
+ * fetch lets any authenticated user reach cloud metadata (169.254.169.254), loopback or
+ * RFC1918. `redirect: 'error'` is required by the guard's contract (a public URL can 302 to
+ * a blocked address after the check). The error message must not echo the URL or the upstream
+ * status — that makes it a usable response oracle.
  *
  * NOTE: `reference_image_url` is ALSO passed to Replicate (callFluxDepthPro),
  * which fetches it from Replicate's own network — validate before it leaves here.

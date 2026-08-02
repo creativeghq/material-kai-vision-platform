@@ -21,7 +21,6 @@ import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { PDFUploadSection } from '@/components/features/pdf/PDFUploadSection';
 import { supabase } from '@/integrations/supabase/client';
 
-// PDFProcessingStepsMonitor has been removed - all monitoring now happens in AsyncJobQueueMonitor
 
 const DataImportHub: React.FC = () => {
   const navigate = useNavigate();

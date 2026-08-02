@@ -44,12 +44,12 @@ Deno.serve(withApiLogging('catalog-render-pdf-page', async (req) => {
     return jsonResponse({ success: false, error: 'CRON_SECRET not configured on edge function' }, 500);
   }
 
-  // This proxy forwards to MIVAA's internal rasterizer under the
-  // platform cron secret; it previously only checked that CRON_SECRET was *set*, never
-  // that the CALLER presented valid auth — so anyone could rasterize any tenant's PDF
-  // page and get a signed PNG URL. Its only legit callers (catalog-extract-from-pdfs /
-  // catalog-translate-pdf) invoke it with the service-role key, so gate on
-  // isCronAuthorized (service-role OR x-cron-secret); fails closed for anon.
+  // This proxy forwards to MIVAA's internal rasterizer under the platform cron secret.
+  // Checking that CRON_SECRET is *set* is not authentication — the CALLER must present
+  // valid auth, or anyone can rasterize any tenant's PDF page and get a signed PNG URL.
+  // Its only legit callers (catalog-extract-from-pdfs / catalog-translate-pdf) invoke it
+  // with the service-role key, so gate on isCronAuthorized (service-role OR x-cron-secret);
+  // fails closed for anon.
   if (!isCronAuthorized(req)) {
     return jsonResponse({ success: false, error: 'unauthorized' }, 401);
   }

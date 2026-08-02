@@ -242,11 +242,11 @@ export const RecordPaymentDialog: React.FC<{
 
   /**
    * ONE "For" control. What money-in can be applied to is an invoice OR an order OR nothing —
-   * three options on the same axis, so they belong in one list. They used to be two adjacent
-   * selects ("On order" + "For"), which read as two unrelated questions and let a payment be
-   * pointed at an order and a different customer's invoice at the same time. Picking one now
-   * clears the other. `none` is the explicit un-pick (on-account credit); Radix cannot carry ''
-   * as an item value, hence the sentinel.
+   * three options on the same axis, so they belong in ONE list. Split them into two adjacent
+   * selects ("On order" + "For") and they read as unrelated questions, letting a payment point at
+   * an order and a different customer's invoice at the same time. Picking one clears the other.
+   * `none` is the explicit un-pick (on-account credit); Radix cannot carry '' as an item value,
+   * hence the sentinel.
    */
   const forValue = targetInvoiceId ? `inv:${targetInvoiceId}` : pickedOrderId ? `ord:${pickedOrderId}` : 'none';
 

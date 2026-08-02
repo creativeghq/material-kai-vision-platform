@@ -125,9 +125,8 @@ export const QuoteDetailPage: React.FC = () => {
     }
   }, [quote?.id]);
 
-  // PDF progress is owned by QuoteDownloadButtons (its own `generating` flag). This page briefly
-  // kept its own generatingPDF/downloadingPDF/updatingStatus mirrors of it; nothing ever set or
-  // read them, so they were removed rather than left looking like busy-state protection.
+  // PDF progress is owned by QuoteDownloadButtons (its own `generating` flag). This page keeps
+  // no mirror of it — an unread busy flag only looks like protection.
   const [sendingQuote, setSendingQuote] = useState(false);
 
   // HTML/client-side PDF — hook must be at top level (before any early returns)
@@ -405,11 +404,9 @@ export const QuoteDetailPage: React.FC = () => {
   }, 0);
 
   // The operator approves THIS preview, so it has to agree to the cent with what
-  // reprice_quote_items will persist. previewTotalsBreakdown mirrors get_quote_totals
-  // step for step; the arithmetic that used to live here was the second of three
-  // divergent implementations and folded in no extras, so the
-  // operator approved a Final that excluded upsells the customer had already accepted
-  // (finding 18).
+  // reprice_quote_items will persist. previewTotalsBreakdown mirrors get_quote_totals step for
+  // step — never re-implement the arithmetic here. A local copy that folds in no extras has the
+  // operator approving a Final that excludes upsells the customer already accepted.
   const pricingPreview = previewTotalsBreakdown({
     subtotal: pricingSubtotal,
     cashDiscountPct: pricingCashPct,

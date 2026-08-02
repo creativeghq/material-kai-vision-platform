@@ -2,8 +2,8 @@
  * Knowledge-Graph Traversal Tools — agent-chat surface for the relational graph.
  *
  * These tools let the KAI agent walk the EXISTING relational edges (products ↔
- * projects ↔ quotes ↔ invoices ↔ suppliers ↔ price history) that previously only
- * powered feature UIs. Each tool is a thin wrapper over a tenancy-guarded
+ * projects ↔ quotes ↔ invoices ↔ suppliers ↔ price history) that also power the
+ * feature UIs. Each tool is a thin wrapper over a tenancy-guarded
  * SECURITY DEFINER RPC (see migration `phase1_knowledge_graph_traversal_rpcs`);
  * the RPC scopes every query by workspace_id, so the tools only pass ids.
  *

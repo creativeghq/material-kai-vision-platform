@@ -115,10 +115,10 @@ async function handleBatchCreate(req: Request, supabase: any, startTime: number)
       return Utils.createErrorResponse('Invalid JSON in request body', 400, startTime);
     }
 
-    // Authenticate BEFORE validating. The order used to be reversed, so an unauthenticated
-    // caller got 400 'documents array is required and must not be empty' — learning the payload
-    // contract of a service-role-capable endpoint without holding a credential. No data leaked
-    // and no work was done, but an anonymous caller should learn nothing beyond 401.
+    // Authenticate BEFORE validating. Validate first and an unauthenticated caller gets
+    // 400 'documents array is required and must not be empty', learning the payload contract
+    // of a service-role-capable endpoint without holding a credential. An anonymous caller
+    // should learn nothing beyond 401.
     const authResult = await AuthUtils.checkAuthentication(req, supabase);
     if (!authResult.success) {
       return Utils.createErrorResponse(authResult.error || 'Authentication failed', 401, startTime);

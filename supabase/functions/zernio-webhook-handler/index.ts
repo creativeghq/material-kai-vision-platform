@@ -20,8 +20,8 @@
  *   message.delivered|read|failed → update messaging_logs / campaign recipient delivery status
  *
  * This is the single Zernio webhook endpoint for BOTH social posts and WhatsApp
- * messaging (the former Twilio messaging-webhook was removed). Register one
- * webhook in Zernio subscribed to post.* + account.* + message.* events.
+ * messaging. Register one webhook in Zernio subscribed to post.* + account.* +
+ * message.* events.
  */
 
 import { createClient } from '@supabase/supabase-js';

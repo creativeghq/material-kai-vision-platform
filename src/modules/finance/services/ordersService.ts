@@ -392,7 +392,7 @@ export const ordersService = {
     // Batch the finance lookups (3 queries total, not 3 per order). We only need presence of an
     // invoice/bill plus the canonical settlement position — not the full getOrderFinance payload.
     // Settlement comes from `orderBalances` (the shared SQL definition), NOT from re-summing
-    // allocations here; this used to be its own hand-rolled direction split.
+    // allocations here.
     const [inv, bills, balances, settings] = await Promise.all([
       supabase.from('invoices').select('order_id').in('order_id', ids),
       supabase.from('supplier_bills').select('order_id').in('order_id', ids),
@@ -456,14 +456,15 @@ export const ordersService = {
    * Settlement position per order, straight from `get_order_settlements` — the SINGLE definition
    * of how much an order is settled and how much is still owed.
    *
-   * Do NOT re-derive `outstanding` from these numbers. The rule (a sales order settles on money
+   * Do NOT re-derive `outstanding` from these numbers. The rule — a sales order settles on money
    * IN; a purchase order on money OUT; the opposite direction is the other side of the trade and
-   * must never reduce what the counterparty owes) used to be restated at five call sites in two
-   * languages. One of them netted the two directions, and a fully-paid sales order with a paid
-   * supplier bill reported as still owing exactly the supplier's amount — while the payment badge
-   * on the same row said "Paid". The RPC now returns `settled` / `outstanding` / `payment_status`
-   * already derived, and the same function backs `recompute_order_payment_status` and the
-   * `finance.order_payment_status_drift` integrity check, so the three cannot disagree.
+   * must never reduce what the counterparty owes — lives in ONE place. Net the two directions and
+   * a fully-paid sales order with a paid supplier bill reports as still owing exactly the
+   * supplier's amount, while the payment badge on the same row says "Paid".
+   *
+   * The RPC returns `settled` / `outstanding` / `payment_status` already derived, and the same
+   * function backs `recompute_order_payment_status` and the `finance.order_payment_status_drift`
+   * integrity check, so the three cannot disagree.
    */
   async orderBalances(orderIds: string[]): Promise<Map<string, OrderBalance>> {
     const out = new Map<string, OrderBalance>();
@@ -1388,9 +1389,9 @@ export const ordersService = {
    * two-call patterns that can crash mid-way".
    *
    * `deliver_order_lines` runs the same per-line function inside a single transaction, so an
-   * exception on any line rolls the whole delivery back. Note the old comment here claimed
-   * stock movement "remains the dispatch flow's job" — it is not: `deliver_order_line` moves
-   * warehouse stock itself, by the delta (sales out / purchase in).
+   * exception on any line rolls the whole delivery back. Stock movement is NOT the dispatch
+   * flow's job: `deliver_order_line` moves warehouse stock itself, by the delta
+   * (sales out / purchase in).
    */
   async setDelivery(orderId: string, deliveries: Array<{ itemId: string; quantityDelivered: number }>): Promise<OrderStatus> {
     const { data, error } = await supabase.rpc('deliver_order_lines', {

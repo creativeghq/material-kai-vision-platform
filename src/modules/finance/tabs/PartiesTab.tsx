@@ -317,8 +317,8 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
   const [releaseOpen, setReleaseOpen] = useState(false);
   /** Bumped after a credit release so the drill-down re-reads the balance it just changed. */
   const [reloadKey, setReloadKey] = useState(0);
-  // Each drill-down list pages independently — these used to be `.slice(0, 15)` / `.slice(0, 10)`,
-  // which silently hid every older invoice/bill/payment with no way to reach it.
+  // Each drill-down list pages independently. A bare `.slice(0, N)` here silently hides every
+  // older invoice/bill/payment with no way to reach it.
   const [invPage, setInvPage] = useState(1);
   const [billPage, setBillPage] = useState(1);
   const [payPage, setPayPage] = useState(1);

@@ -93,13 +93,12 @@ async function step(
 
 // Best-effort teardown. Data first (FK), then memberships, workspaces, users. Never throws —
 // the email-prefix cron is the backstop if anything here fails.
-// It must never throw, but it MUST NOT be silent. Every delete here used to be
-// `.then(() => {}, () => {})`, which discarded the error object as well as the exception — so
-// when a BEFORE DELETE guard on a cascaded child (finance_categories' system-category trigger)
-// started aborting `delete from workspaces`, teardown reported nothing and kept "passing" while
-// 3,057 fixture workspaces piled up in production. The name-prefix reaper that was supposed to
-// catch the leak was independently broken, so two silent failures stacked and nothing surfaced.
-// Now: collect every failure, VERIFY the workspaces actually went, and warn loudly with the count.
+// It must never throw, but it MUST NOT be silent. Never write `.then(() => {}, () => {})`
+// here — that discards the error object as well as the exception, so a BEFORE DELETE guard on
+// a cascaded child (finance_categories' system-category trigger) aborting `delete from
+// workspaces` leaves teardown reporting nothing and "passing" while fixture workspaces pile
+// up in production. Collect every failure, VERIFY the workspaces actually went, and warn
+// loudly with the count.
 export async function teardown(svc: SupabaseClient, opts: { wsIds?: string[]; userIds?: string[] }): Promise<void> {
   const explicitWs = (opts.wsIds || []).filter(Boolean);
   const userIds = (opts.userIds || []).filter(Boolean);

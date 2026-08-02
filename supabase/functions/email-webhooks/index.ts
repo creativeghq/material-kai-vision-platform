@@ -144,8 +144,8 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
         });
       }
     } else {
-      // Fail CLOSED — an unset secret must never fall through to processing
-      // an unsigned webhook (mirror stripe-webhooks, not the old fail-open behaviour).
+      // Fail CLOSED — an unset secret must never fall through to processing an unsigned
+      // webhook. Mirrors stripe-webhooks.
       console.error('RESEND_WEBHOOK_SECRET not set — refusing to process unsigned webhook');
       return new Response(
         JSON.stringify({ error: 'Webhook signature verification not configured' }),
@@ -292,9 +292,9 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
         };
         // Fan out per owner/admin so each event carries a CONCRETE user_id. The seeded
         // default flow ends in `create_notification`, which needs one — a workspace_id
-        // alone produces a notification addressed to nobody. This event previously had no
-        // flow at all, so a hard bounce or a spam complaint on an invoice/quote email
-        // notified nobody and the send looked successful forever.
+        // alone produces a notification addressed to nobody. Without this fan-out a hard
+        // bounce or a spam complaint on an invoice/quote email notifies nobody and the send
+        // looks successful forever.
         if (wsId) {
           await emitFlowEventToWorkspaceRoles(wsId, ['owner', 'admin'], eventType,
             (recipientUserId) => ({ ...payload, user_id: recipientUserId }));

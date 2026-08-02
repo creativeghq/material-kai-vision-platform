@@ -94,10 +94,10 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [payeeBanks, setPayeeBanks] = useState<CrmBankAccount[]>([]);
   const [counterpartyBankId, setCounterpartyBankId] = useState<string>('');
   // What the cost is FOR — a project, a customer whose order it was incurred against, or a
-  // purchase order this cost belongs to. That last one used to be a SECOND control ("On purchase
-  // order", listing only the payee's own POs), which asked the same question twice and could not
-  // express the common case at all: freight and customs are billed by someone other than the
-  // supplier whose order they belong to. One field, one answer.
+  // purchase order this cost belongs to. ONE field, one answer — never a second "On purchase
+  // order" control listing only the payee's own POs. That asks the same question twice and
+  // cannot express the common case at all: freight and customs are billed by someone other
+  // than the supplier whose order they belong to.
   const [link, setLink] = useState<OrderLinkTarget>({ kind: 'none' });
   // `supplier_bills.order_id` — the 3-way-match link. Either the order we were opened from, or the
   // one picked above. NOT `covers_order_id`, which is the demand side (see the picker's own note).

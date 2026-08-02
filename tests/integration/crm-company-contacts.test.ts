@@ -7,7 +7,7 @@ import { hasCreds, serviceClient, createUser, createWorkspace, addMember, teardo
 //     nested crm_company_contacts shape made the Contacts tab render "Contacts (0)" even
 //     though the join row existed, so the contact looked unassigned.
 //  2. POST /companies/{id}/contacts with a `contact` object creates AND attaches atomically —
-//     the old two-call client flow stranded an orphan contact when the attach leg failed.
+//     a two-call client flow strands an orphan contact when the attach leg fails.
 // Runs against the deployed crm-api with a real user JWT, so it exercises auth + scope too.
 // Editing this file is enough to run it: tests/** is in the deploy workflow's push paths and
 // integration-tests gates on the `tests` filter, so a test-only commit still executes here.

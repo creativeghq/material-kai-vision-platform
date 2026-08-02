@@ -2161,9 +2161,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             ? { pinned_material_images: pinnedMaterials.filter(m => m.imageUrl).map(m => m.imageUrl!) }
             : {}),
           // Toolkit-level enablement — agent-chat resolves these to tool IDs server-side.
-          // Always includes the always-on Core toolkit. Single source of truth for
-          // tool gating; the per-tool restriction picker was removed 2026-05-09 in
-          // favor of the visual toolkit picker + load_toolkit meta-tool.
+          // Always includes the always-on Core toolkit, and is the single source of truth
+          // for tool gating: the visual toolkit picker plus the load_toolkit meta-tool.
           // For a direct run we also force-include the owning toolkit so the server
           // binds the target tool even if the user hasn't pre-enabled that cluster.
           // `pendingToolkits` does the same for seeded-prompt quick-starts (race-proof).
@@ -2320,7 +2319,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 ]);
               } else if (chunk.type === 'tool_progress' && chunk.status) {
                 // Mid-tool progress lines (~60 emit sites across job/mention/price/project/sourcing/seo
-                // tools) were previously dropped on the floor in chat. Surface them as reasoning steps.
+                // tools). Surface them as reasoning steps rather than dropping them.
                 setReasoningSteps((prev) => [
                   ...prev,
                   { type: 'tool_call', message: String(chunk.status), timestamp: Date.now() },
@@ -4729,7 +4728,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             : 'flex-1 min-w-0',
         )}
       >
-        {/* Studio header — agent identity + conversation manager launcher (replaces the old left sidebar + mobile drawer) */}
+        {/* Studio header — agent identity + conversation manager launcher */}
         <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5 border-b border-white/8 shrink-0">
           <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner flex-shrink-0">
             <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />

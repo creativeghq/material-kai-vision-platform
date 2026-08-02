@@ -165,11 +165,11 @@ async function trackWebsite(supabase: any, website: { id: string; workspace_id: 
         url: si.relative_url ?? null, captured_at: snapshot.captured_at,
       };
     }).filter((k: any) => k.keyword);
-    // Replace the set ONLY when we actually have a fresh answer. The DELETE used to be
-    // unconditional while the INSERT was guarded by `if (kws.length)` — so one transient
-    // DataForSEO failure wiped every stored keyword and wrote nothing back, and the run still
-    // returned { ok: true } with the snapshot recording error: null. The 'Rankings & Links'
-    // panel went empty and STAYED empty until the next weekly run, with nothing reporting it.
+    // Replace the set ONLY when we actually have a fresh answer. An unconditional DELETE with
+    // the INSERT guarded by `if (kws.length)` means one transient DataForSEO failure wipes
+    // every stored keyword and writes nothing back, while the run still returns { ok: true }
+    // and the snapshot records error: null. The 'Rankings & Links' panel then sits empty until
+    // the next weekly run with nothing reporting it.
     if (rankedFailed) {
       console.warn('[seo-domain-tracker] keeping the existing keyword set — upstream fetch failed for', domain);
     } else {

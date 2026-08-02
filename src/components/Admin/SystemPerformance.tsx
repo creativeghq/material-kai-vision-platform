@@ -53,10 +53,10 @@ interface SystemMetrics {
 }
 
 /**
- * A row of `background_jobs` — the real processing queue.
- * This used to be cast from `materials_catalog`, which has none of these columns, so job_type /
- * status / duration / error rendered blank on every row. Duration is derived from the timestamps
- * (there is no processing_time_ms column) so it agrees with the aggregate tiles above.
+ * A row of `background_jobs` — the real processing queue. Not `materials_catalog`, which
+ * carries none of these columns and renders job_type / status / duration / error blank on
+ * every row. Duration is derived from the timestamps (there is no processing_time_ms column)
+ * so it agrees with the aggregate tiles above.
  */
 interface ProcessingJob {
   id: string;
@@ -612,8 +612,8 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                 <CardContent>
                   <div className="space-y-4">
                     {enhancedJobs.length > 0 ? (
-                      // 5/page keeps the panel the same height as the old slice(0, 5)
-                      // while still making the remaining jobs reachable.
+                      // 5/page keeps the panel a fixed height while still making the
+                      // remaining jobs reachable.
                       paginate(enhancedJobs, enhancedJobsPage, 5).map((job) => (
                         <div key={job.job_id} className="border rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">

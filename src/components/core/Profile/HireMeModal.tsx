@@ -65,10 +65,10 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
         .filter((s) => selectedServices.includes(s.id))
         .map((s) => s.name);
 
-      // Goes through inbox-api, not a direct insert: this modal renders on a PUBLIC profile
-      // page, and profile_contact_requests is authenticated-only, so the old client-side
-      // insert failed for every logged-out visitor — the exact audience the form is for.
-      // The function is Turnstile-gated + rate-limited and sets is_read server-side.
+      // Goes through inbox-api, never a direct insert: this modal renders on a PUBLIC profile
+      // page and profile_contact_requests is authenticated-only, so a client-side insert fails
+      // for every logged-out visitor — the exact audience the form is for. The function is
+      // Turnstile-gated + rate-limited and sets is_read server-side.
       const { error } = await supabase.functions.invoke('inbox-api', {
         body: {
           action: 'profile_contact',

@@ -8,7 +8,7 @@
  * PAGE SIZE + ORIENTATION FOLLOW THE TEMPLATE COVER IMAGE: the page is sized to the
  * cover image's aspect ratio (portrait vs landscape), so a full-page template renders
  * with no distortion and the whole layout adapts. Falls back to A4 portrait when no
- * cover dimensions are known — in which case the geometry is identical to the old A4.
+ * cover dimensions are known.
  */
 import { PDFDocument, PDFFont, PDFImage, PDFPage, rgb, RGB } from 'pdf-lib';
 import { embedOpenSans } from '../fonts/open-sans.ts';

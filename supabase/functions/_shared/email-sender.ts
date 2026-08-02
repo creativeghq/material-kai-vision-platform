@@ -103,11 +103,11 @@ export async function checkWorkspaceSendQuota(
   const globalDefault = Number(setting?.setting_value) || DEFAULT_DAILY_LIMIT;
   const limit = cfg?.daily_send_limit != null ? Number(cfg.daily_send_limit) : globalDefault;
 
-  // FAIL CLOSED. This used to be `const used = count ?? 0`, with `error` dropped — so if the
-  // email_logs count failed for ANY reason, used=0, `0 < limit` was true, and the cap silently
-  // ceased to exist. A quota that fails open is not a quota, and this is the PLATFORM-controlled
-  // cap that a tenant deliberately cannot raise (guard_workspace_email_limit). If we cannot
-  // count today's sends, we cannot prove the tenant is under the cap, so we must not allow.
+  // FAIL CLOSED. Never write `const used = count ?? 0` and drop `error`: if the email_logs
+  // count fails for ANY reason, used=0, `0 < limit` holds, and the cap silently ceases to
+  // exist. A quota that fails open is not a quota, and this is the PLATFORM-controlled cap a
+  // tenant deliberately cannot raise (guard_workspace_email_limit). If we cannot count today's
+  // sends, we cannot prove the tenant is under the cap, so we must not allow.
   if (countErr || count == null) {
     console.error('[email-sender] quota count failed — denying send (fail-closed):', countErr?.message);
     return { allowed: false, limit, used: limit };

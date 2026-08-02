@@ -1,9 +1,9 @@
 /**
  * Filter definitions for the price-alert history.
  *
- * The panel used to be a hardcoded empty state, so there was nothing to filter. Now that it reads
- * `price_alert_log`, the useful questions are "what fired, for which retailer, and did it actually
- * get delivered" — hence the channel dimensions alongside type and date.
+ * The panel reads `price_alert_log`, where the useful questions are "what fired, for which
+ * retailer, and did it actually get delivered" — hence the channel dimensions alongside type
+ * and date.
  */
 import { Bell, CalendarDays, Send } from 'lucide-react';
 import { optionsFromRows, type FilterGroupDef } from '@/components/core/filters';

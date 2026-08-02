@@ -1,9 +1,9 @@
 /**
  * Filter definitions for the projects list.
  *
- * The list previously had a single "Show archived" toggle, so a designer with 40 projects had
- * no way to narrow by client, budget or deadline. Archived is now a field like any other, seeded
- * to `false` so the default view still hides archived projects.
+ * Archived is a field like any other, seeded to `false` so the default view hides archived
+ * projects — not a lone "Show archived" toggle, which leaves a designer with 40 projects no
+ * way to narrow by client, budget or deadline.
  */
 import { CalendarDays, Coins, FolderKanban, UserRound, Users } from 'lucide-react';
 import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } from '@/components/core/filters';

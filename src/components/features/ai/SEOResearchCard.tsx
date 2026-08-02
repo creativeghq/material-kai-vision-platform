@@ -9,7 +9,7 @@
  *
  * Surfaces render on THEME tokens (bg-card / text-foreground / muted / border)
  * so the same card is legible in the light canvas, the dark canvas AND the dark
- * chat bubble — never the old white-on-dark wash. Data shape mirrors the
+ * chat bubble — never a hardcoded white-on-dark wash. Data shape mirrors the
  * `seo_research_card` chunk from `_shared/tools/seo-agent-tools.ts`.
  */
 

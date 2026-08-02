@@ -815,7 +815,7 @@ const App = () => (
                     </PageErrorBoundary>
                   }
                 />
-                {/* Back-compat: the brand hub used to live under /knowledge-base */}
+                {/* Back-compat redirect for the old /knowledge-base brand URLs */}
                 <Route path="/knowledge-base/brands" element={<Navigate to="/brands" replace />} />
                 <Route path="/knowledge-base/brand/:slug" element={<BrandKnowledgePage />} />
                 {/* Individual article — real, slug-based, SEO-friendly URL */}

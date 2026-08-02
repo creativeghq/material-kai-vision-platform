@@ -71,7 +71,7 @@ interface EntityData {
   confidence: number;
 }
 
-// Post-filter selections survive a reload, as they did in the old sidebar panel.
+// Post-filter selections survive a reload.
 const FILTERS_STORAGE_KEY = 'materialSearchFilters';
 
 interface UnifiedSearchInterfaceProps {

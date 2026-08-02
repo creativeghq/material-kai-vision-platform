@@ -149,8 +149,8 @@ export const EmailTemplatesTab: React.FC = () => {
     return <Badge variant={colors[category] || 'outline'}>{humanizeLabel(category)}</Badge>;
   };
 
-  // Only offer topic groups that actually have a template, and carry live counts so the
-  // kind/topic options stay as informative as the old Selects were.
+  // Only offer topic groups that actually have a template, and carry live counts so a
+  // kind/topic option never promises results it cannot deliver.
   const topicOptions = useMemo(() => {
     const counts = new Map<string, number>();
     for (const t of templates) {

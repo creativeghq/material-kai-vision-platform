@@ -101,7 +101,7 @@ const ModulesPage: React.FC = () => {
     } else {
       // Drop the invoice-provider cache so any visible IssueInvoiceButton /
       // the ERP provider button re-resolves on the next render (otherwise the
-      // 30s TTL keeps the old provider visible after toggling an ERP module).
+      // 30s TTL keeps the previous provider visible after toggling an ERP module).
       invalidateInvoiceProviderCache();
       await Promise.all([refreshModuleRegistry(), invalidateMivaaCache()]);
       toast({

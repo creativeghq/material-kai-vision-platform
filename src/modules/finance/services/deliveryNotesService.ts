@@ -267,8 +267,8 @@ export const deliveryNotesService = {
           warehouse_item_id: match?.id ?? null,
           product_id: l.product_id ?? match?.product_id ?? null,
           qty_on_hand: onHand,
-          // A line that matches NO stock row is short by definition — it used to be the one case
-          // that produced no warning at all.
+          // A line that matches NO stock row is short by definition, and is exactly the case a
+          // null-tolerant comparison would pass silently.
           shortfall: onHand == null ? qty > 0 : onHand < qty,
         };
       });

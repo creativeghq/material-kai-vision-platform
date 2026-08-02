@@ -85,10 +85,10 @@ serve(withApiLogging('email-unsubscribe', async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
     // `w` and `c` arrive from the query string. A malformed uuid makes Postgres reject the
-    // whole statement (22P02) — and the old code discarded the result and rendered the green
-    // confirmation on the next line regardless. A recipient was told the opt-out worked and
-    // kept receiving marketing mail: the road to a spam complaint and, under CAN-SPAM/GDPR, a
-    // compliance incident that nothing would have surfaced (email_unsubscribes had 0 rows).
+    // whole statement (22P02), so the result MUST be checked before rendering the green
+    // confirmation below. Skip that and a recipient is told the opt-out worked while still
+    // receiving marketing mail — a spam complaint, and under CAN-SPAM/GDPR a compliance
+    // incident that nothing would surface.
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!UUID_RE.test(ws)) {
       console.error('[email-unsubscribe] malformed workspace id:', ws);

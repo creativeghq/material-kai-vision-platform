@@ -752,8 +752,8 @@ async function executeAction(
       if (!category) throw new Error('Category is required');
 
       // Meter tenant flows only (operator/global flows resolve to null → stay free). Debit BEFORE
-      // the Anthropic web_search call (invariant #10 — previously the only paid flow action with
-      // zero metering); refunded below if the call fails. `scope` here is the outer FlowScope —
+      // the Anthropic web_search call (invariant #10); refunded below if the call fails.
+      // `scope` here is the outer FlowScope —
       // the geo string is `geoScope` to avoid shadowing it.
       const webSearchDebit = resolveFlowDebit(userId, scope);
       if (webSearchDebit) {

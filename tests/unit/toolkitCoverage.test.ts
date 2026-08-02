@@ -72,23 +72,6 @@ const KNOWN_UNCLUSTERED = new Set([
   'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
   // Docs / misc
   'estimate_cost', 'web_search',
-  // ─── Cleared 2026-07-26 ──────────────────────────────────────────────
-  // Pruned once these got clusters in BOTH mirrors: sourcing (create_purchase_order,
-  // send_purchase_order, source_product), trip-expenses (add_trip_expense, create_trip_card,
-  // list_trip_cards, submit_trip_card), expenses (record_expense, list_recent_expenses),
-  // real-estate (manage_real_estate), docs (search_workspace_docs).
-  // ─── Cleared 2026-07-16 ───────────────────────────────────────
-  // 18 entries were removed here, not by 18 separate judgement calls but by
-  // adding the 4 ToolkitDefinitions the SERVER already defined + the 2 tools
-  // the picker's projects cluster omitted:
-  //   knowledge-graph → product_provenance, product_price_history,
-  //     projects_using_product, products_in_project, customer_overview,
-  //     supplier_overview, products_by_brand, brand_overview,
-  //     related_products, find_products_by_spec
-  //   tech-radar      → review_solution, track_tech_radar, list_tech_radar, update_finding
-  //   flows-toolkit   → manage_flows
-  //   social          → manage_social
-  //   projects        → add_purchase_item, generate_purchase_sheet
 ]);
 
 function implementedTools(): Set<string> {

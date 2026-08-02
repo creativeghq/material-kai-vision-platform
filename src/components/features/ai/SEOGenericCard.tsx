@@ -8,7 +8,7 @@
  *
  * Surfaces render on THEME tokens (bg-card / text-foreground / muted / border)
  * so the same card is legible in the light canvas, the dark canvas AND the dark
- * chat bubble — never the old white-on-dark wash. Each section carries a
+ * chat bubble — never a hardcoded white-on-dark wash. Each section carries a
  * one-line plain-language primer so a non-technical reader knows what the raw
  * DataForSEO numbers mean and what to do with them; empty/absent values are
  * spelled out as words (and, where relevant, framed as an opportunity) instead

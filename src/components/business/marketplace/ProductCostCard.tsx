@@ -3,9 +3,8 @@
  *
  * Read-only. Purchase cost is set by the buying flows that know the real number — warehouse
  * intake from a supplier document, the XML importer, supplier pricing — so an editable field
- * here would be a fifth way to disagree with them. It is shown because it was previously shown
- * nowhere: `ProductPricingCard` mentions a `WorkspaceCostBadge` in its own docstring that has
- * never existed, so cost has been invisible on the product record.
+ * here would be a fifth way to disagree with them. This card is the only place cost is
+ * surfaced on the product record.
  *
  * The caller gates this on `pricing.manage` or `sales.team.view` AND own-workspace ownership.
  * Cost is the most sensitive number on a product — it is margin, backwards — and must never

@@ -125,8 +125,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Redeem a pending referral / role-carrying invite before reading memberships.
     // The token is consumed (removed) ONLY on a definitive server response — success OR a permanent
     // rejection (expired/used, ok:false). A THROW (network/transient) keeps the token so the next
-    // context load retries, instead of the old code that deleted it up-front and swallowed the result
-    // → a transient failure permanently lost the user's workspace role with no feedback.
+    // context load retries. Deleting it up-front loses the user's workspace role permanently on a
+    // transient failure, with no feedback.
     const redeemPending = async (
       storageKey: string,
       redeem: (code: string) => Promise<{ ok: boolean; error?: string }>,
@@ -155,9 +155,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     await redeemPending(INVITE_STORAGE_KEY, (c) => workspaceManagementService.redeemInvite(c), 'invitation');
 
     // These two are INDEPENDENT, and both gate `loading`, which every route sits behind via
-    // AuthGuard — so awaiting them in sequence added a full round trip to the first paint of every
-    // authenticated page. The account role additionally used to be a SECOND hop (user_profiles →
-    // roles); `roles(name)` embeds it, so what was three serial queries is now one round trip.
+    // AuthGuard — so awaiting them in sequence adds a full round trip to the first paint of every
+    // authenticated page. `roles(name)` embeds the account role rather than costing a second hop
+    // through user_profiles, which keeps the whole thing to one round trip.
     const [membersRes, profileRes] = await Promise.all([
       supabase
         .from('workspace_members')

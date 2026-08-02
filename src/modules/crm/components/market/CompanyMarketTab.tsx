@@ -354,10 +354,10 @@ interface MarketAnalytics {
 const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<MarketAnalytics | null>(null);
-  // A failed RPC used to be indistinguishable from an empty result, and the empty state then
-  // told the user "No catalog products are linked to this company yet" — presenting a broken
-  // query as a FACT ABOUT THEIR DATA, which is the failure mode most likely to be acted on
-  // incorrectly (someone goes and re-links a factory that was never unlinked).
+  // A failed RPC must stay distinguishable from an empty result. Collapse the two and the
+  // empty state says "No catalog products are linked to this company yet", presenting a broken
+  // query as a FACT ABOUT THEIR DATA — the failure mode most likely to be acted on incorrectly
+  // (someone goes and re-links a factory that was never unlinked).
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {

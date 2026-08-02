@@ -1,12 +1,11 @@
 /**
  * CRM record-timeline derivation guard.
  *
- * The bug this exists to stop: the contact/company Activity feed used to be a WRITE-LOG. Two
- * triggers (`crm_log_invoice_created`, `crm_log_quote_created`) inserted `crm_activities` rows
- * and nothing else did — so orders, payments in and out, supplier bills, credit notes and
- * shipments never appeared on a party's record at all, even though every one of them was
- * stored correctly. And the entries it DID write went stale: every "Invoice created" row on
- * the platform pointed at an invoice that had since been deleted.
+ * The bug this exists to stop: the contact/company Activity feed as a WRITE-LOG. Trigger-
+ * inserted `crm_activities` rows cover only the events someone remembered to write a trigger
+ * for, so orders, payments in and out, supplier bills, credit notes and shipments never reach
+ * a party's record even though all of them are stored correctly — and the rows that are
+ * written go stale, pointing at documents that have since been deleted.
  *
  * A log of events that already exist as documents is a duplicate derivation. `crm_record_timeline`
  * is the single one: business events come from the documents, and `crm_activities` / `crm_notes` /

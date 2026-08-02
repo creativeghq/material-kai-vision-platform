@@ -347,11 +347,11 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
       const autosyncMode = (wsFin as any)?.warehouse_autosync_mode ?? 'suggest';
       const r2 = (n: number) => Math.round(n * 100) / 100;
       // `off` means don't read supplier lines at all: no AI call, no credits, no queue.
-      // The batch comes from documents that still NEED extraction. This used to be
-      // `.order(created_at desc).limit(30)` with the "already extracted?" test applied inside the
-      // loop — so the window was fixed BEFORE the skip and never advanced: once the 30 newest were
-      // done, every later run re-read those same 30, skipped them all, and never reached the
-      // 31st. The backlog would not have drained slowly; it would never have drained at all.
+      // The batch comes from documents that still NEED extraction. The "already extracted?"
+      // test MUST be in the query, not the loop: `.order(created_at desc).limit(30)` with the
+      // skip applied afterwards fixes the window BEFORE the skip, so once the 30 newest are
+      // done every later run re-reads the same 30, skips them all and never reaches the 31st.
+      // Such a backlog does not drain slowly — it never drains.
       const sel = autosyncMode === 'off'
         ? { data: [] as any[], error: null }
         : await supabase.rpc('inbound_docs_needing_extraction', {
@@ -422,8 +422,8 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
 
           // Match each queued line against stock the workspace already carries, so approving it
           // TOPS UP the existing product instead of creating a near-duplicate. Server-side on
-          // purpose: the equivalent rule used to live only in ReceiveToWarehouseDialog, so it ran
-          // only when a human opened that dialog, and everything queued here arrived unmatched.
+          // purpose — the same rule living only in ReceiveToWarehouseDialog runs only when a
+          // human opens that dialog, leaving everything queued here unmatched.
           const { error: matchErr } = await supabase.rpc('match_pending_items_for_document', { p_doc_id: d.id });
           if (matchErr) console.error('[inbound-sync] match failed for doc', d.id, matchErr.message);
           // Then, only when the workspace opted into `auto`, add the certain matches (score 1.0 —

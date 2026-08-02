@@ -48,8 +48,8 @@ const EDIT_CATEGORIES = [
   { id: 'furniture', label: 'Furniture',        icon: Sofa,       description: 'Add, swap or remove pieces' },
   // Region Edit skips steps 2+3, so the user never reaches the 6/15/15 model-tier
   // picker — it goes straight to generate-region-edit, which is a fixed 20-credit
-  // inpaint. Say so on the card; the price was previously invisible until the
-  // failure toast quoted it.
+  // inpaint. The card must state that price, or it is invisible until the failure
+  // toast quotes it.
   { id: 'region',    label: 'Region Edit',      icon: Crop,       description: 'Draw on image & change that area — 20 credits' },
   { id: 'custom',    label: 'Custom Edit',      icon: PencilLine, description: 'Describe anything freely' },
 ] as const;

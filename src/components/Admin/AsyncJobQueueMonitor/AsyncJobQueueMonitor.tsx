@@ -358,10 +358,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     try {
       setError(null);
 
-      // The two sources are INDEPENDENT, so they run concurrently.
-      // They used to be awaited in sequence, which meant this screen — one admins leave open all
-      // day — did two serial round trips for up to 1,000 rows every 10 seconds (`setInterval`
-      // below), paying the sum of both latencies on every tick instead of the larger of the two.
+      // The two sources are INDEPENDENT, so they run concurrently. Awaiting them in sequence
+      // costs the sum of both latencies on every tick of the 10-second `setInterval` below, on a
+      // screen admins leave open all day.
       const [bgJobsRes, xmlJobsRes] = await Promise.all([
         // Fetch background jobs (PDF, Web Scraping, Product Discovery, Image Embedding Regeneration)
         supabase

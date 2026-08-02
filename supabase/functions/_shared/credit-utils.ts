@@ -244,7 +244,7 @@ export async function checkCreditBalance(
 
   // Fail-fast via preflight_credits — mirrors the debit decision (pool-if-member-else-personal) AND
   // enforces the member monthly cap, so a capped member is rejected BEFORE the paid upstream call
-  // rather than after (previously the pre-check read only the pool balance, missing the cap).
+  // rather than after. A pre-check that reads only the pool balance misses the cap entirely.
   const { data: pf } = await supabase.rpc('preflight_credits', {
     p_user_id: userId, p_amount: requiredCredits, p_workspace_id: workspaceId ?? null,
   });

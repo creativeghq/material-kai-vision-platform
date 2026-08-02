@@ -253,8 +253,8 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
   const serviceKey = MODEL_SERVICE_KEYS[resolvedModel];
 
   // ① Debit credits BEFORE the upstream image generation (invariant #10 — debit-before,
-  // refund-on-failure). Replaces the old non-atomic pre-flight read + deduct-on-success,
-  // which let a race between the read and the charge deliver a free image.
+  // refund-on-failure). Never a non-atomic pre-flight read + deduct-on-success: a race
+  // between the read and the charge delivers a free image.
   const debitResult = await debitExternalServiceCredits(
     supabase, userId, serviceKey, 'social_image_generation', 1,
     { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id },

@@ -82,8 +82,8 @@ export const OrderLinkPicker: React.FC<{
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   // Blank query is a real query here — it returns the most recent projects, the customers with open
-  // orders and this supplier's open POs. "What is this for?" almost always has a recent answer, and
-  // making the operator guess a search term to see it is what pushed the old field to always-empty.
+  // orders and this supplier's open POs. "What is this for?" almost always has a recent answer;
+  // make the operator guess a search term to see it and the field sits empty forever.
   useEffect(() => {
     if (!open || disabled) return;
     let cancelled = false;

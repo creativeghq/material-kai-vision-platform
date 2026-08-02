@@ -4,11 +4,8 @@
  * live `user_material_interactions` analytics via the `recommendations-api`
  * edge function's `/track-interaction` route.
  *
- * NOTE: the recommendation-scoring reads (getRecommendationsForUser /
- * getSimilarMaterials) were removed — that scoring engine was never populated
- * and always returned empty. Live product recommendations live in
- * `productRecommendationsService` (product_edges RPCs). This service is
- * tracking-only.
+ * This service is TRACKING-ONLY. Live product recommendations live in
+ * `productRecommendationsService` (product_edges RPCs).
  */
 
 import { supabase } from '@/integrations/supabase/client';

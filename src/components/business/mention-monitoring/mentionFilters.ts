@@ -2,8 +2,8 @@
  * Filter definitions for the mention-monitoring surfaces.
  *
  * Per-product feed: the Feed/Outlets/LLM tabs stay as tabs (they are different views of the
- * same subject, not filters). Sentiment used to be a four-button chip row next to the feed;
- * it now sits in the modal alongside the rest of what a mention row carries.
+ * same subject, not filters). Sentiment is a filter, so it sits in the modal alongside the
+ * rest of what a mention row carries.
  */
 import { CalendarDays, Globe, MessageSquare, Sparkles } from 'lucide-react';
 import { optionsFromRows, type FilterGroupDef } from '@/components/core/filters';

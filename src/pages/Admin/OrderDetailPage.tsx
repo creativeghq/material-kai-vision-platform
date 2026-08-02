@@ -9,10 +9,10 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 /**
  * Dedicated page for ONE order: `/finance/orders/:orderId`.
  *
- * Orders used to be reachable only as a modal over the Orders list, so "open the order" from a
- * receivable, an invoice, or a notification landed you on the list with a dialog on top — no
- * URL of its own, nothing to bookmark or send someone. Invoices have had `/finance/invoices/:id`
- * all along; this is the same for orders.
+ * An order needs a URL of its own. Reachable only as a modal over the Orders list, "open the
+ * order" from a receivable, an invoice or a notification lands you on the list with a dialog on
+ * top — nothing to bookmark or send someone. This is the order equivalent of
+ * `/finance/invoices/:id`.
  *
  * It renders the EXISTING `OrderDetailDialog` rather than a second copy of the order form, so
  * the page and the list row can never drift apart. Closing returns to wherever you came from.

@@ -411,7 +411,7 @@ export const CompanyDetailPage: React.FC = () => {
     }
   };
 
-  /** Tax-tab buttons keep their old name / behaviour (VAT is required there). */
+  /** Tax-tab lookup — VAT is required there. */
   const lookupAade = () => runResearch();
 
   /**

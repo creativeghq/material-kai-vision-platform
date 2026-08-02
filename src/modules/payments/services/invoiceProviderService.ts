@@ -119,9 +119,9 @@ export interface PaymentProvider {
  *   2. `entitledSlugs`  — the workspace's own grant (`workspace_module_entitlements`,
  *      written when the owner clicks Enable).
  *
- * Checking only (1) — which this function used to do — meant ANY tenant seeing a
- * provider implied EVERY tenant saw it, because `modules.enabled` is global. On a
- * payments surface that is a tenant-isolation break, not a cosmetic bug.
+ * BOTH must be checked. Check only (1) and any tenant seeing a provider means EVERY
+ * tenant sees it, because `modules.enabled` is global. On a payments surface that is a
+ * tenant-isolation break, not a cosmetic bug.
  *
  * Pure function — easy to unit test. Sorted by slug for deterministic ordering.
  */

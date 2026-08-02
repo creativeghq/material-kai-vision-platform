@@ -69,12 +69,9 @@ type PayMethod = 'cash' | 'card' | 'iris';
 /**
  * The AADE / myDATA payment-method code for a register payment.
  *
- * ONE derivation. This was previously computed twice inside `issue()`, 45 lines apart and
- * disagreeing: the invoice was stamped `method === 'cash' ? 3 : 7`, which collapses IRIS to
- * the card code, while the terminal call correctly used `method === 'iris' ? 8 : 7`. The
- * wrong one was the one persisted on the fiscal document, so **every IRIS receipt was
- * declared to AADE as a card payment**, and the Z-report payment-method breakdown was wrong
- * for that channel.
+ * ONE derivation — never inline a second one at a call site. `method === 'cash' ? 3 : 7`
+ * looks right and collapses IRIS to the card code, which declares **every IRIS receipt to
+ * AADE as a card payment** and takes the Z-report payment-method breakdown with it.
  *
  *   3 = cash · 7 = card / e-POS · 8 = IRIS
  */
@@ -422,8 +419,8 @@ const PosPage: React.FC = () => {
 
       const itemsPayload = cart.map((l) => {
         // Net is extracted at the LINE's own rate, not the register's current one — see the
-        // note on `totals`. Also persists net_value and vat_amount, which exist on
-        // invoice_items and were previously left null by this page.
+        // note on `totals`. Also persists net_value and vat_amount — both exist on
+        // invoice_items and must not be left null.
         const lineRate = Number.isFinite(l.line_vat) ? l.line_vat : vatRate;
         const unitNet = vatInclusive ? round2(extractNet(l.unit_price, lineRate)) : l.unit_price;
         const lineNet = round2(unitNet * l.qty);

@@ -398,8 +398,8 @@ export const RelevancyManagement: React.FC = () => {
   // No previewCount: the score / type fields are server-side here, so a client-side count of
   // the already-loaded page would understate the result and mislead more than it helps.
 
-  // Deleting a relationship reloads the tab — clamp rather than strand the user
-  // on a page that no longer exists.
+  // Deleting a relationship reloads the tab — clamp rather than strand the user on a page
+  // that no longer has rows.
   useEffect(() => {
     setCurrentPage((p) => clampPage(p, currentData.length));
   }, [currentData.length]);

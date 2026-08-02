@@ -3,8 +3,7 @@
  *
  * A dealer hitting "Request access to KEROS" on the duplicate warning inserts a row with
  * status='requested' — RLS lets them do no more than ask. This is the other half: without
- * it a request lands in a table nobody looks at, which is the same dead-end the whole
- * catalog_access setting used to be.
+ * it a request lands in a table nobody looks at.
  *
  * Approving grants visibility of that ONE factory's operator products. The dealer still
  * never gets a copy — they price the operator's row through product_prices.

@@ -749,12 +749,12 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const vId = String(body.viewing_id ?? '');
         if (!vId) return json({ error: 'viewing_id is required' }, 400);
 
-        // SECURITY: this action previously did no property
-        // or agent lookup at all — workspace scoping alone let one agent cancel or reschedule
-        // another agent's viewing. `list-viewings` self-scopes reads with
-        // `if (!access.isBroker) q = q.eq('agent_id', userId)`; the write now matches, and also
-        // defers to listing ownership so a listing agent retains control of viewings on their
-        // own property. 404 rather than 403 on the lookup, to stay enumeration-safe.
+        // SECURITY: workspace scoping alone lets one agent cancel or reschedule another
+        // agent's viewing, so this needs a property AND agent lookup. `list-viewings`
+        // self-scopes reads with `if (!access.isBroker) q = q.eq('agent_id', userId)`; the
+        // write matches it, and also defers to listing ownership so a listing agent retains
+        // control of viewings on their own property. 404 rather than 403 on the lookup, to
+        // stay enumeration-safe.
         const { data: vRow, error: vErr } = await supabase
           .from('property_viewings').select('agent_id, property_id').eq('id', vId).eq('workspace_id', workspaceId).maybeSingle();
         if (vErr) throw new HttpError(400, vErr.message);

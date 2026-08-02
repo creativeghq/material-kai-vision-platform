@@ -1927,11 +1927,10 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
     case 'token_claim': {
       // Conversion handshake: a freshly-signed-up user adopts the token's thread and becomes a
       // `client` member of the dealer's workspace.
-      // ONE RPC, ONE transaction. This used to be four separate writes — crm_contacts link,
-      // inbox_participants, workspace_members, token claim — with NONE of their errors checked,
-      // returning { ok: true } regardless. A partial conversion is the damaging case: the
-      // contact links, the workspace_members row does not, and the customer lands in an inbox
-      // they cannot read, having been told signup completed.
+      // ONE RPC, ONE transaction — never four separate writes (crm_contacts link,
+      // inbox_participants, workspace_members, token claim). A partial conversion is the
+      // damaging case: the contact links, the workspace_members row does not, and the customer
+      // lands in an inbox they cannot read, having been told signup completed.
       const claimUserId = String(payload.user_id || '');
       if (!claimUserId) throw new HttpError(400, 'user_id is required');
 

@@ -10,7 +10,7 @@ import { initializeGlobalErrorHandlers } from './utils/globalErrorHandler';
 initializeGlobalErrorHandlers();
 
 // Auto-recover from stale chunk references. After a new deploy the hashed chunk
-// filenames change; a browser still running the old index.html will 404 on a lazy
+// filenames change; a browser still holding the previous index.html will 404 on a lazy
 // import ("Failed to fetch dynamically imported module") and otherwise hit the
 // critical error boundary. Reload once to pull the fresh index + chunks. The 15s
 // guard prevents a reload loop if the failure is genuine (not a stale deploy).

@@ -130,9 +130,9 @@ describe('prop-contract guard · wiring-sensitive components', () => {
 
   for (const w of WATCHED) {
     it(`${w.name}: every optional prop is passed by at least one caller`, () => {
-      // A watched component that has been deleted or moved must say so. Previously this fell
-      // through to readFileSync and the whole suite died on a raw ENOENT — which skipped
-      // deploy-functions in CI, so a stale entry here silently stopped shipping edge functions.
+      // A watched component that has been deleted or moved must say so. Fall through to
+      // readFileSync and the whole suite dies on a raw ENOENT, which skips deploy-functions
+      // in CI — a stale entry here then silently stops shipping edge functions.
       const abs = path.join(SRC, w.file);
       expect(
         fs.existsSync(abs),

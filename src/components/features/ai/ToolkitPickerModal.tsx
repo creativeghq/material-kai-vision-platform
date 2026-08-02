@@ -1,11 +1,11 @@
 /**
  * ToolkitPickerModal — visual card picker for enabling tool clusters.
  *
- * Replaces the flat checkbox list with a single screen of big toolkit cards.
- * Each card represents a CLUSTER of related tools (Catalogs / SEO Research /
- * B2B / etc.) — toggling a card flips the entire cluster on/off.
+ * A single screen of big toolkit cards. Each card represents a CLUSTER of related
+ * tools (Catalogs / SEO Research / B2B / etc.) — toggling a card flips the entire
+ * cluster on/off.
  *
- * Why this is better than the old checkbox picker:
+ * What the card layout buys over a flat checkbox list:
  *   • Visible token cost per toolkit + a live total in the footer.
  *   • Always-on `core` toolkit means the agent has sane defaults without the
  *     user having to know what to load.

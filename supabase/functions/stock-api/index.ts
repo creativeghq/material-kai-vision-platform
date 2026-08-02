@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
-// Stock Management module API. Promotes the warehouse/inventory feature (previously a Finance tab)
-// into a first-class PAID ADD-ON, mirroring hr-api.
+// Stock Management module API — the warehouse/inventory feature as a first-class PAID ADD-ON,
+// mirroring hr-api.
 // SECURITY:
 //  • authenticate() yields the caller's user id; the gate chain runs on a SERVICE-ROLE client so it
 //    can't be spoofed by RLS: userCanAccessWorkspace() (no body-trust tenancy bind, 404 on mismatch),

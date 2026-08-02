@@ -1055,10 +1055,8 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
         const companyId = companyData.id;
         const contactIds: string[] = [];
 
-        // Persist initial research notes as a timeline entry on the new company
-        // (the legacy crm_companies.notes blob column was dropped 2026-05-25 in
-        // favour of the crm_notes timeline). Skip when empty so we don't seed
-        // a blank entry.
+        // Persist initial research notes as a crm_notes timeline entry on the new
+        // company. Skip when empty so we don't seed a blank entry.
         if (company.notes && String(company.notes).trim()) {
           const { error: noteErr } = await supabase.from('crm_notes').insert({
             workspace_id: workspaceId,

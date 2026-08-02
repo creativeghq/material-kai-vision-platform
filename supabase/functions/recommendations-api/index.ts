@@ -12,10 +12,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 /**
  * Material interaction tracking
  * Records per-user material interactions (read live by MarketTrendsTab /
- * FactoryAnalytics). The collaborative-filtering SCORING (recommendation_scores +
- * the /for-user, /similar-materials, /analytics, /cache endpoints) was never
- * populated (no writer) and was removed 2026-07-25; product recommendations are
- * served by the live product_edges path (find_similar/complementary_products).
+ * FactoryAnalytics). This function does NOT score recommendations — product
+ * recommendations are served by the product_edges path
+ * (find_similar/complementary_products).
  *
  * Endpoints:
  * - POST /track-interaction - Track user interaction with material

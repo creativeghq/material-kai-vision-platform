@@ -2348,9 +2348,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           // EVERY field that has a value — looked up across flat + nested
           // metadata. Special sections rendered by dedicated cards below are
           // skipped here. Each rendered key is marked consumed so the catch-all
-          // neither drops nor duplicates it. This is what lets lighting / wood /
-          // sanitary / kitchen show their full spec sheet rather than a
-          // tile-shaped subset (the old hardcoded lists were tile-centric).
+          // neither drops nor duplicates it. Driving this off the registry rather
+          // than a hardcoded key list is what lets lighting / wood / sanitary /
+          // kitchen show their full spec sheet instead of a tile-shaped subset.
           const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'packaging', 'commercial']);
           const registrySectionCards = sectionCatConfig.sections
             .filter(section => !SPECIAL_SECTION_KEYS.has(section.key))

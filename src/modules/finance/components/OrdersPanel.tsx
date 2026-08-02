@@ -119,8 +119,8 @@ const pctOf = (code: string) => VAT_CATEGORIES.find((v) => v.code === code)?.pct
 const DEFAULT_VAT_CODE = '1'; // 24%
 const vatCodeOf = (pct?: number | null) => VAT_CATEGORIES.find((v) => v.pct === (pct ?? 0))?.code ?? DEFAULT_VAT_CODE;
 
-// Units of measure for a line. Derived from the canonical list in src/lib/units.ts — this
-// used to be its own array whose 'item' disagreed with quotes' 'pcs' and ingestion's 'sqm'.
+// Units of measure for a line. Derived from the canonical list in src/lib/units.ts — never a
+// local array, which is how 'item' here comes to disagree with quotes' 'pcs' and ingestion's 'sqm'.
 const UNIT_OPTIONS: Array<{ code: string; label: string }> =
   UNITS.map((u) => ({ code: u.key, label: u.label }));
 const DEFAULT_UNIT = 'pcs';
@@ -183,9 +183,9 @@ export const OrdersPanel: React.FC<{
     }
   }, [embedded, searchParams, setSearchParams]);
 
-  // Legacy deep-link `?tab=doc_orders&order=<id>`: orders now have their own page, so forward
-  // there instead of opening a modal over the list. Notification action_urls already stored in
-  // the DB carry the old shape, so this redirect has to stay for them to keep working.
+  // Deep-link `?tab=doc_orders&order=<id>`: orders have their own page, so forward there instead
+  // of opening a modal over the list. Notification action_urls stored in the DB carry this shape,
+  // so the redirect has to stay for them to keep working.
   useEffect(() => {
     if (embedded) return;
     const target = searchParams.get('order');
@@ -499,7 +499,7 @@ export const NewOrderModal: React.FC<{
   // Seeded from a supplier's document: its figures are evidence, so they are shown, not edited.
   const locked = !!prefill?.fromDocument;
   /** Re-order pricing: today's resolved prices (default) or the ones the source order carried.
-   *  This is what used to be a second "Duplicate order" menu item. */
+   *  One control, not a separate "Duplicate order" menu item. */
   const [pricingMode, setPricingMode] = useState<'today' | 'original'>('today');
   const repricedLines = useMemo(
     () => (prefill?.lines ?? []).filter((l) => l.original_unit_price != null && Math.abs(Number(l.unit_price ?? 0) - Number(l.original_unit_price)) > 0.005),
@@ -943,9 +943,9 @@ export const NewOrderModal: React.FC<{
       }
       // A document-seeded purchase is one act with three consequences: the ORDER records what was
       // bought, the EXPENSE records what is owed for it, and — if it is already settled — the
-      // PAYMENT records the cash. Linking used to be copy-pasted into each caller after the fact
-      // and paying was a separate trip through the payment dialog, which is how a document could
-      // end up paid with no order behind it. All three happen here now, in that order.
+      // PAYMENT records the cash. All three happen HERE, in that order — copy the linking into
+      // each caller after the fact, or send paying through a separate dialog, and a document ends
+      // up paid with no order behind it.
       let moneyNote: string | undefined;
       if (prefill?.inboundDocumentId) {
         try {
@@ -977,8 +977,8 @@ export const NewOrderModal: React.FC<{
           moneyNote = `Order created, but the expense step failed: ${linkErr?.message ?? 'unknown error'}.`;
         }
       }
-      // A failed expense/payment step is not a success. It used to be appended to a toast titled
-      // 'Order created', so an over-allocation error read as part of the good news.
+      // A failed expense/payment step is not a success. Append it to a toast titled 'Order
+      // created' and an over-allocation error reads as part of the good news.
       const partialFailure = !!(moneyNote?.includes('failed') || stockNote?.includes('failed'));
       toast({
         title: partialFailure
@@ -1518,9 +1518,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   }) => {
     if (!order) return;
     // generate_invoice_from_order copies category_id and expected_payment_date -> invoices.due_at
-    // at CREATION time only, so editing them after a document exists moved nothing: the invoice
-    // kept the old due_at and the AR aging bucket disagreed with this screen. The fields are
-    // frozen once a document exists (see `metaFrozen` where they render).
+    // at CREATION time only, so editing them after a document exists moves nothing: the invoice
+    // keeps its due_at and the AR aging bucket disagrees with this screen. The fields are frozen
+    // once a document exists (see `metaFrozen` where they render).
     if (metaFrozen && ('categoryId' in patch || 'expectedPaymentDate' in patch)) {
       toast({
         title: 'Already on a document',
@@ -1931,10 +1931,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   /**
    * Order margin = SUM(net_value - unit_cost x qty). ONE definition.
    *
-   * This used to be SUM((unit_price - unit_cost) x qty) with `unit_price` stored PRE-discount,
-   * while the per-line Profit column below computes `net_value - lineCost` (POST-discount). On any
-   * discounted order the Profit column therefore did not sum to the Profit total beneath it. Both
-   * now read net_value, which is the discounted line revenue the invoice is actually built from.
+   * `net_value` is the POST-discount line revenue the invoice is built from, and the per-line
+   * Profit column below reads the same field, so the column always sums to this total. Never
+   * substitute `unit_price` — it is stored PRE-discount, and on any discounted order the two
+   * stop agreeing.
    */
   const anyCost = items.some((it) => it.unit_cost != null);
   const orderMargin = order && anyCost
@@ -1952,17 +1952,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const orderDiscountAmount = order
     ? Math.round((items.reduce((a, it) => a + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0), 0) - Number(order.subtotal_net)) * 100) / 100
     : 0;
-  // READ the derived value; never recompute it. This line used to be
-  // `Math.max(0, round((order.total - orderSettled()) * 100) / 100)` — a sixth independent
-  // derivation of outstanding, and a live reintroduction of the exact bug
-  // moneyDerivation.test.ts exists to prevent. It slipped past that guard because the guard
-  // pattern-matched `total - settled` and the local helper is named `orderSettled`, so
-  // `settled` never matched. get_order_settlements already returns `outstanding`,
-  // direction-resolved.
+  // READ the derived value; never recompute it. `get_order_settlements` already returns
+  // `outstanding`, direction-resolved. Recomputing `total - settled` here is the exact bug
+  // moneyDerivation.test.ts exists to prevent — and naming the local helper something else
+  // (`orderSettled`) is enough to slip past that guard, so do not.
   const outstanding = fin?.outstanding ?? 0;
   // B2B issues an invoice, a consumer a retail receipt. Derived from the buyer's VAT identity via
-  // the SHARED rule — this used to be `order?.customer_company_id ? 'invoice' : 'receipt'`, which
-  // called a sole trader (a contact carrying an ΑΦΜ) retail and proposed an ΑΛΠ to a business.
+  // the SHARED rule — never from `customer_company_id`, which calls a sole trader (a contact
+  // carrying an ΑΦΜ) retail and proposes an ΑΛΠ to a business.
   const salesDocKind: SalesDocumentKind = salesDocumentKindFor(buyerIdentity);
   // Remaining owed per supplier (from the what-we-owe rollup) → drives per-line "Mark paid" visibility:
   // once a line's supplier is fully settled, its "Mark paid" button hides (nothing left to pay).
