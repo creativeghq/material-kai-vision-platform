@@ -199,6 +199,8 @@ export const ModulesActivationTab: React.FC = () => {
     }
 
     const { topLevel, childrenByParent } = groupByParent([...shown.values()], (t) => t.row.slug);
+    // Re-sort: a parent pulled in as a host lands at the end of `shown`, not in name order.
+    topLevel.sort((a, b) => a.row.name.localeCompare(b.row.name));
     const byHub = new Map<string, { label: string; hub: Hub | null; entries: ModuleGroupEntry[]; count: number; order: number }>();
     for (const t of topLevel) {
       const key = t.meta.hub?.id ?? '__more__';

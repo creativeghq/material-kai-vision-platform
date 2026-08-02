@@ -34,7 +34,7 @@ export interface ParentGrouping<T> {
  * A sub-module whose parent is NOT in `items` stays top-level — it has nowhere to nest, and
  * dropping it would silently hide a purchasable module.
  */
-export function groupByParent<T>(items: T[], slugOf: (item: T) => string): ParentGrouping<T> {
+export function groupByParent<T>(items: readonly T[], slugOf: (item: T) => string): ParentGrouping<T> {
   const present = new Set(items.map(slugOf));
   const childrenByParent = new Map<string, T[]>();
   const topLevel: T[] = [];
