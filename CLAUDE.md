@@ -243,4 +243,6 @@ Full reference: `.claude/design-system.md`.
 | Moodboard sheets & client views | [docs/moodboard-presentation-sheets.md](docs/moodboard-presentation-sheets.md) |
 | Data integrity framework | [docs/data-integrity-framework.md](docs/data-integrity-framework.md) |
 | Tenancy & capabilities | [docs/capabilities-and-tenancy.md](docs/capabilities-and-tenancy.md), [docs/role-access-matrix.md](docs/role-access-matrix.md) |
+| Re-running the platform audit | [docs/audit-playbook.md](docs/audit-playbook.md) — method, the 9 defect shapes, and the traps that produced wrong numbers |
+| Which defect classes have a guard, and when it was last watched to fire | [docs/prevention-coverage.md](docs/prevention-coverage.md) |
 | Everything else | [docs/INDEX.md](docs/INDEX.md) |

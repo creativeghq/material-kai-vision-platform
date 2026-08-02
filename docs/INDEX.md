@@ -257,6 +257,12 @@ Complete documentation for Material Kai Vision Platform.
 - `ops.silent_zero` catches the dominant failure here: a number that should be non-zero sitting at zero while nothing complains
 - Janitor crons must ship with a probe on the mess they clear — an exit code proves it ran, not that it worked
 
+**[audit-playbook.md](audit-playbook.md)** — Re-running the platform audit ✨ NEW (2026-08)
+- The method behind #293–#310 (~250 findings, 16 areas): find defects by CLASS, not by clicking
+- The nine defect shapes every finding must sort into, each with its historical instance
+- **The traps** — every way a measurement lied during that audit: `| tee` eating exit codes, semgrep rules that parse-fail and match nothing, `manualChunks` pinning a dep into the entry preload, `overflow-x-hidden` blinding scrollWidth, `.single()` over two rows falling back forever, grep counts (1,325) vs linter counts (407)
+- Verification discipline: measure the artifact that decides, check the live system not the repo's intent, and retract wrong claims in place
+
 **[prevention-coverage.md](prevention-coverage.md)** — Which defect shapes are actually guarded ✨ NEW (2026-08)
 - The seven historical defect shapes, each mapped to its mechanism and the date that mechanism was last watched to fire
 - Answers "is this guarded?" — not "is CI green?". Six guards in this platform have reported clean while enforcing nothing
