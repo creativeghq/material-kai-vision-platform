@@ -159,7 +159,11 @@ export const NewSupplierCreditNoteDialog: React.FC<{
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    // Every dismissal routes through here. clearDraft() used to run only on Cancel and on
+    // a successful save, so Esc, the X and an overlay click left the sessionStorage draft
+    // intact — the next open silently repopulated an abandoned payee, amount, category and
+    // Paid-now state, which is how an abandoned form becomes an accidental second booking.
+    <Dialog open={open} onOpenChange={(v) => { if (!v) clearDraft(); onOpenChange(v); }}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Supplier Credit Note</DialogTitle><DialogDescription className="sr-only">Record a credit note received from a supplier.</DialogDescription></DialogHeader>
         <div className="space-y-3">

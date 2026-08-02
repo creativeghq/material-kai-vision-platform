@@ -710,7 +710,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         // by the same RPC the quote path uses — inline status:'issued' here was
         // skipping legal_number assignment entirely.
         status: 'draft',
-        currency, subtotal_net: Number(totals.net.toFixed(2)), vat_rate: Number(vatRate),
+        // parseDecimalOr, like the totals and the exemption gate. This was `Number(vatRate)`,
+        // which yields NaN for a European decimal ('24,5') — so the STORED rate disagreed with
+        // the totals the operator approved (parseDecimalOr gave 24.5) and with the exemption
+        // gate (parseFloat gave 24). src/utils/decimal.ts is the one parser.
+        currency, subtotal_net: Number(totals.net.toFixed(2)), vat_rate: parseDecimalOr(vatRate, 0),
         vat_amount: Number(totals.vat.toFixed(2)), total: Number(totals.total.toFixed(2)),
         total_withheld_amount: Number(totals.withheld.toFixed(2)),
         total_fees_amount: Number(totals.fees.toFixed(2)), total_stamp_duty_amount: Number(totals.stamp.toFixed(2)),
@@ -828,7 +832,20 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           }
         } catch (e: any) { toast({ title: 'myDATA submission deferred', description: e?.message, variant: 'destructive' }); }
       }
-      if (sendEmail) { try { await financeService.sendInvoiceEmail(invoice.id); } catch { /* surfaced on detail */ } }
+      // The old catch swallowed this with "surfaced on detail" — but the detail page has no
+      // email status to surface it on, so a failed send was invisible everywhere. Reported the
+      // same way the myDATA branch above reports its failure.
+      if (sendEmail) {
+        try {
+          await financeService.sendInvoiceEmail(invoice.id);
+        } catch (emailErr: any) {
+          toast({
+            title: 'Invoice created — email NOT sent',
+            description: emailErr?.message ?? 'The invoice was saved but the email could not be sent. Send it from the invoice page.',
+            variant: 'destructive',
+          });
+        }
+      }
 
       toast({ title: 'Invoice created', description: (draftNumber as string) ?? undefined });
       onCreated(invoice.id);
@@ -1269,7 +1286,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                               </Select>
                             </div>
                           </div>
-                          {vatPctForCat(l.vat_category || undefined, parseFloat(vatRate) || 0) === 0 && (
+                          {vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0)) === 0 && (
                             <div className="space-y-1">
                               <Label className="text-[10px] text-muted-foreground">VAT exemption category (1–31)</Label>
                               <Input className="h-7 text-xs" type="number" min="1" max="31" value={l.vat_exemption} onChange={(e) => update(idx, { vat_exemption: e.target.value })} placeholder="Required for 0% VAT" />
@@ -1424,7 +1441,20 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             <section className="border-t border-border/40 pt-4 space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Document &amp; delivery options</Label>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                <label className="flex items-center justify-between cursor-pointer"><span>Submit to myDATA on issue</span><Checkbox className="h-4 w-4 rounded" checked={submitNow} onCheckedChange={(v) => setSubmitNow(v === true)} /></label>
+                {/* Disabled unless "Issue now" is on, because the save path runs this only when
+                    BOTH are true (`if (submitNow && issueNow)`). The two checkboxes live in
+                    different parts of the form with no coupling, so ticking this one alone
+                    produced a draft that was never transmitted, with no warning that half the
+                    choice had been dropped. */}
+                <label className={`flex items-center justify-between ${issueNow ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+                  <span>
+                    Submit to myDATA on issue
+                    {!issueNow && (
+                      <span className="ml-1 text-[10px] text-muted-foreground">— needs &ldquo;Issue now&rdquo;; a draft cannot be transmitted</span>
+                    )}
+                  </span>
+                  <Checkbox className="h-4 w-4 rounded" disabled={!issueNow} checked={submitNow && issueNow} onCheckedChange={(v) => setSubmitNow(v === true)} />
+                </label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><Checkbox className="h-4 w-4 rounded" checked={printOnlineCode} onCheckedChange={(v) => setPrintOnlineCode(v === true)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Include in MYF report</span><Checkbox className="h-4 w-4 rounded" checked={includeInMyf} onCheckedChange={(v) => setIncludeInMyf(v === true)} /></label>
                 <label className="flex items-center justify-between cursor-pointer"><span>Move stock on issue (decrement warehouse)</span><Checkbox className="h-4 w-4 rounded" checked={moveStock} onCheckedChange={(v) => setMoveStock(v === true)} /></label>

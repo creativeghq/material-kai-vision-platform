@@ -483,6 +483,15 @@ export interface AgingRow {
   total: number;
   amount_paid: number;
   amount_due: number;
+  /**
+   * The document's own currency, from vw_ar_aging / vw_ap_aging.
+   *
+   * Absent until 2026-08-02, which meant every AR/AP figure fell through to formatMoney's EUR
+   * default: a USD invoice's 1,000 rendered as €1,000 AND was summed into the € bucket totals,
+   * the DSO base and the AR-outstanding KPI. Synthesised rows (orders, credits) must set it from
+   * their own source row, never assume the workspace base.
+   */
+  currency: string;
   due_at: string | null;
   issued_at: string | null;
   status: string;
@@ -951,7 +960,18 @@ const _financeServiceCore = {
     if (input.counterpartyBankAccountId) postInsert.counterparty_bank_account_id = input.counterpartyBankAccountId;
     if (input.counterpartyName && !input.counterpartyCompanyId && !input.counterpartyContactId) postInsert.counterparty_name = input.counterpartyName;
     if (Object.keys(postInsert).length > 0 && data) {
-      await supabase.from('payments').update(postInsert).eq('id', data as string);
+      // `error` is checked here like every other write in this file. Discarding it dropped the
+      // counterparty bank account and the one-off payee name silently — the payment then showed
+      // a blank party while recordPayment reported success. Not fatal (the payment itself is
+      // committed by the RPC above, and rolling it back would be worse), so it throws only after
+      // the money is safely recorded, which is what makes the omission visible instead of silent.
+      const { error: postErr } = await supabase.from('payments').update(postInsert).eq('id', data as string);
+      if (postErr) {
+        throw new Error(
+          `Payment ${data} was recorded, but its counterparty details could not be saved: ${postErr.message}. `
+          + 'Edit the payment to add them — do NOT record it again.',
+        );
+      }
     }
     // Payment received → generate the receipt + notify/email the customer via the seeded
     // flow (fire-and-forget). Only for inbound money, and only when sendReceipt isn't
@@ -1624,7 +1644,11 @@ const _financeServiceCore = {
       total,
       issuedAt: input.issuedAt,
       dueAt: input.dueAt,
-      notes: input.notes ?? input.description ?? undefined,
+      // `supplier_bills` has no description column, so Description has to ride in notes. The old
+      // `notes ?? description` DISCARDED Description whenever Notes was also filled — the expense
+      // then showed nothing about what it was actually for. Both are kept, Description first
+      // because it is the shorter "what was this" line.
+      notes: [input.description?.trim(), input.notes?.trim()].filter(Boolean).join('\n\n') || undefined,
       categoryId: input.categoryId,
       orderId: input.orderId ?? undefined,
       projectId: input.projectId ?? null,
@@ -1922,12 +1946,20 @@ const _financeServiceCore = {
         : p.counterparty_contact_id ? (contactName.get(p.counterparty_contact_id) ?? null) : null,
     }));
 
-    // Same-supplier payments first — that's almost always the one being attached.
+    // HARD-FILTER to the expense's own supplier, not merely sort them first.
+    //
+    // Sorting left every unallocated money-out payment in the workspace selectable, so attaching
+    // the wrong row settled this supplier's bill with ANOTHER supplier's cash — the exact
+    // cross-party reattribution that RecordPaymentDialog hard-scopes against on the customer
+    // side. Payments with no counterparty at all are kept: they belong to nobody yet, so
+    // attaching one here is how they get attributed.
     if (!opts.companyId && !opts.contactId) return named;
     const isSameParty = (p: AttachablePayment) =>
       (opts.companyId && p.counterparty_company_id === opts.companyId) ||
       (opts.contactId && p.counterparty_contact_id === opts.contactId);
-    return [...named.filter(isSameParty), ...named.filter((p) => !isSameParty(p))];
+    const isUnattributed = (p: AttachablePayment) =>
+      !p.counterparty_company_id && !p.counterparty_contact_id;
+    return [...named.filter(isSameParty), ...named.filter(isUnattributed)];
   },
 
   /**
@@ -2317,7 +2349,10 @@ const _financeServiceCore = {
    * receipt/invoice is issued), so it never shows in P&L/AR — this surfaces it + lets you reconcile.
    */
   async getDepositsOnAccount(workspaceId: string): Promise<{
+    /** Largest single-currency bucket — NOT a cross-currency sum. Prefer `totals`. */
     total: number; currency: string;
+    /** One entry per currency present, largest first. Never sum across these. */
+    totals: Array<{ currency: string; total: number }>;
     rows: Array<{ payment_id: string; paid_at: string; amount: number; unallocated: number; currency: string; reference: string | null; credit_number: string | null; order_id: string | null; order_number: string | null; party_name: string | null }>;
   }> {
     const { data: pays } = await supabase.from('payments')
@@ -2325,7 +2360,7 @@ const _financeServiceCore = {
       .eq('workspace_id', workspaceId).eq('direction', 'in')
       .order('paid_at', { ascending: false }).limit(500);
     const payments = (pays ?? []) as Array<{ id: string; amount: number; currency: string; paid_at: string; reference: string | null; credit_number: string | null; order_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null }>;
-    if (payments.length === 0) return { total: 0, currency: 'EUR', rows: [] };
+    if (payments.length === 0) return { total: 0, currency: 'EUR', totals: [], rows: [] };
     const ids = payments.map((p) => p.id);
 
     // Allocated per payment (in payment currency = amount_doc_currency).
@@ -2356,7 +2391,27 @@ const _financeServiceCore = {
         party_name: p.counterparty_company_id ? (cmap.get(p.counterparty_company_id) ?? null) : (p.counterparty_contact_id ? (ctmap.get(p.counterparty_contact_id) ?? null) : null),
       };
     }).filter((r) => r.unallocated > 0.005);
-    return { total: Math.round(rows.reduce((a, r) => a + r.unallocated, 0) * 100) / 100, currency: rows[0]?.currency ?? 'EUR', rows };
+
+    // Per-currency totals. `total` used to sum EVERY unallocated remainder regardless of currency
+    // and label the result with `rows[0].currency` — whichever the NEWEST deposit happened to be —
+    // so the "Received, not yet invoiced" card and the AR credit netting presented a mixed sum
+    // under one symbol, and the resulting credit rows netted against euro receivables.
+    //
+    // `total`/`currency` are kept for callers that have not been updated, but they now describe
+    // only the LARGEST single-currency bucket rather than a meaningless cross-currency sum.
+    const byCurrency = new Map<string, number>();
+    for (const r of rows) {
+      byCurrency.set(r.currency, Math.round(((byCurrency.get(r.currency) ?? 0) + r.unallocated) * 100) / 100);
+    }
+    const totals = [...byCurrency.entries()]
+      .map(([currency, total]) => ({ currency, total }))
+      .sort((a, b) => b.total - a.total);
+    return {
+      total: totals[0]?.total ?? 0,
+      currency: totals[0]?.currency ?? 'EUR',
+      totals,
+      rows,
+    };
   },
 
   async getCustomerAccount(opts: { contactId?: string; companyId?: string }): Promise<{

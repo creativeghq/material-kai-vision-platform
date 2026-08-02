@@ -167,7 +167,10 @@ const FinancePage: React.FC = () => {
   const [cashOut, setCashOut] = useState(0); // Σ payments out — money actually paid
   const [bankBalances, setBankBalances] = useState<BankAccountBalance[]>([]);
   // Money received but not yet invoiced (deposits / on-account) — cash held, not yet revenue.
-  const [deposits, setDeposits] = useState<Awaited<ReturnType<typeof financeService.getDepositsOnAccount>>>({ total: 0, currency: 'EUR', rows: [] });
+  const [deposits, setDeposits] = useState<Awaited<ReturnType<typeof financeService.getDepositsOnAccount>>>({ total: 0, currency: 'EUR', totals: [], rows: [] });
+  // True when the uninvoiced-orders overlay failed to load, which makes every AR/AP figure on
+  // this page an UNDER-report rather than a smaller true number. Surfaced, not swallowed.
+  const [overlayFailed, setOverlayFailed] = useState(false);
 
   // Dashboard sales insights (period-scoped — reuse the Reports RPCs at a glance).
   type DashPeriod = 'this_month' | 'last_month' | 'last_quarter' | 'ytd';
@@ -263,6 +266,7 @@ const FinancePage: React.FC = () => {
       // entries are intentionally excluded everywhere now.
       let arWithOrders = arRows.filter((r) => r.entry_kind !== 'manual');
       let apWithOrders = apRows.filter((r) => r.entry_kind !== 'manual');
+      setOverlayFailed(false);
       try {
         const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId: wsId });
         // An un-invoiced order has no invoice due date, so it ages against `due_date` — the
@@ -289,6 +293,9 @@ const FinancePage: React.FC = () => {
           total: o.total,
           amount_paid: o.settled,
           amount_due: o.outstanding,
+          // The ORDER's currency, not the workspace base. A synthesised row that guesses EUR is
+          // exactly how a USD order's outstanding got summed into the euro bucket totals.
+          currency: o.currency,
           // `due_at` stays the operator-set date (often null) so the inline editor below opens
           // empty and never persists a date nobody typed; the derived one drives aging + display.
           due_at: o.expected_payment_date,
@@ -307,14 +314,21 @@ const FinancePage: React.FC = () => {
         });
         arWithOrders = [...arWithOrders, ...uninvoiced.filter((o) => o.order_type === 'sales').map(toAgingRow)];
         apWithOrders = [...apWithOrders, ...uninvoiced.filter((o) => o.order_type === 'purchase').map(toAgingRow)];
-      } catch { /* orders overlay is best-effort — invoices/bills still render */ }
+      } catch (overlayErr) {
+        // Best-effort, but NOT invisible. When this fails, confirmed-but-uninvoiced orders vanish
+        // from BOTH the AR and AP lists and every total above them quietly reports a smaller
+        // number — an under-report that looks exactly like "there is less outstanding", which is
+        // the one reading an operator must never be handed by accident.
+        setOverlayFailed(true);
+        console.error('[FinancePage] uninvoiced-orders overlay failed — AR/AP under-report:', overlayErr);
+      }
       // Customer money held on account (unallocated inbound payments) is folded into the
       // receivables list as a NEGATIVE receivable, not shown as a separate "in credit" section.
       // Rationale (per operator): a credit is money already on OUR account — a receivable, not a
       // liability tied to any one order. It nets against whatever the customer owes; the leftover
       // can fund other orders or be used elsewhere. So each credit becomes one negative AR row and
       // the totals "play between the numbers" automatically.
-      const depositsData = await financeService.getDepositsOnAccount(wsId).catch(() => ({ total: 0, currency: 'EUR', rows: [] }));
+      const depositsData = await financeService.getDepositsOnAccount(wsId).catch(() => ({ total: 0, currency: 'EUR', totals: [], rows: [] }));
       setDeposits(depositsData);
       const creditRows: AgingRow[] = depositsData.rows.map((d) => ({
         id: d.payment_id,
@@ -322,6 +336,9 @@ const FinancePage: React.FC = () => {
         total: -d.unallocated,
         amount_paid: 0,
         amount_due: -d.unallocated, // negative → nets against this customer's open receivables
+        // The DEPOSIT's currency. A credit may only net against same-currency receivables —
+        // netting a USD deposit against a EUR invoice is not a discount, it is a wrong number.
+        currency: d.currency,
         due_at: null,
         issued_at: d.paid_at,
         status: 'credit',
@@ -404,6 +421,10 @@ const FinancePage: React.FC = () => {
 
   const arBuckets = useMemo(() => bucketize(ar), [ar]);
   const apBuckets = useMemo(() => bucketize(ap), [ap]);
+  // What the bucket/KPI aggregates above are actually denominated in. Every total here sums
+  // amount_due across rows, which only means something when the rows share a currency.
+  const arMoney = useMemo(() => aggregateCurrency(ar), [ar]);
+  const apMoney = useMemo(() => aggregateCurrency(ap), [ap]);
 
   // What we actually made on what we sold, over the loaded P&L window. Revenue is what was sold
   // (issued invoices + confirmed sales orders not yet invoiced), NOT cash received — a paid order
@@ -599,18 +620,18 @@ const FinancePage: React.FC = () => {
               <KpiCard
                 icon={ArrowDownCircle}
                 label="AR outstanding"
-                value={formatMoney(kpis.arOutstanding)}
+                value={formatMoney(kpis.arOutstanding, arMoney.currency)}
                 accent={kpis.overdueTotal > 0 ? 'destructive' : 'default'}
                 // NET position: open invoices + uninvoiced orders LESS on-account credit (credit is
                 // money already on our account, folded into receivables — see loadAll creditRows).
                 subtext={kpis.overdueTotal > 0
-                  ? `${formatMoney(kpis.overdueTotal)} overdue`
+                  ? `${formatMoney(kpis.overdueTotal, arMoney.currency)} overdue`
                   : (deposits.total > 0 ? `net of ${formatMoney(deposits.total)} credit on account` : 'All on schedule')}
               />
               <KpiCard
                 icon={ArrowUpCircle}
                 label="AP outstanding"
-                value={formatMoney(kpis.apOutstanding)}
+                value={formatMoney(kpis.apOutstanding, apMoney.currency)}
                 subtext={`${ap.length} open bills`}
               />
               <KpiCard
@@ -635,8 +656,8 @@ const FinancePage: React.FC = () => {
 
             {/* AR / AP buckets side-by-side */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <BucketSummary title="Receivables by age" buckets={arBuckets} viewLink="ar" expected={arExpected} credit={deposits.total} />
-              <BucketSummary title="Payables by age" buckets={apBuckets} viewLink="ap" expected={apExpected} />
+              <BucketSummary title="Receivables by age" buckets={arBuckets} viewLink="ar" expected={arExpected} credit={deposits.total} money={arMoney} />
+              <BucketSummary title="Payables by age" buckets={apBuckets} viewLink="ap" expected={apExpected} money={apMoney} />
             </div>
 
             {/* Money received but not yet a document — deposits / on-account. Cash we hold that
@@ -805,7 +826,7 @@ const FinancePage: React.FC = () => {
               />
               <MoneySummaryCard
                 label="Still owed to us"
-                value={formatMoney(kpis.arOutstanding)}
+                value={formatMoney(kpis.arOutstanding, arMoney.currency)}
                 sub={deposits.total > 0
                   ? `net of ${formatMoney(deposits.total)} customer credit held`
                   : 'across all open receivables'}
@@ -820,7 +841,23 @@ const FinancePage: React.FC = () => {
               />
             </div>
 
-            <BucketCards buckets={arBuckets} active={arBucket} onPick={pickArBucket} noun="receivable(s)" />
+            {(overlayFailed || arMoney.mixed) && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
+                {overlayFailed && (
+                  <div>
+                    Confirmed orders that are not yet invoiced could not be loaded, so the totals
+                    below are <strong>lower than the real position</strong>. Reload to try again.
+                  </div>
+                )}
+                {arMoney.mixed && (
+                  <div>
+                    These rows span more than one currency. Totals are shown in {arMoney.currency} and
+                    are <strong>not converted</strong> — read the per-row amounts, not the sums.
+                  </div>
+                )}
+              </div>
+            )}
+            <BucketCards buckets={arBuckets} active={arBucket} onPick={pickArBucket} noun="receivable(s)" money={arMoney} />
 
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
@@ -907,9 +944,9 @@ const FinancePage: React.FC = () => {
                             ? <span className="text-xs text-muted-foreground">—</span>
                             : <span className={`text-xs ${r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'}`}>{ageBucketLabel(r.age_bucket)}</span>}
                         </td>
-                        <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.total)}</td>
-                        <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.amount_paid)}</td>
-                        <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
+                        <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.total, r.currency)}</td>
+                        <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.amount_paid, r.currency)}</td>
+                        <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due, r.currency)}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
                             <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
@@ -950,7 +987,23 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── PAYABLES ─────────── */}
           <TabsContent value="ap" className="space-y-4">
-            <BucketCards buckets={apBuckets} active={apBucket} onPick={pickApBucket} noun="bill(s)" />
+            {(overlayFailed || apMoney.mixed) && (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
+                {overlayFailed && (
+                  <div>
+                    Confirmed orders that are not yet invoiced could not be loaded, so the totals
+                    below are <strong>lower than the real position</strong>. Reload to try again.
+                  </div>
+                )}
+                {apMoney.mixed && (
+                  <div>
+                    These rows span more than one currency. Totals are shown in {apMoney.currency} and
+                    are <strong>not converted</strong> — read the per-row amounts, not the sums.
+                  </div>
+                )}
+              </div>
+            )}
+            <BucketCards buckets={apBuckets} active={apBucket} onPick={pickApBucket} noun="bill(s)" money={apMoney} />
 
             <Card>
               <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
@@ -1032,9 +1085,9 @@ const FinancePage: React.FC = () => {
                         <td className="px-4 py-2">
                           <span className={`text-xs ${r.age_bucket === '90+' || r.age_bucket === '61-90' ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'}`}>{ageBucketLabel(r.age_bucket)}</span>
                         </td>
-                        <td className="px-4 py-2 text-right">{formatMoney(r.total)}</td>
-                        <td className="px-4 py-2 text-right">{formatMoney(r.amount_paid)}</td>
-                        <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due)}</td>
+                        <td className="px-4 py-2 text-right">{formatMoney(r.total, r.currency)}</td>
+                        <td className="px-4 py-2 text-right">{formatMoney(r.amount_paid, r.currency)}</td>
+                        <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due, r.currency)}</td>
                         <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
                             <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={expenseCats} onSaved={() => loadAll(workspaceId)}>
@@ -1270,6 +1323,30 @@ const KpiCard: React.FC<{
   </Card>
 );
 
+/**
+ * Which currency an aggregate over these rows is actually denominated in.
+ *
+ * Bucket totals, the DSO base and the AR/AP KPI cards all sum `amount_due` across every row, so
+ * they are only meaningful when the rows share a currency. They used to be rendered with
+ * formatMoney's EUR default regardless — a USD invoice's 1,000 was added to the euro total and
+ * shown with a euro symbol.
+ *
+ * Summing genuinely mixed rows is not something a symbol can fix, so this reports the dominant
+ * currency AND whether the set is mixed; the callers label the total honestly and warn when it
+ * cannot be trusted. Converting to a base currency needs stored FX rates per document, which is
+ * a larger change — see #296 finding 4.
+ */
+function aggregateCurrency(rows: AgingRow[]): { currency: string; mixed: boolean } {
+  const totals = new Map<string, number>();
+  for (const r of rows) {
+    const c = r.currency || 'EUR';
+    totals.set(c, (totals.get(c) ?? 0) + Math.abs(r.amount_due || 0));
+  }
+  if (totals.size === 0) return { currency: 'EUR', mixed: false };
+  const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+  return { currency: sorted[0][0], mixed: totals.size > 1 };
+}
+
 function bucketize(rows: AgingRow[]): Record<AgeBucket, { count: number; total: number }> {
   const out = {
     current: { count: 0, total: 0 },
@@ -1291,7 +1368,9 @@ function bucketize(rows: AgingRow[]): Record<AgeBucket, { count: number; total: 
 const BucketCards: React.FC<{
   buckets: Record<AgeBucket, { count: number; total: number }>;
   active: string; onPick: (b: string) => void; noun: string;
-}> = ({ buckets, active, onPick, noun }) => {
+  /** Currency these totals are denominated in, and whether the underlying rows are mixed. */
+  money: { currency: string; mixed: boolean };
+}> = ({ buckets, active, onPick, noun, money }) => {
   // Include 'no_due_date' whenever it carries money/rows — otherwise a workspace whose
   // receivables/payables are all uninvoiced orders or on-account credit (neither of which
   // ages) would show five €0 cards while the table below is full. Only rendered when it has
@@ -1304,8 +1383,10 @@ const BucketCards: React.FC<{
           <Card className={`dashboard-card border-0 transition ${active === b ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}>
             <CardContent className="p-3">
               <div className="text-xs text-muted-foreground">{b === 'no_due_date' ? 'No due date / expected' : ageBucketLabel(b)}</div>
-              <div className="text-lg font-semibold">{formatMoney(buckets[b].total)}</div>
-              <div className="text-[10px] text-muted-foreground">{buckets[b].count} {noun}</div>
+              <div className="text-lg font-semibold">{formatMoney(buckets[b].total, money.currency)}</div>
+              <div className="text-[10px] text-muted-foreground">
+                {buckets[b].count} {noun}{money.mixed ? ' · mixed currencies' : ''}
+              </div>
             </CardContent>
           </Card>
         </button>
@@ -1324,7 +1405,9 @@ const BucketSummary: React.FC<{
   /** On-account customer credit (positive = money held). Subtracted below so the summary shows
    *  the true NET position. AR only — payables have no credit. */
   credit?: number;
-}> = ({ title, buckets, viewLink, expected = 0, credit = 0 }) => {
+  /** Currency these totals are denominated in, and whether the underlying rows are mixed. */
+  money: { currency: string; mixed: boolean };
+}> = ({ title, buckets, viewLink, expected = 0, credit = 0, money }) => {
   // Aged rows (invoices/bills) + uninvoiced orders − credit held = the net position, matching the
   // AR/AP-outstanding KPI. Shown as a footer so the dashboard summary is a complete picture.
   const aged = AGE_BUCKETS.reduce((s, b) => s + buckets[b].total, 0);
@@ -1342,27 +1425,27 @@ const BucketSummary: React.FC<{
             <tr key={b} className="border-b border-border/30">
               <td className="px-4 py-2 text-xs text-muted-foreground">{ageBucketLabel(b)}</td>
               <td className="px-4 py-2 text-right text-xs text-muted-foreground">{buckets[b].count}</td>
-              <td className={`px-4 py-2 text-right font-medium ${b === '90+' || b === '61-90' ? 'text-destructive' : ''}`}>{formatMoney(buckets[b].total)}</td>
+              <td className={`px-4 py-2 text-right font-medium ${b === '90+' || b === '61-90' ? 'text-destructive' : ''}`}>{formatMoney(buckets[b].total, money.currency)}</td>
             </tr>
           ))}
           {expected > 0 && (
             <tr className="border-b border-border/30 bg-muted/20">
               <td className="px-4 py-2 text-xs text-muted-foreground" title="Confirmed orders not yet invoiced — no due date, so not aged above">Expected (uninvoiced orders)</td>
               <td className="px-4 py-2" />
-              <td className="px-4 py-2 text-right font-medium text-amber-600">{formatMoney(expected)}</td>
+              <td className="px-4 py-2 text-right font-medium text-amber-600">{formatMoney(expected, money.currency)}</td>
             </tr>
           )}
           {credit > 0 && (
             <tr className="border-b border-border/30 bg-muted/20">
               <td className="px-4 py-2 text-xs text-muted-foreground" title="Customer money held on account — nets against what they owe">Credit on account</td>
               <td className="px-4 py-2" />
-              <td className="px-4 py-2 text-right font-medium text-emerald-700">− {formatMoney(credit)}</td>
+              <td className="px-4 py-2 text-right font-medium text-emerald-700">− {formatMoney(credit, money.currency)}</td>
             </tr>
           )}
           <tr className="bg-muted/40">
             <td className="px-4 py-2 text-xs font-semibold">Net {viewLink === 'ar' ? 'receivable' : 'payable'}</td>
             <td className="px-4 py-2" />
-            <td className="px-4 py-2 text-right font-semibold">{formatMoney(net)}</td>
+            <td className="px-4 py-2 text-right font-semibold">{formatMoney(net, money.currency)}</td>
           </tr>
         </tbody>
       </table>

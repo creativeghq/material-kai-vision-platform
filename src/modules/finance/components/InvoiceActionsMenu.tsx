@@ -213,9 +213,13 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenuItem onClick={() => go()}><Eye className="h-4 w-4 mr-2" /> View</DropdownMenuItem>
-        {canOperateFinance && <DropdownMenuItem onClick={() => go()}><CreditCard className="h-4 w-4 mr-2" /> Record payment</DropdownMenuItem>}
-        <DropdownMenuItem onClick={() => go()}><FileText className="h-4 w-4 mr-2" /> View / print</DropdownMenuItem>
+        {/* "View", "Record payment", "View / print" and "Issue credit note" all ran the identical
+            go() — four advertised capabilities, one behaviour, and picking "Record payment" landed
+            on a page with nothing open. They deep-link now; InvoiceDetailPage reads ?action= and
+            opens the matching dialog. "View / print" is gone: it was a third label for the same
+            navigation, and printing is what "Download PDF" below does. */}
+        <DropdownMenuItem onClick={() => go()}><Eye className="h-4 w-4 mr-2" /> Open</DropdownMenuItem>
+        {canOperateFinance && <DropdownMenuItem onClick={() => go('?action=payment')}><CreditCard className="h-4 w-4 mr-2" /> Record payment</DropdownMenuItem>}
         <DropdownMenuItem onClick={downloadPdf}><Download className="h-4 w-4 mr-2" /> Download PDF</DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -232,7 +236,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         <DropdownMenuItem onClick={copyLink}><Copy className="h-4 w-4 mr-2" /> Copy link</DropdownMenuItem>
 
         <DropdownMenuSeparator />
-        {!isAccountant && <DropdownMenuItem onClick={() => go()}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>}
+        {!isAccountant && <DropdownMenuItem onClick={() => go('?action=credit_note')}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={useAsTemplate}><Files className="h-4 w-4 mr-2" /> Use as template</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={sendEmail}><Mail className="h-4 w-4 mr-2" /> Send email</DropdownMenuItem>}
       </DropdownMenuContent>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Loader2,
   FileText,
@@ -53,6 +53,31 @@ const InvoiceDetailPage: React.FC = () => {
   const [fiscalBusy, setFiscalBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  /**
+   * Consume `?action=` from InvoiceActionsMenu (#296 finding 25).
+   *
+   * Those menu items — "Record payment", "Issue credit note" — used to run the identical
+   * navigation as "View", so choosing one landed on this page with nothing open and the menu
+   * advertised four capabilities where there was one. They deep-link now; this opens the matching
+   * dialog once the invoice has loaded, then strips the param so a refresh or a back-navigation
+   * does not reopen it.
+   *
+   * Guarded on the same rule as the buttons: a draft must not open either dialog via a URL any
+   * more than via a click.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (!action || !invoice) return;
+    const actionable = invoice.status !== 'void' && invoice.status !== 'credit_noted' && invoice.status !== 'draft';
+    if (actionable) {
+      if (action === 'payment') setPaymentDialogOpen(true);
+      else if (action === 'credit_note') setCreditNoteDialogOpen(true);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('action');
+    setSearchParams(next, { replace: true });
+  }, [invoice, searchParams, setSearchParams]);
 
   const handleDownloadPdf = async () => {
     if (!invoice) return;
@@ -149,6 +174,17 @@ const InvoiceDetailPage: React.FC = () => {
     );
   }
 
+  /**
+   * Can this document be acted on at all?
+   *
+   * A draft is not yet a document: it has no legal number, the payment picker and the credit-note
+   * picker both exclude it, and a public pay link for one would be a link to something that does
+   * not legally exist. Void and credit_noted are closed. Everything else is actionable.
+   */
+  const isActionable = invoice.status !== 'void'
+    && invoice.status !== 'credit_noted'
+    && invoice.status !== 'draft';
+
   const totalMargin = invoice.items.reduce((acc, it) => acc + (it.line_margin ?? 0), 0);
   const totalCogs = invoice.items.reduce((acc, it) => acc + (it.line_cost ?? 0), 0);
   const marginPct =
@@ -207,7 +243,13 @@ const InvoiceDetailPage: React.FC = () => {
               Submit to myDATA
             </Button>
           )}
-          {invoice.status !== 'void' && invoice.status !== 'credit_noted' && Number(invoice.amount_due) > 0 && (
+          {/* `isActionable` adds status !== 'draft'. Gating only on void/credit_noted let a
+              PUBLIC card-pay link be minted for an unissued document, let "Record payment"
+              open against a draft (whose row the payment dialog's picker excludes, so the
+              money booked as unallocated credit), and let "Credit note" open a dialog whose
+              picker excludes drafts — empty, with no explanation. The only action a draft
+              offers is "Mark issued". */}
+          {isActionable && Number(invoice.amount_due) > 0 && (
             <Button
               onClick={async () => {
                 if (!invoice) return;
@@ -234,12 +276,12 @@ const InvoiceDetailPage: React.FC = () => {
               Card pay link
             </Button>
           )}
-          {invoice.status !== 'void' && invoice.status !== 'credit_noted' && (
+          {isActionable && (
             <Button onClick={() => setPaymentDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> Record payment
             </Button>
           )}
-          {invoice.status !== 'void' && invoice.status !== 'credit_noted' && (
+          {isActionable && (
             <Button onClick={() => setCreditNoteDialogOpen(true)} variant="outline">
               Credit note
             </Button>
@@ -423,7 +465,11 @@ const InvoiceDetailPage: React.FC = () => {
                     {/* Account, not method — the method is derived from the account. */}
                     <td className="px-4 py-2">{p.bank_account_name ?? '—'}</td>
                     <td className="px-4 py-2">{p.reference ?? '—'}</td>
-                    <td className="px-4 py-2 text-right font-medium">{formatMoney(allocAmount, p.currency)}</td>
+                    {/* allocAmount is summed from `a.amount`, which is denominated in the
+                        INVOICE's currency (RecordPaymentDialog sets amount = amt x fx and
+                        amount_doc = amt). Stamping it with the PAYMENT's currency showed a euro
+                        figure labelled USD on any cross-currency settlement. */}
+                    <td className="px-4 py-2 text-right font-medium">{formatMoney(allocAmount, invoice.currency)}</td>
                     <td className="px-4 py-2 text-right"><PaymentReceiptActions paymentId={p.id} direction={(p as any).direction ?? 'in'} /></td>
                   </tr>
                 );

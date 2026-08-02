@@ -53,27 +53,34 @@ export const NewCreditNoteDialog: React.FC<{
       .then((rows) => { setInvoices(rows); return rows; })
       .catch(() => { setInvoices([]); return [] as Invoice[]; })
       // Opened from an invoice → select it once its row is in hand, which also loads its lines.
-      .then((rows) => { if (presetInvoiceId && rows.some((i) => i.id === presetInvoiceId)) void pick(presetInvoiceId); });
+      // The rows are passed IN. `pick` used to read the `invoices` state, but this callback
+      // closes over the render that scheduled the fetch — where `invoices` is still [] — so
+      // `invoices.find(...)` was always undefined. Opened from an invoice, that meant
+      // "Transmit to myDATA (5.1)" defaulted OFF even for a MARKed invoice, and the fallback
+      // Amount was left blank.
+      .then((rows) => { if (presetInvoiceId && rows.some((i) => i.id === presetInvoiceId)) void pick(presetInvoiceId, rows); });
   }, [open, workspaceId, presetInvoiceId]);
 
   const invoice = useMemo(() => invoices.find((i) => i.id === invoiceId), [invoices, invoiceId]);
 
-  const pick = async (id: string) => {
+  /** `rows` overrides the `invoices` state for callers that have the freshly-fetched list but
+   *  whose closure predates the state update (see the preset effect above). */
+  const pick = async (id: string, rows?: Invoice[]) => {
     setInvoiceId(id);
-    const inv = invoices.find((i) => i.id === id);
+    const inv = (rows ?? invoices).find((i) => i.id === id);
     setSubmitFiscal(!!(inv as any)?.fiscal_mark);
     setItemsLoading(true);
     try {
       const { data } = await supabase.from('invoice_items')
         .select('id, description, sku, unit, product_id, quantity, unit_price, net_value, vat_amount, vat_category, income_classification_type, income_classification_category')
         .eq('invoice_id', id);
-      const rows = (data ?? []) as InvItem[];
-      setItems(rows);
+      const lineRows = (data ?? []) as InvItem[];
+      setItems(lineRows);
       // default: credit every line at full quantity
       const ls: Record<string, LineState> = {};
-      for (const r of rows) ls[r.id] = { include: true, creditQty: String(r.quantity) };
+      for (const r of lineRows) ls[r.id] = { include: true, creditQty: String(r.quantity) };
       setLineState(ls);
-      if (rows.length === 0) setAmount(String(inv?.total ?? ''));
+      if (lineRows.length === 0) setAmount(String(inv?.total ?? ''));
     } catch { setItems([]); }
     finally { setItemsLoading(false); }
   };
