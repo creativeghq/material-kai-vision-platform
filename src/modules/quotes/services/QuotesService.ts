@@ -209,7 +209,7 @@ export class QuotesService {
     project_id?: string | null;
     notes?: string;
     custom_request_text?: string;
-    /** Optional customer link (used by the Sales portal #201 — rep builds a quote for a customer). */
+    /** Optional customer link (used by the Sales portal — rep builds a quote for a customer). */
     customer_contact_id?: string | null;
     customer_company_id?: string | null;
     /** Source moodboard, when the quote was generated from one (real FK, not a name match). */
@@ -710,7 +710,7 @@ export class QuotesService {
         let unitPrice = data.unit_price !== undefined ? data.unit_price : current.unit_price;
         let discountedPrice = data.discounted_price !== undefined ? data.discounted_price : current.discounted_price;
 
-        // #227 (Option B) — a quantity change (without an explicit price edit) ALWAYS re-runs the
+        // Option B: a quantity change (without an explicit price edit) ALWAYS re-runs the
         // engine so the line stays correct (e.g. crossing a volume threshold), overwriting any
         // prior price. Explicit price edits (data.unit_price set) are respected.
         if (data.quantity !== undefined && data.unit_price === undefined && current.product_id) {

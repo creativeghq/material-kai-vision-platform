@@ -69,8 +69,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           </Badge>
         </div>
 
-        {/* Product Grid — #227: restored to the shared ProductCard (was inlined to a compact card,
-            orphaning ProductCard). The rich card showcases AR / Lighting / Add-to-Quote and respects
+        {/* Product Grid — the shared ProductCard. The rich card showcases AR / Lighting / Add-to-Quote and respects
             the Show Prices toggle. Demo products keep their embedded retail (no live RPC for fake ids);
             real catalog grids pass a `viewerPrice` prop for per-viewer pricing. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

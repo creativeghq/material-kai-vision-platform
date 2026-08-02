@@ -1,5 +1,5 @@
-// Shared SSRF guard for edge functions that fetch a user-supplied URL server-side
-// (pentest #250 C23/C24). Mirrors the Python app/utils/ssrf_guard.py contract.
+// Shared SSRF guard for edge functions that fetch a user-supplied URL server-side.
+// Mirrors the Python app/utils/ssrf_guard.py contract.
 // A user-controlled URL fetched by OUR runtime can be pointed at cloud metadata
 // (169.254.169.254), loopback, or RFC1918 internal services. This guard:
 //   1. requires an http/https scheme,

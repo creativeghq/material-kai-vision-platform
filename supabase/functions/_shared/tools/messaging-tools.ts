@@ -69,7 +69,7 @@ export const createManageMessagingTool = (
         if (!to) return JSON.stringify({ success: false, error: 'send needs a recipient phone (to).' });
         if (!content && !template_id) return JSON.stringify({ success: false, error: 'send needs content (24h window) or a template_id.' });
 
-        // HUMAN-IN-THE-LOOP GATE (#275 / invariant #9): outbound message → confirm first.
+        // HUMAN-IN-THE-LOOP GATE (invariant #9): outbound message → confirm first.
         if (confirm !== true) {
           const preview = content ? `"${String(content).slice(0, 140)}"` : `template ${template_id}`;
           onChunk?.({

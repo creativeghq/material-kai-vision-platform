@@ -386,7 +386,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       });
     }
 
-    // ── #185 POS/IRIS completion path ─────────────────────────────────────────
+    // ── POS/IRIS completion path ─────────────────────────────────────────
     // The terminal charge succeeded (transaction_id from the bank/NSP); finalize the held
     // receipt via Novus CompletionPosInvoices → AADE → MARK. Reserves transmission credits here
     // (the original submit refunded them because the doc was only held, not transmitted).

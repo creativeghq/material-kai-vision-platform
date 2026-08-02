@@ -2377,7 +2377,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
 export const ALWAYS_ON_TOOLKIT_IDS = TOOLKITS.filter((t) => t.alwaysOn).map((t) => t.id);
 
 /**
- * Toolkit → Hub mapping (#275 Capability Fabric) — lets the toolkit picker group clusters by the
+ * Toolkit → Hub mapping — lets the toolkit picker group clusters by the
  * SAME Hubs as the app launcher, so "toolkits under each Hub" lines up with the menu. Toolkits with
  * no entry (core, tech-radar, sub-agents, admin-misc) fall into an "Other" group. Kept as a map
  * (not a per-entry field) so it's one readable place and doesn't touch every TOOLKITS row.

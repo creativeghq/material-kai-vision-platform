@@ -39,7 +39,7 @@ export const QuotesPage: React.FC = () => {
   const { can } = usePermissions();
   const canManageNetwork = can('network.manage');
 
-  // Tab state (?tab=requests deep-links the procurement inbox; #177 merged here from /requests).
+  // Tab state (?tab=requests deep-links the procurement inbox, merged here from /requests).
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const activeTab: QuotesTab = canManageNetwork && (requestedTab === 'requests' || requestedTab === 'settings')
@@ -151,7 +151,7 @@ export const QuotesPage: React.FC = () => {
       {/* Main Content */}
       <div className="page-container pt-6 pb-6">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          {/* Tabs only appear for network-node personas (#177 — Requests merged in from /requests).
+          {/* Tabs only appear for network-node personas (Requests merged in from /requests).
               End-users / staff / sales just see the quotes list with no tab chrome. */}
           {canManageNetwork && (
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2 mb-6">

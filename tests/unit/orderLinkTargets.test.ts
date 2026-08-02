@@ -150,7 +150,7 @@ describe('order line totals are derived in SQL', () => {
 
   /**
    * Mirroring a purchase onto the customer's order must re-price through the pricing resolver
-   * (#227 pricing pyramid). A house markup invented at the call site would be a second pricing
+   * (pricing pyramid). A house markup invented at the call site would be a second pricing
    * rule competing with the resolver, and the two would disagree the first time a customer got a
    * pricing level.
    */

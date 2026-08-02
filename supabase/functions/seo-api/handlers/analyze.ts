@@ -65,7 +65,7 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
   }
 
   // Track fix credits actually debited so the failure path can refund them too
-  // (the catch previously refunded only the analysis credit — audit #217 H15).
+  // (the catch previously refunded only the analysis credit).
   // MUST be declared outside the try: the catch below reads it, and a `let` inside
   // the try block is not in scope there — it threw ReferenceError inside the error
   // handler, so no refund ever happened.

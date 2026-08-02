@@ -646,7 +646,7 @@ const OperationsDashboardInner: React.FC = () => {
             <StorageAuditPanel />
           </TabsContent>
 
-          {/* Module add-ons — #251 per-workspace activation + add-on MRR (operator view). */}
+          {/* Module add-ons — per-workspace activation + add-on MRR (operator view). */}
           <TabsContent value="modules" className="space-y-4">
             <ModuleSubscribersPanel />
           </TabsContent>

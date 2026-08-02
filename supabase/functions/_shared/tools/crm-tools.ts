@@ -184,7 +184,7 @@ export const createCompanyFromVatTool = (
 };
 
 /**
- * manage_crm — agent parity for the core CRM spine (#275 / audit T2-3): create a contact and log an
+ * manage_crm — agent parity for the core CRM spine: create a contact and log an
  * activity/note from chat, the things the page does but the agent previously could not. create_contact
  * routes through crm-api (validation + dedupe + the crm_contact_created event); log_activity writes
  * crm_activities with the caller as actor. workspaceId is SERVER-DERIVED; userId is the caller.
@@ -260,7 +260,7 @@ export const createManageCrmTool = (
 
 /**
  * Enrich an EXISTING CRM company from ΑΑΔΕ (the agent equivalent of the company page's
- * "Fetch from ΑΑΔΕ" button — #275 parity). Resolves the company by id or fuzzy name, then calls
+ * "Fetch from ΑΑΔΕ" button — parity). Resolves the company by id or fuzzy name, then calls
  * myaade-rgwspublic2 with the company_id so the edge does the authoritative write-back (structured
  * columns + 90-day cache). The edge enforces is_workspace_finance_manager on the caller's JWT.
  */

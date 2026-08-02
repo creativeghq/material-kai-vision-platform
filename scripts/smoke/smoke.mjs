@@ -146,7 +146,7 @@ for (const rpc of ['find_similar_products', 'find_complementary_products']) {
 // 4b. plpgsql contract lint — fails if ANY function has an error-level issue (broken
 //   column/table ref, type mismatch). This is the class that 500'd recommendations and
 //   silently broke quote→invoice. As of 2026-06-19 the baseline is ZERO (all live fns fixed,
-//   dead-legacy dropped — issue #226), so this is now a strict gate: any new breakage fails.
+//   dead-legacy dropped), so this is now a strict gate: any new breakage fails.
 const KNOWN_BROKEN_FUNCTIONS = new Set([]);
 await check('db.plpgsql-lint', ['DB_KEY'], async () => {
   const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_plpgsql_errors`, {
@@ -207,7 +207,7 @@ await check('db.data-integrity.registry', ['DB_KEY'], async () => {
   return 'framework wired';
 });
 
-// 8. Business-expenses agent tool (#275, shipped 2026-07-19) — is the schema the
+// 8. Business-expenses agent tool — is the schema the
 //   `list_recent_expenses` / `record_expense` tools depend on actually live? We read
 //   supplier_bills with the EXACT column list the list tool selects, including the
 //   GENERATED `amount_due` column the expense/Payables flow reads. A missing/renamed

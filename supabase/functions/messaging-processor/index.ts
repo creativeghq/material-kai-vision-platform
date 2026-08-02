@@ -110,7 +110,7 @@ serve(withApiLogging('messaging-processor', async (req) => {
         continue;
       }
 
-      // T2-1 — the cron send path must enforce the same gates as messaging-api's `send`:
+      // The cron send path must enforce the same gates as messaging-api's `send`:
       const wsId: string | null = channel.workspace_id ?? null;
       const ownerId: string | null = campaign.created_by ?? null;
       // (a) entitlement/module: a workspace without the messaging add-on must not get free bulk delivery.
@@ -134,7 +134,7 @@ serve(withApiLogging('messaging-processor', async (req) => {
         .or('channel_type.eq.whatsapp,channel_type.eq.all');
       const optedOut = new Set((optouts || []).map((o) => o.phone_number));
 
-      // T2-5 — enforce the channel's CUMULATIVE daily send cap (was only a per-request size guard in
+      // Enforce the channel's CUMULATIVE daily send cap (was only a per-request size guard in
       // send-bulk; the cron blew past it unchecked). Count today's sends for this channel and cap this
       // tick's batch to what's left; if the cap is hit, skip the campaign until after midnight UTC.
       let batchLimit = BATCH_SIZE;
@@ -175,7 +175,7 @@ serve(withApiLogging('messaging-processor', async (req) => {
           continue;
         }
 
-        // T2-1 — debit the campaign owner BEFORE the send (invariant #10), mirroring messaging-api.
+        // Debit the campaign owner BEFORE the send (invariant #10), mirroring messaging-api.
         // Out of credits → re-queue the recipient and pause the campaign so it resumes on top-up
         // (don't churn the whole list into 'failed'). No owner → skip metering (shouldn't happen).
         let debitedCredits = 0;

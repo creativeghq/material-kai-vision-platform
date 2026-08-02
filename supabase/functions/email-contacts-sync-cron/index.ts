@@ -1,5 +1,5 @@
 /**
- * email-contacts-sync-cron — #255. Daily push of CRM contacts → each workspace's Resend audience,
+ * email-contacts-sync-cron — daily push of CRM contacts → each workspace's Resend audience,
  * for workspaces that opted into auto-sync (workspace_email_config.contacts_auto_sync = true).
  *
  * Reuses email-api's `sync-resend-contacts` logic (no duplication): we call it per workspace with

@@ -1,5 +1,5 @@
-// Shared Open Sans embedder for pdf-lib documents (#207 follow-up — single
-// platform typeface across server-generated PDFs too).
+// Shared Open Sans embedder for pdf-lib documents — a single platform
+// typeface across server-generated PDFs too.
 // Open Sans is the platform-wide UI/document font. pdf-lib only ships the
 // standard-14 fonts (Helvetica et al.), so to render PDFs in Open Sans we embed
 // the TTF via fontkit. The static instances cover Latin + Greek + Cyrillic +

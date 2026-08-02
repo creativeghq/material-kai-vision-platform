@@ -77,7 +77,7 @@ export const createManageReviewsTool = (
           .eq('id', review_id).maybeSingle();
         if (!rev || rev.to_user_id !== userId) return JSON.stringify({ success: false, error: 'review not found (or it is not about you).' });
 
-        // Public reply → HUMAN-IN-THE-LOOP GATE (#275 / invariant #9).
+        // Public reply → HUMAN-IN-THE-LOOP GATE (invariant #9).
         if (confirm !== true) {
           onChunk?.({
             type: 'action_confirmation',

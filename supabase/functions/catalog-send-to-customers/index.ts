@@ -140,7 +140,7 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
     const subject = body.subject?.trim() || `${catalog.title} — new catalog`;
     const publicUrl = `${PUBLIC_APP_URL}/c/${catalog.slug}`;
 
-    // Sender display name (user) + workspace brand identity (finance_settings, #174 Option A).
+    // Sender display name (user) + workspace brand identity (finance_settings, Option A).
     const { data: senderProfile } = await supabase
       .from('user_profiles')
       .select('full_name, email')
@@ -181,7 +181,7 @@ Deno.serve(withApiLogging('catalog-send-to-customers', async (req) => {
       });
     }
 
-    // T2-1 — pre-flight the workspace sender BEFORE looping 200 recipients. The per-recipient send uses
+    // pre-flight the workspace sender BEFORE looping 200 recipients. The per-recipient send uses
     // requireWorkspaceSender:true, so a workspace with no BYOK Resend would 403 EVERY recipient; but
     // functions.invoke masks the 503 code, so the batch returned success:true with "0 sent / 200 failed"
     // and the frontend's "connect your email" gate never opened. Short-circuit with an actionable code

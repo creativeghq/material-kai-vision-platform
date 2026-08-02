@@ -156,7 +156,7 @@ async function matchOrCreateContact(
   const { data: created } = await supabase.from('crm_contacts').insert({
     workspace_id: workspaceId, name: name || phone, phone, created_by: owner, lead_source: 'whatsapp',
   }).select('id').single();
-  // T2-2: a WhatsApp reply from an unknown number is a genuine new lead written directly to crm_contacts
+  // A WhatsApp reply from an unknown number is a genuine new lead written directly to crm_contacts
   // (bypassing crm-api), so fire crm_contact_created here or the "new lead → notify/assign" flow never
   // runs for it. Notify workspace owners/admins. Best-effort.
   if (created?.id) {

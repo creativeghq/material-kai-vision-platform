@@ -1,5 +1,5 @@
 /**
- * CanvasPanel — the Agent Studio artifact canvas (issue #253, P2).
+ * CanvasPanel — the Agent Studio artifact canvas.
  *
  * A collapsible, left-docked workspace that renders the currently-selected
  * toolkit artifact (moodboard sheet, product results, virtual staging, …) at

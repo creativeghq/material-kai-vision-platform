@@ -41,7 +41,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 /** Fetch a remote image and return raw bytes + detected mime type.
  *
- * SSRF-guarded (invariant 7, pentest #250 C23/C24). `url` is caller-supplied
+ * SSRF-guarded (invariant 7). `url` is caller-supplied
  * (`body.image_url`), so a raw fetch here was a working internal port scanner:
  * an authenticated user could point it at 169.254.169.254 (cloud metadata),
  * loopback or RFC1918, and the thrown message below leaks the upstream status

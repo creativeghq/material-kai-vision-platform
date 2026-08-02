@@ -740,7 +740,7 @@ function getModelNameForAgent(
     : 'claude-opus-4-8';
 }
 
-// ── Orchestrator routing (Agent Fabric #132) ──────────────────────────────
+// ── Orchestrator routing (Agent Fabric) ──────────────────────────────
 // When the client sends the orchestrator agent id ('orchestrator'/'jarvis'/'auto'),
 // JARVIS picks the specialist whose remit fits and the turn runs AS that agent —
 // the user never switches agents manually. Only the runnable function-tier agents
@@ -887,18 +887,18 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview',
       // Admin-gated at the DB level (RLS) — agent tool exposed to all, writes 401 for non-admin
       'manage_job_sites',
-      // Flows toolkit (#256; module-gated flows-toolkit + workspace entitlement; workspace-scoped)
+      // Flows toolkit (module-gated flows-toolkit + workspace entitlement; workspace-scoped)
       'manage_flows',
-      // HR toolkit (#252; module-gated hr + workspace entitlement; owner/admin RBAC enforced in hr-api)
+      // HR toolkit (module-gated hr + workspace entitlement; owner/admin RBAC enforced in hr-api)
       'manage_hr',
       // Employee HR self-service — for the hr.self persona (no hr.view/hr.manage). Hard-scoped to
       // the caller's own hr_employees row inside hr-api; cannot address another employee.
       'manage_my_hr',
       // Stock toolkit (module-gated stock + workspace entitlement; finance-manager RBAC enforced in stock-api)
       'manage_stock',
-      // Real Estate toolkit (#249; module-gated real-estate + workspace entitlement; realestate.* RBAC in real-estate-api)
+      // Real Estate toolkit (module-gated real-estate + workspace entitlement; realestate.* RBAC in real-estate-api)
       'manage_real_estate',
-      // Sourcing / fulfillment (#237; RPC-gated — resolve=member, create_po=finance-manager; 0 cr)
+      // Sourcing / fulfillment (RPC-gated — resolve=member, create_po=finance-manager; 0 cr)
       'source_product', 'create_purchase_order', 'send_purchase_order',
       // Presentation catalogs (admin/owner only — gated at injection time)
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
@@ -2091,11 +2091,11 @@ async function executeAgent(
   if (config.tools.includes('manage_job_sites') && createManageJobSitesTool) {
     tools.push(createManageJobSitesTool(userId, userJwt, onChunk));
   }
-  // Flows toolkit (#256; module-gated flows-toolkit + workspace entitlement enforced inside the tool)
+  // Flows toolkit (module-gated flows-toolkit + workspace entitlement enforced inside the tool)
   if (config.tools.includes('manage_flows') && createManageFlowsTool) {
     tools.push(createManageFlowsTool(userId, workspaceId, userJwt, onChunk));
   }
-  // HR toolkit (#252; module-gated hr + entitlement; owner/admin RBAC enforced server-side in hr-api)
+  // HR toolkit (module-gated hr + entitlement; owner/admin RBAC enforced server-side in hr-api)
   if (config.tools.includes('manage_my_hr') && createManageMyHrTool) {
     tools.push(createManageMyHrTool(userId, workspaceId, userJwt, onChunk));
   }
@@ -2106,7 +2106,7 @@ async function executeAgent(
   if (config.tools.includes('manage_stock') && createManageStockTool) {
     tools.push(createManageStockTool(userId, workspaceId, userJwt, onChunk));
   }
-  // Real Estate toolkit (#249; module-gated real-estate + entitlement; realestate.* RBAC + agent
+  // Real Estate toolkit (module-gated real-estate + entitlement; realestate.* RBAC + agent
   // lead-scoping enforced server-side in real-estate-api). Read-only actions → 0 cr.
   if (config.tools.includes('manage_real_estate') && createManageRealEstateTool) {
     tools.push(createManageRealEstateTool(userId, workspaceId, userJwt, onChunk));
@@ -2129,7 +2129,7 @@ async function executeAgent(
     tools.push(createManageSocialTool(userId, workspaceId, userJwt, onChunk));
   }
 
-  // Sourcing tools (#237; RPC-gated at the DB layer — resolve=member, create_po=finance-manager; 0 cr)
+  // Sourcing tools (RPC-gated at the DB layer — resolve=member, create_po=finance-manager; 0 cr)
   if (config.tools.includes('source_product') && createSourceProductTool) {
     tools.push(createSourceProductTool(userId, workspaceId, userJwt, onChunk));
   }

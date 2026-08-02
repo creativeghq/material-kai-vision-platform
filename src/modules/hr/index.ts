@@ -4,7 +4,7 @@ import type { ModuleDefinition, ModuleManifest } from '../_core';
 
 const HRPage = lazy(() => import('./pages/HRPage'));
 
-// HR module (first paid add-on on the #251 framework). The `/hr` route carries NO
+// HR module (first paid add-on on the modules framework). The `/hr` route carries NO
 // requireAdmin, so buildModuleRoutes() wraps it in EntitlementGuard (tenant-facing): the active
 // workspace must own the 'hr' module, else an upsell card is shown. The nav entry lives in
 // SIDEBAR_NAV_ITEMS (moduleSlug:'hr', requireCapability:'hr.view') so it appears only when the

@@ -22,7 +22,7 @@ export interface PermissionsApi {
   isOperator: boolean;
   isEndUser: boolean;
   // ── Finer, axis-derived gates (formerly the separate useCapabilities hook, merged here as
-  //    the single permission source — #208). These depend on the marketplace RANK and the raw
+  //    the single permission source). These depend on the marketplace RANK and the raw
   //    workspace role, which the coarse persona capabilities intentionally collapse, so they
   //    live as explicit booleans rather than persona capabilities. ──
   /** Invited accountant: Finance only — operate, never manage settings. */
@@ -55,7 +55,7 @@ export function usePermissions(): PermissionsApi {
     // drives), so a Supplier/Architect/Finance/Sales account role grants the right
     // gates even without a workspace-tree node. operator stays root-only.
     // `isAccountant` = the INVITED EXTERNAL accountant (workspace role) — a RESTRICT
-    // flag (#202: no expense approval / no settings). The internal `finance` account
+    // flag (no expense approval / no settings). The internal `finance` account
     // role also resolves to the accountant persona (Finance surface) but is NOT
     // isAccountant, so it keeps approval rights (server: is_workspace_finance_manager
     // already allows finance + owner/admin).

@@ -1,4 +1,4 @@
-// inbox-api — Issue #209 Multi-Tenant Inbox (P1: schema + directional ACL + channel send-router).
+// inbox-api — Multi-Tenant Inbox (P1: schema + directional ACL + channel send-router).
 // One action-discriminated edge function (merge rule). Two auth branches in one function
 // (precedent: moodboard-sheet-share resolves both a JWT and a token path):
 //   • JWT actions  — authenticated member/operator/customer-account flows.
@@ -118,7 +118,7 @@ async function callerParticipant(db: DbClient, threadId: string, userId: string)
 }
 
 /**
- * Shared-inbox access resolution (#209 §3 — "team inbox, not single-owner inbox").
+ * Shared-inbox access resolution — a team inbox, not a single-owner inbox.
  * A thread is reachable when the caller is the platform operator, an explicit active
  * participant, OR a business member of the thread's workspace on a shared customer/upstream
  * thread (sales jump-in). `internal` threads stay strictly participant-scoped — they are
@@ -539,7 +539,7 @@ async function getOrCreateShareLink(
 }
 
 /**
- * Directional add-rule (the heart of #209 §4). May `userId` (acting in `thread`) add `target`?
+ * Directional add-rule. May `userId` (acting in `thread`) add `target`?
  * `callerRole` is the caller's role in thread.workspace_id (null if not a member).
  */
 async function assertCanAddParticipant(
@@ -1297,7 +1297,7 @@ async function handleJwtAction(
     }
 
     case 'create_marketplace_inquiry': {
-      // Surplus Marketplace (#222) — a BUYER contacts a SELLER about an active listing. This
+      // Surplus Marketplace — a BUYER contacts a SELLER about an active listing. This
       // crosses the tenant wall (the buyer is not a member of the seller's workspace), so it can
       // only run here under the service role. The buyer joins as a `customer`-type participant on
       // a `customer` thread in the SELLER's workspace, so they are note-blind (resolveThreadAccess
@@ -1519,7 +1519,7 @@ async function handleJwtAction(
     }
 
     case 'get_thread_context': {
-      // Right-rail CRM context for the customer a member is talking to (#209 §UI col-3):
+      // Right-rail CRM context for the customer a member is talking to:
       // the linked CRM contact + their company + recent quotes + projects. Members/operators only.
       const threadId = String(payload.thread_id || '');
       if (!threadId) throw new HttpError(400, 'thread_id is required');

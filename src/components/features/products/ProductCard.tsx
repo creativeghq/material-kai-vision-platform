@@ -148,7 +148,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         </div>
 
-        {/* Pricing — #227: per-viewer price (reseller buy price + discount, or retail) gated on the
+        {/* Pricing — per-viewer price (reseller buy price + discount, or retail) gated on the
             Show Prices toggle. NEVER the procurement cost (the old "Wholesale" column leaked products.cost). */}
         {showPrices && (() => {
           const price = viewerPrice?.price ?? (product.pricing.retail > 0 ? product.pricing.retail : null);

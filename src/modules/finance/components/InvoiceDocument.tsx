@@ -216,7 +216,7 @@ export function InvoiceDocument({
           </>
         )}
       </div>
-      {/* Totals (right) — #227 universal breakdown: Price / Discount / Price after Discount / VAT / … / Final */}
+      {/* Totals (right) — universal breakdown: Price / Discount / Price after Discount / VAT / … / Final */}
       <div style={{ width: 260, ...totalsBoxStyle }}>
         {data.totals.discount > 0 ? (
           <>

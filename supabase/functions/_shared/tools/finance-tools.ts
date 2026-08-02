@@ -92,7 +92,7 @@ export const createManageFinanceTool = (
         if (!inv) return JSON.stringify({ success: false, error: 'invoice not found in this workspace' });
         if (inv.status !== 'draft') return JSON.stringify({ success: false, error: `only draft invoices can be issued (this one is "${inv.status}")` });
 
-        // HUMAN-IN-THE-LOOP GATE (#275 / invariant #9): preview instead of mutating until confirmed.
+        // HUMAN-IN-THE-LOOP GATE (invariant #9): preview instead of mutating until confirmed.
         if (confirm !== true) {
           onChunk?.({
             type: 'action_confirmation',

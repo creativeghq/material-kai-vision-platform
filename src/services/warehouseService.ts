@@ -153,7 +153,7 @@ function pickFiscal(fields: ProductFiscalFields | undefined): Record<string, unk
 }
 
 export const warehouseService = {
-  // ── Warehouses (#207 multi-warehouse) ──────────────────────────────────────
+  // ── Warehouses (multi-warehouse) ──────────────────────────────────────
   async listWarehouses(workspaceId: string): Promise<Warehouse[]> {
     const { data, error } = await supabase
       .from('warehouses')

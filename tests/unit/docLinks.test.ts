@@ -7,7 +7,7 @@
  * 75e9e843 (3 dead edge functions) — deleted docs + functions but left the
  * references behind. 30 dangling links accumulated, including 4 to
  * web-scraping-integration.md (deleted by 51ff18b6, yet still advertised as
- * "✨ NEW" in docs/README.md). See #268.
+ * "✨ NEW" in docs/README.md).
  *
  * Deleting is as much a wiring operation as adding; this makes the delete half
  * fail loudly. Added at ZERO — keep it there. If a doc is intentionally removed,

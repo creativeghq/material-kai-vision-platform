@@ -381,7 +381,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 /** Fetch a remote image and return as Uint8Array.
  *
- * SSRF-guarded (invariant 7, pentest #250 C23/C24). `url` originates from
+ * SSRF-guarded (invariant 7). `url` originates from
  * `body.reference_image_url`, so a raw fetch let any authenticated user reach
  * cloud metadata (169.254.169.254), loopback or RFC1918 — and the old error text
  * echoed the URL and upstream status back, making it a usable response oracle.

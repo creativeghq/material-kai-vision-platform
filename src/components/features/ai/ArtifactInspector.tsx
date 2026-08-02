@@ -1,6 +1,6 @@
 /**
- * ArtifactInspector — the contextual detail panel beside the canvas artifact
- * (issue #253, P3). One slot, a different schema per artifact kind: sheet
+ * ArtifactInspector — the contextual detail panel beside the canvas artifact.
+ * One slot, a different schema per artifact kind: sheet
  * details, virtual-staging parameters, or a material-search summary. Purely
  * presentational — it reads the same message data fields the cards render from.
  */

@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supplierClaimsService, type SupplierClaimRequest } from '@/services/supplierClaimsService';
 
 /**
- * #247 / Workstream F — operator review queue for supplier identity claims.
+ * Operator review queue for supplier identity claims.
  * Approving grants the requesting workspace cross-workspace order visibility, so
  * it is operator-only (the `decide_supplier_claim` RPC enforces it server-side).
  */

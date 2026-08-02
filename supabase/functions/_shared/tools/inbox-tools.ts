@@ -108,7 +108,7 @@ export const createManageInboxTool = (
           return JSON.stringify({ success: true, noted: true, thread_id });
         }
 
-        // Customer-facing reply → HUMAN-IN-THE-LOOP GATE (#275 / invariant #9).
+        // Customer-facing reply → HUMAN-IN-THE-LOOP GATE (invariant #9).
         if (confirm !== true) {
           onChunk?.({
             type: 'action_confirmation',

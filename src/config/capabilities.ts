@@ -41,7 +41,7 @@ export interface CapabilityDef {
 }
 
 /**
- * The registry. Seeded with the well-understood capabilities from the #275 inventory; it grows as
+ * The registry. Seeded with the well-understood capabilities from the inventory; it grows as
  * we migrate more onto the rails. `pageRoute`/`agentTool`/`toolkitId`/`recordTable`/`canvasKind`
  * are left undefined where that surface genuinely doesn't exist yet (those are the fabric gaps).
  */

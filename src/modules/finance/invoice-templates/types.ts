@@ -78,9 +78,9 @@ export interface InvoiceRenderData {
   items: InvoiceLineRow[];
   vatAnalysis: VatAnalysisRow[];
   totals: {
-    subtotalNet: number;        // #227 = Price (pre-discount net)
+    subtotalNet: number;        // Price (pre-discount net)
     discount: number;           // order-level (paid-upfront) discount, 0 if none
-    priceAfterDiscount: number; // #227 = net taxable base (post-discount)
+    priceAfterDiscount: number; // Net taxable base (post-discount)
     totalVat: number;
     extras: TotalsExtraRow[];    // fees / stamp / withholding / etc. (NOT the discount)
     grand: number;

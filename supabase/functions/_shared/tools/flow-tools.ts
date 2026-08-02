@@ -2,7 +2,7 @@
 // through chat (mirrors manage_job_sites), writing real workspace-scoped rows to the flows
 // table via the SECURITY DEFINER RPCs create_simple_flow / delete_simple_flow /
 // toggle_simple_flow. The tenant-safe trigger/action vocabulary is enforced SERVER-SIDE in
-// those RPCs (the UI/tool restriction is not the security line — pen-test #250).
+// those RPCs — the UI/tool restriction is not the security line.
 // SECURITY:
 //  • Gated on isModuleEnabled('flows-toolkit') [global publish] + is_workspace_entitled
 //    [per-workspace paid grant]. Both fail closed.

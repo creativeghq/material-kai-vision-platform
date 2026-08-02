@@ -881,7 +881,7 @@ export const DiscoverPage: React.FC = () => {
             <MarketplaceTab />
           </TabsContent>
 
-          {/* ── PROPERTIES (#249 real-estate cross-workspace discovery) ── */}
+          {/* ── PROPERTIES (real-estate cross-workspace discovery) ── */}
           {realEstateEnabled && (
             <TabsContent value="properties" className="mt-6">
               <PropertyDiscoveryTab />

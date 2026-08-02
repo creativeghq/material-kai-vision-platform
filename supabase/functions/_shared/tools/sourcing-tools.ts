@@ -1,5 +1,5 @@
 /**
- * Sourcing Tools — agent-chat surface for the #237 sourcing/fulfillment spine.
+ * Sourcing Tools — agent-chat surface for the sourcing/fulfillment spine.
  *
  * Tools (all 0-credit — internal flow, mirrors price/mention internal usage):
  *   - source_product        — rank supply options for a product (resolve_sourcing_options RPC)

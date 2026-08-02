@@ -10,7 +10,7 @@
  *
  * The detector currently reports ZERO findings. Zero is also what a broken detector reports — this
  * session produced two semgrep rules that loaded fine and matched nothing — so "it found nothing"
- * is only meaningful while the self-test still proves it catches the #294 shape.
+ * is only meaningful while the self-test still proves it catches the shape.
  */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
@@ -30,14 +30,15 @@ describe('tenancy parity gate', () => {
   });
 
   /**
-   * The detector proving it still detects. Runs the script's own self-test, which feeds it #294 S1
-   * exactly as that code was written before the fix, plus the sibling door that correctly checks
-   * `uploaded_by`, and asserts it flags the first and ignores the second.
+   * The detector proving it still detects. Runs the script's own self-test, which feeds it the
+   * unscoped catalog-translate-pdf read exactly as it was written before the fix, plus the
+   * sibling door that correctly checks `uploaded_by`, and asserts it flags the first and
+   * ignores the second.
    */
-  it('still catches the #294 shape it was built for', () => {
+  it('still catches the shape it was built for', () => {
     const out = execFileSync(process.execPath, [SCRIPT], { encoding: 'utf8', cwd: ROOT });
     expect(out, 'the detector no longer flags an unscoped service-role read by a body-supplied id')
-      .toMatch(/ok\s+flags: #294 S1/);
+      .toMatch(/ok\s+flags: catalog-translate-pdf/);
     expect(out, 'the detector now flags a door that DOES check ownership — it will be ignored as noise')
       .toMatch(/ok\s+ignores: the sibling door/);
     expect(out).not.toMatch(/FAIL/);

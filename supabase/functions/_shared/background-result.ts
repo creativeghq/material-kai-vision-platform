@@ -1,5 +1,5 @@
 /**
- * Background-result primitive (#275 rail-4 async) — the ONE sanctioned way an async / delegated
+ * Background-result primitive (rail-4 async) — the ONE sanctioned way an async / delegated
  * agent task reports completion back into the originating chat.
  *
  * How it works: the task inserts an assistant message into `agent_chat_messages` tagged

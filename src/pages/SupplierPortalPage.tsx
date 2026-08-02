@@ -11,7 +11,7 @@ import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/c
 import { SectionHeader } from '@/components/shared/SectionHeader';
 
 /**
- * #247 / Workstream F — supplier portal. A claimed supplier sees the purchase
+ * Supplier portal. A claimed supplier sees the purchase
  * orders sent to their identity across ALL buyer workspaces and can acknowledge /
  * mark shipped. Backed by the operator-claim flow; the RPCs enforce the claim.
  *

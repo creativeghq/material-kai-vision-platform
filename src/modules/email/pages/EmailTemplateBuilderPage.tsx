@@ -613,7 +613,7 @@ function TagInfoPanel({ open, onClose }: { open: boolean; onClose: () => void })
 interface EmailTemplateBuilderProps {
   /** Where "Back" navigates. Defaults to the admin email tab (transactional builder). */
   backPath?: string;
-  /** #255 — when set, Send Test goes out via the workspace's own Resend (BYOK, strict) as a
+  /** When set, Send Test goes out via the workspace's own Resend (BYOK, strict) as a
    *  marketing send, matching how the campaign actually dispatches. */
   workspaceId?: string;
   marketing?: boolean;

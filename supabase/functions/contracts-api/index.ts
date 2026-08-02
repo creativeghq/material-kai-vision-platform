@@ -8,7 +8,7 @@
 // SECURITY: verify_jwt is disabled so the public sign path works; management actions call
 // authenticate() + the module/entitlement gates, then perform the actual writes through a
 // USER-context client so the context-branched RLS (hr→admin, finance→finance-manager,
-// project→member) is the real enforcement — no service-role body-trust (#250 invariant 1).
+// project→member) is the real enforcement — no service-role body-trust (invariant 1).
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';

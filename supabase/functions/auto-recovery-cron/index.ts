@@ -190,7 +190,7 @@ async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
     return [];
   }
 
-  // Audit fix #43: skip jobs with current_slow_operation flag set within
+  // Skip jobs with current_slow_operation flag set within
   // the last 2 minutes. Stages that legitimately take 5+ min (long PaddleOCR
   // structural passes, SLIG embedding fan-out) set this flag so heartbeat staleness
   // doesn't trigger spurious recovery while real work is in progress.
@@ -464,7 +464,7 @@ async function recoverAgentRun(supabase: any, job: StuckJob): Promise<boolean> {
 }
 
 async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
-  // Audit fix #45: read last_checkpoint directly when metadata.last_checkpoint_stage
+  // Read last_checkpoint directly when metadata.last_checkpoint_stage
   // is missing. Without this, every recovery_history row had from_stage:null because
   // the metadata field is a recently-added denormalization that older jobs lack.
   // Resolve BEFORE the claim so we capture the pre-recovery state even if the claim
@@ -492,7 +492,7 @@ async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
     return false;
   }
 
-  // Audit fix #20: actively re-dispatch the PDF job to MIVAA. Previously the
+  // Actively re-dispatch the PDF job to MIVAA. Previously the
   // RPC just flipped status='pending' and we relied on the orchestrator
   // restart hook to pick it up — which only fires on full service restart.
   // Now we POST to MIVAA's /api/rag/documents/job/{job_id}/resume so recovery

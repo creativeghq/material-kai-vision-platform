@@ -84,7 +84,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     };
   });
 
-  // ── Sign & Accept (e-sign + immutable audit trail, Blueprint #242 Phase 2b) ──
+  // ── Sign & Accept (e-sign + immutable audit trail) ──
   // The client signs the estimate on the public page. We capture signer + IP + UA
   // + a content hash of exactly what was signed, flip the quote to accepted, and
   // return early. The page re-fetches (no event) to render the accepted state.
@@ -154,7 +154,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   }
 
   // Resolve a friendly bill-to name (no contact details exposed publicly) + the customer's
-  // VAT-inclusive display preference (#227 — gross prices for retail/consumer customers).
+  // VAT-inclusive display preference (gross prices for retail/consumer customers).
   let client_name: string | null = null;
   let prices_vat_inclusive = false;
   if (quote.customer_company_id) {

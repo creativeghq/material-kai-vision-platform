@@ -106,7 +106,7 @@ export const createManageContractsTool = (
         const c = got.data?.contract;
         if (!c) return JSON.stringify({ success: false, error: 'contract not found in this workspace' });
 
-        // HUMAN-IN-THE-LOOP GATE (#275 / invariant #9): sending for signature is outbound + legal.
+        // HUMAN-IN-THE-LOOP GATE (invariant #9): sending for signature is outbound + legal.
         if (confirm !== true) {
           onChunk?.({
             type: 'action_confirmation',

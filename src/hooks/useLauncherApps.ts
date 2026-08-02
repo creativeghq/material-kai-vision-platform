@@ -26,7 +26,7 @@ export interface LauncherApp {
   active: boolean;
   isAddon?: boolean;
   priceLabel?: string;
-  /** Hub grouping (#251 follow-up). Undefined → catch-all "More" group in the launcher. */
+  /** Hub grouping. Undefined → catch-all "More" group in the launcher. */
   hub?: HubId;
 }
 

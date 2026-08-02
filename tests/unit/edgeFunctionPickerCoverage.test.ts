@@ -14,7 +14,7 @@
  * Why not import the catalogue at runtime instead of duplicating it?
  * `scripts/edge-endpoints.json` is 311 KB — full descriptions, request/response schemas —
  * where the picker needs 16 KB of {id,label,sublabel}. Shipping the former to every browser
- * to fill a dropdown is a bad trade (see #308, frontend bundle). So the projection lives in
+ * to fill a dropdown is a bad trade. So the projection lives in
  * `src/` and this test keeps it honest.
  *
  * Regenerate the picker from the catalogue whenever this fails.

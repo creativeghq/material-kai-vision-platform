@@ -209,7 +209,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
      *
      * An explicit id must be one the caller is an ACTIVE member of — strict membership,
      * NOT `userCanAccessWorkspace`, because that grants global admin/super_admin and would
-     * reopen exactly what #250 C27 closed (operator-of-A attaching an account to workspace-B).
+     * reopen exactly the hole that was closed: operator-of-A attaching an account to workspace-B.
      * With no explicit id, only an unambiguous single membership is used; ambiguous (or none)
      * returns null so the caller decides whether that is fatal.
      */
@@ -325,7 +325,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
         if (!channel.zernio_account_id) throw new Error('Channel is not linked to a Zernio account.');
         const tenantWsId = channel.workspace_id ?? (await resolveTargetWorkspaceId());
         { const gate = await requireMessaging(tenantWsId); if (gate) return gate; }
-        // T2-5 — cumulative daily cap: count what the channel already sent TODAY, not just this request's
+        // Cumulative daily cap: count what the channel already sent TODAY, not just this request's
         // size, so many small requests can't blow past the quota.
         if (channel.daily_quota && channel.daily_quota > 0) {
           const startOfDay = new Date(); startOfDay.setUTCHours(0, 0, 0, 0);
@@ -569,7 +569,7 @@ Deno.serve(withApiLogging('messaging-api', async (req) => {
       // Channels / templates / logs / analytics (DB reads)
       // ─────────────────────────────────────────────────────────────
       case 'channels': {
-        // Tenancy (#250 invariant #1): these read actions use the RLS-bypassing service-role client and
+        // Tenancy (invariant #1): these read actions use the RLS-bypassing service-role client and
         // are NOT operator-gated, so they MUST filter by the caller's workspace or any authenticated user
         // could enumerate every tenant's WhatsApp channels (waba_id/phone_number_id). No workspace → none.
         const chScope = await readScopeWorkspaceIds();

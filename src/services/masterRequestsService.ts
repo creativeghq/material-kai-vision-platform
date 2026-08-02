@@ -78,7 +78,7 @@ export const masterRequestsService = {
     return data as string;
   },
 
-  // ── #237 Phase 4.4 — line-level upstream RFQ ──
+  // ── Line-level upstream RFQ ──
 
   /** Requester — route selected "call for price" lines of a quote upstream. Returns request id. */
   async submitLineRfq(quoteId: string, quoteItemIds: string[]): Promise<string> {

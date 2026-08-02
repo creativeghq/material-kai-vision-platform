@@ -143,7 +143,7 @@ export const ToolkitPickerModal: React.FC<Props> = ({
 
   if (!open) return null;
 
-  // Order: Core first, then standard toolkits grouped by Hub (#275 — same Hubs as the app
+  // Order: Core first, then standard toolkits grouped by Hub (same Hubs as the app
   // launcher, so "toolkits under each Hub" matches the menu), then admin-only toolkits.
   const groups = {
     core: accessible.filter((t) => t.alwaysOn),

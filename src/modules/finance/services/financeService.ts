@@ -604,7 +604,7 @@ const _financeServiceCore = {
     return (data ?? []) as Invoice[];
   },
 
-  /** #204 "Send email" — email the invoice summary + MARK/QR to the customer. */
+  /** "Send email" — email the invoice summary + MARK/QR to the customer. */
   async sendInvoiceEmail(invoiceId: string, to?: string): Promise<{ data: any; error: any }> {
     const { data, error } = await supabase.functions.invoke('finance-send-invoice-email', { body: { invoice_id: invoiceId, to } });
     // Surface a typed error so UI can open the Connect-email gate on `workspace_sender_required`.
@@ -699,7 +699,7 @@ const _financeServiceCore = {
     return { emailed: !!party.email, email: party.email ?? null };
   },
 
-  /** #204 "Use as template" — clone an invoice into a fresh DRAFT (no fiscal/MARK). */
+  /** "Use as template" — clone an invoice into a fresh DRAFT (no fiscal/MARK). */
   async duplicateInvoice(invoiceId: string): Promise<string> {
     const src = await this.getInvoice(invoiceId);
     // Derived draft number only — the gapless myDATA series/aa is allocated at issue by
@@ -1007,7 +1007,7 @@ const _financeServiceCore = {
 
   // -------- Manual (un-invoiced) receivables / payables --------
 
-  // -------- Pricing rules (#176 markup overrides) --------
+  // -------- Pricing rules (markup overrides) --------
 
   // Ordered category tree (parents + subcategories) for pricing pickers; children
   // get an indented label so the hierarchy is visible in a flat <Select>.

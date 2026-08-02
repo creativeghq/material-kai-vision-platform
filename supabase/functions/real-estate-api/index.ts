@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 // Real Estate module API (P1). Authed CRUD/publish/media/inquiry/viewing router for the
 // `real-estate` add-on. The public token page lives in a SEPARATE fn (real-estate-public).
-// SECURITY (pen-test #250 baseline — cloned from hr-api):
+// SECURITY (cloned from hr-api):
 //  • authenticate() yields a SERVICE-ROLE client (RLS bypassed) → every action re-derives the
 //    workspace from the caller and calls userCanAccessWorkspace() (systemic root #2, no body trust).
 //  • Module gates: isModuleEnabled('real-estate') [publish] + assertEntitled [402], strict priority.
@@ -117,7 +117,7 @@ async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property:
         }).catch(() => {});
         if (m.id) alertedReqIds.push(m.id);
       }
-      // T3-2 — advance the digest window for buyers we just alerted immediately, so tonight's digest
+      // Advance the digest window for buyers we just alerted immediately, so tonight's digest
       // doesn't email them the SAME listing again (double-notify). Only for new_listing (the digest is
       // about new listings; a price_drop alert doesn't overlap it).
       if (reason === 'new_listing' && alertedReqIds.length > 0) {
@@ -554,7 +554,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const inqId = String(body.inquiry_id ?? '');
         if (!inqId) return json({ error: 'inquiry_id is required' }, 400);
 
-        // SECURITY (audit #303 finding 3, second half): requireManage() only proves the caller
+        // SECURITY: requireManage() only proves the caller
         // may manage SOMETHING here — for a realestate_agent it is true, so on its own it lets
         // agent B rewrite the buyer PII on agent A's listing, including listings A has not
         // flagged open_for_all and B therefore cannot even READ. `list-inquiries` already scopes
@@ -749,7 +749,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const vId = String(body.viewing_id ?? '');
         if (!vId) return json({ error: 'viewing_id is required' }, 400);
 
-        // SECURITY (audit #303 finding 3, second half): this action previously did no property
+        // SECURITY: this action previously did no property
         // or agent lookup at all — workspace scoping alone let one agent cancel or reschedule
         // another agent's viewing. `list-viewings` self-scopes reads with
         // `if (!access.isBroker) q = q.eq('agent_id', userId)`; the write now matches, and also

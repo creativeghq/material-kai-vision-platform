@@ -246,7 +246,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     }
 
     // ② Debit upfront — REFUNDED on any failure path (see refundCredits + creditsDebited
-    // guard below; audit #217 H4). The earlier "non-refundable" note was stale.
+    // guard below).
     const { data: debitData, error: debitError } = await supabase.rpc('debit_credits', {
       p_user_id: userId,
       p_amount: creditCost,

@@ -164,7 +164,7 @@ const MIVAA_ENDPOINTS = {
   'search_analytics': { path: '/api/search/analytics', method: 'POST' },  // Search analytics
   'search_health': { path: '/api/search/health', method: 'GET' },  // Search service health
 
-  // ==================== SEARCH SUGGESTIONS (Feature #49) ====================
+  // ==================== SEARCH SUGGESTIONS ====================
   'autocomplete': { path: '/api/search/autocomplete', method: 'POST' },  // Auto-complete suggestions
   'trending_searches': { path: '/api/search/trending', method: 'GET' },  // Trending searches
   'typo_correction': { path: '/api/search/typo-correction', method: 'POST' },  // Typo correction

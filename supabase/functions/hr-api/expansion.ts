@@ -85,7 +85,7 @@ const DOC_TYPES = ['contract', 'id', 'certificate', 'payslip', 'review', 'other'
 const HR_DOC_BUCKET = 'pdf-documents';
 
 /**
- * Guard a client-supplied storage path (#252 BOLA fix). `pdf-documents` is a single shared
+ * Guard a client-supplied storage path (BOLA fix). `pdf-documents` is a single shared
  * private bucket, and these routes run under the RLS-bypassing service role — so a body-supplied
  * bucket/path could otherwise sign or delete ANY tenant's object. Force the HR bucket and require
  * the object live under this workspace's own `hr/{workspaceId}/` prefix.

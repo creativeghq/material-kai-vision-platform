@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * #247 / Workstream F — supplier identity claim flow.
+ * Supplier identity claim flow.
  * A workspace requests to claim a (VAT, country) global supplier identity;
  * ONLY the platform operator (owner/admin of the root workspace) approves.
  * Reads are RLS-gated (requester sees own; operator sees all).

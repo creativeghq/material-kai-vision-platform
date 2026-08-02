@@ -269,7 +269,7 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
         owned_property_address: [String(body?.address ?? '').trim(), town].filter(Boolean).join(', ') || null,
         owned_property_value: estimate,
       }, { onConflict: 'crm_contact_id' });
-      // T2-2: this is a genuine new-lead moment that writes crm_contacts directly (bypassing crm-api),
+      // This is a genuine new-lead moment that writes crm_contacts directly (bypassing crm-api),
       // so it must fire crm_contact_created itself — otherwise the agency's "new lead → notify/assign"
       // automation never runs for its highest-value inbound. Notify workspace owners/admins.
       try {

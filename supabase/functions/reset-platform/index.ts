@@ -99,7 +99,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 //   - tracked_jobs + job_listings / job_excluded_urls / job_match_corrections
 //     / job_alert_log / job_classifier_verdict_cache / job_research_sites
 //   - seo_tracked_domains / seo_research_runs / seo_domain_audit_history
-//   ── Agent Fabric persistent layer (#132 — NEVER WIPE, secrets cascade) ──
+//   ── Agent Fabric persistent layer (NEVER WIPE, secrets cascade) ──
 //   - agent_definitions / agent_projects / agent_project_secrets
 //     / agent_project_deployments / agent_project_snapshots
 //     (only the runtime — agent_runs/agent_artifacts/agent_inbox_messages — is cleared)

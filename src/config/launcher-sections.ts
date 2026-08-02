@@ -88,7 +88,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // high-value work is the AI presentation sheets — surface them as ONE agent deep-link so a click
   // opens the studio primed on the presentation-sheets toolkit (its picker offers all 9 sheet types,
   // incl. the "design breakdown" board) instead of hunting for the per-board Sheets tab.
-  // (#275 — sheets are an agent capability, not a page tab.) Deliberately a single entry:
+  // (sheets are an agent capability, not a page tab.) Deliberately a single entry:
   // "Design breakdown" pointed at the same URL (a sheet TYPE, not a separate action), and
   // "Interior studio" duplicated the top-level Interior Design app — both removed as redundant.
   moodboard: [
@@ -104,7 +104,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Heating cost compare', to: '/tools/heating-cost', icon: Thermometer },
   ],
   // Quotes (nav id 'quotes', route /quotes). The list is the Open target; Price Monitoring is nested
-  // here as an agent deep-link (#275 — folded in from a standalone tile to keep the Sales list lean).
+  // here as an agent deep-link (folded in from a standalone tile to keep the Sales list lean).
   quotes: [
     { label: 'Price monitoring', to: '/agent-hub?capability=price-monitoring', icon: TrendingUp },
   ],

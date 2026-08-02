@@ -64,7 +64,7 @@ interface Body {
   project_name?: string;
   mode?: 'per_item' | 'schedule' | 'both' | 'order';
   title?: string;
-  // ---- purchase-order mode (#237 A3 send-to-supplier) ----
+  // ---- purchase-order mode (send-to-supplier) ----
   // When set, renders a purchase ORDER (orders.order_type='purchase') + its
   // order_items as a PO document. With send=true it also emails the supplier,
   // marks the order placed (draft→confirmed) and emits a Flows event.

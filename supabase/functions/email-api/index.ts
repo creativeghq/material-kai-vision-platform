@@ -136,7 +136,7 @@ function mapResendEventToPatch(lastEvent: string, nowISO: string): StatsPatch | 
   }
 }
 
-// ── #255 Resend Audience/Contacts sync ───────────────────────────────────────
+// ── Resend Audience/Contacts sync ───────────────────────────────────────
 // deno-lint-ignore no-explicit-any
 type AnyClient = any;
 const RESEND = 'https://api.resend.com';

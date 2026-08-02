@@ -10,7 +10,7 @@ import {
  *
  * The marketplace_* tables + RPCs were applied to the DB via MCP migrations; the generated
  * Supabase types (`src/integrations/supabase/types.ts`) don't include them yet (regen tracked
- * on #221). The `as any` cast is isolated to this single boundary — every caller below is fully
+ * yet). The `as any` cast is isolated to this single boundary — every caller below is fully
  * typed through the interfaces in this file.
  */
 const sb = supabase as any;

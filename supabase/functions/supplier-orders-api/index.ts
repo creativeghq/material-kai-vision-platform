@@ -1,5 +1,5 @@
 /**
- * supplier-orders-api  (#247 / Workstream F phase-4 — ERP outbound)
+ * supplier-orders-api — ERP outbound
  *
  * Partner API for a claimed supplier's own ERP system. Authenticated with a
  * `kai_*` api_key (Authorization: Bearer kai_...), the same flow price/mention/job

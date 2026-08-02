@@ -36,7 +36,7 @@ const QUOTED_RE = /'([a-z][a-z0-9_]+)'/g;
 // for — so `load_toolkit` can pull them mid-chat, yet a user can never enable them
 // from the ToolkitPickerModal. Each one is a missing ToolkitDefinition in
 // agentToolsCatalog.ts, NOT a missing tool. SHRINK by adding the picker entry;
-// never grow (a newly-orphaned cluster should fail the build). See #266.
+// never grow (a newly-orphaned cluster should fail the build).
 // Emptied 2026-07-16: flows-toolkit / knowledge-graph / social / tech-radar were
 // all given picker entries. Keep at zero.
 const KNOWN_PICKERLESS_CLUSTERS = new Set<string>([]);
@@ -53,7 +53,7 @@ const INTERNAL_TOOLS = new Set([
   // NOT an agent tool: an Anthropic `tool_choice` structured-output schema used
   // inside the tech-radar review call (tech-radar-tools.ts). The `name:` regex
   // can't tell it apart from a LangChain tool — the Phase 0 manifest generator
-  // must exclude `input_schema` blocks or it will emit phantom tools. See #266.
+  // must exclude `input_schema` blocks or it will emit phantom tools.
   'submit_findings',
 ]);
 

@@ -554,7 +554,7 @@ export function PlatformOverviewTab() {
         Promise.all([
           // generation_3d: the column is `generation_status`, not `status`; `credits_used`
           // does not exist at all and was never consumed here, so it is dropped rather than
-          // aliased to `total_cost` (which has no writer — see #304).
+          // aliased to `total_cost` (which has no writer).
           // generation_3d_segments: `zone_name`/`detected_material` are `label`/`material_type`.
           supabase.from('generation_3d').select('created_at,generation_status,room_type').gte('created_at', ago12.toISOString()),
           supabase.from('generation_3d_segments').select('created_at,label,material_type,confidence').gte('created_at', ago12.toISOString()).limit(5000),

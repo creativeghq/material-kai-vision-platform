@@ -1,7 +1,7 @@
 /**
  * Semgrep ruleset validity guard.
  *
- * `.github/semgrep-security.yml` is the code-level half of the pentest #250 invariants (the DB
+ * `.github/semgrep-security.yml` is the code-level half of the invariants (the DB
  * half is check_security_invariants(), run by the data-integrity cron). It was INVALID YAML from
  * the day it was added — an unquoted pattern containing `": F"` parsed as a nested mapping — so
  * semgrep loaded zero rules and exited non-zero on every run. The workflow ran it with
@@ -61,7 +61,7 @@ describe('semgrep security ruleset', () => {
    * the rule level — semgrep reports a "Rule parse error" and the rule matches nothing, which on
    * a clean-looking scan is indistinguishable from a codebase with no violations.
    *
-   * The entry below cost a real debugging cycle while writing the #309 rules: `catch (...)` gives
+   * The entry below cost a real debugging cycle while writing the rules: `catch (...)` gives
    * "Invalid pattern for JavaScript/TypeScript: Stdlib.Parsing.Parse_error". The binding form
    * `catch ($E)` is correct AND also matches a bare `catch {`, so it is strictly better anyway.
    *

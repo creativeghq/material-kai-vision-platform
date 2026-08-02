@@ -163,7 +163,7 @@ export const fiscalConnectorService = {
   },
 };
 
-// ── #185 EFT-POS terminal registry (settings_pos parity) ───────────────────────
+// ── EFT-POS terminal registry (settings_pos parity) ───────────────────────
 // Novus posNspId provider codes (token encoding noted for reference).
 export const POS_NSP_PROVIDERS: { id: number; name: string; encoding: string }[] = [
   { id: 1, name: 'Mellon', encoding: 'HEX' },

@@ -1334,7 +1334,7 @@ const KpiCard: React.FC<{
  * Summing genuinely mixed rows is not something a symbol can fix, so this reports the dominant
  * currency AND whether the set is mixed; the callers label the total honestly and warn when it
  * cannot be trusted. Converting to a base currency needs stored FX rates per document, which is
- * a larger change — see #296 finding 4.
+ * a larger change.
  */
 function aggregateCurrency(rows: AgingRow[]): { currency: string; mixed: boolean } {
   const totals = new Map<string, number>();

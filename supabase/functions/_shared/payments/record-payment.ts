@@ -15,7 +15,7 @@
  * GUARDRAIL: this module is for CUSTOMER→TENANT commerce payments only. Platform
  * billing (credits, subscriptions, module add-ons) settles to the OPERATOR's own
  * Stripe account and must never route through here — it has no invoice, no tenant
- * BYOK provider, and its own idempotency. See #273 blocker #4.
+ * BYOK provider, and its own idempotency.
  */
 
 import { emitFlowEvent } from '../flow-events.ts';
@@ -80,8 +80,8 @@ async function findExisting(
 /**
  * Record a payment against ONE invoice.
  *
- * Allocation is capped at the invoice's CURRENT `amount_due`, re-read inside this call
- * (#273 blocker #2): a webhook/redirect race, a double-click, or paying an invoice that
+ * Allocation is capped at the invoice's CURRENT `amount_due`, re-read inside this call:
+ * a webhook/redirect race, a double-click, or paying an invoice that
  * was settled manually in the meantime must not over-allocate. Any excess is left as
  * unallocated on-account credit rather than being silently dropped or refused — the money
  * genuinely arrived.

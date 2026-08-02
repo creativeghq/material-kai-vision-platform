@@ -77,7 +77,7 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
   await bootstrapForFunction();
 
   // NOTE: we deliberately do NOT gate the whole function on Stripe being configured
-  // any more. Since #273 a workspace may collect via Viva (BYOK) with no platform
+  // any more. A workspace may collect via Viva (BYOK) with no platform
   // Stripe key at all, so "no Stripe" is only fatal on the Stripe path itself —
   // checked at the point of use below.
   const stripe = getStripe();

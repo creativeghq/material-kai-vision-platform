@@ -1,4 +1,4 @@
-// Canonical HTML escaper for the frontend (invariant 11, pentest #250).
+// Canonical HTML escaper for the frontend (invariant 11).
 // Byte-equivalent twin of supabase/functions/_shared/html.ts — Deno edge code and the
 // Vite bundle can't share a module, so the two are kept identical by convention.
 // Escapes the full `& < > " '`, so it is safe in text content AND quoted attributes.

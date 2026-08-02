@@ -82,7 +82,7 @@ export interface SidebarNavItem {
    */
   hub?: HubId;
   /**
-   * Where the item renders (#251 App Launcher IA):
+   * Where the item renders (App Launcher IA):
    * - `'top'` (default) → the lean top nav bar (universal surfaces).
    * - `'app'` → the workspace **App Launcher**, alongside optional modules.
    *   Keeps the top bar uncluttered as the platform grows to many modules. Routes/guards
@@ -132,8 +132,8 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'quotes', label: 'Quotes', path: '/quotes', icon: FileText, requireCapability: 'quotes.use', moduleSlug: 'quotes', surface: 'app', hub: 'sales', description: 'Build and send client quotes.' },
   // Sales portal for invited reps (persona 'sales').
   { id: 'sales', label: 'Sales', path: '/sales', icon: Briefcase, requireCapability: 'sales.portal', surface: 'app', hub: 'sales', description: 'Sales-rep portal for quotes.' },
-  // Business-workspace surfaces — gated through the #195 capability layer, so end-users
-  // (project clients / referral members) never see CRM or Finance. Part of #174.
+  // Business-workspace surfaces — gated through the capability layer, so end-users
+  // (project clients / referral members) never see CRM or Finance.
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'Contacts, companies, and leads.' },
   // Price Monitoring — agent-driven capability, exposed in the launcher like Interior/Social/SEO:
   // the tile opens the studio primed on the price-monitoring toolkit (track a product, pull prices).

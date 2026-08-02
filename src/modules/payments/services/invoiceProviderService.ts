@@ -49,7 +49,7 @@ export const BUILT_IN_PROVIDER: InvoiceProvider = {
  * `provides.invoicing: true` in its manifest and every gated surface lights up — the banner in
  * InvoicingPanel, the hidden Issue button in IssueInvoiceButton, the disabled numbering card.
  *
- * Flagged by audit #298 finding 18 as "unreachable". Verified and kept deliberately: the
+ * This looks unreachable, and is kept deliberately: the
  * mechanism is correct, so deleting it would remove working plumbing rather than dead code.
  */
 export function resolveInvoiceProvider(enabledSlugs: ReadonlySet<string>): InvoiceProvider {

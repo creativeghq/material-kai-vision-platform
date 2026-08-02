@@ -177,7 +177,7 @@ export const createManageEmailCampaignTool = (
           return JSON.stringify({ success: false, error: 'This campaign resolves to 0 recipients — set an audience on the Email page before sending.' });
         }
 
-        // HUMAN-IN-THE-LOOP GATE (#275 / invariant #9): mass email — confirm before sending.
+        // HUMAN-IN-THE-LOOP GATE (invariant #9): mass email — confirm before sending.
         if (confirm !== true) {
           onChunk?.({
             type: 'action_confirmation',

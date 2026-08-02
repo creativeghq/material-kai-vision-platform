@@ -11,7 +11,7 @@ export function tierRank(tier: string | null | undefined): number {
   return TIER_RANK[(tier || '').toLowerCase()] ?? 999;
 }
 
-/** A published module row incl. the #251 add-on/catalog columns (not yet in generated types). */
+/** A published module row incl. the add-on/catalog columns (not yet in generated types). */
 export interface ModuleCatalogRow {
   slug: string;
   name: string;

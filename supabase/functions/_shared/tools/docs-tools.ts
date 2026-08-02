@@ -62,7 +62,7 @@ export const createDocsSearchTool = (workspaceId: string) => {
 };
 
 /**
- * Docs authoring (#254 / #275 capability-fabric parity): create a workspace doc or propose an edit
+ * Docs authoring (capability-fabric parity): create a workspace doc or propose an edit
  * from chat — the page-only authoring surface, now reachable by the agent. workspaceId is
  * SERVER-DERIVED (never model/body), userId is the authenticated caller, stamped as author/proposer.
  */

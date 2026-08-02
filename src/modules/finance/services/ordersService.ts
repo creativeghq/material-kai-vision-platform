@@ -675,7 +675,7 @@ export const ordersService = {
   /**
    * Re-price purchase lines as what the CUSTOMER pays, for the mirrored sales order.
    *
-   * Every catalog line goes back through `resolveLinePricing` — the #227 pricing pyramid, the same
+   * Every catalog line goes back through `resolveLinePricing` — the pricing pyramid, the same
    * resolver a hand-picked line uses — so the customer's pricing level and discount apply. It does
    * NOT mark cost up by a house percentage; there is no such number, and inventing one here would
    * be a second pricing rule competing with the resolver.
@@ -1164,7 +1164,7 @@ export const ordersService = {
    * Customer-aware price for an order line, used to pre-fill it on product pick.
    *  - Sales: the central resolver `get_product_price_for_workspace` applies the customer's
    *    pricing level / discount off retail → `final_sell` (unit_price) + `cost_basis` (unit_cost)
-   *    + `discount_pct`. This is the #227 pricing pyramid; the order reflects it out of the box.
+   *    + `discount_pct`. This is the pricing pyramid; the order reflects it out of the box.
    *  - Purchase: we pay cost, so unit_price = unit_cost = products.cost.
    * Also returns the product's unit of measure to seed the line's unit.
    */

@@ -163,7 +163,7 @@ describe('order settlement has exactly one derivation', () => {
 });
 
 /**
- * Quote totals had the SAME shape of bug, found later (audit #307 findings 17/18/19): the money
+ * Quote totals had the SAME shape of bug, found later: the money
  * chain subtotal -> cash discount -> +extras -> VAT -> grand total was implemented THREE times in
  * TypeScript and ZERO times in SQL. They rounded differently, so `priceAfterDiscount + vat` and
  * `final` could disagree by a cent — and none of them folded in `extras_total`, so a customer
