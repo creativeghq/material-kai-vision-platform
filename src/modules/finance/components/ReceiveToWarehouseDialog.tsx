@@ -446,6 +446,21 @@ export const ReceiveToWarehouseDialog: React.FC<{
       return;
     }
 
+    /**
+     * What this run has already written, for the failure path. Declared OUTSIDE the try so the
+     * catch can read it.
+     *
+     * The stock RECEIPT is atomic — inbound_doc_receive_to_warehouse takes every mapping in one
+     * RPC and runs last — so a mid-loop failure never half-receives stock. What it DOES leave
+     * behind is the preparation: catalog products (each with a real embedding cost), their fiscal
+     * fields, list prices and empty warehouse_items rows. Those cannot be folded into the same
+     * transaction because product creation goes through the ingest service for embeddings.
+     *
+     * So they are tracked and REPORTED instead. Without this the operator sees only 'Failed', has
+     * no idea N products now exist, and pressing Receive again silently creates them twice.
+     */
+    const createdNames: string[] = [];
+
     setBusy(true);
     try {
       const mappings: { item_id: string; quantity: number }[] = [];
@@ -535,6 +550,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
           // The ingest core doesn't model the fiscal columns, so they are applied after.
           await warehouseService.updateProductFiscal(productId, fiscal);
           created += 1;
+          createdNames.push(name);
         } else if (productId) {
           // Matched an existing product — still push the fiscal codes the operator just set,
           // otherwise editing them here would silently do nothing.
@@ -599,7 +615,19 @@ export const ReceiveToWarehouseDialog: React.FC<{
       });
       onDone();
     } catch (e: any) {
-      toast({ title: 'Failed to receive', description: e?.message, variant: 'destructive' });
+      // Name what survived. No stock moved (the receipt RPC is all-or-nothing and runs last), but
+      // anything created before the failure is real and will be duplicated by a blind retry.
+      const leftBehind = createdNames.length > 0
+        ? ` ${createdNames.length} catalog product(s) were already created and still exist: `
+          + `${createdNames.slice(0, 5).join(', ')}${createdNames.length > 5 ? `, +${createdNames.length - 5} more` : ''}. `
+          + 'No stock was received. Before retrying, either link those lines to the products that now exist '
+          + 'or delete them, otherwise they will be created twice.'
+        : ' No stock was received and nothing was created.';
+      toast({
+        title: 'Failed to receive',
+        description: `${e?.message ?? 'Unknown error'}.${leftBehind}`,
+        variant: 'destructive',
+      });
     } finally { setBusy(false); }
   };
 
