@@ -67,6 +67,16 @@ from the day it shipped.
 - **Note:** the **<5%** success-rate threshold matters. An exact-zero test reported this platform clean while two endpoints sat at 0.8% and 4.5%.
 - **Blind spot:** `ops.silent_zero` probes are hardcoded (deliberately — admin-editable SQL run by a SECURITY DEFINER function would be a privilege-escalation surface). A new metric gets no probe until someone writes a migration.
 
+### 4b. Resume gap — a partial run recorded as a finished one
+A worker dies partway through a stage. The rows it managed to write are non-zero, so the resume
+path reads "already done" and short-circuits the stage on every future run — the product stays
+permanently under-processed while the job completes green.
+
+- **Guarded by:** `pdf.product_resume_incomplete` (data-integrity registry, surfaces on `/admin/data-health`), plus the checkpoint's own `completed_empty` status
+- **Proven to fire:** 2026-08-02 — planted a product carrying `metadata.resume_incomplete`, confirmed the detect function returned it with the right entity and counts, confirmed `run_data_integrity_checks` recorded it in the nightly sweep alongside the existing checks, then deleted the probe and re-verified the table was clean.
+- **Deliberately not auto-healed:** repair means re-running Stage 3, which re-bills Claude vision for every image on the product. `heal_fn` is NULL so the registry cannot silently re-bill a catalog; a human decides.
+- **Blind spot:** the check only sees products a resume *noticed* were partial. Chunks are repaired in place (deleted and rebuilt), so they never reach this marker — a different and better outcome, but it means this check is image-side only.
+
 ### 5. Derived-copy drift — a cached number diverging from its source
 Any `total`, `status` or count stored alongside the data it summarises.
 
@@ -98,6 +108,7 @@ Closely related to shape 1, but at the aggregate rather than the row.
 | `npm run lint:a11y` | CI | jsx-a11y, per-rule ratchet | partly — [tests/unit/a11yRatchet.test.ts](../tests/unit/a11yRatchet.test.ts) fails if a rule returns to `'off'` |
 | `npm run lint:tenancy` | CI | invariant 1, two-doors | **yes** — self-test runs before every scan |
 | `ops.silent_zero` | nightly | shape 4 | no |
+| `pdf.product_resume_incomplete` | nightly | shape 4b | no — but it was watched to fire on a planted marker before shipping |
 
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
 what it found. Three of eight qualify. That is the gap.
