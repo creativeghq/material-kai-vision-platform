@@ -238,7 +238,13 @@ async function fetchGuarded(rawUrl: string, accept?: string): Promise<Response> 
 
 async function fetchBinary(rawUrl: string): Promise<Uint8Array> {
   const res = await fetchGuarded(rawUrl);
-  const bytes = new Uint8Array(await res.arrayBuffer());
+  let buf: ArrayBuffer;
+  try {
+    buf = await res.arrayBuffer();
+  } catch (err) {
+    throw new HttpError(502, `Could not read ${rawUrl}: ${(err as Error)?.message ?? 'unknown'}`);
+  }
+  const bytes = new Uint8Array(buf);
   if (bytes.byteLength > MAX_CONTENT_BYTES) {
     throw new HttpError(413, 'TARIC file is larger than 40 MB — import it by chapter');
   }
@@ -260,8 +266,33 @@ async function circabcChildren(nodeId: string): Promise<CircabcNode[]> {
   }
   const url = `${CIRCABC_BASE}/service/circabc/spaces/${nodeId}/children?guest=true&limit=500`;
   const res = await fetchGuarded(url, 'application/json');
-  const body = await res.json();
-  const list = Array.isArray(body) ? body : (body?.data ?? body?.nodes ?? []);
+
+  // Read as TEXT, not .json(). The listing is served chunked, and the edge runtime fails to
+  // drain a chunked body through the JSON path with Deno's opaque "error reading a body from
+  // connection" — a message that names neither the URL nor the stage, and cost several deploys
+  // to localise. Buffering the bytes first works, and any future failure now says where.
+  let raw: string;
+  try {
+    raw = await res.text();
+  } catch (err) {
+    throw new HttpError(
+      502,
+      `Could not read the CIRCABC listing for ${nodeId} (status ${res.status}): ` +
+      `${(err as Error)?.message ?? 'unknown'}`,
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw new HttpError(
+      502,
+      `CIRCABC listing for ${nodeId} was not JSON (status ${res.status}): ${raw.slice(0, 200)}`,
+    );
+  }
+  const envelope = body as { data?: unknown; nodes?: unknown };
+  const list = Array.isArray(body) ? body : (envelope?.data ?? envelope?.nodes ?? []);
   if (!Array.isArray(list)) throw new HttpError(502, 'CIRCABC listing was not a list');
   return list as CircabcNode[];
 }
