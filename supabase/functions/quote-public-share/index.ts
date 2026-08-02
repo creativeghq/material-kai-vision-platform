@@ -43,11 +43,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   // Validate the token + that sharing is currently enabled.
   const { data: quote, error } = await supabase
     .from('quotes')
-    .select(
-      'id, name, quote_number, status, currency, subtotal, vat_rate, vat_amount, ' +
-      'grand_total, extras_total, cash_discount_pct, expires_at, created_at, pdf_storage_path, ' +
-      'public_share_enabled, customer_company_id, customer_contact_id, workspace_id',
-    )
+    .select('id, name, quote_number, status, currency, subtotal, vat_rate, vat_amount, grand_total, extras_total, cash_discount_pct, expires_at, created_at, pdf_storage_path, public_share_enabled, customer_company_id, customer_contact_id, workspace_id')
     .eq('public_share_token', token)
     .maybeSingle();
 
@@ -58,11 +54,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   // Fetch items (catalog + custom).
   const { data: rawItems } = await supabase
     .from('quote_items')
-    .select(
-      'id, product_id, quantity, selected_size, selected_color, unit_price, ' +
-      'discounted_price, line_total, custom_product_name, custom_unit, room, ' +
-      'dimensions, products ( name, sku )',
-    )
+    .select('id, product_id, quantity, selected_size, selected_color, unit_price, discounted_price, line_total, custom_product_name, custom_unit, room, dimensions, products ( name, sku )')
     .eq('quote_id', quote.id)
     .order('added_at', { ascending: true });
 

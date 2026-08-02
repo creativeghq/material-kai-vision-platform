@@ -75,10 +75,7 @@ Deno.serve(withApiLogging('send-quote-email', async (req) => {
   // --- Load quote + authorize ---
   const { data: quote, error: qErr } = await supabase
     .from('quotes')
-    .select(
-      'id, user_id, workspace_id, name, quote_number, status, currency, grand_total, expires_at, ' +
-      'public_share_enabled, public_share_token, customer_company_id, customer_contact_id',
-    )
+    .select('id, user_id, workspace_id, name, quote_number, status, currency, grand_total, expires_at, public_share_enabled, public_share_token, customer_company_id, customer_contact_id')
     .eq('id', body.quote_id)
     .single();
   if (qErr || !quote) return json({ success: false, error: 'Quote not found' }, 404);

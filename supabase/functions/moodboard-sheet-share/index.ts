@@ -83,9 +83,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
   // ---------- 1. CLIENT VIEW token? ----------
   const { data: view } = await supabase
     .from('project_client_views')
-    .select('id, project_id, created_by, title, cover, sheet_ids, pdf_storage_path, ' +
-      'public_share_enabled, share_expires_at, embed_vr, embed_lighting, embed_ffe, ' +
-      'feedback_enabled, vr_world_id, quote_id')
+    .select('id, project_id, created_by, title, cover, sheet_ids, pdf_storage_path, public_share_enabled, share_expires_at, embed_vr, embed_lighting, embed_ffe, feedback_enabled, vr_world_id, quote_id')
     .eq('public_share_token', token)
     .maybeSingle();
 
@@ -146,7 +144,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
     }
 
     // Read path
-    supabase.rpc('increment_client_view_count', { p_view_id: view.id }).then(() => {}).catch(() => {});
+    supabase.rpc('increment_client_view_count', { p_view_id: view.id }).then(() => {}, () => {});
 
     const { data: project } = await supabase
       .from('projects').select('name').eq('id', view.project_id).maybeSingle();
