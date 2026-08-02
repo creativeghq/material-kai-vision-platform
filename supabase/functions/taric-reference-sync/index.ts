@@ -32,6 +32,13 @@ interface RequestBody {
   url?: string;
   /** Override auto-detection when a file uses column names we don't know. */
   mapping?: Partial<Record<Field, string>>;
+  /**
+   * CIRCABC folder to resolve the CURRENT month's extraction from. Overrides the configured
+   * `TARIC_CIRCABC_LIBRARY_ID`. When set (or configured), neither `url` nor `content` is needed.
+   */
+  library_id?: string;
+  /** Which language editions to pull when resolving from CIRCABC. Defaults to EN + EL. */
+  languages?: string[];
 }
 
 type Field =
@@ -92,8 +99,39 @@ Deno.serve(withApiLogging(
 
     if (body.action === 'stats') return json(await stats(supabase));
 
-    // A cron run has no uploaded file — it refreshes from the configured URL.
+    // ── Resolve WHAT to import ──────────────────────────────────────────────────────────────
+    //
+    // Preference order, most automatic first:
+    //   1. a CIRCABC library — the current month is discovered on every run, which is the only
+    //      option that stays correct, because the extraction moves to a new folder monthly;
+    //   2. a pinned file URL — right until the next publication, then quietly stale;
+    //   3. pasted content — the manual fallback.
     let url = body.url ?? null;
+    let libraryId = body.library_id ?? null;
+    if (!libraryId && !url && !body.content) {
+      libraryId = (await resolveSecret(supabase, 'TARIC_CIRCABC_LIBRARY_ID')).value ?? null;
+    }
+
+    if (libraryId) {
+      const languages = (body.languages ?? DEFAULT_LANGUAGES).map((l) => l.toUpperCase());
+      const files = await resolveNomenclatureFiles(libraryId, languages);
+
+      // Each language edition carries its own Language column, so the importer routes each into
+      // description_en / description_el and the coalesce-based upsert merges them onto one row.
+      const imported: Array<Record<string, unknown>> = [];
+      for (const f of files) {
+        const bytes = await fetchBinary(circabcDownloadUrl(f.id, f.name));
+        const g = bytes[0] === 0x50 && bytes[1] === 0x4b
+          ? await parseXlsx(bytes)
+          : parseDelimited(new TextDecoder().decode(bytes), detectDelimiter(new TextDecoder().decode(bytes)));
+        const res = await importGrid(
+          supabase, g, f.language === 'EL' ? 'gr_national' : 'taric_eu', body.mapping ?? {},
+        );
+        imported.push({ language: f.language, file: f.name, folder: f.folder, ...res });
+      }
+      return json({ ok: true, resolved_from: 'circabc', library_id: libraryId, imports: imported });
+    }
+
     if (cron && !body.content && !url) {
       url = (await resolveSecret(supabase, 'TARIC_REFERENCE_URL')).value ?? null;
       if (!url) {
@@ -103,7 +141,7 @@ Deno.serve(withApiLogging(
         // `taric_reference_stale` fires on an empty or 60-day-old table whatever the cron
         // reports. Failing monthly on an optional, not-yet-configured feed would be noise on top
         // of a signal that is already covered.
-        return json({ ok: true, skipped: 'TARIC_REFERENCE_URL is not configured' });
+        return json({ ok: true, skipped: 'neither TARIC_CIRCABC_LIBRARY_ID nor TARIC_REFERENCE_URL is configured' });
       }
     }
 
@@ -115,13 +153,7 @@ Deno.serve(withApiLogging(
     let text = body.content ?? '';
 
     if (!text && url) {
-      const safe = await assertSafeUrl(url, { allowSchemes: ['https:'] });
-      const res = await fetch(safe, { redirect: 'manual' });
-      if (!res.ok) throw new HttpError(502, `Fetching the TARIC file failed: ${res.status}`);
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      if (bytes.byteLength > MAX_CONTENT_BYTES) {
-        throw new HttpError(413, 'TARIC file is larger than 40 MB — import it by chapter');
-      }
+      const bytes = await fetchBinary(url);
       // A xlsx is a zip; every zip starts "PK\x03\x04". Sniffing the bytes beats trusting a
       // Content-Type header that CIRCABC does not always set correctly.
       if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
@@ -144,6 +176,111 @@ Deno.serve(withApiLogging(
     return json(result);
   },
 ));
+
+// ── CIRCABC discovery ──────────────────────────────────────────────────────────────────────
+//
+// The nomenclature is republished EVERY MONTH into a NEW folder, so a pinned file URL is right
+// for exactly one month and then silently serves stale codes. CIRCABC's own Angular client
+// reads `GET /service/circabc/spaces/{id}/children`, and that endpoint honours `guest=true` for
+// public libraries — so the folder tree can be walked without credentials and the current
+// month resolved on every run.
+//
+// (`/api/-default-/public/alfresco/…` answers 401 and `/api/nodes/…` 404s; this is the path the
+// product actually uses.)
+
+const CIRCABC_BASE = 'https://circabc.europa.eu';
+const CIRCABC_MAX_DEPTH = 4;
+const DEFAULT_LANGUAGES = ['EN', 'EL'];
+
+/** Every outbound fetch in this function goes through here: SSRF-guarded and size-capped. */
+async function fetchBinary(rawUrl: string): Promise<Uint8Array> {
+  const safe = await assertSafeUrl(rawUrl, { allowSchemes: ['https:'] });
+  const res = await fetch(safe, { redirect: 'manual' });
+  if (!res.ok) throw new HttpError(502, `Fetching ${rawUrl} failed: ${res.status}`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.byteLength > MAX_CONTENT_BYTES) {
+    throw new HttpError(413, 'TARIC file is larger than 40 MB — import it by chapter');
+  }
+  return bytes;
+}
+
+interface CircabcNode {
+  id: string;
+  name: string;
+  type: string;
+  properties?: Record<string, string>;
+}
+
+const isFolder = (n: CircabcNode) => (n.type ?? '').endsWith('}folder');
+
+async function circabcChildren(nodeId: string): Promise<CircabcNode[]> {
+  if (!/^[0-9a-f-]{36}$/i.test(nodeId)) {
+    throw new HttpError(400, `Not a CIRCABC node id: ${nodeId}`);
+  }
+  const url = `${CIRCABC_BASE}/service/circabc/spaces/${nodeId}/children?guest=true&limit=500`;
+  const safe = await assertSafeUrl(url, { allowSchemes: ['https:'] });
+  const res = await fetch(safe, { headers: { Accept: 'application/json' }, redirect: 'manual' });
+  if (!res.ok) throw new HttpError(502, `CIRCABC listing failed for ${nodeId}: ${res.status}`);
+  const body = await res.json();
+  const list = Array.isArray(body) ? body : (body?.data ?? body?.nodes ?? []);
+  if (!Array.isArray(list)) throw new HttpError(502, 'CIRCABC listing was not a list');
+  return list as CircabcNode[];
+}
+
+/** Most recently published sibling. Dates first — they survive a year rollover that a name
+ *  sort does not, because "01 - January" sorts BELOW "12 - December" of the year before. */
+function newestFolder(folders: CircabcNode[]): CircabcNode {
+  const stamp = (n: CircabcNode) =>
+    Date.parse(n.properties?.modified ?? '') || Date.parse(n.properties?.created ?? '') || 0;
+  return [...folders].sort((a, b) => (stamp(b) - stamp(a)) || b.name.localeCompare(a.name))[0];
+}
+
+interface ResolvedFile { language: string; id: string; name: string; folder: string }
+
+/**
+ * Walk down from `libraryId`, always taking the most recently published subfolder, until a level
+ * carrying `Nomenclature <LANG>.xlsx` files is reached. Works whether the configured node is the
+ * year folder (→ month → files) or its parent (→ year → month → files).
+ */
+async function resolveNomenclatureFiles(
+  libraryId: string,
+  languages: string[],
+): Promise<ResolvedFile[]> {
+  let nodeId = libraryId;
+  let folderName = '';
+  const trail: string[] = [];
+
+  for (let depth = 0; depth < CIRCABC_MAX_DEPTH; depth++) {
+    const children = await circabcChildren(nodeId);
+
+    const found: ResolvedFile[] = [];
+    for (const c of children) {
+      const m = /^Nomenclature\s+([A-Z]{2})\.xlsx$/i.exec((c.name ?? '').trim());
+      if (m && languages.includes(m[1].toUpperCase())) {
+        found.push({ language: m[1].toUpperCase(), id: c.id, name: c.name, folder: folderName });
+      }
+    }
+    if (found.length > 0) return found;
+
+    const folders = children.filter(isFolder);
+    if (folders.length === 0) break;
+    const next = newestFolder(folders);
+    trail.push(next.name);
+    nodeId = next.id;
+    folderName = next.name;
+  }
+
+  throw new HttpError(
+    502,
+    `No "Nomenclature <LANG>.xlsx" found under CIRCABC node ${libraryId}` +
+    (trail.length ? ` (walked ${trail.join(' → ')})` : '') +
+    '. Has the library been reorganised?',
+  );
+}
+
+/** CIRCABC serves any attachment by node id; the filename in the path is decorative. */
+const circabcDownloadUrl = (fileId: string, name: string) =>
+  `${CIRCABC_BASE}/sd/a/${fileId}/${encodeURIComponent(name)}`;
 
 // ── XLSX ───────────────────────────────────────────────────────────────────────────────────
 
