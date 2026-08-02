@@ -108,6 +108,22 @@ export default defineConfig(({ mode }) => {
               'cmdk': 'vendor-ui',
               'vaul': 'vendor-ui',
               'input-otp': 'vendor-ui',
+              // Charts
+              // 'recharts' is deliberately NOT mapped here — same footgun as @sentry/react below,
+              // and the third instance of it in this config.
+              //
+              // Forcing recharts into a named `vendor-charts` chunk made that chunk a STATIC
+              // import of the entry, so index.html emitted a <link rel="modulepreload"> for it and
+              // every visitor downloaded 362,395 bytes of charting library on first paint —
+              // including anonymous landing pages, which have no charts at all. All seven recharts
+              // importers are inside lazy admin/analytics routes; nothing on the eager path uses it.
+              //
+              // Unmapped, Rollup splits it by actual use: CartesianChart / BarChart / LineChart /
+              // PieChart / PriceHistoryChart, 334,590 bytes total (101,970 gzip), fetched only when
+              // a chart actually renders. Eager payload drops to 1,207,814 raw / 359,093 gzip.
+              //
+              // The rule: a manualChunks entry does not "organise" a dependency, it PINS it. Only
+              // map a package you want every visitor to download.
               // Charts — recharts v3 uses function components (no forwardRef),
               // safe in its own chunk; Rollup import ordering guarantees React loads first
               'recharts': 'vendor-charts',
