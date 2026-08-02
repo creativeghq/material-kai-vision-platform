@@ -42,6 +42,23 @@ export interface TaricSuggestion {
 
 export { normalizeTaricInput, formatTaricCode };
 
+
+export interface TaricCategoryRule {
+  id: string;
+  category_key: string;
+  material_match: string | null;
+  code_prefix: string;
+  notes: string | null;
+  is_confirmed: boolean;
+  confirmed_at: string | null;
+  priority: number;
+}
+
+/** '6907' -> '6907000000'. Every nomenclature level is stored zero-padded to ten digits. */
+export function headingToCode(prefix: string): string {
+  return (prefix ?? '').replace(/[^0-9]/g, '').padEnd(10, '0');
+}
+
 export const taricService = {
   /**
    * Free-text or code-prefix search. A numeric query is treated as a code lookup; anything else
@@ -99,6 +116,48 @@ export const taricService = {
       taric_status: 'pending',
       taric_reasoning: null,
     }).eq('id', productId);
+    if (error) throw error;
+  },
+
+
+  // ── Category rules ──────────────────────────────────────────────────────────────────────
+  //
+  // The classification axis: category (+ material) picks the heading, a measured attribute picks
+  // the declarable code. Confirming a rule is a ONE-TIME act that every product in the category
+  // inherits — which is the whole reason this exists rather than a guess per product.
+
+  async listCategoryRules(): Promise<TaricCategoryRule[]> {
+    const { data, error } = await supabase
+      .from('taric_category_rules').select('*')
+      .order('category_key').order('priority');
+    if (error) throw error;
+    return (data ?? []) as TaricCategoryRule[];
+  },
+
+  /** Headings referenced by the rules, resolved to their nomenclature descriptions. */
+  async headingDescriptions(prefixes: string[]): Promise<Record<string, string>> {
+    const codes = [...new Set(prefixes.map(headingToCode))].filter(Boolean);
+    if (codes.length === 0) return {};
+    const { data, error } = await supabase
+      .from('taric_codes').select('code, description_en, description_el').in('code', codes);
+    if (error) throw error;
+    return Object.fromEntries(
+      (data ?? []).map((r: any) => [r.code, r.description_en ?? r.description_el ?? '']),
+    );
+  },
+
+  /**
+   * Sign a rule off (or withdraw it). Only a confirmed rule may be APPLIED automatically —
+   * an unconfirmed one can still resolve, but its output stays a suggestion.
+   */
+  async setRuleConfirmed(id: string, confirmed: boolean): Promise<void> {
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase.from('taric_category_rules').update({
+      is_confirmed: confirmed,
+      confirmed_by: confirmed ? auth?.user?.id ?? null : null,
+      confirmed_at: confirmed ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id);
     if (error) throw error;
   },
 

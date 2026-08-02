@@ -221,10 +221,64 @@ async function classifyOne(
     }
   }
 
-  // The sweep stops here: no declared code means the rest is a paid guess, and it stays at
-  // 'pending' so an operator (or a later explicit run) can still pick it up. Leaving the status
-  // untouched is deliberate — 'failed' would mean "we tried and could not", which is not what
-  // happened.
+  // ── Stage B: the RULES. Category (+ material) -> heading, attribute -> declarable code ──
+  //
+  // This is the axis that actually determines a tariff position. A tile is 6907 because it is a
+  // ceramic tile, and 6907 21 because its water absorption is ≤ 0,5 % — neither fact is in
+  // "AMALFI GRIS 80X80". Resolving from the category means one human decision is inherited by
+  // every product in it, for free and identically, instead of a paid guess per product that
+  // nobody can audit afterwards.
+  const { data: ruleRes } = await supabase.rpc('resolve_taric_for_product', { p_product_id: product.id });
+  const rule = (ruleRes ?? {}) as {
+    resolved?: boolean; code?: string | null; code_prefix?: string;
+    confirmed?: boolean; reason?: string; category_key?: string;
+  };
+
+  if (rule.resolved && rule.code && rule.confirmed) {
+    // A confirmed rule plus a measured attribute is a derivation, not an inference: the human
+    // sign-off happened once, on the rule, and this product inherits it. `taric_source` records
+    // WHICH rule, so a later correction can be traced back to the decision that produced it.
+    const { data: row } = await supabase
+      .from('taric_codes').select('code, declarable, valid_to, description_en')
+      .eq('code', rule.code).maybeSingle();
+    if (row?.declarable && (!row.valid_to || row.valid_to >= now.slice(0, 10))) {
+      await supabase.from('products').update({
+        taric_code: row.code,
+        taric_code_suggested: null,
+        taric_confidence: 1,
+        taric_status: 'confirmed',
+        taric_source: 'category_rule',
+        taric_reasoning: rule.reason ?? null,
+        taric_classified_at: now,
+      }).eq('id', product.id);
+      return {
+        product_id: product.id, stage: 'rule', code: row.code, confidence: 1,
+        status: 'confirmed', description: row.description_en, reasoning: rule.reason,
+      };
+    }
+  }
+
+  if (rule.resolved && rule.code && !rule.confirmed) {
+    // The rule reached a declarable code but nobody has signed the heading off yet. Propose it —
+    // and do NOT spend a credit second-guessing a deterministic answer.
+    await supabase.from('products').update({
+      taric_code_suggested: rule.code,
+      taric_confidence: 0.9,
+      taric_status: 'suggested',
+      taric_source: 'category_rule',
+      taric_reasoning: `${rule.reason} (category rule not yet confirmed)`,
+      taric_classified_at: now,
+    }).eq('id', product.id);
+    return {
+      product_id: product.id, stage: 'rule', code: rule.code, confidence: 0.9,
+      status: 'suggested', reasoning: rule.reason, needs_rule_confirmation: true,
+    };
+  }
+
+  // The sweep stops here: no declared code and no confirmed rule means the rest is a paid guess,
+  // and it stays at 'pending' so an operator (or a later explicit run) can still pick it up.
+  // Leaving the status untouched is deliberate — 'failed' would mean "we tried and could not",
+  // which is not what happened.
   if (!allowLlm) {
     // Stamped, not status-changed, so the sweep does not re-read the same rows every hour
     // while an operator-initiated run can still find them at 'pending'.
@@ -232,15 +286,25 @@ async function classifyOne(
     return { product_id: product.id, stage: 'supplier', status: 'pending', reason: 'no supplier-declared code' };
   }
 
-  // Stage B.
+  // ── Stage C: shortlist, NARROWED by whatever the rules did establish ────────────────────
+  //
+  // Even when the rules cannot reach a declarable code they usually reach the heading, and that
+  // is the single most valuable thing to hand the model: picking among the children of 6907 is a
+  // different problem from picking among 22,000 codes. Falling back to a name search happens
+  // only when the category is unmapped.
   const hsHint = supplierHsHint(product);
-  const query = [product.name, product.category, product.description]
-    .filter((s) => typeof s === 'string' && s.trim())
-    .join(' ').slice(0, 300);
+  const prefix = rule.resolved ? rule.code_prefix : undefined;
+  const query = prefix
+    ? prefix
+    : [product.name, product.category, product.description]
+        .filter((s) => typeof s === 'string' && s.trim())
+        .join(' ').slice(0, 300);
 
   const { data: candidates, error: searchErr } = await supabase.rpc('search_taric_codes', {
     p_query: hsHint ?? query,
-    p_chapters: chapters,
+    // A resolved heading supersedes any caller-supplied chapter filter — it is strictly more
+    // specific, and combining them could exclude the very codes we want.
+    p_chapters: prefix ? null : chapters,
     p_limit: SHORTLIST_SIZE,
     p_declarable: true,
   });
@@ -265,7 +329,7 @@ async function classifyOne(
   let verdict: z.infer<typeof VERDICT_SCHEMA>;
   try {
     const result = await generateStructuredWithClaude(
-      buildPrompt(product, candidates, hsHint),
+      buildPrompt(product, candidates, hsHint, rule.reason ?? null),
       VERDICT_SCHEMA,
       {
         systemPrompt:
@@ -319,7 +383,9 @@ async function classifyOne(
   };
 }
 
-function buildPrompt(product: any, candidates: any[], hsHint: string | null): string {
+function buildPrompt(
+  product: any, candidates: any[], hsHint: string | null, ruleReason: string | null,
+): string {
   const attrs = flatten(product.attributes ?? {});
   const attrLines = Object.entries(attrs).slice(0, 30).map(([k, v]) => `  ${k}: ${v}`).join('\n');
 
@@ -338,6 +404,8 @@ function buildPrompt(product: any, candidates: any[], hsHint: string | null): st
     '</product_data>',
     '',
     hsHint ? `The supplier declared HS subheading ${hsHint}; prefer candidates under it.` : '',
+    // The heading is already settled by the category rules; the model's job is only the leaf.
+    ruleReason ? `Classification rules already established: ${ruleReason}.` : '',
     '',
     'Candidates (code — description — hierarchy):',
     ...candidates.map((c: any) =>

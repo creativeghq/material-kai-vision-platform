@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { TaricReferencePanel } from './TaricReferencePanel';
+import { TaricRulesPanel } from './TaricRulesPanel';
 import {
   dataIntegrityService as svc,
   type IntegrityCheck, type IntegrityFinding, type IntegrityRun, type IntegritySeverity,
@@ -127,6 +128,11 @@ export default function DataHealthPage() {
         {/* Reference data whose staleness IS one of the checks above — the fix belongs next to
             the finding, not in a settings screen the operator has to go hunting for. */}
         <TaricReferencePanel />
+
+        {/* The nomenclature above is the vocabulary; these rules are how a product gets mapped
+            into it. Both are admin-global reference data, and both are things whose staleness
+            shows up as a finding on this page. */}
+        <TaricRulesPanel />
 
         <Tabs defaultValue="findings">
           <TabsList>
