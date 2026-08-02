@@ -53,8 +53,6 @@ import { buildKbDocFilters, type KbFilterCategory } from './kbDocFilters';
 interface DocumentListProps {
   onEdit: (docId: string) => void;
   onCreate: () => void;
-  /** Optional externally-driven search term; seeds the toolbar's `q` field. */
-  searchQuery?: string;
   refreshTrigger?: number;
   /**
    * When set (with a changing `nonce`), seed the filters to show only this
@@ -66,7 +64,6 @@ interface DocumentListProps {
 export const DocumentList: React.FC<DocumentListProps> = ({
   onEdit,
   onCreate,
-  searchQuery,
   refreshTrigger,
   applyCategoryFilter,
 }) => {
@@ -109,11 +106,6 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyCategoryFilter?.nonce]);
-
-  // The parent may drive the search term; mirror it onto the toolbar's `q` field.
-  useEffect(() => {
-    setValues((v) => (((v.q as string) ?? '') === (searchQuery ?? '') ? v : { ...v, q: searchQuery || undefined }));
-  }, [searchQuery]);
 
   // Reset to first page whenever the result set changes.
   useEffect(() => {

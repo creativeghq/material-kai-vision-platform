@@ -5,8 +5,6 @@ import {
   Brain,
   FileText,
   Loader2,
-  CheckCircle,
-  XCircle,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -57,7 +55,10 @@ export const MaterialSuggestionsPanel: React.FC<{ embedded?: boolean }> = ({ emb
 
   const [suggestions, setSuggestions] = useState<MaterialSuggestion[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [testResults, setTestResults] = useState<Record<string, unknown>[]>([]);
+  // NOTE: the "Integration Tests" tab that lived here was removed. Its "Test 3D Integration"
+  // button had already been deleted in favour of /agent-hub, so nothing could ever call
+  // setTestResults — the tab could only ever render its empty state, which told the operator to
+  // click the button that no longer existed. Run these from /agent-hub instead.
   const { toast } = useToast();
 
   const generateSuggestions = useCallback(async () => {
@@ -326,9 +327,6 @@ export const MaterialSuggestionsPanel: React.FC<{ embedded?: boolean }> = ({ emb
             <TabsTrigger value="suggestions">
               Material Suggestions
             </TabsTrigger>
-            <TabsTrigger value="tests">
-              Integration Tests
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="suggestions">
@@ -372,57 +370,6 @@ export const MaterialSuggestionsPanel: React.FC<{ embedded?: boolean }> = ({ emb
                           <span className="text-xs text-muted-foreground capitalize">
                             {suggestion.source}
                           </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="tests">
-            <Card>
-              <CardHeader>
-                <CardTitle>3D Integration Test Results</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {testResults.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No integration tests run yet. Generate suggestions and click
-                    "Test 3D Integration".
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {testResults.map((result, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 border rounded"
-                      >
-                        <div className="flex items-center gap-3">
-                          {result.success ? (
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-500" />
-                          )}
-                          <div>
-                            <div className="font-medium">
-                              Test {index + 1} -{' '}
-                              {result.success ? 'Success' : 'Failed'}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {new Date(
-                                (result.timestamp as string) || Date.now(),
-                              ).toLocaleString()}{' '}
-                              •{(result.materials_suggested as number) || 0}{' '}
-                              materials suggested
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {result.processing_time
-                            ? `${result.processing_time}ms`
-                            : 'N/A'}
                         </div>
                       </div>
                     ))}

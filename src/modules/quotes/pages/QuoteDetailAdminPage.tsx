@@ -12,7 +12,7 @@ import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { parseDecimal, parseDecimalOr } from '@/utils/decimal';
 import { supabase } from '@/integrations/supabase/client';
-import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '../services/QuotesService';
+import { quotesService, QuoteWithItems, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '../services/QuotesService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 import { CustomerPicker, type QuoteCustomer } from '@/modules/quotes/components/CustomerPicker';
 import { masterRequestsService } from '@/services/masterRequestsService';
@@ -59,8 +59,10 @@ export const QuoteDetailPage: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [quote, setQuote] = useState<QuoteWithItems | null>(null);
-  const [statusTags, setStatusTags] = useState<StatusTag[]>([]);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
+  // NOTE: `statusTags` used to be fetched here on every mount via quotesService.getStatusTags().
+  // Its only reader was a `selectedTag` derivation that nothing rendered, so the whole chain —
+  // request, state, derived value — produced nothing. Removed rather than left as a network
+  // call whose result is discarded.
   const [upsells, setUpsells] = useState<Upsell[]>([]);
   const [quoteUpsells, setQuoteUpsells] = useState<QuoteUpsell[]>([]);
   const [loadingUpsells, setLoadingUpsells] = useState(false);
@@ -123,9 +125,9 @@ export const QuoteDetailPage: React.FC = () => {
     }
   }, [quote?.id]);
 
-  // PDF generation state
-  const [generatingPDF, setGeneratingPDF] = useState(false);
-  const [downloadingPDF, setDownloadingPDF] = useState(false);
+  // PDF progress is owned by QuoteDownloadButtons (its own `generating` flag). This page briefly
+  // kept its own generatingPDF/downloadingPDF/updatingStatus mirrors of it; nothing ever set or
+  // read them, so they were removed rather than left looking like busy-state protection.
   const [sendingQuote, setSendingQuote] = useState(false);
 
   // HTML/client-side PDF — hook must be at top level (before any early returns)
@@ -135,7 +137,6 @@ export const QuoteDetailPage: React.FC = () => {
     if (id) {
       trackQuoteView(id, 'admin');
       loadQuoteDetails();
-      loadStatusTags();
       loadUpsells();
       loadQuoteUpsells();
       loadTimelineData();
@@ -179,15 +180,6 @@ export const QuoteDetailPage: React.FC = () => {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadStatusTags = async () => {
-    try {
-      const tags = await quotesService.getStatusTags();
-      setStatusTags(tags);
-    } catch (error) {
-      console.error('Error loading status tags:', error);
     }
   };
 
@@ -553,7 +545,6 @@ export const QuoteDetailPage: React.FC = () => {
     );
   }
 
-  const selectedTag = statusTags.find(tag => tag.id === quote.status_tag_id);
   const itemCount = quote.items?.length || quote.total_items || 0;
   const extrasTotal = pricingExtrasTotal;
 

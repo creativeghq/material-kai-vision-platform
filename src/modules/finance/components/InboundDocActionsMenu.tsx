@@ -38,7 +38,11 @@ interface Props {
   /** Set when the issuer's ΑΦΜ already matches a CRM company — the row resolved it, so the
    *  "add" action is offered as already-done rather than letting a duplicate be started. */
   crmCompanyId?: string;
-  /** Open this document's payments. READ-only — it must not convert the document. */
+  /**
+   * Open the Record Payment form preset to this document. Opening must never WRITE — in
+   * particular it must not convert the document into an expense; that happens when the form
+   * saves. (For the read-only "what has been paid" view, see `onOpenPayments`.)
+   */
   onRecordPayment: () => void;
   /** Open the order form seeded from this document's lines — where "what is this for?" decides
    *  between raising the purchase and booking it onto one that already exists (freight, customs,

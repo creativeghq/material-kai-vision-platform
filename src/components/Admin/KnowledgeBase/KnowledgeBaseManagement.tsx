@@ -24,7 +24,6 @@ import { KnowledgeBaseService } from '@/services/knowledgeBaseService';
 
 export const KnowledgeBaseManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState('documents');
-  const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
@@ -199,7 +198,6 @@ export const KnowledgeBaseManagement: React.FC = () => {
             <DocumentList
               onEdit={handleEditDocument}
               onCreate={handleCreateDocument}
-              searchQuery={searchQuery}
               refreshTrigger={docRefreshKey}
               applyCategoryFilter={categoryFilter}
             />

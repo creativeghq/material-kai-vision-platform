@@ -75,21 +75,20 @@ describe('accessibility ratchet', () => {
     /**
      * Remaining `no-unused-vars` warnings, all of which need a human.
      *
-     * 310 -> 58 on 2026-08-02: 172 unused imports deleted, 52 unused args/catch-bindings given
-     * the `_` prefix the rule sanctions, and 38 dead locals removed via the TypeScript AST —
-     * but only where the initializer was provably side-effect-free (a literal, an arrow, or a
-     * pure hook). `const x = doTheThing()` was deliberately left: deleting the binding deletes
-     * the call.
+     * 310 -> 48 on 2026-08-02: 172 unused imports deleted, 52 unused args/catch-bindings given
+     * the `_` prefix the rule sanctions, 38 dead locals removed via the TypeScript AST (only
+     * where the initializer was provably side-effect-free — `const x = doTheThing()` was left,
+     * because deleting the binding deletes the call), then 10 more removed by hand.
      *
-     * What is left is two shapes, both of which can be REAL BUGS rather than mere untidiness,
-     * which is exactly why they are not machine-removable:
-     *   - "sibling still used": half a `useState` pair, e.g. a `setSearchQuery` nobody calls —
-     *     a filter that can never change is an inert control, not dead code.
-     *   - a binding whose initializer performs work whose result is then discarded.
+     * That last batch is the point of keeping this number visible: every one of the "half a
+     * useState pair" cases turned out to be a DEAD FEATURE, not untidiness — a searchQuery
+     * threaded into a list that nothing could ever set, a viewMode whose 'list' branch had no
+     * toggle, an "Integration Tests" tab whose own button had been deleted, and a statusTags
+     * fetch firing on every mount whose result nothing read.
      *
      * DRIVE THIS TO ZERO. NEVER RAISE IT.
      */
-    const NON_A11Y_DEBT = 58;
+    const NON_A11Y_DEBT = 48;
 
     const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
       scripts: Record<string, string>;
