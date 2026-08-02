@@ -143,7 +143,7 @@ const MarketplaceNetworkPage: React.FC = () => {
                   <th className="px-4 py-2 text-left">Catalog access</th>
                   <th className="px-4 py-2 text-left">Discount %</th>
                   <th className="px-4 py-2 text-center">e-Invoicing</th>
-                  <th className="px-4 py-2"></th>
+                  <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

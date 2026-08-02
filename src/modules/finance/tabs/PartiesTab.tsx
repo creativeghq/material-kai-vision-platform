@@ -220,7 +220,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                   <th className="px-4 py-2 text-right">Receivable</th>
                   <th className="px-4 py-2 text-right">Payable</th>
                   <th className="px-4 py-2 text-right">Net</th>
-                  <th className="px-4 py-2 text-right" />
+                  <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

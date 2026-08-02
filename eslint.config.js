@@ -146,7 +146,14 @@ export default [
       'jsx-a11y/control-has-associated-label': ['warn', {
         labelAttributes: ['label'],
         controlComponents: [],
-        ignoreElements: ['audio', 'canvas', 'embed', 'input', 'textarea', 'tr', 'video'],
+        // The documented list, plus two of our own:
+        //   option — inside a <datalist>, `<option value="x" />` is the CORRECT idiom; the browser
+        //     renders the value as the suggestion. "Fixing" those by adding label text would have
+        //     been wrong, not merely unnecessary.
+        //   td     — a data cell is not a control, and an empty one is ordinary table structure
+        //     (spacers, alignment). <th> is deliberately NOT here: a blank column header really
+        //     does get announced as nothing, so those are fixed in the markup.
+        ignoreElements: ['audio', 'canvas', 'embed', 'input', 'option', 'td', 'textarea', 'tr', 'video'],
         ignoreRoles: [
           'grid', 'listbox', 'menu', 'menubar', 'radiogroup', 'row',
           'tablist', 'toolbar', 'tree', 'treegrid',

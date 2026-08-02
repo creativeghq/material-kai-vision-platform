@@ -484,7 +484,7 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
                 <th className="px-4 py-2 text-left">Account</th>
                 <th className="px-4 py-2 text-left">Reference</th>
                 <th className="px-4 py-2 text-right">Amount</th>
-                <th className="px-4 py-2 text-right w-28"></th>
+                <th className="px-4 py-2 text-right w-28"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>

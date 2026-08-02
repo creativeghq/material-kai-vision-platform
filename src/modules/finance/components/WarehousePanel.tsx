@@ -221,7 +221,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                 <th className="px-4 py-2 text-right">On hand</th>
                 <th className="px-4 py-2 text-right">Reserved</th>
                 <th className="px-4 py-2 text-right">Reorder</th>
-                <th className="px-4 py-2"></th>
+                <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>

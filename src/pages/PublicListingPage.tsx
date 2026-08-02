@@ -47,7 +47,7 @@ export default function PublicListingPage() {
             {photos.length > 1 && (
               <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
                 {photos.map((p, i) => (
-                  <button key={p.id} onClick={() => setActive(i)} className={`h-16 w-24 shrink-0 overflow-hidden rounded-md border-2 ${i === active ? 'border-primary' : 'border-transparent'}`}>
+                  <button key={p.id} onClick={() => setActive(i)} aria-label={`Show photo ${i + 1} of ${photos.length}`} className={`h-16 w-24 shrink-0 overflow-hidden rounded-md border-2 ${i === active ? 'border-primary' : 'border-transparent'}`}>
                     <img src={p.url!} alt="" className="h-full w-full object-cover" />
                   </button>
                 ))}

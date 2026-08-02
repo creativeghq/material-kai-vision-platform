@@ -239,7 +239,12 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
             warning without one and, more importantly, a screen reader announces the dialog with
             no name at all. (audit #302 finding 5) */}
         <DialogTitle className="sr-only">Material preview</DialogTitle>
-        {/* Hidden download anchor */}
+        {/* Hidden download anchor. Not a link in the accessibility sense — it is a DOM handle whose
+            href is assigned at runtime through the ref and then clicked programmatically. It is
+            aria-hidden and display:none, so assistive tech never reaches it.
+            Giving it href="#" to satisfy the rule would be worse: that makes it a genuinely
+            focusable link that navigates nowhere. */}
+        {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
         <a ref={linkRef} className="hidden" aria-hidden="true" />
 
         {/* Header bar */}

@@ -300,6 +300,7 @@ export const RegionEditCanvas: React.FC<RegionEditCanvasProps> = ({
               <button
                 key={size}
                 onClick={() => setBrushSize(size)}
+                aria-label={`Brush size ${size}`}
                 className={cn('rounded-full border-2 transition-all flex items-center justify-center',
                   brushSize === size ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/40')}
                 style={{ width: 28, height: 28 }}

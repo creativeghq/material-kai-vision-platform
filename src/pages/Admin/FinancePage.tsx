@@ -889,7 +889,7 @@ const FinancePage: React.FC = () => {
                       <th className="px-4 py-2 text-right">Due</th>
                       <th className="px-4 py-2 text-right">Due date</th>
                       <th className="px-4 py-2 text-right">Days overdue</th>
-                      <th className="px-4 py-2 w-10" />
+                      <th className="px-4 py-2 w-10"><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1035,7 +1035,7 @@ const FinancePage: React.FC = () => {
                       <th className="px-4 py-2 text-right">Due</th>
                       <th className="px-4 py-2 text-right">Due date</th>
                       <th className="px-4 py-2 text-right">Days overdue</th>
-                      {!isAccountant && <th className="px-4 py-2 w-24" />}
+                      {!isAccountant && <th className="px-4 py-2 w-24"><span className="sr-only">Actions</span></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1220,7 +1220,7 @@ const FinancePage: React.FC = () => {
                         <th className="px-4 py-2 text-right">Value</th>
                         <th className="px-4 py-2 text-right">Days idle</th>
                         <th className="px-4 py-2 text-right">Next scheduled</th>
-                        <th className="px-4 py-2 text-right" />
+                        <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
                     <tbody>

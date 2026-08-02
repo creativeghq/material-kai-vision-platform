@@ -114,7 +114,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
         <table className="w-full text-sm">
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b border-border/60">
-              <th className="px-4 py-2 text-left w-8"></th>
+              <th className="px-4 py-2 text-left w-8"><span className="sr-only">Actions</span></th>
               <th className="px-4 py-2 text-left">Code</th>
               <th className="px-4 py-2 text-left">Document type</th>
               <th className="px-4 py-2 text-center">Issue</th>

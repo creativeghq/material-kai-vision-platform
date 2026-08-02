@@ -1182,6 +1182,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                         className={`w-7 h-7 rounded-full border-2 transition-all ${colorOverride === c ? 'border-violet-600 scale-110' : 'border-border'}`}
                         style={{ backgroundColor: c }}
                         title={c}
+                        aria-label={`Paint colour ${c}`}
                       />
                     ))}
                   </div>

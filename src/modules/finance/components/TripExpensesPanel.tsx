@@ -390,7 +390,7 @@ const TripCardDetail: React.FC<{
                 <th className="px-3 py-2 text-right">Amount</th>
                 <th className="px-3 py-2 text-center">Receipt</th>
                 <th className="px-3 py-2 text-center">Status</th>
-                <th className="px-3 py-2 text-right" />
+                <th className="px-3 py-2 text-right"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>

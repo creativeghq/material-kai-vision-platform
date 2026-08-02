@@ -100,7 +100,7 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
                   <th className="px-4 py-2 text-left">Relation</th>
                   <th className="px-4 py-2 text-left">Status</th>
                   <th className="px-4 py-2 text-right">Price</th>
-                  <th className="px-4 py-2 text-right w-24"></th>
+                  <th className="px-4 py-2 text-right w-24"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

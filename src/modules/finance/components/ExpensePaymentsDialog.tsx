@@ -173,7 +173,7 @@ export const ExpensePaymentsDialog: React.FC<{
                         <th className="px-3 py-1.5 text-left">How</th>
                         <th className="px-3 py-1.5 text-left">Reference</th>
                         <th className="px-3 py-1.5 text-right">Amount</th>
-                        <th className="px-3 py-1.5" />
+                        <th className="px-3 py-1.5"><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
                     <tbody>

@@ -142,7 +142,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
                   <th className="px-4 py-2 text-left">SKU</th>
                   <th className="px-4 py-2 text-right">On hand</th>
                   <th className="px-4 py-2 text-right">Reorder</th>
-                  <th className="px-4 py-2"></th>
+                  <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

@@ -1428,7 +1428,7 @@ const LabelManagerPopover: React.FC<{
             <div key={l.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent group">
               <Popover>
                 <PopoverTrigger asChild>
-                  <button className={`w-3 h-3 rounded-full shrink-0 ${(LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot}`} title="Change color" />
+                  <button className={`w-3 h-3 rounded-full shrink-0 ${(LABEL_COLORS.find((c) => c.key === l.color) || LABEL_COLORS[0]).dot}`} title="Change color" aria-label="Change label colour" />
                 </PopoverTrigger>
                 <PopoverContent align="start" className="w-auto p-2">
                   <div className="flex items-center gap-1.5">
@@ -1437,6 +1437,7 @@ const LabelManagerPopover: React.FC<{
                         key={c.key}
                         onClick={() => recolor(l.id, c.key)}
                         title={c.label}
+                        aria-label={`Colour: ${c.label}`}
                         className={`w-4 h-4 rounded-full ${c.dot} ${l.color === c.key ? 'ring-2 ring-offset-1 ring-offset-background ring-foreground/50' : ''}`}
                       />
                     ))}
@@ -1457,6 +1458,7 @@ const LabelManagerPopover: React.FC<{
                 key={c.key}
                 onClick={() => setNewColor(c.key)}
                 title={c.label}
+                aria-label={`Colour: ${c.label}`}
                 className={`w-4 h-4 rounded-full ${c.dot} ${newColor === c.key ? 'ring-2 ring-offset-1 ring-offset-background ring-foreground/50' : ''}`}
               />
             ))}
@@ -1551,6 +1553,7 @@ const LabelAssignButton: React.FC<{
                   key={c.key}
                   onClick={() => setNewColor(c.key)}
                   title={c.label}
+                  aria-label={`Colour: ${c.label}`}
                   className={`w-4 h-4 rounded-full ${c.dot} ${newColor === c.key ? 'ring-2 ring-offset-1 ring-offset-background ring-foreground/50' : ''}`}
                 />
               ))}

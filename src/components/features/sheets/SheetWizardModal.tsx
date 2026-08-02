@@ -476,7 +476,7 @@ const ImagePick: React.FC<{
       {value && <img src={value} className="mt-1 max-h-32 rounded border border-border object-contain" alt="" />}
       <div className="mt-1 grid grid-cols-5 gap-1.5">
         {withImages.map((i) => (
-          <button key={i.id} onClick={() => onChange(i.image_url!)}
+          <button key={i.id} onClick={() => onChange(i.image_url!)} aria-label={`Use image ${i.id}`}
             className={`relative aspect-square rounded overflow-hidden border-2 ${value === i.image_url ? 'border-primary' : 'border-transparent'}`}>
             <img src={i.image_url!} className="w-full h-full object-cover" alt="" />
           </button>

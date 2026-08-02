@@ -1,11 +1,10 @@
 {
   "_comment": "Per-rule jsx-a11y warning counts. CI fails when a count RISES. Lower them as you fix things and regenerate: node scripts/check-a11y.mjs --write-baseline. When a rule reaches 0, promote it to \"error\" in eslint.config.js and delete its entry here.",
-  "total": 189,
+  "total": 146,
   "rules": {
     "jsx-a11y/label-has-associated-control": 71,
-    "jsx-a11y/control-has-associated-label": 44,
     "jsx-a11y/no-static-element-interactions": 37,
     "jsx-a11y/click-events-have-key-events": 36,
-    "jsx-a11y/anchor-is-valid": 1
+    "jsx-a11y/control-has-associated-label": 2
   }
 }

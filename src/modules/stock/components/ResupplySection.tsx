@@ -117,7 +117,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
                 <th className="px-4 py-2 text-left">Trend</th>
                 <th className="px-4 py-2 text-right">Lead</th>
                 {aiRan && <th className="px-4 py-2 text-left">Recommendation</th>}
-                <th className="px-4 py-2"></th>
+                <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>

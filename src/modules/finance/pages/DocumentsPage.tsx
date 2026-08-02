@@ -458,7 +458,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                         <th className="px-4 py-2 text-right">Due</th>
                         <th className="px-4 py-2 text-center">Status</th>
                         <th className="px-4 py-2 text-center">mD</th>
-                        <th className="px-4 py-2 w-10" />
+                        <th className="px-4 py-2 w-10"><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -631,7 +631,7 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
               <th className="px-4 py-2 text-left">Next</th>
               <th className="px-4 py-2 text-center">Auto-pay</th>
               <th className="px-4 py-2 text-center">Status</th>
-              {!readOnly && <th className="px-4 py-2 w-20" />}
+              {!readOnly && <th className="px-4 py-2 w-20"><span className="sr-only">Actions</span></th>}
             </tr>
           </thead>
           <tbody>
@@ -752,7 +752,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
           <th className="px-4 py-2 text-left">Type</th>
           <th className="px-4 py-2 text-left">Date</th>
           <th className="px-4 py-2 text-center">Status</th>
-          <th className="px-4 py-2 text-right" />
+          <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody>
@@ -839,7 +839,7 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
         <th className="px-4 py-2 text-right">Amount</th>
         <th className="px-4 py-2 text-center">mD</th>
         <th className="px-4 py-2 text-left">Invoice</th>
-        <th className="px-4 py-2 text-right" />
+        <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
       </tr>
     </thead>
     <tbody>
@@ -1127,7 +1127,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
               bill (its derived amount_due), reachable from the expense this row opens. */}
           <th className="px-4 py-2 text-right">Gross</th>
           <th className="px-4 py-2 text-center">Handled</th>
-          <th className="px-4 py-2 text-right" />
+          <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody>

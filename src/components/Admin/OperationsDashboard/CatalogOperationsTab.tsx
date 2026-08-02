@@ -192,7 +192,7 @@ export const CatalogOperationsTab: React.FC = () => {
                       <th className="text-right px-3 py-2 font-medium">Gate (granted/denied)</th>
                       <th className="text-right px-3 py-2 font-medium">Unique emails</th>
                       <th className="text-left px-3 py-2 font-medium">Last activity</th>
-                      <th></th>
+                      <th><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
                   <tbody>

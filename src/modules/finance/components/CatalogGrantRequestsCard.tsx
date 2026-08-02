@@ -95,7 +95,7 @@ export const CatalogGrantRequestsCard: React.FC<{ workspaceIds: string[] }> = ({
                 <th className="px-4 py-2 text-left">Factory</th>
                 <th className="px-4 py-2 text-left">Requested</th>
                 <th className="px-4 py-2 text-center">Status</th>
-                <th className="px-4 py-2 text-right" />
+                <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>

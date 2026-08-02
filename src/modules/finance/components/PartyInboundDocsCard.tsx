@@ -115,7 +115,7 @@ export const PartyInboundDocsCard: React.FC<{
                     <th className="px-4 py-2 text-right">VAT</th>
                     <th className="px-4 py-2 text-right">Payable</th>
                     <th className="px-4 py-2 text-center">Handled</th>
-                    {!readOnly && <th className="px-4 py-2 text-right" />}
+                    {!readOnly && <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>}
                   </tr>
                 </thead>
                 <tbody>

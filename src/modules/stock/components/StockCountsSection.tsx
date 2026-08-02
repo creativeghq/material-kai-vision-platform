@@ -92,7 +92,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
                 <th className="px-4 py-2 text-left">Status</th>
                 <th className="px-4 py-2 text-left">Note</th>
                 <th className="px-4 py-2 text-right">Adjusted</th>
-                <th className="px-4 py-2"></th>
+                <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>

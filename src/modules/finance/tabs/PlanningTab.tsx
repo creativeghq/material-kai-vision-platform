@@ -275,7 +275,7 @@ const FlatTable: React.FC<{
         <th className="px-4 py-2 text-right">Date</th>
         <th className="px-4 py-2 text-right">Reminder</th>
         <th className="px-4 py-2 text-right">Status</th>
-        <th className="px-4 py-2 text-right" />
+        <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
       </tr>
     </thead>
     <tbody>

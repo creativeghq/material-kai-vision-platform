@@ -89,7 +89,7 @@ export const InboundSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
                 <th className="px-4 py-2 text-left">Status</th>
                 <th className="px-4 py-2 text-left">ETA</th>
                 <th className="px-4 py-2 text-left">PO</th>
-                <th className="px-4 py-2"></th>
+                <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
