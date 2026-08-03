@@ -398,3 +398,77 @@ export async function refundAgentChatTurn(
 export function invalidatePricingCache(): void {
   _pricingCache = null;
 }
+
+/**
+ * Debit BEFORE the paid upstream call, and REFUSE the work when the debit fails.
+ *
+ * This exists because `debitExternalServiceCredits` returns `{success:false}` rather than throwing,
+ * and 22 call sites did `await debit(...)` with the result discarded — after the upstream call had
+ * already run. A debit whose result nobody reads is not a debit, it is a log line: an exhausted
+ * workspace still sent every WhatsApp and still ran every Opus call, and we had already paid the
+ * provider by the time we found out we could not bill for it. (CLAUDE.md invariant 10, audit #312)
+ *
+ * Returns `null` when the caller may proceed, or a ready-to-return JSON refusal when it may not —
+ * so the guard is one line at the call site and the failure cannot be ignored by accident:
+ *
+ *     const refusal = await debitOrRefuse(supabase, userId, 'firecrawl-scrape', 'scrape', 1, { url }, wsId);
+ *     if (refusal) return refusal;
+ *     // ...only now call the paid API
+ *
+ * Shaped for the agent-tool callers, which signal failure by RETURNING `JSON.stringify({success:false})`
+ * rather than throwing. For handlers that return a `Response`, read `.success` off
+ * `debitExternalServiceCredits` directly and reply 402.
+ *
+ * When the unit count is only known AFTER the call (a batch whose size the provider decides), the
+ * order cannot be fixed — use `checkCreditBalance` as a preflight first, then debit the real count.
+ */
+export async function debitOrRefuse(
+  supabase: DbClient,
+  userId: string,
+  serviceName: string,
+  operationType: string,
+  units: number = 1,
+  metadata?: Record<string, unknown>,
+  workspaceId?: string | null,
+): Promise<string | null> {
+  const result = await debitExternalServiceCredits(
+    supabase, userId, serviceName, operationType, units, metadata, workspaceId,
+  );
+  if (result.success) return null;
+  console.warn(`[credit-utils] refusing ${serviceName}/${operationType} for ${userId}: ${result.error}`);
+  return JSON.stringify({
+    success: false,
+    error: result.error ?? 'Insufficient credits',
+    credits_required: result.credits_debited,
+    service: serviceName,
+  });
+}
+
+/**
+ * Preflight for the case `debitOrRefuse` cannot cover: the billable unit count is not known until
+ * the provider has answered (a domain search returning N emails, a batch validation).
+ *
+ * Charging the real count afterwards is correct; running the call at all for a workspace that
+ * cannot pay for even one unit is not. Checks against `preflight_credits`, which mirrors the debit
+ * decision (pool-if-member-else-personal) AND the member monthly cap.
+ *
+ * Returns `null` to proceed, or a ready-to-return JSON refusal. (audit #312)
+ */
+export async function preflightOrRefuse(
+  supabase: DbClient,
+  userId: string,
+  serviceName: string,
+  minUnits: number = 1,
+  workspaceId?: string | null,
+): Promise<string | null> {
+  const check = await checkCreditBalance(supabase, userId, serviceName, minUnits, workspaceId);
+  if (check.sufficient) return null;
+  console.warn(`[credit-utils] preflight refused ${serviceName} for ${userId}: balance ${check.balance}`);
+  return JSON.stringify({
+    success: false,
+    error: 'Insufficient credits',
+    credits_required: check.required_credits,
+    balance: check.balance,
+    service: serviceName,
+  });
+}

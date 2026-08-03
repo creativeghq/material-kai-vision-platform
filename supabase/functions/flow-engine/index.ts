@@ -999,6 +999,12 @@ async function executeAction(
       }
 
       // Domain-wide search
+      // Gated like every other paid branch. The person-search branch above has carried this check
+      // since it was added; this one was missed, so a tenant flow with no credits still ran the
+      // Hunter domain query on our account and only discovered it could not bill for it after the
+      // fact. Same shape, same action, one branch apart. (audit #312)
+      { const g = await assertFlowCanAfford(supabase, userId, scope, 'hunter-domain-search'); if (g) throw new Error(g); }
+
       const domainData = await withRetry(async () => {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 20000);

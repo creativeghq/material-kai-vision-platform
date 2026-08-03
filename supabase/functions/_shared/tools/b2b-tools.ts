@@ -23,7 +23,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 type B2BChunkSink = ((chunk: any) => void) | undefined;
 
-import { debitExternalServiceCredits } from '../credit-utils.ts';
+import { debitExternalServiceCredits, debitOrRefuse, preflightOrRefuse } from '../credit-utils.ts';
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { getToolPrompt } from '../prompt-utils.ts';
 
@@ -308,6 +308,16 @@ export const createCompanyWebsiteScrapeTool = (userId: string, onProgress?: (sta
           });
         }
 
+        // Charge BEFORE the paid call (invariant 10). This debit was previously below, after
+        // Firecrawl had already run and been paid for; its result was discarded, so an exhausted
+        // workspace scraped for free at our expense. Moving it changes nothing about WHAT is
+        // billed -- this scrape is charged whether or not it returns content -- only about
+        // whether we find out we cannot bill for it before or after we pay. (audit #312)
+        {
+          const refusal = await debitOrRefuse(supabase, userId, 'firecrawl-scrape', 'company_website_scrape', 1, { url });
+          if (refusal) return refusal;
+        }
+
         // Scrape the website using Firecrawl with timeout (30 seconds)
         const TIMEOUT_MS = 30000;
         const controller = new AbortController();
@@ -354,9 +364,6 @@ export const createCompanyWebsiteScrapeTool = (userId: string, onProgress?: (sta
 
         const markdown = data.data?.markdown || '';
         const metadata = data.data?.metadata || {};
-
-        // Debit credits for Firecrawl scrape
-        await debitExternalServiceCredits(supabase, userId, 'firecrawl-scrape', 'company_website_scrape', 1, { url });
 
         // If no content was scraped, return early with metadata only
         if (!markdown || markdown.length < 100) {
@@ -520,6 +527,14 @@ export const createCompanyEnrichmentTool = (userId: string, onProgress?: (status
           });
         }
 
+        // Charged even if no results -- which is exactly why this belongs BEFORE the call rather
+        // than after it. Same billing outcome, but a workspace that cannot pay no longer gets the
+        // Apollo query run on our account first. (audit #312)
+        {
+          const refusal = await debitOrRefuse(supabase, userId, 'apollo-enrich', 'company_enrichment', 1, { company_name, domain });
+          if (refusal) return refusal;
+        }
+
         // Search for the company in Apollo.io with timeout (20 seconds)
         const TIMEOUT_MS = 20000;
         const controller = new AbortController();
@@ -568,9 +583,6 @@ export const createCompanyEnrichmentTool = (userId: string, onProgress?: (status
         const elapsed = Date.now() - startTime;
 
         const companies = data.organizations || [];
-
-        // Debit credits for Apollo enrichment (charged even if no results)
-        await debitExternalServiceCredits(supabase, userId, 'apollo-enrich', 'company_enrichment', 1, { company_name, domain });
 
         if (companies.length === 0) {
           return JSON.stringify({

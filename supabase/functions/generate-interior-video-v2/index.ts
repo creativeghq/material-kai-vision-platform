@@ -40,6 +40,22 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
   'runway-gen4-turbo':  40,
 };
 
+// Longest clip each model will produce.
+//
+// `duration_seconds` arrives from the request body and the Replicate branch passed it STRAIGHT to
+// the provider unclamped, while CREDIT_COSTS above charges a FLAT per-model price. So
+// `duration_seconds: 60` cost the caller exactly what `5` did and we paid the difference — and
+// `ai_usage_logs` priced the same models per SECOND, so the logged cost and the charged cost
+// disagreed by however long the clip was. The Veo and Kling branches each clamped in-branch;
+// Replicate did not. Clamped once here, at the input, which is also what makes the flat credit
+// price defensible: it is the price of a bounded clip. (audit #312)
+const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
+  'veo-2':              8,
+  'kling-v3.0':         10,
+  'wan2.1-i2v-720p':    5,
+  'runway-gen4-turbo':  10,
+};
+
 // Auto-select model by video type
 const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = {
   walkthrough:          'veo-2',
@@ -185,6 +201,14 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     }, 400);
   }
 
+  // Clamped to the model's ceiling, and defended against a non-numeric or negative body value
+  // (`Number('abc')` is NaN, and NaN silently defeats a bare Math.min). Everything downstream —
+  // the provider call, the usage log, the stored record — uses this, never the raw body field.
+  const requestedDuration = Number(duration_seconds);
+  const durationSeconds = Number.isFinite(requestedDuration) && requestedDuration > 0
+    ? Math.min(Math.round(requestedDuration), MAX_DURATION_SECONDS[resolvedModel])
+    : Math.min(8, MAX_DURATION_SECONDS[resolvedModel]);
+
   // `ai_model_pricing` keys differ from the model ids this function uses: the price
   // table carries `kling-3.0` and `wan2.1-i2v`, here they are `kling-v3.0` and
   // `wan2.1-i2v-720p`. Identity map only — no prices are defined here.
@@ -225,7 +249,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     p_amount: creditCost,
     p_operation_type: 'interior_video_generation_v2',
     p_description: `Interior video v2 (${resolvedModel}, ${video_type})`,
-    p_metadata: { model: resolvedModel, video_type, duration_seconds, aspect_ratio, workspace_id },
+    p_metadata: { model: resolvedModel, video_type, duration_seconds: durationSeconds, aspect_ratio, workspace_id },
     p_workspace_id: workspace_id ?? null,
   });
 
@@ -245,7 +269,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       status: 'processing',
       model: resolvedModel,
       aspect_ratio,
-      duration_s: duration_seconds,
+      duration_s: durationSeconds,
       credits_used: creditCost,
       video_type,
       model_version: REPLICATE_MODELS[resolvedModel] || resolvedModel,
@@ -282,12 +306,12 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         {
           imageUrl: source_image_url,
           aspectRatio: aspect_ratio as '16:9' | '9:16',
-          durationSeconds: Math.min(duration_seconds, 8),
+          durationSeconds,
         },
       );
 
       const videoUrl = await uploadVideoToStorage(supabase, veoResult.base64, jobId, true, uploadCtx);
-      await logVideoUsage(Math.min(duration_seconds, 8));
+      await logVideoUsage(durationSeconds);
 
       await supabase.from('generation_videos').update({
         status: 'completed',
@@ -317,7 +341,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     } else if (resolvedModel === 'kling-v3.0') {
       // Kling v3.0 via native @ai-sdk/klingai
       const klingPrompt = prompt || 'Professional cinematic interior design video, smooth camera movement';
-      const klingDuration = duration_seconds >= 10 ? 10 : 5;
+      const klingDuration = durationSeconds >= 10 ? 10 : 5;
 
       const klingResult = await generateVideoWithKling(klingPrompt, {
         model: 'kling-v3.0-i2v',
@@ -364,7 +388,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       const replicateInput: Record<string, unknown> = {
         image: source_image_url,
         prompt: prompt || 'Professional cinematic interior design video, smooth camera movement',
-        duration: duration_seconds,
+        duration: durationSeconds,
         aspect_ratio,
       };
 
@@ -389,7 +413,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       if (pollResult.status === 'succeeded') {
         const rawUrl = Array.isArray(pollResult.output) ? pollResult.output[0] : pollResult.output as string;
         const videoUrl = await uploadVideoToStorage(supabase, rawUrl, jobId, false, uploadCtx);
-        await logVideoUsage(duration_seconds);
+        await logVideoUsage(durationSeconds);
 
         await supabase.from('generation_videos').update({
           status: 'completed',

@@ -731,6 +731,17 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       throw new Error(`MIVAA API error: ${response.status} ${response.statusText}`);
     }
 
+    // A 200 whose BODY says it failed is still a failure, and the caller was still charged for it.
+    // `!response.ok` above catches HTTP-level errors and throws into the refund path; MIVAA also
+    // answers 200 with `{success:false, error}` for application-level failures, and that fell
+    // straight through to the return below — work not done, credits kept, nothing logged as an
+    // error. Throwing routes it into the same catch that already refunds, so there is one failure
+    // path rather than two with different billing behaviour. (audit #312)
+    if (!isDocsEndpoint && !isJsonEndpoint && responseData?.success === false) {
+      const detail = responseData?.error ?? responseData?.message ?? 'unspecified error';
+      throw new Error(`MIVAA action reported failure: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
+    }
+
     // Wrap response in success object if it doesn't already have success field
     const finalResponse = responseData?.success !== undefined ? responseData : { success: true, data: responseData };
 
