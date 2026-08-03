@@ -38,7 +38,7 @@ import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { recordInvoicePayment } from '../_shared/payments/record-payment.ts';
-import { retrieveVivaTransaction, vivaHosts } from '../_shared/payments/viva-provider.ts';
+import { retrieveVivaOrder, retrieveVivaTransaction, VIVA_ORDER_STATE, vivaHosts } from '../_shared/payments/viva-provider.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import type { PaymentProviderContext } from '../_shared/payments/types.ts';
 
@@ -266,7 +266,16 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     return json({ ok: true, recorded: false, outcome: 'reversal_flagged' });
   }
 
-  // ─── Payment succeeded ───────────────────────────────────────────────────
+  // ─── RF / bank transfer settled (Account Transaction Created, 2054) ───────
+  // A bank transfer produces NO card TransactionId, so the card read-back below cannot
+  // apply. Instead this event just means "money moved on this merchant's wallet" — the
+  // trigger to re-check any RF orders we're waiting on. We resolve each by polling the
+  // ORDER state (StateId === 3 = Paid), which is keyed on the orderCode we already hold.
+  if (eventTypeId === EVENT_ACCOUNT_TRANSACTION) {
+    return await settlePendingRfOrders(db, cfg, ctx);
+  }
+
+  // ─── Card payment succeeded (1796) ────────────────────────────────────────
   const transactionId = String(data?.TransactionId ?? '');
   if (!transactionId) {
     console.warn('[viva-webhooks] payment event without TransactionId', messageId);
@@ -346,3 +355,68 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     payment_id: res.paymentId,
   });
 }));
+
+/**
+ * RF / bank-transfer settlement.
+ *
+ * Triggered by an `Account Transaction Created` (2054) event, which says only "the wallet
+ * balance changed" — it does NOT identify an order. So for each of this workspace's
+ * still-pending bank-reference intents we poll the ORDER state and book the ones Viva now
+ * reports Paid (StateId === 3). Most 2054s (card settlements, fees, payouts) find no
+ * pending RF intents and cost one cheap query.
+ *
+ * providerRef is `viva-rf-<orderCode>` — a bank transfer has no card TransactionId, and the
+ * orderCode is the stable unique key for this settlement, so it gives us idempotency the
+ * same way the card TransactionId does.
+ *
+ * SETTLEMENT IS STILL THE READ-BACK, not the webhook body: the money is only booked after
+ * Viva's own order API confirms StateId === 3.
+ */
+async function settlePendingRfOrders(db: any, cfg: any, ctx: any): Promise<Response> {
+  const { data: pending } = await db
+    .from('invoice_payment_intents')
+    .select('id, invoice_id, provider_order_code, currency, status')
+    .eq('provider', 'viva')
+    .eq('workspace_id', cfg.workspace_id)
+    .eq('method', 'bank_reference')
+    .eq('status', 'pending')
+    .not('provider_order_code', 'is', null)
+    .limit(50);
+
+  if (!pending || pending.length === 0) {
+    return json({ ok: true, settled: 0, reason: 'no pending RF orders' });
+  }
+
+  let settled = 0;
+  for (const intent of pending) {
+    let order;
+    try {
+      order = await retrieveVivaOrder(String(intent.provider_order_code), ctx);
+    } catch (err) {
+      console.error('[viva-webhooks] RF order retrieve failed', intent.provider_order_code, err);
+      continue;
+    }
+    if (order.stateId !== VIVA_ORDER_STATE.PAID) continue;
+
+    const res = await recordInvoicePayment(db, intent.invoice_id, {
+      provider: 'viva',
+      providerRef: `viva-rf-${intent.provider_order_code}`,
+      providerLabel: 'Viva',
+      amount: order.amount, // MAJOR units from the order read-back
+      currency: intent.currency,
+      method: 'bank_transfer',
+      notes: `Bank transfer (RF) via Viva — order ${intent.provider_order_code}`,
+    });
+    if (!res.ok) {
+      console.error('[viva-webhooks] RF ingestion failed', intent.provider_order_code, res.error);
+      continue;
+    }
+    await db
+      .from('invoice_payment_intents')
+      .update({ status: 'paid', updated_at: new Date().toISOString() })
+      .eq('id', intent.id);
+    settled += 1;
+  }
+
+  return json({ ok: true, settled, checked: pending.length });
+}

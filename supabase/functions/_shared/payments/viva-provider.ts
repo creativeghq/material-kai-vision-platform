@@ -197,12 +197,20 @@ export async function generateRfCode(
 }
 
 /**
- * Pull an RF code out of an undocumented response body.
- * Order: known-ish JSON keys → bare string → regex over the raw text.
- * An RF Creditor Reference is `RF` + 2 check digits + 18 digits.
+ * Pull an RF code out of the RF-generation response.
+ *
+ * CONFIRMED against Viva demo (2026-08-03), which Viva does NOT document — the real
+ * success body is:  {"rfPaymentCode":"RF12907263102785539868300"}
+ * i.e. `rfPaymentCode`, value `RF` + ~23 digits (longer than the "20-digit" the prose
+ * claims). The parser stays defensive anyway (unknown-key + regex fallbacks) so a future
+ * shape change degrades to a logged raw body rather than a silent wrong parse.
+ *
+ * RF is an ISO-11649 Creditor Reference: `RF` + 2 check digits + up to 21 more chars.
  */
 export function parseRfCode(rawBody: string): string | null {
-  const RF_RE = /\bRF\d{2}[0-9]{16,20}\b/i;
+  // RF + 2 check digits + 8..25 trailing chars. Deliberately wider than the observed 23
+  // so we never under-match a valid code again.
+  const RF_RE = /\bRF\d{2}[A-Z0-9]{8,25}\b/i;
 
   const direct = rawBody.match(RF_RE);
   let parsed: unknown;
@@ -218,7 +226,8 @@ export function parseRfCode(rawBody: string): string | null {
   }
   if (parsed && typeof parsed === 'object') {
     const obj = parsed as Record<string, unknown>;
-    for (const key of ['rfCode', 'RfCode', 'rf', 'paymentCode', 'referenceNumber', 'code']) {
+    // `rfPaymentCode` is the confirmed key; the rest are belt-and-braces.
+    for (const key of ['rfPaymentCode', 'rfCode', 'RfCode', 'rf', 'paymentCode', 'referenceNumber', 'code']) {
       const v = obj[key];
       if (typeof v === 'string' && RF_RE.test(v)) return v.toUpperCase();
     }
@@ -229,11 +238,13 @@ export function parseRfCode(rawBody: string): string | null {
 export const vivaProvider: PaymentProvider = {
   slug: 'viva',
   label: 'Viva.com',
-  // RF / bank_reference is intentionally NOT offered yet: the 2054 account-transaction settlement
-  // path is unverified against live Viva behaviour (the RF parser + retrieval endpoint are guesses),
-  // so taking a bank transfer risks a paid-but-unsettled order. Re-add 'bank_reference' only after a
-  // live demo transaction proves the 2054→order settlement loop end-to-end. Card is fully wired.
-  methods: ['card'],
+  // RF generation is confirmed against Viva demo (2026-08-03): the code + parser + the
+  // {"rfPaymentCode":"RF…"} response shape are all verified live, and settlement reconciles
+  // via order-state polling (retrieveVivaOrder, StateId===3) driven by the 2054 webhook plus
+  // a periodic safety-net sweep. Still needs ONE real bank transfer to confirm the
+  // 2054→StateId=3 timing end-to-end; until then a tenant enables it deliberately per-workspace
+  // (methods jsonb), it is never on by default. Card is fully wired and proven.
+  methods: ['card', 'bank_reference'],
   currencies: VIVA_CURRENCIES,
 
   async resolveContext(supabase: any, workspaceId: string): Promise<PaymentProviderContext | null> {
@@ -349,4 +360,56 @@ export async function retrieveVivaTransaction(
     transactionTypeId: Number(t.transactionTypeId ?? -1),
     raw: t,
   };
+}
+
+/** Viva order StateId. 3 = Paid is the one that means "collect it". */
+export const VIVA_ORDER_STATE = {
+  PENDING: 0,
+  EXPIRED: 1,
+  CANCELLED: 2,
+  PAID: 3,
+} as const;
+
+/**
+ * Re-read an ORDER's state (`GET /api/orders/{orderCode}`, Basic auth on the www. host).
+ *
+ * This is how RF / bank-transfer settlement is confirmed. A bank transfer produces NO card
+ * `TransactionId` — the `Account Transaction Created` (2054) webhook only tells us "money
+ * moved on the wallet", not which order. So instead of a transaction read-back we poll the
+ * order the RF code was minted against: `StateId === 3` means the transfer landed. Keyed on
+ * orderCode alone, which we hold in `invoice_payment_intents`.
+ *
+ * Verified against Viva demo 2026-08-03: returns `{OrderCode, StateId, RequestAmount, …}`,
+ * amount in MAJOR units.
+ */
+export async function retrieveVivaOrder(
+  orderCode: string,
+  ctx: PaymentProviderContext,
+): Promise<{ orderCode: string; stateId: number; amount: number; raw: Record<string, unknown> }> {
+  const { merchant_id, api_key } = ctx.credentials;
+  if (!merchant_id || !api_key) throw new Error('Viva merchant credentials missing for order retrieve');
+
+  const hosts = vivaHosts(ctx.isSandbox);
+  const res = await fetch(`${hosts.www}/api/orders/${orderCode}`, {
+    headers: { Authorization: `Basic ${btoa(`${merchant_id}:${api_key}`)}` },
+  });
+  const rawBody = await res.text();
+  if (!res.ok) {
+    throw new Error(`Viva retrieve-order failed (${res.status}): ${rawBody.slice(0, 300)}`);
+  }
+
+  const oc = extractOrderCodePascal(rawBody) ?? orderCode; // string-safe (order-retrieve is PascalCase)
+  const o = JSON.parse(rawBody) as Record<string, unknown>;
+  return {
+    orderCode: oc,
+    stateId: Number(o.StateId ?? -1),
+    amount: Number(o.RequestAmount ?? 0),
+    raw: o,
+  };
+}
+
+/** Order-retrieve returns PascalCase `OrderCode` — pull it string-safe like the camelCase one. */
+function extractOrderCodePascal(rawBody: string): string | null {
+  const m = rawBody.match(/"OrderCode"\s*:\s*"?(\d+)"?/);
+  return m ? m[1] : null;
 }
