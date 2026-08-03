@@ -22,13 +22,9 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MODULE_SLUG = 'email-marketing';
 
-function svcClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-}
-
+import { serviceClient as svcClient } from '../supabase-client.ts';
 /** User-scoped client so the membership-guarded audience RPC + RLS behave as on the page. */
 function userClient(jwt: string | undefined) {
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

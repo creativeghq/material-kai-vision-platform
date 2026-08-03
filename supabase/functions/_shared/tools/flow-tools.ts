@@ -35,10 +35,7 @@ const TENANT_ACTIONS = [
   'send_email', 'send_whatsapp', 'create_notification', 'send_agent_message', 'send_campaign',
 ] as const;
 
-function svcClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-}
-
+import { serviceClient as svcClient } from '../supabase-client.ts';
 /**
  * Prefer a JWT-scoped client so the create/toggle/delete RPCs' `auth.uid()`-based
  * `assert_workspace_member` and RLS actually enforce. When no JWT is present (partner `kai_` keys and

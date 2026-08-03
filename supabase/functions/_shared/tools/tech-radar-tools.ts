@@ -27,8 +27,6 @@ const { tool } = await import('npm:@langchain/core@1.1.15/tools');
 const { z } = await import('npm:zod@3.24.0');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY');
 
 const RESEARCH_MODEL = 'claude-sonnet-4-6';   // tech judgement benefits from reasoning
@@ -64,10 +62,9 @@ export interface TechRadarFinding {
   evidence?: Array<{ title?: string; url?: string; note?: string }>;
 }
 
-export function svcClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-}
+import { serviceClient as svcClient } from '../supabase-client.ts';
 
+export { svcClient };
 async function sha1Hex(input: string): Promise<string> {
   const bytes = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest('SHA-1', bytes);

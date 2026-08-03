@@ -18,10 +18,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MODULE_SLUG = 'contracts';
 
-function svcClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-}
-
+import { serviceClient as svcClient } from '../supabase-client.ts';
 async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const sb = svcClient();

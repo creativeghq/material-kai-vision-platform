@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * The Supabase client type that `createClient(url, key)` actually produces here.
@@ -25,3 +25,26 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * and every function inherits real column checking.
  */
 export type DbClient = SupabaseClient<any, 'public', 'public', any, any>;
+
+/**
+ * A service-role client, built fresh on each call.
+ *
+ * Twenty agent-tool modules declared this identical function themselves, each over a pair of
+ * module-level `const SUPABASE_URL = Deno.env.get(...)` captures. That capture is the thing
+ * CLAUDE.md forbids: the secrets bootstrap populates the environment at HANDLER ENTRY, so a
+ * module-load read can see `undefined` and bake it into a client that then fails to authenticate —
+ * with a credentials error rather than anything pointing back at load order.
+ *
+ * Reading the env inside the function is the whole point. Do not hoist these back out to module
+ * scope for a micro-optimisation; `createClient` is cheap and the ordering is not negotiable.
+ *
+ * Service-role bypasses RLS. Every caller therefore still owes the tenancy check itself —
+ * `userCanAccessWorkspace` / `assert_workspace_member` (CLAUDE.md invariant 1). Using this
+ * function does not exempt anyone from that; it makes the manual check mandatory.
+ */
+export function serviceClient(): DbClient {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  ) as DbClient;
+}

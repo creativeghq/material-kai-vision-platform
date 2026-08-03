@@ -20,10 +20,7 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const MODULE_SLUG = 'stock';
 const DIRECTIONS = ['in', 'out', 'adjust'] as const;
 
-function svcClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-}
-
+import { serviceClient as svcClient } from '../supabase-client.ts';
 /** Call a stock-api action AS the user (so all stock-api RBAC/entitlement applies). */
 async function callStockApi(jwt: string, workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<any> {
   try {

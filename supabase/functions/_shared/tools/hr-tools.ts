@@ -26,10 +26,7 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const MODULE_SLUG = 'hr';
 const ABSENCE_TYPES = ['vacation', 'sick', 'unpaid', 'other'] as const;
 
-function svcClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-}
-
+import { serviceClient as svcClient } from '../supabase-client.ts';
 /** Call an hr-api action AS the user (so all hr-api RBAC/entitlement applies). */
 async function callHrApi(jwt: string, workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<any> {
   try {

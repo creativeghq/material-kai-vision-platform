@@ -29,13 +29,8 @@ const { tool } = await import('npm:@langchain/core@1.1.15/tools');
 const { z } = await import('npm:zod@3.24.0');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-function svcClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-}
-
+import { serviceClient as svcClient } from '../supabase-client.ts';
 import { round2 } from '../money.ts';
 
 // One line item as the model supplies it. Either `product_id` (catalog, auto-priced)

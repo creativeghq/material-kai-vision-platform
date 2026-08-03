@@ -19,10 +19,7 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
 const MODULE_SLUG = 'social-media';
 
-function svcClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-}
-
+import { serviceClient as svcClient } from '../supabase-client.ts';
 /** Call any edge function AS the user (so its authenticate() + workspace checks apply). */
 async function callEdge(jwt: string, path: string, payload: Record<string, unknown>): Promise<any> {
   try {
