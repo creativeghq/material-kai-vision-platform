@@ -9,6 +9,7 @@
 // glyphs (and Greek customer names/addresses, regardless of language) render correctly.
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
+import { ensureInvoiceRf } from '../_shared/payments/invoice-rf.ts';
 import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage, type RGB } from 'pdf-lib';
 // @pdf-lib/fontkit's published types declare no default export, so `import fontkit from`
 // failed to typecheck (TS1192) even though esm.sh's interop makes it work at runtime.
@@ -57,6 +58,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     fees: 'Τέλη', stamp: 'Χαρτόσημο', otherTaxes: 'Λοιποί Φόροι', deductions: 'Κρατήσεις',
     digitalFee: 'Ψηφιακό Τέλος Συναλλαγής', related: 'Σχετ. Παραστατικό',
     paymentMethod: 'Τρόπος Πληρωμής', bank: 'Τραπεζικός Λογαριασμός', registry: 'ΓΕΜΗ', website: 'Ιστότοπος',
+    rfCode: 'Κωδικός πληρωμής (RF)', rfNote: 'Πληρώστε με τραπεζικό έμβασμα χρησιμοποιώντας αυτόν τον κωδικό ως αιτιολογία — δεν χρειάζεται IBAN.',
     mark: 'ΜΑΡΚ', uid: 'UID', verify: 'Σαρώστε για επαλήθευση στο myDATA',
     movement: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ', loadingPlace: 'Τόπος φόρτωσης', deliveryPlace: 'Τόπος παράδοσης',
     vehicle: 'Όχημα', purpose: 'Σκοπός', notes: 'Σημειώσεις', page: 'Σελίδα', of: 'από',
@@ -88,6 +90,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     fees: 'Fees', stamp: 'Stamp duty', otherTaxes: 'Other taxes', deductions: 'Deductions',
     digitalFee: 'Digital transaction fee', related: 'Related doc',
     paymentMethod: 'Payment method', bank: 'Bank account', registry: 'Reg. no.', website: 'Website',
+    rfCode: 'Bank transfer code (RF)', rfNote: 'Pay by bank transfer using this code as the payment reference — no IBAN needed.',
     mark: 'MARK', uid: 'UID', verify: 'Scan to verify on myDATA',
     movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading place', deliveryPlace: 'Delivery place',
     vehicle: 'Vehicle', purpose: 'Purpose', notes: 'Notes', page: 'Page', of: 'of',
@@ -402,7 +405,20 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       } catch { /* pay link is best-effort — never block the PDF */ }
     }
 
-    const pdfBytes = await buildPdf({ inv, items, fs, customer, branch, lang, logo, spec, colors, priorBalance, payUrl });
+    // Viva RF bank-transfer code, printed next to the IBANs so a customer holding only the
+    // PDF (no pay link) can still pay by bank transfer. Never-expiring, minted once per
+    // invoice+amount and reused. Best-effort: returns null (and prints nothing) unless the
+    // workspace has Viva bank_reference enabled for a EUR document that is still payable.
+    let rfCode: string | null = null;
+    if (kind === 'invoice' && inv.status !== 'void' && inv.status !== 'credit_noted'
+        && Number(inv.amount_due ?? inv.total ?? 0) > 0.005) {
+      try {
+        const rf = await ensureInvoiceRf(supabase, inv.id);
+        rfCode = rf?.rfCode ?? null;
+      } catch { /* RF is best-effort — never block the PDF */ }
+    }
+
+    const pdfBytes = await buildPdf({ inv, items, fs, customer, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode });
 
     const path = `${OUT}/${docId}/${PREFIX}-${docId}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdfBytes, { upsert: true, contentType: 'application/pdf' });
@@ -420,8 +436,8 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   }
 }));
 
-async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null }): Promise<Uint8Array> {
-  const { inv, items, fs, customer, branch, lang, logo, spec, colors, priorBalance, payUrl } = d;
+async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; branch: any; lang: Lang; logo?: Uint8Array | null; spec: TemplateSpec; colors: InvoicePdfColors; priorBalance?: number | null; payUrl?: string | null; rfCode?: string | null }): Promise<Uint8Array> {
+  const { inv, items, fs, customer, branch, lang, logo, spec, colors, priorBalance, payUrl, rfCode } = d;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
   // Effective notes: the invoice's own notes, else the workspace default footer
@@ -877,6 +893,16 @@ async function buildPdf(d: { inv: any; items: any[]; fs: any; customer: any; bra
       if (y < M + 60) newPage();
       text(i === 0 ? `${L.bank}: ${line}` : line, M, y, 8.5, font, bankColor); y -= 11;
     });
+    y -= 4;
+  }
+
+  // ── Viva RF bank-transfer code — printed right below the IBANs so a customer holding
+  //    the document (and not the pay link) can pay by bank transfer with no IBAN. ──
+  if (rfCode) {
+    if (y < M + 60) newPage();
+    const rfColor = spec.headerStyle === 'sidebar' ? colors.accent : MUTED;
+    text(`${L.rfCode}: ${rfCode}`, M, y, 9, bold, rfColor); y -= 11;
+    for (const nl of wrap(L.rfNote, font, 7.5, right - M)) { text(nl, M, y, 7.5, font, MUTED); y -= 9; }
     y -= 4;
   }
 

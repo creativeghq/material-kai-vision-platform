@@ -115,10 +115,15 @@ export function extractOrderCode(rawBody: string): string | null {
  * with `?t={transactionId}&s={orderCode}`. Our return route resolves the invoice from
  * `s` via invoice_payment_intents.
  */
+/** Viva's sentinel paymentTimeout for a never-expiring order (confirmed on demo:
+ *  ExpirationDate comes back null). Used for RF codes printed on a document, which a
+ *  customer may pay days later — a default ~30-minute order would be dead on arrival. */
+export const VIVA_NEVER_EXPIRES = 65535;
+
 async function createVivaOrder(
   input: CreateChargeInput,
   ctx: PaymentProviderContext,
-  opts: { disableExactAmount?: boolean } = {},
+  opts: { disableExactAmount?: boolean; paymentTimeout?: number } = {},
 ): Promise<{ orderCode: string }> {
   const token = await getVivaAccessToken(ctx);
   const hosts = vivaHosts(ctx.isSandbox);
@@ -143,6 +148,7 @@ async function createVivaOrder(
       sourceCode: ctx.credentials.source_code || 'Default',
       tags: ['materialshub', `invoice:${input.invoiceId}`],
       ...(opts.disableExactAmount ? { disableExactAmount: true } : {}),
+      ...(opts.paymentTimeout != null ? { paymentTimeout: opts.paymentTimeout } : {}),
     }),
   });
 
@@ -156,6 +162,24 @@ async function createVivaOrder(
     throw new Error(`Viva create-order returned no orderCode: ${rawBody.slice(0, 300)}`);
   }
   return { orderCode };
+}
+
+/**
+ * Mint a NEVER-EXPIRING RF code for an invoice/proforma document (as opposed to the
+ * transient one a buyer mints on the pay page). Returns the order + RF so the caller can
+ * persist an invoice_payment_intents row and print the code on the document.
+ */
+export async function mintInvoiceRf(
+  ctx: PaymentProviderContext,
+  input: { invoiceId: string; invoiceNumber: string; amount: number; currency: string; description: string },
+): Promise<{ orderCode: string; rfCode: string }> {
+  const { orderCode } = await createVivaOrder(
+    { ...input, method: 'bank_reference', successUrl: undefined, cancelUrl: undefined } as CreateChargeInput,
+    ctx,
+    { paymentTimeout: VIVA_NEVER_EXPIRES },
+  );
+  const rfCode = await generateRfCode(orderCode, ctx);
+  return { orderCode, rfCode };
 }
 
 /**

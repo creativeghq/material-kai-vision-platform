@@ -6,6 +6,7 @@ import { formatMoney } from '../_shared/money.ts';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { escapeHtml } from '../_shared/html.ts';
+import { ensureInvoiceRf } from '../_shared/payments/invoice-rf.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
@@ -106,6 +107,26 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
     console.warn('invoice PDF attach skipped', e);
   }
 
+  // Viva RF bank-transfer code in the email body — so a customer who reads the email
+  // (not just the attached PDF, and not the pay link) can still pay by bank transfer.
+  // Same never-expiring code the PDF prints (ensureInvoiceRf is idempotent per amount).
+  let rfHtml = '';
+  try {
+    if (Number(inv.amount_due ?? 0) > 0.005 && inv.status !== 'void' && inv.status !== 'credit_noted') {
+      const rf = await ensureInvoiceRf(supabase, invoice_id);
+      if (rf?.rfCode) {
+        rfHtml = `
+      <div style="margin:16px 0;padding:12px 14px;background:#f6f2f5;border-radius:8px">
+        <div style="color:#666;font-size:12px">Pay by bank transfer — no IBAN needed</div>
+        <div style="font-family:monospace;font-size:16px;font-weight:700;letter-spacing:1px;margin-top:4px">${esc(rf.rfCode)}</div>
+        <div style="color:#888;font-size:11px;margin-top:4px">Use this code as the payment reference in your banking app. Transfer exactly ${total}.</div>
+      </div>`;
+      }
+    }
+  } catch (e) {
+    console.warn('invoice RF skipped', e);
+  }
+
   const subject = `Invoice ${number} from ${sender}`;
   const html = `
     <div style="font-family:'Open Sans',Arial,sans-serif;max-width:560px;margin:auto;color:#222">
@@ -117,6 +138,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
         ${inv.due_at ? `<tr><td style="padding:4px 16px 4px 0;color:#666">Due</td><td style="padding:4px 0">${inv.due_at}</td></tr>` : ''}
       </table>
       ${payLinkHtml}
+      ${rfHtml}
       ${mark}
       ${qr}
       <p style="color:#999;font-size:12px;margin-top:24px">Sent via ${esc(sender)}.</p>

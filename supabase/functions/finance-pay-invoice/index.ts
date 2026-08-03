@@ -9,6 +9,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 // multi-provider dispatch. Every gate (published ∧ entitled ∧ configured) is
 // re-checked server-side at charge time; the client only expresses an intent.
 import { dispatchToProvider, resolveWorkspacePaymentProviders } from '../_shared/payments/registry.ts';
+import { ensureInvoiceRf } from '../_shared/payments/invoice-rf.ts';
 
 // Sales/Finance — create a Stripe Checkout session for an invoice.
 // Two entry modes:
@@ -352,6 +353,31 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
     if (providerSlug === 'stripe' && !stripe) return noPaymentProviderResponse(corsHeaders);
     if (!dispatch.provider.methods.includes(method)) {
       return json({ error: `${dispatch.provider.label} does not support ${method}`, code: 'method_unsupported' }, 400);
+    }
+
+    // Viva bank transfer for the FULL balance → reuse the document's own never-expiring RF
+    // (the one printed on the invoice/email), so the buyer sees the SAME code, and one
+    // order settles the invoice. A partial/deposit falls through to a fresh amount-locked RF.
+    if (providerSlug === 'viva' && method === 'bank_reference' && !isPartial) {
+      const rf = await ensureInvoiceRf(supabase, row.invoice_id);
+      if (rf) {
+        return json({
+          ok: true,
+          provider: 'viva',
+          method,
+          invoice_id: row.invoice_id,
+          internal_number: row.internal_number,
+          amount: chargeAmount,
+          amount_due: amountDue,
+          partial: false,
+          currency: row.currency,
+          customer_display: row.customer_display,
+          payment_kind: 'bank_reference',
+          rf_code: rf.rfCode,
+          order_code: rf.orderCode,
+        });
+      }
+      // ensureInvoiceRf returned null (shouldn't, since dispatch resolved) → fall through.
     }
 
     let charge;
