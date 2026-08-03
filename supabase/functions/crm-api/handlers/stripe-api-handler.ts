@@ -72,14 +72,10 @@ export async function handleCrmStripe(req: Request): Promise<Response> {
         );
       }
 
-      // Get or create Stripe customer
-      const { data: stripeCustomer } = await supabase
-        .from('stripe_customers')
-        .select('stripe_id')
-        .eq('user_id', userId)
-        .single();
-
-      // Get or create Stripe customer
+      // A `stripe_customers` lookup used to sit here. That table does not exist — and the result
+      // was never read: the `user_profiles.stripe_customer_id` read immediately below already
+      // answered the same question and is what `customerId` is actually assigned from. So this was
+      // a failing query whose only effect was one wasted round trip per checkout. (audit #270)
       let customerId: string;
       const { data: profile } = await supabase
         .from('user_profiles')

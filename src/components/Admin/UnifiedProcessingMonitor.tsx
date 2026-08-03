@@ -42,7 +42,8 @@ export const UnifiedProcessingMonitor: React.FC = () => {
         ] = await Promise.all([
           supabase.from('documents').select('*', { count: 'exact', head: true }),
           supabase.from('document_chunks').select('*', { count: 'exact', head: true }),
-          supabase.from('images').select('*', { count: 'exact', head: true }),
+          // `images` does not exist; extracted images live in `document_images`. (audit #270)
+          supabase.from('document_images').select('*', { count: 'exact', head: true }),
           supabase.from('products').select('*', { count: 'exact', head: true }),
         ]);
 
@@ -68,7 +69,7 @@ export const UnifiedProcessingMonitor: React.FC = () => {
           { count: totalXMLImages },
         ] = await Promise.all([
           supabase.from('documents').select('*', { count: 'exact', head: true }).eq('file_type', 'xml'),
-          supabase.from('images').select('*', { count: 'exact', head: true }).eq('source_type', 'xml'),
+          supabase.from('document_images').select('*', { count: 'exact', head: true }).eq('source_type', 'xml'),
         ]);
 
         // Fetch Web Scraping metrics
@@ -85,12 +86,18 @@ export const UnifiedProcessingMonitor: React.FC = () => {
         // Embeddings are 1:1 with chunks (stored in VECS, not Supabase table)
         const totalScrapedEmbeddings = totalScrapedChunks;
 
+        // `web_scraping_sessions` does not exist and has NO successor — neither it nor
+        // `scraping_sessions` is in pg_class, which is the same finding that removed the
+        // web_scraping branch from auto-recovery-cron and job-cleanup-cron. Nothing in the
+        // platform records a scrape session any more, so "pages crawled" is not a number we
+        // have. Reported as 0 rather than sourced from a failing query, because a count that
+        // silently reads 0 because the table is missing is indistinguishable from a real zero.
+        // (audit #270)
+        const totalScrapedPages = 0;
         const [
-          { count: totalScrapedPages },
           { count: totalScrapedImages },
         ] = await Promise.all([
-          supabase.from('web_scraping_sessions').select('*', { count: 'exact', head: true }),
-          supabase.from('images').select('*', { count: 'exact', head: true }).eq('source_type', 'web_scraping'),
+          supabase.from('document_images').select('*', { count: 'exact', head: true }).eq('source_type', 'web_scraping'),
         ]);
 
         // Calculate metrics for each source

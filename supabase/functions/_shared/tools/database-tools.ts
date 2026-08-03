@@ -233,10 +233,13 @@ export const createQueryDatabaseTool = () => {
             break;
 
           case 'images':
-            tableName = 'images';
+            // `images` does not exist; extracted images live in `document_images`, and the column
+            // is `image_url`. The sibling 'embeddings' case below already reads that table — this
+            // one was simply missed. (audit #270)
+            tableName = 'document_images';
             query = supabase
-              .from('images')
-              .select('id, url, metadata, created_at')
+              .from('document_images')
+              .select('id, image_url, metadata, created_at')
               .eq('document_id', documentId)
               .limit(5);
             break;

@@ -106,10 +106,15 @@ export const MaterialsDataPage: React.FC = () => {
             .from('document_images')
             .select('*', { count: 'exact', head: true })
             .eq('workspace_id', wsId),
+          // `embeddings` does not exist. VECS is the single source of truth for vectors, and the
+          // canonical O(1) "does this have an embedding" check is the boolean presence flag on the
+          // source row — never a round trip to VECS (CLAUDE.md). Counting SLIG-present images is
+          // the same proxy PDFDocumentDetails already uses for this figure. (audit #270)
           supabase
-            .from('embeddings')
+            .from('document_images')
             .select('*', { count: 'exact', head: true })
-            .eq('workspace_id', wsId),
+            .eq('workspace_id', wsId)
+            .eq('has_slig_embedding', true),
         ]);
 
         setStats({

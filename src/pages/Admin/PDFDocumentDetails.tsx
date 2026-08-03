@@ -79,9 +79,14 @@ export const PDFDocumentDetails: React.FC = () => {
     try {
       setLoading(true);
 
-      // Fetch document info
+      // Fetch document info.
+      // `source_documents` does not exist — the table is `documents` (same filename /
+      // processing_status / metadata / created_at columns this page renders). Because this is the
+      // one query here that throws on error, the dead reference took the WHOLE page down: every
+      // load hit the catch and rendered "Failed to load document details", while the four queries
+      // below were all pointing at live tables the entire time. (audit #270)
       const { data: docData, error: docError } = await supabase
-        .from('source_documents')
+        .from('documents')
         .select('*')
         .eq('id', documentId)
         .single();
