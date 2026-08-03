@@ -12,18 +12,11 @@
  * at request time), no cloaking (every visitor gets the same response).
  */
 
+import { escapeHtml } from './_shared/html.js';
+
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 const SITE_NAME = 'MaterialsHub Knowledge Base';
-
-function escapeHtml(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 // Safe JSON-LD: prevent a "</script>" inside the data from closing the tag.
 function jsonLdScript(obj) {

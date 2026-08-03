@@ -88,7 +88,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
 
   // ── Line items + VAT analysis ──
   const vatByRate: Record<string, { net: number; vat: number }> = {};
-  let totNet = 0, totVat = 0;
+  let totNet = 0;
   const rows: InvoiceLineRow[] = (items ?? []).map((it) => {
     const qty = Number(it.quantity ?? 1);
     const net = Number(it.net_value ?? it.line_total ?? Number(it.unit_price ?? 0) * qty);
@@ -96,7 +96,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       ? VAT_PCT_BY_CAT[Number(it.vat_category)]
       : Number(it.vat_percent ?? inv.vat_rate ?? 0);
     const vat = it.vat_amount != null ? Number(it.vat_amount) : vatOf(net, pct);
-    totNet += net; totVat += vat;
+    totNet += net;
     const key = String(pct);
     vatByRate[key] = vatByRate[key] || { net: 0, vat: 0 };
     vatByRate[key].net += net; vatByRate[key].vat += vat;
@@ -123,7 +123,8 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   // its printed rows.
   //
   // It used to be the other way round: each row rounded `agg.vat * cashFactor` and the total
-  // separately rounded `totVat * cashFactor`. Rounding N values and rounding their sum are not the
+  // separately rounded a `totVat` running sum (deleted with this comment's fix — the VAT total is
+  // now ONLY ever `vatAfter` below). Rounding N values and rounding their sum are not the
   // same operation, so the legally-required VAT-analysis block could add up to 3.70 beside a VAT
   // total printed as 3.71 — on the same document, in Greek, where the table exists precisely so a
   // reader can verify the total. Deriving the total from the rows makes that impossible rather than

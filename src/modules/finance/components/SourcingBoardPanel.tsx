@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { formatMoney } from '@/utils/decimal';
 import { Loader2, PackageSearch, Truck, PackageCheck, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';

@@ -129,9 +129,19 @@ Closely related to shape 1, but at the aggregate rather than the row.
 | `ops.money_without_currency` | nightly | shape 6 | no — but all three branches were watched to fire before shipping |
 | `ops.unsent_queue_backlog` | nightly | shape 4c | no — but it fired on real production data on introduction |
 | `pdf.product_resume_incomplete` | nightly | shape 4b | no — but it was watched to fire on a planted marker before shipping |
+| [tests/unit/escapeHtmlParity.test.ts](../tests/unit/escapeHtmlParity.test.ts) | `npm test`, blocking | invariant 11 — the three `escapeHtml` twins (Vite / Deno edge / Vercel `api/`) stay byte-equivalent | **yes** — imports all three and diffs them over a shared corpus, so a twin that stops matching fails the build rather than reporting clean |
+| `lint_plpgsql_errors()` via `db.plpgsql-lint` | smoke monitor, 2-hourly | every `public` plpgsql function still compiles against the live schema | yes — baseline is a strict **zero**, so any new breakage fails instead of blending into a known-broken list |
 
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
-what it found. Three of eleven qualify. That is the gap.
+what it found. Five of thirteen qualify. That is the gap.
+
+> **`db.plpgsql-lint` has one known false-positive shape: runtime-created temp tables.**
+> `plpgsql_check` analyses statically, so a `create temporary table X` inside a function makes it
+> report the whole function broken on a relation that only exists at runtime. That is not a reason
+> to add the function to `KNOWN_BROKEN_FUNCTIONS` — the zero baseline is the point. Remove the temp
+> table instead (a jsonb local works, costs no `pg_class` row per call, and does not raise
+> "already exists" when the function is called twice in one transaction). Done once for
+> `pos_issue_receipt`, 2026-08-03.
 
 ---
 

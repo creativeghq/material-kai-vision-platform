@@ -49,6 +49,10 @@ rules:
       exclude:
         - "src/utils/escapeHtml.ts"
         - "supabase/functions/_shared/html.ts"
+        # Third canonical twin: the Vercel Node functions in api/ are plain ESM .js with no
+        # `@/` alias and no TS step, so they can import neither of the two above. Parity of all
+        # three is enforced by tests/unit/escapeHtmlParity.test.ts, not by convention.
+        - "api/_shared/html.js"
     pattern-either:
       - pattern: function escapeHtml(...) { ... }
       - pattern: const escapeHtml = (...) => { ... }
