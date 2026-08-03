@@ -162,7 +162,18 @@ export async function authenticate(
           user: null,
           userId: null,
           error: null,
-          supabase: adminClient, // Use admin client for anon access (RLS will still apply based on no user context)
+          // SERVICE-ROLE CLIENT. RLS DOES NOT APPLY.
+          //
+          // The previous comment here said "RLS will still apply based on no user context" and that
+          // is FALSE — the service-role key bypasses RLS unconditionally, user context or not. A
+          // reader trusting it would assume the database was enforcing tenancy on an ANONYMOUS
+          // caller's queries. It is not. Every anon-reachable handler must filter by workspace
+          // itself (CLAUDE.md invariant 1); the database will not catch a missing `.eq()`.
+          //
+          // Returning an RLS-bound client here instead is #197 item 4 and is still open — it is a
+          // structural change across ~70 functions, not a comment fix, because anything currently
+          // relying on service-role reach would start returning empty sets.
+          supabase: adminClient,
         };
       }
 
