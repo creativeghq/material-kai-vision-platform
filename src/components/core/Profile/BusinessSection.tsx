@@ -53,6 +53,20 @@ interface BusinessSectionProps {
   onEntityChanged?: (next: { entity_type: EntityType; business_id: string | null }) => void;
 }
 
+/**
+ * The cached VIES verdict as stored on crm_companies, shown when there is no live result.
+ * Named rather than inlined because three places consume it — the state hook and both status
+ * components — and the shape had already been hand-copied twice.
+ */
+interface ViesCacheSnapshot {
+  validated: boolean | null;
+  validated_at: string | null;
+  name: string | null;
+  address: string | null;
+  /** Latin transliteration of `name`; only set when the register answered in Cyrillic/Greek. */
+  name_latin: string | null;
+}
+
 export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChanged }) => {
   const { user } = useAuth();
   const { activeWorkspaceId } = useWorkspace();
@@ -69,12 +83,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
   const [pendingEntityType, setPendingEntityType] = useState<EntityType>('solo');
 
   // VIES validation state — cached snapshot from crm_companies, refreshed on demand
-  const [viesCache, setViesCache] = useState<{
-    validated: boolean | null;
-    validated_at: string | null;
-    name: string | null;
-    address: string | null;
-  } | null>(null);
+  const [viesCache, setViesCache] = useState<ViesCacheSnapshot | null>(null);
   const [viesChecking, setViesChecking] = useState(false);
   const [viesLastResult, setViesLastResult] = useState<ViesValidationResult | null>(null);
 
@@ -105,7 +114,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
     if (bid) {
       const { data: company } = await supabase
         .from('crm_companies')
-        .select('name, vat_number, tax_office, profession, phone, email, website, country, country_code, city, postal_code, street, street_number, vat_validated, vat_validated_at, vat_validated_name, vat_validated_address')
+        .select('name, vat_number, tax_office, profession, phone, email, website, country, country_code, city, postal_code, street, street_number, vat_validated, vat_validated_at, vat_validated_name, vat_validated_address, vat_validated_name_latin')
         .eq('id', bid)
         .maybeSingle();
       if (company) {
@@ -131,6 +140,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
           validated_at: (company as { vat_validated_at?: string | null }).vat_validated_at ?? null,
           name: (company as { vat_validated_name?: string | null }).vat_validated_name ?? null,
           address: (company as { vat_validated_address?: string | null }).vat_validated_address ?? null,
+          name_latin: (company as { vat_validated_name_latin?: string | null }).vat_validated_name_latin ?? null,
         });
       }
     } else {
@@ -316,6 +326,8 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
                 vat_validated_at: freshVies.checked_at,
                 vat_validated_name: freshVies.name ?? null,
                 vat_validated_address: freshVies.address ?? null,
+                vat_validated_name_latin: freshVies.legal_name_latin ?? null,
+                vat_validated_address_latin: freshVies.address_latin ?? null,
                 vat_validation_source: 'vies',
               }
             : {}),
@@ -621,7 +633,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
 };
 
 interface ViesStatusInlineProps {
-  cache: { validated: boolean | null; validated_at: string | null; name: string | null; address: string | null } | null;
+  cache: ViesCacheSnapshot | null;
   lastResult: ViesValidationResult | null;
   onAdoptName: (name: string) => void;
   onAdoptAddress: (parsed: NonNullable<ViesValidationResult['address_parsed']>, rawFallback: string | null) => void;
@@ -652,21 +664,36 @@ const ViesStatusInline: React.FC<ViesStatusInlineProps> = ({ cache, lastResult, 
       const tradeName = lastResult.trade_name;
       const parsed = lastResult.address_parsed;
       const hasParsedAddress = parsed && (parsed.street || parsed.postal_code || parsed.city);
+      // Only present when the register answered in a non-Latin script (BG Cyrillic, EL/CY Greek).
+      const latinName = lastResult.legal_name_latin;
+      const latinAddress = lastResult.address_latin;
       return (
         <div className="mt-2 rounded-lg border border-green-500/30 bg-green-500/5 p-3 space-y-2">
           <p className="text-xs text-green-700 dark:text-green-400 flex items-start gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             <span>Verified via VIES{legalName ? <> — registered as <strong>{legalName}</strong></> : ''}{tradeName ? <> (trading as <em>{tradeName}</em>)</> : ''}.</span>
           </p>
+          {latinName && (
+            <p className="text-xs text-muted-foreground pl-5">
+              <span className="text-muted-foreground/70">Latin: </span>{latinName}
+              {lastResult.trade_name_latin ? <> (trading as <em>{lastResult.trade_name_latin}</em>)</> : ''}
+            </p>
+          )}
           {lastResult.address && (
             <p className="text-xs text-muted-foreground pl-5">
               <span className="text-muted-foreground/70">Registered address: </span>{lastResult.address}
+              {latinAddress && <><br /><span className="text-muted-foreground/70">Latin: </span>{latinAddress}</>}
             </p>
           )}
           <div className="flex flex-wrap gap-2 pl-4">
             {legalName && (
               <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onAdoptName(legalName)}>
                 <CornerDownLeft className="h-3 w-3 mr-1" />Use this name
+              </Button>
+            )}
+            {latinName && (
+              <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onAdoptName(latinName)}>
+                <CornerDownLeft className="h-3 w-3 mr-1" />Use Latin name
               </Button>
             )}
             {hasParsedAddress && (
@@ -693,7 +720,10 @@ const ViesStatusInline: React.FC<ViesStatusInlineProps> = ({ cache, lastResult, 
     return (
       <p className="text-xs text-green-700 dark:text-green-400 flex items-start gap-1.5 mt-1.5">
         <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-        <span>Verified via VIES on {new Date(cache.validated_at).toLocaleDateString()}{cache.name ? <> — registered as <strong>{cache.name}</strong></> : ''}.</span>
+        <span>
+          Verified via VIES on {new Date(cache.validated_at).toLocaleDateString()}{cache.name ? <> — registered as <strong>{cache.name}</strong></> : ''}
+          {cache.name_latin ? <> (<span className="text-muted-foreground">{cache.name_latin}</span>)</> : ''}.
+        </span>
       </p>
     );
   }
@@ -779,7 +809,7 @@ const AadeInline: React.FC<AadeInlineProps> = ({ show, checking, result, onLooku
 };
 
 /** Compact badge for the read-only display under VAT number. */
-const ViesStatusBadge: React.FC<{ cache: { validated: boolean | null; validated_at: string | null; name: string | null; address: string | null } | null }> = ({ cache }) => {
+const ViesStatusBadge: React.FC<{ cache: ViesCacheSnapshot | null }> = ({ cache }) => {
   if (!cache || cache.validated_at === null) return null;
   if (cache.validated === true) {
     return (

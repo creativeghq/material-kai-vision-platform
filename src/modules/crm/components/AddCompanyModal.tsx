@@ -169,11 +169,20 @@ export const AddCompanyModal: React.FC<{
           vat_validated_at: res.checked_at,
           vat_validated_name: legal,
           vat_validated_address: res.address ?? null,
+          vat_validated_name_latin: res.legal_name_latin ?? null,
+          vat_validated_address_latin: res.address_latin ?? null,
           vat_validation_source: 'vies',
         }));
         if (legal) setName(legal);
         setVerified({ name: legal, address: res.address ?? null, source: 'vies' });
-        toast({ title: 'VAT verified', description: legal ? `Registered as ${legal}` : 'Number is valid.' });
+        toast({
+          title: 'VAT verified',
+          // Registers answering in Cyrillic/Greek get the Latin rendering alongside, so the toast
+          // is readable to a Latin-script user without displacing the authoritative name.
+          description: legal
+            ? `Registered as ${legal}${res.legal_name_latin ? ` (${res.legal_name_latin})` : ''}`
+            : 'Number is valid.',
+        });
         await runEnrichment(legal || name, countryName, vat);
       } else if (res.valid === false) {
         toast({ title: 'VAT not recognised', description: 'VIES does not recognise this number for the given country.', variant: 'destructive' });

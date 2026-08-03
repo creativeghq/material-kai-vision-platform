@@ -21,6 +21,18 @@ export interface ViesValidationResult {
   address?: string | null;
   /** Best-effort parsed address (per-country regex). NULL on unsupported countries. */
   address_parsed?: ViesParsedAddress | null;
+  /**
+   * Latin transliteration of `legal_name`. VIES answers in the member state's own script
+   * (Cyrillic for BG, Greek for EL/CY) and has no language option, so this is derived server-side.
+   * It is a READABILITY AID, not a translation and not a trading name — `Виваком България - ЕАД`
+   * transliterates to `Vivakom Bulgaria - EAD` while the company trades as "Vivacom".
+   * NULL when the registered name is already Latin, so non-null always means real conversion.
+   */
+  legal_name_latin?: string | null;
+  /** Latin transliteration of `trade_name`. NULL when already Latin or absent. */
+  trade_name_latin?: string | null;
+  /** Latin transliteration of `address`. NULL when already Latin or absent. */
+  address_latin?: string | null;
   country_code?: string;
   vat_number?: string;
   checked_at: string;

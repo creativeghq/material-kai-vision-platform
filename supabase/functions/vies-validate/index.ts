@@ -19,10 +19,18 @@
  * VIES is EU-only — non-EU country codes are skipped with skipped_reason='non_eu'.
  * address_parsed additionally carries `state` (province) for countries whose address
  * convention encodes one (e.g. IT); null elsewhere.
+ *
+ * Script note: VIES proxies each member state's own register and returns the name/address in that
+ * register's script — Cyrillic for BG, Greek for EL/CY. It has NO language parameter (verified
+ * 2026-08-03 against the REST and SOAP endpoints and against `Accept-Language` / `lang` / `locale`
+ * / `language`, all ignored). So we additionally return `*_latin` fields carrying a deterministic
+ * transliteration. Those are a readability aid, NOT a translation and NOT a trading name — the
+ * unconverted values stay authoritative and are what belongs on an invoice.
  */
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { transliterateToLatin } from '../_shared/transliterate.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -236,13 +244,20 @@ Deno.serve(withApiLogging('vies-validate', async (req: Request) => {
     const nameParsed = parseViesName(viesData.name);
     const addressParsed = parseEuAddress(country, viesData.address);
 
+    const address = viesData.address && viesData.address !== '---' ? viesData.address : null;
+
     const result = {
       valid: viesData.valid === true,
       name: nameParsed.full,
       legal_name: nameParsed.legal,
       trade_name: nameParsed.trade,
-      address: viesData.address && viesData.address !== '---' ? viesData.address : null,
+      address,
       address_parsed: addressParsed,
+      // Latin transliterations of the above. NULL when the register already answers in Latin —
+      // a non-null value therefore always means a real script conversion happened.
+      legal_name_latin: transliterateToLatin(nameParsed.legal),
+      trade_name_latin: transliterateToLatin(nameParsed.trade),
+      address_latin: transliterateToLatin(address),
       country_code: country,
       vat_number: number,
       checked_at: new Date().toISOString(),
@@ -279,6 +294,8 @@ Deno.serve(withApiLogging('vies-validate', async (req: Request) => {
             vat_validated_at: result.checked_at,
             vat_validated_name: result.legal_name,
             vat_validated_address: result.address,
+            vat_validated_name_latin: result.legal_name_latin,
+            vat_validated_address_latin: result.address_latin,
             vat_validation_source: 'vies',
             updated_at: new Date().toISOString(),
           }).eq('id', body.company_id);

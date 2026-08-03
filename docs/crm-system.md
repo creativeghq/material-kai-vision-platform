@@ -51,7 +51,24 @@ Organisation records (manufacturers, suppliers, clients). Also where a user's ow
 
 **Business-profile fields** (populated by VIES + ΑΑΔΕ auto-fill): `vat_number`, `tax_office`, `profession`, `country_code`, `street`, `street_number`, `postal_code`, `city`, `country`.
 
-**VAT validation cache** (written by `vies-validate` and `myaade-rgwspublic2`): `vat_validated boolean`, `vat_validated_at timestamptz`, `vat_validated_name text`, `vat_validated_address text`, `vat_validation_source text` (today: `vies` or `aade`).
+**VAT validation cache** (written by `vies-validate` and `myaade-rgwspublic2`): `vat_validated boolean`, `vat_validated_at timestamptz`, `vat_validated_name text`, `vat_validated_address text`, `vat_validation_source text` (today: `vies` or `aade`), plus `vat_validated_name_latin text`, `vat_validated_address_latin text`.
+
+**VIES has no English/language option — do not go looking for one.** VIES is a proxy: it forwards the
+query to the member state's own VAT register and echoes back whatever script that register stores —
+Cyrillic for BG (`Виваком България - ЕАД`), Greek for EL/CY. Verified 2026-08-03 against the REST
+endpoint, the legacy SOAP `checkVatService`, an `Accept-Language: en` header, and `lang`/`locale`/
+`language` body fields; every one returned identical Cyrillic. The response schema has no
+name/address language field at all — the extra `trader*` fields are the *qualified*-check echo of
+values **you** supply, not a translation.
+
+So the `*_latin` columns hold a deterministic transliteration produced by
+`_shared/transliterate.ts` (BG Transliteration Act 2009 incl. its `ия`→`ia` and `България`→`Bulgaria`
+exceptions; ELOT 743 for Greek incl. the αυ/ευ voicing rule). They are a **readability aid, not a
+translation and not a trading name** — `Виваком` transliterates to `Vivakom` while the company trades
+as "Vivacom". `vat_validated_name` stays authoritative and is what belongs on an invoice. The Latin
+columns are NULL when the register already answered in Latin, so a populated value always means a
+real script conversion happened. Getting the actual *trading* name needs `company-enrich` (a paid
+web-search call), not transliteration. Covered by [tests/unit/transliterate.test.ts](../tests/unit/transliterate.test.ts).
 
 **ΑΑΔΕ (Greek-business) fields** (written by `myaade-rgwspublic2`, see [`src/modules/myaade/README.md`](../src/modules/myaade/README.md)): `commercial_title`, `legal_status`, `kad_primary`, `kad_primary_description`, `kad_secondary jsonb`, `business_start_date`, `aade_data jsonb`, `aade_data_at` (90-day cache).
 

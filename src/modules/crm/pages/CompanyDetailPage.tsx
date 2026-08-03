@@ -108,6 +108,9 @@ interface Company {
   vat_validated_at?: string | null;
   vat_validated_name?: string | null;
   vat_validated_address?: string | null;
+  /** Derived Latin transliteration; only set when the register answered in a non-Latin script. */
+  vat_validated_name_latin?: string | null;
+  vat_validated_address_latin?: string | null;
   vat_validation_source?: string | null;
   // ΑΑΔΕ enrichment (Greek businesses) — mirrors the columns the myaade-rgwspublic2 fn writes
   commercial_title?: string | null;
@@ -321,7 +324,14 @@ export const CompanyDetailPage: React.FC = () => {
       } else if (result.skipped_reason === 'vies_unreachable') {
         toast({ title: 'VIES unavailable', description: result.message || 'Could not reach the VIES service. Try again later.', variant: 'destructive' });
       } else if (result.valid === true) {
-        toast({ title: 'VAT verified', description: result.name ? `Registered as ${result.name}` : 'Number is valid.' });
+        // BG/EL/CY registers answer in Cyrillic/Greek — show the Latin rendering alongside so the
+        // toast is readable, without displacing the authoritative registered name.
+        toast({
+          title: 'VAT verified',
+          description: result.name
+            ? `Registered as ${result.name}${result.legal_name_latin ? ` (${result.legal_name_latin})` : ''}`
+            : 'Number is valid.',
+        });
         await loadCompany();
       } else if (result.valid === false) {
         toast({ title: 'VAT not valid', description: 'VIES does not recognise this VAT number for the given country.', variant: 'destructive' });
@@ -832,7 +842,11 @@ export const CompanyDetailPage: React.FC = () => {
                             )}
                             {company.vat_validated_name && (<span className="text-sm text-muted-foreground">Registered as <span className="text-foreground">{company.vat_validated_name}</span></span>)}
                           </div>
+                          {/* Only set when the register answered in Cyrillic/Greek — the registered
+                              value above stays authoritative; this is a readability aid. */}
+                          {company.vat_validated_name_latin && (<p className="text-xs text-muted-foreground">Latin: <span className="text-foreground/80">{company.vat_validated_name_latin}</span></p>)}
                           {company.vat_validated_address && (<p className="text-xs text-muted-foreground">{company.vat_validated_address}</p>)}
+                          {company.vat_validated_address_latin && (<p className="text-xs text-muted-foreground">Latin: {company.vat_validated_address_latin}</p>)}
                           {(company.kad_primary || company.legal_status || company.commercial_title || (Array.isArray(company.kad_all) && company.kad_all.length > 0) || company.gemi_data) && (
                             <div className="rounded-md border border-primary/15 bg-primary/[0.03] p-3 space-y-1 text-xs">
                               {company.commercial_title && (<div><span className="text-muted-foreground">Commercial title: </span><span className="text-foreground">{company.commercial_title}</span></div>)}

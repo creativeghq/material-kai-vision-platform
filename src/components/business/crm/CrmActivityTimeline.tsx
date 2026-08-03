@@ -400,7 +400,7 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
               onKeyDown={onKeyDown}
               rows={2}
               placeholder={type === 'meeting' ? 'What was the meeting about? (optional)' : current.placeholder}
-              className="min-h-[2.75rem] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+              className="min-h-[2.75rem] border-0 bg-transparent shadow-none focus-visible:ring-0"
             />
             <div className="flex items-center justify-between gap-2 px-2.5 pb-2">
               <span className="text-[10.5px] text-muted-foreground">⌘/Ctrl + Enter to save</span>

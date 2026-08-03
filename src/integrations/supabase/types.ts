@@ -4528,8 +4528,10 @@ export type Database = {
           vat_number: string | null
           vat_validated: boolean | null
           vat_validated_address: string | null
+          vat_validated_address_latin: string | null
           vat_validated_at: string | null
           vat_validated_name: string | null
+          vat_validated_name_latin: string | null
           vat_validation_source: string | null
           website: string | null
           workspace_id: string
@@ -4603,8 +4605,10 @@ export type Database = {
           vat_number?: string | null
           vat_validated?: boolean | null
           vat_validated_address?: string | null
+          vat_validated_address_latin?: string | null
           vat_validated_at?: string | null
           vat_validated_name?: string | null
+          vat_validated_name_latin?: string | null
           vat_validation_source?: string | null
           website?: string | null
           workspace_id: string
@@ -4678,8 +4682,10 @@ export type Database = {
           vat_number?: string | null
           vat_validated?: boolean | null
           vat_validated_address?: string | null
+          vat_validated_address_latin?: string | null
           vat_validated_at?: string | null
           vat_validated_name?: string | null
+          vat_validated_name_latin?: string | null
           vat_validation_source?: string | null
           website?: string | null
           workspace_id?: string
