@@ -81,13 +81,30 @@ Deno.serve(withApiLogging('flow-webhook', async (req) => {
       }, 405);
     }
 
-    // Validate webhook secret if configured
+    // Webhook secret. THE RULING (audit #271 item 15), because the old `if (secret) { verify }`
+    // with no `else` was an accident that happened to be defensible, and #271 asked for it to be
+    // decided rather than inherited:
+    //
+    // A secret stays OPTIONAL here. CLAIMED invariant 6 ("fail closed, 503 when the secret is
+    // unset") governs webhooks we RECEIVE from a third party — Stripe, Resend, Zernio — where a
+    // secret always exists and a missing one means misconfiguration. This endpoint is the opposite
+    // shape: an ingress URL the operator creates for arbitrary external callers, the same as a
+    // Zapier catch hook. Mandating a secret would silently break every existing secret-less flow in
+    // an ops platform, which is a worse outcome than the exposure it removes: the only thing an
+    // unauthenticated caller can do is trigger a flow the operator already built, addressed by a
+    // v4 UUID they have to know.
+    //
+    // What was genuinely wrong is that an unauthenticated run was INDISTINGUISHABLE from a verified
+    // one after the fact. It is now stamped on the run, so "who could have triggered this" is
+    // answerable from the audit trail instead of by re-reading the config.
     const configSecret = (flow.trigger_config as Record<string, unknown>)?.secret;
+    let webhookAuthenticated = false;
     if (configSecret) {
       const headerSecret = req.headers.get('X-Webhook-Secret') || req.headers.get('x-webhook-secret');
       if (!headerSecret || !await timingSafeEqual(headerSecret, configSecret as string)) {
         return jsonResponse({ success: false, error: 'Invalid webhook secret' }, 401);
       }
+      webhookAuthenticated = true;
     }
 
     // Parse request body
@@ -113,6 +130,10 @@ Deno.serve(withApiLogging('flow-webhook', async (req) => {
         method: req.method,
         query_params: queryParams,
         received_at: new Date().toISOString(),
+        // Whether this invocation proved possession of the flow's shared secret. `false` means the
+        // flow has no secret configured and anyone holding the URL triggered it — see the ruling
+        // above. Recorded so an operator reviewing a run can tell the two apart.
+        authenticated: webhookAuthenticated,
       },
     };
 
