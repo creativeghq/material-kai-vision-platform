@@ -19,6 +19,8 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
 import { round2 } from '../_shared/money.ts';
+import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
+import { resolveSecret } from '../_shared/secrets.ts';
 
 /** Pull a usable image URL out of the product's metadata jsonb (best-effort, schema-loose). */
 function imageFromMetadata(meta: any): string | null {
@@ -59,9 +61,14 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
 
     if (action === 'meta') {
       if (!enabled) return json({ ok: true, enabled: false });
+      // The SITE key is public by design — it is rendered into the widget in the page source.
+      // Returned here so the storefront knows whether to show a challenge at all: when Turnstile
+      // is unconfigured this is null and checkout stays open, matching the server's fail-open.
+      const siteKey = (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY').catch(() => ({ value: null })))?.value ?? null;
       return json({
         ok: true, enabled: true, workspace_name: ws.name,
         headline: store?.headline ?? ws.name, subheadline: store?.subheadline ?? null, accent: store?.accent ?? null,
+        turnstile_site_key: siteKey,
       });
     }
 
@@ -97,6 +104,15 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       const clean = items.filter((i) => i?.product_id && Number(i.qty) > 0);
       if (clean.length === 0) return json({ error: 'cart is empty' }, 400);
       if (!customer?.email || !customer?.name) return json({ error: 'name and email are required' }, 400);
+
+      // Bot gate BEFORE any work (#257 C28). This action mints a legal-ish document, a CRM
+      // contact and a pay token from an ANONYMOUS caller, and had no rate limit or challenge at
+      // all — a script could manufacture draft receipts and contacts indefinitely.
+      //
+      // Placed above the entitlement check on purpose: a bot should not be able to enumerate
+      // which workspaces own the Finance module by reading the difference between a 403 and a 400.
+      const bot = await verifyTurnstile(supabase, body?.turnstile_token, clientIp(req));
+      if (!bot.ok) return json({ error: 'Bot check failed. Please try again.' }, 400);
 
       // Checkout creates a fiscal retail receipt, so the selling workspace must own the
       // Finance module. (Browse actions above stay open so a store can showcase products.)

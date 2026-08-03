@@ -18,6 +18,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { evaluateFormula, computeLinePricing, round2 } from '../_shared/blueprint/formula.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
+import { verifyTurnstile as verifyTurnstileShared } from '../_shared/turnstile.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -30,13 +31,20 @@ function clientIp(req: Request): string {
   return ip === 'unknown' ? '0.0.0.0' : ip;
 }
 
-async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
-  const secret = Deno.env.get('TURNSTILE_SECRET_KEY');
-  if (!secret) throw new HttpError(400, 'Bot check is not configured.');
-  const body = new URLSearchParams({ secret, response: token, remoteip: ip });
-  const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body });
-  const out = await r.json().catch(() => ({ success: false }));
-  return !!out.success;
+/**
+ * Was `Deno.env.get('TURNSTILE_SECRET_KEY')` + `throw 400 'Bot check is not configured.'`.
+ *
+ * `TURNSTILE_SECRET_KEY` lives in `platform_secrets` (set 2026-07-21), and
+ * `bootstrapForFunction()` cannot copy it into env — `Deno.env.set` is denied in this runtime and
+ * the bootstrap swallows the throw. So the secret was never visible here and this endpoint
+ * answered "Bot check is not configured" to every caller: not a weak gate, a dead feature.
+ *
+ * `resolveSecret` (inside the shared helper) reads env first, then platform_secrets, so both
+ * configuration routes work. (#257 C28)
+ */
+async function verifyTurnstile(supabase: DbClient, token: string, ip: string): Promise<boolean> {
+  const { ok } = await verifyTurnstileShared(supabase, token, ip);
+  return ok;
 }
 
 async function quotaUsed(supabase: DbClient, ip: string): Promise<number> {
@@ -87,7 +95,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     const ip = clientIp(req);
 
     // Bot check
-    if (!turnstile_token || !(await verifyTurnstile(String(turnstile_token), ip))) {
+    if (!turnstile_token || !(await verifyTurnstile(supabase, String(turnstile_token), ip))) {
       await supabase.from('public_lookup_log').insert({ scan_type: 'project_plan', ip_address: ip, outcome: 'captcha_failed', query_text: blueprint_id }).then(() => {}, () => {});
       throw new HttpError(400, 'Bot check failed. Please try again.');
     }

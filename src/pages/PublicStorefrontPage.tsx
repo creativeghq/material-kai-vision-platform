@@ -3,7 +3,7 @@
  * products, add to cart, check out → a draft order + pay token → redirect to the existing
  * /pay/:token Stripe-Connect flow.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { useParams } from 'react-router-dom';
 import { Loader2, ShoppingCart, Plus, Minus, Trash2, Store, ArrowRight, Package, Wrench } from 'lucide-react';
@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { TurnstileWidget, type TurnstileHandle } from '@/components/features/turnstile/TurnstileWidget';
 import { storefrontService, type StorefrontMeta, type StorefrontProduct } from '@/modules/finance/services/storefrontService';
 
 const money = (n: number, ccy: string) => formatMoney(n, ccy || 'EUR');
@@ -26,6 +27,11 @@ const PublicStorefrontPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
   const [checkingOut, setCheckingOut] = useState(false);
+  // Null until the visitor passes the challenge. When the platform has no Turnstile configured
+  // `meta.turnstile_site_key` is null, no widget renders, and the server accepts the checkout
+  // without a token — the same fail-open ruling the rest of the public surface uses.
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -65,11 +71,17 @@ const PublicStorefrontPage: React.FC = () => {
         slug,
         cartLines.map(([product_id, qty]) => ({ product_id, qty })),
         { name: name.trim(), email: email.trim(), note: note.trim() || undefined },
+        turnstileToken,
       );
       // Hand off to the existing pay page → Stripe Connect checkout.
       window.location.href = res.pay_url;
     } catch (e: any) {
       setError(e?.message ?? 'Checkout failed. Please try again.');
+      // A Turnstile token is single-use: whatever failed, the old one is now spent, so clear it
+      // and re-arm the widget. Without this a retry sends a burnt token and fails the bot check
+      // for a reason that has nothing to do with why the first attempt failed.
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
       setCheckingOut(false);
     }
   };
@@ -170,8 +182,26 @@ const PublicStorefrontPage: React.FC = () => {
                     <Input className="h-9" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. I'll pick up today" maxLength={500} />
                   </div>
                 </div>
+                {meta?.turnstile_site_key && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Bot check</Label>
+                    <TurnstileWidget
+                      ref={turnstileRef}
+                      siteKey={meta.turnstile_site_key}
+                      action="storefront_checkout"
+                      onVerify={setTurnstileToken}
+                      onExpired={() => setTurnstileToken(null)}
+                      onError={() => setTurnstileToken(null)}
+                    />
+                  </div>
+                )}
                 {error && <p className="text-xs text-destructive">{error}</p>}
-                <Button className="w-full" onClick={checkout} disabled={checkingOut}>
+                <Button
+                  className="w-full"
+                  onClick={checkout}
+                  // Only gated when a challenge is actually being shown.
+                  disabled={checkingOut || (!!meta?.turnstile_site_key && !turnstileToken)}
+                >
                   {checkingOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Checkout · {money(total, currency)} <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>

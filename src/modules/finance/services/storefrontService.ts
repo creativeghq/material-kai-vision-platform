@@ -11,6 +11,10 @@ export interface StorefrontMeta {
   headline?: string | null;
   subheadline?: string | null;
   accent?: string | null;
+  /** Public Turnstile site key, or null when the platform has no Turnstile configured — in which
+   *  case the storefront shows no challenge and the server accepts the checkout without a token
+   *  (same fail-open ruling as every other public form here). */
+  turnstile_site_key?: string | null;
 }
 
 export interface StorefrontProduct {
@@ -51,9 +55,14 @@ export const storefrontService = {
   // ── Public (anonymous) ──
   getMeta(slug: string) { return callFn<StorefrontMeta & { ok: boolean }>({ action: 'meta', slug }); },
   getProducts(slug: string) { return callFn<{ ok: boolean; products: StorefrontProduct[] }>({ action: 'products', slug }); },
-  checkout(slug: string, items: { product_id: string; qty: number }[], customer: { name: string; email: string; note?: string }) {
+  checkout(
+    slug: string,
+    items: { product_id: string; qty: number }[],
+    customer: { name: string; email: string; note?: string },
+    turnstileToken?: string | null,
+  ) {
     return callFn<{ ok: boolean; invoice_id: string; pay_token: string; pay_url: string; total: number; currency: string }>(
-      { action: 'checkout', slug, items, customer },
+      { action: 'checkout', slug, items, customer, turnstile_token: turnstileToken ?? null },
     );
   },
 
