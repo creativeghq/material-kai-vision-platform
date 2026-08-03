@@ -357,7 +357,24 @@ async function resolveCampaignOwner(supabase: any, phone: string): Promise<strin
 /** Delivery-status events for outbound messages (delivered / read / failed). */
 async function handleDeliveryStatus(supabase: any, event: string, payload: any): Promise<void> {
   const msg = payload.message || {};
-  const wamid = msg.platformMessageId || msg.id;
+
+  // Match on EITHER id, because we cannot prove which one we stored.
+  //
+  // Outbound writes `provider_message_id = data.messageId` from Zernio's conversation-create; the
+  // receipt webhook carries BOTH `platformMessageId` (the WhatsApp wamid) and `id` (Zernio's own).
+  // This used to pick `platformMessageId || msg.id` — so if create returns Zernio's internal id
+  // while the webhook carries a wamid, the lookup silently matched nothing and every outbound
+  // message stayed `sent` forever: no delivery, no read, and a message Meta reported as FAILED
+  // still displayed as sent.
+  //
+  // #286 left this open pending Zernio's response contract. Trying both ids closes it without one:
+  // they are distinct opaque strings from the same vendor, so a row matching either is the row,
+  // and if the contract is ever confirmed this simply stops needing the second candidate. Ordered
+  // platform-id first so the common case is one query.
+  const wamidCandidates = [msg.platformMessageId, msg.id]
+    .filter((v: unknown): v is string => typeof v === 'string' && v.length > 0)
+    .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
+  const wamid = wamidCandidates[0];
   if (!wamid) return;
 
   const status = event === 'message.delivered' ? 'delivered' : event === 'message.read' ? 'read' : 'failed';
@@ -373,9 +390,10 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
   }
 
   // Outbound campaign / transactional log.
-  const { data: log } = await supabase
+  const { data: logs } = await supabase
     .from('messaging_logs').select('id, campaign_id')
-    .eq('provider_message_id', wamid).maybeSingle();
+    .in('provider_message_id', wamidCandidates).limit(1);
+  const log = logs?.[0];
   if (log?.id) {
     await supabase.from('messaging_logs').update(update).eq('id', log.id);
     if (log.campaign_id) {
@@ -396,16 +414,24 @@ async function handleDeliveryStatus(supabase: any, event: string, payload: any):
   // `delivered`) recorded itself AND made the row permanently unmatchable. Every later `read` or
   // `failed` receipt matched zero rows forever: read receipts never worked, and a message Meta
   // later reported as FAILED stayed displayed as delivered.
-  const { data: receiptRows, error: receiptErr } = await supabase.rpc('apply_inbox_delivery_receipt', {
-    p_wamid: wamid,
-    p_status: status,
-    p_at: at,
-  });
+  // Same either-id treatment: try each candidate until one matches a row.
+  let receiptRows: unknown = null;
+  let receiptErr: { message: string } | null = null;
+  for (const candidate of wamidCandidates) {
+    const r = await supabase.rpc('apply_inbox_delivery_receipt', {
+      p_wamid: candidate,
+      p_status: status,
+      p_at: at,
+    });
+    receiptErr = r.error;
+    receiptRows = r.data;
+    if (r.error || r.data) break;
+  }
   // The old code discarded the result, so a 0-row match looked exactly like success.
   if (receiptErr) {
     console.error('[zernio-webhook] delivery receipt failed:', receiptErr.message, 'wamid:', wamid);
   } else if (!receiptRows) {
-    console.warn('[zernio-webhook] delivery receipt matched no inbox message. wamid:', wamid, 'status:', status);
+    console.warn('[zernio-webhook] delivery receipt matched no inbox message. tried:', wamidCandidates.join(','), 'status:', status);
   }
 }
 
