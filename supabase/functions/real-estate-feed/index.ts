@@ -9,10 +9,17 @@ import { toPublic } from '../_shared/real-estate.ts';
 
 const corsHeaders = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type' };
 const xml = (s: string) => new Response(s, { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/xml; charset=utf-8' } });
-const err = (msg: string, status = 400) => new Response(`<?xml version="1.0"?><error>${esc(msg)}</error>`, { status, headers: { ...corsHeaders, 'Content-Type': 'application/xml; charset=utf-8' } });
+const err = (msg: string, status = 400) => new Response(`<?xml version="1.0"?><error>${escapeXml(msg)}</error>`, { status, headers: { ...corsHeaders, 'Content-Type': 'application/xml; charset=utf-8' } });
 
-/** XML text/attribute escape (predefined entities). */
-function esc(v: any): string {
+/**
+ * XML text/attribute escape (predefined entities).
+ *
+ * NOT named `esc`: invariant 11 forbids that name precisely because three unrelated contracts —
+ * HTML escaper, PostgREST filter sanitizer, XML/CSV quoter — all used it, and a copy-paste between
+ * two of them is a silent injection with no type error. XML entities are not HTML entities
+ * (`&apos;` is invalid in HTML4), so this must never be swapped for escapeHtml.
+ */
+function escapeXml(v: any): string {
   return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
@@ -65,23 +72,23 @@ function priceFreq(tx: string): string {
 
 function renderKyero(items: Array<{ raw: any; pub: any; images: string[] }>): string {
   const props = items.map(({ pub, images }) => {
-    const imgs = images.map((u, i) => `      <image id="${i + 1}"><url>${esc(u)}</url></image>`).join('\n');
+    const imgs = images.map((u, i) => `      <image id="${i + 1}"><url>${escapeXml(u)}</url></image>`).join('\n');
     return `  <property>
-    <id>${esc(pub.id)}</id>
-    <ref>${esc(pub.reference_code ?? pub.id)}</ref>
-    <price>${esc(pub.price ?? 0)}</price>
-    <currency>${esc(pub.currency ?? 'EUR')}</currency>
-    <price_freq>${esc(priceFreq(pub.transaction_type))}</price_freq>
-    <type>${esc(pub.subtype || pub.property_type)}</type>
-    <town>${esc(pub.town ?? '')}</town>
-    <province>${esc(pub.region ?? pub.prefecture ?? '')}</province>
-    <country>${esc(pub.country_code ?? '')}</country>
-    <location><latitude>${esc(pub.lat ?? '')}</latitude><longitude>${esc(pub.lng ?? '')}</longitude></location>
-    <beds>${esc(pub.bedrooms ?? '')}</beds>
-    <baths>${esc(pub.bathrooms ?? '')}</baths>
-    <surface_area><built>${esc(pub.area_built ?? '')}</built><plot>${esc(pub.plot_area ?? pub.area_plot ?? '')}</plot></surface_area>
-    <energy_rating><consumption>${esc(pub.energy_class ?? '')}</consumption></energy_rating>
-    <desc><en>${esc(pub.description_i18n?.en ?? '')}</en><el>${esc(pub.description_i18n?.el ?? '')}</el></desc>
+    <id>${escapeXml(pub.id)}</id>
+    <ref>${escapeXml(pub.reference_code ?? pub.id)}</ref>
+    <price>${escapeXml(pub.price ?? 0)}</price>
+    <currency>${escapeXml(pub.currency ?? 'EUR')}</currency>
+    <price_freq>${escapeXml(priceFreq(pub.transaction_type))}</price_freq>
+    <type>${escapeXml(pub.subtype || pub.property_type)}</type>
+    <town>${escapeXml(pub.town ?? '')}</town>
+    <province>${escapeXml(pub.region ?? pub.prefecture ?? '')}</province>
+    <country>${escapeXml(pub.country_code ?? '')}</country>
+    <location><latitude>${escapeXml(pub.lat ?? '')}</latitude><longitude>${escapeXml(pub.lng ?? '')}</longitude></location>
+    <beds>${escapeXml(pub.bedrooms ?? '')}</beds>
+    <baths>${escapeXml(pub.bathrooms ?? '')}</baths>
+    <surface_area><built>${escapeXml(pub.area_built ?? '')}</built><plot>${escapeXml(pub.plot_area ?? pub.area_plot ?? '')}</plot></surface_area>
+    <energy_rating><consumption>${escapeXml(pub.energy_class ?? '')}</consumption></energy_rating>
+    <desc><en>${escapeXml(pub.description_i18n?.en ?? '')}</en><el>${escapeXml(pub.description_i18n?.el ?? '')}</el></desc>
     <images>
 ${imgs}
     </images>
@@ -104,9 +111,9 @@ function renderOpenImmo(items: Array<{ raw: any; pub: any; images: string[] }>):
   const props = items.map(({ pub, images }) => {
     const isRent = pub.transaction_type === 'rent' || pub.transaction_type === 'short_let';
     const priceTag = pub.price != null
-      ? (isRent ? `<kaltmiete>${esc(pub.price)}</kaltmiete>` : `<kaufpreis>${esc(pub.price)}</kaufpreis>`)
+      ? (isRent ? `<kaltmiete>${escapeXml(pub.price)}</kaltmiete>` : `<kaufpreis>${escapeXml(pub.price)}</kaufpreis>`)
       : '';
-    const imgs = images.map((u, i) => `        <anhang location="EXTERN" gruppe="BILD"><anhangtitel>Bild ${i + 1}</anhangtitel><daten><pfad>${esc(u)}</pfad></daten></anhang>`).join('\n');
+    const imgs = images.map((u, i) => `        <anhang location="EXTERN" gruppe="BILD"><anhangtitel>Bild ${i + 1}</anhangtitel><daten><pfad>${escapeXml(u)}</pfad></daten></anhang>`).join('\n');
     return `    <immobilie>
       <objektkategorie>
         <nutzungsart WOHNEN="${pub.property_type === 'commercial' ? 'false' : 'true'}" GEWERBE="${pub.property_type === 'commercial' ? 'true' : 'false'}"/>
@@ -114,30 +121,30 @@ function renderOpenImmo(items: Array<{ raw: any; pub: any; images: string[] }>):
         <objektart>${objektart(pub)}</objektart>
       </objektkategorie>
       <geo>
-        <plz>${esc(pub.postcode ?? '')}</plz><ort>${esc(pub.town ?? '')}</ort>
-        <bundesland>${esc(pub.region ?? '')}</bundesland><land iso_land="${esc((pub.country_code ?? 'GR').toUpperCase())}"/>
-        ${pub.lat != null && pub.lng != null ? `<geokoordinaten breitengrad="${esc(pub.lat)}" laengengrad="${esc(pub.lng)}"/>` : ''}
+        <plz>${escapeXml(pub.postcode ?? '')}</plz><ort>${escapeXml(pub.town ?? '')}</ort>
+        <bundesland>${escapeXml(pub.region ?? '')}</bundesland><land iso_land="${escapeXml((pub.country_code ?? 'GR').toUpperCase())}"/>
+        ${pub.lat != null && pub.lng != null ? `<geokoordinaten breitengrad="${escapeXml(pub.lat)}" laengengrad="${escapeXml(pub.lng)}"/>` : ''}
       </geo>
-      <preise>${priceTag}<waehrung iso_waehrung="${esc(pub.currency ?? 'EUR')}"/></preise>
+      <preise>${priceTag}<waehrung iso_waehrung="${escapeXml(pub.currency ?? 'EUR')}"/></preise>
       <flaechen>
-        ${pub.area_built != null ? `<wohnflaeche>${esc(pub.area_built)}</wohnflaeche>` : ''}
-        ${(pub.plot_area ?? pub.area_plot) != null ? `<grundstuecksflaeche>${esc(pub.plot_area ?? pub.area_plot)}</grundstuecksflaeche>` : ''}
-        ${pub.bedrooms != null ? `<anzahl_schlafzimmer>${esc(pub.bedrooms)}</anzahl_schlafzimmer>` : ''}
-        ${pub.bathrooms != null ? `<anzahl_badezimmer>${esc(pub.bathrooms)}</anzahl_badezimmer>` : ''}
+        ${pub.area_built != null ? `<wohnflaeche>${escapeXml(pub.area_built)}</wohnflaeche>` : ''}
+        ${(pub.plot_area ?? pub.area_plot) != null ? `<grundstuecksflaeche>${escapeXml(pub.plot_area ?? pub.area_plot)}</grundstuecksflaeche>` : ''}
+        ${pub.bedrooms != null ? `<anzahl_schlafzimmer>${escapeXml(pub.bedrooms)}</anzahl_schlafzimmer>` : ''}
+        ${pub.bathrooms != null ? `<anzahl_badezimmer>${escapeXml(pub.bathrooms)}</anzahl_badezimmer>` : ''}
       </flaechen>
       <zustand_angaben>
-        ${pub.year_built != null ? `<baujahr>${esc(pub.year_built)}</baujahr>` : ''}
-        ${pub.energy_class ? `<energiepass><epart>ENDENERGIEBEDARF</epart><wertklasse>${esc(pub.energy_class)}</wertklasse></energiepass>` : ''}
+        ${pub.year_built != null ? `<baujahr>${escapeXml(pub.year_built)}</baujahr>` : ''}
+        ${pub.energy_class ? `<energiepass><epart>ENDENERGIEBEDARF</epart><wertklasse>${escapeXml(pub.energy_class)}</wertklasse></energiepass>` : ''}
       </zustand_angaben>
       <freitexte>
-        <objekttitel>${esc(pub.title ?? '')}</objekttitel>
-        <objektbeschreibung>${esc(pub.description_i18n?.en || pub.description_i18n?.el || '')}</objektbeschreibung>
+        <objekttitel>${escapeXml(pub.title ?? '')}</objekttitel>
+        <objektbeschreibung>${escapeXml(pub.description_i18n?.en || pub.description_i18n?.el || '')}</objektbeschreibung>
       </freitexte>
       <anhaenge>
 ${imgs}
       </anhaenge>
       <verwaltung_techn>
-        <objektnr_extern>${esc(pub.reference_code ?? pub.id)}</objektnr_extern>
+        <objektnr_extern>${escapeXml(pub.reference_code ?? pub.id)}</objektnr_extern>
         <aktion/>
       </verwaltung_techn>
     </immobilie>`;
@@ -153,24 +160,24 @@ ${props}
 
 function renderGeneric(items: Array<{ raw: any; pub: any; images: string[] }>): string {
   const props = items.map(({ pub, images }) => {
-    const imgs = images.map((u) => `      <image>${esc(u)}</image>`).join('\n');
-    const feats = (Array.isArray(pub.features) ? pub.features : []).map((f: string) => `      <feature>${esc(f)}</feature>`).join('\n');
+    const imgs = images.map((u) => `      <image>${escapeXml(u)}</image>`).join('\n');
+    const feats = (Array.isArray(pub.features) ? pub.features : []).map((f: string) => `      <feature>${escapeXml(f)}</feature>`).join('\n');
     return `  <listing>
-    <id>${esc(pub.id)}</id>
-    <reference>${esc(pub.reference_code ?? '')}</reference>
-    <title>${esc(pub.title ?? '')}</title>
-    <property_type>${esc(pub.property_type)}</property_type>
-    <transaction_type>${esc(pub.transaction_type)}</transaction_type>
-    <price>${esc(pub.price ?? '')}</price>
-    <currency>${esc(pub.currency ?? 'EUR')}</currency>
-    <town>${esc(pub.town ?? '')}</town>
-    <region>${esc(pub.region ?? '')}</region>
-    <country>${esc(pub.country_code ?? '')}</country>
-    <bedrooms>${esc(pub.bedrooms ?? '')}</bedrooms>
-    <bathrooms>${esc(pub.bathrooms ?? '')}</bathrooms>
-    <area_built>${esc(pub.area_built ?? '')}</area_built>
-    <energy_class>${esc(pub.energy_class ?? '')}</energy_class>
-    <description>${esc(pub.description_i18n?.en || pub.description_i18n?.el || '')}</description>
+    <id>${escapeXml(pub.id)}</id>
+    <reference>${escapeXml(pub.reference_code ?? '')}</reference>
+    <title>${escapeXml(pub.title ?? '')}</title>
+    <property_type>${escapeXml(pub.property_type)}</property_type>
+    <transaction_type>${escapeXml(pub.transaction_type)}</transaction_type>
+    <price>${escapeXml(pub.price ?? '')}</price>
+    <currency>${escapeXml(pub.currency ?? 'EUR')}</currency>
+    <town>${escapeXml(pub.town ?? '')}</town>
+    <region>${escapeXml(pub.region ?? '')}</region>
+    <country>${escapeXml(pub.country_code ?? '')}</country>
+    <bedrooms>${escapeXml(pub.bedrooms ?? '')}</bedrooms>
+    <bathrooms>${escapeXml(pub.bathrooms ?? '')}</bathrooms>
+    <area_built>${escapeXml(pub.area_built ?? '')}</area_built>
+    <energy_class>${escapeXml(pub.energy_class ?? '')}</energy_class>
+    <description>${escapeXml(pub.description_i18n?.en || pub.description_i18n?.el || '')}</description>
     <features>
 ${feats}
     </features>

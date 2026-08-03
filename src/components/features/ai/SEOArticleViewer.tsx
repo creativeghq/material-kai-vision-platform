@@ -1854,9 +1854,12 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
     if (!article?.id) return 'notfound';
     const md = article.markdown_content ?? '';
     if (md.includes(`](${url})`) || md.includes(`[${anchor}](`)) return 'exists';
-    const esc = anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // NOT `esc` — this escapes REGEX metacharacters for the RegExp below and has nothing to do
+    // with HTML escaping. Invariant 11: three unrelated contracts shared that one name, and a
+    // copy-paste between any two of them is a silent injection with no type error to catch it.
+    const escapedAnchor = anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     let re: RegExp;
-    try { re = new RegExp(`(?<!\\[)\\b${esc}\\b(?!\\]|\\()`); } catch { re = new RegExp(esc); }
+    try { re = new RegExp(`(?<!\\[)\\b${escapedAnchor}\\b(?!\\]|\\()`); } catch { re = new RegExp(escapedAnchor); }
     if (!re.test(md)) return 'notfound';
     const next = md.replace(re, `[${anchor}](${url})`);
     const { error } = await supabase.from('seo_articles').update({ markdown_content: next }).eq('id', article.id);

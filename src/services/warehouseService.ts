@@ -459,13 +459,15 @@ export const warehouseService = {
   async searchCatalogProducts(workspaceId: string, query: string, limit = 8): Promise<CatalogMatch[]> {
     const q = query.trim();
     if (q.length < 2) return [];
-    const esc = q.replace(/[,%()]/g, ' ').trim();
+    // NOT `esc` — this strips PostgREST `or()` metacharacters, it does NOT escape HTML.
+    // Invariant 11: the two contracts shared a name, and swapping them is a silent injection.
+    const filterSafe = q.replace(/[,%()]/g, ' ').trim();
     const { data, error } = await supabase
       .from('products')
       .select(`id, name, sku, external_sku, metadata, ${PRODUCT_IMAGE_SELECT}`)
       .eq('workspace_id', workspaceId)
       .neq('supply_mode', 'reference_only')
-      .or(`name.ilike.%${esc}%,sku.ilike.%${esc}%,external_sku.ilike.%${esc}%`)
+      .or(`name.ilike.%${filterSafe}%,sku.ilike.%${filterSafe}%,external_sku.ilike.%${filterSafe}%`)
       .limit(limit);
     if (error) throw error;
     return (data ?? []).map((p: any) => ({
