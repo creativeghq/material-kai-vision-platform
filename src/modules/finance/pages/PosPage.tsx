@@ -223,15 +223,17 @@ const PosPage: React.FC = () => {
     const byRate = new Map<number, { net: number; vat: number; gross: number }>();
     for (const l of cart) {
       const rate = Number.isFinite(l.line_vat) ? l.line_vat : vatRate;
-      const lineSum = l.unit_price * l.qty;
-      const net = vatInclusive ? extractNet(lineSum, rate) : lineSum;
-      const vat = vatInclusive ? lineSum - net : net * rate / 100;
+      // Rounded per line, in the same order `pos_issue_receipt` rounds: unit net, then line net,
+      // then VAT on that rounded net. The previous version accumulated UNROUNDED line values and
+      // rounded once per rate bucket, which is a different number — a basket could preview 24.18
+      // and store 24.19 off the same cart. Whatever the register shows must be what myDATA gets.
+      const unitNet = round2(vatInclusive ? extractNet(l.unit_price, rate) : l.unit_price);
+      const net = round2(unitNet * l.qty);
+      const vat = vatOf(net, rate);
       const e = byRate.get(rate) ?? { net: 0, vat: 0, gross: 0 };
       e.net += net; e.vat += vat; e.gross += net + vat;
       byRate.set(rate, e);
     }
-    // Round once per rate bucket, not per line — rounding each line then summing drifts
-    // against the printed per-rate subtotals.
     const buckets = [...byRate.entries()]
       .map(([rate, v]) => ({ rate, net: round2(v.net), vat: round2(v.vat), gross: round2(v.gross) }))
       .sort((a, b) => b.rate - a.rate);
@@ -379,76 +381,59 @@ const PosPage: React.FC = () => {
     if (!activeWorkspaceId || cart.length === 0) return;
     setIssuing(true);
     try {
-      const { data: numRows, error: numErr } = await supabase.rpc('next_document_number', {
-        p_workspace_id: activeWorkspaceId, p_doc_code: docType, p_branch_code: parseInt(branchCode, 10) || 0,
-      });
-      if (numErr) throw numErr;
-      const num = Array.isArray(numRows) ? numRows[0] : numRows;
-
-      const { data: invoice, error: insErr } = await supabase
-        .from('invoices')
-        .insert({
-          workspace_id: activeWorkspaceId,
-          internal_number: num?.formatted,
-          series: num?.series ?? null,
-          series_number: num?.number ?? null,
-          branch_code: parseInt(branchCode, 10) || 0,
-          status: 'issued',
-          pos_session_id: session!.id,
-          document_type: docType, // 11.1 ΑΛΠ or 11.2 ΑΠΥ
-          customer_company_id: customer?.type === 'company' ? customer.id : null,
-          customer_contact_id: customer?.type === 'contact' ? customer.id : null,
-          // ONE derivation — see AADE_PAYMENT_CODE. Was `method === 'cash' ? 3 : 7`, which
-          // declared every IRIS receipt to AADE as a card payment.
-          payment_method_code: AADE_PAYMENT_CODE[method],
-          currency,
-          subtotal_net: totals.net,
-          // Dominant rate by net — a mixed basket has no single truthful rate, and this
-          // column is NOT NULL. Per-rate truth is on invoice_items.
-          vat_rate: totals.dominantRate,
-          vat_amount: totals.vat,
-          total: totals.total,
-          issued_at: new Date().toISOString(),
-          has_shipping: movementDoc,
-          vehicle_number: movementDoc ? (movVehicle || null) : null,
-          ship_to: movementDoc ? (movShipTo || null) : null,
-          move_purpose: movementDoc ? '1' : null,
-        })
-        .select()
-        .single();
-      if (insErr) throw insErr;
-
-      const itemsPayload = cart.map((l) => {
-        // Net is extracted at the LINE's own rate, not the register's current one — see the
-        // note on `totals`. Also persists net_value and vat_amount — both exist on
-        // invoice_items and must not be left null.
-        const lineRate = Number.isFinite(l.line_vat) ? l.line_vat : vatRate;
-        const unitNet = vatInclusive ? round2(extractNet(l.unit_price, lineRate)) : l.unit_price;
-        const lineNet = round2(unitNet * l.qty);
-        return {
-          invoice_id: invoice.id,
+      // ONE round trip, ONE transaction: allocate the legal ΑΑΔΕ number, write the header, write
+      // the lines. Previously these were three separate calls, so anything failing after the first
+      // (RLS rejection, validation, dropped connection, closed tab) left a permanent GAP in the
+      // legal series — and a failure after the second left an `issued` invoice, holding a legal
+      // number, with zero items. The counter increment is a plain UPDATE, so inside the function it
+      // simply rolls back with everything else.
+      //
+      // The header totals come back DERIVED FROM THE STORED LINES, so Σ lines = subtotal_net always
+      // holds. myDATA rejects a document whose lines do not foot. (audit #271 items 4 and 6)
+      const { data: issued, error: issErr } = await supabase.rpc('pos_issue_receipt', {
+        p_workspace_id: activeWorkspaceId,
+        p_session_id: session!.id,
+        p_doc_code: docType, // 11.1 ΑΛΠ or 11.2 ΑΠΥ
+        p_branch_code: parseInt(branchCode, 10) || 0,
+        p_items: cart.map((l) => ({
           product_id: l.id.startsWith('manual-') ? null : l.id,
           description: l.name,
           quantity: l.qty,
-          unit_price: unitNet,
-          line_total: lineNet,
-          net_value: lineNet,
-          vat_amount: vatOf(lineNet, lineRate),
+          unit_price: l.unit_price,
+          // The LINE's own rate, not whatever the keypad currently shows.
+          vat_rate: Number.isFinite(l.line_vat) ? l.line_vat : vatRate,
           vat_category: l.vat_category,
-          income_classification_type: l.inc_type,
-          income_classification_category: l.inc_cat,
-        };
+          inc_type: l.inc_type,
+          inc_cat: l.inc_cat,
+        })),
+        p_vat_inclusive: vatInclusive,
+        p_currency: currency,
+        // ONE derivation — see AADE_PAYMENT_CODE. Was `method === 'cash' ? 3 : 7`, which
+        // declared every IRIS receipt to AADE as a card payment.
+        p_payment_method_code: AADE_PAYMENT_CODE[method],
+        p_customer_company_id: customer?.type === 'company' ? customer.id : null,
+        p_customer_contact_id: customer?.type === 'contact' ? customer.id : null,
+        p_has_shipping: movementDoc,
+        p_vehicle_number: movementDoc ? (movVehicle || null) : null,
+        p_ship_to: movementDoc ? (movShipTo || null) : null,
+        p_move_purpose: movementDoc ? '1' : null,
       });
-      const { error: itErr } = await supabase.from('invoice_items').insert(itemsPayload);
-      if (itErr) throw itErr;
+      if (issErr) throw issErr;
+      const invoice = Array.isArray(issued) ? issued[0] : issued;
+      if (!invoice?.invoice_id) throw new Error('Receipt was not issued');
 
       const snapshot = {
-        invoiceId: invoice.id,
-        number: num?.formatted as string, total: totals.total, currency,
-        net: totals.net, vat: totals.vat, vatRate, docType, customerName: customer?.name ?? null,
+        invoiceId: invoice.invoice_id as string,
+        // Everything printed on the customer's receipt is what the database actually stored,
+        // read back from the same transaction that stored it — not a client-side recomputation
+        // that could round differently.
+        number: invoice.internal_number as string,
+        total: Number(invoice.total), currency,
+        net: Number(invoice.net), vat: Number(invoice.vat),
+        vatRate, docType, customerName: customer?.name ?? null,
         // Per-rate buckets so the receipt can print a real ΑΝΑΛΥΣΗ ΦΠΑ for a mixed basket
         // instead of one row at whatever rate the keypad last showed.
-        vatBreakdown: totals.byRate,
+        vatBreakdown: (invoice.by_rate ?? []) as { rate: number; net: number; vat: number; gross: number }[],
         lines: cart.map((l) => ({ name: l.name, qty: l.qty, unit_price: l.unit_price, line_vat: l.line_vat })),
       };
 
@@ -456,32 +441,32 @@ const PosPage: React.FC = () => {
 
       // Law 5155 — card/IRIS on a registered terminal must be SIGNED, charged, then finalized.
       if (method !== 'cash' && selectedTerminal) {
-        const res = await fiscalConnectorService.submitInvoice(invoice.id, {
+        const res = await fiscalConnectorService.submitInvoice(snapshot.invoiceId, {
           posPayment: { terminal_id: selectedTerminal.terminal_id, pos_nsp_id: selectedTerminal.pos_nsp_id, payment_type: AADE_PAYMENT_CODE[method] },
         });
         if (res?.fiscal?.status === 'awaiting_payment') {
           const { data: sig } = await supabase
             .from('pos_signatures').select('id')
-            .eq('invoice_id', invoice.id).eq('status', 'awaiting_payment')
+            .eq('invoice_id', snapshot.invoiceId).eq('status', 'awaiting_payment')
             .order('created_at', { ascending: false }).limit(1).maybeSingle();
           setAwaiting({
-            posSignatureId: (sig as any)?.id ?? '', invoiceId: invoice.id,
+            posSignatureId: (sig as any)?.id ?? '', invoiceId: snapshot.invoiceId,
             method: method as 'card' | 'iris', ...snapshot,
           });
           resetSale();
           toast({ title: 'Receipt signed — charge the terminal', description: 'Complete the card payment on the EFT-POS device, then confirm.' });
           return;
         }
-        await finalizeSale(invoice.id, snapshot, method as 'card' | 'iris', res?.fiscal?.mark ?? null);
+        await finalizeSale(snapshot.invoiceId, snapshot, method as 'card' | 'iris', res?.fiscal?.mark ?? null);
         return;
       }
 
       let mark: string | null = null;
       try {
-        const res = await fiscalConnectorService.submitInvoice(invoice.id);
+        const res = await fiscalConnectorService.submitInvoice(snapshot.invoiceId);
         mark = res?.fiscal?.mark ?? null;
       } catch { /* surfaced on the document page */ }
-      await finalizeSale(invoice.id, snapshot, method, mark);
+      await finalizeSale(snapshot.invoiceId, snapshot, method, mark);
     } catch (err: any) {
       toast({ title: 'Failed to issue receipt', description: err?.message, variant: 'destructive' });
     } finally { setIssuing(false); }
