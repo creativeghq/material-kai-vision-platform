@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { timeAgo } from '@/utils/datetime';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -50,15 +51,6 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   changelog_published:    <Megaphone className="h-4 w-4 text-primary" />,
 };
 
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1)  return 'just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
 
 export const NotificationsPanel: React.FC = () => {
   const { user } = useAuth();

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { timeAgo } from '@/utils/datetime';
 import {
   Globe, Plus, Trash2, RefreshCw, Loader2, ExternalLink, Star,
   AlertTriangle, CheckCircle2, Pencil,
@@ -22,16 +23,6 @@ import {
 import { Search, FileSearch, BarChart3, ChevronRight } from 'lucide-react';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 
-function timeAgo(iso: string | null): string {
-  if (!iso) return 'never';
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1)  return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24)  return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 function statusOf(w: UserWebsite): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ReactNode } {
   if (w.last_crawl_error) {
