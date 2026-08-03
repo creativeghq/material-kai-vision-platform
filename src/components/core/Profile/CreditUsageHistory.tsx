@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { formatDate as formatDateValue } from '@/utils/datetime';
 import { History, Loader2, TrendingDown, ArrowDownRight, ArrowUpRight, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
@@ -40,13 +41,8 @@ const CATEGORY_COLOR: Record<string, string> = {
   Other: 'bg-muted-foreground/50',
 };
 
-const formatDate = (dateString: string) =>
-  new Date(dateString).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+// Now carries the year as well — a credit ledger spanning a year boundary was ambiguous without it.
+const formatDate = (dateString: string) => formatDateValue(dateString, { withTime: true });
 
 export const CreditUsageHistory: React.FC = () => {
   const { user } = useAuth();

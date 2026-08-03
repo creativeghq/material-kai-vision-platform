@@ -10,6 +10,7 @@
  */
 
 import React from 'react';
+import { formatDate as formatDateValue } from '@/utils/datetime';
 import { FileText, CheckCircle, XCircle, AlertCircle, Clock, RefreshCw, Eye, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
@@ -76,9 +77,8 @@ export const XMLImportJobCard: React.FC<XMLImportJobCardProps> = ({
     return Math.round((job.processed_products / job.total_products) * 100);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
+  // Was `toLocaleString()` — browser-locale, so an import's timestamp read differently per viewer.
+  const formatDate = (dateString: string) => formatDateValue(dateString, { withTime: true });
 
   const getDuration = () => {
     if (!job.completed_at) return 'In progress...';

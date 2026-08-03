@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatDate as formatDateValue } from '@/utils/datetime';
 import { Receipt, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -52,15 +53,7 @@ export const BillingHistoryTab: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const formatDate = (dateString: string) => formatDateValue(dateString, { withTime: true });
 
   // Money-in (purchase / refund / bonus / monthly_grant) vs money-out (debit / deduction)
   // is decided by the sign of the amount — the transaction_type is only the label.

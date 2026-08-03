@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatDate as formatDateValue } from '@/utils/datetime';
 import { useSearchParams } from 'react-router-dom';
 import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, Wrench, ChevronRight, Info, Trash2, AlertTriangle, DollarSign, ListChecks, Activity, Database, Boxes, Network, Box } from 'lucide-react';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
@@ -268,11 +269,7 @@ export const AgentConfigsPage: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    });
-  };
+  const formatDate = (dateString: string) => formatDateValue(dateString, { withTime: true });
 
   const getPromptTypeLabel = (type: string) => {
     const labels: Record<string, string> = {

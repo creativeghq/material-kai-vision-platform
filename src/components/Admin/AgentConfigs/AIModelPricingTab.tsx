@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatDate as formatDateValue } from '@/utils/datetime';
 import { DollarSign, RefreshCw, Edit2, Clock, Cpu, Image, Sparkles, ToggleLeft, ToggleRight, ExternalLink, Check, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -213,14 +214,7 @@ export const AIModelPricingTab: React.FC = () => {
     return value ? `$${value.toFixed(decimals)}` : '-';
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Never';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const formatDate = (dateString: string | null) => formatDateValue(dateString, { fallback: 'Never' });
 
   // Retired/replaced models are deactivated (is_active=false) rather than deleted so
   // their historical ai_usage_logs still resolve. Hide them by default so the tab only

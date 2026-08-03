@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { formatDate as formatDateValue } from '@/utils/datetime';
 import {
   Building2,
   User as UserIcon,
@@ -31,10 +32,8 @@ interface OverviewTabProps {
 
 import { formatMoney } from '@/utils/decimal';
 
-const formatDate = (d: string | null) => {
-  if (!d) return null;
-  return new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-};
+/** Callers branch on `null`, so this keeps the null return rather than the canonical dash. */
+const formatDate = (d: string | null) => (d ? formatDateValue(d) : null);
 
 const daysUntil = (date: string | null) => {
   if (!date) return null;

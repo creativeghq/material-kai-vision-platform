@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { formatDate as formatDateValue } from '@/utils/datetime';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -787,9 +788,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     return `${(seconds / 3600).toFixed(1)}h`;
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
+  // Was `toLocaleString()` — browser-locale, so a job's timestamp read differently per viewer.
+  const formatDate = (dateString: string) => formatDateValue(dateString, { withTime: true });
 
   // Helper function to calculate elapsed time for a job
   // Backend often doesn't set started_at, so fall back to created_at

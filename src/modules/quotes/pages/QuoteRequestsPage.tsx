@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatDate as formatDateValue } from '@/utils/datetime';
 import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -122,13 +123,7 @@ export const QuoteRequestsPage: React.FC = () => {
     );
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const formatDate = (dateString: string) => formatDateValue(dateString);
 
 
   if (loading) {
