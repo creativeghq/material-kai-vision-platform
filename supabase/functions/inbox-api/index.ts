@@ -11,6 +11,7 @@
 // relays via Zernio (Meta 24h service window applies — freeform in-window).
 
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
@@ -47,12 +48,6 @@ interface Attachment {
 // Helpers
 // ──────────────────────────────────────────────────────────────────────────
 
-function json(body: Json, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 const ACTIVE_MEMBER = (s: string | null | undefined) => !s || s === 'active';
 const BUSINESS_ROLES = new Set(['owner', 'admin', 'member', 'staff', 'sales']);

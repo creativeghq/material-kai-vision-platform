@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { formatMoneyLocalized } from '../_shared/money.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
@@ -116,9 +117,6 @@ async function loadFonts() {
   return _fontCache;
 }
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 const fmtMoney = (value: number, currency = 'EUR', lang: Lang = 'el') =>
   formatMoneyLocalized(value, currency, lang);

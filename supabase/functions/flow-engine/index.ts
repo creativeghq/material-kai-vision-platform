@@ -9,6 +9,7 @@
  */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { jsonResponse } from '../_shared/http.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isCronAuthorized, userCanAccessWorkspace, type AuthResult } from '../_shared/auth.ts';
@@ -1779,12 +1780,6 @@ async function handleTriggerEvent(
 // MAIN HANDLER
 // =====================================================
 
-function jsonResponse(body: Record<string, unknown>, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 Deno.serve(withApiLogging('flow-engine', async (req) => {
   // CORS preflight

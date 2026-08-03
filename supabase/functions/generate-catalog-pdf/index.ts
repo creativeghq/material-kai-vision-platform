@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { fetchCatalog } from './data-fetcher.ts';
 import type { CatalogPDFRequest, CatalogPDFResponse } from './types.ts';
@@ -259,6 +260,3 @@ function firstMaterialCurrency(sections: Array<{ materials?: any[] }>): string |
   return null;
 }
 
-function jsonResponse(body: CatalogPDFResponse, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}

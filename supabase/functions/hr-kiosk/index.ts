@@ -9,14 +9,12 @@
 //  • Returns minimal data (name + in/out state); never other employees, salary, or ids.
 //  • The punch is recorded and filed to Ergani (WRKCardSE) when the workspace has it configured.
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 /** Trusted-ish client IP from the proxy hop. */
 function clientIp(req: Request): string {

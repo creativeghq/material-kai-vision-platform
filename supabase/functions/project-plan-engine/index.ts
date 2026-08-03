@@ -12,6 +12,7 @@
 // userCanAccessWorkspace — the service-role client bypasses RLS, so we re-check membership.
 
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -46,8 +47,6 @@ interface ItemRow {
   source: string;
 }
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 // Resolve rates for service_id/product_id from product_prices (latest confirmed list_price).
 async function buildRateMap(supabase: DbClient, items: ItemRow[]) {

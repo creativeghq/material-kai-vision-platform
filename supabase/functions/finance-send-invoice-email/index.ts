@@ -1,6 +1,7 @@
 // Email an invoice to its customer (the "Send Email" document action, #204/#6).
 // Sends a summary + the myDATA MARK / QR link via the platform email-api. Auth: finance.
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { formatMoney } from '../_shared/money.ts';
 import { encodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -8,9 +9,6 @@ import { escapeHtml } from '../_shared/html.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 const money = (v: number, c: string) => formatMoney(v, c);
 

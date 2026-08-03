@@ -8,6 +8,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../_shared/http.ts';
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.39.0';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -37,12 +38,6 @@ const PLATFORM_SPECS: Record<string, { max_chars: number; hashtag_style: string;
   threads:    { max_chars: 500, hashtag_style: 'minimal hashtags', tone_notes: 'conversational, authentic' },
 };
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 Deno.serve(withApiLogging('generate-social-content', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

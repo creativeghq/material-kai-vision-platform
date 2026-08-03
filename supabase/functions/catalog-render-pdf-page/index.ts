@@ -10,6 +10,7 @@
  * PDF stack into the edge runtime.
  */
 import { corsHeaders } from '../_shared/cors.ts';
+import { jsonResponse } from '../_shared/http.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
@@ -85,9 +86,3 @@ Deno.serve(withApiLogging('catalog-render-pdf-page', async (req) => {
   }
 }));
 
-function jsonResponse(body: RenderResponse, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

@@ -7,6 +7,7 @@
 // this function is the auth boundary + thin dispatcher. See migration data_integrity_framework_core.
 
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isCronAuthorized } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -27,8 +28,6 @@ interface RequestBody {
   enabled?: boolean;
 }
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 const svc = () =>
   createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {

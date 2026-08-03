@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -15,9 +16,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 // trusted for amounts. The order is a draft until the buyer pays (existing stripe-webhooks
 // flips it to paid), so abandoned carts never burn a legal receipt number.
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
+
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
 import { round2 } from '../_shared/money.ts';
 
@@ -117,17 +116,14 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
       const vatRate = Number(fs?.default_vat_rate ?? 24);
 
       let currency = 'EUR';
-      let totalGross = 0;
       const lines: any[] = [];
       for (const it of clean) {
         const pr = priceById.get(it.product_id);
         if (!pr || pr.list_price == null) return json({ error: 'a product is no longer available' }, 409);
         currency = pr.currency ?? currency;
         const qty = Math.min(Number(it.qty), 9999);
-        // list_price is NET (ex-VAT); add VAT to get the consumer gross, keep net per line for myDATA.
+        // list_price is NET (ex-VAT); keep net per line for myDATA.
         const unitNet = Number(pr.list_price);
-        const unitGross = round2(unitNet * (1 + vatRate / 100));
-        totalGross += round2(unitGross * qty);
         lines.push({
           description: pr.product?.name ?? 'Item', quantity: qty,
           unit_price: unitNet, net_value: round2(unitNet * qty), line_total: round2(unitNet * qty),
@@ -137,9 +133,20 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
           product_id: it.product_id,
         });
       }
-      totalGross = round2(totalGross);
-      const totalNet = round2(totalGross / (1 + vatRate / 100));
-      const totalVat = round2(totalGross - totalNet);
+      // Header derived FROM THE LINES, in one direction only.
+      //
+      // This used to accumulate a per-unit GROSS (`round2(unitNet * (1 + vat/100)) * qty`) and then
+      // back-extract the net from it, while the lines stored `round2(unitNet * qty)`. Those are two
+      // different numbers: 3 x 9.99 gives lines of 29.97 and a header of 29.98, and 29.97 + 7.19
+      // came to 37.16 against a stored total of 37.17. myDATA rejects a document whose lines do not
+      // foot to the header, so the arithmetic had to pick one direction — net upward, matching the
+      // line values that are actually transmitted. (audit #271 item 6)
+      //
+      // Net-up also removes the double rounding: rounding a unit to cents, multiplying, then
+      // dividing the VAT back out rounds three times and drifts with quantity.
+      const totalNet = round2(lines.reduce((s, l) => s + l.net_value, 0));
+      const totalVat = round2(totalNet * vatRate / 100);
+      const totalGross = round2(totalNet + totalVat);
 
       // Guest checkout carries only name+email. The invoices_customer_xor CHECK requires
       // exactly one of customer_company_id / customer_contact_id, so find-or-create a CRM

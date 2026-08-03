@@ -18,6 +18,7 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { formatMoney } from '../_shared/money.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -67,11 +68,6 @@ interface Snapshot {
   quotes: { open: number; recent_30d: number };
 }
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
 
 // ── Stats gathering (each block is independently fault-tolerant) ──────────────
 async function gatherSnapshot(admin: SB, userId: string, workspaceId: string): Promise<Snapshot> {

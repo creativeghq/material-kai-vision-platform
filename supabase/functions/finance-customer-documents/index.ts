@@ -9,14 +9,12 @@
 // companies); the service-role client is used only for PDF signing and `order_detail`,
 // which does its own explicit ownership check.
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 const isReceiptDoc = (dt: string | null) => String(dt ?? '').startsWith('11');
 

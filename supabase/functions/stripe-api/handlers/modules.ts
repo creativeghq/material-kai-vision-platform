@@ -16,6 +16,7 @@
 //     after verifying owner + that the plan tier already covers the module.
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
+import { jsonResponse as json } from '../../_shared/http.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate, isAdminAccess, userCanAccessWorkspace, type AuthResult } from '../../_shared/auth.ts';
@@ -29,12 +30,6 @@ import {
 
 import { moduleTierRank as tierRank } from '../../_shared/module-tiers.ts';
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 /** True when the user is the OWNER of this exact workspace, or the platform operator. */
 async function isOwnerOrOperator(

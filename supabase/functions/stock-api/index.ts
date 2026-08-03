@@ -10,6 +10,7 @@
 //    membership (reads) and is_workspace_finance_manager + is_workspace_entitled (writes) as the caller.
 //    Defense in depth: even if the gate chain were bypassed, RLS still refuses an un-entitled writer.
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -19,9 +20,6 @@ import { trackShipment, refreshShipment, type TrackInput } from '../_shared/ship
 import { getFreightQuote, type SearatesCreds, type QuoteParams } from '../_shared/shipping/searates.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 const DIRECTIONS = ['in', 'out', 'adjust'];
 

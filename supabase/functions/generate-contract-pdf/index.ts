@@ -4,6 +4,7 @@
 // The PDF is stored (overwritten) at pdf-documents/contract-output/{contract_id}.pdf (private bucket) and
 // returned as a 7-day signed URL. Regenerated on demand — no stale persisted URL (invariant #8).
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
@@ -16,9 +17,6 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const PAGE_W = 595.28, PAGE_H = 841.89; // A4 portrait (pt)
 const MARGIN = 56;
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 /** Word-wrap `text` to `maxWidth` at `size`, returning lines. Preserves blank lines between paragraphs. */
 function wrapLines(text: string, font: any, size: number, maxWidth: number): string[] {

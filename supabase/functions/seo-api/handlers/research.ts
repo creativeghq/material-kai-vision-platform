@@ -9,6 +9,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
@@ -23,12 +24,6 @@ const dataforseoPassword = () => Deno.env.get('DATAFORSEO_PASSWORD') || '';
 
 const CREDIT_COST = 18;
 
-function jsonResponse(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 /** Map DataForSEO numeric location_code → ISO-3166 alpha-2 country code so
  * the mention-monitoring opportunities endpoint can pin the correct locale.

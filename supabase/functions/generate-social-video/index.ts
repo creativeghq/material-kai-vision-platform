@@ -10,6 +10,7 @@
  */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { jsonResponse } from '../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -71,12 +72,6 @@ const REPLICATE_MODELS: Record<string, string> = {
   'kling-1.6-pro': 'klingai/kling-1.6-pro',
 };
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 async function createReplicatePrediction(
   model: string,

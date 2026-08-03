@@ -11,6 +11,7 @@
  */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { jsonResponse } from '../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -56,12 +57,6 @@ function autoSelectModel(imageType: ImageType): Exclude<ImageModel, 'auto'> {
   }
 }
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 // ── xAI Aurora (OpenAI-compatible) ───────────────────────────────────────────
 async function generateWithAurora(prompt: string, size: string): Promise<string> {

@@ -17,6 +17,7 @@
  *   - "send"     → actually dispatches.
  */
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
@@ -325,9 +326,3 @@ function firstNameFor(r: RecipientRow): string {
   return local.charAt(0).toUpperCase() + local.slice(1);
 }
 
-function jsonResponse(body: SendResponse, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

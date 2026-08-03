@@ -5,15 +5,13 @@
 // (fail-open when not, so it works out of the box). Writes only hr_candidates + hr_applications
 // (+ the applicant's résumé into this workspace's own hr/ storage prefix).
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { emitApplicantStage } from '../_shared/hr/applicant-events.ts';
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 /** Board (GET) responses are public + pollable, so let aggregators/CDNs cache them briefly. */
 function jsonCached(body: any, status = 200): Response {

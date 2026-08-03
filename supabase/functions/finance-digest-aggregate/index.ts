@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { formatMoney } from '../_shared/money.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { escapeHtml } from '../_shared/html.ts';
@@ -51,12 +52,6 @@ interface Settings {
   digest_last_sent_at: string | null;
 }
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 function fmtMoney(value: number | null | undefined, currency = 'EUR'): string {
   return formatMoney(value, currency);

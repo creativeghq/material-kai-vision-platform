@@ -12,6 +12,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
 import { zernioApi } from '../zernio.ts';
@@ -19,12 +20,6 @@ import { zernioApi } from '../zernio.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 export async function handleZernioPublish(req: Request, body: any): Promise<Response> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);

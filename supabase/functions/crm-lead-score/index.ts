@@ -4,14 +4,12 @@
 // Writes the shared crm_contacts.lead_score / health_score so CRM, Sales, and Real Estate all show
 // the SAME score. Credit-metered (reserve → settle). Not module-gated — it's a CRM-wide capability.
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { MARKUP_MULTIPLIER, CREDITS_PER_USD } from '../_shared/pricing-constants.ts';
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 const FAMILY_PRICING: Array<{ match: string; input: number; output: number }> = [
   { match: 'claude-opus', input: 15.0, output: 75.0 },

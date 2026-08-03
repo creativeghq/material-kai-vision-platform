@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { fetchQuoteData, fetchStorageFile, fetchImageBytesFromUrl } from './data-fetcher.ts';
@@ -384,9 +385,3 @@ function buildSampleQuote(workspaceId: string | null, vatRate: number): QuoteDat
   };
 }
 
-function jsonResponse(body: QuotePDFResponse, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

@@ -4,6 +4,7 @@
 // Claude OCR identifies the doc + extracts the fields (credit-metered); a "prepare" step reconciles
 // the extracted payments against the payroll run and stamps the payment IDs onto its Finance lines.
 import { corsHeaders } from '../_shared/cors.ts';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 import { callClaudeTool, meterHrAi, creditBalance, reserveHrCredits, refundHrCredits, base64FromBytes } from './ai-meter.ts';
 
@@ -16,9 +17,6 @@ const HR_DOC_BUCKET = 'pdf-documents';
 const ANALYZE_MAX_CREDITS = 25;   // a large multi-page scanned batch
 const PREPARE_MAX_CREDITS = 25;   // reconciling a big headcount + many docs
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 /** Returns a Response, or null if `action` isn't ours. Caller already bound to workspace + entitled. */
 export async function handleAccounting(action: string, ctx: AcctCtx): Promise<Response | null> {

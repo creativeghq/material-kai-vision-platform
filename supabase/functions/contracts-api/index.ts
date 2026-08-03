@@ -10,6 +10,7 @@
 // USER-context client so the context-branched RLS (hr→admin, finance→finance-manager,
 // project→member) is the real enforcement — no service-role body-trust (invariant 1).
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
@@ -23,8 +24,6 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-const json = (body: any, status = 200): Response =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 const CONTEXTS = ['hr', 'finance', 'project', 'realestate'];
 // Fields a caller may write (no status / token / workspace / created_by — those are server-set).

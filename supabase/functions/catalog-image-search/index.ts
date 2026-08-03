@@ -10,6 +10,7 @@
  * an approval grid; the user clicks ✓ to attach one to the material.
  */
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -250,9 +251,3 @@ async function searchWebImages(query: string, limit: number): Promise<ImageCandi
   }
 }
 
-function jsonResponse(body: SearchResponse, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

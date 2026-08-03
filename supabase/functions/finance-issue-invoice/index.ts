@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -100,12 +101,6 @@ async function reserveTransmission(
   };
 }
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 /**
  * Authoritative buyer risk-gate, enforced server-side at ISSUANCE/TRANSMISSION (the client

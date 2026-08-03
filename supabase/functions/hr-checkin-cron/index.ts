@@ -4,15 +4,14 @@
 // fires ONE `hr_late_checkin` flow event per resolved recipient (bell + email via the seeded default
 // flow). Deduped to one alert per employee per day via hr_checkin_alerts. Runs every few minutes.
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
+
 function minutesInTz(d: Date, tz: string): number {
   const p = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(d);
   return Number(p.find((x) => x.type === 'hour')?.value ?? '0') * 60 + Number(p.find((x) => x.type === 'minute')?.value ?? '0');

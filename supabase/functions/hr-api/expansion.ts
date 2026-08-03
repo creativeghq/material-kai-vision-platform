@@ -3,6 +3,7 @@
 // payroll (+ Finance link via planned_payments), analytics. Dispatched from index.ts AFTER the
 // caller is bound to the workspace + entitlement + hr.view is confirmed. Writes require hr.manage.
 import { corsHeaders } from '../_shared/cors.ts';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 import { fileWorkcardPunch } from '../_shared/ergani/workcard.ts';
 import { sha256hex } from '../_shared/hash.ts';
@@ -24,9 +25,7 @@ export interface Ctx {
   access: { canView: boolean; canManage: boolean };
 }
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
+
 function pick(body: any, cols: readonly string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const c of cols) if (body?.[c] !== undefined) out[c] = body[c];

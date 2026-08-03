@@ -9,6 +9,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getToolPrompt } from '../../_shared/prompt-utils.ts';
@@ -33,12 +34,6 @@ const FIX_CREDIT_COST = 5;
 const DEFAULT_MAX_ITERATIONS = 3;
 const MIN_ACCEPTABLE_SCORE = 70;
 
-function jsonResponse(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 export async function handleAnalyze(req: Request, body: any): Promise<Response> {
   if (req.method === 'OPTIONS') {

@@ -12,6 +12,7 @@
  */
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
+import { jsonResponse } from '../../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
@@ -24,12 +25,6 @@ const PINTEREST_REDIRECT_URI = () => Deno.env.get('PINTEREST_REDIRECT_URI') || '
 
 const PINTEREST_API_BASE = 'https://api.pinterest.com/v5';
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 /**
  * Base64 encode client credentials for Basic auth

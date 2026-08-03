@@ -20,6 +20,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { zernioApi, zernioKey, publicAppUrl, resolveWorkspaceProfile } from '../zernio.ts';
@@ -33,12 +34,6 @@ const SUPPORTED_PLATFORMS = [
   'pinterest', 'youtube', 'twitter', 'threads',
 ];
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 export async function handleZernioOauth(req: Request, body: any): Promise<Response> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);

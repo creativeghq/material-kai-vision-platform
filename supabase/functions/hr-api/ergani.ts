@@ -12,6 +12,7 @@
 //    a turnkey leave path that maps an hr_absences row onto the common Documents envelope. We never
 //    fabricate field names — the type-specific detail comes from Ergani's schema or the caller.
 import { corsHeaders } from '../_shared/cors.ts';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { HttpError } from '../_shared/api-logger.ts';
 import {
   resolveErganiCredentials, listSubmissions, getDocumentSchema, submitDocument,
@@ -27,9 +28,6 @@ export interface ErganiCtx {
   access: { canView: boolean; canManage: boolean };
 }
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 /** Resolve the workspace's Ergani credentials or fail with a clear "not configured". */
 async function client(ctx: ErganiCtx): Promise<ErganiCredentials> {

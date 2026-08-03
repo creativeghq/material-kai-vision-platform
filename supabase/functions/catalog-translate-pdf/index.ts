@@ -11,6 +11,7 @@
  * category — Claude groups materials into sensible sections.
  */
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -384,9 +385,3 @@ function base64Encode(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-function jsonResponse(body: TranslateResponse, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}

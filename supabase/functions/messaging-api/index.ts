@@ -14,6 +14,7 @@
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess, listUserWorkspaceIds } from '../_shared/auth.ts';
@@ -42,12 +43,6 @@ interface SendBulkRequest extends Omit<SendMessageRequest, 'to'> {
   recipients: Array<{ to: string; variables?: Record<string, string> }>;
 }
 
-function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 function normalizePhoneNumber(phone: string): string {
   let n = (phone || '').replace(/[^\d+]/g, '');

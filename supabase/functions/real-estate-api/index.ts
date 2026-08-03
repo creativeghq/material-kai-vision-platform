@@ -12,6 +12,7 @@
 //  • Publish runs the compliance gate (GR hard-block); toPublic() is never applied here (management
 //    sees full rows) — it is the public fn's contract.
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
@@ -138,9 +139,6 @@ async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property:
   } catch (e) { console.error('[real-estate-api] buyer alerting failed (listing op unaffected):', e); }
 }
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 const INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'viewing_booked', 'closed', 'spam'];
 const VIEWING_STATUSES = ['scheduled', 'completed', 'cancelled', 'no_show'];

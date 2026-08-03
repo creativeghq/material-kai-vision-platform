@@ -8,6 +8,7 @@
 // explicitly asked for a per-invoice GR/EN choice. A Unicode font is embedded so Greek
 // glyphs (and Greek customer names/addresses, regardless of language) render correctly.
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { PDFDocument, rgb, degrees, type PDFFont, type PDFPage, type RGB } from 'pdf-lib';
 // @pdf-lib/fontkit's published types declare no default export, so `import fontkit from`
 // failed to typecheck (TS1192) even though esm.sh's interop makes it work at runtime.
@@ -133,9 +134,6 @@ function fmtMoney(n: any, currency: string, lang: Lang): string {
   return `${s} ${sym}`;
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

@@ -10,15 +10,13 @@
 //  • Inquiry POST is bound to the token's property+workspace (client cannot supply either), requires
 //    gdpr_consent, and is written server-side (no anon RLS insert path exists).
 import { createClient } from '@supabase/supabase-js';
+import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { toPublic, matchesCriteria, estimateFromMedianPerSqm } from '../_shared/real-estate.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 
-function json(body: any, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-}
 
 /** RE T1-1 — per-IP throttle for the anonymous lead-capture writes. Returns a 429 Response when the
  *  caller has exceeded the hourly budget (across all public lead actions), else records the attempt and
