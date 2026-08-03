@@ -32,15 +32,19 @@ function clientIp(req: Request): string {
 }
 
 /**
- * Was `Deno.env.get('TURNSTILE_SECRET_KEY')` + `throw 400 'Bot check is not configured.'`.
+ * Uses the shared Turnstile helper so there is one verify in the codebase rather than four.
  *
- * `TURNSTILE_SECRET_KEY` lives in `platform_secrets` (set 2026-07-21), and
- * `bootstrapForFunction()` cannot copy it into env — `Deno.env.set` is denied in this runtime and
- * the bootstrap swallows the throw. So the secret was never visible here and this endpoint
- * answered "Bot check is not configured" to every caller: not a weak gate, a dead feature.
+ * This gate WORKS and always has — `TURNSTILE_SECRET_KEY` is set as a Supabase edge secret, so the
+ * previous `Deno.env.get` read it fine. Verified against production before changing it: the live
+ * endpoint answers "Bot check failed" (Cloudflare rejected the token) and not "Bot check is not
+ * configured" (secret missing). I had assumed the opposite and was wrong.
  *
- * `resolveSecret` (inside the shared helper) reads env first, then platform_secrets, so both
- * configuration routes work. (#257 C28)
+ * What the shared helper adds is a SECOND configuration route: `resolveSecret` falls back to
+ * `platform_secrets`, so a key saved from the admin UI also works. `bootstrapForFunction()` cannot
+ * provide that on its own — it copies platform_secrets into env with `Deno.env.set`, which this
+ * runtime denies while the bootstrap swallows the throw. So an env-only read is correct today and
+ * silently breaks the day someone configures the key from the admin screen instead of the CLI.
+ * (#257 C28)
  */
 async function verifyTurnstile(supabase: DbClient, token: string, ip: string): Promise<boolean> {
   const { ok } = await verifyTurnstileShared(supabase, token, ip);

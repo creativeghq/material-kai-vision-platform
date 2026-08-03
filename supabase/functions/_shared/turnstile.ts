@@ -5,17 +5,18 @@ import type { DbClient } from './supabase-client.ts';
  * Cloudflare Turnstile verification — the canonical copy.
  *
  * There were four near-identical implementations (hr-careers, inbox-api, public-project-plan, and
- * this one was about to become the fifth for the storefront). They had already drifted in the way
- * that matters: `public-project-plan` read the secret with `Deno.env.get('TURNSTILE_SECRET_KEY')`,
- * and that is the one mistake this check cannot survive.
+ * this one was about to become the fifth for the storefront). All four work today; consolidating
+ * them is about keeping it that way, not about repairing a break — I claimed public-project-plan
+ * was broken, checked production, and it answers "Bot check failed" rather than "not configured",
+ * so its `Deno.env.get` read was finding the key all along.
  *
- * WHY `Deno.env.get` IS WRONG HERE. `bootstrapForFunction()` copies `platform_secrets` into env via
- * `Deno.env.set`, which this runtime DENIES — the bootstrap swallows the throw. So an admin-saved
- * key never reaches env, `Deno.env.get` returns undefined, and the "not configured → allow" branch
- * fires on every request. The bot gate then reports itself as working while challenging nobody:
- * a guard that cannot fail is worth less than no guard, because it also stops anyone looking.
- * `resolveSecret` reads env FIRST and falls back to `platform_secrets`, so both configuration
- * routes work.
+ * WHY `resolveSecret` RATHER THAN `Deno.env.get`. Both work when the secret is set as a Supabase
+ * edge secret, which is how it is set today. Only `resolveSecret` ALSO finds a key saved from the
+ * admin UI into `platform_secrets` — `bootstrapForFunction()` cannot bridge that gap, because it
+ * copies platform_secrets into env with `Deno.env.set`, which this runtime denies while the
+ * bootstrap swallows the throw. An env-only read is therefore correct until the day someone
+ * configures the key from the admin screen, at which point the gate silently starts allowing
+ * everything. `resolveSecret` reads env FIRST and falls back, so both routes work.
  *
  * FAIL-OPEN WHEN UNCONFIGURED, FAIL-CLOSED WHEN CONFIGURED. This is deliberate and is the same
  * ruling every public form in this platform already follows. A tenant who has never set up
