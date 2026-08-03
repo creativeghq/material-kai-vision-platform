@@ -5,6 +5,7 @@
 // icons + copy (see `resolveModuleMeta`), and each card states what it costs and what happens if
 // you click. Filter pills jump straight to what's available to add vs. what's already running.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { formatDate as formatDateValue } from '@/utils/datetime';
 import { Loader2, Check, Sparkles, Send, ArrowRight, Lock, Coins } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -38,13 +39,9 @@ import {
 } from '@/services/moduleActivationService';
 
 /** "21 Aug 2026" — the renewal/cancellation date a cost line has to state to be honest. */
-function formatDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? null
-    : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-}
+/** Callers here branch on `null`, so this keeps the null return rather than the canonical dash. */
+const formatDate = (iso: string | null | undefined): string | null =>
+  iso && !Number.isNaN(new Date(iso).getTime()) ? formatDateValue(iso) : null;
 
 // Tenant-facing modules to list here: registered modules that expose a workspace launcher entry
 // (Docs, …), the business surfaces moved into the App Launcher (surface:'app' with a moduleSlug —

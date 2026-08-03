@@ -17,7 +17,7 @@ import {
 import { SectionHeader } from '@/components/shared/SectionHeader';
 
 import { formatMoney as money } from '@/utils/decimal';
-const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString() : '—');
+import { formatDate as fmtDate } from '@/utils/datetime';
 
 const ORDER_STATUS_LABEL: Record<CustomerOrder['status'], string> = {
   draft: 'Pre-order', confirmed: 'Confirmed', partially_fulfilled: 'Partially delivered',

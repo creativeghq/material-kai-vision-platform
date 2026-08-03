@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { formatMoney } from '@/utils/decimal';
 import { Loader2, PackageSearch, Truck, PackageCheck, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -34,7 +35,7 @@ interface BoardData {
   counts: { needs_ordering: number; on_order: number; reserved: number };
 }
 
-const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString() : '—');
+import { formatDate as fmtDate } from '@/utils/datetime';
 
 const AllocationCard: React.FC<{ row: AllocationRow; lane: 'needs' | 'on_order' | 'reserved' }> = ({ row, lane }) => (
   <div className="dashboard-card p-3 space-y-1.5">

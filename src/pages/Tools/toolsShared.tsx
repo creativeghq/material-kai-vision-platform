@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { formatDate } from '@/utils/datetime';
 import { Link } from 'react-router-dom';
 import {
   AlertCircle,
@@ -699,13 +700,11 @@ export function formatPrice(value: number | null | undefined, currency: string |
   }
 }
 
-export function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return iso;
-  }
-}
+// Was `toLocaleDateString(undefined, …)` — browser-locale — with the raw ISO string as its
+// fallback. The canonical formatter pins the locale and dashes an unparseable value.
+// Imported AND re-exported: this file calls formatDate itself, and `export … from` would forward
+// the binding to consumers without creating one here (see tests/unit/reExportBinding.test.ts).
+export { formatDate };
 
 export function hostnameOf(url: string): string | null {
   try {
