@@ -133,8 +133,17 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
   if (!ent.ok) return ent.response;
 
   // Writes go through the USER client so context-branched RLS is the enforcement.
+  //
+  // Taken from `authenticate()` rather than rebuilt here (#197 item 4): this file was one of five
+  // that hand-rolled the same anon-key + Authorization-header client, each slightly differently.
+  // Identical construction, so no behaviour change — the point is that there is now one definition
+  // to keep correct instead of five that can drift apart.
+  //
+  // The local build stays as the fallback for the case where SUPABASE_ANON_KEY is unset, which is
+  // exactly the case the old line already handled (badly — with an empty key).
   const authHeader = req.headers.get('Authorization') ?? '';
-  const asUser = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } });
+  const asUser = auth.supabaseAsUser
+    ?? createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } });
 
   if (action === 'create') {
     const context = String(body?.context ?? '');

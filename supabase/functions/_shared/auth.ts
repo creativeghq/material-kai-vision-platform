@@ -10,6 +10,27 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 // API_PUBLISHABLE_KEY = sb_publishable_... (for client access)
 const supabaseSecretKey = Deno.env.get('API_SECRET_KEY') || '';
 const supabasePublishableKey = Deno.env.get('API_PUBLISHABLE_KEY') || '';
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+
+/**
+ * A client that RLS ACTUALLY APPLIES TO — the anon key plus the caller's own JWT, so Postgres sees
+ * the real `auth.uid()` and every policy runs. This is what `supabase` is not.
+ *
+ * The pattern was already hand-rolled in at least five functions (contracts-api,
+ * generate-purchase-sheet-pdf, health-check, finance-customer-documents, company-enrich), each
+ * building it slightly differently. One definition here means one thing to get right, and it is
+ * available to all ~370 `authenticate()` call sites instead of the five that thought of it.
+ *
+ * Returns null when SUPABASE_ANON_KEY is unset — callers must treat null as "cannot verify" and
+ * fall back to their own workspace filtering rather than silently proceeding unguarded.
+ */
+function rlsBoundClient(token: string | null): DbClient | null {
+  if (!supabaseAnonKey) return null;
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    ...(token ? { global: { headers: { Authorization: `Bearer ${token}` } } } : {}),
+  }) as DbClient;
+}
 
 export type AuthLevel = 'secret' | 'user' | 'anon' | 'api_key' | 'none';
 
@@ -27,7 +48,27 @@ export interface AuthResult {
   user: User | null;
   userId: string | null;
   error: string | null;
+  /**
+   * SERVICE-ROLE CLIENT. RLS DOES NOT APPLY, at any auth level.
+   *
+   * Tenant isolation on this client is whatever the handler writes itself — a forgotten
+   * `.eq('workspace_id', …)` is a full cross-tenant read and the database will not stop it
+   * (CLAUDE.md invariant 1). Prefer `supabaseAsUser` for anything reading tenant data on behalf
+   * of a user.
+   */
   supabase: DbClient;
+  /**
+   * The same connection with RLS ENFORCED as the calling user (#197 item 4).
+   *
+   * Non-null only at `user` and `anon` levels — `secret` and `api_key` are server-to-server and
+   * have no user to bind to. Null also when SUPABASE_ANON_KEY is unset.
+   *
+   * Use this for reads of tenant data: it makes a missed workspace filter return nothing instead
+   * of everything. Keep `supabase` for writes that legitimately need to cross a policy (job rows,
+   * audit logs, service bookkeeping) — swapping wholesale would break those, which is why this is
+   * additive and adopted per function rather than flipped globally.
+   */
+  supabaseAsUser?: DbClient | null;
   apiKey?: ApiKeyContext | null;
 }
 
@@ -162,18 +203,17 @@ export async function authenticate(
           user: null,
           userId: null,
           error: null,
-          // SERVICE-ROLE CLIENT. RLS DOES NOT APPLY.
+          // An anonymous caller now gets an ANON-KEY client, so RLS genuinely applies with no
+          // user context — which is what the original comment here claimed was already true of
+          // the service-role client. It was not: service-role bypasses RLS unconditionally.
           //
-          // The previous comment here said "RLS will still apply based on no user context" and that
-          // is FALSE — the service-role key bypasses RLS unconditionally, user context or not. A
-          // reader trusting it would assume the database was enforcing tenancy on an ANONYMOUS
-          // caller's queries. It is not. Every anon-reachable handler must filter by workspace
-          // itself (CLAUDE.md invariant 1); the database will not catch a missing `.eq()`.
-          //
-          // Returning an RLS-bound client here instead is #197 item 4 and is still open — it is a
-          // structural change across ~70 functions, not a comment fix, because anything currently
-          // relying on service-role reach would start returning empty sets.
-          supabase: adminClient,
+          // Safe to change rather than merely document, because `allowAnon` is passed by ZERO
+          // callers today — this branch is currently unreachable. Fixing it now means the option
+          // is correct the first time someone reaches for it, instead of handing an anonymous
+          // request a key that ignores every policy. Falls back to the admin client only if
+          // SUPABASE_ANON_KEY is unset, which would otherwise break the branch outright.
+          supabase: rlsBoundClient(null) ?? adminClient,
+          supabaseAsUser: rlsBoundClient(null),
         };
       }
 
@@ -213,6 +253,8 @@ async function validateUserToken(
   token: string,
   allowedRoles?: string[]
 ): Promise<AuthResult> {
+  // Bound to THIS caller's JWT, so Postgres sees their real auth.uid() and policies apply.
+  const asUser = rlsBoundClient(token);
   try {
     const { data: { user }, error } = await adminClient.auth.getUser(token);
 
@@ -266,6 +308,7 @@ async function validateUserToken(
       userId: user.id,
       error: null,
       supabase: adminClient,
+      supabaseAsUser: asUser,
     };
   } catch (err) {
     return {
