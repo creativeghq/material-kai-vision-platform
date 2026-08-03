@@ -16,6 +16,19 @@
  * So: `get_order_settlements` returns `settled` / `outstanding` / `payment_status` already
  * derived, and this test fails the build if the finance client-side code starts doing the
  * arithmetic again.
+ *
+ * SCOPE — read this before assuming a clean run means the invariant holds.
+ * These tests scan REPO FILES, so they can only ever see the TypeScript half. This project's SQL
+ * is applied through the Supabase MCP and never committed as a file (CLAUDE.md), so a function
+ * body exists only in `pg_proc` and is invisible here. That is not hypothetical: audit #271 item 3
+ * was a violation in `issue_invoice_from_quote`, which built an invoice from the quote's stale
+ * `grand_total` while every TypeScript path correctly read the derivation — these tests passed
+ * throughout, and a second copy of the same bug sat in `create_project_progress_invoice`.
+ *
+ * The SQL half is guarded in SQL, by the `finance.money_fn_bypasses_derivation` integrity check
+ * (`dic_detect__finance_money_fn_bypasses_derivation`), plus `finance.derived_doc_drift` comparing
+ * each invoice to its source quote's DERIVED total. Adding a money derivation to SQL means adding
+ * it there — a green `npm test` says nothing about it.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
