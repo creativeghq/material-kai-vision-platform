@@ -60,6 +60,33 @@ function isDuplicate(err: { code?: string; message?: string } | null): boolean {
 }
 
 /**
+ * Does this payment already have its allocation rows?
+ *
+ * The whole point of asking: the payment insert and the allocation insert are two statements, and
+ * only the first is protected by a unique index. If the allocation insert failed, the payment row
+ * stands and the provider redelivers — but `findExisting` then reported "already recorded" and the
+ * allocation was NEVER retried. Money in the bank, invoice `amount_due` stuck at full forever, and
+ * the customer chased for an invoice they had paid.
+ *
+ * A redelivery is the natural moment to repair that, and the provider gives us one for free.
+ * (#287 T1-1)
+ */
+async function hasAllocations(supabase: any, paymentId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('payment_allocations')
+    .select('id', { count: 'exact', head: true })
+    .eq('payment_id', paymentId);
+  // On a read failure, claim allocations EXIST. Healing is an insert; guessing "missing" when we
+  // cannot see would double-allocate a payment that was already fine. The over-allocation trigger
+  // would reject it, but "do nothing on a blind read" is the safer default for a write path.
+  if (error) {
+    console.error('[payments] could not count allocations for', paymentId, error.message);
+    return true;
+  }
+  return (count ?? 0) > 0;
+}
+
+/**
  * Has this provider payment already been ingested? Checked BEFORE the insert so the
  * common retry path is a cheap read; the unique index is the actual race-proof guarantee.
  */
@@ -91,10 +118,16 @@ export async function recordInvoicePayment(
   invoiceId: string,
   src: PaymentSource,
 ): Promise<RecordResult> {
+  // A redelivery is only a no-op if the FIRST delivery actually finished. If the payment row
+  // landed but its allocation did not, this is the retry that repairs it — fall through with the
+  // existing payment id instead of inserting a second one. (#287 T1-1)
   const existingId = await findExisting(supabase, src.provider, src.providerRef);
-  if (existingId) {
+  if (existingId && await hasAllocations(supabase, existingId)) {
     console.log(`[payments] ${src.provider} ${src.providerRef} already recorded as ${existingId}`);
     return { ok: true, duplicate: true, paymentId: existingId };
+  }
+  if (existingId) {
+    console.warn(`[payments] ${src.provider} ${src.providerRef} recorded as ${existingId} but has NO allocations — healing on redelivery`);
   }
 
   const { data: inv, error: invErr } = await supabase
@@ -109,7 +142,10 @@ export async function recordInvoicePayment(
 
   const currency = (src.currency || inv.currency || 'eur').toUpperCase();
 
-  const { data: paymentRow, error: payErr } = await supabase
+  // Healing an earlier delivery: the payment already exists, only its allocation is missing.
+  const { data: paymentRow, error: payErr } = existingId
+    ? { data: { id: existingId }, error: null }
+    : await supabase
     .from('payments')
     .insert({
       workspace_id: inv.workspace_id,
@@ -223,16 +259,23 @@ export async function recordStatementPayment(
   party: { workspaceId: string; partyType: 'company' | 'contact'; partyId: string },
   src: PaymentSource,
 ): Promise<RecordResult> {
+  // Same heal as recordInvoicePayment: a redelivery repairs a payment whose allocations never
+  // landed, rather than reporting success over a half-finished ingestion. (#287 T1-1)
   const existingId = await findExisting(supabase, src.provider, src.providerRef);
-  if (existingId) {
+  if (existingId && await hasAllocations(supabase, existingId)) {
     console.log(`[payments] statement ${src.provider} ${src.providerRef} already recorded as ${existingId}`);
     return { ok: true, duplicate: true, paymentId: existingId };
+  }
+  if (existingId) {
+    console.warn(`[payments] statement ${src.provider} ${src.providerRef} recorded as ${existingId} but has NO allocations — healing on redelivery`);
   }
 
   const currency = (src.currency || 'eur').toUpperCase();
   const isCompany = party.partyType === 'company';
 
-  const { data: paymentRow, error: payErr } = await supabase
+  const { data: paymentRow, error: payErr } = existingId
+    ? { data: { id: existingId }, error: null }
+    : await supabase
     .from('payments')
     .insert({
       workspace_id: party.workspaceId,
