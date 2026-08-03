@@ -11468,6 +11468,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          amount_credited: number
           amount_due: number | null
           amount_paid: number
           b2g_details: Json | null
@@ -11554,6 +11555,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          amount_credited?: number
           amount_due?: number | null
           amount_paid?: number
           b2g_details?: Json | null
@@ -11640,6 +11642,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          amount_credited?: number
           amount_due?: number | null
           amount_paid?: number
           b2g_details?: Json | null
@@ -25105,6 +25108,7 @@ export type Database = {
       }
       supplier_bills: {
         Row: {
+          amount_credited: number
           amount_due: number | null
           amount_paid: number
           category_id: string | null
@@ -25132,6 +25136,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          amount_credited?: number
           amount_due?: number | null
           amount_paid?: number
           category_id?: string | null
@@ -25159,6 +25164,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          amount_credited?: number
           amount_due?: number | null
           amount_paid?: number
           category_id?: string | null
