@@ -119,14 +119,27 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   // post-discount taxable figures. "Price" = pre-discount net; "Price after Discount" = taxable.
   const cashPct = Number(inv.cash_discount_pct ?? 0);
   const cashFactor = cashPct > 0 && cashPct < 100 ? 1 - cashPct / 100 : 1;
-  const priceNet = r2(totNet);
-  const netAfter = r2(totNet * cashFactor);
-  const cashDisc = r2(priceNet - netAfter);
-  const vatAfter = r2(totVat * cashFactor);
-
+  // The per-rate ΑΝΑΛΥΣΗ ΦΠΑ table is computed FIRST, and the printed totals are then the sum of
+  // its printed rows.
+  //
+  // It used to be the other way round: each row rounded `agg.vat * cashFactor` and the total
+  // separately rounded `totVat * cashFactor`. Rounding N values and rounding their sum are not the
+  // same operation, so the legally-required VAT-analysis block could add up to 3.70 beside a VAT
+  // total printed as 3.71 — on the same document, in Greek, where the table exists precisely so a
+  // reader can verify the total. Deriving the total from the rows makes that impossible rather than
+  // unlikely. (audit #271 item 6)
+  //
+  // The pre-discount convention above is deliberate and UNCHANGED: lines and per-rate rows are
+  // pre-discount figures scaled by cashFactor at render, so Σ rows ≠ invoices.subtotal_net when
+  // cash_discount_pct > 0 — by design, not by drift.
   const vatAnalysis: VatAnalysisRow[] = Object.entries(vatByRate)
     .map(([pct, agg]) => ({ pct: Number(pct), net: r2(agg.net * cashFactor), vat: r2(agg.vat * cashFactor) }))
     .sort((a, b) => b.pct - a.pct);
+
+  const priceNet = r2(totNet);
+  const netAfter = r2(vatAnalysis.reduce((s, v) => s + v.net, 0));
+  const cashDisc = r2(priceNet - netAfter);
+  const vatAfter = r2(vatAnalysis.reduce((s, v) => s + v.vat, 0));
 
   // ── Totals ──
   const fees = Number(inv.total_fees_amount ?? 0);

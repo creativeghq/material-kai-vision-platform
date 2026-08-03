@@ -27,7 +27,7 @@ import { formatAddressLine } from '@/services/crm.service';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeService, formatMoney, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
-import { vatOfRaw } from '@/modules/finance/lib/vatMath';
+import { vatOfRaw, round2 } from '@/modules/finance/lib/vatMath';
 import { buyerIsConsumer as isConsumerBuyer } from '@/modules/finance/utils/salesDocumentKind';
 import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
 import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
@@ -577,10 +577,16 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const totals = useMemo(() => {
     let net = 0, vat = 0, fees = 0, stamp = 0, other = 0, deduct = 0;
     for (const l of lines) {
-      const lineNet = lineNetOf(l);
+      // Rounded to cents HERE, because this is the value the line is PERSISTED with
+      // (`net_value: Number(net.toFixed(2))` in itemsPayload). Accumulating the unrounded net and
+      // rounding only the header produced a subtotal_net of 90.04 against stored lines summing to
+      // 90.03 — myDATA rejects a document whose lines do not foot to the header. The header must
+      // be the sum of what is actually transmitted, not of a more precise intermediate nobody
+      // stores. (audit #271 item 6)
+      const lineNet = round2(lineNetOf(l));
       const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
-      // vatOfRaw, not vatOf: this sums every line and rounds ONCE at the end, so rounding here
-      // would shift a multi-line invoice by a cent.
+      // vatOfRaw on the ROUNDED net: VAT is not stored per line here, so it still accumulates
+      // unrounded and rounds once at the end — but off the same net the line carries.
       net += lineNet; vat += vatOfRaw(lineNet, pct);
       // fees / stamp / other are category-driven: a 'percent' category computes net × rate%,
       // an 'amount' category uses the typed amount.
@@ -885,7 +891,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     },
     items: lines.filter((l) => l.description.trim()).map((l) => {
       const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
-      const net = lineNetOf(l);
+      // Rounded, matching both the header accumulation and the value itemsPayload persists —
+      // otherwise the preview renders a more precise net than the document ever carries.
+      const net = round2(lineNetOf(l));
       return {
         description: l.description, sku: l.sku || null, quantity: parseDecimalOr(l.quantity, 0),
         unit: l.unit || null, measurement_unit_code: l.measurement_unit_code ? parseInt(l.measurement_unit_code, 10) : null,
