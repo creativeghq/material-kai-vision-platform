@@ -126,12 +126,29 @@ export interface LegendEntry {
   label: string;
 }
 
+/**
+ * Title-block responsibility metadata.
+ *
+ * A drawing that leaves the office has to say who produced it, who checked it,
+ * and which revision it is — two versions of the same plan are otherwise
+ * indistinguishable on site. The date is stored rather than stamped at render
+ * time, so re-printing an issued drawing does not silently move its date.
+ */
+export interface SheetTitleBlock {
+  prepared_by?: string;
+  checked_by?: string;
+  revision?: string;
+  /** Issue date (ISO). Defaults to the render date until someone sets one. */
+  date_iso?: string;
+}
+
 interface FixtureSymbolCanvasProps {
   sheetId: string;
   backdrop: { kind: 'upload' | 'rect'; image_url?: string; width_mm?: number; height_mm?: number };
   initialSymbols?: FixtureSymbol[];
   initialLegend?: LegendEntry[];
   initialRuns?: FixtureRun[];
+  initialTitleBlock?: SheetTitleBlock;
   /** Symbol palette. Defaults to lighting; pass PLUMBING_/ELECTRICAL_FIXTURE_DEFS for those plans. */
   fixtureDefs?: FixtureDef[];
   /** Run palette. Defaults to lighting circuits. */
@@ -147,6 +164,7 @@ export function FixtureSymbolCanvas({
   initialSymbols = [],
   initialLegend = [],
   initialRuns = [],
+  initialTitleBlock,
   fixtureDefs = LIGHTING_FIXTURE_DEFS,
   runDefs = LIGHTING_RUN_DEFS,
   paletteIcon: PaletteIcon = Lightbulb,
@@ -156,6 +174,27 @@ export function FixtureSymbolCanvas({
   const [symbols, setSymbols] = useState<FixtureSymbol[]>(() => ensureSymbolIds(initialSymbols));
   const [legend, setLegend] = useState<LegendEntry[]>(initialLegend);
   const [runs, setRuns] = useState<FixtureRun[]>(initialRuns);
+  const [titleBlock, setTitleBlock] = useState<SheetTitleBlock>(initialTitleBlock ?? {});
+
+  // Default "prepared by" to whoever is drawing, and the issue date to today —
+  // the two fields that are nearly always the obvious answer. Only fills blanks,
+  // so a sheet someone else prepared is never silently reattributed.
+  useEffect(() => {
+    if (titleBlock.prepared_by && titleBlock.date_iso) return;
+    void (async () => {
+      const patch: SheetTitleBlock = {};
+      if (!titleBlock.date_iso) patch.date_iso = new Date().toISOString();
+      if (!titleBlock.prepared_by) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const meta = user?.user_metadata as { full_name?: string; name?: string } | undefined;
+        const name = meta?.full_name || meta?.name || user?.email;
+        if (name) patch.prepared_by = name;
+      }
+      if (Object.keys(patch).length) setTitleBlock((tb) => ({ ...patch, ...tb }));
+    })();
+    // Once, on mount — later edits must not be overwritten.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [activeType, setActiveType] = useState<string>(fixtureDefs[0]?.type ?? 'recessed');
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [rendering, setRendering] = useState(false);
@@ -276,7 +315,7 @@ export function FixtureSymbolCanvas({
     setError(null);
     try {
       await moodboardSheetsService.update(sheetId, {
-        data: { backdrop, symbols, legend, runs },
+        data: { backdrop, symbols, legend, runs, title_block: titleBlock },
       });
       const result = await moodboardSheetsService.generatePdf(sheetId);
       onPdfReady?.(result.pdf_url);
@@ -486,6 +525,44 @@ export function FixtureSymbolCanvas({
             </div>
           )}
 
+          {/* Title block — who is answerable for this drawing, and which issue
+              of it this is. Printed at the bottom of the sheet. */}
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-1">Title block</div>
+            <div className="space-y-1">
+              <Input
+                value={titleBlock.prepared_by ?? ''}
+                onChange={(e) => setTitleBlock((tb) => ({ ...tb, prepared_by: e.target.value }))}
+                placeholder="Prepared by"
+                className="h-7 text-xs"
+              />
+              <Input
+                value={titleBlock.checked_by ?? ''}
+                onChange={(e) => setTitleBlock((tb) => ({ ...tb, checked_by: e.target.value }))}
+                placeholder="Checked by"
+                className="h-7 text-xs"
+              />
+              <div className="flex gap-1">
+                <Input
+                  value={titleBlock.revision ?? ''}
+                  onChange={(e) => setTitleBlock((tb) => ({ ...tb, revision: e.target.value }))}
+                  placeholder="Rev (e.g. A)"
+                  className="h-7 text-xs"
+                />
+                <Input
+                  type="date"
+                  value={(titleBlock.date_iso ?? '').slice(0, 10)}
+                  onChange={(e) => setTitleBlock((tb) => ({
+                    ...tb,
+                    // Empty clears the stored date, falling back to render-time.
+                    date_iso: e.target.value ? new Date(e.target.value).toISOString() : undefined,
+                  }))}
+                  className="h-7 text-xs"
+                />
+              </div>
+            </div>
+          </div>
+
           <div>
             <div className="text-xs font-medium text-muted-foreground mb-1">Placed symbols ({symbols.length})</div>
             {symbols.map((s, idx) => (
@@ -507,7 +584,7 @@ export function FixtureSymbolCanvas({
 
       <LivePreviewPanel
         sheetId={sheetId}
-        data={{ backdrop, symbols, legend, runs }}
+        data={{ backdrop, symbols, legend, runs, title_block: titleBlock }}
         enabled={
           backdrop.kind === 'upload' ? !!backdrop.image_url : !!backdrop.width_mm && !!backdrop.height_mm
         }

@@ -257,6 +257,10 @@ Backdrop has two modes:
 
 **Scale is not part of the sheet.** A backdrop is a raster with no inherent scale, and an AI-generated plan's printed dimension callouts are decorative. Measurable geometry lives on the *room* (`project_rooms.plan_geometry`, calibrated by [PlanCalibrationCanvas](../src/components/features/plans/PlanCalibrationCanvas.tsx)) — see [planGeometry.ts](../src/utils/planGeometry.ts).
 
+**Title block responsibility.** `data.title_block` carries `prepared_by`, `checked_by`, `revision` and an optional `date_iso`, rendered as a second row of the bottom title block (columns 1–2; column 0 holds CLIENT, column 3 the studio branding strip). Each is drawn only when set, so a mood board shows no empty labels. `prepared_by` and the date default to the signed-in user and today on first open, filling blanks only — a sheet someone else prepared is never silently reattributed.
+
+**A stored issue date beats `now()`.** Once a drawing is issued its date is part of the record; re-rendering must not restamp it to today, or two prints of the same revision disagree. `buildSheetForDeck` also re-applies the *sheet's* own responsibility fields over the deck's, so binding a plan into a presentation doesn't strip its author and revision.
+
 **Borrowing a room's scale.** The wizard offers any room of the moodboard's project that already has `width_mm`/`length_mm`, and picking one copies those into a `rect` backdrop and records `room_id` on the sheet. That copy is the whole design: `room_id` is **provenance only**, never resolved server-side. Having the PDF function look up a body-supplied room with the service-role client would be precisely the "trust an id from the request" shape security invariant 1 forbids. `createSheet` still verifies the caller owns that room's project before storing the id, and drops it otherwise; `ON DELETE SET NULL` means deleting a room never deletes the drawing made of it. Pinned by [sheetTypeCoverage.test.ts](../tests/unit/sheetTypeCoverage.test.ts).
 
 Only *sized* rooms are offered — a room with no dimensions has nothing to lend, and picking one would leave the plan unscaled while looking configured.

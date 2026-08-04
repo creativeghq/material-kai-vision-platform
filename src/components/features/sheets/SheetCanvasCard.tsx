@@ -11,6 +11,7 @@ import {
   type FixtureSymbol,
   type FixtureRun,
   type LegendEntry,
+  type SheetTitleBlock,
 } from './FixtureSymbolCanvas';
 import { Droplets, Zap } from 'lucide-react';
 import { DeckBuilderCanvas } from './DeckBuilderCanvas';
@@ -82,6 +83,7 @@ export function SheetCanvasCard({ sheetId, sheetType, moodboardId, initialData, 
           initialSymbols={(initialData.symbols || []) as FixtureSymbol[]}
           initialLegend={(initialData.legend || []) as LegendEntry[]}
           initialRuns={(initialData.runs || []) as FixtureRun[]}
+          initialTitleBlock={initialData.title_block as SheetTitleBlock | undefined}
           onPdfReady={setPdfUrl}
         />
       )}
@@ -93,6 +95,7 @@ export function SheetCanvasCard({ sheetId, sheetType, moodboardId, initialData, 
           initialSymbols={(initialData.symbols || []) as FixtureSymbol[]}
           initialLegend={(initialData.legend || []) as LegendEntry[]}
           initialRuns={(initialData.runs || []) as FixtureRun[]}
+          initialTitleBlock={initialData.title_block as SheetTitleBlock | undefined}
           fixtureDefs={PLUMBING_FIXTURE_DEFS}
           runDefs={PLUMBING_RUN_DEFS}
           paletteIcon={Droplets}
@@ -107,6 +110,7 @@ export function SheetCanvasCard({ sheetId, sheetType, moodboardId, initialData, 
           initialSymbols={(initialData.symbols || []) as FixtureSymbol[]}
           initialLegend={(initialData.legend || []) as LegendEntry[]}
           initialRuns={(initialData.runs || []) as FixtureRun[]}
+          initialTitleBlock={initialData.title_block as SheetTitleBlock | undefined}
           fixtureDefs={ELECTRICAL_FIXTURE_DEFS}
           runDefs={ELECTRICAL_RUN_DEFS}
           paletteIcon={Zap}

@@ -249,8 +249,14 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       project_title: parent.title,
       sheet_title: sheet.title,
       sheet_label: sheetLabel(sheet.sheet_type),
-      date_iso: new Date().toISOString(),
+      // A stored issue date wins over "now". Once a drawing has been issued its
+      // date is part of the record — re-rendering it must not silently restamp
+      // it to today, which would make two prints of the same revision disagree.
+      date_iso: sheet.data?.title_block?.date_iso || new Date().toISOString(),
       client_name: sheet.data?.cover?.client_name || clientName,
+      prepared_by: sheet.data?.title_block?.prepared_by,
+      checked_by: sheet.data?.title_block?.checked_by,
+      revision: sheet.data?.title_block?.revision,
       branding_logo_url: branding?.logo_url,
       branding_company_name: branding?.company_name,
       branding_contact_line: branding?.contact_line,

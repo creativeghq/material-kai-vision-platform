@@ -169,7 +169,14 @@ describe('symbol-plan glyph coverage', () => {
   // agent. Break any link and the plan still renders — just without its
   // pipework, which reads as "nothing was drawn" rather than "this is broken".
   it('runs survive end to end: canvas save → PDF polyline → agent schema', () => {
-    expect(CANVAS, 'runs are not persisted with the sheet').toMatch(/data:\s*\{\s*backdrop,\s*symbols,\s*legend,\s*runs\s*\}/);
+    // Assert the saved payload CONTAINS runs rather than pinning its exact
+    // shape — the previous version broke simply because title_block was added,
+    // which is noise, not a regression.
+    // Anchored on `backdrop` so it cannot match the `const { data: { user } }`
+    // destructure earlier in the file.
+    const saved = /data:\s*\{\s*backdrop([^}]*)\}/.exec(CANVAS);
+    expect(saved, 'could not find the canvas save payload').toBeTruthy();
+    expect(saved![1], 'runs are not persisted with the sheet').toMatch(/\bruns\b/);
     expect(BUILDERS, 'symbol plan does not draw runs').toContain('payload.runs');
     expect(BUILDERS, 'no SERVICES key for the run colours').toContain("'SERVICES'");
     expect(SHEET_TOOL, 'agent cannot define runs').toMatch(/runs:\s*z\.array/);
@@ -197,6 +204,22 @@ describe('symbol-plan glyph coverage', () => {
     // The insert must use the verified value, never the raw body field.
     expect(CREATE, 'insert uses the unverified body value').not.toMatch(/room_id:\s*params\.room_id/);
     expect(CREATE).toMatch(/room_id:\s*safeRoomId/);
+  });
+
+  // Responsibility metadata has to survive the same three hops as everything
+  // else, and the stored issue date must win over "now" — re-rendering an issued
+  // drawing that silently restamps its date makes two prints of the same
+  // revision disagree.
+  it('title block survives end to end: canvas save → render → agent schema', () => {
+    // Anchored on `backdrop` so it cannot match the `const { data: { user } }`
+    // destructure earlier in the file.
+    const saved = /data:\s*\{\s*backdrop([^}]*)\}/.exec(CANVAS);
+    expect(saved![1], 'title_block is not persisted with the sheet').toMatch(/title_block/);
+    const EDGE_INDEX = read('supabase/functions/generate-moodboard-sheet-pdf/index.ts');
+    expect(EDGE_INDEX, 'renderer ignores prepared_by').toMatch(/prepared_by:\s*sheet\.data/);
+    expect(EDGE_INDEX, 'stored issue date does not take precedence over now()')
+      .toMatch(/title_block\?\.date_iso\s*\|\|\s*new Date\(\)/);
+    expect(SHEET_TOOL, 'agent cannot set the title block').toMatch(/title_block:\s*z\.object/);
   });
 
   it('symbols carry a stable id, so a run can reference which ones it connects', () => {

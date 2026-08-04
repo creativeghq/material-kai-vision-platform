@@ -258,6 +258,15 @@ export const createPresentationSheetTool = (
             'Pipe / cable runs joining symbols. Requires symbols to carry ids. ' +
             'Drawn on the plan and keyed in a SERVICES block.',
           ),
+          title_block: z.object({
+            prepared_by: z.string().optional(),
+            checked_by: z.string().optional(),
+            revision: z.string().optional(),
+            date_iso: z.string().optional().describe('Issue date. Omit to stamp at render time.'),
+          }).optional().describe(
+            'Who is answerable for the drawing and which issue it is. Only set these from what ' +
+            'the user actually said — inventing a checker puts a name against work they never saw.',
+          ),
           legend: z.array(z.object({
             symbol_type: z.string(),
             label: z.string(),

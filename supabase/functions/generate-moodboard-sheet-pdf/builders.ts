@@ -1416,6 +1416,12 @@ export async function buildSheetForDeck(
     sheet_label: sheetLabel(sheet.sheet_type),
     sheet_index: index,
     total_sheets: total,
+    // Responsibility belongs to the SHEET, not the deck it was bound into.
+    // Inheriting the parent's (usually empty) values would strip a plan of its
+    // author and revision the moment it was included in a presentation.
+    ...(sheet.data?.title_block?.prepared_by ? { prepared_by: sheet.data.title_block.prepared_by } : {}),
+    ...(sheet.data?.title_block?.checked_by ? { checked_by: sheet.data.title_block.checked_by } : {}),
+    ...(sheet.data?.title_block?.revision ? { revision: sheet.data.title_block.revision } : {}),
   };
 
   switch (sheet.sheet_type) {

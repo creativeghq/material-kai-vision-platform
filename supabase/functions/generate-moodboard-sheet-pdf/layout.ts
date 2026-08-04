@@ -75,6 +75,15 @@ export interface TitleBlockData {
   total_sheets?: number;
   date_iso: string;
   client_name?: string;
+  /**
+   * Responsibility and issue metadata. A technical drawing that leaves the
+   * office needs to say who produced it, who checked it, and which revision it
+   * is — otherwise two versions of the same plan are indistinguishable on site.
+   * All optional: a mood board has no use for them and renders exactly as before.
+   */
+  prepared_by?: string;
+  checked_by?: string;
+  revision?: string;
   // Studio branding (pulled from user_profiles by the PDF function)
   branding_logo_url?: string;
   branding_company_name?: string;
@@ -151,6 +160,32 @@ export function drawTitleBlock(
       size: 8,
       font: fonts.regular,
       color: COLOR_GRAY,
+      maxWidth: colW - 16,
+    });
+  }
+
+  // Second row: responsibility + revision. Each is drawn only when set, so a
+  // sheet that never fills them in shows no empty labels. Columns 1 and 2 are
+  // free here (column 0 holds CLIENT, column 3 the studio branding strip).
+  const subRow = (idx: number, label: string, value: string) => {
+    page.drawText(`${label}: ${value}`, {
+      x: MARGIN + colW * idx + 8,
+      y: tbY + tbH - 50,
+      size: 8,
+      font: fonts.regular,
+      color: COLOR_GRAY,
+      maxWidth: colW - 16,
+    });
+  };
+  if (td.prepared_by) subRow(1, 'PREPARED BY', truncate(td.prepared_by, 24));
+  if (td.checked_by) subRow(2, 'CHECKED BY', truncate(td.checked_by, 24));
+  if (td.revision) {
+    page.drawText(`REV: ${truncate(td.revision, 12)}`, {
+      x: MARGIN + 8,
+      y: tbY + tbH - 60,
+      size: 8,
+      font: fonts.bold,
+      color: COLOR_DARK,
       maxWidth: colW - 16,
     });
   }
