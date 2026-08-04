@@ -483,6 +483,59 @@ async function buildSymbolPlan(
     }
   }
 
+  // CHECKS — voltage drop per run, but ONLY where the backdrop carries a scale
+  // and the user supplied current and cable size. A rect backdrop has exact
+  // dimensions; an uploaded image has none, and a drop computed from a guessed
+  // length would be a confident wrong number on a document someone builds from.
+  const bd = payload.backdrop;
+  const scaled = bd?.kind === 'rect' && !!bd.width_mm && !!bd.height_mm;
+  if (scaled && (payload.runs || []).some((r) => r.props?.current_a && r.props?.csa_mm2)) {
+    const rows: string[] = [];
+    for (const run of payload.runs || []) {
+      const a = symbolById.get(run.from);
+      const b = symbolById.get(run.to);
+      const cur = run.props?.current_a;
+      const csa = run.props?.csa_mm2;
+      if (!a || !b || !cur || !csa) continue;
+      const pts = [a, ...(run.vertices ?? []), b];
+      let mm = 0;
+      for (let i = 1; i < pts.length; i++) {
+        mm += Math.hypot(
+          (pts[i].x - pts[i - 1].x) * bd!.width_mm!,
+          (pts[i].y - pts[i - 1].y) * bd!.height_mm!,
+        );
+      }
+      const phases = run.props?.phases === 3 ? 3 : 1;
+      const nominal = phases === 3 ? 400 : 230;
+      const dropV = ((phases === 3 ? Math.sqrt(3) : 2) * 0.0225 * (mm / 1000) * cur) / csa;
+      const pct = (dropV / nominal) * 100;
+      const isLighting = run.kind === 'lighting_circuit' || run.kind === 'switch_leg';
+      const limit = isLighting ? 3 : 5;
+      rows.push(`${run.kind.replace(/_/g, ' ')}: ${pct.toFixed(1)}% / ${limit}% ${pct <= limit ? 'OK' : 'OVER'}`);
+    }
+    if (rows.length > 0) {
+      ly -= 8;
+      page.drawText('CHECKS', { x: legendX, y: ly, size: 11, font: fonts.bold, color: COLOR_DARK });
+      ly -= 16;
+      for (const row of rows.slice(0, 8)) {
+        page.drawText(truncate(row, 34), {
+          x: legendX, y: ly, size: 8, font: fonts.regular, color: COLOR_DARK,
+        });
+        ly -= 12;
+      }
+      // A verdict with no stated basis is just a word. Say what it was judged
+      // against, and that it is not an engineer's sign-off.
+      page.drawText('Voltage drop, copper @70C. Conventional 3%/5%', {
+        x: legendX, y: ly, size: 6, font: fonts.regular, color: COLOR_GRAY,
+      });
+      ly -= 9;
+      page.drawText('limits — not a substitute for design sign-off.', {
+        x: legendX, y: ly, size: 6, font: fonts.regular, color: COLOR_GRAY,
+      });
+      ly -= 12;
+    }
+  }
+
   // SCHEDULE — the quantity take-off implied by the plan. Counting symbols per
   // linked product is the whole reason a symbol carries a product_id: the plan
   // stops being a picture and becomes something you can order from.

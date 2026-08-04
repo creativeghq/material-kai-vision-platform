@@ -21,6 +21,16 @@ export interface FixtureRun {
   /** Intermediate corners, so a run follows walls instead of cutting through them. */
   vertices?: Array<{ x: number; y: number }>;
   label?: string;
+  /**
+   * Electrical parameters, entered per run. Absent until someone fills them in —
+   * the voltage-drop check simply reports "not enough information" rather than
+   * assuming a cable size on the user's behalf.
+   */
+  props?: {
+    current_a?: number;
+    csa_mm2?: number;
+    phases?: 1 | 3;
+  };
 }
 
 export interface RunDef {

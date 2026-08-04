@@ -107,6 +107,7 @@ export interface FixtureRunData {
   to: string;
   vertices?: Array<{ x: number; y: number }>;
   label?: string;
+  props?: { current_a?: number; csa_mm2?: number; phases?: 1 | 3 };
 }
 
 export interface FfeItem {

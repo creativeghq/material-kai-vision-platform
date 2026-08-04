@@ -14,6 +14,7 @@ import {
   type FixtureRun,
   type RunDef,
 } from '@/utils/fixtureRuns';
+import { voltageDrop, checkVoltageDrop, DEFAULT_DROP_LIMIT_PCT } from '@/utils/mepCalculations';
 import { LivePreviewPanel } from './LivePreviewPanel';
 
 // Re-exported so consumers keep importing run types and palettes from the canvas
@@ -451,18 +452,25 @@ export function FixtureSymbolCanvas({
                 const def = runDefs.find((d) => d.kind === r.kind);
                 const mm = runLengthMm(r, symbols, backdrop);
                 return (
-                  <div key={r.id} className="flex items-center gap-2 text-xs p-1.5 rounded border border-white/10 mb-1">
-                    <span className="w-3 h-0.5 rounded shrink-0" style={{ backgroundColor: def?.color ?? '#94a3b8' }} />
-                    <span className="truncate">{def?.label ?? r.kind}</span>
-                    {/* Length only where the backdrop actually carries a scale. An
-                        uploaded image has none, and a guessed metre figure would be
-                        a confident wrong number in front of someone buying cable. */}
-                    <span className="text-muted-foreground ml-auto shrink-0">
-                      {mm !== null ? `${(mm / 1000).toFixed(2)} m` : '—'}
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => removeRun(r.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                  <div key={r.id} className="text-xs p-1.5 rounded border border-white/10 mb-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-0.5 rounded shrink-0" style={{ backgroundColor: def?.color ?? '#94a3b8' }} />
+                      <span className="truncate">{def?.label ?? r.kind}</span>
+                      {/* Length only where the backdrop actually carries a scale. An
+                          uploaded image has none, and a guessed metre figure would be
+                          a confident wrong number in front of someone buying cable. */}
+                      <span className="text-muted-foreground ml-auto shrink-0">
+                        {mm !== null ? `${(mm / 1000).toFixed(2)} m` : '—'}
+                      </span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => removeRun(r.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <RunElectricalCheck
+                      run={r}
+                      lengthMm={mm}
+                      onChange={(props) => setRuns((arr) => arr.map((x) => (x.id === r.id ? { ...x, props } : x)))}
+                    />
                   </div>
                 );
               })}
@@ -522,6 +530,80 @@ export function FixtureSymbolCanvas({
       {error && (
         <div className="text-xs text-red-400 p-2 rounded border border-red-500/30 bg-red-500/10">
           {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Voltage-drop check for one run.
+ *
+ * Deliberately reports "needs length, current and cable size" rather than
+ * assuming any of them. The cable size especially: guessing it would produce a
+ * verdict that looks authoritative about something nobody actually specified.
+ *
+ * The limit shown is the conventional 3% / 5% installation figure, and it says
+ * so — a verdict with no stated basis is just a coloured word.
+ */
+function RunElectricalCheck({ run, lengthMm, onChange }: {
+  run: FixtureRun;
+  lengthMm: number | null;
+  onChange: (props: NonNullable<FixtureRun['props']>) => void;
+}) {
+  const props = run.props ?? {};
+  const phases = props.phases ?? 1;
+  const isLighting = run.kind === 'lighting_circuit' || run.kind === 'switch_leg';
+  const limit = isLighting ? DEFAULT_DROP_LIMIT_PCT.lighting : DEFAULT_DROP_LIMIT_PCT.power;
+
+  const drop = lengthMm !== null
+    ? voltageDrop({
+        lengthM: lengthMm / 1000,
+        currentA: props.current_a ?? 0,
+        csaMm2: props.csa_mm2 ?? 0,
+        phases,
+      })
+    : null;
+  const check = checkVoltageDrop(drop, limit);
+
+  const num = (v: string) => (v.trim() === '' ? undefined : Number(v));
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-1">
+        <Input
+          value={props.current_a ?? ''}
+          onChange={(e) => onChange({ ...props, current_a: num(e.target.value) })}
+          placeholder="A"
+          inputMode="decimal"
+          className="h-6 text-[11px] px-1.5"
+        />
+        <Input
+          value={props.csa_mm2 ?? ''}
+          onChange={(e) => onChange({ ...props, csa_mm2: num(e.target.value) })}
+          placeholder="mm²"
+          inputMode="decimal"
+          className="h-6 text-[11px] px-1.5"
+        />
+        <button
+          type="button"
+          onClick={() => onChange({ ...props, phases: phases === 1 ? 3 : 1 })}
+          className="h-6 px-2 rounded border border-white/15 text-[11px] text-muted-foreground shrink-0"
+          title="Single or three phase"
+        >
+          {phases}Ø
+        </button>
+      </div>
+      {check ? (
+        <div className={check.verdict === 'pass' ? 'text-emerald-400' : 'text-red-400'}>
+          {check.value.toFixed(2)}% drop · limit {check.limit}% · {check.verdict}
+          <span className="text-muted-foreground"> ({check.basis})</span>
+        </div>
+      ) : (
+        <div className="text-muted-foreground">
+          {lengthMm === null
+            ? 'Needs a scaled backdrop to measure length.'
+            : 'Enter current and cable size to check voltage drop.'}
         </div>
       )}
     </div>

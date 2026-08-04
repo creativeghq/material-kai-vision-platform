@@ -245,6 +245,15 @@ export const createPresentationSheetTool = (
             vertices: z.array(z.object({ x: z.number(), y: z.number() })).optional()
               .describe('Intermediate corners so a run follows walls instead of cutting through them'),
             label: z.string().optional(),
+            props: z.object({
+              current_a: z.number().optional(),
+              csa_mm2: z.number().optional(),
+              phases: z.union([z.literal(1), z.literal(3)]).optional(),
+            }).optional().describe(
+              'Electrical parameters. Only set these when the user actually specified them — ' +
+              'they drive a voltage-drop verdict printed on the sheet, and a guessed cable size ' +
+              'produces an authoritative-looking check of something nobody chose.',
+            ),
           })).optional().describe(
             'Pipe / cable runs joining symbols. Requires symbols to carry ids. ' +
             'Drawn on the plan and keyed in a SERVICES block.',
