@@ -4,6 +4,12 @@ import { edgeError } from '@/utils/edgeError';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { parsePlanGeometry, type PlanGeometry } from '@/utils/planGeometry';
+
+/**
+ * Room floor-plan backdrops live alongside the other user-uploaded imagery.
+ * Public-read, so the URL is re-derived on read rather than persisted.
+ */
+const ROOM_PLAN_BUCKET = 'generation-images';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 
@@ -63,6 +69,9 @@ export interface ProjectRoom {
   width_mm: number | null;
   length_mm: number | null;
   height_mm: number | null;
+  /** Floor-plan backdrop, as bucket + object path. Both set, or both null. */
+  plan_storage_bucket: string | null;
+  plan_storage_path: string | null;
   /**
    * Calibrated plan geometry (walls, openings, mm-per-px). Raw jsonb — read it
    * through parsePlanGeometry in @/utils/planGeometry rather than destructuring
@@ -577,6 +586,64 @@ class ProjectsService {
   /** Read a room's geometry, defaulting cleanly when it has never been traced. */
   roomGeometry(room: Pick<ProjectRoom, 'plan_geometry'>): PlanGeometry {
     return parsePlanGeometry(room.plan_geometry);
+  }
+
+  /**
+   * Upload a floor-plan backdrop for a room.
+   *
+   * Stores bucket + object path rather than a URL (pipeline convention 7) and
+   * re-derives the URL on read. project_rooms.plan_storage_* is registered in
+   * build_storage_reference_set(), so storage-orphan-cleanup-cron leaves these
+   * files alone; a CHECK keeps bucket and path set together, because half a
+   * reference is both unreadable AND invisible to the GC.
+   */
+  async uploadRoomPlan(roomId: string, file: File): Promise<ProjectRoom> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+    const path = `u/${user.id}/room-plans/${roomId}/${Date.now()}.${ext}`;
+    const { data, error } = await supabase.storage
+      .from(ROOM_PLAN_BUCKET)
+      .upload(path, file, { upsert: true });
+    if (error || !data) throw error ?? new Error('Upload failed');
+
+    const { data: row, error: updErr } = await (supabase as any)
+      .from('project_rooms')
+      .update({ plan_storage_bucket: ROOM_PLAN_BUCKET, plan_storage_path: data.path })
+      .eq('id', roomId)
+      .select()
+      .single();
+    if (updErr) throw updErr;
+    return row as ProjectRoom;
+  }
+
+  /** Readable URL for a room's plan backdrop, or null when it has none. */
+  roomPlanUrl(room: Pick<ProjectRoom, 'plan_storage_bucket' | 'plan_storage_path'>): string | null {
+    if (!room.plan_storage_bucket || !room.plan_storage_path) return null;
+    return supabase.storage
+      .from(room.plan_storage_bucket)
+      .getPublicUrl(room.plan_storage_path).data.publicUrl;
+  }
+
+  /**
+   * Detach the plan backdrop. The blob itself is left for the orphan cron —
+   * cleanup here is GC-based, not trigger-based (see docs/storage-buckets.md),
+   * so dropping the reference is the whole job.
+   *
+   * Scale is dropped with it: an mm-per-pixel derived from an image that is no
+   * longer attached would silently measure against the wrong backdrop.
+   */
+  async clearRoomPlan(roomId: string, geometry: PlanGeometry): Promise<ProjectRoom> {
+    const { scale: _dropped, ...rest } = geometry;
+    const { data, error } = await (supabase as any)
+      .from('project_rooms')
+      .update({ plan_storage_bucket: null, plan_storage_path: null, plan_geometry: rest })
+      .eq('id', roomId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ProjectRoom;
   }
 
   async deleteRoom(id: string): Promise<void> {

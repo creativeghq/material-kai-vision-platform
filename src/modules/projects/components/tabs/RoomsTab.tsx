@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Plus, Trash2, Home, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Home, Loader2, Ruler } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -39,6 +39,7 @@ interface RoomsTabProps {
 }
 
 import { formatMoney } from '@/utils/decimal';
+import { RoomGeometryModal, roomGeometrySummary } from '../RoomGeometryModal';
 
 export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, isOwner = true }) => {
   const { toast } = useToast();
@@ -50,6 +51,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
   const [newBudget, setNewBudget] = useState('');
   const [newDeadline, setNewDeadline] = useState('');
   const [creating, setCreating] = useState(false);
+  const [geometryRoom, setGeometryRoom] = useState<ProjectRoom | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -180,11 +182,38 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
                     <span>Due {new Date(r.deadline).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
                   )}
                 </div>
+                {(() => {
+                  const summary = roomGeometrySummary(r);
+                  return (
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/10">
+                      <span className={`text-xs ${summary.calibrated ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                        {summary.text}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1.5 text-xs"
+                        onClick={() => setGeometryRoom(r)}
+                      >
+                        <Ruler className="h-3.5 w-3.5" />
+                        Size & plan
+                      </Button>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <RoomGeometryModal
+        room={geometryRoom}
+        open={!!geometryRoom}
+        onOpenChange={(o) => { if (!o) setGeometryRoom(null); }}
+        onSaved={load}
+        readOnly={!isOwner}
+      />
     </div>
   );
 };

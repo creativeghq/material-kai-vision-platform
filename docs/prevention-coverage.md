@@ -90,6 +90,17 @@ permanently under-processed while the job completes green.
 - **Deliberately not auto-healed:** repair means re-running Stage 3, which re-bills Claude vision for every image on the product. `heal_fn` is NULL so the registry cannot silently re-bill a catalog; a human decides.
 - **Blind spot:** the check only sees products a resume *noticed* were partial. Chunks are repaired in place (deleted and rebuilt), so they never reach this marker — a different and better outcome, but it means this check is image-side only.
 
+### 4d. Unregistered storage path — the GC deletes a file the DB still points at
+`build_storage_reference_set()` is the allow-list `storage-orphan-cleanup-cron` sweeps against. A
+table that stores an object path but never got a branch in it has its files treated as orphans and
+deleted. The row survives, still holding the path, so nothing looks wrong.
+
+- **Guarded by:** `ops.storage_paths_unregistered` — scans `public` base tables for `%storage_path%` / `%storage_object_path%` columns and fails any whose table is absent from the function body.
+- **Proven to fire:** 2026-08-04, on introduction, against **real loss**. `public.payments` wrote receipt PDFs into `pdf-documents` (swept on a 72h grace) and was never registered; **both** payment-receipt PDFs on this project had already been deleted while their rows still referenced them. Six more tables were latent (`hr_documents`, `hr_accounting_documents`, `material_images`, `property_documents`, `property_photos` — all empty at the time). All registered in the same change; the probe was then re-run against a simulated pre-fix definition and confirmed to return `payments`.
+- **Match on the QUALIFIED name.** The first hand-written version of this check tested `position(table_name in def)` and reported `uploaded_files` as registered — because it is a substring of `agent_uploaded_files`. An unqualified match hides exactly the tables most likely to be missed: the ones whose names resemble a table that *is* registered.
+- **Deliberately not auto-healed:** the fix is a new branch in a SECURITY DEFINER function, and the deleted files are already gone. Nothing to heal, only to prevent.
+- **Blind spot:** columns that hold a storage path under a name matching neither pattern, and paths stored inside jsonb. Both are invisible to a column-name scan.
+
 ### 5. Derived-copy drift — a cached number diverging from its source
 Any `total`, `status` or count stored alongside the data it summarises.
 
@@ -126,6 +137,7 @@ Closely related to shape 1, but at the aggregate rather than the row.
 | `npm run lint:a11y` | CI | jsx-a11y, per-rule ratchet | partly — [tests/unit/a11yRatchet.test.ts](../tests/unit/a11yRatchet.test.ts) fails if a rule returns to `'off'` |
 | `npm run lint:tenancy` | CI | invariant 1, two-doors | **yes** — self-test runs before every scan |
 | `ops.silent_zero` | nightly | shape 4 | no |
+| `ops.storage_paths_unregistered` | nightly | shape 4d | **yes** — reads `build_storage_reference_set()`'s own body, so it cannot drift from what the cron actually honours |
 | `ops.money_without_currency` | nightly | shape 6 | no — but all three branches were watched to fire before shipping |
 | `ops.unsent_queue_backlog` | nightly | shape 4c | no — but it fired on real production data on introduction |
 | `pdf.product_resume_incomplete` | nightly | shape 4b | no — but it was watched to fire on a planted marker before shipping |
