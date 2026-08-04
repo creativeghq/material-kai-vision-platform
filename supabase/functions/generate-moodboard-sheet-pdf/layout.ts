@@ -192,7 +192,11 @@ export function drawTitleBlock(
 
   // Studio branding strip (right edge of title block) — company name + contact
   if (td.branding_company_name || td.branding_contact_line) {
-    const brandingX = MARGIN + tbW - colW - 8;
+    // Align to column 3 exactly like every other cell. The old
+    // `MARGIN + tbW - colW - 8` landed 8pt LEFT of the divider, so the studio
+    // name and contact line hung out of their cell into the neighbouring one —
+    // invisible while that cell was empty, obvious once CHECKED BY filled it.
+    const brandingX = MARGIN + colW * 3 + 8;
     page.drawText(td.branding_company_name || '', {
       x: brandingX,
       y: tbY + tbH - 50,
