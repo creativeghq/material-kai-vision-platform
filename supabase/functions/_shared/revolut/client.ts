@@ -371,3 +371,118 @@ export function listTransactions(
   q.set('count', String(opts.count ?? 500));
   return revolutJson<RevolutTransaction[]>(supabase, cfg, issuerDomain, `/transactions?${q.toString()}`);
 }
+
+// ---------------------------------------------------------------------------
+// Money-out (PAY/WRITE scopes) — thin wrappers; auditing lives in revolut_payouts.
+// ---------------------------------------------------------------------------
+
+export interface RevolutCounterparty {
+  id: string;
+  name?: string;
+  state?: string;
+}
+
+/** Create an external-IBAN counterparty. Body per Revolut: company_name | individual_name + iban/bic. */
+export function createCounterparty(
+  supabase: any,
+  cfg: RevolutConfigRow,
+  issuerDomain: string,
+  body: Record<string, unknown>,
+) {
+  return revolutJson<RevolutCounterparty>(supabase, cfg, issuerDomain, '/counterparty', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Immediate transfer to a counterparty (UNATTENDED money movement — callers audit first). */
+export function createPayment(
+  supabase: any,
+  cfg: RevolutConfigRow,
+  issuerDomain: string,
+  body: {
+    request_id: string;
+    account_id: string;
+    receiver: { counterparty_id: string; account_id?: string };
+    amount: number;
+    currency: string;
+    reference?: string;
+  },
+) {
+  return revolutJson<{ id: string; state: string }>(supabase, cfg, issuerDomain, '/pay', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Payment draft — prepared by the ERP, approved by a human in the Revolut app. */
+export function createPaymentDraft(
+  supabase: any,
+  cfg: RevolutConfigRow,
+  issuerDomain: string,
+  body: {
+    title?: string;
+    payments: Array<{
+      account_id: string;
+      receiver: { counterparty_id: string; account_id?: string };
+      amount: number;
+      currency: string;
+      reference?: string;
+    }>;
+  },
+) {
+  return revolutJson<{ id: string }>(supabase, cfg, issuerDomain, '/payment-drafts', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** Payout link — money claimable by URL; no IBAN needed (customer refunds). */
+export function createPayoutLink(
+  supabase: any,
+  cfg: RevolutConfigRow,
+  issuerDomain: string,
+  body: {
+    counterparty_name: string;
+    request_id: string;
+    account_id: string;
+    amount: number;
+    currency: string;
+    reference?: string;
+  },
+) {
+  return revolutJson<{ id: string; state?: string; url?: string }>(supabase, cfg, issuerDomain, '/payout-links', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function getExchangeRate(
+  supabase: any,
+  cfg: RevolutConfigRow,
+  issuerDomain: string,
+  from: string,
+  to: string,
+  amount: number,
+) {
+  const q = new URLSearchParams({ from, to, amount: String(amount) });
+  return revolutJson<Record<string, unknown>>(supabase, cfg, issuerDomain, `/rate?${q.toString()}`);
+}
+
+/** Exchange between the business's own currency pockets. */
+export function exchangeMoney(
+  supabase: any,
+  cfg: RevolutConfigRow,
+  issuerDomain: string,
+  body: {
+    request_id: string;
+    from: { account_id: string; currency: string; amount: number };
+    to: { account_id: string; currency: string };
+    reference?: string;
+  },
+) {
+  return revolutJson<{ id?: string; state?: string }>(supabase, cfg, issuerDomain, '/exchange', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}

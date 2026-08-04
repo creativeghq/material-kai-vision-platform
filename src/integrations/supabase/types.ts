@@ -4298,6 +4298,9 @@ export type Database = {
           id: string
           is_primary: boolean
           notes: string | null
+          revolut_counterparty_id: string | null
+          vop_checked_at: string | null
+          vop_result: string | null
           updated_at: string
           workspace_id: string
         }
@@ -4313,6 +4316,9 @@ export type Database = {
           id?: string
           is_primary?: boolean
           notes?: string | null
+          revolut_counterparty_id?: string | null
+          vop_checked_at?: string | null
+          vop_result?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -4328,6 +4334,9 @@ export type Database = {
           id?: string
           is_primary?: boolean
           notes?: string | null
+          revolut_counterparty_id?: string | null
+          vop_checked_at?: string | null
+          vop_result?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -23051,6 +23060,78 @@ export type Database = {
           },
           {
             foreignKeyName: "revolut_bank_transactions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      revolut_payouts: {
+        Row: {
+          amount: number
+          counterparty_name: string | null
+          created_at: string
+          created_by: string | null
+          crm_bank_account_id: string | null
+          currency: string
+          id: string
+          kind: string
+          provider_id: string | null
+          provider_url: string | null
+          reference: string | null
+          request_id: string
+          source_revolut_account_id: string | null
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount: number
+          counterparty_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          crm_bank_account_id?: string | null
+          currency: string
+          id?: string
+          kind: string
+          provider_id?: string | null
+          provider_url?: string | null
+          reference?: string | null
+          request_id: string
+          source_revolut_account_id?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount?: number
+          counterparty_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          crm_bank_account_id?: string | null
+          currency?: string
+          id?: string
+          kind?: string
+          provider_id?: string | null
+          provider_url?: string | null
+          reference?: string | null
+          request_id?: string
+          source_revolut_account_id?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revolut_payouts_crm_bank_account_id_fkey"
+            columns: ["crm_bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revolut_payouts_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

@@ -27,8 +27,14 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import {
+  createCounterparty,
+  createPayment,
+  createPaymentDraft,
+  createPayoutLink,
   exchangeAuthCode,
+  exchangeMoney,
   generateRevolutKeypair,
+  getExchangeRate,
   issuerDomainFrom,
   listAccounts,
   resolveRevolutConfig,
@@ -328,6 +334,218 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       const result = await syncWorkspaceRevolut(service, cfg);
       if (!result.ok) throw new HttpError(502, result.error ?? 'sync failed');
       return jsonResponse({ ok: true, fetched: result.fetched, upserted: result.upserted });
+    }
+
+    case 'create-counterparty': {
+      // Mirror a CRM bank row as a Revolut counterparty — the prerequisite for paying it.
+      // VoP-GATED: the account name is verified first; a non-match blocks unless the
+      // caller explicitly overrides (force=true), and the verdict is stored either way.
+      const crmBankId = String(body?.crm_bank_account_id ?? '');
+      if (!crmBankId) throw new HttpError(400, 'crm_bank_account_id is required');
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+
+      const { data: bank } = await service
+        .from('crm_bank_accounts')
+        .select('*, company:crm_companies!company_id(name), contact:crm_contacts!contact_id(name)')
+        .eq('id', crmBankId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (!bank) throw new HttpError(404, 'not found');
+      if (bank.revolut_counterparty_id) return jsonResponse({ ok: true, counterparty_id: bank.revolut_counterparty_id, already: true });
+      const holderName = String(bank.account_holder || bank.company?.name || bank.contact?.name || '').trim();
+      const iban = String(bank.iban ?? '').replace(/\s+/g, '').toUpperCase();
+      if (!holderName || !iban) throw new HttpError(400, 'the CRM bank row needs an account holder name and an IBAN');
+      const isCompany = !!bank.company_id;
+
+      let vop = 'cannot_be_checked';
+      try {
+        const { revolutFetch: rf } = await import('../_shared/revolut/client.ts');
+        const vopBody: Record<string, unknown> = { iban };
+        if (isCompany) vopBody.company_name = holderName;
+        else {
+          const parts = holderName.split(/\s+/);
+          vopBody.individual_name = { first_name: parts[0], last_name: parts.slice(1).join(' ') || parts[0] };
+        }
+        const res = await rf(service, cfg, issuer, '/account-name-validation', { method: 'POST', body: JSON.stringify(vopBody) });
+        const out = await res.json().catch(() => ({}));
+        if (res.ok) vop = String((out as any).result_code ?? (out as any).result ?? 'cannot_be_checked');
+      } catch { /* verdict stays cannot_be_checked */ }
+      await service.from('crm_bank_accounts')
+        .update({ vop_result: vop, vop_checked_at: new Date().toISOString() })
+        .eq('id', crmBankId);
+      if (vop === 'not_matched' && !body?.force) {
+        throw new HttpError(400, `Account name does NOT match this IBAN (VoP). Verify with the counterparty; pass force=true only if you are certain.`);
+      }
+
+      const cpBody: Record<string, unknown> = { iban, currency: bank.currency || 'EUR' };
+      if (bank.account_ref) cpBody.bic = bank.account_ref;
+      if (isCompany) cpBody.company_name = holderName;
+      else {
+        const parts = holderName.split(/\s+/);
+        cpBody.individual_name = { first_name: parts[0], last_name: parts.slice(1).join(' ') || parts[0] };
+      }
+      const cp = await createCounterparty(service, cfg, issuer, cpBody);
+      const { error } = await service.from('crm_bank_accounts')
+        .update({ revolut_counterparty_id: cp.id })
+        .eq('id', crmBankId);
+      if (error) throw new HttpError(500, `counterparty created but link failed: ${error.message}`);
+      return jsonResponse({ ok: true, counterparty_id: cp.id, vop_result: vop });
+    }
+
+    case 'send-payment': {
+      // Money OUT: mode 'draft' prepares it for human approval in the Revolut app;
+      // mode 'payment' moves money immediately. Both are audited in revolut_payouts
+      // with an idempotency request_id before Revolut is called.
+      const crmBankId = String(body?.crm_bank_account_id ?? '');
+      const sourceAccountId = String(body?.source_revolut_account_id ?? '');
+      const amount = Number(body?.amount ?? 0);
+      const currency = String(body?.currency ?? 'EUR').toUpperCase();
+      const reference = String(body?.reference ?? '').slice(0, 140);
+      const mode = body?.mode === 'payment' ? 'payment' : 'draft';
+      if (!crmBankId || !sourceAccountId) throw new HttpError(400, 'crm_bank_account_id and source_revolut_account_id are required');
+      if (!(amount > 0)) throw new HttpError(400, 'amount must be positive');
+
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const { data: bank } = await service
+        .from('crm_bank_accounts')
+        .select('id, account_holder, revolut_counterparty_id, company:crm_companies!company_id(name), contact:crm_contacts!contact_id(name)')
+        .eq('id', crmBankId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (!bank) throw new HttpError(404, 'not found');
+      if (!bank.revolut_counterparty_id) throw new HttpError(400, 'create the Revolut counterparty for this bank first (VoP-gated)');
+
+      const requestId = crypto.randomUUID();
+      const bankAny = bank as any;
+      const cpName = String(bankAny.account_holder || bankAny.company?.name || bankAny.contact?.name || '');
+      const { data: audit, error: auditErr } = await service.from('revolut_payouts').insert({
+        workspace_id: workspaceId,
+        request_id: requestId,
+        kind: mode,
+        amount, currency,
+        source_revolut_account_id: sourceAccountId,
+        crm_bank_account_id: crmBankId,
+        counterparty_name: cpName,
+        reference,
+        created_by: auth.userId,
+      }).select('id').single();
+      if (auditErr || !audit) throw new HttpError(500, `audit insert failed: ${auditErr?.message}`);
+
+      try {
+        if (mode === 'draft') {
+          const draft = await createPaymentDraft(service, cfg, issuer, {
+            title: reference || `Payment to ${cpName}`,
+            payments: [{
+              account_id: sourceAccountId,
+              receiver: { counterparty_id: bank.revolut_counterparty_id },
+              amount, currency,
+              reference: reference || undefined,
+            }],
+          });
+          await service.from('revolut_payouts').update({ provider_id: draft.id, state: 'pending_approval', updated_at: new Date().toISOString() }).eq('id', audit.id);
+          return jsonResponse({ ok: true, mode, draft_id: draft.id, note: 'Approve the draft in the Revolut app to execute it.' });
+        }
+        const pay = await createPayment(service, cfg, issuer, {
+          request_id: requestId,
+          account_id: sourceAccountId,
+          receiver: { counterparty_id: bank.revolut_counterparty_id },
+          amount, currency,
+          reference: reference || undefined,
+        });
+        await service.from('revolut_payouts').update({ provider_id: pay.id, state: pay.state ?? 'pending', updated_at: new Date().toISOString() }).eq('id', audit.id);
+        return jsonResponse({ ok: true, mode, payment_id: pay.id, state: pay.state });
+      } catch (err) {
+        await service.from('revolut_payouts').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('id', audit.id);
+        throw err;
+      }
+    }
+
+    case 'create-payout-link': {
+      // Refund/pay someone WITHOUT knowing their IBAN — they claim via the link.
+      const name = String(body?.counterparty_name ?? '').trim();
+      const sourceAccountId = String(body?.source_revolut_account_id ?? '');
+      const amount = Number(body?.amount ?? 0);
+      const currency = String(body?.currency ?? 'EUR').toUpperCase();
+      const reference = String(body?.reference ?? '').slice(0, 140);
+      if (!name || !sourceAccountId) throw new HttpError(400, 'counterparty_name and source_revolut_account_id are required');
+      if (!(amount > 0)) throw new HttpError(400, 'amount must be positive');
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+
+      const requestId = crypto.randomUUID();
+      const { data: audit, error: auditErr } = await service.from('revolut_payouts').insert({
+        workspace_id: workspaceId, request_id: requestId, kind: 'payout_link',
+        amount, currency, source_revolut_account_id: sourceAccountId,
+        counterparty_name: name, reference, created_by: auth.userId,
+      }).select('id').single();
+      if (auditErr || !audit) throw new HttpError(500, `audit insert failed: ${auditErr?.message}`);
+
+      try {
+        const link = await createPayoutLink(service, cfg, issuer, {
+          counterparty_name: name, request_id: requestId,
+          account_id: sourceAccountId, amount, currency,
+          reference: reference || undefined,
+        });
+        await service.from('revolut_payouts').update({
+          provider_id: link.id, provider_url: link.url ?? null,
+          state: link.state ?? 'created', updated_at: new Date().toISOString(),
+        }).eq('id', audit.id);
+        return jsonResponse({ ok: true, link_id: link.id, url: link.url ?? null });
+      } catch (err) {
+        await service.from('revolut_payouts').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('id', audit.id);
+        throw err;
+      }
+    }
+
+    case 'fx-rate': {
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const from = String(body?.from ?? '').toUpperCase();
+      const to = String(body?.to ?? '').toUpperCase();
+      const amount = Number(body?.amount ?? 1);
+      if (!from || !to) throw new HttpError(400, 'from and to currencies are required');
+      const rate = await getExchangeRate(service, cfg, issuer, from, to, amount);
+      return jsonResponse({ ok: true, rate });
+    }
+
+    case 'exchange': {
+      // Treasury conversion between the business's own pockets.
+      const fromAccountId = String(body?.from_account_id ?? '');
+      const toAccountId = String(body?.to_account_id ?? '');
+      const fromCurrency = String(body?.from_currency ?? '').toUpperCase();
+      const toCurrency = String(body?.to_currency ?? '').toUpperCase();
+      const amount = Number(body?.amount ?? 0);
+      if (!fromAccountId || !toAccountId || !fromCurrency || !toCurrency) {
+        throw new HttpError(400, 'from/to account ids and currencies are required');
+      }
+      if (!(amount > 0)) throw new HttpError(400, 'amount must be positive');
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+
+      const requestId = crypto.randomUUID();
+      const { data: audit, error: auditErr } = await service.from('revolut_payouts').insert({
+        workspace_id: workspaceId, request_id: requestId, kind: 'exchange',
+        amount, currency: fromCurrency, source_revolut_account_id: fromAccountId,
+        counterparty_name: null, reference: `FX ${fromCurrency}→${toCurrency}`, created_by: auth.userId,
+      }).select('id').single();
+      if (auditErr || !audit) throw new HttpError(500, `audit insert failed: ${auditErr?.message}`);
+
+      try {
+        const fx = await exchangeMoney(service, cfg, issuer, {
+          request_id: requestId,
+          from: { account_id: fromAccountId, currency: fromCurrency, amount },
+          to: { account_id: toAccountId, currency: toCurrency },
+        });
+        await service.from('revolut_payouts').update({
+          provider_id: fx.id ?? null, state: fx.state ?? 'completed', updated_at: new Date().toISOString(),
+        }).eq('id', audit.id);
+        return jsonResponse({ ok: true, exchange_id: fx.id ?? null, state: fx.state ?? null });
+      } catch (err) {
+        await service.from('revolut_payouts').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('id', audit.id);
+        throw err;
+      }
     }
 
     case 'disconnect': {
