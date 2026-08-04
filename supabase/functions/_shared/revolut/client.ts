@@ -214,7 +214,13 @@ export async function exchangeAuthCode(
   code: string,
   issuerDomain: string,
 ): Promise<void> {
-  const out = await tokenRequest(cfg, issuerDomain, { grant_type: 'authorization_code', code });
+  const out = await tokenRequest(cfg, issuerDomain, {
+    grant_type: 'authorization_code',
+    code,
+    // OAuth requires echoing the redirect_uri used on the consent request; Revolut
+    // rejects the code as "invalid or expired" without it.
+    ...(cfg.oauth_redirect_uri ? { redirect_uri: cfg.oauth_redirect_uri } : {}),
+  });
   const expiresAt = new Date(Date.now() + (Number(out.expires_in ?? 2400) - 120) * 1000).toISOString();
   const { error } = await supabase
     .from('workspace_revolut_config')
