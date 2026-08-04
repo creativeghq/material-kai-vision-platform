@@ -3,6 +3,7 @@ import { flowEventService } from '@/services/flows/flowEventService';
 import { edgeError } from '@/utils/edgeError';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { parsePlanGeometry, type PlanGeometry } from '@/utils/planGeometry';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 
@@ -58,6 +59,16 @@ export interface ProjectRoom {
   budget_amount: number | null;
   deadline: string | null;
   notes: string | null;
+  /** Physical size. Null until someone fills it in — never assume a default. */
+  width_mm: number | null;
+  length_mm: number | null;
+  height_mm: number | null;
+  /**
+   * Calibrated plan geometry (walls, openings, mm-per-px). Raw jsonb — read it
+   * through parsePlanGeometry in @/utils/planGeometry rather than destructuring
+   * here, so the backing store can change without touching consumers.
+   */
+  plan_geometry: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -277,6 +288,10 @@ export interface CreateRoomInput {
   deadline?: string | null;
   notes?: string | null;
   sort_order?: number;
+  /** Physical size in mm. Feeds plan scale and, later, the MEP calculations. */
+  width_mm?: number | null;
+  length_mm?: number | null;
+  height_mm?: number | null;
 }
 
 export interface CreateTaskInput {
@@ -506,6 +521,9 @@ class ProjectsService {
         deadline: input.deadline ?? null,
         notes: input.notes ?? null,
         sort_order: input.sort_order ?? 0,
+        width_mm: input.width_mm ?? null,
+        length_mm: input.length_mm ?? null,
+        height_mm: input.height_mm ?? null,
       })
       .select()
       .single();
@@ -514,14 +532,51 @@ class ProjectsService {
   }
 
   async updateRoom(id: string, input: Partial<Omit<CreateRoomInput, 'project_id'>>): Promise<ProjectRoom> {
+    // Allowlisted payload rather than spreading `input` — a spread lets any extra
+    // runtime key reach the write (CLAUDE.md security invariant 8), and this
+    // object now sits next to columns that feed calculations.
+    const payload: Record<string, unknown> = {};
+    if (input.name !== undefined) payload.name = input.name;
+    if (input.room_type !== undefined) payload.room_type = input.room_type;
+    if (input.budget_amount !== undefined) payload.budget_amount = input.budget_amount;
+    if (input.deadline !== undefined) payload.deadline = input.deadline;
+    if (input.notes !== undefined) payload.notes = input.notes;
+    if (input.sort_order !== undefined) payload.sort_order = input.sort_order;
+    if (input.width_mm !== undefined) payload.width_mm = input.width_mm;
+    if (input.length_mm !== undefined) payload.length_mm = input.length_mm;
+    if (input.height_mm !== undefined) payload.height_mm = input.height_mm;
+
     const { data, error } = await (supabase as any)
       .from('project_rooms')
-      .update(input)
+      .update(payload)
       .eq('id', id)
       .select()
       .single();
     if (error) throw error;
     return data as ProjectRoom;
+  }
+
+  /**
+   * Persist calibrated plan geometry for a room.
+   *
+   * Separate from updateRoom on purpose: geometry is written by the canvas as a
+   * whole document, never field-by-field, and keeping it off the general update
+   * path means a stray form submit can never blank someone's traced walls.
+   */
+  async updateRoomGeometry(id: string, geometry: PlanGeometry): Promise<ProjectRoom> {
+    const { data, error } = await (supabase as any)
+      .from('project_rooms')
+      .update({ plan_geometry: geometry })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ProjectRoom;
+  }
+
+  /** Read a room's geometry, defaulting cleanly when it has never been traced. */
+  roomGeometry(room: Pick<ProjectRoom, 'plan_geometry'>): PlanGeometry {
+    return parsePlanGeometry(room.plan_geometry);
   }
 
   async deleteRoom(id: string): Promise<void> {
