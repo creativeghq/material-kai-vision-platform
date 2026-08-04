@@ -287,6 +287,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
           backdrop: sheet.data.backdrop,
           symbols,
           legend: sheet.data.legend || [],
+          runs: sheet.data.runs || [],
           chips: symbolChips,
         };
         if (sheet.sheet_type === 'lighting_plan') await buildLightingPlan(pdfDoc, fonts, td, symbolPayload);

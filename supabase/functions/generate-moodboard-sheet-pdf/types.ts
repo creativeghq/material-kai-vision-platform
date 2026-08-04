@@ -99,6 +99,16 @@ export interface FixtureSymbolData {
   product_id?: string;
 }
 
+/** A pipe / cable / circuit joining two symbols. Coordinates normalized [0..1]. */
+export interface FixtureRunData {
+  id: string;
+  kind: string;
+  from: string;
+  to: string;
+  vertices?: Array<{ x: number; y: number }>;
+  label?: string;
+}
+
 export interface FfeItem {
   room: string | null;
   name: string;

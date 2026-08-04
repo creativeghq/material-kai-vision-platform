@@ -31,6 +31,7 @@ import type {
   DimensionData,
   FfeItem,
   FixtureSymbolData,
+  FixtureRunData,
   ProductChip,
   SheetRow,
   SwatchData,
@@ -297,11 +298,28 @@ type SymbolPlanPayload = {
   backdrop?: { kind: 'upload' | 'rect'; image_url?: string; width_mm?: number; height_mm?: number };
   symbols: FixtureSymbolData[];
   legend: { symbol_type: string; label: string }[];
+  /** Pipe / cable runs joining symbols. Drawn under the symbols. */
+  runs?: FixtureRunData[];
   /**
    * Catalog products linked to symbols, already workspace-scoped by the caller.
    * Drives the SCHEDULE block — the quantity take-off the plan implies.
    */
   chips?: ProductChip[];
+};
+
+/**
+ * Run styling, keyed by kind. Must mirror the *_RUN_DEFS palettes in
+ * FixtureSymbolCanvas.tsx — a kind missing here renders as an anonymous grey
+ * line, which on a services drawing reads as a different service entirely.
+ */
+const RUN_STYLES: Record<string, { rgb: [number, number, number]; dash?: number[] }> = {
+  lighting_circuit:  { rgb: [0.96, 0.62, 0.04] },
+  socket_circuit:    { rgb: [0.23, 0.51, 0.96] },
+  dedicated_circuit: { rgb: [0.94, 0.27, 0.27], dash: [4, 2] },
+  switch_leg:        { rgb: [0.65, 0.55, 0.98], dash: [2, 2] },
+  cold_supply:       { rgb: [0.23, 0.51, 0.96] },
+  hot_supply:        { rgb: [0.94, 0.27, 0.27] },
+  waste:             { rgb: [0.47, 0.44, 0.42], dash: [5, 3] },
 };
 
 type SymbolDrawer = (page: PDFPage, fonts: SheetFonts, type: string, cx: number, cy: number, label?: string) => void;
@@ -389,11 +407,38 @@ async function buildSymbolPlan(
     }
   }
 
+  // Project a normalized point into page space. y is flipped because PDF origin
+  // is bottom-left while the canvas measures from the top.
+  const toPage = (p: { x: number; y: number }) => ({
+    x: bdX + Math.max(0, Math.min(1, p.x)) * bdW,
+    y: bdY + (1 - Math.max(0, Math.min(1, p.y))) * bdH,
+  });
+
+  // Runs FIRST, so symbols sit on top of their pipework rather than under it.
+  const symbolById = new Map((payload.symbols || []).map((s) => [s.id, s]));
+  for (const run of payload.runs || []) {
+    const a = symbolById.get(run.from);
+    const b = symbolById.get(run.to);
+    // An orphaned run (endpoint deleted) is skipped rather than drawn to nowhere.
+    if (!a || !b) continue;
+    const style = RUN_STYLES[run.kind] ?? { rgb: [0.58, 0.64, 0.72] as [number, number, number] };
+    const color = rgb(style.rgb[0], style.rgb[1], style.rgb[2]);
+    const pts = [a, ...(run.vertices ?? []), b].map(toPage);
+    for (let i = 1; i < pts.length; i++) {
+      page.drawLine({
+        start: pts[i - 1],
+        end: pts[i],
+        color,
+        thickness: 1.1,
+        ...(style.dash ? { dashArray: style.dash } : {}),
+      });
+    }
+  }
+
   // Fixture symbols (x,y are normalized 0..1 within backdrop)
   for (const s of payload.symbols || []) {
-    const px = bdX + Math.max(0, Math.min(1, s.x)) * bdW;
-    const py = bdY + (1 - Math.max(0, Math.min(1, s.y))) * bdH;
-    drawSymbol(page, fonts, s.type, px, py, s.label);
+    const p = toPage(s);
+    drawSymbol(page, fonts, s.type, p.x, p.y, s.label);
   }
 
   // Legend on right
@@ -411,6 +456,31 @@ async function buildSymbolPlan(
       maxWidth: CONTENT_W - planW - 50,
     });
     ly -= 22;
+  }
+
+  // Run key — a services drawing is unreadable without one: three coloured lines
+  // with no key is just decoration. Only kinds actually drawn get a row.
+  const usedKinds = [...new Set((payload.runs || []).map((r) => r.kind))];
+  if (usedKinds.length > 0) {
+    ly -= 8;
+    page.drawText('SERVICES', {
+      x: legendX, y: ly, size: 11, font: fonts.bold, color: COLOR_DARK,
+    });
+    ly -= 18;
+    for (const kind of usedKinds.slice(0, 8)) {
+      const style = RUN_STYLES[kind] ?? { rgb: [0.58, 0.64, 0.72] as [number, number, number] };
+      page.drawLine({
+        start: { x: legendX, y: ly + 3 },
+        end: { x: legendX + 18, y: ly + 3 },
+        color: rgb(style.rgb[0], style.rgb[1], style.rgb[2]),
+        thickness: 1.4,
+        ...(style.dash ? { dashArray: style.dash } : {}),
+      });
+      page.drawText(truncate(kind.replace(/_/g, ' '), 24), {
+        x: legendX + 24, y: ly, size: 9, font: fonts.regular, color: COLOR_DARK,
+      });
+      ly -= 15;
+    }
   }
 
   // SCHEDULE — the quantity take-off implied by the plan. Counting symbols per
@@ -1329,6 +1399,7 @@ export async function buildSheetForDeck(
         backdrop: sheet.data.backdrop,
         symbols,
         legend: sheet.data.legend || [],
+        runs: sheet.data.runs || [],
         chips: ids.length ? await resolveChips(ids) : [],
       };
       if (sheet.sheet_type === 'lighting_plan') await buildLightingPlan(pdfDoc, fonts, td, payload);

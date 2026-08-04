@@ -26,7 +26,7 @@ Shipped 2026-05-02. The 9th type (`area_breakdown`) and **Project Client Views**
 | `material_board` | 0 cr | No | `product_ids[]` (cap 8). Optional `chip_descriptions{product_id: text}` to override product description text. |
 | `color_palette` | 0 cr | No | `swatches[{hex, name, source_image_id?}]` (cap 8). |
 | `concept_board` | 0 cr | No | `layout[{image_url, caption?}]` (cap 6). |
-| `lighting_plan` | 3 cr | Yes | `backdrop` (`{kind: 'upload'\|'rect', image_url? OR width_mm/height_mm}`), `symbols[{id?, type, x, y, label?, product_id?}]` (normalized 0..1), `legend[{symbol_type, label}]`. |
+| `lighting_plan` | 3 cr | Yes | `backdrop` (`{kind: 'upload'\|'rect', image_url? OR width_mm/height_mm}`), `symbols[{id?, type, x, y, label?, product_id?}]` (normalized 0..1), `runs[{id, kind, from, to, vertices?}]`, `legend[{symbol_type, label}]`. |
 | `plumbing_plan` | 3 cr | Yes | Same shape as `lighting_plan`; symbol types are `wc / basin / bath / shower / floor_drain / water_supply / waste / water_heater / mixer`. |
 | `electrical_plan` | 3 cr | Yes | Same shape as `lighting_plan`; IEC 60617-style types `socket / socket_double / switch_1way / switch_2way / dimmer / distribution_board / data_outlet / tv_outlet / dedicated_point / junction_box / earth_point`. **Added 2026-08-04.** |
 | `annotated_render` | 3 cr | Yes | `backdrop_image_url`, `annotations[{x, y, line_endpoint_x, line_endpoint_y, label, product_id?, source: 'ai'\|'manual'\|'auto'}]`. |
@@ -236,9 +236,16 @@ Both render as SVG overlays on top of `AnnotationLayer`. Dimensions show the val
 
 One widget, three palettes, injected via the `fixtureDefs` prop (`LIGHTING_` / `PLUMBING_` / `ELECTRICAL_FIXTURE_DEFS`). Each palette's types must stay in sync with its PDF drawer (`drawFixtureSymbol` / `drawPlumbingSymbol` / `drawElectricalSymbol`) — guarded by [tests/unit/sheetTypeCoverage.test.ts](../tests/unit/sheetTypeCoverage.test.ts), because a drifted type renders as a default circle in the PDF and is visible only by opening the file.
 
-**Two modes, because a click cannot mean two things.**
+**Three modes, because a click cannot mean three things.**
 - **Place** — pick a type, click the backdrop to drop a symbol; drag to move.
 - **Select** — click a symbol to open its properties: a label, and the catalog **product** it represents. A linked symbol shows a green dot, so "which of these 40 sockets still needs a product?" doesn't mean clicking every one.
+- **Connect** — click symbol A, then symbol B, to draw a **run** (pipe / cable / circuit). Clicks on empty canvas in between drop corners so the run follows walls instead of cutting through them. `Esc` abandons a half-drawn run; clicking the origin twice cancels rather than creating a zero-length circuit.
+
+**Runs** (`runs[{id, kind, from, to, vertices?, label?}]`, `src/utils/fixtureRuns.ts`) are the primitive the plans never had — before them a sheet was a scatter of independent points, which is why nothing downstream was computable. Kinds are per-discipline (`ELECTRICAL_RUN_DEFS` / `PLUMBING_RUN_DEFS` / `LIGHTING_RUN_DEFS`) and each must have a matching entry in `RUN_STYLES` in `builders.ts`, or it renders as an anonymous grey line — on a services drawing that reads as a *different service*. Guarded by [tests/unit/fixtureRuns.test.ts](../tests/unit/fixtureRuns.test.ts).
+
+Runs are drawn **before** symbols so a cable never covers the fixture it feeds, and keyed in a **SERVICES** block beside the legend. Deleting a symbol prunes the runs that referenced it (`pruneOrphanRuns`) rather than leaving one dangling to nothing.
+
+**`runLengthMm` returns `null`, never `0`, without a scale.** A `rect` backdrop has exact dimensions so lengths are real; an uploaded image has none. `totalRunLengthMm` is all-or-nothing for the same reason — a total that silently omits an unmeasurable run looks complete while under-ordering the job. The maths lives in `src/utils/` rather than the component because the canvas imports the Supabase client for its product search, and geometry that decides how much cable someone buys should be testable without a database.
 
 **Symbols carry a stable `id`** (`newSymbolId()`, backfilled on load by `ensureSymbolIds()`). They used to be addressed by array index, which breaks as soon as one is deleted — and connectivity (runs / circuits) has to reference *which* symbols it joins.
 

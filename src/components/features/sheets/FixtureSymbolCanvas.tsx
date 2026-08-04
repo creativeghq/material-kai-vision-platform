@@ -1,11 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Trash2, Save, Lightbulb, X, Package } from 'lucide-react';
+import { Trash2, Save, Lightbulb, X, Package, Spline } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { AnnotationLayer } from './AnnotationLayer';
 import { moodboardSheetsService } from '@/services/moodboardSheetsService';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  newRunId,
+  runLengthMm,
+  totalRunLengthMm,
+  pruneOrphanRuns,
+  LIGHTING_RUN_DEFS,
+  type FixtureRun,
+  type RunDef,
+} from '@/utils/fixtureRuns';
 import { LivePreviewPanel } from './LivePreviewPanel';
+
+// Re-exported so consumers keep importing run types and palettes from the canvas
+// they belong to; the maths itself lives in @/utils/fixtureRuns so it can be
+// unit-tested without dragging in the Supabase client.
+export {
+  ELECTRICAL_RUN_DEFS,
+  PLUMBING_RUN_DEFS,
+  LIGHTING_RUN_DEFS,
+  newRunId,
+  runLengthMm,
+  totalRunLengthMm,
+  pruneOrphanRuns,
+} from '@/utils/fixtureRuns';
+export type { FixtureRun, RunDef } from '@/utils/fixtureRuns';
 
 /**
  * Symbol-plan canvas — drives lighting_plan, plumbing_plan and electrical_plan.
@@ -107,8 +130,11 @@ interface FixtureSymbolCanvasProps {
   backdrop: { kind: 'upload' | 'rect'; image_url?: string; width_mm?: number; height_mm?: number };
   initialSymbols?: FixtureSymbol[];
   initialLegend?: LegendEntry[];
+  initialRuns?: FixtureRun[];
   /** Symbol palette. Defaults to lighting; pass PLUMBING_/ELECTRICAL_FIXTURE_DEFS for those plans. */
   fixtureDefs?: FixtureDef[];
+  /** Run palette. Defaults to lighting circuits. */
+  runDefs?: RunDef[];
   /** Palette header icon. Defaults to a lightbulb. */
   paletteIcon?: React.ComponentType<{ className?: string }>;
   onPdfReady?: (pdfUrl: string) => void;
@@ -119,21 +145,37 @@ export function FixtureSymbolCanvas({
   backdrop,
   initialSymbols = [],
   initialLegend = [],
+  initialRuns = [],
   fixtureDefs = LIGHTING_FIXTURE_DEFS,
+  runDefs = LIGHTING_RUN_DEFS,
   paletteIcon: PaletteIcon = Lightbulb,
   onPdfReady,
 }: FixtureSymbolCanvasProps) {
   const FIXTURE_DEFS = fixtureDefs;
   const [symbols, setSymbols] = useState<FixtureSymbol[]>(() => ensureSymbolIds(initialSymbols));
   const [legend, setLegend] = useState<LegendEntry[]>(initialLegend);
+  const [runs, setRuns] = useState<FixtureRun[]>(initialRuns);
   const [activeType, setActiveType] = useState<string>(fixtureDefs[0]?.type ?? 'recessed');
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Click means "drop a symbol" in place mode and "pick one" in select mode —
-  // it cannot mean both, so the mode is explicit rather than inferred.
-  const [mode, setMode] = useState<'place' | 'select'>('place');
+  // Click means "drop a symbol" in place mode, "pick one" in select mode, and
+  // "join two" in connect mode — it cannot mean all three, so the mode is
+  // explicit rather than inferred from what happens to be under the cursor.
+  const [mode, setMode] = useState<'place' | 'select' | 'connect'>('place');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeRunKind, setActiveRunKind] = useState<string>(runDefs[0]?.kind ?? 'lighting_circuit');
+  /** The run being drawn: its origin symbol plus any corners dropped so far. */
+  const [pending, setPending] = useState<{ from: string; vertices: Array<{ x: number; y: number }> } | null>(null);
+
+  // Escape abandons a half-drawn run. Without it the only way out is to finish
+  // a connection the user no longer wants.
+  useEffect(() => {
+    if (!pending) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPending(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pending]);
 
   const selected = symbols.find((s) => s.id === selectedId) ?? null;
 
@@ -146,6 +188,12 @@ export function FixtureSymbolCanvas({
     // In select mode a click on empty canvas clears the selection rather than
     // silently adding a symbol the user did not ask for.
     if (mode === 'select') { setSelectedId(null); return; }
+    // In connect mode an empty-canvas click drops a corner on the run in
+    // progress, so a cable can follow a wall instead of cutting through it.
+    if (mode === 'connect') {
+      if (pending) setPending({ ...pending, vertices: [...pending.vertices, p] });
+      return;
+    }
     setSymbols((arr) => [...arr, { id: newSymbolId(), type: activeType, x: p.x, y: p.y }]);
     // Auto-add legend entry for new types
     if (!legend.find((l) => l.symbol_type === activeType)) {
@@ -161,7 +209,24 @@ export function FixtureSymbolCanvas({
 
   const handleSymbolPointerDown = (idx: number) => (e: React.PointerEvent) => {
     e.stopPropagation();
-    setSelectedId(symbols[idx]?.id ?? null);
+    const sym = symbols[idx];
+    if (mode === 'connect') {
+      if (!sym?.id) return;
+      if (!pending) { setPending({ from: sym.id, vertices: [] }); return; }
+      // A run from a symbol to itself is meaningless; treat the second click as
+      // cancelling rather than creating a zero-length circuit.
+      if (pending.from === sym.id) { setPending(null); return; }
+      setRuns((arr) => [...arr, {
+        id: newRunId(),
+        kind: activeRunKind,
+        from: pending.from,
+        to: sym.id!,
+        ...(pending.vertices.length ? { vertices: pending.vertices } : {}),
+      }]);
+      setPending(null);
+      return;
+    }
+    setSelectedId(sym?.id ?? null);
     if (mode === 'select') return; // select-mode clicks pick, they don't drag
     setDraggingIdx(idx);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -174,9 +239,16 @@ export function FixtureSymbolCanvas({
   const removeSymbol = (idx: number) => {
     setSymbols((arr) => {
       if (arr[idx]?.id === selectedId) setSelectedId(null);
-      return arr.filter((_, i) => i !== idx);
+      const next = arr.filter((_, i) => i !== idx);
+      // Deleting an endpoint orphans its runs. Drop them here rather than let a
+      // circuit dangle to a symbol that no longer exists — the PDF would skip it
+      // silently and the plan would quietly lose a connection.
+      setRuns((rs) => pruneOrphanRuns(rs, next));
+      return next;
     });
   };
+
+  const removeRun = (id: string) => setRuns((arr) => arr.filter((r) => r.id !== id));
 
   const updateLegendLabel = (idx: number, label: string) => {
     setLegend((arr) => arr.map((l, i) => (i === idx ? { ...l, label } : l)));
@@ -185,6 +257,13 @@ export function FixtureSymbolCanvas({
   const removeLegendEntry = (idx: number) => {
     setLegend((arr) => arr.filter((_, i) => i !== idx));
   };
+
+  // Null (not 0) when the backdrop has no scale, so the UI can say "unknown"
+  // instead of reporting a total that would read as "no cable needed".
+  const totalRunM = React.useMemo(() => {
+    const mm = totalRunLengthMm(runs, symbols, backdrop);
+    return mm === null ? null : mm / 1000;
+  }, [runs, symbols, backdrop]);
 
   const backdropUrl = backdrop.kind === 'upload' ? backdrop.image_url : undefined;
   const ratio = backdrop.width_mm && backdrop.height_mm
@@ -196,7 +275,7 @@ export function FixtureSymbolCanvas({
     setError(null);
     try {
       await moodboardSheetsService.update(sheetId, {
-        data: { backdrop, symbols, legend },
+        data: { backdrop, symbols, legend, runs },
       });
       const result = await moodboardSheetsService.generatePdf(sheetId);
       onPdfReady?.(result.pdf_url);
@@ -212,11 +291,11 @@ export function FixtureSymbolCanvas({
       {/* Mode: click places, or click selects. Never both. */}
       <div className="flex items-center gap-1 text-xs">
         <div className="flex rounded-full border border-white/15 overflow-hidden">
-          {(['place', 'select'] as const).map((m) => (
+          {(['place', 'select', 'connect'] as const).map((m) => (
             <button
               key={m}
               type="button"
-              onClick={() => { setMode(m); if (m === 'place') setSelectedId(null); }}
+              onClick={() => { setMode(m); setPending(null); if (m !== 'select') setSelectedId(null); }}
               className={`px-3 py-1 capitalize ${mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
             >
               {m}
@@ -224,12 +303,34 @@ export function FixtureSymbolCanvas({
           ))}
         </div>
         <span className="text-muted-foreground ml-1">
-          {mode === 'place' ? 'Click the plan to drop a symbol; drag to move.' : 'Click a symbol to link a product.'}
+          {mode === 'place' ? 'Click the plan to drop a symbol; drag to move.'
+            : mode === 'select' ? 'Click a symbol to link a product.'
+            : pending ? 'Click empty space to add a corner, or another symbol to finish. Esc cancels.'
+            : 'Click the first symbol of the run.'}
         </span>
       </div>
 
+      {/* Run palette — only meaningful while connecting */}
+      {mode === 'connect' && (
+        <div className="flex items-center gap-1 flex-wrap text-xs">
+          <Spline className="h-3.5 w-3.5 mr-1" />
+          {runDefs.map((def) => (
+            <button
+              key={def.kind}
+              onClick={() => setActiveRunKind(def.kind)}
+              className={`px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${
+                activeRunKind === def.kind ? 'border-primary text-foreground' : 'border-white/15 text-muted-foreground'
+              }`}
+            >
+              <span className="w-3 h-0.5 rounded" style={{ backgroundColor: def.color }} />
+              <span>{def.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Fixture palette */}
-      <div className={`flex items-center gap-1 flex-wrap text-xs ${mode === 'select' ? 'opacity-40 pointer-events-none' : ''}`}>
+      <div className={`flex items-center gap-1 flex-wrap text-xs ${mode !== 'place' ? 'opacity-40 pointer-events-none' : ''}`}>
         <PaletteIcon className="h-3.5 w-3.5 mr-1" />
         {FIXTURE_DEFS.map((def) => (
           <button
@@ -258,6 +359,7 @@ export function FixtureSymbolCanvas({
               onPointerMovePoint={handleSymbolMove}
               onPointerUpPoint={handlePointerUp}
             >
+              <RunLayer runs={runs} symbols={symbols} defs={runDefs} pending={pending} />
               {symbols.map((s, idx) => (
                 <SymbolDot
                   key={s.id ?? idx}
@@ -295,6 +397,7 @@ export function FixtureSymbolCanvas({
                   {backdrop.width_mm} × {backdrop.height_mm} mm
                 </div>
               )}
+              <RunLayer runs={runs} symbols={symbols} defs={runDefs} pending={pending} />
               {symbols.map((s, idx) => (
                 <SymbolDot
                   key={s.id ?? idx}
@@ -341,6 +444,40 @@ export function FixtureSymbolCanvas({
               </div>
             ))}
           </div>
+          {runs.length > 0 && (
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">Runs ({runs.length})</div>
+              {runs.map((r) => {
+                const def = runDefs.find((d) => d.kind === r.kind);
+                const mm = runLengthMm(r, symbols, backdrop);
+                return (
+                  <div key={r.id} className="flex items-center gap-2 text-xs p-1.5 rounded border border-white/10 mb-1">
+                    <span className="w-3 h-0.5 rounded shrink-0" style={{ backgroundColor: def?.color ?? '#94a3b8' }} />
+                    <span className="truncate">{def?.label ?? r.kind}</span>
+                    {/* Length only where the backdrop actually carries a scale. An
+                        uploaded image has none, and a guessed metre figure would be
+                        a confident wrong number in front of someone buying cable. */}
+                    <span className="text-muted-foreground ml-auto shrink-0">
+                      {mm !== null ? `${(mm / 1000).toFixed(2)} m` : '—'}
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => removeRun(r.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                );
+              })}
+              {totalRunM !== null ? (
+                <div className="text-[11px] text-muted-foreground px-1 pt-0.5">
+                  Total {totalRunM.toFixed(2)} m
+                </div>
+              ) : (
+                <div className="text-[11px] text-muted-foreground px-1 pt-0.5">
+                  Lengths need a scale — use room dimensions rather than an uploaded plan.
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <div className="text-xs font-medium text-muted-foreground mb-1">Placed symbols ({symbols.length})</div>
             {symbols.map((s, idx) => (
@@ -362,7 +499,7 @@ export function FixtureSymbolCanvas({
 
       <LivePreviewPanel
         sheetId={sheetId}
-        data={{ backdrop, symbols, legend }}
+        data={{ backdrop, symbols, legend, runs }}
         enabled={
           backdrop.kind === 'upload' ? !!backdrop.image_url : !!backdrop.width_mm && !!backdrop.height_mm
         }
@@ -388,6 +525,68 @@ export function FixtureSymbolCanvas({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Runs drawn beneath the symbols, in a 0..100 viewBox so the same normalized
+ * coordinates the data uses map straight onto the SVG. `vectorEffect` keeps the
+ * stroke a constant width regardless of how the box is stretched — without it a
+ * non-square backdrop renders visibly thicker lines on one axis.
+ */
+function RunLayer({ runs, symbols, defs, pending }: {
+  runs: FixtureRun[];
+  symbols: FixtureSymbol[];
+  defs: RunDef[];
+  pending: { from: string; vertices: Array<{ x: number; y: number }> } | null;
+}) {
+  const at = (id: string) => symbols.find((s) => s.id === id);
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+    >
+      {runs.map((r) => {
+        const a = at(r.from);
+        const b = at(r.to);
+        if (!a || !b) return null; // orphan; pruneOrphanRuns clears these on edit
+        const def = defs.find((d) => d.kind === r.kind);
+        const pts = [a, ...(r.vertices ?? []), b]
+          .map((p) => `${p.x * 100},${p.y * 100}`)
+          .join(' ');
+        return (
+          <polyline
+            key={r.id}
+            points={pts}
+            fill="none"
+            stroke={def?.color ?? '#94a3b8'}
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            {...(def?.dash ? { strokeDasharray: def.dash.join(' ') } : {})}
+          />
+        );
+      })}
+      {/* The run in progress, so the user can see what they are drawing. */}
+      {pending && (() => {
+        const a = at(pending.from);
+        if (!a) return null;
+        const pts = [a, ...pending.vertices].map((p) => `${p.x * 100},${p.y * 100}`).join(' ');
+        return (
+          <polyline
+            points={pts}
+            fill="none"
+            stroke="currentColor"
+            className="text-primary"
+            strokeWidth={1.5}
+            strokeDasharray="3 2"
+            vectorEffect="non-scaling-stroke"
+          />
+        );
+      })()}
+    </svg>
   );
 }
 

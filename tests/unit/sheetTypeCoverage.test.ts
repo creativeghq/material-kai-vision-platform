@@ -155,6 +155,25 @@ describe('symbol-plan glyph coverage', () => {
     expect(BUILDERS, 'schedule does not count symbols per product').toMatch(/counts\.set\(s\.product_id/);
   });
 
+  // Runs are persisted by the canvas, drawn by the builder, and settable by the
+  // agent. Break any link and the plan still renders — just without its
+  // pipework, which reads as "nothing was drawn" rather than "this is broken".
+  it('runs survive end to end: canvas save → PDF polyline → agent schema', () => {
+    expect(CANVAS, 'runs are not persisted with the sheet').toMatch(/data:\s*\{\s*backdrop,\s*symbols,\s*legend,\s*runs\s*\}/);
+    expect(BUILDERS, 'symbol plan does not draw runs').toContain('payload.runs');
+    expect(BUILDERS, 'no SERVICES key for the run colours').toContain("'SERVICES'");
+    expect(SHEET_TOOL, 'agent cannot define runs').toMatch(/runs:\s*z\.array/);
+  });
+
+  it('runs are drawn beneath symbols, not over them', () => {
+    // A cable drawn on top of the fixture it feeds hides the glyph.
+    const runsAt = BUILDERS.indexOf('for (const run of payload.runs');
+    const symbolsAt = BUILDERS.indexOf('for (const s of payload.symbols');
+    expect(runsAt).toBeGreaterThan(-1);
+    expect(symbolsAt).toBeGreaterThan(-1);
+    expect(runsAt, 'runs must be drawn before symbols').toBeLessThan(symbolsAt);
+  });
+
   it('symbols carry a stable id, so a run can reference which ones it connects', () => {
     expect(CANVAS).toMatch(/export function newSymbolId/);
     expect(CANVAS, 'legacy symbols must be backfilled with ids on load').toMatch(/export function ensureSymbolIds/);

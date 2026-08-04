@@ -234,6 +234,21 @@ export const createPresentationSheetTool = (
             product_id: z.string().uuid().optional()
               .describe('Catalog product this fixture is. Drives the SCHEDULE (quantity take-off) on the sheet.'),
           })).optional().describe('lighting_plan / plumbing_plan / electrical_plan: fixture symbols'),
+          runs: z.array(z.object({
+            id: z.string(),
+            kind: z.string().describe(
+              'electrical: lighting_circuit | socket_circuit | dedicated_circuit | switch_leg; ' +
+              'plumbing: cold_supply | hot_supply | waste',
+            ),
+            from: z.string().describe('id of the symbol the run starts at'),
+            to: z.string().describe('id of the symbol the run ends at'),
+            vertices: z.array(z.object({ x: z.number(), y: z.number() })).optional()
+              .describe('Intermediate corners so a run follows walls instead of cutting through them'),
+            label: z.string().optional(),
+          })).optional().describe(
+            'Pipe / cable runs joining symbols. Requires symbols to carry ids. ' +
+            'Drawn on the plan and keyed in a SERVICES block.',
+          ),
           legend: z.array(z.object({
             symbol_type: z.string(),
             label: z.string(),

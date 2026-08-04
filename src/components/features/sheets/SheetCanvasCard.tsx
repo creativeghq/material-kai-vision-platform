@@ -2,7 +2,16 @@ import React, { useState } from 'react';
 import { Card } from '@/components/core/ui/card';
 import { CalloutCanvas, type CalloutAnnotation } from './CalloutCanvas';
 import { DimensionCanvas, type Dimension, type TileCallout } from './DimensionCanvas';
-import { FixtureSymbolCanvas, PLUMBING_FIXTURE_DEFS, ELECTRICAL_FIXTURE_DEFS, type FixtureSymbol, type LegendEntry } from './FixtureSymbolCanvas';
+import {
+  FixtureSymbolCanvas,
+  PLUMBING_FIXTURE_DEFS,
+  ELECTRICAL_FIXTURE_DEFS,
+  PLUMBING_RUN_DEFS,
+  ELECTRICAL_RUN_DEFS,
+  type FixtureSymbol,
+  type FixtureRun,
+  type LegendEntry,
+} from './FixtureSymbolCanvas';
 import { Droplets, Zap } from 'lucide-react';
 import { DeckBuilderCanvas } from './DeckBuilderCanvas';
 import { SheetPreviewCard } from './SheetPreviewCard';
@@ -72,6 +81,7 @@ export function SheetCanvasCard({ sheetId, sheetType, moodboardId, initialData, 
           backdrop={initialData.backdrop || { kind: 'rect', width_mm: 4000, height_mm: 3000 }}
           initialSymbols={(initialData.symbols || []) as FixtureSymbol[]}
           initialLegend={(initialData.legend || []) as LegendEntry[]}
+          initialRuns={(initialData.runs || []) as FixtureRun[]}
           onPdfReady={setPdfUrl}
         />
       )}
@@ -82,7 +92,9 @@ export function SheetCanvasCard({ sheetId, sheetType, moodboardId, initialData, 
           backdrop={initialData.backdrop || { kind: 'rect', width_mm: 4000, height_mm: 3000 }}
           initialSymbols={(initialData.symbols || []) as FixtureSymbol[]}
           initialLegend={(initialData.legend || []) as LegendEntry[]}
+          initialRuns={(initialData.runs || []) as FixtureRun[]}
           fixtureDefs={PLUMBING_FIXTURE_DEFS}
+          runDefs={PLUMBING_RUN_DEFS}
           paletteIcon={Droplets}
           onPdfReady={setPdfUrl}
         />
@@ -94,7 +106,9 @@ export function SheetCanvasCard({ sheetId, sheetType, moodboardId, initialData, 
           backdrop={initialData.backdrop || { kind: 'rect', width_mm: 4000, height_mm: 3000 }}
           initialSymbols={(initialData.symbols || []) as FixtureSymbol[]}
           initialLegend={(initialData.legend || []) as LegendEntry[]}
+          initialRuns={(initialData.runs || []) as FixtureRun[]}
           fixtureDefs={ELECTRICAL_FIXTURE_DEFS}
+          runDefs={ELECTRICAL_RUN_DEFS}
           paletteIcon={Zap}
           onPdfReady={setPdfUrl}
         />
