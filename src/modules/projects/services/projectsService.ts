@@ -1079,7 +1079,7 @@ class ProjectsService {
 
   async listProjectSheets(projectId: string): Promise<Array<{
     id: string;
-    moodboard_id: string;
+    moodboard_id: string | null;
     moodboard_title: string | null;
     sheet_type: string;
     title: string | null;
@@ -1089,25 +1089,28 @@ class ProjectsService {
     created_at: string;
     updated_at: string;
   }>> {
-    // Two-step (no FK join needed): get the project's moodboard ids, then pull sheets for them.
+    // Sheets reach a project two ways now: through one of its moodboards, or
+    // owned by the project directly (technical plans, which are not mood work).
     const { data: mbs } = await (supabase as any)
       .from('moodboards')
       .select('id, title')
       .eq('project_id', projectId);
     const ids = (mbs || []).map((m: any) => m.id);
-    if (ids.length === 0) return [];
     const titleById = new Map((mbs || []).map((m: any) => [m.id, m.title]));
 
-    const { data, error } = await (supabase as any)
-      .from('moodboard_presentation_sheets')
-      .select('id, moodboard_id, sheet_type, title, status, pdf_storage_path, credits_used, created_at, updated_at')
-      .in('moodboard_id', ids)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return (data || []).map((s: any) => ({
-      ...s,
-      moodboard_title: titleById.get(s.moodboard_id) ?? null,
-    }));
+    const cols = 'id, moodboard_id, project_id, room_id, sheet_type, title, status, pdf_storage_path, credits_used, created_at, updated_at';
+
+    const [viaMoodboards, viaProject] = await Promise.all([
+      ids.length
+        ? (supabase as any).from('moodboard_presentation_sheets').select(cols).in('moodboard_id', ids)
+        : Promise.resolve({ data: [] }),
+      (supabase as any).from('moodboard_presentation_sheets').select(cols).eq('project_id', projectId),
+    ]);
+
+    const rows = [...(viaMoodboards.data || []), ...(viaProject.data || [])];
+    return rows
+      .map((s: any) => ({ ...s, moodboard_title: titleById.get(s.moodboard_id) ?? null }))
+      .sort((a: any, b: any) => (a.created_at < b.created_at ? 1 : -1));
   }
 
   // ---------- COLLABORATORS (Phase 4 — passwordless email-invite read access) ----------

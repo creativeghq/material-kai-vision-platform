@@ -109,6 +109,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       auto_enhance?: boolean;
       auto_render?: boolean;
       room_id?: string | null;
+      project_id?: string | null;
     };
 
     // Project-level Client View deck — assembled from sheets across any of the
@@ -133,12 +134,16 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       if (!userId) {
         return jsonResponse({ success: false, error: 'create requires a user (JWT or user_id)' }, 400);
       }
-      if (!body.moodboard_id || !body.sheet_type || !body.title) {
-        return jsonResponse({ success: false, error: 'create requires moodboard_id, sheet_type and title' }, 400);
+      if ((!body.moodboard_id && !body.project_id) || !body.sheet_type || !body.title) {
+        return jsonResponse(
+          { success: false, error: 'create requires sheet_type, title and one of moodboard_id / project_id' },
+          400,
+        );
       }
       const created = await createSheet(supabase, {
         userId,
-        moodboard_id: body.moodboard_id,
+        moodboard_id: body.moodboard_id ?? null,
+        project_id: body.project_id ?? null,
         sheet_type: body.sheet_type,
         title: body.title,
         initial_data: body.initial_data,

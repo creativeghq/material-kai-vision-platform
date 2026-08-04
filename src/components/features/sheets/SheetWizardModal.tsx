@@ -48,6 +48,11 @@ interface Props {
   presetMoodboardTitle?: string;
   /** When set, the type step is skipped (launched from a typed quick-start). */
   presetType?: SheetType;
+  /**
+   * Create the sheet against a PROJECT instead of a moodboard — technical plans
+   * belong to the project, not to mood work. Skips the moodboard step entirely.
+   */
+  presetProjectId?: string;
   onCreated?: (result: SheetWizardResult) => void;
 }
 
@@ -64,7 +69,7 @@ type Item = { id: string; product_id: string | null; name: string; image_url: st
 type QuoteRow = { id: string; label: string };
 type SheetRow = { id: string; label: string };
 
-export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodboardTitle, presetType, onCreated }: Props) {
+export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodboardTitle, presetType, presetProjectId, onCreated }: Props) {
   const { toast } = useToast();
 
   const [type, setType] = useState<SheetType | null>(presetType ?? null);
@@ -100,10 +105,11 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
   const steps = useMemo(() => {
     const s: ('type' | 'moodboard' | 'details')[] = [];
     if (!presetType) s.push('type');
-    if (!presetMoodboardId) s.push('moodboard');
+    // A project-owned sheet has no moodboard to pick.
+    if (!presetMoodboardId && !presetProjectId) s.push('moodboard');
     s.push('details');
     return s;
-  }, [presetType, presetMoodboardId]);
+  }, [presetType, presetMoodboardId, presetProjectId]);
   const [stepIdx, setStepIdx] = useState(0);
   const step = steps[stepIdx];
 
@@ -124,12 +130,17 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
   // offered — a room with no width/length has nothing to lend, and picking one
   // would leave the plan unscaled while looking like it had been configured.
   useEffect(() => {
-    if (!open || !moodboardId) { setSizedRooms([]); return; }
+    if (!open || (!moodboardId && !presetProjectId)) { setSizedRooms([]); return; }
     let cancelled = false;
     void (async () => {
-      const { data: mb } = await supabase
-        .from('moodboards').select('project_id').eq('id', moodboardId).maybeSingle();
-      const projectId = (mb as any)?.project_id;
+      // A project-owned sheet already knows its project; a moodboard one has to
+      // resolve it through the board.
+      let projectId: string | undefined = presetProjectId;
+      if (!projectId && moodboardId) {
+        const { data: mb } = await supabase
+          .from('moodboards').select('project_id').eq('id', moodboardId).maybeSingle();
+        projectId = (mb as any)?.project_id;
+      }
       if (!projectId) { if (!cancelled) setSizedRooms([]); return; }
       const { data: rooms } = await supabase
         .from('project_rooms')
@@ -141,7 +152,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
       if (!cancelled) setSizedRooms((rooms ?? []) as any);
     })();
     return () => { cancelled = true; };
-  }, [open, moodboardId]);
+  }, [open, moodboardId, presetProjectId]);
 
   // Load the user's moodboards (only when the moodboard step is in play).
   useEffect(() => {
@@ -278,7 +289,8 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
     setSubmitting(true);
     try {
       const res = await moodboardSheetsService.createSheet({
-        moodboard_id: moodboardId,
+        moodboard_id: presetProjectId ? null : moodboardId,
+        project_id: presetProjectId ?? null,
         sheet_type: type,
         title: title || SHEET_TYPE_LABELS[type],
         initial_data: built.data,
@@ -510,7 +522,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
           {step !== 'details' ? (
             <Button onClick={() => setStepIdx((i) => i + 1)} disabled={!canNext}>Next</Button>
           ) : (
-            <Button onClick={submit} disabled={submitting || !moodboardId || !type}>
+            <Button onClick={submit} disabled={submitting || (!moodboardId && !presetProjectId) || !type}>
               {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Generate{credits > 0 ? ` (${credits} cr)` : ''}
             </Button>

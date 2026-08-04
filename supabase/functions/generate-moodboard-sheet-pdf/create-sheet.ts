@@ -54,7 +54,10 @@ export const INTERACTIVE_TYPES: SheetType[] = [
 
 export interface CreateSheetParams {
   userId: string;
-  moodboard_id: string;
+  /** Moodboard parent. Omit for a project-owned technical plan. */
+  moodboard_id?: string | null;
+  /** Project parent. Used when the sheet is not attached to a moodboard. */
+  project_id?: string | null;
   sheet_type: SheetType;
   title: string;
   initial_data?: Record<string, any>;
@@ -91,18 +94,38 @@ export async function createSheet(
   params: CreateSheetParams,
 ): Promise<CreateSheetResult> {
   const { userId, moodboard_id, sheet_type, title } = params;
+  const project_id = params.project_id ?? null;
   const auto_enhance = params.auto_enhance !== false;
   let initial_data = params.initial_data || {};
 
-  // 1. Ownership
-  const { data: moodboard, error: mbError } = await supabase
-    .from('moodboards')
-    .select('id, user_id')
-    .eq('id', moodboard_id)
-    .maybeSingle();
-  if (mbError || !moodboard) return { ok: false, status: 404, error: 'Moodboard not found' };
-  if ((moodboard as any).user_id !== userId) {
-    return { ok: false, status: 403, error: 'Not authorized for this moodboard' };
+  // 1. Ownership of whichever parent is claimed. A technical plan belongs to a
+  //    project; a presentation sheet belongs to a moodboard. Exactly one, matching
+  //    the sheets_has_a_parent CHECK.
+  if (!moodboard_id && !project_id) {
+    return { ok: false, status: 400, error: 'A sheet needs either a moodboard_id or a project_id' };
+  }
+
+  if (moodboard_id) {
+    const { data: moodboard, error: mbError } = await supabase
+      .from('moodboards')
+      .select('id, user_id')
+      .eq('id', moodboard_id)
+      .maybeSingle();
+    if (mbError || !moodboard) return { ok: false, status: 404, error: 'Moodboard not found' };
+    if ((moodboard as any).user_id !== userId) {
+      // 404, not 403, on an ownership mismatch — a 403 confirms the id exists.
+      return { ok: false, status: 404, error: 'Moodboard not found' };
+    }
+  } else {
+    const { data: project, error: pjError } = await supabase
+      .from('projects')
+      .select('id, user_id')
+      .eq('id', project_id!)
+      .maybeSingle();
+    if (pjError || !project) return { ok: false, status: 404, error: 'Project not found' };
+    if ((project as any).user_id !== userId) {
+      return { ok: false, status: 404, error: 'Project not found' };
+    }
   }
 
   // 1a. room_id is caller-supplied, so verify the caller actually owns the
@@ -123,7 +146,10 @@ export async function createSheet(
   }
 
   // 1b. Auto-enhance — fill sensible defaults from the moodboard BEFORE validation.
-  if (auto_enhance) {
+  //     Both enhancers read the moodboard's own contents, so they only apply to a
+  //     moodboard-parented sheet. A project-owned technical plan has no palette
+  //     to extract and no moodboard imagery to detect callouts in.
+  if (auto_enhance && moodboard_id) {
     if (sheet_type === 'color_palette' && (!initial_data.swatches || initial_data.swatches.length === 0)) {
       const swatches = await autoExtractPalette(supabase, moodboard_id, 8);
       if (swatches.length > 0) initial_data = { ...initial_data, swatches };
@@ -174,7 +200,9 @@ export async function createSheet(
   const { data: sheet, error: insertError } = await supabase
     .from('moodboard_presentation_sheets')
     .insert({
-      moodboard_id, sheet_type, title,
+      moodboard_id: moodboard_id ?? null,
+      project_id,
+      sheet_type, title,
       data: initial_data || {},
       credits_used: creditCost,
       status: 'draft',

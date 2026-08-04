@@ -136,7 +136,10 @@ class MoodboardSheetsService {
    * the agent stay in lockstep (no client-side path that skips credits).
    */
   async createSheet(input: {
-    moodboard_id: string;
+    /** Moodboard parent. Omit for a project-owned technical plan. */
+    moodboard_id?: string | null;
+    /** Project parent — technical plans live on the project, not a mood board. */
+    project_id?: string | null;
     sheet_type: SheetType;
     title: string;
     initial_data?: Record<string, any>;
@@ -156,7 +159,8 @@ class MoodboardSheetsService {
     const { data, error } = await supabase.functions.invoke('generate-moodboard-sheet-pdf', {
       body: {
         action: 'create',
-        moodboard_id: input.moodboard_id,
+        moodboard_id: input.moodboard_id ?? null,
+        project_id: input.project_id ?? null,
         sheet_type: input.sheet_type,
         title: input.title,
         initial_data: input.initial_data ?? {},
