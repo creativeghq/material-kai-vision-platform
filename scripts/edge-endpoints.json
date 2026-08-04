@@ -9875,5 +9875,101 @@
         "params": []
       }
     ]
+  },
+  {
+    "name": "revolut-api",
+    "tag": "Finance",
+    "summary": "Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync",
+    "description": "#315. Actions on one POST surface: init (mint RSA keypair server-side; private key never leaves the server), authorize-url (Revolut consent URL), oauth-complete (exchange the auth code via JWT client assertion), register-webhook (webhooks v2 subscription + signing secret), accounts (live Revolut accounts + finance_bank_accounts mapping), map-account (link a Revolut currency pocket to a bank account row), sync-now (shared sync core for this workspace), disconnect. Caller must be a finance manager of the target workspace (RLS-checked; 404 on mismatch) and the workspace must be entitled to banking-revolut (402 otherwise).",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "action",
+        "type": "string",
+        "required": true,
+        "desc": "init | authorize-url | oauth-complete | register-webhook | accounts | map-account | sync-now | disconnect"
+      },
+      {
+        "name": "workspace_id",
+        "type": "uuid",
+        "required": true,
+        "desc": "Target workspace; caller must be its finance manager."
+      },
+      {
+        "name": "redirect_uri",
+        "type": "string (https URL)",
+        "required": false,
+        "desc": "init only. The OAuth redirect URI registered in the Revolut dashboard; its domain becomes the JWT assertion issuer."
+      },
+      {
+        "name": "force",
+        "type": "boolean",
+        "required": false,
+        "desc": "init only. Regenerate over an existing keypair (invalidates the current connection)."
+      },
+      {
+        "name": "code",
+        "type": "string",
+        "required": false,
+        "desc": "oauth-complete only. Authorisation code from the consent redirect."
+      },
+      {
+        "name": "revolut_account_id",
+        "type": "string",
+        "required": false,
+        "desc": "map-account only. Revolut account (currency pocket) id."
+      },
+      {
+        "name": "bank_account_id",
+        "type": "uuid | null",
+        "required": false,
+        "desc": "map-account only. finance_bank_accounts row to link, or null to unlink."
+      }
+    ],
+    "response": "{ok: true, ...action-specific fields (public_key, url, accounts, fetched/upserted)}"
+  },
+  {
+    "name": "revolut-sync",
+    "tag": "Finance",
+    "summary": "Revolut transaction sync sweep — cron backstop over every connected workspace",
+    "description": "#315. Pulls transactions since each workspace's watermark (first run: 365 days) and upserts statement lines into revolut_bank_transactions, deduped on workspace + '<txid>:<legid>'. Dual auth like finance-inbound-sync: x-cron-secret/service-role for the cron path; a JWT user path restricted to the caller's own workspaces. Skips workspaces whose banking-revolut entitlement lapsed. Failures land in workspace_revolut_config.last_sync_error (explicit failure marker, never a silent zero).",
+    "security": [
+      "supabaseJwt",
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [],
+    "response": "{ok, workspaces, fetched, upserted, failures: [{workspace_id, error}]}"
+  },
+  {
+    "name": "revolut-webhooks",
+    "tag": "Finance",
+    "summary": "Revolut Business webhooks v2 receiver — signed transaction events, per-workspace secret",
+    "description": "#315. Registered per workspace with ?ws=<workspace_id>; the config row's webhook_signing_secret verifies each delivery (HMAC-SHA256 over v1.<timestamp>.<body>, 5-minute replay window, timing-safe compare). Fail-closed: no stored secret → 503, bad signature/stale timestamp → 400, unknown ws → bland 200 so workspace ids cannot be enumerated. TransactionCreated upserts statement lines into revolut_bank_transactions (silver layer); TransactionStateChanged updates state. Reconciliation into payments is a separate explicit step — the webhook never writes money tables.",
+    "security": [
+      "revolutSignature"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "ws",
+        "type": "uuid (query)",
+        "required": true,
+        "desc": "Workspace whose signing secret verifies this delivery."
+      }
+    ],
+    "response": "{ok: true} | {ok: true, ignored: true}"
   }
 ]

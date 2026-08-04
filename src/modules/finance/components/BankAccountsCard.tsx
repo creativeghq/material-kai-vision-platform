@@ -1,7 +1,9 @@
 /**
  * Manage the workspace's bank / cash accounts — where money lands on a payment in and
  * leaves from on a payment out. Shows the live running balance per account so the
- * operator always knows where they have what money (control surface until GoCardless).
+ * operator always knows where they have what money. Accounts can be linked to the
+ * workspace's Revolut Business account (banking-revolut module, #315) via
+ * `revolut_account_id`, which routes the synced transaction feed onto the right row.
  *
  * Each account can carry an IBAN and a free-form account/card reference so it's clear
  * which real-world account a row maps to. Add and Edit share one dialog form.

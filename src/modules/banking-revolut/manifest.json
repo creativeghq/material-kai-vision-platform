@@ -1,0 +1,10 @@
+{
+  "slug": "banking-revolut",
+  "name": "Revolut Business",
+  "description": "Connect the workspace's own Revolut Business account — live balances and transaction feed into Finance, webhook-driven reconciliation, and (phase 2) payment drafts, payouts and FX from the ERP. Per-workspace BYOK: keys and tokens belong to the workspace, never the operator.",
+  "category": "core",
+  "parent": "payments",
+  "priceTier": "pro",
+  "icon": "Landmark",
+  "version": "0.1.0"
+}

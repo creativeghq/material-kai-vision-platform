@@ -29,6 +29,7 @@ import { SectionHeader } from '@/components/shared/SectionHeader';
 import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentialsCard';
 import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
 import { VivaConfigCard } from '@/modules/payments-viva/components/VivaConfigCard';
+import { RevolutConfigCard } from '@/modules/banking-revolut/components/RevolutConfigCard';
 import { WorkspacePdfTemplateCard } from '@/components/core/Profile/WorkspacePdfTemplateCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
 import { ErganiCredentialsCard } from '@/modules/hr/components/ErganiCredentialsCard';
@@ -151,6 +152,7 @@ export const WorkspaceKeysTab: React.FC = () => {
             <AadeCredentialsCard workspaceId={activeWorkspaceId} />
             <InboundSetupCard workspaceId={activeWorkspaceId} />
             <VivaConfigCard workspaceId={activeWorkspaceId} />
+            <RevolutConfigCard workspaceId={activeWorkspaceId} />
             <Card>
               <CardContent className="p-5">
                 <ConnectionRow

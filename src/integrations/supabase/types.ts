@@ -7639,6 +7639,7 @@ export type Database = {
           name: string
           notes: string | null
           opening_balance: number
+          revolut_account_id: string | null
           show_on_invoice: boolean
           sort_order: number
           updated_at: string
@@ -7656,6 +7657,7 @@ export type Database = {
           name: string
           notes?: string | null
           opening_balance?: number
+          revolut_account_id?: string | null
           show_on_invoice?: boolean
           sort_order?: number
           updated_at?: string
@@ -7673,6 +7675,7 @@ export type Database = {
           name?: string
           notes?: string | null
           opening_balance?: number
+          revolut_account_id?: string | null
           show_on_invoice?: boolean
           sort_order?: number
           updated_at?: string
@@ -22942,6 +22945,94 @@ export type Database = {
           },
         ]
       }
+      revolut_bank_transactions: {
+        Row: {
+          amount: number
+          bank_account_id: string | null
+          booked_at: string | null
+          counterparty_name: string | null
+          created_at: string
+          currency: string
+          direction: string | null
+          id: string
+          leg_id: string | null
+          provider_ref: string
+          raw: Json | null
+          reconciled_payment_id: string | null
+          reference: string | null
+          revolut_account_id: string
+          state: string
+          transaction_id: string
+          type: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount: number
+          bank_account_id?: string | null
+          booked_at?: string | null
+          counterparty_name?: string | null
+          created_at?: string
+          currency: string
+          direction?: string | null
+          id?: string
+          leg_id?: string | null
+          provider_ref: string
+          raw?: Json | null
+          reconciled_payment_id?: string | null
+          reference?: string | null
+          revolut_account_id: string
+          state: string
+          transaction_id: string
+          type?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount?: number
+          bank_account_id?: string | null
+          booked_at?: string | null
+          counterparty_name?: string | null
+          created_at?: string
+          currency?: string
+          direction?: string | null
+          id?: string
+          leg_id?: string | null
+          provider_ref?: string
+          raw?: Json | null
+          reconciled_payment_id?: string | null
+          reference?: string | null
+          revolut_account_id?: string
+          state?: string
+          transaction_id?: string
+          type?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revolut_bank_transactions_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revolut_bank_transactions_reconciled_payment_id_fkey"
+            columns: ["reconciled_payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revolut_bank_transactions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       response_quality_metrics: {
         Row: {
           coherence_score: number
@@ -29267,6 +29358,80 @@ export type Database = {
         }
         Relationships: []
       }
+      workspace_revolut_config: {
+        Row: {
+          access_token: string | null
+          access_token_expires_at: string | null
+          client_id: string | null
+          connected_at: string | null
+          created_at: string
+          enabled: boolean
+          environment: string
+          last_sync_at: string | null
+          last_sync_error: string | null
+          oauth_redirect_uri: string | null
+          private_key: string | null
+          public_key: string | null
+          refresh_token: string | null
+          sync_watermark: string | null
+          updated_at: string
+          webhook_id: string | null
+          webhook_signing_secret: string | null
+          webhook_verified_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          access_token_expires_at?: string | null
+          client_id?: string | null
+          connected_at?: string | null
+          created_at?: string
+          enabled?: boolean
+          environment?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          oauth_redirect_uri?: string | null
+          private_key?: string | null
+          public_key?: string | null
+          refresh_token?: string | null
+          sync_watermark?: string | null
+          updated_at?: string
+          webhook_id?: string | null
+          webhook_signing_secret?: string | null
+          webhook_verified_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          access_token?: string | null
+          access_token_expires_at?: string | null
+          client_id?: string | null
+          connected_at?: string | null
+          created_at?: string
+          enabled?: boolean
+          environment?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          oauth_redirect_uri?: string | null
+          private_key?: string | null
+          public_key?: string | null
+          refresh_token?: string | null
+          sync_watermark?: string | null
+          updated_at?: string
+          webhook_id?: string | null
+          webhook_signing_secret?: string | null
+          webhook_verified_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_revolut_config_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_shipping_credentials: {
         Row: {
           api_key: string | null
@@ -31863,6 +32028,26 @@ export type Database = {
       get_workspace_payout_account: {
         Args: { p_workspace_id: string }
         Returns: string
+      }
+      get_workspace_revolut_config_status: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          client_id_hint: string
+          configured: boolean
+          connected: boolean
+          connected_at: string
+          enabled: boolean
+          environment: string
+          has_client_id: boolean
+          has_keypair: boolean
+          last_sync_at: string
+          last_sync_error: string
+          oauth_redirect_uri: string
+          public_key: string
+          sync_watermark: string
+          updated_at: string
+          webhook_ready: boolean
+        }[]
       }
       get_workspace_viva_config_status: {
         Args: { p_workspace_id: string }

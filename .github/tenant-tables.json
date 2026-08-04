@@ -57,7 +57,8 @@
     "property_photos", "property_price_history", "property_rent_charges", "property_sales",
     "property_tenancies", "property_viewings", "proposals", "public_realestate_submissions",
     "quality_metrics_daily", "quote_requests", "quotes", "real_estate_settings",
-    "recommendation_analytics", "reseller_applications", "saved_searches",
+    "recommendation_analytics", "reseller_applications", "revolut_bank_transactions",
+    "saved_searches",
     "search_query_tracking", "search_sessions", "seo_articles", "seo_domain_keywords",
     "seo_domain_snapshots", "seo_keyword_research", "seo_research_runs", "seo_tracked_domains",
     "shopping_carts", "social_account_insights", "social_accounts", "social_post_analytics",
@@ -80,7 +81,7 @@
     "workspace_inbound_credentials", "workspace_invites", "workspace_member_credit_limits",
     "workspace_members", "workspace_module_entitlements", "workspace_module_subscriptions",
     "workspace_payment_config", "workspace_pdf_templates", "workspace_permissions",
-    "workspace_shipping_credentials", "workspace_storefront", "workspace_user_levels",
-    "workspace_viva_config", "xml_mapping_templates"
+    "workspace_revolut_config", "workspace_shipping_credentials", "workspace_storefront",
+    "workspace_user_levels", "workspace_viva_config", "xml_mapping_templates"
   ]
 }
