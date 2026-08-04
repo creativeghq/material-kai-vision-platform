@@ -53,7 +53,7 @@ interface Props {
 
 const TYPE_GROUPS: { group: string; types: SheetType[] }[] = [
   { group: 'Boards', types: ['material_board', 'color_palette', 'concept_board', 'area_breakdown'] },
-  { group: 'Plans', types: ['lighting_plan', 'plumbing_plan'] },
+  { group: 'Plans', types: ['lighting_plan', 'plumbing_plan', 'electrical_plan'] },
   { group: 'Renders', types: ['annotated_render', 'elevation_render_pair'] },
   { group: 'Schedules', types: ['ffe_schedule'] },
   { group: 'Decks', types: ['full_deck'] },
@@ -133,7 +133,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
   useEffect(() => {
     if (!open || step !== 'details' || !moodboardId || !type) return;
     let cancelled = false;
-    const needsItems = ['material_board', 'concept_board', 'area_breakdown', 'annotated_render', 'elevation_render_pair', 'lighting_plan', 'plumbing_plan'].includes(type);
+    const needsItems = ['material_board', 'concept_board', 'area_breakdown', 'annotated_render', 'elevation_render_pair', 'lighting_plan', 'plumbing_plan', 'electrical_plan'].includes(type);
     const run = async () => {
       setLoadingData(true);
       try {
@@ -222,6 +222,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
         } };
       case 'lighting_plan':
       case 'plumbing_plan':
+      case 'electrical_plan':
         if (backdropKind === 'upload') {
           if (!backdropUrl) return { error: 'Upload or pick a floor-plan image.' };
           return { data: { backdrop: { kind: 'upload', image_url: backdropUrl } } };
@@ -395,7 +396,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
               </div>
             )}
 
-            {!loadingData && (type === 'lighting_plan' || type === 'plumbing_plan') && (
+            {!loadingData && (type === 'lighting_plan' || type === 'plumbing_plan' || type === 'electrical_plan') && (
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <Button type="button" size="sm" variant={backdropKind === 'upload' ? 'default' : 'outline'} onClick={() => setBackdropKind('upload')}>Floor-plan image</Button>

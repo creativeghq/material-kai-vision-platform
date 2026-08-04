@@ -7,7 +7,7 @@ import { moodboardSheetsService } from '@/services/moodboardSheetsService';
 import { LivePreviewPanel } from './LivePreviewPanel';
 
 /**
- * Symbol-plan canvas — drives BOTH lighting_plan and plumbing_plan.
+ * Symbol-plan canvas — drives lighting_plan, plumbing_plan and electrical_plan.
  *
  * Backdrop is either an uploaded floor plan image OR a plain rectangle drawn
  * from user-typed room dimensions. The user picks a symbol type from the
@@ -46,6 +46,24 @@ export const PLUMBING_FIXTURE_DEFS: FixtureDef[] = [
   { type: 'mixer',        label: 'Tap / Mixer', glyph: '◉' },
 ];
 
+// Electrical symbols follow IEC 60617 conventions closely enough to read as a
+// real installation plan: a socket is a semicircle on a baseline, a switch is a
+// dot with a lever, earth is the three-bar stem. Types must stay in sync with
+// drawElectricalSymbol in the PDF builder.
+export const ELECTRICAL_FIXTURE_DEFS: FixtureDef[] = [
+  { type: 'socket',             label: 'Socket',        glyph: '◗' },
+  { type: 'socket_double',      label: 'Double Socket', glyph: '◖◗' },
+  { type: 'switch_1way',        label: 'Switch',        glyph: '⌁' },
+  { type: 'switch_2way',        label: '2-Way Switch',  glyph: '⌥' },
+  { type: 'dimmer',             label: 'Dimmer',        glyph: '◑' },
+  { type: 'distribution_board', label: 'Board (DB)',    glyph: '▤' },
+  { type: 'data_outlet',        label: 'Data / RJ45',   glyph: '⊟' },
+  { type: 'tv_outlet',          label: 'TV / SAT',      glyph: '⊡' },
+  { type: 'dedicated_point',    label: 'Dedicated',     glyph: '⊗' },
+  { type: 'junction_box',       label: 'Junction Box',  glyph: '⊞' },
+  { type: 'earth_point',        label: 'Earth',         glyph: '⏚' },
+];
+
 export interface FixtureSymbol {
   type: string;
   x: number;
@@ -63,7 +81,7 @@ interface FixtureSymbolCanvasProps {
   backdrop: { kind: 'upload' | 'rect'; image_url?: string; width_mm?: number; height_mm?: number };
   initialSymbols?: FixtureSymbol[];
   initialLegend?: LegendEntry[];
-  /** Symbol palette. Defaults to lighting fixtures; pass PLUMBING_FIXTURE_DEFS for plumbing_plan. */
+  /** Symbol palette. Defaults to lighting; pass PLUMBING_/ELECTRICAL_FIXTURE_DEFS for those plans. */
   fixtureDefs?: FixtureDef[];
   /** Palette header icon. Defaults to a lightbulb. */
   paletteIcon?: React.ComponentType<{ className?: string }>;

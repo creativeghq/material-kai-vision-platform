@@ -325,6 +325,8 @@ const PRESENTATION_SHEET: WorkflowDefinition = {
             { value: 'color_palette',          label: 'Color Palette' },
             { value: 'concept_board',          label: 'Concept Board' },
             { value: 'lighting_plan',          label: 'Lighting Plan (interactive)' },
+            { value: 'plumbing_plan',          label: 'Plumbing Plan (interactive)' },
+            { value: 'electrical_plan',        label: 'Electrical Plan (interactive)' },
             { value: 'annotated_render',       label: 'Annotated Render (interactive)' },
             { value: 'elevation_render_pair',  label: 'Elevation + Render Pair (interactive)' },
             { value: 'ffe_schedule',           label: 'FF&E Schedule' },

@@ -42,6 +42,7 @@ const SHEET_LABELS: Record<string, string> = {
   concept_board: 'CONCEPT BOARD',
   lighting_plan: 'LIGHTING PLAN',
   plumbing_plan: 'PLUMBING PLAN',
+  electrical_plan: 'ELECTRICAL PLAN',
   annotated_render: 'ANNOTATED RENDER',
   elevation_render_pair: 'ELEVATION + RENDER',
   ffe_schedule: 'FF&E SCHEDULE',
@@ -318,6 +319,15 @@ export async function buildPlumbingPlan(
   return buildSymbolPlan(pdfDoc, fonts, td, payload, 'Plumbing layout', drawPlumbingSymbol);
 }
 
+export async function buildElectricalPlan(
+  pdfDoc: PDFDocument,
+  fonts: SheetFonts,
+  td: TitleBlockData,
+  payload: SymbolPlanPayload,
+): Promise<void> {
+  return buildSymbolPlan(pdfDoc, fonts, td, payload, 'Electrical layout', drawElectricalSymbol);
+}
+
 async function buildSymbolPlan(
   pdfDoc: PDFDocument,
   fonts: SheetFonts,
@@ -495,6 +505,103 @@ function drawPlumbingSymbol(
     case 'mixer': // tap / mixer — small triangle-ish marker
       page.drawCircle({ x: cx, y: cy, size: r * 0.7, borderColor: COLOR_DARK, borderWidth: 1, color: COLOR_WHITE });
       page.drawCircle({ x: cx, y: cy, size: 1.2, color: COLOR_DARK });
+      break;
+    default:
+      page.drawCircle({ x: cx, y: cy, size: r, borderColor: COLOR_DARK, borderWidth: 1 });
+  }
+  if (label) {
+    page.drawText(label, {
+      x: cx + r + 3, y: cy - 3,
+      size: 7, font: fonts.regular, color: COLOR_GRAY,
+    });
+  }
+}
+
+// Electrical glyphs — IEC 60617-style 2D symbols from pdf-lib primitives.
+// Types must stay in sync with ELECTRICAL_FIXTURE_DEFS in FixtureSymbolCanvas.tsx
+// so the canvas preview and the rendered PDF agree.
+function drawElectricalSymbol(
+  page: PDFPage,
+  fonts: SheetFonts,
+  type: string,
+  cx: number,
+  cy: number,
+  label?: string,
+): void {
+  const r = 7;
+  const code = (txt: string) =>
+    page.drawText(txt, { x: cx - txt.length * 1.45, y: cy - 2.5, size: 5, font: fonts.bold, color: COLOR_DARK });
+  // Socket outlet: half-disc sitting on a baseline, with `ticks` stems for
+  // single vs double. The white rectangle masks the lower half of the circle.
+  const socket = (ticks: number) => {
+    page.drawCircle({ x: cx, y: cy, size: r, borderColor: COLOR_DARK, borderWidth: 1, color: COLOR_WHITE });
+    page.drawRectangle({ x: cx - r - 1, y: cy - r - 1, width: r * 2 + 2, height: r + 1, color: COLOR_WHITE });
+    page.drawLine({ start: { x: cx - r, y: cy }, end: { x: cx + r, y: cy }, color: COLOR_DARK, thickness: 1 });
+    for (let i = 0; i < ticks; i++) {
+      const ox = ticks === 1 ? 0 : (i === 0 ? -r * 0.4 : r * 0.4);
+      page.drawLine({ start: { x: cx + ox, y: cy }, end: { x: cx + ox, y: cy - r * 0.8 }, color: COLOR_DARK, thickness: 1 });
+    }
+  };
+  // Switch: filled node with `levers` diagonal arms.
+  const switchSym = (levers: number) => {
+    page.drawCircle({ x: cx, y: cy - r * 0.4, size: 2, color: COLOR_DARK });
+    for (let i = 0; i < levers; i++) {
+      const dy = i === 0 ? r * 1.1 : r * 0.6;
+      page.drawLine({
+        start: { x: cx, y: cy - r * 0.4 },
+        end: { x: cx + r * 0.9, y: cy - r * 0.4 + dy },
+        color: COLOR_DARK, thickness: 1,
+      });
+    }
+  };
+  switch (type) {
+    case 'socket':
+      socket(1);
+      break;
+    case 'socket_double':
+      socket(2);
+      break;
+    case 'switch_1way':
+      switchSym(1);
+      break;
+    case 'switch_2way':
+      switchSym(2);
+      break;
+    case 'dimmer': // switch + filled control block
+      switchSym(1);
+      page.drawRectangle({ x: cx - r, y: cy - r, width: r * 0.8, height: r * 0.8, color: COLOR_DARK });
+      break;
+    case 'distribution_board': // hatched rectangle + DB
+      page.drawRectangle({ x: cx - r * 1.4, y: cy - r * 0.9, width: r * 2.8, height: r * 1.8, borderColor: COLOR_DARK, borderWidth: 1.2, color: COLOR_WHITE });
+      for (let i = 1; i <= 3; i++) {
+        const lx = cx - r * 1.4 + (r * 2.8 * i) / 4;
+        page.drawLine({ start: { x: lx, y: cy - r * 0.9 }, end: { x: lx, y: cy + r * 0.9 }, color: COLOR_DARK, thickness: 0.4 });
+      }
+      break;
+    case 'data_outlet': // square + D
+      page.drawSquare({ x: cx - r * 0.8, y: cy - r * 0.8, size: r * 1.6, rotate: undefined as any, borderColor: COLOR_DARK, borderWidth: 1, color: COLOR_WHITE });
+      code('D');
+      break;
+    case 'tv_outlet': // square + TV
+      page.drawSquare({ x: cx - r * 0.9, y: cy - r * 0.9, size: r * 1.8, rotate: undefined as any, borderColor: COLOR_DARK, borderWidth: 1, color: COLOR_WHITE });
+      code('TV');
+      break;
+    case 'dedicated_point': // circle + saltire — a dedicated/fixed appliance point
+      page.drawCircle({ x: cx, y: cy, size: r, borderColor: COLOR_DARK, borderWidth: 1.2, color: COLOR_WHITE });
+      page.drawLine({ start: { x: cx - r * 0.6, y: cy - r * 0.6 }, end: { x: cx + r * 0.6, y: cy + r * 0.6 }, color: COLOR_DARK, thickness: 0.8 });
+      page.drawLine({ start: { x: cx - r * 0.6, y: cy + r * 0.6 }, end: { x: cx + r * 0.6, y: cy - r * 0.6 }, color: COLOR_DARK, thickness: 0.8 });
+      break;
+    case 'junction_box': // square + cross
+      page.drawSquare({ x: cx - r * 0.7, y: cy - r * 0.7, size: r * 1.4, rotate: undefined as any, borderColor: COLOR_DARK, borderWidth: 0.9, color: COLOR_WHITE });
+      page.drawLine({ start: { x: cx - r * 0.7, y: cy }, end: { x: cx + r * 0.7, y: cy }, color: COLOR_DARK, thickness: 0.6 });
+      page.drawLine({ start: { x: cx, y: cy - r * 0.7 }, end: { x: cx, y: cy + r * 0.7 }, color: COLOR_DARK, thickness: 0.6 });
+      break;
+    case 'earth_point': // stem + three diminishing bars
+      page.drawLine({ start: { x: cx, y: cy + r }, end: { x: cx, y: cy }, color: COLOR_DARK, thickness: 1 });
+      [1.0, 0.6, 0.3].forEach((w, i) => {
+        const by = cy - i * 2.6;
+        page.drawLine({ start: { x: cx - r * w, y: by }, end: { x: cx + r * w, y: by }, color: COLOR_DARK, thickness: 1 });
+      });
       break;
     default:
       page.drawCircle({ x: cx, y: cy, size: r, borderColor: COLOR_DARK, borderWidth: 1 });
@@ -1162,6 +1269,13 @@ export async function buildSheetForDeck(
       break;
     case 'plumbing_plan':
       await buildPlumbingPlan(pdfDoc, fonts, td, {
+        backdrop: sheet.data.backdrop,
+        symbols: sheet.data.symbols || [],
+        legend: sheet.data.legend || [],
+      });
+      break;
+    case 'electrical_plan':
+      await buildElectricalPlan(pdfDoc, fonts, td, {
         backdrop: sheet.data.backdrop,
         symbols: sheet.data.symbols || [],
         legend: sheet.data.legend || [],

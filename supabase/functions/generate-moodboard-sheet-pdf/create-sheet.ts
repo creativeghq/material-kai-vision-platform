@@ -19,6 +19,7 @@ export type SheetType =
   | 'concept_board'
   | 'lighting_plan'
   | 'plumbing_plan'
+  | 'electrical_plan'
   | 'annotated_render'
   | 'elevation_render_pair'
   | 'ffe_schedule'
@@ -35,6 +36,7 @@ export const SHEET_CREDITS: Record<SheetType, number> = {
   ffe_schedule: 1,
   lighting_plan: 3,
   plumbing_plan: 3,
+  electrical_plan: 3,
   annotated_render: 4,
   elevation_render_pair: 3,
   area_breakdown: 2,
@@ -44,6 +46,7 @@ export const SHEET_CREDITS: Record<SheetType, number> = {
 export const INTERACTIVE_TYPES: SheetType[] = [
   'lighting_plan',
   'plumbing_plan',
+  'electrical_plan',
   'annotated_render',
   'elevation_render_pair',
   'full_deck',
@@ -373,6 +376,7 @@ function validateInitialData(sheet_type: SheetType, data: Record<string, any> | 
       return null;
     case 'lighting_plan':
     case 'plumbing_plan':
+    case 'electrical_plan':
       if (!d.backdrop || !['upload', 'rect'].includes(d.backdrop.kind)) {
         return `${sheet_type} needs a backdrop (upload a floor plan or give room dimensions).`;
       }

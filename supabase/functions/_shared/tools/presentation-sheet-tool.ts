@@ -170,13 +170,14 @@ export const createPresentationSheetTool = (
         'material_board (selected materials, 1 credit), color_palette (extracted colors, 2), ' +
         'concept_board (inspiration collage, 1), lighting_plan (fixture layout, 3), ' +
         'plumbing_plan (top-down plumbing fixture layout — WC/basin/bath/shower/floor drain/supply/waste/water heater — 3), ' +
+        'electrical_plan (top-down electrical layout — sockets/switches/dimmer/distribution board/data/TV/dedicated points/junction/earth — 3), ' +
         'annotated_render (render with AI-detected callouts, 4), ' +
         'elevation_render_pair (uploaded elevation + render with user dimensions, 3), ' +
         'ffe_schedule (FF&E table from quote, 1), ' +
         'area_breakdown (single composited board: hero render + dimensioned plan + elevation + ' +
         'finishes + fitting columns + palette, 2), full_deck (multi-page deck with cover + reorder canvas, 5). ' +
         'Passive types (material_board, color_palette, concept_board, ffe_schedule, area_breakdown) ' +
-        'generate the PDF immediately. Interactive types (lighting_plan, plumbing_plan, annotated_render, ' +
+        'generate the PDF immediately. Interactive types (lighting_plan, plumbing_plan, electrical_plan, annotated_render, ' +
         'elevation_render_pair, full_deck) open a canvas widget for user input first. ALWAYS pass a sensible ' +
         'initial_data payload — see the schema for each sheet_type.',
       schema: z.object({
@@ -187,6 +188,7 @@ export const createPresentationSheetTool = (
           'concept_board',
           'lighting_plan',
           'plumbing_plan',
+          'electrical_plan',
           'annotated_render',
           'elevation_render_pair',
           'ffe_schedule',
@@ -215,18 +217,21 @@ export const createPresentationSheetTool = (
             image_url: z.string().optional(),
             width_mm: z.number().optional(),
             height_mm: z.number().optional(),
-          }).optional().describe('lighting_plan / plumbing_plan: floor plan backdrop'),
+          }).optional().describe('lighting_plan / plumbing_plan / electrical_plan: floor plan backdrop'),
           symbols: z.array(z.object({
             type: z.enum([
               // lighting_plan
               'recessed', 'pendant', 'wall', 'spot', 'led_strip', 'floor', 'table',
               // plumbing_plan
               'wc', 'basin', 'bath', 'shower', 'floor_drain', 'water_supply', 'waste', 'water_heater', 'mixer',
+              // electrical_plan
+              'socket', 'socket_double', 'switch_1way', 'switch_2way', 'dimmer', 'distribution_board',
+              'data_outlet', 'tv_outlet', 'dedicated_point', 'junction_box', 'earth_point',
             ]),
             x: z.number().describe('Normalized 0..1 in backdrop'),
             y: z.number().describe('Normalized 0..1 in backdrop'),
             label: z.string().optional(),
-          })).optional().describe('lighting_plan / plumbing_plan: fixture symbols'),
+          })).optional().describe('lighting_plan / plumbing_plan / electrical_plan: fixture symbols'),
           legend: z.array(z.object({
             symbol_type: z.string(),
             label: z.string(),

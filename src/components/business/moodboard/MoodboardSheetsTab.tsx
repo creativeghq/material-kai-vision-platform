@@ -35,6 +35,7 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
   concept_board: 'Inspiration collage with curated images',
   lighting_plan: 'Top-down floor plan with fixture symbols',
   plumbing_plan: 'Top-down plan with plumbing fixtures (WC, basin, bath, drains)',
+  electrical_plan: 'Top-down plan with sockets, switches, the board and data/TV outlets',
   annotated_render: 'Render with AI-detected callouts',
   elevation_render_pair: 'Uploaded elevation with dimensions + render',
   ffe_schedule: 'Furniture, Fixtures & Equipment table',
@@ -43,11 +44,14 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
 };
 
 // Sheet types finished on a drawing canvas (SheetCanvasCard) rather than up-front wizard inputs.
-const INTERACTIVE_SHEET_TYPES = new Set<SheetType>(['annotated_render', 'elevation_render_pair', 'lighting_plan', 'plumbing_plan']);
+// Must mirror INTERACTIVE_TYPES in generate-moodboard-sheet-pdf/create-sheet.ts —
+// guarded by tests/unit/sheetTypeCoverage.test.ts. full_deck was missing here, so
+// Edit on a deck re-ran the wizard instead of opening DeckBuilderCanvas.
+const INTERACTIVE_SHEET_TYPES = new Set<SheetType>(['annotated_render', 'elevation_render_pair', 'lighting_plan', 'plumbing_plan', 'electrical_plan', 'full_deck']);
 
 const SHEET_GROUPS: { label: string; types: SheetType[] }[] = [
   { label: 'Boards', types: ['material_board', 'color_palette', 'concept_board', 'area_breakdown'] },
-  { label: 'Plans', types: ['lighting_plan', 'plumbing_plan', 'annotated_render', 'elevation_render_pair'] },
+  { label: 'Plans', types: ['lighting_plan', 'plumbing_plan', 'electrical_plan', 'annotated_render', 'elevation_render_pair'] },
   { label: 'Schedules', types: ['ffe_schedule'] },
   { label: 'Decks', types: ['full_deck'] },
 ];

@@ -2716,6 +2716,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   role: 'assistant',
                   content: `Sheet ready for editing — use the canvas below to ${
                     chunk.sheet_type === 'lighting_plan' ? 'place fixture symbols'
+                    : chunk.sheet_type === 'plumbing_plan' ? 'place plumbing symbols'
+                    : chunk.sheet_type === 'electrical_plan' ? 'place electrical symbols'
                     : chunk.sheet_type === 'annotated_render' ? 'review and edit callouts'
                     : 'add dimensions and tile callouts'
                   }, then click Render PDF.`,

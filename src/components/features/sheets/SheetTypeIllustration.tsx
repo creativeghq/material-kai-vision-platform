@@ -198,6 +198,54 @@ export function SheetTypeIllustration({ sheetType, className }: Props) {
           </>
         );
 
+      case 'electrical_plan':
+        return (
+          <>
+            {/* Floor plan rectangle (top-down) — a living space */}
+            <rect x={20} y={30} width={210} height={130} fill={paper} stroke={ink} strokeWidth={1.5} />
+            <line x1={140} y1={30} x2={140} y2={90} stroke={ink} strokeWidth={1} />
+            {/* Distribution board — hatched rectangle */}
+            <g transform="translate(45,45)">
+              <rect x={-14} y={-9} width={28} height={18} fill={paper} stroke={ink} strokeWidth={1.2} />
+              {[-7, 0, 7].map((x, i) => (
+                <line key={i} x1={x} y1={-9} x2={x} y2={9} stroke={ink} strokeWidth={0.4} />
+              ))}
+            </g>
+            {/* Sockets — half-disc on a baseline */}
+            {[[60, 140], [105, 140], [200, 60]].map(([x, y], i) => (
+              <g key={i} transform={`translate(${x},${y})`}>
+                <path d="M-8,0 A8,8 0 0,1 8,0 Z" fill={paper} stroke={ink} strokeWidth={1} />
+                <line x1={-8} y1={0} x2={8} y2={0} stroke={ink} strokeWidth={1} />
+                <line x1={0} y1={0} x2={0} y2={6} stroke={ink} strokeWidth={1} />
+              </g>
+            ))}
+            {/* Switch — node + lever */}
+            <g transform="translate(160,120)">
+              <circle r={2} fill={ink} />
+              <line x1={0} y1={0} x2={7} y2={-9} stroke={ink} strokeWidth={1} />
+            </g>
+            {/* Earth point — stem + three diminishing bars */}
+            <g transform="translate(105,60)">
+              <line x1={0} y1={-7} x2={0} y2={0} stroke={ink} strokeWidth={1} />
+              {[7, 4.5, 2.5].map((w, i) => (
+                <line key={i} x1={-w} y1={i * 2.6} x2={w} y2={i * 2.6} stroke={ink} strokeWidth={1} />
+              ))}
+            </g>
+            {/* Legend on the right */}
+            <text x={245} y={45} fontSize={6} fill={ink} fontWeight="bold">LEGEND</text>
+            {[
+              ['◗', 'Socket'],
+              ['⌁', 'Switch'],
+              ['▤', 'Board'],
+              ['⏚', 'Earth'],
+            ].map(([sym, label], i) => (
+              <text key={i} x={245} y={60 + i * 12} fontSize={5} fill={ink}>
+                {sym}  {label}
+              </text>
+            ))}
+          </>
+        );
+
       case 'annotated_render':
         return (
           <>
