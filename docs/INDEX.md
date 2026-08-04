@@ -257,7 +257,7 @@ Complete documentation for Material Kai Vision Platform.
 - `ops.silent_zero` catches the dominant failure here: a number that should be non-zero sitting at zero while nothing complains
 - Janitor crons must ship with a probe on the mess they clear — an exit code proves it ran, not that it worked
 
-**[audit-playbook.md](audit-playbook.md)** — Re-running the platform audit ✨ NEW (2026-08)
+**Platform audit playbook** — now **GitHub issue #314** (was `audit-playbook.md`, deleted 2026-08-04). Plans and specs live in issues, per CLAUDE.md.
 - The method behind #293–#310 (~250 findings, 16 areas): find defects by CLASS, not by clicking
 - The nine defect shapes every finding must sort into, each with its historical instance
 - **The traps** — every way a measurement lied during that audit: `| tee` eating exit codes, semgrep rules that parse-fail and match nothing, `manualChunks` pinning a dep into the entry preload, `overflow-x-hidden` blinding scrollWidth, `.single()` over two rows falling back forever, grep counts (1,325) vs linter counts (407)
