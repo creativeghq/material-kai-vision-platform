@@ -29482,6 +29482,7 @@ export type Database = {
           private_key: string | null
           public_key: string | null
           refresh_token: string | null
+          revtag: string | null
           sync_watermark: string | null
           updated_at: string
           webhook_id: string | null
@@ -29503,6 +29504,7 @@ export type Database = {
           private_key?: string | null
           public_key?: string | null
           refresh_token?: string | null
+          revtag?: string | null
           sync_watermark?: string | null
           updated_at?: string
           webhook_id?: string | null
@@ -29524,6 +29526,7 @@ export type Database = {
           private_key?: string | null
           public_key?: string | null
           refresh_token?: string | null
+          revtag?: string | null
           sync_watermark?: string | null
           updated_at?: string
           webhook_id?: string | null

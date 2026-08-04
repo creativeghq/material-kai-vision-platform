@@ -88,7 +88,10 @@ export async function ensureRevolutBankAccounts(service: any, cfg: RevolutConfig
       iban,
       account_ref: bic,
       is_active: true,
-      show_on_invoice: false,
+      // The EUR pocket's IBAN goes straight onto invoices — customers can pay by plain
+      // transfer and the feed reconciles it. Other currencies stay off by default
+      // (toggleable in Settings → Bank accounts).
+      show_on_invoice: !!iban && acc.currency === 'EUR',
       notes: 'Auto-created from the connected Revolut account.',
     });
     if (error && !/duplicate|unique/i.test(error.message ?? '')) {

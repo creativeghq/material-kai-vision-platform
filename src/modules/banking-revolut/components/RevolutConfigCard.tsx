@@ -43,6 +43,7 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
   const [busy, setBusy] = useState<string | null>(null);
   const [clientId, setClientId] = useState('');
   const [environment, setEnvironment] = useState<RevolutEnvironment>('sandbox');
+  const [revtag, setRevtag] = useState('');
   const [accounts, setAccounts] = useState<RevolutAccountInfo[] | null>(null);
   const [bankAccounts, setBankAccounts] = useState<RevolutBankAccountRow[]>([]);
 
@@ -102,6 +103,7 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
         client_id: clientId,
         environment,
         enabled: status?.enabled ?? true,
+        revtag: revtag.replace(/^@/, ''),
       });
       setClientId('');
       await refresh();
@@ -242,6 +244,15 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
                 <option value="sandbox">Sandbox</option>
                 <option value="production">Production</option>
               </select>
+            </div>
+            <div className="sm:col-span-3">
+              <Label htmlFor="revolut-revtag" className="text-xs">Revolut username (@revtag) — printed on invoices for instant in-app payment</Label>
+              <Input
+                id="revolut-revtag"
+                value={revtag}
+                onChange={(e) => setRevtag(e.target.value)}
+                placeholder={status.revtag ? `@${status.revtag} (saved — leave blank to keep)` : '@yourbusiness'}
+              />
             </div>
           </div>
           <Button size="sm" variant="outline" onClick={saveSettings} disabled={busy !== null}>

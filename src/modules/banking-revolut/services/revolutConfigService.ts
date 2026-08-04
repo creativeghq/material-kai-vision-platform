@@ -21,6 +21,7 @@ export interface RevolutConfigStatus {
   has_keypair: boolean;
   public_key: string | null;
   oauth_redirect_uri: string | null;
+  revtag: string | null;
   connected: boolean;
   webhook_ready: boolean;
   client_id_hint: string | null;
@@ -39,6 +40,7 @@ const EMPTY: RevolutConfigStatus = {
   has_keypair: false,
   public_key: null,
   oauth_redirect_uri: null,
+  revtag: null,
   connected: false,
   webhook_ready: false,
   client_id_hint: null,
@@ -63,6 +65,7 @@ export interface RevolutConfigInput {
   client_id?: string;
   environment?: RevolutEnvironment;
   enabled?: boolean;
+  revtag?: string;
 }
 
 /** Blank fields are omitted rather than written (re-save must not wipe stored values). */

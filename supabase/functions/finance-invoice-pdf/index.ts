@@ -386,6 +386,18 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
           ? { type: 'bank', bank_name: a.name, iban: a.iban ?? '', beneficiary: (fs as any).business_name ?? '' }
           : { type: 'other', label: a.name, notes: a.account_ref ?? a.iban ?? '' },
       );
+
+      // Revolut @revtag (#315): printed next to the IBANs so Revolut-to-Revolut payers
+      // can pay instantly by username. Stored on the workspace's Revolut config.
+      const { data: revCfg } = await supabase
+        .from('workspace_revolut_config')
+        .select('revtag, enabled')
+        .eq('workspace_id', inv.workspace_id)
+        .maybeSingle();
+      if (revCfg?.enabled && revCfg?.revtag) {
+        const tag = String(revCfg.revtag).replace(/^@/, '');
+        (fs as any).bank_accounts.push({ type: 'other', label: 'Revolut', notes: `@${tag} — instant in-app payment` });
+      }
     }
 
     let customer: any = null;
