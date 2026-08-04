@@ -4,7 +4,7 @@
 // configures their own merchant account in-place. Mirrors the admin ProvidersPanel but is
 // entitlement-aware (upsell when off) and renders the provider's own config panel in a dialog.
 import React, { useEffect, useMemo, useState } from 'react';
-import { CreditCard, Sliders, CheckCircle2, Sparkles, Loader2 } from 'lucide-react';
+import { CreditCard, Landmark, Sliders, CheckCircle2, Sparkles, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -21,6 +21,7 @@ import { fetchModuleCatalog, activateModule, requestModule, formatAddonPrice, ty
 const PROVIDER_PANELS: Record<string, React.ComponentType<{ embedded?: boolean }>> = {
   'payments-stripe': lazy(() => import('@/modules/payments-stripe/components/StripeConfigPanel').then((m) => ({ default: m.StripeConfigPanel }))),
   'payments-viva': lazy(() => import('@/modules/payments-viva/components/VivaSettingsPanel').then((m) => ({ default: m.VivaSettingsPanel }))),
+  'banking-revolut': lazy(() => import('@/modules/banking-revolut/components/RevolutSettingsPanel').then((m) => ({ default: m.RevolutSettingsPanel }))),
 };
 
 export const PaymentProvidersCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
@@ -43,6 +44,16 @@ export const PaymentProvidersCard: React.FC<{ workspaceId: string }> = ({ worksp
       .sort((a, b) => a.name.localeCompare(b.name)),
   []);
 
+  // Bank connections (provides.banking) are the workspace's OWN accounts — read/reconcile/
+  // treasury. Listed below the checkout providers with the same enable/configure mechanics,
+  // but never offered as a way for a buyer to pay.
+  const bankConnections = useMemo(() =>
+    registeredModules
+      .filter((m) => m.manifest.provides?.banking === true)
+      .map((m) => ({ slug: m.manifest.slug, name: m.manifest.name, description: m.manifest.description }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  []);
+
   const enable = async (slug: string, name: string) => {
     setBusy(slug);
     try {
@@ -61,6 +72,33 @@ export const PaymentProvidersCard: React.FC<{ workspaceId: string }> = ({ worksp
 
   const PanelComp = configuring ? PROVIDER_PANELS[configuring.slug] : null;
 
+  const renderRow = (p: { slug: string; name: string; description: string }, icon: React.ReactNode) => {
+    const entitled = isModuleAvailable(p.slug);
+    const cat = catalog.get(p.slug);
+    const price = cat ? formatAddonPrice(cat.addon_price_cents, cat.addon_currency, cat.billing_interval) : null;
+    return (
+      <div key={p.slug} className="flex items-center gap-4 px-5 py-3.5">
+        {icon}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{p.name}</span>
+            {entitled
+              ? <span className={`inline-flex items-center text-[10px] capitalize ${statusTone('enabled')}`}><CheckCircle2 className="mr-1 h-3 w-3" />Enabled</span>
+              : price ? <Badge className="rounded-full border-0 bg-muted text-[10px]">{price}</Badge> : null}
+          </div>
+          <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{p.description}</div>
+        </div>
+        {loading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          : entitled
+            ? <Button size="sm" variant="outline" className="rounded-full" onClick={() => setConfiguring({ slug: p.slug, name: p.name })}><Sliders className="mr-1.5 h-3.5 w-3.5" /> Configure</Button>
+            : <Button size="sm" className="rounded-full" onClick={() => enable(p.slug, p.name)} disabled={busy === p.slug}>
+                {busy === p.slug ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                {canActivate ? (price ? `Enable · ${price}` : 'Enable') : 'Request'}
+              </Button>}
+      </div>
+    );
+  };
+
   return (
     <>
       <Card>
@@ -70,33 +108,19 @@ export const PaymentProvidersCard: React.FC<{ workspaceId: string }> = ({ worksp
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
-            {providers.map((p) => {
-              const entitled = isModuleAvailable(p.slug);
-              const cat = catalog.get(p.slug);
-              const price = cat ? formatAddonPrice(cat.addon_price_cents, cat.addon_currency, cat.billing_interval) : null;
-              return (
-                <div key={p.slug} className="flex items-center gap-4 px-5 py-3.5">
-                  <CreditCard className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{p.name}</span>
-                      {entitled
-                        ? <span className={`inline-flex items-center text-[10px] capitalize ${statusTone('enabled')}`}><CheckCircle2 className="mr-1 h-3 w-3" />Enabled</span>
-                        : price ? <Badge className="rounded-full border-0 bg-muted text-[10px]">{price}</Badge> : null}
-                    </div>
-                    <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{p.description}</div>
-                  </div>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    : entitled
-                      ? <Button size="sm" variant="outline" className="rounded-full" onClick={() => setConfiguring({ slug: p.slug, name: p.name })}><Sliders className="mr-1.5 h-3.5 w-3.5" /> Configure</Button>
-                      : <Button size="sm" className="rounded-full" onClick={() => enable(p.slug, p.name)} disabled={busy === p.slug}>
-                          {busy === p.slug ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-                          {canActivate ? (price ? `Enable · ${price}` : 'Enable') : 'Request'}
-                        </Button>}
-                </div>
-              );
-            })}
+            {providers.map((p) => renderRow(p, <CreditCard className="h-4 w-4 shrink-0 text-muted-foreground" />))}
           </div>
+          {bankConnections.length > 0 && (
+            <>
+              <div className="border-t border-border/60 bg-muted/30 px-5 py-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><Landmark className="h-3.5 w-3.5" /> Bank connections</div>
+                <div className="text-[11px] text-muted-foreground">Your own business bank accounts — live balances, transaction feed and reconciliation. Not a checkout method.</div>
+              </div>
+              <div className="divide-y divide-border">
+                {bankConnections.map((p) => renderRow(p, <Landmark className="h-4 w-4 shrink-0 text-muted-foreground" />))}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

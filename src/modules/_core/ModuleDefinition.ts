@@ -57,10 +57,16 @@ export interface ModuleManifest {
    *   payment processing). **Multi-provider**: every enabled module with this
    *   flag is listed on the parent Payments module's Providers tab; admins
    *   may operate multiple simultaneously.
+   *
+   * `banking` — this module connects the workspace's own BANK account
+   *   (banking-revolut today; future Wise). Read/reconcile/treasury, not
+   *   customer checkout — listed in the Banking section of the Finance
+   *   settings providers card, never offered as a way for a buyer to pay.
    */
   provides?: {
     invoicing?: boolean;
     payments?: boolean;
+    banking?: boolean;
   };
 }
 
