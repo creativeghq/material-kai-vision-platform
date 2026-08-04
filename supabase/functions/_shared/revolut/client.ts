@@ -469,6 +469,108 @@ export function getExchangeRate(
   return revolutJson<Record<string, unknown>>(supabase, cfg, issuerDomain, `/rate?${q.toString()}`);
 }
 
+// ---------------------------------------------------------------------------
+// Cards + expenses (#315 phase 4)
+// ---------------------------------------------------------------------------
+
+export interface RevolutTeamMember {
+  id: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  state?: string;
+  role?: string;
+}
+
+export interface RevolutCard {
+  id: string;
+  label?: string;
+  state?: string;
+  virtual?: boolean;
+  holder_id?: string;
+  last_digits?: string;
+  expiry?: string;
+  created_at?: string;
+}
+
+export interface RevolutExpense {
+  id: string;
+  state?: string;
+  merchant?: { name?: string; category?: string };
+  transaction_id?: string;
+  amount?: number;
+  currency?: string;
+  spent_at?: string;
+  card_id?: string;
+  labels?: unknown[];
+  receipts?: Array<{ id: string; file_name?: string; content_type?: string }>;
+}
+
+export function listTeamMembers(supabase: any, cfg: RevolutConfigRow, issuerDomain: string) {
+  return revolutJson<RevolutTeamMember[]>(supabase, cfg, issuerDomain, '/team-members');
+}
+
+export function listCards(supabase: any, cfg: RevolutConfigRow, issuerDomain: string) {
+  return revolutJson<RevolutCard[]>(supabase, cfg, issuerDomain, '/cards');
+}
+
+/** Create a VIRTUAL card for a team member (physical cards need address plumbing). */
+export function createCard(
+  supabase: any,
+  cfg: RevolutConfigRow,
+  issuerDomain: string,
+  body: { holder_id: string; label?: string; virtual: true; accounts?: string[] },
+) {
+  return revolutJson<RevolutCard>(supabase, cfg, issuerDomain, '/cards', {
+    method: 'POST',
+    body: JSON.stringify({ ...body, request_id: crypto.randomUUID() }),
+  });
+}
+
+export function setCardFrozen(
+  supabase: any,
+  cfg: RevolutConfigRow,
+  issuerDomain: string,
+  cardId: string,
+  frozen: boolean,
+) {
+  return revolutFetch(supabase, cfg, issuerDomain, `/cards/${cardId}/${frozen ? 'freeze' : 'unfreeze'}`, {
+    method: 'POST',
+  });
+}
+
+export function listExpenses(
+  supabase: any,
+  cfg: RevolutConfigRow,
+  issuerDomain: string,
+  opts: { from?: string; count?: number } = {},
+) {
+  const q = new URLSearchParams();
+  if (opts.from) q.set('from', opts.from);
+  q.set('count', String(opts.count ?? 100));
+  return revolutJson<RevolutExpense[]>(supabase, cfg, issuerDomain, `/expenses?${q.toString()}`);
+}
+
+/** Raw receipt bytes for an expense (content-type comes from the response). */
+export async function getExpenseReceipt(
+  supabase: any,
+  cfg: RevolutConfigRow,
+  issuerDomain: string,
+  expenseId: string,
+  receiptId: string,
+): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const res = await revolutFetch(
+    supabase, cfg, issuerDomain,
+    `/expenses/${expenseId}/receipts/${receiptId}/content`,
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`receipt fetch failed (${res.status}): ${text.slice(0, 200)}`);
+  }
+  const buf = new Uint8Array(await res.arrayBuffer());
+  return { bytes: buf, contentType: res.headers.get('content-type') ?? 'application/octet-stream' };
+}
+
 /** Exchange between the business's own currency pockets. */
 export function exchangeMoney(
   supabase: any,

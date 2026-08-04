@@ -8,6 +8,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { RevolutConfigCard } from './RevolutConfigCard';
+import { CardsExpensesCard } from './CardsExpensesCard';
 
 interface Props { embedded?: boolean }
 
@@ -27,6 +28,7 @@ export const RevolutSettingsPanel: React.FC<Props> = (_props) => {
   return (
     <div className="space-y-4">
       <RevolutConfigCard workspaceId={activeWorkspaceId} />
+      <CardsExpensesCard workspaceId={activeWorkspaceId} />
     </div>
   );
 };

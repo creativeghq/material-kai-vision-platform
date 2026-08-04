@@ -27,6 +27,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import {
+  createCard,
   createCounterparty,
   createPayment,
   createPaymentDraft,
@@ -35,12 +36,17 @@ import {
   exchangeMoney,
   generateRevolutKeypair,
   getExchangeRate,
+  getExpenseReceipt,
   issuerDomainFrom,
   listAccounts,
+  listCards,
+  listExpenses,
+  listTeamMembers,
   resolveRevolutConfig,
   revolutFetch,
   revolutJson,
   revolutHosts,
+  setCardFrozen,
   type RevolutConfigRow,
 } from '../_shared/revolut/client.ts';
 import { syncWorkspaceRevolut } from '../_shared/revolut/sync-core.ts';
@@ -546,6 +552,71 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         await service.from('revolut_payouts').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('id', audit.id);
         throw err;
       }
+    }
+
+    case 'team-members': {
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const members = await listTeamMembers(service, cfg, issuer);
+      return jsonResponse({ ok: true, members });
+    }
+
+    case 'cards': {
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const cards = await listCards(service, cfg, issuer);
+      return jsonResponse({ ok: true, cards });
+    }
+
+    case 'create-card': {
+      // Virtual cards only — instant, no shipping address plumbing.
+      const holderId = String(body?.holder_id ?? '');
+      if (!holderId) throw new HttpError(400, 'holder_id (Revolut team member) is required');
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const card = await createCard(service, cfg, issuer, {
+        holder_id: holderId,
+        label: body?.label ? String(body.label).slice(0, 30) : undefined,
+        virtual: true,
+      });
+      return jsonResponse({ ok: true, card });
+    }
+
+    case 'freeze-card':
+    case 'unfreeze-card': {
+      const cardId = String(body?.card_id ?? '');
+      if (!cardId) throw new HttpError(400, 'card_id is required');
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const res = await setCardFrozen(service, cfg, issuer, cardId, action === 'freeze-card');
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new HttpError(502, `${action} failed (${res.status}): ${text.slice(0, 200)}`);
+      }
+      return jsonResponse({ ok: true });
+    }
+
+    case 'expenses': {
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const from = body?.from ? String(body.from) : new Date(Date.now() - 90 * 24 * 3600_000).toISOString();
+      const expenses = await listExpenses(service, cfg, issuer, { from, count: 100 });
+      return jsonResponse({ ok: true, expenses });
+    }
+
+    case 'expense-receipt': {
+      // Receipt passthrough — fetched on demand, never persisted (no storage GC surface).
+      const expenseId = String(body?.expense_id ?? '');
+      const receiptId = String(body?.receipt_id ?? '');
+      if (!expenseId || !receiptId) throw new HttpError(400, 'expense_id and receipt_id are required');
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const { bytes, contentType } = await getExpenseReceipt(service, cfg, issuer, expenseId, receiptId);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      }
+      return jsonResponse({ ok: true, content_type: contentType, base64: btoa(bin) });
     }
 
     case 'disconnect': {
