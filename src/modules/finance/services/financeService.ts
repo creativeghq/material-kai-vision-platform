@@ -518,8 +518,10 @@ export interface AgingRow {
   due_from_terms?: boolean;
   /** 'invoice' = real invoice/supplier bill; 'manual' = un-invoiced receivable/payable;
    *  'order' = a confirmed order not yet invoiced (synthesised client-side, not from the view);
-   *  'credit' = customer money held on account (a NEGATIVE receivable — synthesised client-side
-   *  from unallocated inbound payments). It nets against what the customer owes. */
+   *  'credit' = customer money held on account (synthesised client-side from unallocated inbound
+   *  payments). Amounts are POSITIVE like every other row — it is "money we hold", not money owed
+   *  to us, so aggregates must key off this kind (exclude from "owed" sums, sum separately as
+   *  credit held) rather than rely on a sign. Negative on-screen numbers are banned (operator). */
   entry_kind?: 'invoice' | 'manual' | 'order' | 'credit';
   /** Free-text label for manual entries (null for invoices/bills). */
   description?: string | null;

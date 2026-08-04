@@ -322,20 +322,20 @@ const FinancePage: React.FC = () => {
         setOverlayFailed(true);
         console.error('[FinancePage] uninvoiced-orders overlay failed — AR/AP under-report:', overlayErr);
       }
-      // Customer money held on account (unallocated inbound payments) is folded into the
-      // receivables list as a NEGATIVE receivable, not shown as a separate "in credit" section.
-      // Rationale (per operator): a credit is money already on OUR account — a receivable, not a
-      // liability tied to any one order. It nets against whatever the customer owes; the leftover
-      // can fund other orders or be used elsewhere. So each credit becomes one negative AR row and
-      // the totals "play between the numbers" automatically.
+      // Customer money held on account (unallocated inbound payments) lives in the receivables
+      // list so the operator sees it next to what that customer owes — but it carries POSITIVE
+      // amounts and is aggregated separately (creditHeld), never summed into "owed" totals as a
+      // negative row. Per operator (2026-08-04): negative numbers on this page are banned; a
+      // credit is presented as "money we hold for the customer", and the netting happens in
+      // labelled aggregate lines, not in row signs.
       const depositsData = await financeService.getDepositsOnAccount(wsId).catch(() => ({ total: 0, currency: 'EUR', totals: [], rows: [] }));
       setDeposits(depositsData);
       const creditRows: AgingRow[] = depositsData.rows.map((d) => ({
         id: d.payment_id,
         workspace_id: wsId,
-        total: -d.unallocated,
+        total: d.unallocated,
         amount_paid: 0,
-        amount_due: -d.unallocated, // negative → nets against this customer's open receivables
+        amount_due: d.unallocated, // positive — aggregates key off entry_kind, not the sign
         // The DEPOSIT's currency. A credit may only net against same-currency receivables —
         // netting a USD deposit against a EUR invoice is not a discount, it is a wrong number.
         currency: d.currency,
@@ -394,7 +394,10 @@ const FinancePage: React.FC = () => {
 
   // ---- Derived metrics
   const kpis = useMemo(() => {
-    const arOutstanding = ar.reduce((acc, r) => acc + (r.amount_due || 0), 0);
+    // Owed and held are reported as two separate POSITIVE numbers, never netted into one figure
+    // that can go negative on screen. Credit rows are excluded from every "owed" sum.
+    const arOutstanding = ar.reduce((acc, r) => acc + (r.entry_kind === 'credit' ? 0 : (r.amount_due || 0)), 0);
+    const creditHeld = ar.reduce((acc, r) => acc + (r.entry_kind === 'credit' ? (r.amount_due || 0) : 0), 0);
     const apOutstanding = ap.reduce((acc, r) => acc + (r.amount_due || 0), 0);
     const overdue = ar.filter((r) => r.age_bucket !== 'current' && r.age_bucket !== 'paid' && r.age_bucket !== 'no_due_date');
     const overdueTotal = overdue.reduce((acc, r) => acc + (r.amount_due || 0), 0);
@@ -408,7 +411,7 @@ const FinancePage: React.FC = () => {
     // True DSO = AR ÷ trailing-12-mo revenue × 365. Null when there's no revenue to divide by.
     const annualRevenue = pnl.reduce((acc, p) => acc + Number(p.revenue_net ?? 0), 0);
     const dso = annualRevenue > 0 ? Math.round((invoicedAr / annualRevenue) * 365) : null;
-    return { arOutstanding, apOutstanding, overdueTotal, monthRevenue, monthMargin, monthMarginPct, dso };
+    return { arOutstanding, creditHeld, apOutstanding, overdueTotal, monthRevenue, monthMargin, monthMarginPct, dso };
   }, [ar, ap, pnl]);
 
   // Uninvoiced-order money that still can't age, shown as a separate "expected" line under the
@@ -622,11 +625,11 @@ const FinancePage: React.FC = () => {
                 label="AR outstanding"
                 value={formatMoney(kpis.arOutstanding, arMoney.currency)}
                 accent={kpis.overdueTotal > 0 ? 'destructive' : 'default'}
-                // NET position: open invoices + uninvoiced orders LESS on-account credit (credit is
-                // money already on our account, folded into receivables — see loadAll creditRows).
+                // GROSS owed. Credit we hold is a separate positive fact, never netted into this
+                // figure — a negative headline here reads as "we owe" and was banned by the operator.
                 subtext={kpis.overdueTotal > 0
                   ? `${formatMoney(kpis.overdueTotal, arMoney.currency)} overdue`
-                  : (deposits.total > 0 ? `net of ${formatMoney(deposits.total)} credit on account` : 'All on schedule')}
+                  : (kpis.creditHeld > 0 ? `holding ${formatMoney(kpis.creditHeld, arMoney.currency)} customer credit` : 'All on schedule')}
               />
               <KpiCard
                 icon={ArrowUpCircle}
@@ -827,8 +830,8 @@ const FinancePage: React.FC = () => {
               <MoneySummaryCard
                 label="Still owed to us"
                 value={formatMoney(kpis.arOutstanding, arMoney.currency)}
-                sub={deposits.total > 0
-                  ? `net of ${formatMoney(deposits.total)} customer credit held`
+                sub={kpis.creditHeld > 0
+                  ? `we hold ${formatMoney(kpis.creditHeld, arMoney.currency)} of customer credit for their next orders`
                   : 'across all open receivables'}
               />
               <MoneySummaryCard
@@ -925,7 +928,7 @@ const FinancePage: React.FC = () => {
                           ) : isCredit ? (
                             <span className="flex items-center gap-2">
                               <span className="text-xs">{r.credit_number ?? r.description}</span>
-                              <span className="text-[10px] text-muted-foreground">· Credit on account</span>
+                              <span className="text-[10px] text-muted-foreground" title="The customer paid more than their orders — we hold the extra for their next order or a refund">· Customer credit (overpayment)</span>
                             </span>
                           ) : (
                             <span className="font-mono text-xs">{r.internal_number}</span>
@@ -946,7 +949,11 @@ const FinancePage: React.FC = () => {
                         </td>
                         <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.total, r.currency)}</td>
                         <td className="px-4 py-2 text-right">{isCredit ? '—' : formatMoney(r.amount_paid, r.currency)}</td>
-                        <td className="px-4 py-2 text-right font-medium">{formatMoney(r.amount_due, r.currency)}</td>
+                        <td className="px-4 py-2 text-right font-medium">
+                          {isCredit
+                            ? <span className="text-emerald-600 dark:text-emerald-400" title="Not owed to us — money we hold for this customer">{formatMoney(r.amount_due, r.currency)} credit</span>
+                            : formatMoney(r.amount_due, r.currency)}
+                        </td>
                         <td className="px-4 py-2 text-right" onClick={(e) => isOrder && e.stopPropagation()}>
                           {isOrder ? (
                             <OrderAgingInlineEditor orderId={r.id} categoryId={r.category_id ?? null} categoryName={r.category_name ?? null} expectedDate={r.due_at} categories={incomeCats} onSaved={() => loadAll(workspaceId)}>
@@ -980,9 +987,9 @@ const FinancePage: React.FC = () => {
                 <TablePagination page={arPage} total={arFiltered.length} onPageChange={setArPage} label="receivables" />
               </CardContent>
             </Card>
-            {/* Customer credit (money held on account) is no longer a separate section — it is
-                folded into the receivables list above as a negative row per customer, so the
-                totals net automatically. See loadAll's creditRows. */}
+            {/* Customer credit (money held on account) lives in the receivables list above as a
+                positively-signed row labelled "Customer credit (overpayment)" — aggregates key
+                off entry_kind === 'credit', never off a negative amount. See loadAll's creditRows. */}
           </TabsContent>
 
           {/* ─────────── PAYABLES ─────────── */}
@@ -1357,6 +1364,9 @@ function bucketize(rows: AgingRow[]): Record<AgeBucket, { count: number; total: 
     no_due_date: { count: 0, total: 0 },
   } as Record<AgeBucket, { count: number; total: number }>;
   for (const r of rows) {
+    // Credit held for a customer is not a receivable that ages — it has no due date and it is
+    // not money owed to us. Summing it here is how the "No due date" card once showed −€920.
+    if (r.entry_kind === 'credit') continue;
     out[r.age_bucket].count += 1;
     out[r.age_bucket].total += r.amount_due || 0;
   }
@@ -1436,16 +1446,26 @@ const BucketSummary: React.FC<{
           )}
           {credit > 0 && (
             <tr className="border-b border-border/30 bg-muted/20">
-              <td className="px-4 py-2 text-xs text-muted-foreground" title="Customer money held on account — nets against what they owe">Credit on account</td>
+              <td className="px-4 py-2 text-xs text-muted-foreground" title="Customer money we hold (overpayments) — covers what they owe before any new money is due">Customer credit we hold</td>
               <td className="px-4 py-2" />
-              <td className="px-4 py-2 text-right font-medium text-emerald-700">− {formatMoney(credit, money.currency)}</td>
+              <td className="px-4 py-2 text-right font-medium text-emerald-700 dark:text-emerald-400">{formatMoney(credit, money.currency)}</td>
             </tr>
           )}
-          <tr className="bg-muted/40">
-            <td className="px-4 py-2 text-xs font-semibold">Net {viewLink === 'ar' ? 'receivable' : 'payable'}</td>
-            <td className="px-4 py-2" />
-            <td className="px-4 py-2 text-right font-semibold">{formatMoney(net, money.currency)}</td>
-          </tr>
+          {/* Never a negative headline: when credit held exceeds what is owed, say that in words
+              and show the surplus as a positive number. */}
+          {net >= 0 ? (
+            <tr className="bg-muted/40">
+              <td className="px-4 py-2 text-xs font-semibold">{viewLink === 'ar' ? 'Owed to us after credit' : 'Net payable'}</td>
+              <td className="px-4 py-2" />
+              <td className="px-4 py-2 text-right font-semibold">{formatMoney(net, money.currency)}</td>
+            </tr>
+          ) : (
+            <tr className="bg-muted/40">
+              <td className="px-4 py-2 text-xs font-semibold" title="All receivables are covered; this much customer money is left over for their next orders or refunds">Credit left after covering all owed</td>
+              <td className="px-4 py-2" />
+              <td className="px-4 py-2 text-right font-semibold text-emerald-700 dark:text-emerald-400">{formatMoney(-net, money.currency)}</td>
+            </tr>
+          )}
         </tbody>
       </table>
     </CardContent>
