@@ -19,6 +19,8 @@ export type SheetStatus = 'draft' | 'generating' | 'ready' | 'failed';
 export interface PresentationSheet {
   id: string;
   moodboard_id: string;
+  /** Project room this sheet documents, when it was created from one. */
+  room_id?: string | null;
   created_by: string | null;
   sheet_type: SheetType;
   title: string;
@@ -139,6 +141,8 @@ class MoodboardSheetsService {
     title: string;
     initial_data?: Record<string, any>;
     auto_enhance?: boolean;
+    /** Project room this documents. Verified server-side against the caller. */
+    room_id?: string | null;
   }): Promise<{
     sheet_id: string;
     sheet_type: SheetType;
@@ -157,6 +161,7 @@ class MoodboardSheetsService {
         title: input.title,
         initial_data: input.initial_data ?? {},
         auto_enhance: input.auto_enhance,
+        room_id: input.room_id ?? null,
       },
     });
     // Non-2xx (validation 422 / insufficient-credits 402 / 403) lands in `error`

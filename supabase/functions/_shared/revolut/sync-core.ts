@@ -10,8 +10,10 @@
 // deno-lint-ignore-file no-explicit-any
 
 import {
+  getRevolutAccessToken,
   issuerDomainFrom,
   listTransactions,
+  revolutHosts,
   type RevolutConfigRow,
   type RevolutTransaction,
 } from './client.ts';
@@ -21,6 +23,8 @@ export interface SyncResult {
   workspaceId: string;
   fetched: number;
   upserted: number;
+  /** Failed webhook deliveries Revolut reports for this workspace's subscription. */
+  webhookFailures?: number;
   error?: string;
 }
 
@@ -100,6 +104,27 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
       upserted += chunk.length;
     }
 
+    // Webhook-failure visibility (#315 scope pt 5): ask Revolut which deliveries failed.
+    // The sync that just ran IS the heal (it re-pulled everything the webhook missed);
+    // the count is surfaced so the ops probe can alert on chronic failure.
+    let webhookFailures = 0;
+    if (cfg.webhook_id) {
+      try {
+        const v2 = revolutHosts(cfg.environment).api.replace('/api/1.0', '/api/2.0');
+        const token = await getRevolutAccessToken(service, cfg, issuer);
+        const res = await fetch(`${v2}/webhooks/${cfg.webhook_id}/failed-events?limit=100`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const events = await res.json();
+          webhookFailures = Array.isArray(events) ? events.length : 0;
+          if (webhookFailures > 0) {
+            console.warn(`[revolut-sync] ${workspaceId}: ${webhookFailures} failed webhook deliveries reported`);
+          }
+        }
+      } catch { /* visibility only — never fail the sync over it */ }
+    }
+
     const maxCreated = all.reduce(
       (acc, tx) => (tx.created_at > acc ? tx.created_at : acc),
       cfg.sync_watermark ?? from,
@@ -114,7 +139,7 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
       })
       .eq('workspace_id', workspaceId);
 
-    return { ok: true, workspaceId, fetched: all.length, upserted };
+    return { ok: true, workspaceId, fetched: all.length, upserted, webhookFailures };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await service

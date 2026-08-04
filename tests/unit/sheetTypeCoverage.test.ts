@@ -174,6 +174,21 @@ describe('symbol-plan glyph coverage', () => {
     expect(runsAt, 'runs must be drawn before symbols').toBeLessThan(symbolsAt);
   });
 
+  // A sheet can borrow a project room's dimensions, which is what gives the plan
+  // a real scale and makes run lengths and voltage-drop checks computable.
+  // room_id arrives from the request body, so it must be verified server-side —
+  // an unverified foreign id on a tenant row is the shape security invariant 1
+  // exists to stop.
+  it('room_id is verified against the caller before being stored', () => {
+    const CREATE = read('supabase/functions/generate-moodboard-sheet-pdf/create-sheet.ts');
+    expect(CREATE, 'room_id is stored without an ownership check').toContain('safeRoomId');
+    expect(CREATE, 'no ownership lookup for the supplied room').toMatch(/from\('project_rooms'\)[\s\S]{0,200}projects!inner/);
+    expect(CREATE, 'ownership compared against the authenticated user').toMatch(/project\?\.user_id === userId/);
+    // The insert must use the verified value, never the raw body field.
+    expect(CREATE, 'insert uses the unverified body value').not.toMatch(/room_id:\s*params\.room_id/);
+    expect(CREATE).toMatch(/room_id:\s*safeRoomId/);
+  });
+
   it('symbols carry a stable id, so a run can reference which ones it connects', () => {
     expect(CANVAS).toMatch(/export function newSymbolId/);
     expect(CANVAS, 'legacy symbols must be backfilled with ids on load').toMatch(/export function ensureSymbolIds/);

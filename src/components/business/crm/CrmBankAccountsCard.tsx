@@ -8,6 +8,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { crmBankAccountsAPI, type CrmBankAccount, type CrmBankAccountInput } from '@/services/crm.service';
 import { normalizeIban } from '@/utils/iban';
+import { callRevolutApi, getRevolutStatus } from '@/modules/banking-revolut/services/revolutConfigService';
 
 interface Props {
   workspaceId: string;
@@ -30,6 +31,11 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
   const [saving, setSaving] = React.useState(false);
   const [editingId, setEditingId] = React.useState<string | null>(null); // 'new' = add form
   const [form, setForm] = React.useState<CrmBankAccountInput>(EMPTY);
+  // Confirmation of Payee via the workspace's Revolut connection (#315). Offered only
+  // when Revolut is actually connected; verdict is per-edit-session, not persisted.
+  const [vopAvailable, setVopAvailable] = React.useState(false);
+  const [vopBusy, setVopBusy] = React.useState(false);
+  const [vopVerdict, setVopVerdict] = React.useState<{ code: string; actualName?: string } | null>(null);
 
   const parent = companyId ? { companyId } : { contactId };
 
@@ -46,12 +52,55 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
 
   React.useEffect(() => { void load(); }, [load]);
 
-  const startAdd = () => { setForm(EMPTY); setEditingId('new'); };
+  React.useEffect(() => {
+    // Silently detect whether this workspace can verify account names (Revolut connected).
+    getRevolutStatus(workspaceId)
+      .then((s) => setVopAvailable(s.connected && s.enabled))
+      .catch(() => setVopAvailable(false));
+  }, [workspaceId]);
+
+  const verifyHolder = async () => {
+    const name = (form.account_holder ?? '').trim();
+    const iban = normalizeIban(form.iban ?? '');
+    if (!name || !iban) {
+      toast({ title: 'Account holder and IBAN are both needed to verify', variant: 'destructive' });
+      return;
+    }
+    setVopBusy(true);
+    setVopVerdict(null);
+    try {
+      const out = await callRevolutApi<Record<string, unknown>>('validate-account-name', workspaceId, {
+        name,
+        iban,
+        company: Boolean(companyId),
+      });
+      const code = String(out.result_code ?? out.result ?? 'cannot_be_checked');
+      const actual = (out.actual_name ?? (out.company_name as string | undefined)) as string | undefined;
+      setVopVerdict({ code, actualName: actual });
+    } catch (e: any) {
+      toast({ title: 'Verification unavailable', description: e?.message, variant: 'destructive' });
+    } finally {
+      setVopBusy(false);
+    }
+  };
+
+  const vopWord = vopVerdict && (
+    vopVerdict.code === 'matched'
+      ? <span className="text-xs text-emerald-600 dark:text-emerald-400">Name matches this account</span>
+      : vopVerdict.code === 'close_match'
+        ? <span className="text-xs text-amber-600 dark:text-amber-400">Close match{vopVerdict.actualName ? ` — bank has “${vopVerdict.actualName}”` : ''}</span>
+        : vopVerdict.code === 'not_matched'
+          ? <span className="text-xs text-destructive">Name does NOT match this account — verify before paying</span>
+          : <span className="text-xs text-muted-foreground">Could not be checked for this bank</span>
+  );
+
+  const startAdd = () => { setForm(EMPTY); setVopVerdict(null); setEditingId('new'); };
   const startEdit = (r: CrmBankAccount) => {
     setForm({ bank_name: r.bank_name, account_holder: r.account_holder ?? '', iban: r.iban ?? '', account_ref: r.account_ref ?? '', currency: r.currency, is_primary: r.is_primary, notes: r.notes ?? '' });
+    setVopVerdict(null);
     setEditingId(r.id);
   };
-  const cancel = () => { setEditingId(null); setForm(EMPTY); };
+  const cancel = () => { setEditingId(null); setForm(EMPTY); setVopVerdict(null); };
 
   const save = async () => {
     if (!(form.bank_name ?? '').trim()) { toast({ title: 'Bank name is required', variant: 'destructive' }); return; }
@@ -97,7 +146,16 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">IBAN</Label>
-          <Input value={form.iban ?? ''} onChange={(e) => setForm((f) => ({ ...f, iban: normalizeIban(e.target.value) }))} placeholder="GR16 0110 1250 0000 0001 2300 695" className="font-mono" />
+          <Input value={form.iban ?? ''} onChange={(e) => { setForm((f) => ({ ...f, iban: normalizeIban(e.target.value) })); setVopVerdict(null); }} placeholder="GR16 0110 1250 0000 0001 2300 695" className="font-mono" />
+          {vopAvailable && (
+            <div className="flex items-center gap-2 pt-0.5">
+              <Button size="sm" variant="outline" type="button" onClick={verifyHolder} disabled={vopBusy}>
+                {vopBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
+                Verify holder
+              </Button>
+              {vopWord}
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">

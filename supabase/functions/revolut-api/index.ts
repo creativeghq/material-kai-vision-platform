@@ -32,6 +32,8 @@ import {
   issuerDomainFrom,
   listAccounts,
   resolveRevolutConfig,
+  revolutFetch,
+  revolutJson,
   revolutHosts,
   type RevolutConfigRow,
 } from '../_shared/revolut/client.ts';
@@ -172,7 +174,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         // The target row must belong to THIS workspace — 404 otherwise (no id probing).
         const { data: target } = await service
           .from('finance_bank_accounts')
-          .select('id')
+          .select('id, iban, account_ref')
           .eq('id', bankAccountId)
           .eq('workspace_id', workspaceId)
           .maybeSingle();
@@ -181,8 +183,74 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
           .update({ revolut_account_id: revolutAccountId })
           .eq('id', bankAccountId);
         if (error) throw new HttpError(500, `mapping failed: ${error.message}`);
+
+        // Auto-fill the row's IBAN/BIC from Revolut's bank details when they are empty,
+        // so invoices show the right IBAN with zero typing. Best-effort: a details
+        // failure must not undo the mapping.
+        if (!target.iban) {
+          try {
+            const cfg = await requireConfig(service, workspaceId);
+            const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+            const details = await revolutJson<Array<{ iban?: string; bic?: string }>>(
+              service, cfg, issuer, `/accounts/${revolutAccountId}/bank-details`,
+            );
+            const d = (details ?? []).find((x) => x.iban) ?? (details ?? [])[0];
+            if (d?.iban) {
+              await service.from('finance_bank_accounts')
+                .update({
+                  iban: d.iban,
+                  ...(target.account_ref ? {} : d.bic ? { account_ref: d.bic } : {}),
+                })
+                .eq('id', bankAccountId);
+            }
+          } catch (err) {
+            console.warn('[revolut-api] bank-details autofill skipped:', err instanceof Error ? err.message : err);
+          }
+        }
       }
       return jsonResponse({ ok: true });
+    }
+
+    case 'validate-account-name': {
+      // CoP/VoP — does this IBAN/account actually belong to the named holder? Used from
+      // the CRM bank area before a counterparty IBAN is trusted (#315 scope pt 1).
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const name = String(body?.name ?? '').trim();
+      if (!name) throw new HttpError(400, 'name is required');
+      const iban = body?.iban ? String(body.iban).replace(/\s+/g, '').toUpperCase() : undefined;
+      const accountNo = body?.account_no ? String(body.account_no) : undefined;
+      const sortCode = body?.sort_code ? String(body.sort_code) : undefined;
+      if (!iban && !accountNo) throw new HttpError(400, 'iban or account_no is required');
+
+      const payload: Record<string, unknown> = {
+        ...(iban ? { iban } : {}),
+        ...(accountNo ? { account_no: accountNo } : {}),
+        ...(sortCode ? { sort_code: sortCode } : {}),
+      };
+      // Default to a company check — CRM bank rows overwhelmingly belong to companies;
+      // pass company=false for a person (name is split into first/last).
+      if (body?.company === false) {
+        const parts = name.split(/\s+/);
+        payload.individual_name = {
+          first_name: parts[0],
+          last_name: parts.slice(1).join(' ') || parts[0],
+        };
+      } else {
+        payload.company_name = name;
+      }
+
+      const res = await revolutFetch(service, cfg, issuer, '/account-name-validation', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new HttpError(502, `name validation failed (${res.status}): ${JSON.stringify(out).slice(0, 200)}`);
+      }
+      // Pass Revolut's verdict through verbatim (result_code: matched | close_match |
+      // not_matched | cannot_be_checked, plus any suggested actual name).
+      return jsonResponse({ ok: true, ...out });
     }
 
     case 'sync-now': {

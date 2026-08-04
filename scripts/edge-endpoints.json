@@ -9880,7 +9880,7 @@
     "name": "revolut-api",
     "tag": "Finance",
     "summary": "Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync",
-    "description": "#315. Actions on one POST surface: init (mint RSA keypair server-side; private key never leaves the server), authorize-url (Revolut consent URL), oauth-complete (exchange the auth code via JWT client assertion), register-webhook (webhooks v2 subscription + signing secret), accounts (live Revolut accounts + finance_bank_accounts mapping), map-account (link a Revolut currency pocket to a bank account row), sync-now (shared sync core for this workspace), disconnect. Caller must be a finance manager of the target workspace (RLS-checked; 404 on mismatch) and the workspace must be entitled to banking-revolut (402 otherwise).",
+    "description": "#315. Actions on one POST surface: init (mint RSA keypair server-side; private key never leaves the server), authorize-url (Revolut consent URL), oauth-complete (exchange the auth code via JWT client assertion), register-webhook (webhooks v2 subscription + signing secret), accounts (live Revolut accounts + finance_bank_accounts mapping), map-account (link a Revolut currency pocket to a bank account row), sync-now (shared sync core for this workspace), disconnect. Caller must be a finance manager of the target workspace (RLS-checked; 404 on mismatch) and the workspace must be entitled to banking-revolut (402 otherwise). validate-account-name proxies Revolut CoP/VoP so the CRM bank area can confirm an IBAN belongs to the named counterparty; map-account auto-fills the finance row IBAN/BIC from /accounts/{id}/bank-details when empty.",
     "security": [
       "supabaseJwt"
     ],
@@ -9893,7 +9893,7 @@
         "name": "action",
         "type": "string",
         "required": true,
-        "desc": "init | authorize-url | oauth-complete | register-webhook | accounts | map-account | sync-now | disconnect"
+        "desc": "init | authorize-url | oauth-complete | register-webhook | accounts | map-account | validate-account-name | sync-now | disconnect"
       },
       {
         "name": "workspace_id",
@@ -9930,6 +9930,18 @@
         "type": "uuid | null",
         "required": false,
         "desc": "map-account only. finance_bank_accounts row to link, or null to unlink."
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": false,
+        "desc": "validate-account-name only. The holder name to check (company by default; company=false splits into first/last)."
+      },
+      {
+        "name": "iban",
+        "type": "string",
+        "required": false,
+        "desc": "validate-account-name only. IBAN to check (or account_no + sort_code)."
       }
     ],
     "response": "{ok: true, ...action-specific fields (public_key, url, accounts, fetched/upserted)}"

@@ -60,6 +60,13 @@ export interface CreateSheetParams {
   initial_data?: Record<string, any>;
   auto_enhance?: boolean;
   auto_render?: boolean;
+  /**
+   * Project room this sheet documents. Provenance only — the backdrop is copied
+   * into initial_data by the caller. Still verified against the caller's own
+   * access before being stored, because a body-supplied id is never trusted
+   * (security invariant 1), even when nothing later reads it back.
+   */
+  room_id?: string | null;
 }
 
 export type CreateSheetResult =
@@ -96,6 +103,23 @@ export async function createSheet(
   if (mbError || !moodboard) return { ok: false, status: 404, error: 'Moodboard not found' };
   if ((moodboard as any).user_id !== userId) {
     return { ok: false, status: 403, error: 'Not authorized for this moodboard' };
+  }
+
+  // 1a. room_id is caller-supplied, so verify the caller actually owns the
+  //     project that room belongs to before storing it. Nothing later resolves
+  //     this id server-side, but an unverified foreign id on a tenant row is the
+  //     shape security invariant 1 exists to stop — and it would leak room
+  //     existence through a foreign-key error otherwise. Silently dropped rather
+  //     than 403'd: it is provenance metadata, not the point of the request.
+  let safeRoomId: string | null = null;
+  if (params.room_id) {
+    const { data: room } = await supabase
+      .from('project_rooms')
+      .select('id, project:projects!inner(user_id)')
+      .eq('id', params.room_id)
+      .maybeSingle();
+    if (room && (room as any).project?.user_id === userId) safeRoomId = params.room_id;
+    else console.warn(`[createSheet] dropping room_id ${params.room_id} — not owned by ${userId}`);
   }
 
   // 1b. Auto-enhance — fill sensible defaults from the moodboard BEFORE validation.
@@ -155,6 +179,7 @@ export async function createSheet(
       credits_used: creditCost,
       status: 'draft',
       created_by: userId,
+      room_id: safeRoomId,
     })
     .select('id')
     .single();

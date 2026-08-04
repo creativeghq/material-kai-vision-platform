@@ -92,6 +92,9 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
   const [rectH, setRectH] = useState('');
   const [elevationUrl, setElevationUrl] = useState('');
   const [includedSheetIds, setIncludedSheetIds] = useState<string[]>([]);
+  /** Rooms of the moodboard's project that already have dimensions to borrow. */
+  const [sizedRooms, setSizedRooms] = useState<Array<{ id: string; name: string; width_mm: number | null; length_mm: number | null }>>([]);
+  const [roomId, setRoomId] = useState<string | null>(null);
 
   // Which steps apply, in order.
   const steps = useMemo(() => {
@@ -114,7 +117,31 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
     setProductIds([]); setImageUrls([]); setQuoteId(''); setHeroUrl(''); setPlanUrl(''); setSubtitle('');
     setBackdropKind('upload'); setBackdropUrl(''); setRectW(''); setRectH('');
     setElevationUrl(''); setIncludedSheetIds([]);
+    setSizedRooms([]); setRoomId(null);
   }, [open, presetType, presetMoodboardId]);
+
+  // Rooms of the moodboard's project that carry dimensions. Only sized rooms are
+  // offered — a room with no width/length has nothing to lend, and picking one
+  // would leave the plan unscaled while looking like it had been configured.
+  useEffect(() => {
+    if (!open || !moodboardId) { setSizedRooms([]); return; }
+    let cancelled = false;
+    void (async () => {
+      const { data: mb } = await supabase
+        .from('moodboards').select('project_id').eq('id', moodboardId).maybeSingle();
+      const projectId = (mb as any)?.project_id;
+      if (!projectId) { if (!cancelled) setSizedRooms([]); return; }
+      const { data: rooms } = await supabase
+        .from('project_rooms')
+        .select('id, name, width_mm, length_mm')
+        .eq('project_id', projectId)
+        .not('width_mm', 'is', null)
+        .not('length_mm', 'is', null)
+        .order('sort_order');
+      if (!cancelled) setSizedRooms((rooms ?? []) as any);
+    })();
+    return () => { cancelled = true; };
+  }, [open, moodboardId]);
 
   // Load the user's moodboards (only when the moodboard step is in play).
   useEffect(() => {
@@ -255,6 +282,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
         sheet_type: type,
         title: title || SHEET_TYPE_LABELS[type],
         initial_data: built.data,
+        room_id: roomId,
       });
       onCreated?.({
         sheet_id: res.sheet_id,
@@ -398,17 +426,49 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
 
             {!loadingData && (type === 'lighting_plan' || type === 'plumbing_plan' || type === 'electrical_plan') && (
               <div className="space-y-2">
+                {/* A room that already has dimensions is the best backdrop
+                    available: it carries a real scale, which is what makes run
+                    lengths and the voltage-drop checks computable at all. */}
+                {sizedRooms.length > 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Use a project room</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {sizedRooms.map((r) => (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => {
+                            setRoomId(r.id);
+                            setBackdropKind('rect');
+                            setRectW(String(r.width_mm));
+                            setRectH(String(r.length_mm));
+                          }}
+                          className={`px-2.5 py-1 rounded-full border text-xs ${
+                            roomId === r.id ? 'border-primary text-foreground' : 'border-white/15 text-muted-foreground'
+                          }`}
+                        >
+                          {r.name} · {(r.width_mm! / 1000).toFixed(1)}×{(r.length_mm! / 1000).toFixed(1)} m
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-2">
-                  <Button type="button" size="sm" variant={backdropKind === 'upload' ? 'default' : 'outline'} onClick={() => setBackdropKind('upload')}>Floor-plan image</Button>
+                  <Button type="button" size="sm" variant={backdropKind === 'upload' ? 'default' : 'outline'} onClick={() => { setBackdropKind('upload'); setRoomId(null); }}>Floor-plan image</Button>
                   <Button type="button" size="sm" variant={backdropKind === 'rect' ? 'default' : 'outline'} onClick={() => setBackdropKind('rect')}>Blank room (mm)</Button>
                 </div>
                 {backdropKind === 'upload'
                   ? <ImagePick label="Floor plan" value={backdropUrl} onChange={setBackdropUrl} items={items} onUpload={uploadImage} />
                   : <div className="grid grid-cols-2 gap-2">
-                      <div><Label className="text-xs">Width (mm)</Label><Input type="number" value={rectW} onChange={(e) => setRectW(e.target.value)} placeholder="e.g. 3000" /></div>
-                      <div><Label className="text-xs">Height (mm)</Label><Input type="number" value={rectH} onChange={(e) => setRectH(e.target.value)} placeholder="e.g. 2400" /></div>
+                      <div><Label className="text-xs">Width (mm)</Label><Input type="number" value={rectW} onChange={(e) => { setRectW(e.target.value); setRoomId(null); }} placeholder="e.g. 3000" /></div>
+                      <div><Label className="text-xs">Height (mm)</Label><Input type="number" value={rectH} onChange={(e) => { setRectH(e.target.value); setRoomId(null); }} placeholder="e.g. 2400" /></div>
                     </div>}
-                <p className="text-[11px] text-muted-foreground">You'll place the symbols on the canvas after this.</p>
+                <p className="text-[11px] text-muted-foreground">
+                  You'll place the symbols on the canvas after this.
+                  {backdropKind === 'upload'
+                    ? ' An uploaded image carries no scale, so run lengths and voltage-drop checks stay blank.'
+                    : ' Dimensions give the plan a real scale, so run lengths and voltage-drop checks compute.'}
+                </p>
               </div>
             )}
 

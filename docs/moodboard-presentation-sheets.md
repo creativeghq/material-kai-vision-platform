@@ -257,6 +257,10 @@ Backdrop has two modes:
 
 **Scale is not part of the sheet.** A backdrop is a raster with no inherent scale, and an AI-generated plan's printed dimension callouts are decorative. Measurable geometry lives on the *room* (`project_rooms.plan_geometry`, calibrated by [PlanCalibrationCanvas](../src/components/features/plans/PlanCalibrationCanvas.tsx)) — see [planGeometry.ts](../src/utils/planGeometry.ts).
 
+**Borrowing a room's scale.** The wizard offers any room of the moodboard's project that already has `width_mm`/`length_mm`, and picking one copies those into a `rect` backdrop and records `room_id` on the sheet. That copy is the whole design: `room_id` is **provenance only**, never resolved server-side. Having the PDF function look up a body-supplied room with the service-role client would be precisely the "trust an id from the request" shape security invariant 1 forbids. `createSheet` still verifies the caller owns that room's project before storing the id, and drops it otherwise; `ON DELETE SET NULL` means deleting a room never deletes the drawing made of it. Pinned by [sheetTypeCoverage.test.ts](../tests/unit/sheetTypeCoverage.test.ts).
+
+Only *sized* rooms are offered — a room with no dimensions has nothing to lend, and picking one would leave the plan unscaled while looking configured.
+
 #### `SheetCanvasCard.tsx` — chat dispatcher
 
 Receives `{sheet_id, sheet_type, moodboard_id, initial_data, title}` from the `sheet_canvas_open` chunk. Mounts the appropriate canvas widget. When the canvas calls `onPdfReady(url)`, the card swaps to `SheetPreviewCard` in place.

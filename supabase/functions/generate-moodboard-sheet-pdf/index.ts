@@ -108,6 +108,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       user_id?: string;
       auto_enhance?: boolean;
       auto_render?: boolean;
+      room_id?: string | null;
     };
 
     // Project-level Client View deck — assembled from sheets across any of the
@@ -143,6 +144,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
         initial_data: body.initial_data,
         auto_enhance: body.auto_enhance,
         auto_render: body.auto_render,
+        room_id: body.room_id ?? null,
       });
       if (!created.ok) {
         return jsonResponse(
