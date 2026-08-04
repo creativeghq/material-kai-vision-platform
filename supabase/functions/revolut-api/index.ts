@@ -111,7 +111,16 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       if (!code) throw new HttpError(400, 'code is required');
       const cfg = await requireConfig(service, workspaceId);
       if (!cfg.oauth_redirect_uri) throw new HttpError(400, 'run init first');
-      await exchangeAuthCode(service, cfg, code, issuerDomainFrom(cfg.oauth_redirect_uri));
+      // Idempotent against callback double-fire: if a parallel exchange already landed
+      // tokens, this duplicate must not surface an error for an already-good connection.
+      if (cfg.refresh_token && cfg.connected_at) return jsonResponse({ ok: true, already: true });
+      try {
+        await exchangeAuthCode(service, cfg, code, issuerDomainFrom(cfg.oauth_redirect_uri));
+      } catch (err) {
+        const fresh = await resolveRevolutConfig(service, workspaceId);
+        if (fresh?.refresh_token) return jsonResponse({ ok: true, already: true });
+        throw err;
+      }
       return jsonResponse({ ok: true });
     }
 

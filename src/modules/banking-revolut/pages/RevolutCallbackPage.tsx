@@ -14,16 +14,29 @@ import { callRevolutApi } from '../services/revolutConfigService';
 
 const SETTINGS_PATH = '/admin/modules/banking-revolut/settings';
 
+// MODULE-level guard, not a ref: remounts (auth/workspace context settling, router
+// re-renders) create fresh component instances whose refs all start false, and two
+// exchanges of the same single-use code burn it — observed live as paired POSTs 82ms
+// apart, both 500. A code that has been sent once must never be sent again.
+const consumedCodes = new Set<string>();
+
 export const RevolutCallbackPage: React.FC = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
   const [error, setError] = useState<string | null>(null);
+  const [waitingLong, setWaitingLong] = useState(false);
   const ran = useRef(false);
 
   useEffect(() => {
-    // React 18 StrictMode double-mounts effects; the code is single-use, so guard it.
-    if (ran.current || !activeWorkspaceId) return;
+    // No session/workspace yet → we cannot exchange. Don't spin forever looking alive:
+    // after 8s tell the operator what's wrong (usually: consent opened in a browser
+    // that isn't logged into the app).
+    if (!activeWorkspaceId) {
+      const t = setTimeout(() => setWaitingLong(true), 8000);
+      return () => clearTimeout(t);
+    }
+    if (ran.current) return;
     ran.current = true;
 
     const code = params.get('code');
@@ -31,6 +44,8 @@ export const RevolutCallbackPage: React.FC = () => {
       setError(params.get('error_description') || 'Revolut returned no authorisation code.');
       return;
     }
+    if (consumedCodes.has(code)) return; // another instance is already exchanging it
+    consumedCodes.add(code);
 
     void (async () => {
       try {
@@ -51,6 +66,17 @@ export const RevolutCallbackPage: React.FC = () => {
           {error ? (
             <>
               <p className="text-destructive">Revolut connection failed: {error}</p>
+              <button className="text-primary underline" onClick={() => navigate(SETTINGS_PATH)}>
+                Back to settings
+              </button>
+            </>
+          ) : waitingLong ? (
+            <>
+              <p className="text-muted-foreground">
+                Waiting for your workspace session… If this doesn&apos;t resolve, you are probably
+                not logged in <em>in this browser</em>. Log in at app.materialshub.gr, then restart
+                the connection from the Revolut card (the code in this page has expired).
+              </p>
               <button className="text-primary underline" onClick={() => navigate(SETTINGS_PATH)}>
                 Back to settings
               </button>
