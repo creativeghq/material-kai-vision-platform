@@ -165,9 +165,10 @@ export function PlanCalibrationCanvas({
 
       <div className="flex items-end gap-2 flex-wrap">
         <div className="flex-1 min-w-[140px]">
-          <label className="text-xs text-muted-foreground mb-1 block">Real length of that line</label>
+          <label htmlFor="plan-calibration-length" className="text-xs text-muted-foreground mb-1 block">Real length of that line</label>
           <div className="flex items-center gap-1">
             <Input
+              id="plan-calibration-length"
               value={lengthInput}
               onChange={(e) => setLengthInput(e.target.value)}
               placeholder={unit === 'mm' ? 'e.g. 4000' : 'e.g. 4'}
