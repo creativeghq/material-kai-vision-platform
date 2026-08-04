@@ -584,6 +584,13 @@ All colors MUST be HSL.
     border-color: hsl(var(--border));
   }
 
+  html {
+    /* Reserve the scrollbar gutter permanently: without it, the bar popping in/out as
+       async content loads (login → dashboard) shifts the whole layout ~15px — the
+       "page blinks and changes width" effect. */
+    scrollbar-gutter: stable;
+  }
+
   body {
     @apply bg-background text-foreground;
     background-attachment: fixed;

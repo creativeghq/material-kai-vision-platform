@@ -12,7 +12,9 @@ import { Card, CardContent } from '@/components/core/ui/card';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { callRevolutApi } from '../services/revolutConfigService';
 
-const SETTINGS_PATH = '/admin/modules/banking-revolut/settings';
+// Land back on Profile → Keys — the per-workspace BYOK home where the card lives.
+// (The /admin/modules page renders the same card but is operator-flavoured surface.)
+const SETTINGS_PATH = '/profile?tab=keys';
 
 // MODULE-level guard, not a ref: remounts (auth/workspace context settling, router
 // re-renders) create fresh component instances whose refs all start false, and two

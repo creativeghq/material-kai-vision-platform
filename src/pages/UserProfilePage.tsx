@@ -47,8 +47,13 @@ export const UserProfilePage: React.FC = () => {
   }, [searchParams]);
 
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    setSearchParams(tab === 'profile' ? {} : { tab });
+    // Heavy tab trees (several cards, each with its own fetch) block the paint on first
+    // activation — mark the switch as a transition so the click responds instantly and
+    // the content streams in behind it.
+    React.startTransition(() => {
+      setActiveTab(tab);
+      setSearchParams(tab === 'profile' ? {} : { tab });
+    });
   };
 
   return (
