@@ -197,7 +197,7 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
           {status.has_keypair && status.public_key ? (
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">
-                Add this public key in Revolut dashboard → Settings → API, with redirect URI{' '}
+                Add this certificate in Revolut dashboard → Settings → API, with redirect URI{' '}
                 <code className="text-xs">{status.oauth_redirect_uri}</code>
                 <Button variant="ghost" size="sm" className="ml-1 h-6 px-2" onClick={() => copy(status.oauth_redirect_uri ?? '', 'Redirect URI')}>
                   <Copy className="h-3 w-3" />
@@ -205,7 +205,7 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
               </p>
               <div className="flex items-start gap-2">
                 <pre className="max-h-24 flex-1 overflow-auto rounded-md bg-muted p-2 text-[10px] leading-tight">{status.public_key}</pre>
-                <Button variant="outline" size="sm" onClick={() => copy(status.public_key ?? '', 'Public key')}>
+                <Button variant="outline" size="sm" onClick={() => copy(status.public_key ?? '', 'Certificate')}>
                   <Copy className="mr-1 h-3 w-3" /> Copy
                 </Button>
               </div>

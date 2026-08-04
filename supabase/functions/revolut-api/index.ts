@@ -80,7 +80,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         // Revolut dashboard; the UI passes force=true after an explicit confirmation.
         throw new HttpError(400, 'keypair already exists — pass force=true to regenerate');
       }
-      const pair = await generateRevolutKeypair();
+      const pair = await generateRevolutKeypair(issuerDomainFrom(redirectUri));
       const { error } = await service.from('workspace_revolut_config').upsert({
         workspace_id: workspaceId,
         public_key: pair.publicKey,

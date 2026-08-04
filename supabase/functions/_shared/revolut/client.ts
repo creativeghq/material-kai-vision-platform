@@ -87,16 +87,34 @@ function pemToDer(pem: string): Uint8Array {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 }
 
-/** Mint the workspace's RSA-2048 signing pair. Private = PKCS#8 PEM, public = SPKI PEM. */
-export async function generateRevolutKeypair(): Promise<{ publicKey: string; privateKey: string }> {
+/**
+ * Mint the workspace's RSA-2048 signing pair. Private = PKCS#8 PEM; public side is a
+ * self-signed **X.509 certificate** — Revolut's dashboard rejects a bare SPKI public
+ * key ("invalid public key"), it wants the key wrapped in a certificate.
+ * `cnDomain` becomes the certificate CN (we pass the redirect URI's domain).
+ */
+export async function generateRevolutKeypair(cnDomain: string): Promise<{ publicKey: string; privateKey: string }> {
   const pair = await crypto.subtle.generateKey(
     { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
     true,
     ['sign', 'verify'],
-  );
+  ) as CryptoKeyPair;
   const priv = await crypto.subtle.exportKey('pkcs8', pair.privateKey);
-  const pub = await crypto.subtle.exportKey('spki', pair.publicKey);
-  return { publicKey: toPem(pub, 'PUBLIC KEY'), privateKey: toPem(priv, 'PRIVATE KEY') };
+
+  const x509 = await import('@peculiar/x509');
+  x509.cryptoProvider.set(crypto);
+  const serial = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+    .map((b) => b.toString(16).padStart(2, '0')).join('');
+  const cert = await x509.X509CertificateGenerator.createSelfSigned({
+    serialNumber: serial,
+    name: `CN=${cnDomain.replace(/[^A-Za-z0-9.-]/g, '')}`,
+    notBefore: new Date(),
+    notAfter: new Date(Date.now() + 5 * 365 * 24 * 3600 * 1000),
+    keys: pair,
+    signingAlgorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+  });
+
+  return { publicKey: cert.toString('pem'), privateKey: toPem(priv, 'PRIVATE KEY') };
 }
 
 // ---------------------------------------------------------------------------
