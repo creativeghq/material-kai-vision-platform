@@ -26,7 +26,9 @@ Shipped 2026-05-02. The 9th type (`area_breakdown`) and **Project Client Views**
 | `material_board` | 0 cr | No | `product_ids[]` (cap 8). Optional `chip_descriptions{product_id: text}` to override product description text. |
 | `color_palette` | 0 cr | No | `swatches[{hex, name, source_image_id?}]` (cap 8). |
 | `concept_board` | 0 cr | No | `layout[{image_url, caption?}]` (cap 6). |
-| `lighting_plan` | 3 cr | Yes | `backdrop` (`{kind: 'upload'\|'rect', image_url? OR width_mm/height_mm}`), `symbols[{type, x, y, label?}]` (normalized 0..1), `legend[{symbol_type, label}]`. |
+| `lighting_plan` | 3 cr | Yes | `backdrop` (`{kind: 'upload'\|'rect', image_url? OR width_mm/height_mm}`), `symbols[{id?, type, x, y, label?, product_id?}]` (normalized 0..1), `legend[{symbol_type, label}]`. |
+| `plumbing_plan` | 3 cr | Yes | Same shape as `lighting_plan`; symbol types are `wc / basin / bath / shower / floor_drain / water_supply / waste / water_heater / mixer`. |
+| `electrical_plan` | 3 cr | Yes | Same shape as `lighting_plan`; IEC 60617-style types `socket / socket_double / switch_1way / switch_2way / dimmer / distribution_board / data_outlet / tv_outlet / dedicated_point / junction_box / earth_point`. **Added 2026-08-04.** |
 | `annotated_render` | 3 cr | Yes | `backdrop_image_url`, `annotations[{x, y, line_endpoint_x, line_endpoint_y, label, product_id?, source: 'ai'\|'manual'\|'auto'}]`. |
 | `elevation_render_pair` | 2 cr | Yes | `elevation_image_url`, `render_image_url?`, `dimensions[{x1,y1,x2,y2,value,unit}]`, `tile_callouts[{x,y,label}]`. |
 | `ffe_schedule` | 0 cr | No | `quote_id` (preferred — pulls items from `quote_items`) OR explicit `items[{room, name, dimensions, install, delivery, qty, price?}]`. |
@@ -230,13 +232,23 @@ Two modes:
 
 Both render as SVG overlays on top of `AnnotationLayer`. Dimensions show the value+unit at the midpoint with a white stroke for legibility on busy elevations. The render image (bottom half of the PDF) is uploaded separately and not annotated.
 
-#### `FixtureSymbolCanvas.tsx` — for `lighting_plan`
+#### `FixtureSymbolCanvas.tsx` — for `lighting_plan`, `plumbing_plan`, `electrical_plan`
 
-Fixture palette at the top (Recessed ⊕ / Pendant ● / Wall ◐ / Spot ◇ / LED Strip ▬ / Floor / Table). User picks a type, then clicks anywhere on the backdrop to drop a symbol. Symbols draggable. When the first symbol of a new type is placed, a legend entry auto-populates (label is editable in the side panel).
+One widget, three palettes, injected via the `fixtureDefs` prop (`LIGHTING_` / `PLUMBING_` / `ELECTRICAL_FIXTURE_DEFS`). Each palette's types must stay in sync with its PDF drawer (`drawFixtureSymbol` / `drawPlumbingSymbol` / `drawElectricalSymbol`) — guarded by [tests/unit/sheetTypeCoverage.test.ts](../tests/unit/sheetTypeCoverage.test.ts), because a drifted type renders as a default circle in the PDF and is visible only by opening the file.
+
+**Two modes, because a click cannot mean two things.**
+- **Place** — pick a type, click the backdrop to drop a symbol; drag to move.
+- **Select** — click a symbol to open its properties: a label, and the catalog **product** it represents. A linked symbol shows a green dot, so "which of these 40 sockets still needs a product?" doesn't mean clicking every one.
+
+**Symbols carry a stable `id`** (`newSymbolId()`, backfilled on load by `ensureSymbolIds()`). They used to be addressed by array index, which breaks as soon as one is deleted — and connectivity (runs / circuits) has to reference *which* symbols it joins.
+
+**`product_id` produces the SCHEDULE.** `buildSymbolPlan` counts symbols per linked product and renders a quantity take-off under the legend, plus an explicit "N symbols not linked to a product" line — a truncated or partial schedule must never read as a complete one. Chips are resolved through the caller's workspace-scoped `fetchProductChips`, so a stray `product_id` cannot pull in another tenant's catalog row.
 
 Backdrop has two modes:
 - `kind: 'upload'` — uploaded floor plan image via `AnnotationLayer`.
 - `kind: 'rect'` — plain rectangle drawn from typed `width_mm/height_mm`. Same pointer math, no image.
+
+**Scale is not part of the sheet.** A backdrop is a raster with no inherent scale, and an AI-generated plan's printed dimension callouts are decorative. Measurable geometry lives on the *room* (`project_rooms.plan_geometry`, calibrated by [PlanCalibrationCanvas](../src/components/features/plans/PlanCalibrationCanvas.tsx)) — see [planGeometry.ts](../src/utils/planGeometry.ts).
 
 #### `SheetCanvasCard.tsx` — chat dispatcher
 

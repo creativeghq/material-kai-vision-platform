@@ -297,6 +297,11 @@ type SymbolPlanPayload = {
   backdrop?: { kind: 'upload' | 'rect'; image_url?: string; width_mm?: number; height_mm?: number };
   symbols: FixtureSymbolData[];
   legend: { symbol_type: string; label: string }[];
+  /**
+   * Catalog products linked to symbols, already workspace-scoped by the caller.
+   * Drives the SCHEDULE block — the quantity take-off the plan implies.
+   */
+  chips?: ProductChip[];
 };
 
 type SymbolDrawer = (page: PDFPage, fonts: SheetFonts, type: string, cx: number, cy: number, label?: string) => void;
@@ -406,6 +411,57 @@ async function buildSymbolPlan(
       maxWidth: CONTENT_W - planW - 50,
     });
     ly -= 22;
+  }
+
+  // SCHEDULE — the quantity take-off implied by the plan. Counting symbols per
+  // linked product is the whole reason a symbol carries a product_id: the plan
+  // stops being a picture and becomes something you can order from.
+  const chips = payload.chips ?? [];
+  if (chips.length > 0) {
+    const counts = new Map<string, number>();
+    for (const s of payload.symbols || []) {
+      if (s.product_id) counts.set(s.product_id, (counts.get(s.product_id) ?? 0) + 1);
+    }
+    // Only chips that are actually placed, most-used first so the big-ticket
+    // lines are visible even if the column runs out of room.
+    const rows = chips
+      .map((c) => ({ chip: c, qty: counts.get(c.product_id) ?? 0 }))
+      .filter((r) => r.qty > 0)
+      .sort((a, b) => b.qty - a.qty);
+
+    if (rows.length > 0) {
+      ly -= 10;
+      page.drawText('SCHEDULE', {
+        x: legendX, y: ly, size: 11, font: fonts.bold, color: COLOR_DARK,
+      });
+      ly -= 18;
+      const shown = rows.slice(0, 14);
+      for (const { chip, qty } of shown) {
+        page.drawText(`${qty}×`, {
+          x: legendX, y: ly, size: 9, font: fonts.bold, color: COLOR_DARK,
+        });
+        page.drawText(truncate(chip.name, 26), {
+          x: legendX + 22, y: ly,
+          size: 9, font: fonts.regular, color: COLOR_DARK,
+          maxWidth: CONTENT_W - planW - 40,
+        });
+        ly -= 15;
+      }
+      // Never let a truncated schedule read as a complete one — an omitted line
+      // is a missing order, so say so on the drawing itself.
+      if (rows.length > shown.length) {
+        page.drawText(`+ ${rows.length - shown.length} more not shown`, {
+          x: legendX, y: ly, size: 7, font: fonts.regular, color: COLOR_GRAY,
+        });
+        ly -= 13;
+      }
+      const unlinked = (payload.symbols || []).filter((s) => !s.product_id).length;
+      if (unlinked > 0) {
+        page.drawText(`${unlinked} symbol${unlinked === 1 ? '' : 's'} not linked to a product`, {
+          x: legendX, y: ly, size: 7, font: fonts.regular, color: COLOR_GRAY,
+        });
+      }
+    }
   }
 
   drawTitleBlock(page, fonts, td);
@@ -1261,26 +1317,25 @@ export async function buildSheetForDeck(
       await buildConceptBoard(pdfDoc, fonts, td, sheet.data.layout || []);
       break;
     case 'lighting_plan':
-      await buildLightingPlan(pdfDoc, fonts, td, {
-        backdrop: sheet.data.backdrop,
-        symbols: sheet.data.symbols || [],
-        legend: sheet.data.legend || [],
-      });
-      break;
     case 'plumbing_plan':
-      await buildPlumbingPlan(pdfDoc, fonts, td, {
+    case 'electrical_plan': {
+      const symbols: FixtureSymbolData[] = sheet.data.symbols || [];
+      // resolveChips is the caller's workspace-scoped fetcher — same guard as
+      // material_board, so a stray product_id cannot pull in another tenant's row.
+      const ids = [...new Set(
+        symbols.map((s) => s.product_id).filter((x): x is string => !!x),
+      )];
+      const payload = {
         backdrop: sheet.data.backdrop,
-        symbols: sheet.data.symbols || [],
+        symbols,
         legend: sheet.data.legend || [],
-      });
+        chips: ids.length ? await resolveChips(ids) : [],
+      };
+      if (sheet.sheet_type === 'lighting_plan') await buildLightingPlan(pdfDoc, fonts, td, payload);
+      else if (sheet.sheet_type === 'plumbing_plan') await buildPlumbingPlan(pdfDoc, fonts, td, payload);
+      else await buildElectricalPlan(pdfDoc, fonts, td, payload);
       break;
-    case 'electrical_plan':
-      await buildElectricalPlan(pdfDoc, fonts, td, {
-        backdrop: sheet.data.backdrop,
-        symbols: sheet.data.symbols || [],
-        legend: sheet.data.legend || [],
-      });
-      break;
+    }
     case 'annotated_render': {
       const ids: string[] = (sheet.data.annotations || [])
         .map((a: AnnotationData) => a.product_id)

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Trash2, Save, Lightbulb } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Trash2, Save, Lightbulb, X, Package } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { AnnotationLayer } from './AnnotationLayer';
 import { moodboardSheetsService } from '@/services/moodboardSheetsService';
+import { supabase } from '@/integrations/supabase/client';
 import { LivePreviewPanel } from './LivePreviewPanel';
 
 /**
@@ -65,10 +66,35 @@ export const ELECTRICAL_FIXTURE_DEFS: FixtureDef[] = [
 ];
 
 export interface FixtureSymbol {
+  /**
+   * Stable identity. Symbols used to be addressed by array index, which breaks
+   * the moment one is deleted — and a run/circuit in Phase 3 has to reference
+   * WHICH symbols it connects. Legacy sheets have no id; ensureSymbolIds()
+   * assigns one on load so old plans keep working.
+   */
+  id?: string;
   type: string;
   x: number;
   y: number;
   label?: string;
+  /**
+   * Linked catalog product. This is what turns a plan into a bill of materials:
+   * the symbol stops being an anonymous glyph and becomes a real product with a
+   * price, a supplier and a lead time.
+   */
+  product_id?: string;
+}
+
+let symbolSeq = 0;
+/** Collision-resistant enough for ids that only need to be unique within one sheet. */
+export function newSymbolId(): string {
+  symbolSeq += 1;
+  return `s${Date.now().toString(36)}${symbolSeq.toString(36)}`;
+}
+
+/** Backfill ids for symbols saved before they had one. */
+export function ensureSymbolIds(symbols: FixtureSymbol[]): FixtureSymbol[] {
+  return symbols.map((s) => (s.id ? s : { ...s, id: newSymbolId() }));
 }
 
 export interface LegendEntry {
@@ -98,16 +124,29 @@ export function FixtureSymbolCanvas({
   onPdfReady,
 }: FixtureSymbolCanvasProps) {
   const FIXTURE_DEFS = fixtureDefs;
-  const [symbols, setSymbols] = useState<FixtureSymbol[]>(initialSymbols);
+  const [symbols, setSymbols] = useState<FixtureSymbol[]>(() => ensureSymbolIds(initialSymbols));
   const [legend, setLegend] = useState<LegendEntry[]>(initialLegend);
   const [activeType, setActiveType] = useState<string>(fixtureDefs[0]?.type ?? 'recessed');
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Click means "drop a symbol" in place mode and "pick one" in select mode —
+  // it cannot mean both, so the mode is explicit rather than inferred.
+  const [mode, setMode] = useState<'place' | 'select'>('place');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const selected = symbols.find((s) => s.id === selectedId) ?? null;
+
+  const patchSelected = (patch: Partial<FixtureSymbol>) => {
+    setSymbols((arr) => arr.map((s) => (s.id === selectedId ? { ...s, ...patch } : s)));
+  };
 
   const handlePointerDown = (p: { x: number; y: number }) => {
     if (draggingIdx !== null) return;
-    setSymbols((arr) => [...arr, { type: activeType, x: p.x, y: p.y }]);
+    // In select mode a click on empty canvas clears the selection rather than
+    // silently adding a symbol the user did not ask for.
+    if (mode === 'select') { setSelectedId(null); return; }
+    setSymbols((arr) => [...arr, { id: newSymbolId(), type: activeType, x: p.x, y: p.y }]);
     // Auto-add legend entry for new types
     if (!legend.find((l) => l.symbol_type === activeType)) {
       const def = FIXTURE_DEFS.find((d) => d.type === activeType);
@@ -122,6 +161,8 @@ export function FixtureSymbolCanvas({
 
   const handleSymbolPointerDown = (idx: number) => (e: React.PointerEvent) => {
     e.stopPropagation();
+    setSelectedId(symbols[idx]?.id ?? null);
+    if (mode === 'select') return; // select-mode clicks pick, they don't drag
     setDraggingIdx(idx);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
@@ -131,7 +172,10 @@ export function FixtureSymbolCanvas({
   };
 
   const removeSymbol = (idx: number) => {
-    setSymbols((arr) => arr.filter((_, i) => i !== idx));
+    setSymbols((arr) => {
+      if (arr[idx]?.id === selectedId) setSelectedId(null);
+      return arr.filter((_, i) => i !== idx);
+    });
   };
 
   const updateLegendLabel = (idx: number, label: string) => {
@@ -165,8 +209,27 @@ export function FixtureSymbolCanvas({
 
   return (
     <div className="space-y-3">
+      {/* Mode: click places, or click selects. Never both. */}
+      <div className="flex items-center gap-1 text-xs">
+        <div className="flex rounded-full border border-white/15 overflow-hidden">
+          {(['place', 'select'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => { setMode(m); if (m === 'place') setSelectedId(null); }}
+              className={`px-3 py-1 capitalize ${mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+        <span className="text-muted-foreground ml-1">
+          {mode === 'place' ? 'Click the plan to drop a symbol; drag to move.' : 'Click a symbol to link a product.'}
+        </span>
+      </div>
+
       {/* Fixture palette */}
-      <div className="flex items-center gap-1 flex-wrap text-xs">
+      <div className={`flex items-center gap-1 flex-wrap text-xs ${mode === 'select' ? 'opacity-40 pointer-events-none' : ''}`}>
         <PaletteIcon className="h-3.5 w-3.5 mr-1" />
         {FIXTURE_DEFS.map((def) => (
           <button
@@ -197,9 +260,10 @@ export function FixtureSymbolCanvas({
             >
               {symbols.map((s, idx) => (
                 <SymbolDot
-                  key={idx}
+                  key={s.id ?? idx}
                   symbol={s}
                   defs={FIXTURE_DEFS}
+                  selected={s.id === selectedId}
                   onPointerDown={handleSymbolPointerDown(idx)}
                 />
               ))}
@@ -233,9 +297,10 @@ export function FixtureSymbolCanvas({
               )}
               {symbols.map((s, idx) => (
                 <SymbolDot
-                  key={idx}
+                  key={s.id ?? idx}
                   symbol={s}
                   defs={FIXTURE_DEFS}
+                  selected={s.id === selectedId}
                   onPointerDown={handleSymbolPointerDown(idx)}
                 />
               ))}
@@ -245,6 +310,14 @@ export function FixtureSymbolCanvas({
 
         {/* Legend + symbol list */}
         <div className="space-y-3 max-h-[460px] overflow-y-auto">
+          {selected && (
+            <SymbolProperties
+              symbol={selected}
+              def={FIXTURE_DEFS.find((d) => d.type === selected.type)}
+              onChange={patchSelected}
+              onClose={() => setSelectedId(null)}
+            />
+          )}
           <div>
             <div className="text-xs font-medium text-muted-foreground mb-1">Legend</div>
             {legend.length === 0 && (
@@ -318,7 +391,12 @@ export function FixtureSymbolCanvas({
   );
 }
 
-function SymbolDot({ symbol, defs, onPointerDown }: { symbol: FixtureSymbol; defs: FixtureDef[]; onPointerDown: (e: React.PointerEvent) => void }) {
+function SymbolDot({ symbol, defs, selected, onPointerDown }: {
+  symbol: FixtureSymbol;
+  defs: FixtureDef[];
+  selected?: boolean;
+  onPointerDown: (e: React.PointerEvent) => void;
+}) {
   const def = defs.find((d) => d.type === symbol.type);
   return (
     <div
@@ -327,9 +405,127 @@ function SymbolDot({ symbol, defs, onPointerDown }: { symbol: FixtureSymbol; def
       style={{ left: `${symbol.x * 100}%`, top: `${symbol.y * 100}%` }}
       onPointerDown={onPointerDown}
     >
-      <span className="w-7 h-7 sm:w-6 sm:h-6 rounded-full bg-white text-black border border-black flex items-center justify-center font-mono text-sm">
+      <span
+        className={`w-7 h-7 sm:w-6 sm:h-6 rounded-full bg-white text-black flex items-center justify-center font-mono text-sm ${
+          selected ? 'ring-2 ring-primary border border-primary' : 'border border-black'
+        }`}
+      >
         {def?.glyph || '•'}
       </span>
+      {/* A linked symbol is visibly different — otherwise "which of these 40
+          sockets still needs a product?" means clicking every one of them. */}
+      {symbol.product_id && (
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-black/40" />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Properties for the selected symbol: a label, and the catalog product it
+ * represents. Linking a product is what lets the sheet produce a bill of
+ * materials rather than a picture of some circles.
+ */
+function SymbolProperties({ symbol, def, onChange, onClose }: {
+  symbol: FixtureSymbol;
+  def?: FixtureDef;
+  onChange: (patch: Partial<FixtureSymbol>) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Array<{ id: string; name: string }>>([]);
+  const [searching, setSearching] = useState(false);
+  const [linkedName, setLinkedName] = useState<string | null>(null);
+  const debounce = useRef<ReturnType<typeof setTimeout>>();
+
+  // Resolve the linked product's name so the panel shows what it is, not a UUID.
+  useEffect(() => {
+    let cancelled = false;
+    if (!symbol.product_id) { setLinkedName(null); return; }
+    void (async () => {
+      const { data } = await supabase.from('products').select('id, name').eq('id', symbol.product_id!).maybeSingle();
+      if (!cancelled) setLinkedName((data as any)?.name ?? 'Unknown product');
+    })();
+    return () => { cancelled = true; };
+  }, [symbol.product_id]);
+
+  useEffect(() => {
+    if (debounce.current) clearTimeout(debounce.current);
+    const term = query.trim();
+    if (!term) { setResults([]); return; }
+    debounce.current = setTimeout(() => {
+      void (async () => {
+        try {
+          setSearching(true);
+          // Escape LIKE wildcards so a product name containing % or _ searches literally.
+          const escaped = term.replace(/[%_]/g, (m) => `\\${m}`);
+          const { data } = await supabase
+            .from('products')
+            .select('id, name')
+            .ilike('name', `%${escaped}%`)
+            .limit(8);
+          setResults(((data ?? []) as any[]).map((p) => ({ id: p.id, name: p.name ?? 'Untitled' })));
+        } finally {
+          setSearching(false);
+        }
+      })();
+    }, 250);
+    return () => { if (debounce.current) clearTimeout(debounce.current); };
+  }, [query]);
+
+  return (
+    <div className="p-2 rounded border border-primary/40 bg-primary/5 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-xs">{def?.glyph || '•'}</span>
+        <span className="text-xs font-medium">{def?.label || symbol.type}</span>
+        <Button variant="ghost" size="icon" className="ml-auto h-6 w-6" onClick={onClose}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      <Input
+        value={symbol.label ?? ''}
+        onChange={(e) => onChange({ label: e.target.value })}
+        placeholder="Label (e.g. above worktop)"
+        className="h-7 text-xs"
+      />
+
+      {symbol.product_id ? (
+        <div className="flex items-center gap-2 text-xs">
+          <Package className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+          <span className="truncate">{linkedName ?? 'Loading…'}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto h-6 w-6"
+            onClick={() => { onChange({ product_id: undefined }); setQuery(''); }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-1">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Link a product…"
+            className="h-7 text-xs"
+          />
+          {searching && <div className="text-[11px] text-muted-foreground px-1">Searching…</div>}
+          {results.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => { onChange({ product_id: r.id }); setQuery(''); setResults([]); }}
+              className="w-full text-left text-xs px-2 py-1 rounded hover:bg-white/10 truncate"
+            >
+              {r.name}
+            </button>
+          ))}
+          {!searching && query.trim() && results.length === 0 && (
+            <div className="text-[11px] text-muted-foreground px-1">No products match.</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

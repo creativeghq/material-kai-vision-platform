@@ -231,6 +231,8 @@ export const createPresentationSheetTool = (
             x: z.number().describe('Normalized 0..1 in backdrop'),
             y: z.number().describe('Normalized 0..1 in backdrop'),
             label: z.string().optional(),
+            product_id: z.string().uuid().optional()
+              .describe('Catalog product this fixture is. Drives the SCHEDULE (quantity take-off) on the sheet.'),
           })).optional().describe('lighting_plan / plumbing_plan / electrical_plan: fixture symbols'),
           legend: z.array(z.object({
             symbol_type: z.string(),

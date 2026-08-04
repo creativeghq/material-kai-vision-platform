@@ -89,10 +89,14 @@ export interface DimensionData {
 }
 
 export interface FixtureSymbolData {
+  /** Stable per-sheet identity. Absent on plans saved before ids existed. */
+  id?: string;
   type: string;
   x: number;
   y: number;
   label?: string;
+  /** Linked catalog product — what turns the plan into a bill of materials. */
+  product_id?: string;
 }
 
 export interface FfeItem {

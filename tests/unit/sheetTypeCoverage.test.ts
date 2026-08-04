@@ -142,6 +142,26 @@ describe('symbol-plan glyph coverage', () => {
     expect(missing, `${defsName} entries with no ${drawerName} branch`).toEqual([]);
   });
 
+  // A symbol's product_id is what produces the SCHEDULE (quantity take-off) on
+  // the rendered sheet. If any leg of that chain is missing the plan still
+  // renders — just silently without a bill of materials, which looks like "this
+  // plan has no products" rather than "the feature is broken".
+  it('the product link survives end to end: canvas → tool schema → PDF schedule', () => {
+    expect(CANVAS, 'FixtureSymbol lost product_id').toMatch(/product_id\?:\s*string/);
+    expect(SHEET_TOOL, 'agent tool cannot set a symbol product_id').toMatch(/product_id:\s*z\.string\(\)/);
+    expect(BUILDERS, 'symbol plan no longer renders a SCHEDULE').toContain("'SCHEDULE'");
+    // The take-off must count placed symbols, not just list resolved chips —
+    // otherwise a product placed 8 times reads as quantity 1.
+    expect(BUILDERS, 'schedule does not count symbols per product').toMatch(/counts\.set\(s\.product_id/);
+  });
+
+  it('symbols carry a stable id, so a run can reference which ones it connects', () => {
+    expect(CANVAS).toMatch(/export function newSymbolId/);
+    expect(CANVAS, 'legacy symbols must be backfilled with ids on load').toMatch(/export function ensureSymbolIds/);
+    // Index-keyed rendering is what made identity unstable in the first place.
+    expect(CANVAS, 'symbols are still keyed by array index').not.toMatch(/key=\{idx\}\s*\n\s*symbol=/);
+  });
+
   it('every placeable symbol type is accepted by the agent tool schema', () => {
     const toolSymbols = arrayMembers(SHEET_TOOL, 'symbols: z\\.array\\(z\\.object\\(\\{\\s*type: z\\.enum\\(');
     const allDefs = [...CANVAS.matchAll(/type:\s*'([a-z_0-9]+)'/g)].map((m) => m[1]);

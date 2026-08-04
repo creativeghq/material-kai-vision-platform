@@ -69,6 +69,7 @@ import { loadFonts } from './layout.ts';
 import type { TitleBlockData } from './layout.ts';
 import type {
   AnnotationData,
+  FixtureSymbolData,
   SheetPdfRequest,
   SheetPdfResponse,
 } from './types.ts';
@@ -268,26 +269,31 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
         await buildConceptBoard(pdfDoc, fonts, td, sheet.data.layout || []);
         break;
       case 'lighting_plan':
-        await buildLightingPlan(pdfDoc, fonts, td, {
-          backdrop: sheet.data.backdrop,
-          symbols: sheet.data.symbols || [],
-          legend: sheet.data.legend || [],
-        });
-        break;
       case 'plumbing_plan':
-        await buildPlumbingPlan(pdfDoc, fonts, td, {
+      case 'electrical_plan': {
+        const symbols = sheet.data.symbols || [];
+        // Workspace-scoped resolve — a symbol could carry any product_id the
+        // client sent, so the schedule must never render a product from another
+        // tenant's catalog.
+        const symbolProductIds = [...new Set(
+          symbols
+            .map((s: FixtureSymbolData) => s.product_id)
+            .filter((x: string | undefined): x is string => !!x),
+        )] as string[];
+        const symbolChips = symbolProductIds.length
+          ? await fetchProductChips(supabase, symbolProductIds, scopeWorkspaceIds)
+          : [];
+        const symbolPayload = {
           backdrop: sheet.data.backdrop,
-          symbols: sheet.data.symbols || [],
+          symbols,
           legend: sheet.data.legend || [],
-        });
+          chips: symbolChips,
+        };
+        if (sheet.sheet_type === 'lighting_plan') await buildLightingPlan(pdfDoc, fonts, td, symbolPayload);
+        else if (sheet.sheet_type === 'plumbing_plan') await buildPlumbingPlan(pdfDoc, fonts, td, symbolPayload);
+        else await buildElectricalPlan(pdfDoc, fonts, td, symbolPayload);
         break;
-      case 'electrical_plan':
-        await buildElectricalPlan(pdfDoc, fonts, td, {
-          backdrop: sheet.data.backdrop,
-          symbols: sheet.data.symbols || [],
-          legend: sheet.data.legend || [],
-        });
-        break;
+      }
       case 'annotated_render': {
         const ids = (sheet.data.annotations || [])
           .map((a: AnnotationData) => a.product_id)

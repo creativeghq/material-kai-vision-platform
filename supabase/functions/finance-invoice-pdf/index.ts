@@ -138,6 +138,55 @@ function fmtMoney(n: any, currency: string, lang: Lang): string {
 }
 
 
+/**
+ * Signed URL for a stored PDF — or null when the object is not actually there.
+ *
+ * A recorded `pdf_storage_path` is bookkeeping, not proof of a file. Objects get
+ * removed out of band: `storage-orphan-cleanup-cron` deleted every payment
+ * receipt on this project while `payments` was missing from
+ * `build_storage_reference_set()`, and the rows kept pointing at them.
+ * `createSignedUrl()` signs a path without checking it resolves, so the cache
+ * branches below were handing back URLs that 404 — a "cached: true" response
+ * that is simply wrong.
+ *
+ * Check the world, not the bookkeeping: probe storage, and let the caller fall
+ * through to a rebuild when the file is gone.
+ */
+// Typed by what the helper actually uses rather than by a SupabaseClient
+// generic: `ReturnType<typeof createClient>` instantiates the generics
+// differently from the client this function builds, and the mismatch is noise
+// with no bearing on the behaviour.
+interface StorageApi {
+  from(bucket: string): {
+    list(
+      path: string,
+      opts: { search?: string; limit?: number },
+    ): Promise<{ data: Array<{ name: string }> | null; error: unknown }>;
+    createSignedUrl(
+      path: string,
+      expiresIn: number,
+    ): Promise<{ data: { signedUrl: string } | null }>;
+  };
+}
+
+async function signedIfPresent(storage: StorageApi, path: string): Promise<string | null> {
+  const slash = path.lastIndexOf('/');
+  const dir = slash === -1 ? '' : path.slice(0, slash);
+  const file = slash === -1 ? path : path.slice(slash + 1);
+  try {
+    const { data: found, error } = await storage
+      .from('pdf-documents')
+      .list(dir, { search: file, limit: 100 });
+    // Fail CLOSED on a list error: treat it as "unknown", not "present". Serving
+    // a dead URL is worse than re-rendering a PDF we already had.
+    if (error || !found?.some((f) => f.name === file)) return null;
+  } catch {
+    return null;
+  }
+  const { data: signed } = await storage.from('pdf-documents').createSignedUrl(path, 60 * 60 * 24 * 7);
+  return signed?.signedUrl ?? null;
+}
+
 Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -191,9 +240,11 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     return json({ error: 'Not authorized for this document' }, 403);
   }
 
+  // Both cache branches below verify the object is REALLY there before claiming a
+  // hit; a missing file falls through and rebuilds rather than returning a dead URL.
   if (!regenerate && row.pdf_storage_path && row.pdf_generation_status === 'completed') {
-    const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(row.pdf_storage_path, 60 * 60 * 24 * 7);
-    return json({ ok: true, pdf_url: signed?.signedUrl, pdf_storage_path: row.pdf_storage_path, cached: true });
+    const url = await signedIfPresent(supabase.storage, row.pdf_storage_path);
+    if (url) return json({ ok: true, pdf_url: url, pdf_storage_path: row.pdf_storage_path, cached: true });
   }
 
   // A payment receipt (απόδειξη είσπραξης) is a proof-of-payment the customer already
@@ -201,9 +252,18 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   // re-render it for a DIFFERENT amount — that would hand the customer a second receipt whose
   // figure no longer matches the one they have. Applying credit no longer mutates payment
   // amounts (it allocates), so this is defense-in-depth: serve the issued copy unchanged.
+  //
+  // Rebuilding a receipt whose FILE has vanished is not that case: the re-render reuses the
+  // stored receipt_number and the row's own amounts, so the customer's copy still matches.
+  // Note this branch deliberately ignores `regenerate` — an issued receipt is never
+  // re-rendered on request, only restored when its file is genuinely absent.
   if (kind === 'payment_receipt' && (row as any).receipt_number && row.pdf_storage_path) {
-    const { data: signed } = await supabase.storage.from('pdf-documents').createSignedUrl(row.pdf_storage_path, 60 * 60 * 24 * 7);
-    return json({ ok: true, pdf_url: signed?.signedUrl, pdf_storage_path: row.pdf_storage_path, cached: true });
+    const url = await signedIfPresent(supabase.storage, row.pdf_storage_path);
+    if (url) return json({ ok: true, pdf_url: url, pdf_storage_path: row.pdf_storage_path, cached: true });
+    console.warn(
+      `[finance-invoice-pdf] receipt ${(row as any).receipt_number} (payment ${docId}) had a stored ` +
+      `path but no file — restoring it under the same number and amount.`,
+    );
   }
 
   try {
