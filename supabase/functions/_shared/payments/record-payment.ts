@@ -66,6 +66,28 @@ function isDuplicate(err: { code?: string; message?: string } | null): boolean {
 }
 
 /**
+ * Default treasury attribution: providers auto-provision a settlement account row
+ * (`finance_bank_accounts.provider_slug` = 'stripe' | 'viva' | 'revolut'), so a payment
+ * whose caller didn't name an account still lands on the provider's own — the running
+ * balances then reflect where the money actually sits without any manual step (#315).
+ */
+async function providerBankAccountId(
+  supabase: any,
+  workspaceId: string,
+  provider: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('finance_bank_accounts')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .eq('provider_slug', provider)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
+/**
  * Does this payment already have its allocation rows?
  *
  * The whole point of asking: the payment insert and the allocation insert are two statements, and
@@ -162,7 +184,7 @@ export async function recordInvoicePayment(
       paid_at: new Date().toISOString(),
       counterparty_contact_id: inv.customer_contact_id,
       counterparty_company_id: inv.customer_company_id,
-      bank_account_id: src.bankAccountId ?? null,
+      bank_account_id: src.bankAccountId ?? await providerBankAccountId(supabase, inv.workspace_id, src.provider),
       reference: `${src.providerLabel} ${src.providerRef}`,
       notes: src.notes ?? `Inv ${inv.internal_number} via ${src.providerLabel}`,
       provider: src.provider,
@@ -293,6 +315,7 @@ export async function recordStatementPayment(
       paid_at: new Date().toISOString(),
       counterparty_contact_id: isCompany ? null : party.partyId,
       counterparty_company_id: isCompany ? party.partyId : null,
+      bank_account_id: src.bankAccountId ?? await providerBankAccountId(supabase, party.workspaceId, src.provider),
       reference: `${src.providerLabel} ${src.providerRef}`,
       notes: src.notes ?? `Account balance via ${src.providerLabel}`,
       provider: src.provider,

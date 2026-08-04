@@ -133,6 +133,17 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         if (fresh?.refresh_token) return jsonResponse({ ok: true, already: true });
         throw err;
       }
+      // Provision the pocket bank-account rows right away — the user should see their
+      // Revolut accounts under Finance → Banks the moment the connection lands.
+      try {
+        const fresh = await resolveRevolutConfig(service, workspaceId);
+        if (fresh) {
+          const { ensureRevolutBankAccounts } = await import('../_shared/revolut/sync-core.ts');
+          await ensureRevolutBankAccounts(service, fresh);
+        }
+      } catch (err) {
+        console.warn('[revolut-api] pocket provisioning after connect failed:', err instanceof Error ? err.message : err);
+      }
       return jsonResponse({ ok: true });
     }
 

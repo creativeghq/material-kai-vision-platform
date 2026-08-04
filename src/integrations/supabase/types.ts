@@ -7648,6 +7648,7 @@ export type Database = {
           name: string
           notes: string | null
           opening_balance: number
+          provider_slug: string | null
           revolut_account_id: string | null
           show_on_invoice: boolean
           sort_order: number
@@ -7666,6 +7667,7 @@ export type Database = {
           name: string
           notes?: string | null
           opening_balance?: number
+          provider_slug?: string | null
           revolut_account_id?: string | null
           show_on_invoice?: boolean
           sort_order?: number
@@ -7684,6 +7686,7 @@ export type Database = {
           name?: string
           notes?: string | null
           opening_balance?: number
+          provider_slug?: string | null
           revolut_account_id?: string | null
           show_on_invoice?: boolean
           sort_order?: number

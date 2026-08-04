@@ -12,8 +12,10 @@
 import {
   getRevolutAccessToken,
   issuerDomainFrom,
+  listAccounts,
   listTransactions,
   revolutHosts,
+  revolutJson,
   type RevolutConfigRow,
   type RevolutTransaction,
 } from './client.ts';
@@ -55,6 +57,46 @@ export function legToRow(workspaceId: string, tx: RevolutTransaction, leg: Revol
   };
 }
 
+/**
+ * Auto-provision a finance_bank_accounts row per active Revolut pocket (#315: connecting
+ * a provider must never leave the user with a manual "add bank" step). Existing mappings
+ * are respected; IBAN/BIC are filled best-effort from the account's bank details.
+ */
+export async function ensureRevolutBankAccounts(service: any, cfg: RevolutConfigRow): Promise<void> {
+  const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+  const accounts = await listAccounts(service, cfg, issuer);
+  const mapping = await loadAccountMapping(service, cfg.workspace_id);
+  for (const acc of accounts) {
+    if (acc.state !== 'active' || mapping.has(acc.id)) continue;
+    let iban: string | null = null;
+    let bic: string | null = null;
+    try {
+      const details = await revolutJson<Array<{ iban?: string; bic?: string }>>(
+        service, cfg, issuer, `/accounts/${acc.id}/bank-details`,
+      );
+      const d = (details ?? []).find((x) => x.iban) ?? (details ?? [])[0];
+      iban = d?.iban ?? null;
+      bic = d?.bic ?? null;
+    } catch { /* pocket rows are still useful without bank details */ }
+    const { error } = await service.from('finance_bank_accounts').insert({
+      workspace_id: cfg.workspace_id,
+      name: `Revolut ${acc.currency}`,
+      kind: 'bank',
+      currency: acc.currency,
+      provider_slug: 'revolut',
+      revolut_account_id: acc.id,
+      iban,
+      account_ref: bic,
+      is_active: true,
+      show_on_invoice: false,
+      notes: 'Auto-created from the connected Revolut account.',
+    });
+    if (error && !/duplicate|unique/i.test(error.message ?? '')) {
+      console.warn('[revolut-sync] pocket provisioning failed:', error.message);
+    }
+  }
+}
+
 /** The workspace's revolut_account_id → finance_bank_accounts.id mapping. */
 export async function loadAccountMapping(service: any, workspaceId: string): Promise<Map<string, string>> {
   const { data } = await service
@@ -83,6 +125,12 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
       ? new Date(new Date(cfg.sync_watermark).getTime() - 3600_000).toISOString()
       : new Date(Date.now() - 365 * 24 * 3600_000).toISOString();
 
+    // Provision pocket rows before loading the mapping so first-sync lines land against
+    // real bank accounts instead of null. Tolerant: a provisioning fault must not block
+    // the pull.
+    try { await ensureRevolutBankAccounts(service, cfg); } catch (err) {
+      console.warn('[revolut-sync] ensure accounts failed:', err instanceof Error ? err.message : err);
+    }
     const mapping = await loadAccountMapping(service, workspaceId);
 
     // Newest-first pages; walk backwards via `to` until a short page or the cap.
