@@ -40,6 +40,12 @@ export interface PaymentSource {
   checkoutSessionId?: string | null;
   /** Overrides the default `notes` line when the provider wants a specific one. */
   notes?: string;
+  /**
+   * The workspace treasury account the money landed in (`finance_bank_accounts.id`),
+   * when the provider knows it — bank-feed reconciliation does (#315); card acquirers
+   * settle later and leave it null. Drives the per-account running balance.
+   */
+  bankAccountId?: string | null;
 }
 
 export interface RecordResult {
@@ -156,6 +162,7 @@ export async function recordInvoicePayment(
       paid_at: new Date().toISOString(),
       counterparty_contact_id: inv.customer_contact_id,
       counterparty_company_id: inv.customer_company_id,
+      bank_account_id: src.bankAccountId ?? null,
       reference: `${src.providerLabel} ${src.providerRef}`,
       notes: src.notes ?? `Inv ${inv.internal_number} via ${src.providerLabel}`,
       provider: src.provider,

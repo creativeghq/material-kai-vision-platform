@@ -54,6 +54,7 @@ import {
   Truck,
   Home,
   Undo2,
+  Landmark,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -152,6 +153,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   material_alert: Bell,
   finance_follow_up: Bell,
   invoice_paid: CheckCircle2,
+  bank_payment_unmatched: Landmark,
   expense_card_reviewed: CheckCircle2,
   expense_card_requested: FileText,
   pricing_change_requested: ClipboardCheck,
@@ -258,6 +260,7 @@ const triggerLabels: Record<TriggerType, string> = {
   material_alert: 'Saved-Search Material Alert',
   finance_follow_up: 'Finance Follow-up Due',
   invoice_paid: 'Invoice Paid (card)',
+  bank_payment_unmatched: 'Unmatched Bank Payment',
   expense_card_reviewed: 'Expense Card Reviewed',
   expense_card_requested: 'Expense Card Requested',
   pricing_change_requested: 'Discount Approval Requested',

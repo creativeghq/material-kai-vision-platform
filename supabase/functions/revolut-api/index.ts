@@ -262,6 +262,67 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       return jsonResponse({ ok: true, ...out });
     }
 
+    case 'reconcile': {
+      // Re-run the matcher over unmatched incoming lines (auto after every sync too).
+      const { reconcileWorkspaceRevolut } = await import('../_shared/revolut/reconcile.ts');
+      const rec = await reconcileWorkspaceRevolut(service, workspaceId);
+      return jsonResponse({ ok: true, ...rec });
+    }
+
+    case 'confirm-match': {
+      // Human confirms a suggested (or manual) invoice for a statement line.
+      const rowId = String(body?.transaction_row_id ?? '');
+      const invoiceId = String(body?.invoice_id ?? '');
+      if (!rowId || !invoiceId) throw new HttpError(400, 'transaction_row_id and invoice_id are required');
+
+      const { data: tx } = await service
+        .from('revolut_bank_transactions')
+        .select('*')
+        .eq('id', rowId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (!tx) throw new HttpError(404, 'not found');
+      if (tx.match_status === 'matched') throw new HttpError(400, 'line is already matched');
+      if (tx.direction !== 'in') throw new HttpError(400, 'only incoming lines can settle an invoice');
+
+      const { data: inv } = await service
+        .from('invoices')
+        .select('id')
+        .eq('id', invoiceId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (!inv) throw new HttpError(404, 'not found');
+
+      const { settleTransaction } = await import('../_shared/revolut/reconcile.ts');
+      const s = await settleTransaction(service, tx, invoiceId, 'manual');
+      if (!s.ok) throw new HttpError(502, s.error ?? 'settle failed');
+      return jsonResponse({ ok: true });
+    }
+
+    case 'ignore-transaction': {
+      const rowId = String(body?.transaction_row_id ?? '');
+      if (!rowId) throw new HttpError(400, 'transaction_row_id is required');
+      const ignore = body?.ignore !== false;
+      const { data: tx } = await service
+        .from('revolut_bank_transactions')
+        .select('id, match_status')
+        .eq('id', rowId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (!tx) throw new HttpError(404, 'not found');
+      if (tx.match_status === 'matched') throw new HttpError(400, 'a matched line cannot be ignored');
+      const { error } = await service
+        .from('revolut_bank_transactions')
+        .update({
+          match_status: ignore ? 'ignored' : 'unmatched',
+          suggested_invoice_ids: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', rowId);
+      if (error) throw new HttpError(500, error.message);
+      return jsonResponse({ ok: true });
+    }
+
     case 'sync-now': {
       const cfg = await requireConfig(service, workspaceId);
       const result = await syncWorkspaceRevolut(service, cfg);

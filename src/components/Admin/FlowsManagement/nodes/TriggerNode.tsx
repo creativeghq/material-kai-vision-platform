@@ -12,6 +12,7 @@ import {
   Ship, Truck,
   Home,
   Undo2,
+  Landmark,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -81,6 +82,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   material_alert: Zap,
   finance_follow_up: Zap,
   invoice_paid: CheckCircle2,
+  bank_payment_unmatched: Landmark,
   module_access_requested: LayoutGrid,
   expense_card_reviewed: CheckCircle2,
   expense_card_requested: FileText,

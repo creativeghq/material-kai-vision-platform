@@ -247,6 +247,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'invoice_paid', group: 'Finance',
     label: 'Invoice Paid (card)', description: 'A Stripe card payment settled an invoice', icon: 'CheckCircle2', color: 'emerald',
     defaultData: { label: 'Invoice Paid (card)', category: 'trigger', triggerType: 'invoice_paid', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'bank_payment_unmatched', group: 'Finance',
+    label: 'Unmatched Bank Payment', description: 'An incoming bank transfer matched no open invoice', icon: 'Landmark', color: 'amber',
+    defaultData: { label: 'Unmatched Bank Payment', category: 'trigger', triggerType: 'bank_payment_unmatched', config: {} } as TriggerNodeData },
   // A workspace member requested activation of a module; the owner is notified.
   { type: 'triggerNode', category: 'trigger', subType: 'module_access_requested', group: 'Modules',
     label: 'Module Activation Requested', description: 'A member asked the workspace owner to activate a module', icon: 'LayoutGrid', color: 'violet',
@@ -502,7 +505,7 @@ export const actionPaletteItems = paletteItems.filter(i => i.category === 'actio
  */
 export const TENANT_ALLOWED_SUBTYPES: ReadonlySet<string> = new Set<string>([
   // triggers
-  'scheduled', 'quote_approved', 'invoice_paid', 'payment_received', 'payment_sent', 'payment_reversed',
+  'scheduled', 'quote_approved', 'invoice_paid', 'bank_payment_unmatched', 'payment_received', 'payment_sent', 'payment_reversed',
   'inbox.message_received', 'appointment_booked', 'contract_signed',
   // actions (send_sms is the engine's WhatsApp alias)
   'send_email', 'send_sms', 'create_notification', 'send_agent_message',

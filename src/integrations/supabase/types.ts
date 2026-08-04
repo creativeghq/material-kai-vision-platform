@@ -22956,14 +22956,20 @@ export type Database = {
           direction: string | null
           id: string
           leg_id: string | null
+          match_method: string | null
+          match_status: string
+          matched_at: string | null
+          matched_invoice_id: string | null
           provider_ref: string
           raw: Json | null
           reconciled_payment_id: string | null
           reference: string | null
           revolut_account_id: string
           state: string
+          suggested_invoice_ids: Json | null
           transaction_id: string
           type: string | null
+          unmatched_notified_at: string | null
           updated_at: string
           workspace_id: string
         }
@@ -22977,14 +22983,20 @@ export type Database = {
           direction?: string | null
           id?: string
           leg_id?: string | null
+          match_method?: string | null
+          match_status?: string
+          matched_at?: string | null
+          matched_invoice_id?: string | null
           provider_ref: string
           raw?: Json | null
           reconciled_payment_id?: string | null
           reference?: string | null
           revolut_account_id: string
           state: string
+          suggested_invoice_ids?: Json | null
           transaction_id: string
           type?: string | null
+          unmatched_notified_at?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -22998,14 +23010,20 @@ export type Database = {
           direction?: string | null
           id?: string
           leg_id?: string | null
+          match_method?: string | null
+          match_status?: string
+          matched_at?: string | null
+          matched_invoice_id?: string | null
           provider_ref?: string
           raw?: Json | null
           reconciled_payment_id?: string | null
           reference?: string | null
           revolut_account_id?: string
           state?: string
+          suggested_invoice_ids?: Json | null
           transaction_id?: string
           type?: string | null
+          unmatched_notified_at?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -23015,6 +23033,13 @@ export type Database = {
             columns: ["bank_account_id"]
             isOneToOne: false
             referencedRelation: "finance_bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "revolut_bank_transactions_matched_invoice_id_fkey"
+            columns: ["matched_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {

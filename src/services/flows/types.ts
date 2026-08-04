@@ -87,6 +87,8 @@ export type TriggerType =
   | 'material_alert'
   | 'finance_follow_up'
   | 'invoice_paid'
+  // Banking (#315): an incoming bank transfer matched no invoice (payload-only)
+  | 'bank_payment_unmatched'
   | 'module_access_requested'
   // HR: an employee has not clocked in past their start time + grace (payload-only)
   | 'hr_late_checkin'
@@ -201,6 +203,7 @@ export interface PurchaseOrderReceivedTriggerConfig {}
 export interface MaterialAlertTriggerConfig {}
 export interface FinanceFollowUpTriggerConfig {}
 export interface InvoicePaidTriggerConfig {}
+export interface BankPaymentUnmatchedTriggerConfig {}
 export interface ReviewSubmittedTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
@@ -372,6 +375,7 @@ export type TriggerConfigMap = {
   material_alert: MaterialAlertTriggerConfig;
   finance_follow_up: FinanceFollowUpTriggerConfig;
   invoice_paid: InvoicePaidTriggerConfig;
+  bank_payment_unmatched: BankPaymentUnmatchedTriggerConfig;
   module_access_requested: ModuleAccessRequestedTriggerConfig;
   hr_late_checkin: HrLateCheckinTriggerConfig;
   'hr.applicant_stage_changed': HrApplicantStageChangedTriggerConfig;
