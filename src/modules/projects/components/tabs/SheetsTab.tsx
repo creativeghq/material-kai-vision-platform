@@ -4,14 +4,30 @@ import { FileImage, Loader2, ArrowRight, Palette, Plus, Ruler } from 'lucide-rea
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { SheetWizardModal } from '@/components/features/sheets/SheetWizardModal';
+import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
+import {
+  moodboardSheetsService,
+  INTERACTIVE_SHEET_TYPES,
+  type PresentationSheet,
+  type SheetType,
+} from '@/services/moodboardSheetsService';
 import { projectsService } from '../../services/projectsService';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
 
 interface SheetsTabProps {
   projectId: string;
+  /**
+   * Collaborators can READ sheets (RLS grants it) but cannot insert one. Without
+   * this they would see the create button, fill in the whole wizard, and hit an
+   * opaque row-level-security failure at the end.
+   */
+  isOwner?: boolean;
 }
 
 const SHEET_TYPE_LABEL: Record<string, string> = {
@@ -30,12 +46,14 @@ const SHEET_TYPE_LABEL: Record<string, string> = {
 
 type Sheet = Awaited<ReturnType<typeof projectsService.listProjectSheets>>[number];
 
-export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId }) => {
+
+export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId, isOwner = true }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [sheets, setSheets] = useState<Sheet[]>([]);
   const [loading, setLoading] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [canvasSheet, setCanvasSheet] = useState<PresentationSheet | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -67,7 +85,10 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId }) => {
   }, [sheets]);
 
   const SheetRow: React.FC<{ s: Sheet }> = ({ s }) => (
-    <li className="p-3 flex items-center gap-3 hover:bg-muted/40 transition-colors">
+    <li
+      className="p-3 flex items-center gap-3 hover:bg-muted/40 transition-colors cursor-pointer"
+      onClick={() => { if (INTERACTIVE_SHEET_TYPES.has(s.sheet_type as SheetType)) void openCanvas(s.id); }}
+    >
       <FileImage className="h-4 w-4 text-primary shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">
@@ -84,19 +105,67 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId }) => {
   );
 
   const NewPlanButton = () => (
-    <Button size="sm" className="gap-2" onClick={() => setWizardOpen(true)}>
-      <Plus className="h-4 w-4" />
-      New technical plan
-    </Button>
+    isOwner ? (
+      <Button size="sm" className="gap-2" onClick={() => setWizardOpen(true)}>
+        <Plus className="h-4 w-4" />
+        New technical plan
+      </Button>
+    ) : null
   );
 
+  // Interactive types are created as a DRAFT and finished on the canvas. Without
+  // this the credits are debited and the user is left with a plan they cannot
+  // draw — the paid-but-stuck flow the moodboard tab already had to fix once.
+  const openCanvas = async (sheetId: string) => {
+    try {
+      const sheet = await moodboardSheetsService.get(sheetId);
+      if (sheet) setCanvasSheet(sheet);
+      else toast({ title: 'Sheet not found', variant: 'destructive' });
+    } catch (err) {
+      toast({
+        title: 'Could not open the canvas',
+        description: err instanceof Error ? err.message : undefined,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const wizard = (
-    <SheetWizardModal
-      open={wizardOpen}
-      onClose={() => setWizardOpen(false)}
-      presetProjectId={projectId}
-      onCreated={() => { setWizardOpen(false); void load(); }}
-    />
+    <>
+      <SheetWizardModal
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        presetProjectId={projectId}
+        onCreated={(res) => {
+          setWizardOpen(false);
+          void load();
+          if (res.is_interactive) {
+            toast({ title: 'Draft created', description: 'Finishing it in the canvas…' });
+            void openCanvas(res.sheet_id);
+          }
+        }}
+      />
+
+      <Dialog open={!!canvasSheet} onOpenChange={(o) => { if (!o) { setCanvasSheet(null); void load(); } }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{canvasSheet ? (SHEET_TYPE_LABEL[canvasSheet.sheet_type] ?? 'Sheet') : 'Sheet'}</DialogTitle>
+            <DialogDescription className="sr-only">Finish this sheet on the canvas.</DialogDescription>
+          </DialogHeader>
+          {canvasSheet && (
+            <SheetCanvasCard
+              sheetId={canvasSheet.id}
+              sheetType={canvasSheet.sheet_type}
+              // Project-owned plans have no moodboard; only the deck builder
+              // reads this, and a deck is never project-owned.
+              moodboardId={canvasSheet.moodboard_id ?? ''}
+              initialData={canvasSheet.data ?? {}}
+              title={canvasSheet.title}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 
   if (loading) {

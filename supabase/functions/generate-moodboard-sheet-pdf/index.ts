@@ -40,6 +40,7 @@ async function authenticate(req: Request): Promise<{ success: boolean; userId?: 
 import {
   fetchClientName,
   fetchMoodboard,
+  fetchSheetParent,
   fetchOwnerBranding,
   fetchProductChips,
   fetchQuoteFfeItems,
@@ -210,10 +211,11 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       .update({ status: 'generating' })
       .eq('id', sheetId);
 
-    const moodboard = await fetchMoodboard(supabase, sheet.moodboard_id);
+    // Either parent — a technical plan hangs off the project, not a moodboard.
+    const parent = await fetchSheetParent(supabase, sheet);
     // Brand under the owning PROJECT's workspace (deterministic); fall back to the
-    // creator's oldest membership only when the moodboard isn't project-linked.
-    const brandingWsId = await resolveBrandingWorkspaceId(supabase, moodboard.project_id, sheet.created_by);
+    // creator's oldest membership only when the sheet isn't project-linked.
+    const brandingWsId = await resolveBrandingWorkspaceId(supabase, parent.project_id, sheet.created_by);
     const branding = sheet.created_by
       ? await fetchOwnerBranding(supabase, sheet.created_by, brandingWsId)
       : undefined;
@@ -244,7 +246,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
     const fonts = await loadFonts(pdfDoc);
 
     const td: TitleBlockData = {
-      project_title: moodboard.title,
+      project_title: parent.title,
       sheet_title: sheet.title,
       sheet_label: sheetLabel(sheet.sheet_type),
       date_iso: new Date().toISOString(),
@@ -340,8 +342,8 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
         subSheets.sort((a, b) => includedIds.indexOf(a.id) - includedIds.indexOf(b.id));
 
         const cover = sheet.data.cover || {
-          title: moodboard.title,
-          description: moodboard.description || '',
+          title: parent.title,
+          description: parent.description || '',
           date: new Date().toISOString(),
         };
         await buildFullDeckCover(pdfDoc, fonts, td, cover, await fetchWorkspaceCoverBytes(supabase, brandingWsId));
@@ -364,7 +366,7 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
         return jsonResponse({ success: false, error: `Unknown sheet_type: ${sheet.sheet_type}` }, 400);
     }
 
-    pdfDoc.setTitle(`${moodboard.title} — ${sheet.title}`);
+    pdfDoc.setTitle(`${parent.title} — ${sheet.title}`);
     pdfDoc.setSubject(sheetLabel(sheet.sheet_type));
     pdfDoc.setCreator('Material Kai');
 

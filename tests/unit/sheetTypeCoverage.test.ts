@@ -111,10 +111,20 @@ describe('presentation sheet type coverage', () => {
 
   it('interactive types agree between the frontend set and the edge list', () => {
     const edgeInteractive = arrayMembers(CREATE_SHEET, 'INTERACTIVE_TYPES[^=]*=\\s*');
-    const feSrc = read('src/components/business/moodboard/MoodboardSheetsTab.tsx');
-    const feInteractive = arrayMembers(feSrc, 'INTERACTIVE_SHEET_TYPES[^=]*=[^[]*');
+    // ONE frontend definition, in the service. It briefly existed in two tabs,
+    // which is how a third copy nearly shipped with the project Sheets tab.
+    const feInteractive = arrayMembers(SERVICE, 'INTERACTIVE_SHEET_TYPES[^=]*=[^[]*');
     expect(feInteractive.length).toBeGreaterThan(0);
     expect(feInteractive.sort()).toEqual(edgeInteractive.sort());
+  });
+
+  it('no component redefines the interactive set locally', () => {
+    // A local copy in a tab drifts silently, and the symptom is a paid draft the
+    // user cannot draw — the flow the moodboard tab already had to fix once.
+    const offenders = ['src/components/business/moodboard/MoodboardSheetsTab.tsx',
+                       'src/modules/projects/components/tabs/SheetsTab.tsx']
+      .filter((p) => /const\s+INTERACTIVE_SHEET_TYPES\s*=/.test(read(p)));
+    expect(offenders, 'these files define their own INTERACTIVE_SHEET_TYPES').toEqual([]);
   });
 });
 

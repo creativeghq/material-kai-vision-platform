@@ -8,11 +8,47 @@ export async function fetchSheet(
 ): Promise<SheetRow> {
   const { data, error } = await supabase
     .from('moodboard_presentation_sheets')
-    .select('id, moodboard_id, created_by, sheet_type, title, data')
+    .select('id, moodboard_id, project_id, created_by, sheet_type, title, data')
     .eq('id', sheetId)
     .single();
   if (error || !data) throw new Error(`Sheet not found: ${sheetId}`);
   return data as SheetRow;
+}
+
+/**
+ * The sheet's owning context, from whichever parent it has.
+ *
+ * A sheet hangs off a moodboard OR a project (technical plans belong to the
+ * project — see sheets_has_a_parent). The renderer needs the same three facts
+ * either way: a display title for the title block, a description for a deck
+ * cover, and the project id that decides which workspace brands the PDF.
+ *
+ * Resolving this in one place is the point. Calling fetchMoodboard with a null
+ * id throws, so a project-owned sheet would fail to render AFTER its status was
+ * already flipped to 'generating' — leaving the row stuck there with no PDF and
+ * no explanation.
+ */
+export async function fetchSheetParent(
+  supabase: DbClient,
+  sheet: Pick<SheetRow, 'moodboard_id' | 'project_id'>,
+): Promise<{ title: string; description: string | null; project_id: string | null }> {
+  if (sheet.moodboard_id) {
+    const mb = await fetchMoodboard(supabase, sheet.moodboard_id);
+    return { title: mb.title, description: mb.description ?? null, project_id: mb.project_id ?? null };
+  }
+  if (sheet.project_id) {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, name, description')
+      .eq('id', sheet.project_id)
+      .single();
+    if (error || !data) throw new Error(`Project not found: ${sheet.project_id}`);
+    const p = data as { id: string; name: string | null; description: string | null };
+    return { title: p.name ?? 'Project', description: p.description, project_id: p.id };
+  }
+  // The CHECK constraint makes this unreachable; fail loudly rather than render
+  // a sheet with no provenance in its title block.
+  throw new Error(`Sheet has neither a moodboard nor a project parent`);
 }
 
 export async function fetchMoodboard(

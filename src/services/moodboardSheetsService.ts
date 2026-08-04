@@ -18,7 +18,9 @@ export type SheetStatus = 'draft' | 'generating' | 'ready' | 'failed';
 
 export interface PresentationSheet {
   id: string;
-  moodboard_id: string;
+  /** Null for a project-owned technical plan — exactly one parent is set. */
+  moodboard_id: string | null;
+  project_id?: string | null;
   /** Project room this sheet documents, when it was created from one. */
   room_id?: string | null;
   created_by: string | null;
@@ -68,6 +70,19 @@ export const SHEET_TYPE_LABELS: Record<SheetType, string> = {
   area_breakdown: 'Area Breakdown',
   full_deck: 'Full Presentation Deck',
 };
+
+/**
+ * Types finished on a canvas rather than fully specified up front.
+ *
+ * ONE frontend copy, mirroring INTERACTIVE_TYPES in
+ * generate-moodboard-sheet-pdf/create-sheet.ts — the two are pinned together by
+ * tests/unit/sheetTypeCoverage.test.ts. Every surface that creates or edits a
+ * sheet imports this; a local copy in a tab drifts silently, and the symptom is
+ * a paid draft the user cannot draw.
+ */
+export const INTERACTIVE_SHEET_TYPES = new Set<SheetType>([
+  'annotated_render', 'elevation_render_pair', 'lighting_plan', 'plumbing_plan', 'electrical_plan', 'full_deck',
+]);
 
 // Mirror of SHEET_CREDITS in the agent tool. Every tool costs credits.
 export const SHEET_TYPE_CREDITS: Record<SheetType, number> = {
@@ -274,9 +289,14 @@ class MoodboardSheetsService {
     return { pdf_url: result.pdf_url, page_count: result.page_count };
   }
 
-  /** Clone a sheet's title + data into a new draft row on the same moodboard.
+  /** Clone a sheet's title + data into a new draft row under the SAME parent.
    *  Useful for "use this as a template" or A/B variants. Does NOT copy the
    *  PDF; the duplicate is `draft` until the user re-renders it.
+   *
+   *  Both parents are carried over: a project-owned technical plan has a null
+   *  moodboard_id, so copying only that field would produce a row with no parent
+   *  at all — rejected by sheets_has_a_parent, and correctly so. room_id comes
+   *  along too, since the copy documents the same room.
    */
   async duplicate(sheetId: string, newTitle?: string): Promise<PresentationSheet> {
     const original = await this.get(sheetId);
@@ -287,7 +307,9 @@ class MoodboardSheetsService {
     const { data, error } = await supabase
       .from('moodboard_presentation_sheets')
       .insert({
-        moodboard_id: original.moodboard_id,
+        moodboard_id: original.moodboard_id ?? null,
+        project_id: original.project_id ?? null,
+        room_id: original.room_id ?? null,
         sheet_type: original.sheet_type,
         title: newTitle ?? `${original.title} (copy)`,
         data: original.data,

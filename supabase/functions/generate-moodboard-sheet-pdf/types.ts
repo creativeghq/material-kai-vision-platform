@@ -13,7 +13,9 @@ export type SheetType =
 
 export interface SheetRow {
   id: string;
-  moodboard_id: string;
+  /** Null for a project-owned technical plan. Exactly one parent is set. */
+  moodboard_id: string | null;
+  project_id?: string | null;
   created_by: string | null;
   sheet_type: SheetType;
   title: string;

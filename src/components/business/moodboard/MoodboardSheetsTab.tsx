@@ -16,6 +16,7 @@ import {
   type SheetType,
   SHEET_TYPE_LABELS,
   SHEET_TYPE_CREDITS,
+  INTERACTIVE_SHEET_TYPES,
 } from '@/services/moodboardSheetsService';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
@@ -44,10 +45,6 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
 };
 
 // Sheet types finished on a drawing canvas (SheetCanvasCard) rather than up-front wizard inputs.
-// Must mirror INTERACTIVE_TYPES in generate-moodboard-sheet-pdf/create-sheet.ts —
-// guarded by tests/unit/sheetTypeCoverage.test.ts. full_deck was missing here, so
-// Edit on a deck re-ran the wizard instead of opening DeckBuilderCanvas.
-const INTERACTIVE_SHEET_TYPES = new Set<SheetType>(['annotated_render', 'elevation_render_pair', 'lighting_plan', 'plumbing_plan', 'electrical_plan', 'full_deck']);
 
 const SHEET_GROUPS: { label: string; types: SheetType[] }[] = [
   { label: 'Boards', types: ['material_board', 'color_palette', 'concept_board', 'area_breakdown'] },
