@@ -30,6 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { BankFeedTab } from '@/modules/finance/tabs/BankFeedTab';
 import { PayViaRevolutDialog } from '@/modules/banking-revolut/components/PayViaRevolutDialog';
 import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
+import { CardsExpensesCard } from '@/modules/banking-revolut/components/CardsExpensesCard';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -1186,6 +1187,9 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── EXPENSE CARDS (finance review) ─────────── */}
           <TabsContent value="trip_cards" className="space-y-4">
+            {/* Revolut team cards live NEXT TO their statements: issue/freeze/limit cards
+                here, and the imported card expenses land in the reports below. */}
+            {!isAccountant && workspaceId && <CardsExpensesCard workspaceId={workspaceId} />}
             <TripExpensesPanel workspaceId={workspaceId} canReview={!isAccountant} />
           </TabsContent>
 
