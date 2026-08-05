@@ -113,8 +113,13 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       const cfg = await requireConfig(service, workspaceId);
       if (!cfg.client_id) throw new HttpError(400, 'save the client_id from the Revolut dashboard first');
       if (!cfg.oauth_redirect_uri) throw new HttpError(400, 'run init first');
+      // Request ONLY the scopes we use. Omitting `scope` grants everything including
+      // READ_SENSITIVE_CARD_DATA — and Revolut hard-requires IP whitelisting for any
+      // token carrying that scope (error 9002 on every call), which is impossible from
+      // dynamic-IP edge functions. READ/WRITE/PAY covers the entire module.
       const url = `${revolutHosts(cfg.environment).authorize}?client_id=${encodeURIComponent(cfg.client_id)}` +
-        `&redirect_uri=${encodeURIComponent(cfg.oauth_redirect_uri)}&response_type=code`;
+        `&redirect_uri=${encodeURIComponent(cfg.oauth_redirect_uri)}&response_type=code` +
+        `&scope=${encodeURIComponent('READ,WRITE,PAY')}`;
       return jsonResponse({ ok: true, url });
     }
 
