@@ -87,7 +87,15 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId, isOwner = true 
   const SheetRow: React.FC<{ s: Sheet }> = ({ s }) => (
     <li
       className="p-3 flex items-center gap-3 hover:bg-muted/40 transition-colors cursor-pointer"
+      role="button"
+      tabIndex={0}
       onClick={() => { if (INTERACTIVE_SHEET_TYPES.has(s.sheet_type as SheetType)) void openCanvas(s.id); }}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && INTERACTIVE_SHEET_TYPES.has(s.sheet_type as SheetType)) {
+          e.preventDefault();
+          void openCanvas(s.id);
+        }
+      }}
     >
       <FileImage className="h-4 w-4 text-primary shrink-0" />
       <div className="flex-1 min-w-0">
