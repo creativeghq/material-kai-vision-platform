@@ -26,7 +26,7 @@ export type PaymentMethod = 'card' | 'bank_transfer' | 'cash' | 'check' | 'other
 const PG_UNIQUE_VIOLATION = '23505';
 
 export interface PaymentSource {
-  /** Provider slug — must match the module slug suffix: 'stripe' | 'viva'. */
+  /** Provider slug — must match the module slug suffix: 'stripe' | 'viva' | 'revolut'. */
   provider: string;
   /** Provider-side immutable id (Stripe payment_intent id, Viva TransactionId). */
   providerRef: string;
@@ -76,11 +76,16 @@ async function providerBankAccountId(
   workspaceId: string,
   provider: string,
 ): Promise<string | null> {
+  // Checkout settlements from provider 'revolut' belong to the 'revolut_merchant'
+  // settlement account, NOT the banking module's pocket rows (provider_slug 'revolut')
+  // — the bank feed imports the real settlement onto those later, and attributing both
+  // would double-count the running balance.
+  const slug = provider === 'revolut' ? 'revolut_merchant' : provider;
   const { data } = await supabase
     .from('finance_bank_accounts')
     .select('id')
     .eq('workspace_id', workspaceId)
-    .eq('provider_slug', provider)
+    .eq('provider_slug', slug)
     .eq('is_active', true)
     .limit(1)
     .maybeSingle();

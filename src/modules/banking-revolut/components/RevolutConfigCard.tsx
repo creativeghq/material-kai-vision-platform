@@ -270,12 +270,17 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
               {status.webhook_ready
                 ? <span className="text-emerald-600 dark:text-emerald-400">· webhook active</span>
                 : <span className="text-amber-600 dark:text-amber-400">· webhook missing</span>}
-              {!status.webhook_ready && (
-                <Button size="sm" variant="outline" disabled={busy !== null}
-                  onClick={() => run('Register webhook', async () => { await callRevolutApi('register-webhook', workspaceId); await refresh(); })}>
-                  Register webhook
-                </Button>
-              )}
+              <Button size="sm" variant="outline" disabled={busy !== null}
+                onClick={() => run('Register webhook', async () => { await callRevolutApi('register-webhook', workspaceId); await refresh(); })}>
+                {status.webhook_ready ? 'Re-register webhook' : 'Register webhook'}
+              </Button>
+              <Button size="sm" variant="outline" disabled={busy !== null}
+                onClick={() => run('Sync labels', async () => {
+                  const out = await callRevolutApi<{ created: number; total: number }>('sync-labels', workspaceId);
+                  toast({ title: 'Labels synced', description: `${out.created} new label(s) of ${out.total} categories.` });
+                })}>
+                Sync labels
+              </Button>
               <Button size="sm" variant="outline" onClick={syncNow} disabled={busy !== null}>
                 {busy === 'Sync' ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
                 Sync now

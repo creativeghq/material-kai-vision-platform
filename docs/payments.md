@@ -2,7 +2,7 @@
 
 Payment processing + invoice provider routing. The Payments module is the **parent / shared surface**: business identity printed on every invoice, the **built-in invoice generator**, and a **provider registry** that lists every enabled payment-provider module + routes invoice issuance to the active ERP.
 
-Specific payment processors are **sibling modules** (`payments-stripe` today; future `payments-paypal`, `payments-adyen`, `payments-viva`, `payments-bank-transfer`). ERPs that bring native payment processing can also declare `provides: { payments: true }` and slot into the same registry.
+Specific payment processors are **sibling modules** (`payments-stripe` today; future `payments-paypal`, `payments-adyen`, `payments-viva / payments-revolut`, `payments-bank-transfer`). ERPs that bring native payment processing can also declare `provides: { payments: true }` and slot into the same registry.
 
 ---
 

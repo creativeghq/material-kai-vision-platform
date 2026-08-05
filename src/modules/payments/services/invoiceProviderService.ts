@@ -44,7 +44,7 @@ export const BUILT_IN_PROVIDER: InvoiceProvider = {
  * NO MODULE DECLARES `provides.invoicing` TODAY, so this always returns BUILT_IN_PROVIDER and
  * `isErp` is currently always false. That is a live extension point awaiting its first
  * consumer, NOT a broken branch: the only modules declaring `provides` are payments-stripe and
- * payments-viva, both `{ payments: true }`, and `myaade` is an ΑΦΜ lookup rather than an
+ * payments-viva and payments-revolut, all `{ payments: true }`, and `myaade` is an ΑΦΜ lookup rather than an
  * invoicer. The first real ERP integration (Novus e-invoicing is the planned one) sets
  * `provides.invoicing: true` in its manifest and every gated surface lights up — the banner in
  * InvoicingPanel, the hidden Issue button in IssueInvoiceButton, the disabled numbering card.

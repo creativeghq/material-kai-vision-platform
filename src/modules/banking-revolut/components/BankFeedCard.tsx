@@ -41,7 +41,11 @@ interface InvoiceLite {
 }
 
 const MatchWord: React.FC<{ row: FeedRow }> = ({ row }) => {
-  if (row.direction !== 'in') return <span className="text-muted-foreground text-xs">—</span>;
+  // Outgoing lines settle supplier bills; show their match state too. Unmatched OUT
+  // lines are normal (fees, FX, drawings) — render neutrally, not as a problem.
+  if (row.direction !== 'in' && row.match_status !== 'matched') {
+    return <span className="text-muted-foreground text-xs">—</span>;
+  }
   switch (row.match_status) {
     case 'matched': return <span className="text-xs text-emerald-600 dark:text-emerald-400">Matched</span>;
     case 'suggested': return <span className="text-xs text-amber-600 dark:text-amber-400">Needs review</span>;

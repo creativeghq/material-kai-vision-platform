@@ -64,7 +64,13 @@ async function createCharge(input: CreateChargeInput, ctx: PaymentProviderContex
       currency: input.currency.toUpperCase(),
       description: input.description,
       merchant_order_data: { reference: input.invoiceNumber },
-      ...(input.successUrl ? { redirect_url: input.successUrl } : {}),
+      // Revolut has ONE redirect_url fired on EVERY outcome (completed, failed,
+      // abandoned) — pointing it at the success URL would show "Payment received" to a
+      // buyer who cancelled. Send them back neutrally; the pay page verifies state
+      // server-side before claiming anything.
+      ...(input.successUrl
+        ? { redirect_url: input.successUrl.replace('status=success', 'status=return') }
+        : {}),
     }),
   });
   if (!res.ok) {

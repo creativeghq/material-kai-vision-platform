@@ -237,6 +237,12 @@ verify_jwt = false
 [functions.viva-webhooks]
 verify_jwt = false
 
+[functions.revolut-webhooks]
+verify_jwt = false
+
+[functions.revolut-merchant-webhooks]
+verify_jwt = false
+
 [functions.generate-interior-video-v2]
 verify_jwt = false
 

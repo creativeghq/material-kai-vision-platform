@@ -177,7 +177,11 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
     if (!bill || !method) continue;
 
     try {
-      // Idempotent payments row (provider, provider_ref unique).
+      // Idempotent payments row (provider, provider_ref unique). On a duplicate, pick
+      // up the EXISTING row and continue — a crash between payment insert and
+      // allocation insert must be healed on the next pass, not orphaned forever
+      // (same doctrine as record-payment's heal-on-redelivery).
+      let payId: string | null = null;
       const { data: pay, error: payErr } = await service.from('payments').insert({
         workspace_id: workspaceId,
         direction: 'out',
@@ -193,13 +197,35 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
         provider: 'revolut',
         provider_ref: tx.provider_ref,
       }).select('id').single();
-      if (payErr) {
-        if (!/duplicate|unique/i.test(payErr.message ?? '')) out.errors.push(`${tx.provider_ref}: ${payErr.message}`);
+      if (pay) payId = pay.id;
+      else if (payErr && /duplicate|unique/i.test(payErr.message ?? '')) {
+        const { data: existing } = await service.from('payments')
+          .select('id').eq('provider', 'revolut').eq('provider_ref', tx.provider_ref).maybeSingle();
+        payId = existing?.id ?? null;
+        if (payId) {
+          const { count } = await service.from('payment_allocations')
+            .select('id', { count: 'exact', head: true }).eq('payment_id', payId);
+          if ((count ?? 0) > 0) {
+            // Fully recorded earlier — just stamp the line and move on.
+            await service.from('revolut_bank_transactions').update({
+              match_status: 'matched', match_method: method,
+              matched_at: new Date().toISOString(), reconciled_payment_id: payId,
+              updated_at: new Date().toISOString(),
+            }).eq('id', tx.id);
+            out.settled++;
+            continue;
+          }
+        }
+      }
+      if (!payId) {
+        if (payErr) out.errors.push(`${tx.provider_ref}: ${payErr.message}`);
         continue;
       }
       const applied = Math.min(Number(tx.amount), Number(bill.amount_due));
+      // The over-allocation trigger raises when sum(allocations) would exceed the bill
+      // total; a race that trips it lands in errors and retries next pass.
       const { error: allocErr } = await service.from('payment_allocations').insert({
-        payment_id: pay.id,
+        payment_id: payId,
         supplier_bill_id: bill.id,
         amount: applied,
         amount_doc_currency: applied,
@@ -213,7 +239,7 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
         match_status: 'matched',
         match_method: method,
         matched_at: new Date().toISOString(),
-        reconciled_payment_id: pay.id,
+        reconciled_payment_id: payId,
         updated_at: new Date().toISOString(),
       }).eq('id', tx.id);
       bill.amount_due = Number(bill.amount_due) - applied;

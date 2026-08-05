@@ -30,6 +30,7 @@ import { AadeCredentialsCard } from '@/modules/myaade/components/AadeCredentials
 import { WorkspaceEmailConfigCard } from '@/modules/email/components/WorkspaceEmailConfigCard';
 import { VivaConfigCard } from '@/modules/payments-viva/components/VivaConfigCard';
 import { RevolutConfigCard } from '@/modules/banking-revolut/components/RevolutConfigCard';
+import { RevolutMerchantSettingsPanel } from '@/modules/payments-revolut/components/RevolutMerchantSettingsPanel';
 import { WorkspacePdfTemplateCard } from '@/components/core/Profile/WorkspacePdfTemplateCard';
 import { InboundSetupCard } from '@/modules/finance/components/InboundSetupCard';
 import { ErganiCredentialsCard } from '@/modules/hr/components/ErganiCredentialsCard';
@@ -153,6 +154,7 @@ export const WorkspaceKeysTab: React.FC = () => {
             <InboundSetupCard workspaceId={activeWorkspaceId} />
             <VivaConfigCard workspaceId={activeWorkspaceId} />
             <RevolutConfigCard workspaceId={activeWorkspaceId} />
+            <RevolutMerchantSettingsPanel />
             <Card>
               <CardContent className="p-5">
                 <ConnectionRow

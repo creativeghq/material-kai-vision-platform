@@ -45,13 +45,20 @@ function buildOptions(providers: ProviderOption[]): PayOption[] {
   const out: PayOption[] = [];
   for (const p of providers) {
     for (const m of p.methods) {
+      // Revolut's hosted page fans out beyond cards (Revolut Pay, Apple/Google Pay,
+      // Pay by Bank) — describing it as just "Card" would under-sell it.
+      const isRevolut = p.slug === 'revolut';
       out.push({
         key: `${p.slug}:${m}`,
         provider: p.slug,
         method: m,
-        label: m === 'card' ? `Card — ${p.label}` : `Bank transfer — ${p.label}`,
+        label: m === 'card'
+          ? (isRevolut ? 'Pay online — Revolut' : `Card — ${p.label}`)
+          : `Bank transfer — ${p.label}`,
         hint: m === 'card'
-          ? 'Pay now by card. You will be redirected to a secure page.'
+          ? (isRevolut
+            ? 'Card, Revolut Pay, Apple/Google Pay or Pay by Bank — on Revolut’s secure page.'
+            : 'Pay now by card. You will be redirected to a secure page.')
           : 'Get a payment code to use in your banking app. No IBAN needed.',
       });
     }
@@ -76,8 +83,10 @@ const PayInvoicePage: React.FC = () => {
   const [bankRef, setBankRef] = useState<{ rf_code: string; amount: number; currency: string } | null>(null);
 
   // Load the document + payable options. No session, no side effects.
+  // Also runs for status=return (a provider whose redirect fires on EVERY outcome —
+  // Revolut): the server-resolved state decides what the buyer is told.
   useEffect(() => {
-    if (!token || status) { setLoading(false); return; }
+    if (!token || (status && status !== 'return')) { setLoading(false); return; }
     void (async () => {
       try {
         const res = await financeService.resolvePayToken(token, { infoOnly: true });
@@ -174,6 +183,43 @@ const PayInvoicePage: React.FC = () => {
         <p className="mt-2 text-sm text-muted-foreground">
           Thank you. A receipt will be emailed to you, and the seller sees this within a minute.
         </p>
+      </div>,
+    );
+  }
+
+  // Neutral provider return (Revolut redirects here on success AND cancel/failure):
+  // only the server-verified state decides what we claim.
+  if (status === 'return' && !loading) {
+    if (alreadyPaid) {
+      return shell(
+        <div className="text-center">
+          <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+          <h1 className="mt-4 text-xl font-semibold">Payment received</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Thank you. A receipt will be emailed to you, and the seller sees this within a minute.
+          </p>
+        </div>,
+      );
+    }
+    return shell(
+      <div className="text-center">
+        <AlertCircle className="mx-auto h-12 w-12 text-amber-500" />
+        <h1 className="mt-4 text-xl font-semibold">Checking your payment…</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          If you completed the payment, it can take a moment to confirm — refresh this page shortly.
+          If you cancelled or it failed, you can simply try again.
+        </p>
+        {info && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Outstanding right now: {formatMoney(info.amount_due, info.currency)}
+          </p>
+        )}
+        <div className="mt-4 flex justify-center gap-2">
+          <Button variant="outline" className="rounded-full" onClick={() => window.location.reload()}>Refresh</Button>
+          <Button className="rounded-full" onClick={() => { window.location.href = `${window.location.origin}/pay/${token}`; }}>
+            Try again
+          </Button>
+        </div>
       </div>,
     );
   }

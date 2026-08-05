@@ -340,7 +340,14 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
     // ── Provider dispatch ────────────────────────────────────────────────
     // Every gate is re-checked here, at the moment money is about to move: the
     // client-supplied provider slug is an intent, never an authorisation.
-    const providerSlug = pb.provider || 'stripe';
+    // Legacy callers that omit the provider get the workspace's FIRST configured one
+    // (registry order: stripe, viva, revolut) — a hardcoded 'stripe' default left
+    // Stripe-less workspaces dead on those paths.
+    let providerSlug = pb.provider;
+    if (!providerSlug) {
+      const avail = await resolveWorkspacePaymentProviders(supabase, row.workspace_id, { configuredOnly: true });
+      providerSlug = avail[0]?.slug ?? 'stripe';
+    }
     const method = pb.method || 'card';
     const currency = String(row.currency || 'EUR').toUpperCase();
 

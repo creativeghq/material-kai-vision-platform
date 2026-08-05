@@ -56,7 +56,9 @@ export async function saveRevolutMerchantConfig(workspaceId: string, input: Revo
 
 /** Register the settlement webhook with the tenant's own key (edge does the API call). */
 export async function activateRevolutMerchantWebhook(workspaceId: string): Promise<void> {
-  const { data, error } = await supabase.functions.invoke('revolut-merchant-webhooks?setup=1', {
+  // Plain function name — the edge function routes on the Revolut-Signature header
+  // (deliveries are signed; browser calls are not), so no query-string is needed.
+  const { data, error } = await supabase.functions.invoke('revolut-merchant-webhooks', {
     body: { workspace_id: workspaceId },
   });
   if (error) {

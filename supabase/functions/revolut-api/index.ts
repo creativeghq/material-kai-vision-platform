@@ -152,6 +152,16 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
       if (!supabaseUrl) throw new HttpError(500, 'SUPABASE_URL unset');
       const hookUrl = `${supabaseUrl}/functions/v1/revolut-webhooks?ws=${workspaceId}`;
+      // Re-registration (e.g. to widen the event list) must not leave the old
+      // subscription alive delivering duplicates — best-effort delete first.
+      if (cfg.webhook_id) {
+        try {
+          await fetch(`${webhooksV2Base(cfg)}/webhooks/${cfg.webhook_id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${await tokenFor(service, cfg)}` },
+          });
+        } catch { /* old hook may already be gone */ }
+      }
       // The shared client prefixes the v1 base; webhooks v2 needs its own absolute call.
       const v2 = await fetch(`${webhooksV2Base(cfg)}/webhooks`, {
         method: 'POST',

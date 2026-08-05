@@ -2,10 +2,10 @@
  * Revolut Merchant webhooks (#315, payments-revolut) — settlement for the checkout side.
  *
  * Two surfaces:
- *  - POST ?setup=1  (user JWT): registers the merchant webhook with the tenant's own
+ *  - POST (unsigned, user JWT): registers the merchant webhook with the tenant's own
  *    secret key and stores the returned signing secret. The provider stays "not
  *    configured" until this succeeds — settlement depends on it.
- *  - POST ?ws=<id>  (Revolut): signed deliveries. HMAC v1.{timestamp}.{body} with the
+ *  - POST ?ws=<id> (Revolut-Signature header present): signed deliveries. HMAC v1.{timestamp}.{body} with the
  *    per-workspace signing secret, 5-minute window, timing-safe compare — the same
  *    doctrine as revolut-webhooks / stripe-webhooks (invariant 6, fail closed).
  *
@@ -57,7 +57,11 @@ Deno.serve(withApiLogging('revolut-merchant-webhooks', async (req) => {
   );
 
   // ---- Setup surface (user-facing) -----------------------------------------
-  if (url.searchParams.get('setup') === '1') {
+  // A Revolut delivery ALWAYS carries the signature header; a browser call never does.
+  // Deciding on the header (not a query param) keeps supabase-js invoke() on its plain
+  // function-name path. Unsigned probes fall into this branch and die on the JWT check.
+  const isDelivery = !!req.headers.get('Revolut-Signature');
+  if (!isDelivery) {
     const auth = await authenticate(req, { requireUser: true });
     if (!auth.success || !auth.userId) throw new HttpError(401, 'unauthorized');
     const body = await req.json().catch(() => ({})) as { workspace_id?: string };

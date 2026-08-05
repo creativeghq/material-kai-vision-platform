@@ -94,9 +94,13 @@ export async function resolveWorkspacePaymentProviders(
     }),
   );
 
+  // Stable, DELIBERATE buyer-facing order — the pay page preselects the first entry,
+  // so alphabetical sorting would silently flip a Stripe seller's default to a newly
+  // added provider ('revolut' < 'stripe'). New providers go LAST until promoted.
+  const ORDER: Record<string, number> = { stripe: 0, viva: 1, revolut: 2 };
   return resolved
     .filter((r): r is AvailableProvider => r !== null)
-    .sort((a, b) => a.slug.localeCompare(b.slug));
+    .sort((a, b) => (ORDER[a.slug] ?? 99) - (ORDER[b.slug] ?? 99) || a.slug.localeCompare(b.slug));
 }
 
 /**
