@@ -23,6 +23,7 @@ import { isWorkspaceEntitled } from '../entitlement.ts';
 import { stripeProvider } from './stripe-provider.ts';
 import { vivaProvider } from './viva-provider.ts';
 import { revolutProvider } from './revolut-provider.ts';
+import { parseEnabledMethods } from './types.ts';
 import type { AvailableProvider, PaymentProvider, PaymentProviderSlug } from './types.ts';
 
 const PROVIDERS: Record<string, PaymentProvider> = {
@@ -85,10 +86,15 @@ export async function resolveWorkspacePaymentProviders(
       const configured = ctx !== null;
       if (opts.configuredOnly && !configured) return null;
 
+      const methods = enabledMethodsFor(p, ctx);
+      // A tenant who turned every method off has opted the provider out of the buyer
+      // surface entirely; seller-facing settings still see it (configuredOnly=false).
+      if (opts.configuredOnly && methods.length === 0) return null;
+
       return {
         slug: p.slug,
         label: p.label,
-        methods: enabledMethodsFor(p, ctx),
+        methods,
         configured,
       } as AvailableProvider;
     }),
@@ -105,15 +111,12 @@ export async function resolveWorkspacePaymentProviders(
 
 /**
  * Methods actually offered = what the provider supports ∩ what the tenant ticked.
- * An empty/absent `methods` setting means "all of them" so a freshly-connected
- * provider works without extra configuration.
+ * ABSENT `__methods` means "never configured" → all of them, so a freshly-connected
+ * provider works. An EMPTY subset means the tenant turned everything off → none —
+ * the old fall-back-to-all here inverted an explicit opt-out into a full opt-in.
  */
 function enabledMethodsFor(p: PaymentProvider, ctx: { credentials: Record<string, string> } | null) {
-  const raw = ctx?.credentials?.__methods;
-  if (!raw) return p.methods;
-  const wanted = new Set(raw.split(',').map((m) => m.trim()).filter(Boolean));
-  const intersect = p.methods.filter((m) => wanted.has(m));
-  return intersect.length > 0 ? intersect : p.methods;
+  return parseEnabledMethods(ctx?.credentials?.__methods, p.methods);
 }
 
 export type ChargeDispatch =

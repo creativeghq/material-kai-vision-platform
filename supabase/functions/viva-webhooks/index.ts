@@ -238,6 +238,21 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
         .maybeSingle();
       paymentRow = (pay as { id: string; workspace_id: string | null } | null) ?? null;
     }
+    // RF payments carry provider_ref 'viva-rf-<orderCode>', so the ParentId lookup
+    // misses them and the flag had no recipient (audit L2). Fall back to the reversal
+    // message's own order code when present.
+    if (!paymentRow) {
+      const revOrderCode = rawOrderCode(rawBody);
+      if (revOrderCode) {
+        const { data: rfPay } = await db
+          .from('payments')
+          .select('id, workspace_id')
+          .eq('provider', 'viva')
+          .eq('provider_ref', `viva-rf-${revOrderCode}`)
+          .maybeSingle();
+        paymentRow = (rfPay as { id: string; workspace_id: string | null } | null) ?? null;
+      }
+    }
 
     // "Flag it loudly for a human" was only ever a console.error — which reaches no human.
     // Emit the same payment_reversed event the Stripe path now emits, so the seeded default
@@ -373,6 +388,10 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
  * Viva's own order API confirms StateId === 3.
  */
 async function settlePendingRfOrders(db: any, cfg: any, ctx: any): Promise<Response> {
+  // Newest-first + capped: without an explicit order, 50 immortal stale intents could
+  // nondeterministically starve the genuinely-fresh RF that was just paid (audit M1).
+  // The daily payment-intents janitor cancels intents whose invoice is no longer
+  // payable, keeping this window small.
   const { data: pending } = await db
     .from('invoice_payment_intents')
     .select('id, invoice_id, provider_order_code, currency, status')
@@ -381,6 +400,7 @@ async function settlePendingRfOrders(db: any, cfg: any, ctx: any): Promise<Respo
     .eq('method', 'bank_reference')
     .eq('status', 'pending')
     .not('provider_order_code', 'is', null)
+    .order('created_at', { ascending: false })
     .limit(50);
 
   if (!pending || pending.length === 0) {

@@ -19,6 +19,7 @@
  *       https://developer.viva.com/payment-tools/rf-code-payments/
  */
 
+import { parseEnabledMethods } from './types.ts';
 import type {
   ChargeResult,
   CreateChargeInput,
@@ -264,10 +265,12 @@ export const vivaProvider: PaymentProvider = {
   label: 'Viva.com',
   // RF generation is confirmed against Viva demo (2026-08-03): the code + parser + the
   // {"rfPaymentCode":"RF…"} response shape are all verified live, and settlement reconciles
-  // via order-state polling (retrieveVivaOrder, StateId===3) driven by the 2054 webhook plus
-  // a periodic safety-net sweep. Still needs ONE real bank transfer to confirm the
-  // 2054→StateId=3 timing end-to-end; until then a tenant enables it deliberately per-workspace
-  // (methods jsonb), it is never on by default. Card is fully wired and proven.
+  // via order-state polling (retrieveVivaOrder, StateId===3) driven by the 2054 webhook.
+  // There is NO independent periodic sweep (audit H2) — settlement depends on the tenant's
+  // registered 2054 webhook; the `ops.payment_intents_stale` probe surfaces RF intents that
+  // sit pending on a payable invoice so a broken webhook cannot stay silent. Still needs ONE
+  // real bank transfer to confirm the 2054→StateId=3 timing end-to-end; until then a tenant
+  // enables it deliberately per-workspace (methods jsonb), never on by default. Card is proven.
   methods: ['card', 'bank_reference'],
   currencies: VIVA_CURRENCIES,
 
@@ -305,8 +308,11 @@ export const vivaProvider: PaymentProvider = {
         merchant_id: data.merchant_id ?? '',
         api_key: data.api_key ?? '',
         source_code: data.source_code ?? 'Default',
-        // Consumed by the registry to intersect offered methods.
-        __methods: Array.isArray(data.methods) ? data.methods.join(',') : '',
+        // Consumed by the registry to intersect offered methods. ABSENT (key omitted)
+        // when the tenant never configured a subset — the parser reads absent as "all"
+        // and empty-string as "none"; collapsing both to '' inverted an explicit
+        // opt-out into everything-on (audit H1).
+        ...(Array.isArray(data.methods) ? { __methods: data.methods.join(',') } : {}),
       },
       isSandbox: (data.environment ?? 'demo') !== 'production',
     };
@@ -316,9 +322,10 @@ export const vivaProvider: PaymentProvider = {
     // Honor the tenant's ENABLED method subset at charge time, not just the provider's full capability.
     // Discovery intersects `methods`, but a crafted request could ask for a method the seller disabled
     // (e.g. bank_reference on a card-only workspace) — the dispatch validates against provider.methods,
-    // so enforce the per-tenant subset here too.
-    const enabled = String(ctx.credentials.__methods ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    if (enabled.length && !enabled.includes(input.method)) {
+    // so enforce the per-tenant subset here too. ONE parser (parseEnabledMethods): an
+    // empty subset means NOTHING is chargeable, never everything.
+    const enabled = parseEnabledMethods(ctx.credentials.__methods, ['card', 'bank_reference']);
+    if (!enabled.includes(input.method)) {
       throw new Error(`Payment method "${input.method}" is not enabled for this workspace.`);
     }
     const hosts = vivaHosts(ctx.isSandbox);

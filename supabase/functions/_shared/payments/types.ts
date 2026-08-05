@@ -82,6 +82,22 @@ export interface PaymentProvider {
   createCharge(input: CreateChargeInput, ctx: PaymentProviderContext): Promise<ChargeResult>;
 }
 
+/**
+ * ONE parser for the per-tenant enabled-method subset (`credentials.__methods`).
+ * Semantics (audit H1 — the old three hand-rolled parsers disagreed and one failed OPEN):
+ *   - `undefined`  → the tenant never chose → ALL of the provider's methods.
+ *   - `''` (empty) → the tenant explicitly disabled everything → NONE. Never fall back
+ *     to "all": a tenant unticking their last method must turn methods OFF, not on.
+ */
+export function parseEnabledMethods(
+  raw: string | undefined,
+  providerMethods: PaymentMethodKind[],
+): PaymentMethodKind[] {
+  if (raw === undefined) return providerMethods;
+  const wanted = new Set(raw.split(',').map((s) => s.trim()).filter(Boolean));
+  return providerMethods.filter((m) => wanted.has(m));
+}
+
 /** A provider that is enabled AND configured for a given workspace. */
 export interface AvailableProvider {
   slug: PaymentProviderSlug;

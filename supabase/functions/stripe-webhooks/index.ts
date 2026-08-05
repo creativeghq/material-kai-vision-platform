@@ -122,6 +122,15 @@ Deno.serve(withApiLogging('stripe-webhooks', async (req) => {
         break;
 
       // ============================================
+      // Connect account lifecycle (audit F3): without this, charges_enabled only
+      // refreshed when a human revisited the settings page — until then charges
+      // silently ran platform-collect and the settlement account never provisioned.
+      // ============================================
+      case 'account.updated':
+        await handleConnectAccountUpdated(event.data.object as Stripe.Account);
+        break;
+
+      // ============================================
       // Subscription Events
       // ============================================
       case 'customer.subscription.created':
@@ -439,6 +448,19 @@ async function handleModuleAddonDeleted(subscription: Stripe.Subscription) {
   console.log(`Module add-on '${moduleSlug}' ended for ws ${workspaceId} (covered_by_plan=${covered}; sub ${subscription.id} deleted)`);
 }
 
+/** Keep the Connect routing config fresh from Stripe's own lifecycle events. */
+async function handleConnectAccountUpdated(account: Stripe.Account) {
+  const { error } = await supabase
+    .from('workspace_payment_config')
+    .update({
+      charges_enabled: !!account.charges_enabled,
+      details_submitted: !!account.details_submitted,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('stripe_connect_account_id', account.id);
+  if (error) console.warn('[stripe-webhooks] connect account refresh failed:', error.message);
+}
+
 async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   // Route by metadata.type FIRST — invoice payments don't require a registered user.
   if (paymentIntent.metadata?.type === 'invoice_payment') {
@@ -584,6 +606,20 @@ async function handleInvoicePaymentSucceeded(paymentIntent: Stripe.PaymentIntent
 
   // Throw → non-2xx → Stripe retries. Only for real failures; a duplicate is a success.
   if (!res.ok) throw new Error(`invoice_payment ingestion failed: ${res.error}`);
+
+  // Close the intent loop (audit F1): a settled Stripe checkout previously left its
+  // invoice_payment_intents row 'pending' forever — the pay page's return leg and any
+  // intents-based reconciliation were blind for Stripe. Best-effort: settlement above
+  // already succeeded, so an update failure must not make Stripe retry the money.
+  await supabase
+    .from('invoice_payment_intents')
+    .update({ status: 'paid', updated_at: new Date().toISOString() })
+    .eq('provider', 'stripe')
+    .eq('invoice_id', invoiceId)
+    .eq('status', 'pending')
+    .then(({ error }: { error: { message: string } | null }) => {
+      if (error) console.warn('[stripe-webhooks] intent close failed:', error.message);
+    });
 }
 
 /**

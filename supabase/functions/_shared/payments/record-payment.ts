@@ -81,6 +81,19 @@ async function providerBankAccountId(
   // — the bank feed imports the real settlement onto those later, and attributing both
   // would double-count the running balance.
   const slug = provider === 'revolut' ? 'revolut_merchant' : provider;
+
+  // Stripe (audit F2): the 'Stripe' treasury account represents the tenant's OWN
+  // connected balance. A charge that ran platform-collect (never onboarded, or Connect
+  // later disabled) lands on the OPERATOR's Stripe — attributing it to the tenant row
+  // would show operator-held money as tenant cash. Attribute only while Connect is live.
+  if (slug === 'stripe') {
+    const { data: pc } = await supabase
+      .from('workspace_payment_config')
+      .select('stripe_connect_account_id, charges_enabled')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (!pc?.stripe_connect_account_id || !pc?.charges_enabled) return null;
+  }
   const { data } = await supabase
     .from('finance_bank_accounts')
     .select('id')
