@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Viva.com | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="payments.html">Payment Providers</a> / Viva.com</div>
+  <h1>Viva.com <span class="badge gated">Pro add-on · BYOK</span></h1>
+  <div class="routes"><span class="badge route">/finance → Settings → Payments</span> <span class="badge gated">finance.manage · owner to activate</span></div>
+  <p class="lead">Viva.com is the provider for <strong>Greek and EU merchants</strong> who want card payments <em>and</em> bank transfers. It's <strong>bring-your-own-key</strong>: you connect your own Viva merchant account, and payments settle <strong>directly to your Viva wallet</strong> — the platform never holds your funds. Its standout feature is the Greek <strong>RF bank-transfer</strong>: a structured reference that lets a customer pay by plain bank transfer and have the invoice <strong>reconcile itself</strong>. This page covers the BYOK setup (there's more to connect than the other providers), the methods, and how each one settles.</p>
+
+  <div class="callout"><p><strong>Where:</strong> enable the add-on at <a href="finance-settings-payments.html">Finance → Settings → Payments</a> (owner-only), then open <strong>Configure</strong>. The same card also appears under <a href="account-keys.html">Profile → Keys</a>. Credentials are <strong>write-only</strong> — once saved they're never sent back to the browser.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/payments/viva-config.png" alt="The Viva.com configuration dialog">
+    <figcaption>The Viva <strong>Configure</strong> dialog — <strong>two credential pairs</strong> (the Smart Checkout pair authorises payments; the Merchant pair looks orders up and verifies the webhook), plus the payment source code and the demo/production environment.</figcaption>
+  </figure>
+
+  <h2>Connecting your Viva account — the four steps</h2>
+  <ol>
+    <li><strong>Credentials.</strong> Viva issues <strong>two pairs</strong>, both required:
+      <ul class="feat">
+        <li><strong>Smart Checkout pair</strong> — <em>Client ID</em> + <em>Client Secret</em> (authorise payments).</li>
+        <li><strong>Merchant pair</strong> — <em>Merchant ID</em> (a UUID from Viva → Settings → API Access) + <em>API Key</em> (used to look orders up and verify the webhook).</li>
+      </ul>
+      Also set the <strong>payment source code</strong> (case-sensitive; default <code>Default</code>) and the <strong>environment</strong> — <em>demo</em> for testing, <em>production</em> for live money.</li>
+    <li><strong>Return URL.</strong> Viva has no per-payment return URL, so you set it <em>once</em> on your payment source in the Viva dashboard, to the address the card shows you (<code>…/pay/return</code>).</li>
+    <li><strong>Webhook + Verify.</strong> Register the shown webhook URL in Viva and subscribe to <strong>Transaction Payment Created (1796)</strong>, <strong>Transaction Failed (1798)</strong>, and — for RF — <strong>Account Transaction Created (2054)</strong>. Then <strong>Verify</strong>. The card refuses to show “Connected” until the webhook is verified, because without it a payment could complete at Viva and never be booked here.</li>
+    <li><strong>Payment methods.</strong> Toggle the methods you'll offer and switch on <strong>Offer Viva at checkout</strong> (disabled until the connection is fully verified).</li>
+  </ol>
+  <div class="callout"><p><strong>Why the webhook is trusted-but-verified.</strong> Viva's webhook is treated only as a <em>trigger</em> — the platform never takes the money facts from the message itself. It reads the transaction (or order) back from Viva with <em>your</em> credentials and books only what Viva confirms. That's why the Merchant pair is required even just to receive payments.</p></div>
+
+  <h2>Methods</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Method</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Card (Smart Checkout)</strong></td><td>The customer is redirected to Viva's hosted Smart Checkout to pay by card, then returned to your pay page. Proven and live.</td></tr>
+      <tr><td><strong>RF bank-transfer</strong></td><td>A Greek <strong>ISO-11649 creditor reference</strong> the customer quotes on a plain bank transfer — no IBAN needed on their side — which <strong>auto-reconciles</strong> the invoice when the money lands (see below).</td></tr>
+    </tbody>
+  </table></div>
+  <p>Viva supports EUR plus several EU currencies (RON, PLN, CZK, HUF, SEK, DKK, GBP); <strong>RF is EUR / Greek-merchant only</strong>. You choose which methods to offer with the per-workspace toggles in step 4.</p>
+  <div class="callout warn"><p><strong>RF at checkout is being rolled out.</strong> The RF <em>code on your documents</em> is live (see below), but the RF option <em>on the online pay page</em> may show as “coming soon” while its end-to-end settlement is finished being verified. Card payments are fully live.</p></div>
+
+  <h2>The RF bank-transfer — pay by transfer, reconcile automatically</h2>
+  <p>This is Viva's differentiator. A <strong>never-expiring RF order</strong> is minted <em>per invoice</em> for the amount due, and the <strong>same RF code</strong> appears on the invoice/proforma <a href="finance-doc-invoices.html">PDF and email</a> and on the online pay page. When the customer's bank transfer arrives quoting that reference, Viva's <em>Account Transaction (2054)</em> webhook fires; the platform then polls the order and, once Viva marks it <strong>Paid</strong>, settles the invoice — <strong>no manual matching</strong>. It's amount-aware (edit a proforma's total before issuing and the code refreshes) and <strong>fails closed</strong> (if it can't be booked safely, the code is simply withheld rather than risk taking money it can't reconcile). Full detail on how it prints is in <a href="finance-doc-invoices.html">Invoices</a>.</p>
+
+  <h2>Reconciliation, failures &amp; reversals</h2>
+  <p>A successful card payment or a paid RF transfer settles through the shared payment ledger, so it books like any other payment and never over-collects. A <strong>failed</strong> payment marks the attempt failed (the customer can retry). A <strong>reversal</strong> is <strong>flagged to owners/admins, never auto-un-allocated</strong> — you settle it with a <a href="finance-doc-credit-notes.html">credit note</a>. Everything is idempotent, so a re-delivered webhook repairs rather than double-books.</p>
+
+  <div class="callout tip"><p><strong>Recap:</strong> owner enables Viva → paste <strong>both credential pairs</strong> + source code + environment → set the source's <strong>return URL</strong> in Viva → register &amp; <strong>Verify</strong> the webhook (events 1796 / 1798 / 2054) → toggle methods and offer Viva at checkout. Enable the RF code on your documents for auto-reconciling bank transfers. Compare with <a href="payments-stripe.html">Stripe</a> and <a href="banking.html">Revolut</a> on the <a href="payments.html">overview</a>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

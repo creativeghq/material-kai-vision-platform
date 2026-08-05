@@ -124,11 +124,6 @@
         { file: "real-estate-syndication.html", title: "Portal syndication" },
       ]},
       { file: "stock.html", title: "Stock Management", icon: "📦" },
-      { file: "banking.html", title: "Banking (Revolut)", icon: "🏦", children: [
-        { file: "banking-reconciliation.html", title: "Bank feed & reconciliation" },
-        { file: "banking-money-out.html", title: "Money-out & payouts" },
-        { file: "banking-cards.html", title: "Team cards & expenses" },
-      ]},
       { file: "company-assets.html", title: "Company Assets", icon: "🚗" },
       { file: "contracts.html", title: "Contracts & e-Signature", icon: "✍️" },
       { file: "email-marketing.html", title: "Email Marketing (BYOK)", icon: "📣" },
@@ -138,6 +133,16 @@
       ]},
       { file: "flows.html", title: "Flows (Automations)", icon: "🔀" },
       { file: "team-docs.html", title: "Team Docs", icon: "📓" },
+    ]},
+    { title: "Payment Providers", items: [
+      { file: "payments.html", title: "Overview", icon: "💳" },
+      { file: "payments-stripe.html", title: "Stripe", icon: "💠" },
+      { file: "payments-viva.html", title: "Viva.com", icon: "🏧" },
+      { file: "banking.html", title: "Revolut", icon: "🏦", children: [
+        { file: "banking-reconciliation.html", title: "Bank feed & reconciliation" },
+        { file: "banking-money-out.html", title: "Money-out & payouts" },
+        { file: "banking-cards.html", title: "Team cards & expenses" },
+      ]},
     ]},
     { title: "API", items: [
       { file: "api.html", title: "API overview", icon: "🔌", children: [

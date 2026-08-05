@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payment Providers | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / Payment Providers</div>
+  <h1>Payment Providers</h1>
+  <div class="routes"><span class="badge route">/finance → Settings → Payments</span> <span class="badge gated">finance.manage · owner to activate</span></div>
+  <p class="lead">Payment providers are the third-party integrations that <strong>move money into (and, with Revolut, out of) your workspace</strong>. Three are supported — <a href="payments-stripe.html">Stripe</a>, <a href="payments-viva.html">Viva.com</a> and <a href="banking.html">Revolut</a> — and each connects <em>your own</em> account, so funds settle directly to you, never through the platform. Whatever you connect and enable is what a customer is offered on the public pay page; whichever method they use, the invoice is <strong>reconciled through one shared money path</strong>, so a card payment and a bank transfer book the same way. This page compares the three and explains how they're gated; each has its own page for the deep setup.</p>
+
+  <div class="callout"><p><strong>Where you set them up:</strong> <a href="finance-settings-payments.html">Finance → Settings → Payments</a>. Each provider is a separate <strong>Pro add-on</strong> — only a workspace <strong>owner</strong> can activate one; other finance managers can request it.</p></div>
+
+  <h2>Which provider does what</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Provider</th><th>How you connect</th><th>Methods it offers customers</th></tr></thead>
+    <tbody>
+      <tr><td><strong><a href="payments-stripe.html">Stripe</a></strong></td><td><strong>Stripe Connect</strong> onboarding — you click through Stripe's flow rather than pasting keys (the platform holds the Stripe key; you're paid via Connect).</td><td>Card payments, worldwide.</td></tr>
+      <tr><td><strong><a href="payments-viva.html">Viva.com</a></strong></td><td><strong>BYOK</strong> — paste your own Viva merchant credentials; funds settle to your Viva wallet.</td><td>Card (Smart Checkout) and the Greek <strong>RF bank-transfer</strong> that auto-reconciles.</td></tr>
+      <tr><td><strong><a href="banking.html">Revolut Checkout</a></strong></td><td><strong>BYOK</strong> — your own Revolut Merchant account key.</td><td>Cards, Revolut Pay, Apple/Google Pay, Pay by Bank.</td></tr>
+    </tbody>
+  </table></div>
+  <p>On the public pay page the enabled methods are offered in a fixed order — <strong>Stripe, then Viva, then Revolut</strong> — with the first preselected. A customer never needs a MaterialsHub account; they follow the token link from their invoice email and pay.</p>
+
+  <div class="callout"><p><strong>Revolut is two things.</strong> Under this category, <a href="banking.html">Revolut</a> covers both <strong>Revolut Checkout</strong> (a customer payment method, above) <em>and</em> <strong>Revolut Business</strong> — your <em>own</em> bank account, with a transaction feed, reconciliation, money-out and team cards. Stripe and Viva are checkout-only; Revolut also does your banking.</p></div>
+
+  <h2>How a provider becomes usable</h2>
+  <p>A provider is only offered to your customers once <strong>three</strong> things are true — a deliberate ladder so a half-set-up provider never shows a broken pay button:</p>
+  <ol>
+    <li><strong>Published</strong> — the operator has the provider enabled platform-wide (a global kill-switch).</li>
+    <li><strong>Enabled</strong> — your workspace owner has activated the add-on for your workspace.</li>
+    <li><strong>Connected</strong> — you've actually completed the provider's setup (Connect onboarding for Stripe; credentials + a verified webhook for Viva and Revolut).</li>
+  </ol>
+  <p>Turn every method off and the provider simply drops from the customer's choices. Each provider re-checks all three gates <em>at the moment money moves</em>, so a client can never trigger a charge through a provider you haven't fully set up.</p>
+
+  <h2>What they settle</h2>
+  <p>Every provider writes into the <strong>same</strong> payment ledger through one shared routine — so a Stripe card payment, a Viva RF bank transfer and a Revolut Pay charge all book identically against the <a href="finance-doc-invoices.html">invoice</a>, allocate correctly, and never over-collect. Refunds and disputes are <strong>flagged to owners/admins, never auto-reversed</strong> — you settle them with a <a href="finance-doc-credit-notes.html">credit note</a>, keeping the books deliberate.</p>
+
+  <div class="callout tip"><p><strong>Pick by what you need:</strong> want the widest card reach with the least setup → <a href="payments-stripe.html">Stripe</a>; a Greek merchant who wants card <em>and</em> auto-reconciling bank transfers → <a href="payments-viva.html">Viva</a>; already bank with Revolut and want your account, cards and reconciliation in one place → <a href="banking.html">Revolut</a>. You can enable more than one; the customer chooses at checkout.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

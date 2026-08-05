@@ -25,12 +25,12 @@
   <div class="table-wrap"><table>
     <thead><tr><th>Provider</th><th>What it offers</th></tr></thead>
     <tbody>
-      <tr><td><strong>Stripe</strong></td><td>Card checkout for invoices, plus the platform's subscription &amp; credit purchases, with webhook reconciliation. Connect your Stripe account and its methods are offered on the pay page.</td></tr>
-      <tr><td><strong>Viva.com</strong></td><td>A per-workspace BYOK merchant account — <strong>Smart Checkout</strong> card payments and the Greek <strong>RF bank-transfer</strong> method (a structured reference that auto-reconciles a bank transfer — see below).</td></tr>
-      <tr><td><strong>Revolut Checkout</strong></td><td>One hosted checkout that accepts <strong>cards, Revolut Pay, Apple Pay / Google Pay and Pay by Bank</strong>, via your own Revolut Merchant account. (Distinct from <a href="banking.html">Revolut Business</a> below.)</td></tr>
+      <tr><td><strong><a href="payments-stripe.html">Stripe</a></strong></td><td>Card checkout for invoices (worldwide), plus the platform's subscription &amp; credit purchases. You connect via <strong>Stripe Connect</strong> — a click-through, not key-pasting. <a href="payments-stripe.html">Full guide →</a></td></tr>
+      <tr><td><strong><a href="payments-viva.html">Viva.com</a></strong></td><td>A per-workspace BYOK merchant account — <strong>Smart Checkout</strong> card payments and the Greek <strong>RF bank-transfer</strong> method (a structured reference that auto-reconciles a bank transfer — see below). <a href="payments-viva.html">Full guide →</a></td></tr>
+      <tr><td><strong><a href="banking.html">Revolut Checkout</a></strong></td><td>One hosted checkout that accepts <strong>cards, Revolut Pay, Apple Pay / Google Pay and Pay by Bank</strong>, via your own Revolut Merchant account. (Distinct from <a href="banking.html">Revolut Business</a> below.)</td></tr>
     </tbody>
   </table></div>
-  <p>Each provider is enabled/configured in its own dialog — you paste your merchant credentials (and, for Revolut Checkout, activate its webhook). A provider is only offered to customers once it's both connected <em>and</em> its webhook is active, so a half-configured provider never shows a broken pay button.</p>
+  <p>Each provider is enabled/configured in its own dialog. Setup differs by provider — <a href="payments-stripe.html">Stripe</a> uses Connect onboarding, while <a href="payments-viva.html">Viva</a> and <a href="banking.html">Revolut</a> take your own credentials plus a verified webhook. A provider is only offered to customers once it's both connected <em>and</em> its webhook is active, so a half-configured provider never shows a broken pay button. For the deep per-provider setup, see the <a href="payments.html">Payment Providers</a> pages.</p>
 
   <h3>The Greek RF bank-transfer method</h3>
   <p>Via <strong>Viva</strong>, you can offer a <strong>bank-transfer with an RF reference</strong> — a structured payment code. Its power is <strong>automatic reconciliation</strong>: because the code is minted per invoice, when the customer's transfer arrives it's recognised and the invoice is <strong>settled without anyone matching it by hand</strong>. The RF code also <strong>prints on the invoice/proforma PDF and email</strong>, so a customer who never opens the pay link can still pay by transfer with the right reference — see <a href="finance-doc-invoices.html">Invoices</a> for how it appears on the document.</p>
@@ -41,7 +41,7 @@
   <h2>How to set up online payments — step by step</h2>
   <ol>
     <li>Go to <strong>Finance → Settings → Payments</strong>.</li>
-    <li>Pick a provider (Stripe, Viva or Revolut Checkout), click <strong>Configure</strong>, and connect <strong>your own</strong> merchant account (paste the keys; activate the webhook where asked).</li>
+    <li>Pick a provider (<a href="payments-stripe.html">Stripe</a>, <a href="payments-viva.html">Viva</a> or <a href="banking.html">Revolut Checkout</a>), click <strong>Configure</strong>, and complete its setup — Connect onboarding for Stripe, or your own credentials + a verified webhook for Viva and Revolut.</li>
     <li>For Viva, enable the <strong>RF bank-transfer</strong> method if you want auto-reconciling transfers and the RF code on your documents.</li>
     <li>Email an invoice to a customer, then open its <span class="badge route">/pay/:token</span> link yourself to confirm the methods appear.</li>
   </ol>

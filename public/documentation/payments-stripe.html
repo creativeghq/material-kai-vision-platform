@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stripe | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="payments.html">Payment Providers</a> / Stripe</div>
+  <h1>Stripe <span class="badge gated">Pro add-on</span></h1>
+  <div class="routes"><span class="badge route">/finance → Settings → Payments</span> <span class="badge gated">finance.manage · owner to activate</span></div>
+  <p class="lead">Stripe is the <strong>card-payment provider with the widest reach and the least setup</strong>. Unlike the other providers, you don't paste API keys — you connect through <strong>Stripe Connect</strong>, and payments for your invoices are routed to your connected Stripe account. Stripe also quietly powers the platform's own billing (your subscription, credit top-ups and add-ons), so it's worth understanding the two separate roles it plays.</p>
+
+  <div class="callout"><p><strong>Where:</strong> enable and configure it at <a href="finance-settings-payments.html">Finance → Settings → Payments</a> (a workspace <strong>owner</strong> activates the add-on). The <strong>Configure</strong> dialog handles the webhook and quick links; your Connect onboarding is a click-through with Stripe.</p></div>
+
+  <h2>Two roles — don't confuse them</h2>
+  <p>Stripe appears in two places on the platform, and they're deliberately separate:</p>
+  <ul class="feat">
+    <li><strong>Your invoice payments</strong> — when a customer pays one of <em>your</em> invoices by card, the money is routed to <em>your</em> connected Stripe account (via Stripe Connect). This is the payment-provider role documented here.</li>
+    <li><strong>The platform's billing</strong> — your own MaterialsHub <a href="account-subscription.html">subscription</a>, <a href="account-credits.html">credit</a> purchases and paid add-ons are also processed through Stripe, but on the <em>operator's</em> billing account. That's why some “pay” actions open a Stripe page even before you've connected anything — it's the platform charging you, not your customers paying you.</li>
+  </ul>
+
+  <h2>How you connect — Stripe Connect, not keys</h2>
+  <p><strong>What it is —</strong> rather than copying secret keys into the platform, you complete <strong>Stripe Connect</strong> onboarding: the platform creates a connected (Express) account for your workspace and hands you off to Stripe to verify your business and bank details. <strong>Why it matters —</strong> it means the platform never holds your Stripe keys, and Stripe pays you directly. Once onboarding reports your account as <em>charges-enabled</em>, invoice payments route to you automatically.</p>
+  <ol>
+    <li>A workspace <strong>owner</strong> enables the <strong>Stripe</strong> add-on in <a href="finance-settings-payments.html">Settings → Payments</a>.</li>
+    <li>Complete <strong>Connect onboarding</strong> with Stripe (business details + payout bank). Until that's done, card payments still work but settle to the platform account rather than routing to you — so finish onboarding before you rely on it.</li>
+    <li>In the <strong>Configure</strong> dialog, add the <strong>webhook</strong> (below) so completed payments reconcile.</li>
+  </ol>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/payments/stripe-config.png" alt="The Stripe configuration dialog">
+    <figcaption>The Stripe <strong>Configure</strong> dialog — the webhook URL to paste into Stripe (Dashboard → Developers → Webhooks) with the exact events to subscribe to, plus quick links to the Stripe surfaces you manage on Stripe's side.</figcaption>
+  </figure>
+
+  <h3>The webhook</h3>
+  <p>Paste the shown URL into <strong>Stripe Dashboard → Developers → Webhooks</strong> and subscribe to <code>payment_intent.succeeded</code>, <code>checkout.session.completed</code>, <code>customer.subscription.*</code> and <code>invoice.payment_failed</code>. The <code>STRIPE_WEBHOOK_SECRET</code> is what verifies each event's signature — a payment is only booked after Stripe's signed confirmation, never on the customer's redirect alone.</p>
+
+  <h2>What it powers</h2>
+  <ul class="feat">
+    <li><strong>Invoice / pay-page card payments</strong> — the customer pays at <span class="badge route">/pay/:token</span> via a Stripe Checkout session; on success the invoice is settled and routed to your connected account.</li>
+    <li><strong>Platform subscriptions</strong> — your MaterialsHub plan (Pro / Enterprise) is billed through Stripe.</li>
+    <li><strong>Credit-pack purchases</strong> — buying <a href="account-credits.html">credits</a> (personal or the workspace pool) goes through Stripe; €1 = 100 credits.</li>
+    <li><strong>Add-on subscriptions</strong> — the paid modules (including the other payment providers) are Stripe subscriptions; enabling one may send you to a Stripe checkout.</li>
+    <li><strong>Customer portal</strong> — manage your platform subscription and payment method through Stripe's hosted customer portal.</li>
+  </ul>
+
+  <h2>Methods &amp; reach</h2>
+  <p>Stripe offers <strong>card</strong> payments with no currency restriction (≈135 currencies), which is what makes it the broadest-reach option. It's offered <strong>first</strong> on the pay page when enabled.</p>
+
+  <h2>Reconciliation, refunds &amp; disputes</h2>
+  <p>A completed payment arrives as a signed <strong>webhook</strong>, which settles the matching invoice through the shared payment ledger (so it books exactly like any other payment and never over-collects). A <a href="public-pages.html">statement “pay balance”</a> link settles the same way. <strong>Refunds and disputes are flagged to owners/admins — never auto-reversed</strong>: you resolve them deliberately with a <a href="finance-doc-credit-notes.html">credit note</a>, so a chargeback can't silently unwind your books.</p>
+
+  <div class="callout tip"><p><strong>Recap:</strong> owner enables Stripe → complete <strong>Connect onboarding</strong> so payments route to you → add the <strong>webhook</strong> in the Configure dialog → email an invoice and confirm the card option appears at <span class="badge route">/pay/:token</span>. See <a href="payments.html">Payment Providers</a> to compare with <a href="payments-viva.html">Viva</a> and <a href="banking.html">Revolut</a>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
