@@ -100,6 +100,56 @@ export async function ensureRevolutBankAccounts(service: any, cfg: RevolutConfig
   }
 }
 
+/**
+ * Card-spend alerts (#315 idea 5): emit ONE `card_spend_threshold` flow event per card
+ * payment of ≥ €100 (hardcoded floor — flows can filter higher via the amount payload).
+ * Called after both ingestion paths (webhook + sync); the stamp makes it idempotent.
+ */
+export async function notifyCardSpends(service: any, workspaceId: string): Promise<number> {
+  const { data: rows } = await service
+    .from('revolut_bank_transactions')
+    .select('id, amount, currency, counterparty_name, reference, booked_at')
+    .eq('workspace_id', workspaceId)
+    .eq('type', 'card_payment')
+    .eq('direction', 'out')
+    .gte('amount', 100)
+    .is('spend_notified_at', null)
+    .gte('booked_at', new Date(Date.now() - 7 * 24 * 3600_000).toISOString())
+    .limit(50);
+  if (!rows?.length) return 0;
+
+  const { data: owner } = await service
+    .from('workspace_members')
+    .select('user_id')
+    .eq('workspace_id', workspaceId)
+    .eq('role', 'owner')
+    .eq('status', 'active')
+    .limit(1)
+    .maybeSingle();
+  if (!owner?.user_id) return 0;
+
+  const { emitFlowEvent } = await import('../flow-events.ts');
+  let sent = 0;
+  for (const tx of rows as any[]) {
+    await emitFlowEvent('card_spend_threshold', {
+      user_id: owner.user_id,
+      type: 'card_spend_threshold',
+      title: 'Large card spend',
+      body: `${String(tx.currency).toUpperCase()} ${Number(tx.amount).toFixed(2)} at ${tx.counterparty_name ?? tx.reference ?? 'unknown merchant'}.`,
+      action_url: '/finance?tab=settings&section=banks',
+      workspace_id: workspaceId,
+      amount: Number(tx.amount),
+      currency: String(tx.currency).toUpperCase(),
+      merchant: tx.counterparty_name ?? null,
+    }).catch((err: unknown) => console.warn('[revolut/cards] spend emit failed:', err instanceof Error ? err.message : err));
+    await service.from('revolut_bank_transactions')
+      .update({ spend_notified_at: new Date().toISOString() })
+      .eq('id', tx.id);
+    sent++;
+  }
+  return sent;
+}
+
 /** The workspace's revolut_account_id → finance_bank_accounts.id mapping. */
 export async function loadAccountMapping(service: any, workspaceId: string): Promise<Map<string, string>> {
   const { data } = await service
@@ -205,6 +255,7 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
     } catch (err) {
       console.warn('[revolut-sync] reconcile pass failed:', err instanceof Error ? err.message : err);
     }
+    try { await notifyCardSpends(service, workspaceId); } catch { /* alerts never block the pull */ }
 
     return { ok: true, workspaceId, fetched: all.length, upserted, webhookFailures, autoMatched, suggested };
   } catch (err) {

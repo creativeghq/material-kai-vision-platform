@@ -113,6 +113,11 @@ Deno.serve(withApiLogging('revolut-webhooks', async (req) => {
         .from('revolut_bank_transactions')
         .upsert(rows, { onConflict: 'workspace_id,provider_ref' });
       if (error) return json({ error: 'ingest failed' }, 500);
+      // Near-real-time large-card-spend alert (idempotent via spend_notified_at).
+      try {
+        const { notifyCardSpends } = await import('../_shared/revolut/sync-core.ts');
+        await notifyCardSpends(service, cfg.workspace_id);
+      } catch { /* alerting never fails the delivery */ }
       return json({ ok: true, upserted: rows.length });
     }
 

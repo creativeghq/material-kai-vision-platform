@@ -89,6 +89,8 @@ export type TriggerType =
   | 'invoice_paid'
   // Banking (#315): an incoming bank transfer matched no invoice (payload-only)
   | 'bank_payment_unmatched'
+  // Banking (#315): a company-card spend of ≥€100 landed (filter higher via amount)
+  | 'card_spend_threshold'
   | 'module_access_requested'
   // HR: an employee has not clocked in past their start time + grace (payload-only)
   | 'hr_late_checkin'
@@ -204,6 +206,7 @@ export interface MaterialAlertTriggerConfig {}
 export interface FinanceFollowUpTriggerConfig {}
 export interface InvoicePaidTriggerConfig {}
 export interface BankPaymentUnmatchedTriggerConfig {}
+export interface CardSpendThresholdTriggerConfig {}
 export interface ReviewSubmittedTriggerConfig {}
 
 export interface ScheduledTriggerConfig {
@@ -376,6 +379,7 @@ export type TriggerConfigMap = {
   finance_follow_up: FinanceFollowUpTriggerConfig;
   invoice_paid: InvoicePaidTriggerConfig;
   bank_payment_unmatched: BankPaymentUnmatchedTriggerConfig;
+  card_spend_threshold: CardSpendThresholdTriggerConfig;
   module_access_requested: ModuleAccessRequestedTriggerConfig;
   hr_late_checkin: HrLateCheckinTriggerConfig;
   'hr.applicant_stage_changed': HrApplicantStageChangedTriggerConfig;

@@ -13,6 +13,7 @@ import {
   Home,
   Undo2,
   Landmark,
+  CreditCard,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -83,6 +84,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   finance_follow_up: Zap,
   invoice_paid: CheckCircle2,
   bank_payment_unmatched: Landmark,
+  card_spend_threshold: CreditCard,
   module_access_requested: LayoutGrid,
   expense_card_reviewed: CheckCircle2,
   expense_card_requested: FileText,
