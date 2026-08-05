@@ -26,6 +26,9 @@ export const PropertyDiscoveryTab: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-[220px] flex-[2]">
+          <Input placeholder="Describe it — e.g. bright two-bed near the sea with a balcony" value={filters.query ?? ''} onChange={(e) => set('query', e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run(filters)} />
+        </div>
         <div className="min-w-[140px] flex-1">
           <Input placeholder="Town" value={filters.town ?? ''} onChange={(e) => set('town', e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run(filters)} />
         </div>

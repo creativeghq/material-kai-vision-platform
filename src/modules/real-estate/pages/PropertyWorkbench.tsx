@@ -37,6 +37,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
 const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
+
+// Lazy: the Spark/Three splat renderer only loads when a listing actually shows a VR world.
+const WorldViewer = React.lazy(() => import('@/components/features/ai/WorldViewer').then((m) => ({ default: m.WorldViewer })));
 const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
 const TRANSACTION_TYPES = ['sale', 'rent', 'short_let', 'business_transfer', 'auction'];
 const LISTING_STATUSES = ['draft', 'active', 'under_offer', 'sold', 'rented', 'withdrawn', 'archived'];
@@ -79,7 +82,7 @@ const FORM_FIELDS = [
   'max_guests', 'bed_config', 'min_stay_nights', 'check_in_time', 'check_out_time', 'cleaning_fee', 'deposit',
   'instant_book', 'cancellation_policy', 'house_rules', 'smoking_allowed', 'events_allowed',
   // content & agent
-  'features', 'amenities', 'description_i18n', 'agent_name', 'agent_phone', 'agent_email', 'agent_website',
+  'features', 'amenities', 'description_i18n', 'virtual_tour_url', 'video_url', 'agent_name', 'agent_phone', 'agent_email', 'agent_website',
 ] as const;
 
 const ARRAY_FIELDS = new Set(['features', 'amenities', 'utilities_available', 'legal_clearances', 'view_types', 'suitable_for']);
@@ -490,6 +493,8 @@ export default function PropertyWorkbench() {
                   <F label="Description (EL)" wide><Textarea rows={4} value={form.description_el ?? ''} onChange={(e) => set('description_el', e.target.value)} /></F>
                   <F label="Features (comma-separated)" wide><Input value={form.features ?? ''} onChange={(e) => set('features', e.target.value)} /></F>
                   <F label="Amenities notes (comma-separated)" wide><Input value={form.amenities ?? ''} onChange={(e) => set('amenities', e.target.value)} /></F>
+                  <F label="Virtual tour URL"><Input type="url" value={form.virtual_tour_url ?? ''} onChange={(e) => set('virtual_tour_url', e.target.value)} placeholder="https://my.matterport.com/…" /></F>
+                  <F label="Video URL (YouTube / Vimeo)"><Input type="url" value={form.video_url ?? ''} onChange={(e) => set('video_url', e.target.value)} placeholder="https://youtu.be/…" /></F>
                 </FormSection>
                 <FormSection title="Listing agent" icon={Contact}>
                   <F label="Agent name"><Input value={form.agent_name ?? ''} onChange={(e) => set('agent_name', e.target.value)} /></F>
@@ -536,6 +541,51 @@ export default function PropertyWorkbench() {
                 ))}
               </div>
             )}
+
+            {/* ── VR walkthrough (WorldLabs Marble from the cover photo) ── */}
+            <div className="mt-6">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Globe className="h-4 w-4" /> VR walkthrough</h3>
+              {property.vr_world_id ? (
+                <div className="space-y-2">
+                  <div className="h-[420px] overflow-hidden rounded-xl border">
+                    <React.Suspense fallback={<Skeleton className="h-full w-full" />}>
+                      <WorldViewer vrWorldId={property.vr_world_id} />
+                    </React.Suspense>
+                  </div>
+                  {editable && (
+                    <Button variant="outline" size="sm" className="rounded-full text-xs" disabled={busy}
+                      onClick={async () => { await realEstateService.updateProperty(ws!, id, { vr_world_id: null }); await load(); }}>
+                      <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove walkthrough
+                    </Button>
+                  )}
+                </div>
+              ) : editable ? (
+                photos.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Upload at least one photo first — the walkthrough is generated from the cover photo.</p>
+                ) : (
+                  <div>
+                    <Button variant="outline" className="rounded-full" disabled={busy} onClick={async () => {
+                      if (!ws) return;
+                      setBusy(true);
+                      try {
+                        const cover = photos.find((p) => p.is_cover) ?? photos[0];
+                        const { supabase } = await import('@/integrations/supabase/client');
+                        const { data: s } = await supabase.storage.from('property-media').createSignedUrl(cover.storage_path, 3600);
+                        if (!s?.signedUrl) throw new Error('Could not access the cover photo');
+                        const { vrWorldService } = await import('@/services/vrWorldService');
+                        const prompt = [property.title, property.property_type, property.town].filter(Boolean).join(', ') || 'Property interior';
+                        const r = await vrWorldService.generateVRWorld({ sourceImageUrl: s.signedUrl, prompt });
+                        await realEstateService.updateProperty(ws, id, { vr_world_id: r.vrWorldId });
+                        await load();
+                        toast({ title: 'VR walkthrough started', description: 'It renders here (and on the public page) when ready.' });
+                      } catch (e) { toast({ title: 'VR generation failed', description: (e as Error).message, variant: 'destructive' }); }
+                      finally { setBusy(false); }
+                    }}><Sparkles className="mr-2 h-4 w-4" /> Create VR walkthrough from cover photo</Button>
+                    <p className="mt-1 text-[11px] text-muted-foreground">Explorable 3D world (WorldLabs Marble) generated from the cover photo. 18 credits.</p>
+                  </div>
+                )
+              ) : null}
+            </div>
           </TabsContent>
 
           {/* ── Leads / inquiries ── */}

@@ -76,7 +76,7 @@ Legend — **M** = requires `canManage`; **PM** = also requires the `real-estate
 | `create-property` | **`property`** | M | `workspace_id`, `created_by` and `listing_agent_id` are set server-side. |
 | `update-property` | **`property_id`**, **`patch`** | M | Allow-listed fields only. |
 | `delete-property` | **`property_id`** | M | Cascades to photos, viewings, offers and interest rows. |
-| `publish-property` | **`property_id`**, `in_discovery?` | M | Sets `listing_status=active`, mints/keeps `public_listing_token` (the `/p/:token` capability). `in_discovery` additionally opts the listing into cross-workspace discovery **and** the syndication feed. |
+| `publish-property` | **`property_id`**, `in_discovery?` | M | Sets `listing_status=active`, mints/keeps `public_listing_token` (the `/p/:token` capability). `in_discovery` additionally opts the listing into cross-workspace discovery **and** the syndication feed. Also refreshes `text_embedding` (Voyage 1024D via the MIVAA gateway, best-effort — an embedding outage never blocks publish) so the listing is findable by semantic `discover` search; `update-property` re-refreshes it while the listing stays live. |
 | `unpublish-property` | **`property_id`** | M | Withdraws from the public page, discovery and the feed in one step. |
 | `draft-description` 💳 | **`property_id`**, `tone?` | M | AI-drafts listing copy from the structured fields. |
 
@@ -184,9 +184,9 @@ No `Authorization` header. Security model:
 
 | Action | Params (required **bold**) | Description |
 |---|---|---|
-| `get` | **`token`** | Resolve a listing token → the public listing payload behind `/p/:token`. |
+| `get` | **`token`** | Resolve a listing token → the public listing payload behind `/p/:token`. Includes `vr_world` (public WorldLabs splat/panorama URLs) when the listing carries a **completed** VR walkthrough — pending/failed worlds stay invisible. |
 | `inquire` | **`token`**, **`name`**, **`email`**, **`gdpr_consent`**, `phone?`, `message?` | Anonymous lead capture. Rate-limited. |
-| `discover` | `filters?`, `limit?` | Cross-workspace discovery — only listings explicitly opted in with `in_discovery=true`. |
+| `discover` | `query?`, `filters?`, `limit?` | Cross-workspace discovery — only listings explicitly opted in with `in_discovery=true`. A free-text `query` switches to **semantic ranking**: it is embedded (Voyage, `input_type: query`) and matched by cosine against `properties.text_embedding` via the service-role-only `search_properties_semantic` RPC (same discover population, facet params still filter). Falls back to the facet/recency path on any embedding failure. |
 | `agency-listings` | **`workspace_slug`**, `filters?` | Public listing wall for one agency. |
 | `buyer-portal` | **`token`** | Buyer's matched listings, favourites and requirement summary (`/buyer/:token`). |
 | `buyer-favorite` | **`token`**, **`property_id`** | Toggle a favourite from the portal. |

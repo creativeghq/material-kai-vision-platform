@@ -21,7 +21,20 @@ import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { checkPublishRequirements, matchesCriteria, createRentInvoiceForCharge, estimateFromMedianPerSqm } from '../_shared/real-estate.ts';
 import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
 import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
+import { refreshListingEmbedding } from '../_shared/real-estate-embedding.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+
+/** Member-entered link fields render as hrefs on the ANONYMOUS public page — enforce http(s)
+ *  at write time so a stored `javascript:` URL can never exist (the page also guards on render). */
+function assertHttpUrls(payload: Record<string, unknown>): void {
+  for (const key of ['virtual_tour_url', 'video_url', 'agent_website']) {
+    const v = payload[key];
+    if (v == null || v === '') continue;
+    let ok = false;
+    try { const u = new URL(String(v)); ok = u.protocol === 'https:' || u.protocol === 'http:'; } catch { ok = false; }
+    if (!ok) throw new HttpError(400, `${key} must be an http(s) URL`);
+  }
+}
 
 /** Does a buyer requirement's saved-search criteria match a listing? (deterministic facets) */
 
@@ -302,6 +315,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       case 'create-property': {
         requireManage();
         const payload = pick(body, PROPERTY_WRITABLE);
+        assertHttpUrls(payload);
         // The creator becomes the listing agent (owner) unless a broker explicitly assigns another.
         if (payload.listing_agent_id === undefined) payload.listing_agent_id = userId;
         const { data, error } = await supabase.from('properties')
@@ -317,6 +331,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (!id) return json({ error: 'property_id is required' }, 400);
         await loadEditable(id);
         const payload = pick(body, PROPERTY_WRITABLE);
+        assertHttpUrls(payload);
         // record a price-history row when price changes; flag a drop for buyer-match alerts
         let priceDropped = false;
         if (payload.price !== undefined) {
@@ -329,6 +344,8 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const { data, error } = await supabase.from('properties').update(payload).eq('id', id).eq('workspace_id', workspaceId).select('*').single();
         if (error) throw new HttpError(400, error.message);
         if (priceDropped && data.is_public && data.listing_status === 'active') await emitBuyerMatchAlert(supabase, workspaceId, data, 'price_drop');
+        // Keep the semantic-search vector in step with the listing text while it is live.
+        if (data.is_public && data.listing_status === 'active') await refreshListingEmbedding(supabase, data);
         return json({ property: data });
       }
 
@@ -368,6 +385,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const { data, error } = await supabase.from('properties').update(patch).eq('id', id).eq('workspace_id', workspaceId).select('*').single();
         if (error) throw new HttpError(400, error.message);
         await emitBuyerMatchAlert(supabase, workspaceId, data, 'new_listing'); // D10 — alert agent of matching buyers
+        await refreshListingEmbedding(supabase, data); // semantic Discovery search (best-effort, never blocks publish)
         return json({ property: data, warnings: gate.warnings });
       }
 

@@ -14,6 +14,7 @@ import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { toPublic, matchesCriteria, estimateFromMedianPerSqm } from '../_shared/real-estate.ts';
+import { embedText } from '../_shared/real-estate-embedding.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 
@@ -149,6 +150,38 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
 
   // ── Cross-workspace Discovery (no token) — only active+public+in_discovery listings, toPublic-projected.
   if (action === 'discover' || action === 'agency-listings') {
+    // Semantic search: a free-text `query` embeds (Voyage, input_type 'query') and ranks by
+    // cosine against properties.text_embedding via the service-role-only RPC. The RPC filters
+    // to the exact discover population (active + is_public + in_discovery), so it can never
+    // return a listing the facet path below would not. Falls back to the facet path on any
+    // embedding/RPC failure — search degrading to recency beats search failing.
+    const queryText = action === 'discover' ? String(body?.query ?? '').trim().slice(0, 500) : '';
+    if (queryText) {
+      try {
+        const emb = await embedText(queryText, 'query');
+        if (!emb) throw new Error('no embedding returned');
+        const { data: hits, error: rpcErr } = await supabase.rpc('search_properties_semantic', {
+          p_embedding: emb,
+          p_limit: 60,
+          p_property_type: body?.property_type ? String(body.property_type) : null,
+          p_transaction_type: body?.transaction_type ? String(body.transaction_type) : null,
+          p_town: body?.town ? String(body.town) : null,
+          p_price_min: body?.price_min ?? null,
+          p_price_max: body?.price_max ?? null,
+          p_bedrooms_min: body?.bedrooms_min ?? null,
+        });
+        if (rpcErr) throw rpcErr;
+        const ordered: string[] = (hits ?? []).map((h: any) => h.id);
+        if (!ordered.length) return json({ listings: [], semantic: true });
+        const { data: rows } = await supabase.from('properties').select('*').in('id', ordered);
+        const byId = new Map((rows ?? []).map((r: any) => [r.id, r]));
+        const ranked = ordered.map((pid) => byId.get(pid)).filter(Boolean);
+        const covers = await coverUrls(ranked.map((r: any) => r.id));
+        return json({ listings: ranked.map((r: any) => ({ ...toPublic(r), cover_url: covers[r.id] ?? null })), semantic: true });
+      } catch (e) {
+        console.error('[real-estate-public] semantic discover failed — falling back to facet search:', e);
+      }
+    }
     let q = supabase.from('properties').select('*')
       .eq('is_public', true).eq('listing_status', 'active')
       .order('published_at', { ascending: false }).limit(60);
@@ -299,9 +332,20 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
       const { data } = await supabase.storage.from('property-media').createSignedUrl(ph.storage_path, 3600);
       return { id: ph.id, kind: ph.kind, caption: ph.caption, is_cover: ph.is_cover, url: data?.signedUrl ?? null };
     }));
+    // VR walkthrough: expose ONLY a completed world's public WorldLabs asset URLs — the anon
+    // page cannot read vr_worlds itself, and an incomplete/failed world stays invisible.
+    let vrWorld: Record<string, unknown> | null = null;
+    if (property.vr_world_id) {
+      const { data: w } = await supabase.from('vr_worlds')
+        .select('status, splat_url_100k, splat_url_500k, splat_url_full, panorama_url, caption')
+        .eq('id', property.vr_world_id).maybeSingle();
+      if (w?.status === 'completed') {
+        vrWorld = { splat_url_100k: w.splat_url_100k, splat_url_500k: w.splat_url_500k, splat_url_full: w.splat_url_full, panorama_url: w.panorama_url, caption: w.caption };
+      }
+    }
     // Fire-and-forget view counter (never blocks the render).
     supabase.rpc('increment_property_view_count', { p_property_id: property.id }).then(() => {}, () => {});
-    return json({ listing: toPublic(property), photos: signed });
+    return json({ listing: toPublic(property), photos: signed, vr_world: vrWorld });
   }
 
   if (action === 'inquire') {

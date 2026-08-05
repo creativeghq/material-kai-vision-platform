@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { useParams } from 'react-router-dom';
-import { Building2, MapPin, BedDouble, Bath, Ruler, Zap, Loader2, CheckCircle2 } from 'lucide-react';
+import { Building2, MapPin, BedDouble, Bath, Ruler, Zap, Loader2, CheckCircle2, ExternalLink, Rotate3D } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
@@ -11,6 +11,37 @@ import { realEstatePublic, type PublicListing } from '@/modules/real-estate/serv
 // Public `/p/:token` listing page (anonymous). All content comes from the token-gated
 // real-estate-public edge fn's toPublic() projection; rendered via JSX only (no HTML-string assembly).
 const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on request' });
+
+// Lazy: the Spark/Three splat renderer loads only when the listing actually carries a VR world.
+const WorldViewer = React.lazy(() => import('@/components/features/ai/WorldViewer').then((m) => ({ default: m.WorldViewer })));
+
+/** Only ever link to http(s) — a stored `javascript:` URL must render as nothing, not a live link. */
+function safeHttpUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !raw) return null;
+  try { const u = new URL(raw); return u.protocol === 'https:' || u.protocol === 'http:' ? raw : null; } catch { return null; }
+}
+
+/** Privacy-friendly embed URL for the two providers we support; anything else renders as a link.
+ *  The id is constrained to [\w-] so the built URL can only point at the provider's player. */
+function videoEmbedUrl(raw: string): string | null {
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.replace(/^www\.|^m\./, '');
+    if (host === 'youtu.be') {
+      const id = u.pathname.slice(1).split('/')[0];
+      return /^[\w-]{5,}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+    }
+    if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      const id = u.pathname === '/watch' ? (u.searchParams.get('v') ?? '') : (u.pathname.match(/^\/(?:embed|shorts|live)\/([\w-]+)/)?.[1] ?? '');
+      return /^[\w-]{5,}$/.test(id) ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+    }
+    if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+      const id = u.pathname.match(/(\d{6,})/)?.[1] ?? '';
+      return id ? `https://player.vimeo.com/video/${id}` : null;
+    }
+    return null;
+  } catch { return null; }
+}
 
 export default function PublicListingPage() {
   const { token = '' } = useParams();
@@ -69,6 +100,28 @@ export default function PublicListingPage() {
             </div>
 
             {desc && <div><h2 className="mb-2 font-semibold">Description</h2><p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{desc}</p></div>}
+
+            {data.vr_world && (data.vr_world.splat_url_100k || data.vr_world.splat_url_500k || data.vr_world.splat_url_full) && (
+              <div>
+                <h2 className="mb-2 flex items-center gap-1.5 font-semibold"><Rotate3D className="h-4 w-4" /> 3D walkthrough</h2>
+                <div className="h-[380px] overflow-hidden rounded-xl border">
+                  <React.Suspense fallback={<div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+                    <WorldViewer vrWorldId="public-listing" initialStatus="completed"
+                      splatUrls={{ draft: data.vr_world.splat_url_100k ?? undefined, standard: data.vr_world.splat_url_500k ?? undefined, full: data.vr_world.splat_url_full ?? undefined }} />
+                  </React.Suspense>
+                </div>
+              </div>
+            )}
+
+            {safeHttpUrl(l.video_url) && (videoEmbedUrl(l.video_url)
+              ? <div><h2 className="mb-2 font-semibold">Video</h2><iframe src={videoEmbedUrl(l.video_url)!} title="Property video" className="aspect-video w-full rounded-xl border" allow="fullscreen; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-presentation" /></div>
+              : <Button asChild variant="outline" className="rounded-full"><a href={safeHttpUrl(l.video_url)!} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Watch video</a></Button>)}
+
+            {safeHttpUrl(l.virtual_tour_url) && (
+              <Button asChild variant="outline" className="rounded-full">
+                <a href={safeHttpUrl(l.virtual_tour_url)!} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> Open virtual tour</a>
+              </Button>
+            )}
 
             {Array.isArray(l.features) && l.features.length > 0 && (
               <div><h2 className="mb-2 font-semibold">Features</h2>

@@ -348,9 +348,11 @@ export function isPublishBlocked(e: unknown): e is { code: 'publish_blocked'; er
 }
 
 // ── Public token page + cross-workspace discovery (no auth; toPublic-projected) ──
-export interface PublicListing { listing: Record<string, any>; photos: { id: string; kind: string; caption: string | null; is_cover: boolean; url: string | null }[] }
+export interface PublicVrWorld { splat_url_100k: string | null; splat_url_500k: string | null; splat_url_full: string | null; panorama_url: string | null; caption: string | null }
+export interface PublicListing { listing: Record<string, any>; photos: { id: string; kind: string; caption: string | null; is_cover: boolean; url: string | null }[]; vr_world?: PublicVrWorld | null }
 export type PublicListingCard = Record<string, any> & { id: string; cover_url: string | null };
-export interface DiscoverFilters { property_type?: string; transaction_type?: string; town?: string; price_min?: number; price_max?: number; bedrooms_min?: number }
+/** `query` triggers semantic (Voyage) ranking server-side; the facet fields still apply as filters. */
+export interface DiscoverFilters { query?: string; property_type?: string; transaction_type?: string; town?: string; price_min?: number; price_max?: number; bedrooms_min?: number }
 
 export const realEstatePublic = {
   async getListing(token: string): Promise<PublicListing> {

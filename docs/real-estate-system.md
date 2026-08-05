@@ -121,7 +121,8 @@ Each requirement can carry a `portal_token`, giving the buyer their own `/buyer/
 | **myDATA** | Rent drafts are **never** auto-transmitted. Automatic invoicing must not become automatic irrevocable fiscal transmission — the manager reviews VAT and document type and issues from Finance. |
 | **Flows** | Public leads and buyer requests emit workspace-scoped flow events (`emitFlowEventToWorkspaceRoles`), so notification routing is configurable rather than hardcoded. |
 | **Agent** | The `manage_real_estate` tool gives the JARVIS agent the same capabilities as the UI (capability-fabric parity). |
-| **VR / media** | A listing can carry `vr_world_id` (Marble walkthrough), `virtual_tour_url` and `video_url`. |
+| **VR / media** | The workbench Media tab generates a Marble VR walkthrough from the cover photo (`generate-vr-world`, 18 credits, saved as `vr_world_id`); the Content step edits `virtual_tour_url` / `video_url` (http(s) enforced at write time — these render as links to anonymous visitors). The public page embeds the completed splat world (lazy-loaded Spark viewer), a privacy-friendly YouTube/Vimeo embed, and the tour link. |
+| **Semantic search** | `publish-property` / `update-property` maintain `properties.text_embedding` (Voyage 1024D through the MIVAA gateway, best-effort). Discovery's free-text query ranks by cosine via the service-role-only `search_properties_semantic` RPC (HNSW-indexed), restricted to the exact discover population; embedding failure degrades to facet/recency search. |
 
 ---
 
