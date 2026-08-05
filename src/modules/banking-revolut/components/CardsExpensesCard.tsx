@@ -39,6 +39,9 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
   const [busy, setBusy] = React.useState<string | null>(null);
   const [holderId, setHolderId] = React.useState('');
   const [label, setLabel] = React.useState('');
+  const [limitCardId, setLimitCardId] = React.useState<string | null>(null);
+  const [limitAmount, setLimitAmount] = React.useState('');
+  const [inviteEmail, setInviteEmail] = React.useState('');
 
   React.useEffect(() => {
     getRevolutStatus(workspaceId)
@@ -137,6 +140,20 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
             <Button size="sm" className="rounded-full" onClick={issueCard} disabled={busy !== null}>
               <Plus className="mr-1 h-3.5 w-3.5" /> Issue virtual card
             </Button>
+            <div className="w-52 space-y-1">
+              <Label className="text-xs">Not in Revolut yet? Invite by email</Label>
+              <div className="flex gap-1">
+                <Input className="h-9 text-xs" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="new.hire@company.gr" />
+                <Button size="sm" variant="outline" className="rounded-full text-xs" disabled={busy !== null}
+                  onClick={() => run('Invite', async () => {
+                    await callRevolutApi('create-card-invitation', workspaceId, { email: inviteEmail.trim() });
+                    setInviteEmail('');
+                    toast({ title: 'Invitation sent', description: 'Once they join, issue their card here.' });
+                  })}>
+                  Invite
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Cards */}
@@ -145,7 +162,7 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
               <div className="text-sm font-medium">Cards</div>
               <div className="divide-y divide-border/60">
                 {cards.map((c) => (
-                  <div key={c.id} className="flex items-center gap-3 py-2 text-sm">
+                  <div key={c.id} className="flex flex-wrap items-center gap-3 py-2 text-sm">
                     <span className="min-w-0 flex-1 truncate">
                       {c.label || 'Card'} {c.last_digits ? `•••• ${c.last_digits}` : ''}
                       <span className="ml-2 text-xs text-muted-foreground">{memberName(c.holder_id)}{c.virtual ? ' · virtual' : ''}</span>
@@ -153,6 +170,28 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
                     {c.state === 'frozen'
                       ? <span className="text-xs text-sky-600 dark:text-sky-400">frozen</span>
                       : <span className="text-xs text-emerald-600 dark:text-emerald-400">{c.state ?? 'active'}</span>}
+                    {limitCardId === c.id ? (
+                      <span className="flex items-center gap-1">
+                        <Input className="h-7 w-24 text-xs" inputMode="decimal" autoFocus placeholder="€ / month"
+                          value={limitAmount} onChange={(e) => setLimitAmount(e.target.value)} />
+                        <Button size="sm" variant="outline" className="rounded-full text-xs" disabled={busy !== null}
+                          onClick={() => run('Limit', async () => {
+                            const amt = Number(limitAmount);
+                            if (!(amt > 0)) { toast({ title: 'Enter a positive monthly amount', variant: 'destructive' }); return; }
+                            await callRevolutApi('set-card-limit', workspaceId, { card_id: c.id, amount: amt, period: 'month', currency: 'EUR' });
+                            setLimitCardId(null); setLimitAmount('');
+                            toast({ title: 'Monthly limit set' });
+                          })}>
+                          Set
+                        </Button>
+                        <Button size="sm" variant="ghost" className="rounded-full text-xs" onClick={() => setLimitCardId(null)}>Cancel</Button>
+                      </span>
+                    ) : (
+                      <Button size="sm" variant="ghost" className="rounded-full text-xs" disabled={busy !== null}
+                        onClick={() => { setLimitCardId(c.id); setLimitAmount(''); }}>
+                        Limit
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" className="rounded-full text-xs" disabled={busy !== null} onClick={() => toggleFreeze(c)}>
                       {c.state === 'frozen' ? 'Unfreeze' : 'Freeze'}
                     </Button>

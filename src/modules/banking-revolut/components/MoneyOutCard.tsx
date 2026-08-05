@@ -249,6 +249,35 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
           </Button>
         </div>
 
+        {/* Supplier bill run */}
+        <div className="border-t border-border/60 pt-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium"><Send className="h-3.5 w-3.5" /> Supplier bill run</div>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Drafts ONE payment run covering every due supplier bill whose supplier has a verified
+            Revolut counterparty — a single approval in the Revolut app pays them all.
+          </p>
+          <Button size="sm" variant="outline" className="rounded-full" disabled={busy || !pocketId}
+            onClick={async () => {
+              if (!pocketId) { toast({ title: 'Pick a source account first', variant: 'destructive' }); return; }
+              setBusy(true);
+              try {
+                const out = await callRevolutApi<{ drafted: number; skipped: Array<{ bill: string; reason: string }>; note?: string }>(
+                  'pay-due-bills', workspaceId, { source_revolut_account_id: pocketId });
+                toast({
+                  title: out.drafted > 0 ? `${out.drafted} bill(s) drafted` : 'Nothing to draft',
+                  description: out.skipped.length
+                    ? `Skipped ${out.skipped.length}: ${out.skipped.map((s) => s.bill).join(', ')} (no linked counterparty).`
+                    : out.note,
+                });
+                await load();
+              } catch (e) {
+                toast({ title: 'Bill run failed', description: (e as Error).message, variant: 'destructive' });
+              } finally { setBusy(false); }
+            }}>
+            Draft all due bills
+          </Button>
+        </div>
+
         {/* Payout link */}
         <div className="border-t border-border/60 pt-4">
           <div className="mb-2 flex items-center gap-2 text-sm font-medium"><Link2 className="h-3.5 w-3.5" /> Payout link</div>

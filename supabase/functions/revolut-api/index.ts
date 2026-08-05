@@ -479,6 +479,119 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       }
     }
 
+    case 'pay-due-bills': {
+      // One multi-payment DRAFT covering the due supplier bills — a single in-app
+      // approval executes the whole run. Bills whose supplier has no VoP-linked
+      // Revolut counterparty are skipped and reported, never guessed.
+      const sourceAccountId = String(body?.source_revolut_account_id ?? '');
+      if (!sourceAccountId) throw new HttpError(400, 'source_revolut_account_id is required');
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+
+      const billIds: string[] | null = Array.isArray(body?.bill_ids) ? body.bill_ids.map(String) : null;
+      let q = service
+        .from('supplier_bills')
+        .select('id, supplier_bill_number, supplier_name, supplier_company_id, supplier_contact_id, amount_due, currency, due_at')
+        .eq('workspace_id', workspaceId)
+        .gt('amount_due', 0)
+        .order('due_at', { ascending: true })
+        .limit(25);
+      q = billIds ? q.in('id', billIds) : q.lte('due_at', new Date().toISOString().slice(0, 10));
+      const { data: bills, error: billErr } = await q;
+      if (billErr) throw new HttpError(500, billErr.message);
+      if (!bills?.length) return jsonResponse({ ok: true, drafted: 0, skipped: [], note: 'No due bills.' });
+
+      const payments: Array<{ account_id: string; receiver: { counterparty_id: string }; amount: number; currency: string; reference?: string }> = [];
+      const auditRows: Array<Record<string, unknown>> = [];
+      const skipped: Array<{ bill: string; reason: string }> = [];
+      const requestId = crypto.randomUUID();
+
+      for (const bill of bills as any[]) {
+        let bq = service
+          .from('crm_bank_accounts')
+          .select('id, revolut_counterparty_id, account_holder')
+          .eq('workspace_id', workspaceId)
+          .not('revolut_counterparty_id', 'is', null)
+          .order('is_primary', { ascending: false })
+          .limit(1);
+        bq = bill.supplier_company_id
+          ? bq.eq('company_id', bill.supplier_company_id)
+          : bq.eq('contact_id', bill.supplier_contact_id ?? '00000000-0000-0000-0000-000000000000');
+        const { data: bank } = await bq.maybeSingle();
+        if (!bank?.revolut_counterparty_id) {
+          skipped.push({ bill: bill.supplier_bill_number ?? bill.id, reason: 'supplier has no VoP-linked Revolut counterparty' });
+          continue;
+        }
+        payments.push({
+          account_id: sourceAccountId,
+          receiver: { counterparty_id: bank.revolut_counterparty_id },
+          amount: Number(bill.amount_due),
+          currency: String(bill.currency ?? 'EUR').toUpperCase(),
+          reference: String(bill.supplier_bill_number ?? '').slice(0, 140) || undefined,
+        });
+        auditRows.push({
+          workspace_id: workspaceId,
+          request_id: `${requestId}:${bill.id}`,
+          kind: 'draft',
+          amount: Number(bill.amount_due),
+          currency: String(bill.currency ?? 'EUR').toUpperCase(),
+          source_revolut_account_id: sourceAccountId,
+          crm_bank_account_id: bank.id,
+          counterparty_name: bill.supplier_name ?? bank.account_holder ?? null,
+          reference: `Bill ${bill.supplier_bill_number ?? bill.id}`,
+          created_by: auth.userId,
+        });
+      }
+      if (payments.length === 0) return jsonResponse({ ok: true, drafted: 0, skipped });
+
+      const { error: auditErr } = await service.from('revolut_payouts').insert(auditRows);
+      if (auditErr) throw new HttpError(500, `audit insert failed: ${auditErr.message}`);
+      const draft = await createPaymentDraft(service, cfg, issuer, {
+        title: `Supplier bill run — ${payments.length} payment(s)`,
+        payments,
+      });
+      await service.from('revolut_payouts')
+        .update({ provider_id: draft.id, state: 'pending_approval', updated_at: new Date().toISOString() })
+        .like('request_id', `${requestId}:%`);
+      return jsonResponse({ ok: true, drafted: payments.length, draft_id: draft.id, skipped, note: 'Approve the draft in the Revolut app to pay the whole run.' });
+    }
+
+    case 'create-card-invitation': {
+      // Invite someone (e.g. a new hire) to Revolut so a card can be issued to them.
+      const email = String(body?.email ?? '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'a valid email is required');
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const res = await revolutFetch(service, cfg, issuer, '/card-invitations', {
+        method: 'POST',
+        body: JSON.stringify({ email, request_id: crypto.randomUUID() }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new HttpError(502, `invitation failed (${res.status}): ${JSON.stringify(out).slice(0, 200)}`);
+      return jsonResponse({ ok: true, invitation: out });
+    }
+
+    case 'set-card-limit': {
+      // Weekly/monthly spending cap on a card (budget control per salesperson).
+      const cardId = String(body?.card_id ?? '');
+      const amount = Number(body?.amount ?? 0);
+      const period = body?.period === 'week' ? 'week' : 'month';
+      const currency = String(body?.currency ?? 'EUR').toUpperCase();
+      if (!cardId) throw new HttpError(400, 'card_id is required');
+      if (!(amount > 0)) throw new HttpError(400, 'amount must be positive');
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const res = await revolutFetch(service, cfg, issuer, `/cards/${cardId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ spending_limits: { [period]: { amount, currency } } }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new HttpError(502, `limit update failed (${res.status}): ${text.slice(0, 200)}`);
+      }
+      return jsonResponse({ ok: true });
+    }
+
     case 'create-payout-link': {
       // Refund/pay someone WITHOUT knowing their IBAN — they claim via the link.
       const name = String(body?.counterparty_name ?? '').trim();
