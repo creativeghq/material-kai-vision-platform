@@ -37,6 +37,7 @@ export interface SyncResult {
 export function legToRow(workspaceId: string, tx: RevolutTransaction, leg: RevolutTransaction['legs'][number], bankAccountByRevolutId: Map<string, string>) {
   return {
     workspace_id: workspaceId,
+    provider: 'revolut',
     bank_account_id: bankAccountByRevolutId.get(leg.account_id) ?? null,
     revolut_account_id: leg.account_id,
     provider_ref: `${tx.id}:${leg.leg_id}`,
@@ -203,7 +204,7 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
       const chunk = rows.slice(i, i + 500);
       const { error } = await service
         .from('revolut_bank_transactions')
-        .upsert(chunk, { onConflict: 'workspace_id,provider_ref' });
+        .upsert(chunk, { onConflict: 'workspace_id,provider,provider_ref' });
       if (error) throw new Error(`upsert failed: ${error.message}`);
       upserted += chunk.length;
     }

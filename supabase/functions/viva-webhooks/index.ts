@@ -363,6 +363,18 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     .update({ status: 'paid', updated_at: new Date().toISOString() })
     .eq('id', intent.id);
 
+  // Unified bank feed (#315): show this settlement alongside Revolut/Stripe money.
+  await upsertVivaFeedRow(db, cfg.workspace_id, {
+    ref: `viva-tx-${transactionId}`,
+    type: intent.method === 'bank_reference' ? 'bank_transfer' : 'card_payment',
+    direction: 'in',
+    amount: tx.amount,
+    currency: intent.currency,
+    reference: `Order ${orderCode}`,
+    matchedInvoiceId: intent.invoice_id,
+    paymentId: res.paymentId ?? null,
+  });
+
   return json({
     ok: true,
     recorded: !res.duplicate,
@@ -370,6 +382,57 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     payment_id: res.paymentId,
   });
 }));
+
+/**
+ * Mirror a Viva wallet movement into the unified bank feed (informational — settlement
+ * itself always happens above through record-payment; the feed row just makes Viva money
+ * visible next to Revolut and Stripe). Best-effort: a feed failure never fails a webhook.
+ */
+async function upsertVivaFeedRow(db: any, workspaceId: string, row: {
+  ref: string;
+  type: string;
+  direction: 'in' | 'out';
+  amount: number;
+  currency: string;
+  counterparty?: string | null;
+  reference?: string | null;
+  matchedInvoiceId?: string | null;
+  paymentId?: string | null;
+}): Promise<void> {
+  try {
+    const { data: acct } = await db
+      .from('finance_bank_accounts')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('provider_slug', 'viva')
+      .eq('is_active', true)
+      .maybeSingle();
+    const { error } = await db.from('revolut_bank_transactions').upsert({
+      workspace_id: workspaceId,
+      provider: 'viva',
+      provider_ref: row.ref,
+      transaction_id: row.ref,
+      revolut_account_id: 'viva-wallet',
+      bank_account_id: acct?.id ?? null,
+      state: 'completed',
+      type: row.type,
+      direction: row.direction,
+      amount: row.amount,
+      currency: row.currency,
+      booked_at: new Date().toISOString(),
+      counterparty_name: row.counterparty ?? null,
+      reference: row.reference ?? null,
+      match_status: row.matchedInvoiceId ? 'matched' : 'ignored',
+      matched_invoice_id: row.matchedInvoiceId ?? null,
+      reconciled_payment_id: row.paymentId ?? null,
+      raw: { source: 'viva-webhook' },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'workspace_id,provider,provider_ref' });
+    if (error) console.warn('[viva-webhooks] feed upsert failed:', error.message);
+  } catch (err) {
+    console.warn('[viva-webhooks] feed upsert threw:', err instanceof Error ? err.message : err);
+  }
+}
 
 /**
  * RF / bank-transfer settlement.
@@ -431,6 +494,16 @@ async function settlePendingRfOrders(db: any, cfg: any, ctx: any): Promise<Respo
       console.error('[viva-webhooks] RF ingestion failed', intent.provider_order_code, res.error);
       continue;
     }
+    await upsertVivaFeedRow(db, cfg.workspace_id, {
+      ref: `viva-rf-${intent.provider_order_code}`,
+      type: 'bank_transfer',
+      direction: 'in',
+      amount: order.amount,
+      currency: intent.currency,
+      reference: `RF order ${intent.provider_order_code}`,
+      matchedInvoiceId: intent.invoice_id,
+      paymentId: res.paymentId ?? null,
+    });
     await db
       .from('invoice_payment_intents')
       .update({ status: 'paid', updated_at: new Date().toISOString() })

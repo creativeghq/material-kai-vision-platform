@@ -78,12 +78,33 @@ Deno.serve(withApiLogging('revolut-sync', async (req) => {
     }
   }
 
+  // Stripe balance feed rides the same sweep — including workspaces that have Stripe
+  // Connect but no Revolut. Informational rows only; tolerant per workspace.
+  let stripeRows = 0;
+  try {
+    let sq = service
+      .from('workspace_payment_config')
+      .select('workspace_id')
+      .not('stripe_connect_account_id', 'is', null)
+      .eq('charges_enabled', true);
+    if (allowedWorkspaceIds) sq = sq.in('workspace_id', allowedWorkspaceIds);
+    const { data: stripeWs } = await sq;
+    const { syncStripeFeed } = await import('../_shared/bank-feed/stripe-feed.ts');
+    for (const w of stripeWs ?? []) {
+      try { stripeRows += await syncStripeFeed(service, w.workspace_id); }
+      catch (err) { console.warn('[revolut-sync] stripe feed failed for', w.workspace_id, err instanceof Error ? err.message : err); }
+    }
+  } catch (err) {
+    console.warn('[revolut-sync] stripe feed sweep failed:', err instanceof Error ? err.message : err);
+  }
+
   const failed = results.filter((r) => !r.ok);
   return jsonResponse({
     ok: failed.length === 0,
     workspaces: results.length,
     fetched: results.reduce((n, r) => n + r.fetched, 0),
     upserted: results.reduce((n, r) => n + r.upserted, 0),
+    stripe_rows: stripeRows,
     failures: failed.map((r) => ({ workspace_id: r.workspaceId, error: r.error })),
   });
 }));

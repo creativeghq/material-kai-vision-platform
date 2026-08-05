@@ -322,6 +322,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         .eq('workspace_id', workspaceId)
         .maybeSingle();
       if (!tx) throw new HttpError(404, 'not found');
+      if (tx.provider !== 'revolut') throw new HttpError(400, 'stripe/viva feed rows were settled by their provider webhooks — matching them again would double-book');
       if (tx.match_status === 'matched') throw new HttpError(400, 'line is already matched');
       if (tx.direction !== 'in') throw new HttpError(400, 'only incoming lines can settle an invoice');
 
@@ -337,6 +338,80 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       const s = await settleTransaction(service, tx, invoiceId, 'manual');
       if (!s.ok) throw new HttpError(502, s.error ?? 'settle failed');
       return jsonResponse({ ok: true });
+    }
+
+    case 'confirm-bill-match': {
+      // Human matches an OUTGOING revolut transfer to a supplier bill from the feed's
+      // row menu. Same write path as the auto matcher: payments (out) + allocation.
+      const rowId = String(body?.transaction_row_id ?? '');
+      const billId = String(body?.bill_id ?? '');
+      if (!rowId || !billId) throw new HttpError(400, 'transaction_row_id and bill_id are required');
+
+      const { data: tx } = await service
+        .from('revolut_bank_transactions')
+        .select('*')
+        .eq('id', rowId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (!tx) throw new HttpError(404, 'not found');
+      if (tx.provider !== 'revolut') throw new HttpError(400, 'only bank-feed (Revolut) lines can settle bills — provider rows are informational');
+      if (tx.direction !== 'out') throw new HttpError(400, 'only outgoing lines can settle a supplier bill');
+      if (tx.match_status === 'matched') throw new HttpError(400, 'line is already matched');
+
+      const { data: bill } = await service
+        .from('supplier_bills')
+        .select('id, supplier_bill_number, supplier_company_id, supplier_contact_id, amount_due, currency')
+        .eq('id', billId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle();
+      if (!bill) throw new HttpError(404, 'not found');
+      const txCcy = String(tx.currency ?? 'EUR').toUpperCase();
+      if (String(bill.currency ?? 'EUR').toUpperCase() !== txCcy) {
+        throw new HttpError(400, 'currency mismatch between the transfer and the bill');
+      }
+
+      const { data: pay, error: payErr } = await service.from('payments').insert({
+        workspace_id: workspaceId,
+        direction: 'out',
+        amount: Number(tx.amount),
+        currency: txCcy,
+        method: 'bank_transfer',
+        paid_at: tx.booked_at ?? new Date().toISOString(),
+        counterparty_company_id: bill.supplier_company_id,
+        counterparty_contact_id: bill.supplier_contact_id,
+        bank_account_id: tx.bank_account_id ?? null,
+        reference: `Bank transfer (Revolut) ${tx.provider_ref}`,
+        notes: `Manually matched to bill ${bill.supplier_bill_number ?? bill.id}`,
+        provider: 'revolut',
+        provider_ref: tx.provider_ref,
+      }).select('id').single();
+      if (payErr && !/duplicate|unique/i.test(payErr.message ?? '')) throw new HttpError(500, payErr.message);
+      let payId = pay?.id as string | undefined;
+      if (!payId) {
+        const { data: existing } = await service.from('payments')
+          .select('id').eq('provider', 'revolut').eq('provider_ref', tx.provider_ref).maybeSingle();
+        payId = existing?.id;
+      }
+      if (!payId) throw new HttpError(500, 'payment row could not be created');
+
+      const applied = Math.min(Number(tx.amount), Number(bill.amount_due));
+      if (!(applied > 0)) throw new HttpError(400, 'the bill has nothing due');
+      const { error: allocErr } = await service.from('payment_allocations').insert({
+        payment_id: payId,
+        supplier_bill_id: bill.id,
+        amount: applied,
+        amount_doc_currency: applied,
+        fx_rate: 1,
+      });
+      if (allocErr) throw new HttpError(502, `allocation failed: ${allocErr.message}`);
+      await service.from('revolut_bank_transactions').update({
+        match_status: 'matched',
+        match_method: 'manual',
+        matched_at: new Date().toISOString(),
+        reconciled_payment_id: payId,
+        updated_at: new Date().toISOString(),
+      }).eq('id', rowId);
+      return jsonResponse({ ok: true, applied });
     }
 
     case 'ignore-transaction': {

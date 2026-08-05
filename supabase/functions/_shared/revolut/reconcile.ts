@@ -95,7 +95,7 @@ export async function settleTransaction(
   method: 'reference' | 'amount_name' | 'manual',
 ): Promise<{ ok: boolean; error?: string }> {
   const res = await recordInvoicePayment(service, invoiceId, {
-    provider: 'revolut',
+    provider: String(tx.provider ?? 'revolut'),
     providerRef: tx.provider_ref,
     providerLabel: 'Bank transfer (Revolut)',
     amount: Number(tx.amount),
@@ -136,6 +136,7 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
     .from('revolut_bank_transactions')
     .select('*')
     .eq('workspace_id', workspaceId)
+    .eq('provider', 'revolut')
     .eq('match_status', 'unmatched')
     .eq('direction', 'out')
     .eq('state', 'completed')
@@ -258,6 +259,9 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
     .from('revolut_bank_transactions')
     .select('*')
     .eq('workspace_id', workspaceId)
+    // Only REVOLUT rows auto-match: stripe/viva feed rows describe money the provider
+    // webhooks already settled — rematching them would double-book.
+    .eq('provider', 'revolut')
     .eq('match_status', 'unmatched')
     .eq('direction', 'in')
     .eq('state', 'completed')

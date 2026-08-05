@@ -22,9 +22,11 @@ import {
   Plane,
   Award,
   Boxes,
+  Landmark,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { BankFeedTab } from '@/modules/finance/tabs/BankFeedTab';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -559,6 +561,9 @@ const FinancePage: React.FC = () => {
             <TabsTrigger value="ap" className="w-full justify-start">
               <ArrowUpCircle className="h-4 w-4 mr-2" /> Payables ({ap.length})
             </TabsTrigger>
+            <TabsTrigger value="bank_feed" className="w-full justify-start">
+              <Landmark className="h-4 w-4 mr-2" /> Bank feed
+            </TabsTrigger>
             {!isAccountant && (
               <TabsTrigger value="supplier_portal" className="w-full justify-start">
                 <Truck className="h-4 w-4 mr-2" /> Supplier Portal
@@ -993,6 +998,10 @@ const FinancePage: React.FC = () => {
           </TabsContent>
 
           {/* ─────────── PAYABLES ─────────── */}
+          <TabsContent value="bank_feed" className="space-y-4">
+            {workspaceId && <BankFeedTab workspaceId={workspaceId} />}
+          </TabsContent>
+
           <TabsContent value="ap" className="space-y-4">
             {(overlayFailed || apMoney.mixed) && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">

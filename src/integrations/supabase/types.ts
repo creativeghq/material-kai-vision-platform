@@ -22972,6 +22972,7 @@ export type Database = {
           match_status: string
           matched_at: string | null
           matched_invoice_id: string | null
+          provider: string
           provider_ref: string
           raw: Json | null
           reconciled_payment_id: string | null
@@ -22999,6 +23000,7 @@ export type Database = {
           match_status?: string
           matched_at?: string | null
           matched_invoice_id?: string | null
+          provider?: string
           provider_ref: string
           raw?: Json | null
           reconciled_payment_id?: string | null
@@ -23026,6 +23028,7 @@ export type Database = {
           match_status?: string
           matched_at?: string | null
           matched_invoice_id?: string | null
+          provider?: string
           provider_ref?: string
           raw?: Json | null
           reconciled_payment_id?: string | null

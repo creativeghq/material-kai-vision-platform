@@ -111,7 +111,7 @@ Deno.serve(withApiLogging('revolut-webhooks', async (req) => {
       const rows = tx.legs.map((leg: any) => legToRow(cfg.workspace_id, tx, leg, mapping));
       const { error } = await service
         .from('revolut_bank_transactions')
-        .upsert(rows, { onConflict: 'workspace_id,provider_ref' });
+        .upsert(rows, { onConflict: 'workspace_id,provider,provider_ref' });
       if (error) return json({ error: 'ingest failed' }, 500);
       // Near-real-time large-card-spend alert (idempotent via spend_notified_at).
       try {

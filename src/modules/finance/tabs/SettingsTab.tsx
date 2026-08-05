@@ -35,7 +35,6 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { WorkspaceCreditsCard } from '@/modules/finance/components/WorkspaceCreditsCard';
 import { EInvoicingCard } from '@/modules/finance/components/EInvoicingCard';
 import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
-import { BankFeedCard } from '@/modules/banking-revolut/components/BankFeedCard';
 import { MoneyOutCard } from '@/modules/banking-revolut/components/MoneyOutCard';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
@@ -264,7 +263,6 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="banks" className="mt-0 space-y-4">
           <BankAccountsCard workspaceId={workspaceId} />
-          <BankFeedCard workspaceId={workspaceId} />
           <MoneyOutCard workspaceId={workspaceId} />
         </TabsContent>
 
