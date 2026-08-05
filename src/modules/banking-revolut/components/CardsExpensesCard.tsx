@@ -79,7 +79,7 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
     await loadAll();
   });
 
-  const toggleFreeze = (card: CardRow) => run('Freeze', async () => {
+  const toggleFreeze = (card: CardRow) => run(card.state === 'frozen' ? 'Unfreeze' : 'Freeze', async () => {
     const frozen = card.state === 'frozen';
     await callRevolutApi(frozen ? 'unfreeze-card' : 'freeze-card', workspaceId, { card_id: card.id });
     toast({ title: frozen ? 'Card unfrozen' : 'Card frozen' });
@@ -108,10 +108,10 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
   if (!connected) return null;
 
   return (
-    <Card className="dashboard-card">
+    <Card>
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
-          <CardTitle className="flex items-center gap-2 text-base"><CreditCard className="h-4 w-4" /> Team cards &amp; expenses</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base"><CreditCard className="h-4 w-4" /> Team Cards &amp; Expenses</CardTitle>
           <CardDescription>
             Issue virtual Revolut cards to team members and browse card expenses with their receipts.
           </CardDescription>
@@ -126,24 +126,24 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
           {/* Issue */}
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-48 space-y-1">
-              <Label className="text-xs">Team member</Label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              <Label className="text-xs" htmlFor="ce-member">Team member</Label>
+              <select id="ce-member" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={holderId} onChange={(e) => setHolderId(e.target.value)}>
                 <option value="">— choose —</option>
                 {members.map((m) => <option key={m.id} value={m.id}>{memberName(m.id)}</option>)}
               </select>
             </div>
             <div className="w-44 space-y-1">
-              <Label className="text-xs">Card label</Label>
-              <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Site expenses" maxLength={30} />
+              <Label className="text-xs" htmlFor="ce-label">Card label</Label>
+              <Input id="ce-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Site expenses" maxLength={30} />
             </div>
             <Button size="sm" className="rounded-full" onClick={issueCard} disabled={busy !== null}>
               <Plus className="mr-1 h-3.5 w-3.5" /> Issue virtual card
             </Button>
             <div className="w-52 space-y-1">
-              <Label className="text-xs">Not in Revolut yet? Invite by email</Label>
+              <Label className="text-xs" htmlFor="ce-invite">Not in Revolut yet? Invite by email</Label>
               <div className="flex gap-1">
-                <Input className="h-9 text-xs" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="new.hire@company.gr" />
+                <Input id="ce-invite" className="h-9 text-xs" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="new.hire@company.gr" />
                 <Button size="sm" variant="outline" className="rounded-full text-xs" disabled={busy !== null}
                   onClick={() => run('Invite', async () => {
                     await callRevolutApi('create-card-invitation', workspaceId, { email: inviteEmail.trim() });

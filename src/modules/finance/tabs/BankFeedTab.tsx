@@ -75,6 +75,13 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   const [direction, setDirection] = React.useState('');
   const [statusF, setStatusF] = React.useState('');
   const [q, setQ] = React.useState('');
+  const [qInput, setQInput] = React.useState('');
+  React.useEffect(() => {
+    // Debounce + sanitize: raw commas/parens break PostgREST .or() filter syntax, and
+    // querying per keystroke flashes the table on every letter.
+    const t = setTimeout(() => setQ(qInput.replace(/[,()%]/g, ' ').trim()), 350);
+    return () => clearTimeout(t);
+  }, [qInput]);
   const [from, setFrom] = React.useState('');
   const [to, setTo] = React.useState('');
 
@@ -136,11 +143,14 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   });
 
   const settleInvoice = (row: FeedRow, invoiceId: string) => act('Settle', async () => {
+    const inv = invoices.get(invoiceId) ?? pickInvoices.find((i) => i.id === invoiceId);
+    if (!window.confirm(`Record ${Number(row.amount).toFixed(2)} ${row.currency} against ${inv?.internal_number ?? 'this invoice'}? This books a payment.`)) return;
     await callRevolutApi('confirm-match', workspaceId, { transaction_row_id: row.id, invoice_id: invoiceId });
     setPicking(null);
     toast({ title: 'Invoice settled', description: 'Recorded through the normal payment path; any linked order updates via its invoice.' });
   });
   const settleBill = (row: FeedRow, billId: string) => act('Settle bill', async () => {
+    if (!window.confirm(`Record ${Number(row.amount).toFixed(2)} ${row.currency} against this supplier bill? This books an outgoing payment.`)) return;
     await callRevolutApi('confirm-bill-match', workspaceId, { transaction_row_id: row.id, bill_id: billId });
     setPicking(null);
     toast({ title: 'Bill settled' });
@@ -199,7 +209,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
       <CardHeader className="border-b border-border/60 px-5 py-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <CardTitle className="flex items-center gap-2 text-base"><Landmark className="h-4 w-4" /> Bank feed</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base"><Landmark className="h-4 w-4" /> Bank Feed</CardTitle>
             <CardDescription className="text-xs">
               Money movement across your connected providers. Revolut lines are matchable; Stripe and Viva
               lines mirror payments their webhooks already settled.
@@ -214,29 +224,33 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         </div>
         {/* Filters */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select className={sel} value={provider} onChange={(e) => setProvider(e.target.value)}>
+          <select aria-label="Provider filter" className={sel} value={provider} onChange={(e) => setProvider(e.target.value)}>
             <option value="">All providers</option>
             <option value="revolut">Revolut</option>
             <option value="stripe">Stripe</option>
             <option value="viva">Viva</option>
           </select>
-          <select className={sel} value={direction} onChange={(e) => setDirection(e.target.value)}>
+          <select aria-label="Direction filter" className={sel} value={direction} onChange={(e) => setDirection(e.target.value)}>
             <option value="">In & out</option>
             <option value="in">Money in</option>
             <option value="out">Money out</option>
           </select>
-          <select className={sel} value={statusF} onChange={(e) => setStatusF(e.target.value)}>
+          <select aria-label="Match status filter" className={sel} value={statusF} onChange={(e) => setStatusF(e.target.value)}>
             <option value="">Any status</option>
             <option value="review">Needs review</option>
             <option value="matched">Matched</option>
             <option value="unmatched">Unmatched</option>
             <option value="ignored">Ignored</option>
           </select>
-          <Input type="date" className="h-9 w-36" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <Input type="date" className="h-9 w-36" value={to} onChange={(e) => setTo(e.target.value)} />
+          <label htmlFor="feed-from" className="flex items-center gap-1 text-xs text-muted-foreground">From
+            <Input id="feed-from" type="date" className="h-9 w-36" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </label>
+          <label htmlFor="feed-to" className="flex items-center gap-1 text-xs text-muted-foreground">To
+            <Input id="feed-to" type="date" className="h-9 w-36" value={to} onChange={(e) => setTo(e.target.value)} />
+          </label>
           <div className="relative min-w-44 flex-1">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input className="h-9 pl-8" placeholder="Counterparty or reference…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input className="h-9 pl-8" placeholder="Counterparty or reference…" value={qInput} onChange={(e) => setQInput(e.target.value)} />
           </div>
         </div>
       </CardHeader>
@@ -278,7 +292,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                   </span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" aria-label="Transaction actions"><MoreHorizontal className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel className="text-xs">{Number(r.amount).toFixed(2)} {r.currency} · {PROVIDER_LABEL[r.provider] ?? r.provider}</DropdownMenuLabel>
@@ -312,15 +326,20 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
             })}
           </div>
         )}
+        {!loading && rows.length >= 100 && (
+          <p className="border-t border-border/60 px-5 py-2 text-xs text-muted-foreground">
+            Showing the latest 100 — narrow the filters or date range to see older lines.
+          </p>
+        )}
       </CardContent>
 
       <Dialog open={!!picking} onOpenChange={(o) => !o && setPicking(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {picking?.kind === 'bill' ? 'Match to a supplier bill'
-                : picking?.kind === 'order' ? 'Attach to an order (settles its open invoice)'
-                : 'Match to an invoice'}
+              {picking?.kind === 'bill' ? 'Match to a Supplier Bill'
+                : picking?.kind === 'order' ? 'Attach to an Order (Settles Its Open Invoice)'
+                : 'Match to an Invoice'}
               {picking ? ` — ${Number(picking.row.amount).toFixed(2)} ${picking.row.currency}` : ''}
             </DialogTitle>
           </DialogHeader>

@@ -9,8 +9,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { callRevolutApi } from '../services/revolutConfigService';
+import { useToast } from '@/hooks/use-toast';
 
 // Land back on Profile → Keys — the per-workspace BYOK home where the card lives.
 // (The /admin/modules page renders the same card but is operator-flavoured surface.)
@@ -26,6 +28,7 @@ export const RevolutCallbackPage: React.FC = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
+  const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [waitingLong, setWaitingLong] = useState(false);
   const ran = useRef(false);
@@ -46,7 +49,11 @@ export const RevolutCallbackPage: React.FC = () => {
       setError(params.get('error_description') || 'Revolut returned no authorisation code.');
       return;
     }
-    if (consumedCodes.has(code)) return; // another instance is already exchanging it
+    if (consumedCodes.has(code)) {
+      // Another mounted instance is exchanging it — don't spin forever here.
+      navigate(SETTINGS_PATH, { replace: true });
+      return;
+    }
     consumedCodes.add(code);
 
     void (async () => {
@@ -54,23 +61,22 @@ export const RevolutCallbackPage: React.FC = () => {
         await callRevolutApi('oauth-complete', activeWorkspaceId, { code });
         // Best-effort: webhook registration can be redone from the card if it fails here.
         await callRevolutApi('register-webhook', activeWorkspaceId).catch(() => undefined);
+        toast({ title: 'Revolut connected', description: 'Accounts are being set up — map or rename them under Finance → Settings → Accounts.' });
         navigate(SETTINGS_PATH, { replace: true });
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       }
     })();
-  }, [activeWorkspaceId, params, navigate]);
+  }, [activeWorkspaceId, params, navigate, toast]);
 
   return (
     <div className="mx-auto max-w-md p-8">
-      <Card className="dashboard-card">
+      <Card>
         <CardContent className="space-y-3 py-8 text-center text-sm">
           {error ? (
             <>
               <p className="text-destructive">Revolut connection failed: {error}</p>
-              <button className="text-primary underline" onClick={() => navigate(SETTINGS_PATH)}>
-                Back to settings
-              </button>
+              <Button variant="link" onClick={() => navigate(SETTINGS_PATH)}>Back to settings</Button>
             </>
           ) : waitingLong ? (
             <>
@@ -79,9 +85,7 @@ export const RevolutCallbackPage: React.FC = () => {
                 not logged in <em>in this browser</em>. Log in at app.materialshub.gr, then restart
                 the connection from the Revolut card (the code in this page has expired).
               </p>
-              <button className="text-primary underline" onClick={() => navigate(SETTINGS_PATH)}>
-                Back to settings
-              </button>
+              <Button variant="link" onClick={() => navigate(SETTINGS_PATH)}>Back to settings</Button>
             </>
           ) : (
             <>

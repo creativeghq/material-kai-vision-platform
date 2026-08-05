@@ -143,6 +143,7 @@ const FinancePage: React.FC = () => {
   const { isAccountant } = usePermissions(); // read-only role hides write actions
   const workspaceId = activeWorkspaceId;
   const [payRevolutBillId, setPayRevolutBillId] = useState<string | null>(null);
+  const [draftAllBusy, setDraftAllBusy] = useState(false);
   // Tab is URL-driven so other surfaces (e.g. the CRM Account tab) can deep-link
   // straight to a view — /finance?tab=parties&party=company:<id>.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1044,17 +1045,27 @@ const FinancePage: React.FC = () => {
                     title="Filter payables"
                   />
                   {!isAccountant && (
-                    <Button size="sm" variant="outline" title="One Revolut draft covering every due bill whose supplier has a verified counterparty — a single in-app approval pays the run"
+                    <Button size="sm" variant="outline" disabled={draftAllBusy}
+                      title="One Revolut draft covering every due bill whose supplier has a verified counterparty — a single in-app approval pays the run"
                       onClick={async () => {
+                        if (draftAllBusy) return;
+                        // Preview before acting: this is a bulk money instruction.
+                        const dueBills = apFiltered.filter((b) => b.entry_kind !== 'order' && Number(b.amount_due) > 0 && b.due_at && b.due_at <= new Date().toISOString().slice(0, 10));
+                        const dueTotal = dueBills.reduce((n, b) => n + Number(b.amount_due), 0);
+                        if (dueBills.length === 0) { toast({ title: 'No due bills to draft' }); return; }
+                        if (!window.confirm(`Draft ONE Revolut payment run for ${dueBills.length} due bill(s), ~${dueTotal.toFixed(2)} total? Suppliers without a verified Revolut counterparty are skipped. You approve the run in the Revolut app before any money moves.`)) return;
+                        setDraftAllBusy(true);
                         try {
-                          const acc = await callRevolutApi<{ accounts: Array<{ id: string; currency: string }> }>('accounts', workspaceId!);
+                          const acc = await callRevolutApi<{ accounts: Array<{ id: string; currency: string }> }>('accounts', workspaceId!)
+                            .catch(() => { throw new Error('Revolut is not connected — set it up under Profile → Keys first.'); });
                           const eur = acc.accounts.find((a) => a.currency === 'EUR') ?? acc.accounts[0];
                           if (!eur) { toast({ title: 'Connect Revolut first (Profile → Keys)', variant: 'destructive' }); return; }
                           const out = await callRevolutApi<{ drafted: number; skipped: Array<{ bill: string }>; note?: string }>('pay-due-bills', workspaceId!, { source_revolut_account_id: eur.id });
                           toast({ title: out.drafted > 0 ? `${out.drafted} bill(s) drafted — approve in the Revolut app` : 'Nothing to draft', description: out.skipped.length ? `Skipped: ${out.skipped.map((x) => x.bill).join(', ')} (no verified counterparty).` : out.note });
                         } catch (e) { toast({ title: 'Bill run failed', description: (e as Error).message, variant: 'destructive' }); }
+                        finally { setDraftAllBusy(false); }
                       }}>
-                      <SendIcon className="h-4 w-4 mr-1" /> Draft all due
+                      {draftAllBusy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <SendIcon className="h-4 w-4 mr-1" />} Draft all due
                     </Button>
                   )}
                   {!isAccountant && <Button size="sm" variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
@@ -1145,11 +1156,11 @@ const FinancePage: React.FC = () => {
                               </Button>
                             ) : (
                               <span className="inline-flex items-center gap-1">
-                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPayExpenseId(r.id)} title="Record a payment against this bill (settles it)">
-                                  <Banknote className="h-3.5 w-3.5 mr-1" /> Pay
+                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPayExpenseId(r.id)} title="Record a payment that already happened (bank transfer, cash) — settles the bill, moves no money">
+                                  <Banknote className="h-3.5 w-3.5 mr-1" /> Record
                                 </Button>
-                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPayRevolutBillId(r.id)} title="Send this payment from your Revolut account — draft by default, approved in the Revolut app; the bank feed settles the bill when it executes">
-                                  <SendIcon className="h-3.5 w-3.5 mr-1" /> Send
+                                <Button size="sm" className="h-7 text-xs" onClick={() => setPayRevolutBillId(r.id)} title="Pay this bill FROM your Revolut account — drafted for approval in the Revolut app by default; the bank feed settles the bill when it executes">
+                                  <SendIcon className="h-3.5 w-3.5 mr-1" /> Pay via Revolut
                                 </Button>
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
                                   <FileMinus className="h-3.5 w-3.5 mr-1" /> Credit

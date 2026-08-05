@@ -3,7 +3,6 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { Loader2, CheckCircle2, AlertCircle, CreditCard, FileText, Landmark, Copy } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Label } from '@/components/core/ui/label';
 import { MoneyInput } from '@/components/core/ui/money-input';
 import { financeService, formatMoney } from '@/modules/finance/services/financeService';
 
@@ -53,7 +52,7 @@ function buildOptions(providers: ProviderOption[]): PayOption[] {
         provider: p.slug,
         method: m,
         label: m === 'card'
-          ? (isRevolut ? 'Pay online — Revolut' : `Card — ${p.label}`)
+          ? (isRevolut ? 'Online payment — Revolut' : `Card — ${p.label}`)
           : `Bank transfer — ${p.label}`,
         hint: m === 'card'
           ? (isRevolut
@@ -80,13 +79,14 @@ const PayInvoicePage: React.FC = () => {
   const [option, setOption] = useState<string | null>(null);
   // Set when the buyer chose a bank-reference method: nothing to redirect to, we just
   // show them the code to quote in their banking app.
+  const [codeCopied, setCodeCopied] = useState(false);
   const [bankRef, setBankRef] = useState<{ rf_code: string; amount: number; currency: string } | null>(null);
 
   // Load the document + payable options. No session, no side effects.
   // Also runs for status=return (a provider whose redirect fires on EVERY outcome —
   // Revolut): the server-resolved state decides what the buyer is told.
   useEffect(() => {
-    if (!token || (status && status !== 'return')) { setLoading(false); return; }
+    if (!token || (status && status !== 'return' && status !== 'success')) { setLoading(false); return; }
     void (async () => {
       try {
         const res = await financeService.resolvePayToken(token, { infoOnly: true });
@@ -158,38 +158,31 @@ const PayInvoicePage: React.FC = () => {
         setBankRef({ rf_code: res.rf_code, amount, currency: info.currency });
         return;
       }
-      if (res.checkout_url) window.location.href = res.checkout_url;
-      else setError('Could not start the checkout.');
+      if (res.checkout_url) {
+        // Keep the button disabled through the navigation - a slow redirect must not
+        // let an impatient double-click mint a second checkout session.
+        window.location.href = res.checkout_url;
+        return;
+      }
+      setError('Could not start the checkout.');
+      setBusy(false);
     } catch (err: any) {
       setError(err?.message ?? 'Could not start the checkout.');
-    } finally {
       setBusy(false);
     }
   };
 
   const shell = (children: React.ReactNode) => (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="dashboard-card w-full max-w-md border-0">
+      <Card className="w-full max-w-md border-0">
         <CardContent className="p-8">{children}</CardContent>
       </Card>
     </div>
   );
 
-  if (status === 'success') {
-    return shell(
-      <div className="text-center">
-        <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
-        <h1 className="mt-4 text-xl font-semibold">Payment received</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Thank you. A receipt will be emailed to you, and the seller sees this within a minute.
-        </p>
-      </div>,
-    );
-  }
-
-  // Neutral provider return (Revolut redirects here on success AND cancel/failure):
-  // only the server-verified state decides what we claim.
-  if (status === 'return' && !loading) {
+  // Provider return (status=success from Stripe/Viva, status=return from Revolut):
+  // ONLY the server-verified state decides what we claim - a URL param is not a receipt.
+  if ((status === 'return' || status === 'success') && !loading) {
     if (alreadyPaid) {
       return shell(
         <div className="text-center">
@@ -268,9 +261,9 @@ const PayInvoicePage: React.FC = () => {
             variant="outline"
             size="sm"
             className="mt-3 rounded-full"
-            onClick={() => void navigator.clipboard.writeText(bankRef.rf_code)}
+            onClick={() => { void navigator.clipboard.writeText(bankRef.rf_code); setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2500); }}
           >
-            <Copy className="h-3.5 w-3.5 mr-2" /> Copy code
+            <Copy className="h-3.5 w-3.5 mr-2" /> {codeCopied ? 'Copied!' : 'Copy code'}
           </Button>
         </div>
 
@@ -341,13 +334,15 @@ const PayInvoicePage: React.FC = () => {
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs">How much would you like to pay?</Label>
-        <div className="grid gap-2">
+        <span id="pay-amount-label" className="text-xs font-medium">How much would you like to pay?</span>
+        <div className="grid gap-2" role="radiogroup" aria-labelledby="pay-amount-label">
           {canDeposit && (
             <button
               type="button"
+              role="radio"
+              aria-checked={choice === 'deposit'}
               onClick={() => setChoice('deposit')}
-              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm text-left transition ${choice === 'deposit' ? 'border-primary bg-primary/10' : 'border-border/60 hover:bg-muted/40'}`}
+              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm text-left transition ${choice === 'deposit' ? 'border-primary bg-primary/10 font-medium' : 'border-border/60 hover:bg-muted/40'}`}
             >
               <span>Deposit {info.deposit_pct != null && <span className="text-muted-foreground">({info.deposit_pct}%)</span>}</span>
               <span className="tabular-nums font-medium">{formatMoney(info.deposit_amount!, info.currency)}</span>
@@ -355,24 +350,29 @@ const PayInvoicePage: React.FC = () => {
           )}
           <button
             type="button"
+            role="radio"
+            aria-checked={choice === 'full'}
             onClick={() => setChoice('full')}
-            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm text-left transition ${choice === 'full' ? 'border-primary bg-primary/10' : 'border-border/60 hover:bg-muted/40'}`}
+            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm text-left transition ${choice === 'full' ? 'border-primary bg-primary/10 font-medium' : 'border-border/60 hover:bg-muted/40'}`}
           >
             <span>Pay in full</span>
             <span className="tabular-nums font-medium">{formatMoney(info.amount_due, info.currency)}</span>
           </button>
-          <button
-            type="button"
+          <div
+            role="radio"
+            aria-checked={choice === 'custom'}
+            tabIndex={0}
             onClick={() => setChoice('custom')}
-            className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm text-left transition ${choice === 'custom' ? 'border-primary bg-primary/10' : 'border-border/60 hover:bg-muted/40'}`}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setChoice('custom'); } }}
+            className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm text-left transition ${choice === 'custom' ? 'border-primary bg-primary/10 font-medium' : 'border-border/60 hover:bg-muted/40'}`}
           >
             <span>Another amount</span>
             {choice === 'custom' && (
-              <span role="presentation" onClick={(e) => e.stopPropagation()} className="w-32">
-                <MoneyInput className="h-8 text-right text-sm" value={custom} onValueChange={setCustom} />
+              <span role="presentation" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="w-32">
+                <MoneyInput aria-label="Custom amount" className="h-8 text-right text-sm" value={custom} onValueChange={setCustom} onFocus={() => setChoice('custom')} />
               </span>
             )}
-          </button>
+          </div>
         </div>
         {info.min_amount > 0 && info.min_amount < info.amount_due - 0.005 && (
           <p className="text-[11px] text-muted-foreground">
@@ -385,14 +385,16 @@ const PayInvoicePage: React.FC = () => {
           to pay — a single-option seller keeps the original one-click flow. */}
       {payOptions.length > 1 && (
         <div className="space-y-2">
-          <Label className="text-xs">How would you like to pay?</Label>
-          <div className="grid gap-2">
+          <span id="pay-method-label" className="text-xs font-medium">How would you like to pay?</span>
+          <div className="grid gap-2" role="radiogroup" aria-labelledby="pay-method-label">
             {payOptions.map((o) => (
               <button
                 key={o.key}
                 type="button"
+                role="radio"
+                aria-checked={option === o.key}
                 onClick={() => setOption(o.key)}
-                className={`rounded-lg border px-3 py-2 text-sm text-left transition ${option === o.key ? 'border-primary bg-primary/10' : 'border-border/60 hover:bg-muted/40'}`}
+                className={`rounded-lg border px-3 py-2 text-sm text-left transition ${option === o.key ? 'border-primary bg-primary/10 font-medium' : 'border-border/60 hover:bg-muted/40'}`}
               >
                 <span className="flex items-center gap-2">
                   {o.method === 'card'

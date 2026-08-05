@@ -144,17 +144,19 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
       toast({ title: 'Sync complete', description: `${out.fetched} transactions fetched.` });
     });
 
-  const disconnect = () =>
-    run('Disconnect', async () => {
+  const disconnect = () => {
+    if (!window.confirm('Disconnect Revolut? The saved connection and webhook are removed and you will need to authorise again. Synced transactions are kept.')) return;
+    return run('Disconnect', async () => {
       await callRevolutApi('disconnect', workspaceId);
       setAccounts(null);
       await refresh();
       toast({ title: 'Revolut disconnected' });
     });
+  };
 
   if (loading || !status) {
     return (
-      <Card className="dashboard-card">
+      <Card>
         <CardContent className="flex items-center justify-center py-8">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </CardContent>
@@ -169,7 +171,7 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
       : <span className="text-muted-foreground">Not set up</span>;
 
   return (
-    <Card className="dashboard-card">
+    <Card>
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -201,7 +203,7 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
               <p className="text-xs text-muted-foreground">
                 Add this certificate in Revolut dashboard → Settings → API, with redirect URI{' '}
                 <code className="text-xs">{status.oauth_redirect_uri}</code>
-                <Button variant="ghost" size="sm" className="ml-1 h-6 px-2" onClick={() => copy(status.oauth_redirect_uri ?? '', 'Redirect URI')}>
+                <Button variant="ghost" size="sm" className="ml-1 h-6 px-2" aria-label="Copy redirect URI" onClick={() => copy(status.oauth_redirect_uri ?? '', 'Redirect URI')}>
                   <Copy className="h-3 w-3" />
                 </Button>
               </p>
@@ -323,7 +325,8 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
                       <span className="min-w-32 font-medium">{a.name || a.currency}</span>
                       <span className="text-muted-foreground">{a.balance.toFixed(2)} {a.currency}</span>
                       <select
-                        className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                        aria-label={`Map ${a.name || a.currency} to a bank account`}
+                        className="h-10 rounded-md border border-input bg-background px-2 text-sm"
                         value={mappedTo}
                         onChange={(e) => mapAccount(a.id, e.target.value || null)}
                       >

@@ -104,7 +104,7 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle className="flex items-center gap-2 text-base"><Landmark className="h-4 w-4" /> Revolut treasury</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-base"><Landmark className="h-4 w-4" /> Revolut Treasury</CardTitle>
         <CardDescription className="text-xs">
           Supplier bills are paid from Finance → Payables (the Send action on each bill).
           Here: payout links for refunds without an IBAN, and the audit of every instruction.
@@ -115,19 +115,19 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
           <div className="mb-2 flex items-center gap-2 text-sm font-medium"><Link2 className="h-3.5 w-3.5" /> Payout link</div>
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-40 flex-1 space-y-1">
-              <Label className="text-xs">Recipient name</Label>
-              <Input value={linkName} onChange={(e) => setLinkName(e.target.value)} placeholder="As known to Revolut" />
+              <Label className="text-xs" htmlFor="mo-link-name">Recipient name</Label>
+              <Input id="mo-link-name" value={linkName} onChange={(e) => setLinkName(e.target.value)} placeholder="As known to Revolut" />
             </div>
             <div className="w-40 space-y-1">
-              <Label className="text-xs">From</Label>
-              <select className="flex h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
+              <Label className="text-xs" htmlFor="mo-pocket">From</Label>
+              <select id="mo-pocket" className="flex h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
                 value={pocketId} onChange={(e) => setPocketId(e.target.value)}>
                 {pockets.map((p) => <option key={p.id} value={p.id}>{p.currency} · {p.balance.toFixed(2)}</option>)}
               </select>
             </div>
             <div className="w-28 space-y-1">
-              <Label className="text-xs">Amount</Label>
-              <Input inputMode="decimal" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} placeholder="0.00" />
+              <Label className="text-xs" htmlFor="mo-amount">Amount</Label>
+              <Input id="mo-amount" inputMode="decimal" value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} placeholder="0.00" />
             </div>
             <Button size="sm" variant="outline" className="rounded-full" onClick={makeLink} disabled={busy}>
               {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Link2 className="mr-1 h-3.5 w-3.5" />}Create link
@@ -147,7 +147,7 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
                   {stateWord(h.state)}
                   <span className="shrink-0 font-medium">{Number(h.amount).toFixed(2)} {h.currency}</span>
                   {h.provider_url && (
-                    <Button size="sm" variant="ghost" className="h-6 px-2"
+                    <Button size="sm" variant="ghost" className="h-6 px-2" aria-label="Copy payout link"
                       onClick={() => { void navigator.clipboard.writeText(h.provider_url as string); toast({ title: 'Link copied' }); }}>
                       <Copy className="h-3 w-3" />
                     </Button>

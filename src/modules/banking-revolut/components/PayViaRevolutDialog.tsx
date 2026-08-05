@@ -97,6 +97,7 @@ export const PayViaRevolutDialog: React.FC<{
         setPockets(pocketList);
         setPocketId(pocketList.find((p) => p.currency === ccy)?.id ?? pocketList[0]?.id ?? '');
       } catch (e) {
+        setConnected(false); // degrade to the connect-first message instead of an eternal spinner
         toast({ title: 'Could not prepare the payment', description: (e as Error).message, variant: 'destructive' });
       }
     })();
@@ -109,9 +110,13 @@ export const PayViaRevolutDialog: React.FC<{
       toast({ title: 'Pick the supplier account, a source account and a positive amount', variant: 'destructive' });
       return;
     }
+    const bankSel = banks.find((b) => b.id === bankId);
+    if (direct && !window.confirm(
+      `Send ${amt.toFixed(2)} ${String(bill.currency ?? 'EUR').toUpperCase()} to ${bankSel?.account_holder || bankSel?.bank_name || 'this account'} NOW? This moves money immediately, without the in-app approval.`,
+    )) return;
     setBusy(true);
     try {
-      const bank = banks.find((b) => b.id === bankId);
+      const bank = bankSel;
       if (bank && !bank.revolut_counterparty_id) {
         try {
           await callRevolutApi('create-counterparty', workspaceId, {
@@ -170,8 +175,8 @@ export const PayViaRevolutDialog: React.FC<{
         ) : (
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Supplier account</Label>
-              <select className={sel} value={bankId} onChange={(e) => { setBankId(e.target.value); setVopBlocked(false); setForceVop(false); }}>
+              <Label className="text-xs" htmlFor="pvr-bank">Supplier account</Label>
+              <select id="pvr-bank" className={sel} value={bankId} onChange={(e) => { setBankId(e.target.value); setVopBlocked(false); setForceVop(false); }}>
                 {banks.map((b) => (
                   <option key={b.id} value={b.id}>
                     {(b.account_holder || b.bank_name)} · {b.iban}{b.revolut_counterparty_id ? ' ✓' : ' (will be verified)'}
@@ -180,8 +185,8 @@ export const PayViaRevolutDialog: React.FC<{
               </select>
             </div>
             <div>
-              <Label className="text-xs">From</Label>
-              <select className={sel} value={pocketId} onChange={(e) => setPocketId(e.target.value)}>
+              <Label className="text-xs" htmlFor="pvr-pocket">From</Label>
+              <select id="pvr-pocket" className={sel} value={pocketId} onChange={(e) => setPocketId(e.target.value)}>
                 {pockets.map((p) => (
                   <option key={p.id} value={p.id}>{p.name || p.currency} · {p.balance.toFixed(2)} {p.currency}</option>
                 ))}
@@ -189,12 +194,12 @@ export const PayViaRevolutDialog: React.FC<{
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">Amount ({bill?.currency ?? 'EUR'})</Label>
-                <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                <Label className="text-xs" htmlFor="pvr-amount">Amount ({bill?.currency ?? 'EUR'})</Label>
+                <Input id="pvr-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
               <div>
-                <Label className="text-xs">Reference</Label>
-                <Input value={reference} onChange={(e) => setReference(e.target.value)} maxLength={140} />
+                <Label className="text-xs" htmlFor="pvr-ref">Reference</Label>
+                <Input id="pvr-ref" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={140} />
               </div>
             </div>
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
