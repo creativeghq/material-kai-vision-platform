@@ -23,10 +23,13 @@ import {
   Award,
   Boxes,
   Landmark,
+  Send as SendIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { BankFeedTab } from '@/modules/finance/tabs/BankFeedTab';
+import { PayViaRevolutDialog } from '@/modules/banking-revolut/components/PayViaRevolutDialog';
+import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -138,6 +141,7 @@ const FinancePage: React.FC = () => {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
   const { isAccountant } = usePermissions(); // read-only role hides write actions
   const workspaceId = activeWorkspaceId;
+  const [payRevolutBillId, setPayRevolutBillId] = useState<string | null>(null);
   // Tab is URL-driven so other surfaces (e.g. the CRM Account tab) can deep-link
   // straight to a view — /finance?tab=parties&party=company:<id>.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1002,6 +1006,10 @@ const FinancePage: React.FC = () => {
             {workspaceId && <BankFeedTab workspaceId={workspaceId} />}
           </TabsContent>
 
+          {workspaceId && (
+            <PayViaRevolutDialog workspaceId={workspaceId} billId={payRevolutBillId} onClose={() => setPayRevolutBillId(null)} />
+          )}
+
           <TabsContent value="ap" className="space-y-4">
             {(overlayFailed || apMoney.mixed) && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
@@ -1034,6 +1042,20 @@ const FinancePage: React.FC = () => {
                     searchPlaceholder="Search supplier / bill #…"
                     title="Filter payables"
                   />
+                  {!isAccountant && (
+                    <Button size="sm" variant="outline" title="One Revolut draft covering every due bill whose supplier has a verified counterparty — a single in-app approval pays the run"
+                      onClick={async () => {
+                        try {
+                          const acc = await callRevolutApi<{ accounts: Array<{ id: string; currency: string }> }>('accounts', workspaceId!);
+                          const eur = acc.accounts.find((a) => a.currency === 'EUR') ?? acc.accounts[0];
+                          if (!eur) { toast({ title: 'Connect Revolut first (Profile → Keys)', variant: 'destructive' }); return; }
+                          const out = await callRevolutApi<{ drafted: number; skipped: Array<{ bill: string }>; note?: string }>('pay-due-bills', workspaceId!, { source_revolut_account_id: eur.id });
+                          toast({ title: out.drafted > 0 ? `${out.drafted} bill(s) drafted — approve in the Revolut app` : 'Nothing to draft', description: out.skipped.length ? `Skipped: ${out.skipped.map((x) => x.bill).join(', ')} (no verified counterparty).` : out.note });
+                        } catch (e) { toast({ title: 'Bill run failed', description: (e as Error).message, variant: 'destructive' }); }
+                      }}>
+                      <SendIcon className="h-4 w-4 mr-1" /> Draft all due
+                    </Button>
+                  )}
                   {!isAccountant && <Button size="sm" variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
                   {!isAccountant && <Button size="sm" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>}
                 </div>
@@ -1124,6 +1146,9 @@ const FinancePage: React.FC = () => {
                               <span className="inline-flex items-center gap-1">
                                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPayExpenseId(r.id)} title="Record a payment against this bill (settles it)">
                                   <Banknote className="h-3.5 w-3.5 mr-1" /> Pay
+                                </Button>
+                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPayRevolutBillId(r.id)} title="Send this payment from your Revolut account — draft by default, approved in the Revolut app; the bank feed settles the bill when it executes">
+                                  <SendIcon className="h-3.5 w-3.5 mr-1" /> Send
                                 </Button>
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
                                   <FileMinus className="h-3.5 w-3.5 mr-1" /> Credit
