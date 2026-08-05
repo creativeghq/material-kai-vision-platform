@@ -164,7 +164,23 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
 
           {/* Expenses */}
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-sm font-medium"><Receipt className="h-3.5 w-3.5" /> Recent expenses (90 days)</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-medium"><Receipt className="h-3.5 w-3.5" /> Recent expenses (90 days)</div>
+              <Button size="sm" variant="outline" className="rounded-full text-xs" disabled={busy !== null}
+                onClick={() => run('Import', async () => {
+                  const out = await callRevolutApi<{ imported: number; unmatchedPerson: number; receipts: number }>('import-expenses', workspaceId);
+                  toast({
+                    title: 'Expenses imported',
+                    description: `${out.imported} attributed to employees (${out.receipts} receipts)${out.unmatchedPerson ? `; ${out.unmatchedPerson} had no matching employee email` : ''}.`,
+                  });
+                })}>
+                Import to expense reports
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Import attributes each card expense to the employee whose email matches the card holder,
+              into their monthly report — receipts included. Runs automatically with the sync too.
+            </p>
             {expenses.length === 0 ? (
               <p className="text-xs text-muted-foreground">No card expenses in the window.</p>
             ) : (

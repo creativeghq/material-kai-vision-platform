@@ -63,6 +63,19 @@ Deno.serve(withApiLogging('revolut-sync', async (req) => {
     // A lapsed entitlement pauses the sweep for that workspace (fail closed, no error).
     if (!(await isWorkspaceEntitled(service, cfg.workspace_id, 'banking-revolut'))) continue;
     results.push(await syncWorkspaceRevolut(service, cfg));
+
+    // Card→person expense import + offboard freeze ride the same sweep. Both are
+    // idempotent and tolerant — a fault in either never blocks the transaction pull.
+    try {
+      const { importRevolutExpenses, enforceCardLifecycle } = await import('../_shared/revolut/expenses-import.ts');
+      const imp = await importRevolutExpenses(service, cfg);
+      if (imp.imported > 0 || imp.errors.length > 0) {
+        console.log(`[revolut-sync] ${cfg.workspace_id}: expenses imported=${imp.imported} unmatched=${imp.unmatchedPerson} errors=${imp.errors.length}`);
+      }
+      await enforceCardLifecycle(service, cfg);
+    } catch (err) {
+      console.warn('[revolut-sync] expense/card pass failed:', err instanceof Error ? err.message : err);
+    }
   }
 
   const failed = results.filter((r) => !r.ok);

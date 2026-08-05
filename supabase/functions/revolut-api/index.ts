@@ -161,7 +161,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         },
         body: JSON.stringify({
           url: hookUrl,
-          events: ['TransactionCreated', 'TransactionStateChanged'],
+          events: ['TransactionCreated', 'TransactionStateChanged', 'PayoutLinkCreated', 'PayoutLinkStateChanged'],
         }),
       });
       if (!v2.ok) {
@@ -605,6 +605,15 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         throw new HttpError(502, `${action} failed (${res.status}): ${text.slice(0, 200)}`);
       }
       return jsonResponse({ ok: true });
+    }
+
+    case 'import-expenses': {
+      // Card→person attribution: pull card expenses into per-employee monthly reports.
+      const cfg = await requireConfig(service, workspaceId);
+      const { importRevolutExpenses } = await import('../_shared/revolut/expenses-import.ts');
+      const out = await importRevolutExpenses(service, cfg);
+      if (!out.ok) throw new HttpError(502, out.errors[0] ?? 'expense import failed');
+      return jsonResponse(out);
     }
 
     case 'expenses': {

@@ -58,7 +58,7 @@
     "property_tenancies", "property_viewings", "proposals", "public_realestate_submissions",
     "quality_metrics_daily", "quote_requests", "quotes", "real_estate_settings",
     "recommendation_analytics", "reseller_applications", "revolut_bank_transactions",
-    "revolut_payouts",
+    "revolut_expenses", "revolut_payouts",
     "saved_searches",
     "search_query_tracking", "search_sessions", "seo_articles", "seo_domain_keywords",
     "seo_domain_snapshots", "seo_keyword_research", "seo_research_runs", "seo_tracked_domains",

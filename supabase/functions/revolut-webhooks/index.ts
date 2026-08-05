@@ -129,6 +129,21 @@ Deno.serve(withApiLogging('revolut-webhooks', async (req) => {
       return json({ ok: true });
     }
 
+    if (type === 'PayoutLinkCreated' || type === 'PayoutLinkStateChanged') {
+      // Keep the payout audit's state live (created → claimed/expired/cancelled).
+      const linkId = String(data?.id ?? '');
+      const newState = String(data?.new_state ?? data?.state ?? '');
+      if (!linkId || !newState) return json({ ok: true, ignored: true });
+      const { error } = await service
+        .from('revolut_payouts')
+        .update({ state: newState, updated_at: new Date().toISOString() })
+        .eq('workspace_id', cfg.workspace_id)
+        .eq('kind', 'payout_link')
+        .eq('provider_id', linkId);
+      if (error) return json({ error: 'payout state update failed' }, 500);
+      return json({ ok: true });
+    }
+
     // Event types we did not subscribe to (or new ones) — acknowledge, stop retries.
     return json({ ok: true, ignored: true });
   } catch (err) {
