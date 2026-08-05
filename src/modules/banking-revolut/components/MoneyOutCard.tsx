@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { callRevolutApi, getRevolutStatus, type RevolutAccountInfo } from '../services/revolutConfigService';
@@ -32,9 +33,9 @@ const stateWord = (s: string) =>
   s === 'failed'
     ? <span className="text-xs text-destructive">failed</span>
     : s === 'pending_approval'
-      ? <span className="text-xs text-amber-600 dark:text-amber-400">awaiting approval</span>
+      ? <span className="text-xs text-warning">awaiting approval</span>
       : s === 'completed' || s === 'claimed'
-        ? <span className="text-xs text-emerald-600 dark:text-emerald-400">{s}</span>
+        ? <span className="text-xs text-success">{s}</span>
         : <span className="text-xs text-muted-foreground">{s}</span>;
 
 export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
@@ -120,10 +121,12 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
             </div>
             <div className="w-40 space-y-1">
               <Label className="text-xs" htmlFor="mo-pocket">From</Label>
-              <select id="mo-pocket" className="flex h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
-                value={pocketId} onChange={(e) => setPocketId(e.target.value)}>
-                {pockets.map((p) => <option key={p.id} value={p.id}>{p.currency} · {p.balance.toFixed(2)}</option>)}
-              </select>
+              <Select value={pocketId} onValueChange={setPocketId}>
+                <SelectTrigger id="mo-pocket"><SelectValue placeholder="— choose —" /></SelectTrigger>
+                <SelectContent>
+                  {pockets.map((p) => <SelectItem key={p.id} value={p.id}>{p.currency} · {p.balance.toFixed(2)}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="w-28 space-y-1">
               <Label className="text-xs" htmlFor="mo-amount">Amount</Label>

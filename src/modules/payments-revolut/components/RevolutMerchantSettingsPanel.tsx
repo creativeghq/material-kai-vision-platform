@@ -10,6 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
@@ -47,20 +48,20 @@ const ConfigCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   };
 
   if (!status) {
-    return <Card className="dashboard-card"><CardContent className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>;
+    return <Card><CardContent className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>;
   }
 
   return (
-    <Card className="dashboard-card">
+    <Card>
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2 text-base"><CreditCard className="h-4 w-4" /> Revolut Checkout</CardTitle>
           <CardDescription>
             Buyers pay by card, Revolut Pay, Apple/Google Pay or Pay by Bank on Revolut&apos;s hosted page.{' '}
             {status.configured
-              ? <span className="text-emerald-600 dark:text-emerald-400">Ready</span>
+              ? <span className="text-success">Ready</span>
               : status.has_secret_key
-                ? <span className="text-amber-600 dark:text-amber-400">Webhook pending</span>
+                ? <span className="text-warning">Webhook pending</span>
                 : <span className="text-muted-foreground">Not connected</span>}
           </CardDescription>
         </div>
@@ -79,11 +80,13 @@ const ConfigCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
           </div>
           <div>
             <Label htmlFor="revm-env" className="text-xs">Environment</Label>
-            <select id="revm-env" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={environment} onChange={(e) => setEnvironment(e.target.value as RevolutMerchantEnvironment)}>
-              <option value="sandbox">Sandbox</option>
-              <option value="production">Production</option>
-            </select>
+            <Select value={environment} onValueChange={(v) => setEnvironment(v as RevolutMerchantEnvironment)}>
+              <SelectTrigger id="revm-env"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sandbox">Sandbox</SelectItem>
+                <SelectItem value="production">Production</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -103,7 +106,7 @@ const ConfigCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
             {busy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
             {status.webhook_ready ? 'Re-register webhook' : 'Activate webhook'}
           </Button>
-          {status.webhook_ready && <span className="text-xs text-emerald-600 dark:text-emerald-400">webhook active</span>}
+          {status.webhook_ready && <span className="text-xs text-success">webhook active</span>}
         </div>
       </CardContent>
     </Card>
@@ -116,7 +119,7 @@ export const RevolutMerchantSettingsPanel: React.FC<Props> = (_props) => {
   const { activeWorkspaceId } = useWorkspace();
   if (!activeWorkspaceId) {
     return (
-      <Card className="dashboard-card">
+      <Card>
         <CardContent className="py-8 text-center text-sm text-muted-foreground">
           Select a workspace to configure Revolut Checkout.
         </CardContent>

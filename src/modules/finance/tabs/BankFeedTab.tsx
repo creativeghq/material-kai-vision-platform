@@ -15,6 +15,7 @@ import { ArrowDownLeft, ArrowUpRight, Landmark, Loader2, MoreHorizontal, Refresh
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
@@ -49,13 +50,13 @@ const PROVIDER_LABEL: Record<string, string> = { revolut: 'Revolut', stripe: 'St
 const MatchWord: React.FC<{ row: FeedRow }> = ({ row }) => {
   if (row.provider !== 'revolut') {
     return row.match_status === 'matched'
-      ? <span className="text-xs text-emerald-600 dark:text-emerald-400">Settled</span>
+      ? <span className="text-xs text-success">Settled</span>
       : <span className="text-xs text-muted-foreground">Info</span>;
   }
   if (row.state !== 'completed') return <span className="text-xs text-muted-foreground">{row.state}</span>;
   switch (row.match_status) {
-    case 'matched': return <span className="text-xs text-emerald-600 dark:text-emerald-400">Matched</span>;
-    case 'suggested': return <span className="text-xs text-amber-600 dark:text-amber-400">Needs review</span>;
+    case 'matched': return <span className="text-xs text-success">Matched</span>;
+    case 'suggested': return <span className="text-xs text-warning">Needs review</span>;
     case 'ignored': return <span className="text-xs text-muted-foreground">Ignored</span>;
     default: return row.direction === 'in'
       ? <span className="text-xs text-destructive">Unmatched</span>
@@ -202,7 +203,6 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
     void run();
   }, [picking, pickQuery, workspaceId]);
 
-  const sel = 'flex h-9 rounded-md border border-input bg-background px-2 text-sm';
 
   return (
     <Card>
@@ -224,24 +224,33 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         </div>
         {/* Filters */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select aria-label="Provider filter" className={sel} value={provider} onChange={(e) => setProvider(e.target.value)}>
-            <option value="">All providers</option>
-            <option value="revolut">Revolut</option>
-            <option value="stripe">Stripe</option>
-            <option value="viva">Viva</option>
-          </select>
-          <select aria-label="Direction filter" className={sel} value={direction} onChange={(e) => setDirection(e.target.value)}>
-            <option value="">In & out</option>
-            <option value="in">Money in</option>
-            <option value="out">Money out</option>
-          </select>
-          <select aria-label="Match status filter" className={sel} value={statusF} onChange={(e) => setStatusF(e.target.value)}>
-            <option value="">Any status</option>
-            <option value="review">Needs review</option>
-            <option value="matched">Matched</option>
-            <option value="unmatched">Unmatched</option>
-            <option value="ignored">Ignored</option>
-          </select>
+          <Select value={provider || 'all'} onValueChange={(v) => setProvider(v === 'all' ? '' : v)}>
+            <SelectTrigger aria-label="Provider filter" className="h-9 w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All providers</SelectItem>
+              <SelectItem value="revolut">Revolut</SelectItem>
+              <SelectItem value="stripe">Stripe</SelectItem>
+              <SelectItem value="viva">Viva</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={direction || 'all'} onValueChange={(v) => setDirection(v === 'all' ? '' : v)}>
+            <SelectTrigger aria-label="Direction filter" className="h-9 w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">In & out</SelectItem>
+              <SelectItem value="in">Money in</SelectItem>
+              <SelectItem value="out">Money out</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={statusF || 'all'} onValueChange={(v) => setStatusF(v === 'all' ? '' : v)}>
+            <SelectTrigger aria-label="Match status filter" className="h-9 w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any status</SelectItem>
+              <SelectItem value="review">Needs review</SelectItem>
+              <SelectItem value="matched">Matched</SelectItem>
+              <SelectItem value="unmatched">Unmatched</SelectItem>
+              <SelectItem value="ignored">Ignored</SelectItem>
+            </SelectContent>
+          </Select>
           <label htmlFor="feed-from" className="flex items-center gap-1 text-xs text-muted-foreground">From
             <Input id="feed-from" type="date" className="h-9 w-36" value={from} onChange={(e) => setFrom(e.target.value)} />
           </label>
@@ -268,7 +277,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
               return (
                 <div key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
                   {r.direction === 'in'
-                    ? <ArrowDownLeft className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    ? <ArrowDownLeft className="h-4 w-4 shrink-0 text-success" />
                     : <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                   <span className="w-20 shrink-0 text-xs text-muted-foreground">{PROVIDER_LABEL[r.provider] ?? r.provider}</span>
                   <div className="min-w-0 flex-1">
@@ -287,7 +296,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                       Settle {inv.internal_number}
                     </Button>
                   ))}
-                  <span className={`shrink-0 font-medium ${r.direction === 'in' ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+                  <span className={`shrink-0 font-medium ${r.direction === 'in' ? 'text-success' : ''}`}>
                     {r.direction === 'in' ? '+' : '−'}{Number(r.amount).toFixed(2)} {r.currency}
                   </span>
                   <DropdownMenu>

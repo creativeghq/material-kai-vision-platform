@@ -295,6 +295,18 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       if (!res.ok) {
         throw new HttpError(502, `name validation failed (${res.status}): ${JSON.stringify(out).slice(0, 200)}`);
       }
+      // Persist the verdict on the CRM bank row when the caller names one, so the
+      // verification is VISIBLE afterwards instead of evaporating with the edit session.
+      const crmBankId = body?.crm_bank_account_id ? String(body.crm_bank_account_id) : null;
+      if (crmBankId) {
+        await service.from('crm_bank_accounts')
+          .update({
+            vop_result: String((out as any).result_code ?? (out as any).result ?? 'cannot_be_checked'),
+            vop_checked_at: new Date().toISOString(),
+          })
+          .eq('id', crmBankId)
+          .eq('workspace_id', workspaceId);
+      }
       // Pass Revolut's verdict through verbatim (result_code: matched | close_match |
       // not_matched | cannot_be_checked, plus any suggested actual name).
       return jsonResponse({ ok: true, ...out });

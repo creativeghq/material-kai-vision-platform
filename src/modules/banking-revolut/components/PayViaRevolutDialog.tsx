@@ -13,6 +13,8 @@ import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { Checkbox } from '@/components/core/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { callRevolutApi, getRevolutStatus, type RevolutAccountInfo } from '../services/revolutConfigService';
@@ -149,8 +151,6 @@ export const PayViaRevolutDialog: React.FC<{
     }
   };
 
-  const sel = 'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm';
-
   return (
     <Dialog open={!!billId} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
@@ -176,21 +176,27 @@ export const PayViaRevolutDialog: React.FC<{
           <div className="space-y-3">
             <div>
               <Label className="text-xs" htmlFor="pvr-bank">Supplier account</Label>
-              <select id="pvr-bank" className={sel} value={bankId} onChange={(e) => { setBankId(e.target.value); setVopBlocked(false); setForceVop(false); }}>
-                {banks.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {(b.account_holder || b.bank_name)} · {b.iban}{b.revolut_counterparty_id ? ' ✓' : ' (will be verified)'}
-                  </option>
-                ))}
-              </select>
+              <Select value={bankId} onValueChange={(v) => { setBankId(v); setVopBlocked(false); setForceVop(false); }}>
+                <SelectTrigger id="pvr-bank"><SelectValue placeholder="— choose —" /></SelectTrigger>
+                <SelectContent>
+                  {banks.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {(b.account_holder || b.bank_name)} · {b.iban}{b.revolut_counterparty_id ? ' ✓' : ' (will be verified)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-xs" htmlFor="pvr-pocket">From</Label>
-              <select id="pvr-pocket" className={sel} value={pocketId} onChange={(e) => setPocketId(e.target.value)}>
-                {pockets.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name || p.currency} · {p.balance.toFixed(2)} {p.currency}</option>
-                ))}
-              </select>
+              <Select value={pocketId} onValueChange={setPocketId}>
+                <SelectTrigger id="pvr-pocket"><SelectValue placeholder="— choose —" /></SelectTrigger>
+                <SelectContent>
+                  {pockets.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name || p.currency} · {p.balance.toFixed(2)} {p.currency}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -202,15 +208,15 @@ export const PayViaRevolutDialog: React.FC<{
                 <Input id="pvr-ref" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={140} />
               </div>
             </div>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <input type="checkbox" checked={direct} onChange={(e) => setDirect(e.target.checked)} />
-              Send immediately (skip the in-app approval)
-            </label>
+            <div className="flex items-center gap-2">
+              <Checkbox id="pvr-direct" checked={direct} onCheckedChange={(v) => setDirect(v === true)} />
+              <Label htmlFor="pvr-direct" className="text-xs font-normal text-muted-foreground">Send immediately (skip the in-app approval)</Label>
+            </div>
             {vopBlocked && (
-              <label className="flex items-center gap-2 text-xs text-destructive">
-                <input type="checkbox" checked={forceVop} onChange={(e) => setForceVop(e.target.checked)} />
-                The holder name does NOT match this IBAN — tick to proceed anyway
-              </label>
+              <div className="flex items-center gap-2">
+                <Checkbox id="pvr-force" checked={forceVop} onCheckedChange={(v) => setForceVop(v === true)} />
+                <Label htmlFor="pvr-force" className="text-xs font-normal text-destructive">The holder name does NOT match this IBAN — tick to proceed anyway</Label>
+              </div>
             )}
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="ghost" className="rounded-full" onClick={onClose} disabled={busy}>Cancel</Button>

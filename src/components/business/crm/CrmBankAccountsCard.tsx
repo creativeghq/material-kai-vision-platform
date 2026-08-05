@@ -73,10 +73,14 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
         name,
         iban,
         company: Boolean(companyId),
+        // Persist the verdict on the row when we're editing an existing account, so the
+        // verification stays visible after save instead of evaporating.
+        ...(editingId && editingId !== 'new' ? { crm_bank_account_id: editingId } : {}),
       });
       const code = String(out.result_code ?? out.result ?? 'cannot_be_checked');
       const actual = (out.actual_name ?? (out.company_name as string | undefined)) as string | undefined;
       setVopVerdict({ code, actualName: actual });
+      if (editingId && editingId !== 'new') await load();
     } catch (e: any) {
       toast({ title: 'Verification unavailable', description: e?.message, variant: 'destructive' });
     } finally {
@@ -86,9 +90,9 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
 
   const vopWord = vopVerdict && (
     vopVerdict.code === 'matched'
-      ? <span className="text-xs text-emerald-600 dark:text-emerald-400">Name matches this account</span>
+      ? <span className="text-xs text-success">Name matches this account</span>
       : vopVerdict.code === 'close_match'
-        ? <span className="text-xs text-amber-600 dark:text-amber-400">Close match{vopVerdict.actualName ? ` — bank has “${vopVerdict.actualName}”` : ''}</span>
+        ? <span className="text-xs text-warning">Close match{vopVerdict.actualName ? ` — bank has “${vopVerdict.actualName}”` : ''}</span>
         : vopVerdict.code === 'not_matched'
           ? <span className="text-xs text-destructive">Name does NOT match this account — verify before paying</span>
           : <span className="text-xs text-muted-foreground">Could not be checked for this bank</span>
@@ -137,16 +141,16 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
     <div className="rounded-md border border-border/60 p-3 space-y-3 bg-muted/20">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs">Bank name *</Label>
-          <Input value={form.bank_name ?? ''} onChange={(e) => setForm((f) => ({ ...f, bank_name: e.target.value }))} placeholder="e.g. Piraeus Bank" />
+          <Label className="text-xs" htmlFor="crmb-name">Bank name *</Label>
+          <Input id="crmb-name" value={form.bank_name ?? ''} onChange={(e) => setForm((f) => ({ ...f, bank_name: e.target.value }))} placeholder="e.g. Piraeus Bank" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Account holder</Label>
-          <Input value={form.account_holder ?? ''} onChange={(e) => setForm((f) => ({ ...f, account_holder: e.target.value }))} placeholder="Name on the account" />
+          <Label className="text-xs" htmlFor="crmb-holder">Account holder</Label>
+          <Input id="crmb-holder" value={form.account_holder ?? ''} onChange={(e) => setForm((f) => ({ ...f, account_holder: e.target.value }))} placeholder="Name on the account" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">IBAN</Label>
-          <Input value={form.iban ?? ''} onChange={(e) => { setForm((f) => ({ ...f, iban: normalizeIban(e.target.value) })); setVopVerdict(null); }} placeholder="GR16 0110 1250 0000 0001 2300 695" className="font-mono" />
+          <Label className="text-xs" htmlFor="crmb-iban">IBAN</Label>
+          <Input id="crmb-iban" value={form.iban ?? ''} onChange={(e) => { setForm((f) => ({ ...f, iban: normalizeIban(e.target.value) })); setVopVerdict(null); }} placeholder="GR16 0110 1250 0000 0001 2300 695" className="font-mono" />
           {vopAvailable && (
             <div className="flex items-center gap-2 pt-0.5">
               <Button size="sm" variant="outline" type="button" onClick={verifyHolder} disabled={vopBusy}>
@@ -159,12 +163,12 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs">SWIFT / Account #</Label>
-            <Input value={form.account_ref ?? ''} onChange={(e) => setForm((f) => ({ ...f, account_ref: e.target.value }))} placeholder="Optional" />
+            <Label className="text-xs" htmlFor="crmb-ref">SWIFT / Account #</Label>
+            <Input id="crmb-ref" value={form.account_ref ?? ''} onChange={(e) => setForm((f) => ({ ...f, account_ref: e.target.value }))} placeholder="Optional" />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Currency</Label>
-            <Input value={form.currency ?? 'EUR'} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))} maxLength={3} />
+            <Label className="text-xs" htmlFor="crmb-ccy">Currency</Label>
+            <Input id="crmb-ccy" value={form.currency ?? 'EUR'} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value.toUpperCase() }))} maxLength={3} />
           </div>
         </div>
       </div>
@@ -199,12 +203,18 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
                   </div>
                   {r.account_holder && <div className="text-xs text-muted-foreground truncate">{r.account_holder}</div>}
                   {r.iban && <div className="text-xs font-mono text-muted-foreground truncate">{r.iban}</div>}
+                  {(r as { vop_result?: string | null }).vop_result === 'matched' && (
+                    <div className="text-[11px] text-success">Holder verified</div>
+                  )}
+                  {(r as { vop_result?: string | null }).vop_result === 'not_matched' && (
+                    <div className="text-[11px] text-destructive">Holder name did NOT match — verify before paying</div>
+                  )}
                   {r.account_ref && <div className="text-[11px] text-muted-foreground">SWIFT/Acct: {r.account_ref}</div>}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {!r.is_primary && <button type="button" title="Make primary" className="text-muted-foreground hover:text-foreground p-1" onClick={() => makePrimary(r.id)}><Star className="h-3.5 w-3.5" /></button>}
-                  <button type="button" title="Edit" className="text-muted-foreground hover:text-foreground p-1" onClick={() => startEdit(r)}><Pencil className="h-3.5 w-3.5" /></button>
-                  <button type="button" title="Delete" className="text-muted-foreground hover:text-destructive p-1" onClick={() => remove(r.id)}><Trash2 className="h-3.5 w-3.5" /></button>
+                  {!r.is_primary && <button type="button" title="Make primary" aria-label="Make primary" className="text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring rounded p-1" onClick={() => makePrimary(r.id)}><Star className="h-3.5 w-3.5" /></button>}
+                  <button type="button" title="Edit" aria-label="Edit bank account" className="text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring rounded p-1" onClick={() => startEdit(r)}><Pencil className="h-3.5 w-3.5" /></button>
+                  <button type="button" title="Delete" aria-label="Delete bank account" className="text-muted-foreground hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring rounded p-1" onClick={() => remove(r.id)}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
               </div>
             ))}

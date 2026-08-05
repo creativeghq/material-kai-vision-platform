@@ -148,12 +148,14 @@ export const WorkspaceKeysTab: React.FC = () => {
             <SectionHead
               icon={Landmark}
               title="Finance & Tax"
-              description="Your Greek tax + e-invoicing credentials and the account payments settle into. Leave blank to use the platform defaults."
+              description="Tax credentials, the checkout providers buyers pay through, and your own bank connection. Leave blank to use the platform defaults."
             />
+            {/* Subgrouped so the six cards scan as three questions: taxes? checkout? bank? */}
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tax & e-Invoicing</p>
             <AadeCredentialsCard workspaceId={activeWorkspaceId} />
             <InboundSetupCard workspaceId={activeWorkspaceId} />
+            <p className="pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Checkout Providers — how buyers pay you</p>
             <VivaConfigCard workspaceId={activeWorkspaceId} />
-            <RevolutConfigCard workspaceId={activeWorkspaceId} />
             <RevolutMerchantSettingsPanel />
             <Card>
               <CardContent className="p-5">
@@ -164,14 +166,16 @@ export const WorkspaceKeysTab: React.FC = () => {
                   to="/finance"
                   status={
                     conn.stripe === 'connected'
-                      ? <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">Connected</Badge>
+                      ? <span className="text-xs text-success">Connected</span>
                       : conn.stripe === 'onboarding'
-                        ? <Badge className="bg-amber-500/15 text-amber-500 border-amber-500/30">Onboarding</Badge>
-                        : <Badge variant="secondary">Not connected</Badge>
+                        ? <span className="text-xs text-warning">Onboarding</span>
+                        : <span className="text-xs text-muted-foreground">Not connected</span>
                   }
                 />
               </CardContent>
             </Card>
+            <p className="pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Banking — your own account, feed & payouts</p>
+            <RevolutConfigCard workspaceId={activeWorkspaceId} />
           </>
         );
       case 'email':

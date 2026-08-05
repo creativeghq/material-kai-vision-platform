@@ -20,6 +20,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
   callRevolutApi,
@@ -165,9 +166,9 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
   }
 
   const stateWord = status.connected
-    ? <span className="text-emerald-600 dark:text-emerald-400">Connected</span>
+    ? <span className="text-success">Connected</span>
     : status.configured
-      ? <span className="text-amber-600 dark:text-amber-400">Awaiting authorisation</span>
+      ? <span className="text-warning">Awaiting authorisation</span>
       : <span className="text-muted-foreground">Not set up</span>;
 
   return (
@@ -237,15 +238,13 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
             </div>
             <div>
               <Label htmlFor="revolut-env" className="text-xs">Environment</Label>
-              <select
-                id="revolut-env"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={environment}
-                onChange={(e) => setEnvironment(e.target.value as RevolutEnvironment)}
-              >
-                <option value="sandbox">Sandbox</option>
-                <option value="production">Production</option>
-              </select>
+              <Select value={environment} onValueChange={(v) => setEnvironment(v as RevolutEnvironment)}>
+                <SelectTrigger id="revolut-env"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sandbox">Sandbox</SelectItem>
+                  <SelectItem value="production">Production</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="sm:col-span-3">
               <Label htmlFor="revolut-revtag" className="text-xs">Revolut username (@revtag) — printed on invoices for instant in-app payment</Label>
@@ -268,10 +267,10 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
           <div className="text-sm font-medium">3. Authorise</div>
           {status.connected ? (
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-emerald-600 dark:text-emerald-400">Authorised</span>
+              <span className="text-success">Authorised</span>
               {status.webhook_ready
-                ? <span className="text-emerald-600 dark:text-emerald-400">· webhook active</span>
-                : <span className="text-amber-600 dark:text-amber-400">· webhook missing</span>}
+                ? <span className="text-success">· webhook active</span>
+                : <span className="text-warning">· webhook missing</span>}
               <Button size="sm" variant="outline" disabled={busy !== null}
                 onClick={() => run('Register webhook', async () => { await callRevolutApi('register-webhook', workspaceId); await refresh(); })}>
                 {status.webhook_ready ? 'Re-register webhook' : 'Register webhook'}
@@ -324,17 +323,17 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
                     <div key={a.id} className="flex flex-wrap items-center gap-2 text-sm">
                       <span className="min-w-32 font-medium">{a.name || a.currency}</span>
                       <span className="text-muted-foreground">{a.balance.toFixed(2)} {a.currency}</span>
-                      <select
-                        aria-label={`Map ${a.name || a.currency} to a bank account`}
-                        className="h-10 rounded-md border border-input bg-background px-2 text-sm"
-                        value={mappedTo}
-                        onChange={(e) => mapAccount(a.id, e.target.value || null)}
-                      >
-                        <option value="">— not mapped —</option>
-                        {bankAccounts.map((b) => (
-                          <option key={b.id} value={b.id}>{b.name}{b.currency ? ` (${b.currency})` : ''}</option>
-                        ))}
-                      </select>
+                      <Select value={mappedTo || 'none'} onValueChange={(v) => mapAccount(a.id, v === 'none' ? null : v)}>
+                        <SelectTrigger aria-label={`Map ${a.name || a.currency} to a bank account`} className="h-9 w-48 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">— not mapped —</SelectItem>
+                          {bankAccounts.map((b) => (
+                            <SelectItem key={b.id} value={b.id}>{b.name}{b.currency ? ` (${b.currency})` : ''}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   );
                 })}

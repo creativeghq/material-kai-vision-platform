@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { callRevolutApi, getRevolutStatus } from '../services/revolutConfigService';
 
@@ -127,11 +128,12 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-48 space-y-1">
               <Label className="text-xs" htmlFor="ce-member">Team member</Label>
-              <select id="ce-member" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={holderId} onChange={(e) => setHolderId(e.target.value)}>
-                <option value="">— choose —</option>
-                {members.map((m) => <option key={m.id} value={m.id}>{memberName(m.id)}</option>)}
-              </select>
+              <Select value={holderId || undefined} onValueChange={setHolderId}>
+                <SelectTrigger id="ce-member"><SelectValue placeholder="— choose —" /></SelectTrigger>
+                <SelectContent>
+                  {members.map((m) => <SelectItem key={m.id} value={m.id}>{memberName(m.id)}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="w-44 space-y-1">
               <Label className="text-xs" htmlFor="ce-label">Card label</Label>
@@ -169,7 +171,7 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
                     </span>
                     {c.state === 'frozen'
                       ? <span className="text-xs text-sky-600 dark:text-sky-400">frozen</span>
-                      : <span className="text-xs text-emerald-600 dark:text-emerald-400">{c.state ?? 'active'}</span>}
+                      : <span className="text-xs text-success">{c.state ?? 'active'}</span>}
                     {limitCardId === c.id ? (
                       <span className="flex items-center gap-1">
                         <Input className="h-7 w-24 text-xs" inputMode="decimal" autoFocus placeholder="€ / month"

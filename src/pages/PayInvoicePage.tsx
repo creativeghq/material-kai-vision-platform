@@ -186,7 +186,7 @@ const PayInvoicePage: React.FC = () => {
     if (alreadyPaid) {
       return shell(
         <div className="text-center">
-          <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+          <CheckCircle2 className="mx-auto h-12 w-12 text-success" />
           <h1 className="mt-4 text-xl font-semibold">Payment received</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Thank you. A receipt will be emailed to you, and the seller sees this within a minute.
@@ -196,7 +196,7 @@ const PayInvoicePage: React.FC = () => {
     }
     return shell(
       <div className="text-center">
-        <AlertCircle className="mx-auto h-12 w-12 text-amber-500" />
+        <AlertCircle className="mx-auto h-12 w-12 text-warning" />
         <h1 className="mt-4 text-xl font-semibold">Checking your payment…</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           If you completed the payment, it can take a moment to confirm — refresh this page shortly.
@@ -278,7 +278,7 @@ const PayInvoicePage: React.FC = () => {
   if (alreadyPaid) {
     return shell(
       <div className="text-center">
-        <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-500" />
+        <CheckCircle2 className="mx-auto h-12 w-12 text-success" />
         <h1 className="mt-4 text-xl font-semibold">Already paid</h1>
         <p className="mt-2 text-sm text-muted-foreground">This document has no outstanding balance.</p>
       </div>,

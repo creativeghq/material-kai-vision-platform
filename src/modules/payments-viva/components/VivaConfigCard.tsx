@@ -10,7 +10,7 @@
  * to show "Connected" until we have actually received a delivery from their merchant id.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Copy, CreditCard, ExternalLink, Loader2 } from 'lucide-react';
+import { CheckCircle2, Copy, CreditCard, ExternalLink, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -113,7 +113,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
 
   if (loading) {
     return (
-      <Card className="dashboard-card">
+      <Card>
         <CardContent className="flex justify-center py-8">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </CardContent>
@@ -128,19 +128,13 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle className="font-light flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2">
           <CreditCard className="h-4 w-4 text-primary" />
           Viva.com
           {fullyConnected ? (
-            <Badge variant="outline" className="bg-success/10 text-success border-success/30">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Connected
-            </Badge>
+            <span className="text-xs font-normal text-success">Connected</span>
           ) : (
-            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30">
-              <AlertCircle className="h-3 w-3 mr-1" />
-              {credsReady ? 'Webhook not verified' : 'Not connected'}
-            </Badge>
+            <span className="text-xs font-normal text-warning">{credsReady ? 'Webhook not verified' : 'Not connected'}</span>
           )}
         </CardTitle>
         <CardDescription>
