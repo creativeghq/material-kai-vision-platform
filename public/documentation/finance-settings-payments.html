@@ -10,37 +10,46 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / Payments</div>
   <h1>Settings · Payments</h1>
-  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">The Payments section configures how your customers pay you online. It controls the payment methods and links offered on the public pay page at <code>/pay/:token</code> — the page a customer reaches when they click through from an emailed invoice. Set it up once and every invoice you send gives the recipient a way to settle it online.</p>
+  <div class="routes"><span class="badge route">/finance → Settings → Payments</span> <span class="badge gated">finance.manage · owner to activate</span></div>
+  <p class="lead">The Payments section is where you connect the <strong>payment providers</strong> that let your customers settle invoices online — and where you see your <strong>bank connections</strong>. Each provider is a separate <strong>bring-your-own-account</strong> add-on: you connect <em>your own</em> Stripe, Viva or Revolut merchant account, and the methods you enable here are what a customer is offered on the public pay page. Set it up once and every invoice you send gives the recipient a way to pay.</p>
 
-  <h2>Where it is</h2>
-  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>Payments</strong> (in the row of settings sub-tabs).</p>
+  <div class="callout"><p><strong>Where:</strong> <strong>Finance → Settings</strong> tab → <strong>Payments</strong> (in the row of settings sub-tabs, alongside <em>Accounts</em>). Only a workspace <strong>owner</strong> can activate a paid provider; other finance managers can request one.</p></div>
 
-  <h2>What's on the screen</h2>
-  <p>The configuration for your online payment options:</p>
-  <ul class="feat">
-    <li><strong>Online payment methods / links</strong> — the methods and payment links that will be presented to a customer on the public pay page. These are what the customer chooses from when they go to pay an emailed invoice.</li>
-  </ul>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-payments.png" alt="Payments section: configuration of online payment methods and links offered on the public pay page">
-    <figcaption>The Payments section — where you configure the online payment methods and links that appear on the public pay page at <code>/pay/:token</code>.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-payments.png" alt="The Payments settings — providers and bank connections">
+    <figcaption>Payment providers — <strong>Revolut Checkout</strong>, <strong>Stripe</strong> and <strong>Viva.com</strong>, each a separate add-on you enable and configure with your own merchant account. A <strong>Bank connections</strong> section below lists <a href="banking.html">Revolut Business</a> (your bank account, not a checkout method).</figcaption>
   </figure>
 
-  <h2>How online payment works</h2>
-  <p>When you email an invoice, the customer can open a public pay page at <code>/pay/:token</code>. Whatever you configure here is what that page offers them. The customer never needs an account — they follow the token link from their invoice email and pay using one of the methods you've set up. See <a href="public-pages.html">Public Pages</a> for how the pay page renders alongside the other public-facing surfaces.</p>
+  <h2>Payment providers — how customers pay you</h2>
+  <p>These providers power the public pay page at <span class="badge route">/pay/:token</span> that a customer reaches from an emailed invoice. Enable the ones you want and connect your own account; the customer never needs a MaterialsHub login.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Provider</th><th>What it offers</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Stripe</strong></td><td>Card checkout for invoices, plus the platform's subscription &amp; credit purchases, with webhook reconciliation. Connect your Stripe account and its methods are offered on the pay page.</td></tr>
+      <tr><td><strong>Viva.com</strong></td><td>A per-workspace BYOK merchant account — <strong>Smart Checkout</strong> card payments and the Greek <strong>RF bank-transfer</strong> method (a structured reference that auto-reconciles a bank transfer — see below).</td></tr>
+      <tr><td><strong>Revolut Checkout</strong></td><td>One hosted checkout that accepts <strong>cards, Revolut Pay, Apple Pay / Google Pay and Pay by Bank</strong>, via your own Revolut Merchant account. (Distinct from <a href="banking.html">Revolut Business</a> below.)</td></tr>
+    </tbody>
+  </table></div>
+  <p>Each provider is enabled/configured in its own dialog — you paste your merchant credentials (and, for Revolut Checkout, activate its webhook). A provider is only offered to customers once it's both connected <em>and</em> its webhook is active, so a half-configured provider never shows a broken pay button.</p>
+
+  <h3>The Greek RF bank-transfer method</h3>
+  <p>Via <strong>Viva</strong>, you can offer a <strong>bank-transfer with an RF reference</strong> — a structured payment code. Its power is <strong>automatic reconciliation</strong>: because the code is minted per invoice, when the customer's transfer arrives it's recognised and the invoice is <strong>settled without anyone matching it by hand</strong>. The RF code also <strong>prints on the invoice/proforma PDF and email</strong>, so a customer who never opens the pay link can still pay by transfer with the right reference — see <a href="finance-doc-invoices.html">Invoices</a> for how it appears on the document.</p>
+
+  <h2>Bank connections</h2>
+  <p>Below the checkout providers, the <strong>Bank connections</strong> section lists <a href="banking.html">Revolut Business</a> — your <em>own</em> bank account. It uses the same enable/configure mechanics but is labelled “not a checkout method”, because it isn't about customers paying you: it's the bank feed, reconciliation, money-out and team cards documented under <a href="banking.html">Banking</a>. Enabling it here is the same as enabling the Banking add-on.</p>
 
   <h2>How to set up online payments — step by step</h2>
   <ol>
     <li>Go to <strong>Finance → Settings → Payments</strong>.</li>
-    <li>Configure the <strong>online payment methods / links</strong> you want to offer your customers.</li>
-    <li>Save your configuration so it applies to the public pay page.</li>
-    <li>Email an invoice to a customer, then open its <code>/pay/:token</code> link yourself to confirm the payment options appear as expected.</li>
+    <li>Pick a provider (Stripe, Viva or Revolut Checkout), click <strong>Configure</strong>, and connect <strong>your own</strong> merchant account (paste the keys; activate the webhook where asked).</li>
+    <li>For Viva, enable the <strong>RF bank-transfer</strong> method if you want auto-reconciling transfers and the RF code on your documents.</li>
+    <li>Email an invoice to a customer, then open its <span class="badge route">/pay/:token</span> link yourself to confirm the methods appear.</li>
   </ol>
 
-  <div class="callout tip"><p><strong>Worked example — letting a customer pay an invoice online.</strong> Open Payments → configure your online payment method → save. Now email an invoice to a customer. They click the link in the email, land on the public pay page at <code>/pay/:token</code>, and choose the method you set up — settling the invoice without ever logging in.</p></div>
+  <div class="callout tip"><p><strong>Worked example.</strong> Configure <strong>Viva</strong> with your merchant account and turn on <strong>RF bank-transfer</strong> → email an invoice. The PDF now carries an RF code next to your IBAN; the customer either pays online at <span class="badge route">/pay/:token</span> or makes a bank transfer quoting the RF — and either way the invoice reconciles itself.</p></div>
 
   <h2>What it affects</h2>
-  <p>This section drives only the public pay page at <code>/pay/:token</code> — the methods and links a customer sees when paying an emailed invoice. It changes how customers can pay, not the invoices themselves. For the broader set of customer-facing surfaces, see <a href="public-pages.html">Public Pages</a>.</p>
+  <p>The checkout providers drive the public pay page at <span class="badge route">/pay/:token</span> and (for Viva RF) the payment block on your documents; <a href="banking.html">Revolut Business</a> under Bank connections drives your <a href="banking-reconciliation.html">bank feed and reconciliation</a>. For the broader set of customer-facing surfaces, see <a href="public-pages.html">Public Pages</a>.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

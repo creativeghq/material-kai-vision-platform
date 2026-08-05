@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team Cards & Expenses | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="banking.html">Banking</a> / Team cards &amp; expenses</div>
+  <h1>Team cards &amp; expenses</h1>
+  <div class="routes"><span class="badge gated">Revolut Business · finance.manage</span></div>
+  <p class="lead">With <a href="banking.html">Revolut</a> connected, you can issue <strong>virtual cards</strong> to your team, cap what each can spend, freeze them instantly, and — the part that saves real time — have every card purchase, <strong>with its receipt</strong>, flow automatically into the right person's <a href="hr-self-service.html">expense report</a>. No chasing paper receipts, no manually keying card spend into the books, and no card left live after someone leaves.</p>
+
+  <div class="callout"><p><strong>Where:</strong> the <strong>Cards &amp; expenses</strong> panel in the Revolut Business module settings (open it, then click <strong>Load</strong> to fetch your team, their cards, and recent expenses).</p></div>
+
+  <h2>Issuing &amp; controlling cards</h2>
+  <ul class="feat">
+    <li><strong>Issue a virtual card</strong> — pick a team member and an optional label; the card is created instantly (virtual only).</li>
+    <li><strong>Invite by email</strong> — for someone not yet in your Revolut team, send a card invitation to their email.</li>
+    <li><strong>Set a spend limit</strong> — an inline limit sets a monthly (or weekly) cap on the card.</li>
+    <li><strong>Freeze / unfreeze</strong> — instantly block or restore a card with a toggle.</li>
+  </ul>
+
+  <h2>Card spend → the right person's expense report</h2>
+  <p><strong>What it is —</strong> the panel shows each card's expenses (last 90 days) with date, merchant and amount, and each receipt downloads on demand — fetched live from Revolut, never stored by the platform until you import it. <strong>Import to expense reports</strong> then files each expense against the <em>person who holds the card</em>.</p>
+  <p><strong>How the attribution is safe —</strong> it's a deterministic chain, never name-guessing: the expense → the card holder → that holder's <strong>email</strong> → the matching <a href="hr-employees.html">HR employee</a> → their user → their monthly “Revolut card” expense report → a line item (marked <em>company card</em>, awaiting approval) with the receipt attached exactly where a manually uploaded one would go. A card whose holder can't be matched to an employee is <strong>logged as unmatched, never invented</strong> — so spend is never attributed to the wrong person.</p>
+
+  <h2>Large-spend alerts</h2>
+  <p>Any company-card purchase of <strong>€100 or more</strong> raises the <strong>Large Card Spend</strong> event, which you can route through <a href="flows.html">Flows</a> (e.g. notify the owner, post to a channel). It carries the amount, so a flow can filter to a higher threshold if €100 is too noisy. It fires once per payment.</p>
+
+  <h2>Offboarding — cards freeze themselves</h2>
+  <p>You don't have to remember to kill a leaver's card. A background sweep <strong>freezes</strong> (never unfreezes) any active card whose holder maps to an <a href="hr-employees.html">employee</a> who has an end-date in the past or is marked terminated. So the moment HR records someone's departure, their card stops working — closing the gap where an ex-employee's card stays live because nobody thought to cancel it.</p>
+
+  <div class="callout"><p><strong>It also runs on a schedule.</strong> The same import and offboard-freeze run automatically on the nightly sync, so card expenses keep flowing into reports and leavers' cards keep getting frozen even if nobody opens the panel.</p></div>
+
+  <div class="callout tip"><p><strong>Worked example — a card for a new hire.</strong> Open the <strong>Cards &amp; expenses</strong> panel → <strong>Load</strong> → issue a virtual card to the employee with a <strong>€500 monthly limit</strong>. They spend on it; receipts and lines appear against <em>their</em> monthly expense report automatically (pending approval). If a purchase tops €100 you get a <strong>Large Card Spend</strong> alert. When they later leave and HR sets their end-date, the card <strong>freezes itself</strong> on the next sweep.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

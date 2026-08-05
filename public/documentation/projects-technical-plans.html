@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects: Technical Plans | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Technical Plans</div>
+  <h1>Projects · Technical Plans</h1>
+  <div class="routes"><span class="badge route">/projects/:id</span> · <span class="badge">Sheets tab</span></div>
+  <p class="lead">Technical plans are the <strong>services drawings</strong> for a project — <strong>electrical</strong>, <strong>plumbing</strong> and <strong>lighting</strong> layouts. You draw the plan on a floor-plan backdrop by dropping standardised symbols and connecting them with <strong>runs</strong> (circuits, pipes). Because every symbol can be linked to a real product and every run can be measured, the sheet stops being a picture and becomes something you can <strong>order from</strong> and <strong>check</strong>: it yields a <strong>schedule</strong> (a counted material list) and, for electrical, a <strong>voltage-drop check</strong> — then exports to a titled, branded <strong>PDF</strong>. This page covers building one end to end, and — importantly — <em>where the tool deliberately refuses to give you a number it can't stand behind</em>.</p>
+
+  <div class="callout warn"><p><strong>Not the same as “Plan &amp; Estimating.”</strong> The Projects area has two things with “plan” in the name. The <a href="projects-plan.html">Plan &amp; Estimating</a> tab is the <em>costing</em> engine (measurements → priced bill of quantities). <strong>Technical Plans</strong> — this page — are <em>drawings</em> on the <strong>Sheets</strong> tab. They share nothing but the word.</p></div>
+
+  <h2>Where it is</h2>
+  <p>Open a project (<span class="badge route">/projects/:id</span>) → the <strong>Sheets</strong> tab. Sheets are split into two groups: <strong>Technical plans</strong> (owned by the project — electrical, plumbing, lighting) and the <a href="moodboards-sheets.html">presentation sheets</a> that came from the project's moodboards. Click <strong>New technical plan</strong> to start one. (Any project member can open the tab; creating a sheet is owner-only.)</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/technical-plans.png" alt="The Sheets tab with technical plans">
+    <figcaption>The <strong>Sheets</strong> tab — <strong>Technical plans</strong> (electrical / plumbing / lighting) sit at the top, owned by the project; presentation sheets from the project's moodboards are grouped below. <strong>New technical plan</strong> starts one.</figcaption>
+  </figure>
+
+  <h2>Building a plan — the two phases</h2>
+  <p>A technical plan is created in a short <strong>wizard</strong>, then drawn on a <strong>canvas</strong>.</p>
+  <ol>
+    <li><strong>Wizard.</strong> Choose the plan type (Electrical, Plumbing or Lighting), then pick a <strong>backdrop</strong> (below). This creates a draft — you're charged for it here (<strong>3 credits</strong>), and the draft opens on the canvas so you never pay for a sheet you can't then draw.</li>
+    <li><strong>Canvas.</strong> The drawing surface: place symbols, connect runs, link products, fill the title block, and render the PDF.</li>
+  </ol>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/plan-wizard.png" alt="The New Sheet wizard — Plans group">
+    <figcaption>The <strong>New technical plan</strong> wizard — under <strong>Plans</strong> you pick <strong>Lighting</strong>, <strong>Plumbing</strong> or <strong>Electrical</strong> (3 credits each). Choosing one and a backdrop creates the draft you then draw on the canvas.</figcaption>
+  </figure>
+
+  <h3>The backdrop — and why it decides what can be measured</h3>
+  <p>This is the single most important choice, because it's what gives the drawing <strong>scale</strong>. You have three options:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Backdrop</th><th>What it is</th><th>Measurable?</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Blank room (mm)</strong></td><td>A plain rectangle drawn from width × length you type in millimetres.</td><td><strong>Yes</strong> — real dimensions, so run lengths and voltage-drop compute.</td></tr>
+      <tr><td><strong>A project room</strong></td><td>One-click backdrop from a <a href="projects-rooms.html">room</a> that already has dimensions set.</td><td><strong>Yes</strong> — inherits the room's millimetres.</td></tr>
+      <tr><td><strong>Uploaded floor plan</strong></td><td>An image of an existing drawing.</td><td><strong>No</strong> — an image carries no scale, so lengths and checks stay blank (see the honesty note below).</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout tip"><p><strong>If you want lengths and voltage-drop checks, use a sized backdrop</strong> — <em>Blank room (mm)</em> or a project room with dimensions. An uploaded floor-plan image is fine for laying out symbols, but the tool won't invent a scale for it, so run lengths show “—” and the electrical checks are omitted. (You can give a <a href="projects-rooms.html">room</a> real dimensions — or calibrate an uploaded plan by drawing a line of known length — on the Rooms tab.)</p></div>
+
+  <h2>On the canvas</h2>
+  <p>The canvas has a backdrop, a <strong>symbol palette</strong>, a <strong>legend</strong> that fills itself as you place symbols, a <strong>runs</strong> list, and a <strong>title block</strong> editor. You work in three explicit modes:</p>
+  <ul class="feat">
+    <li><strong>Place</strong> — click the backdrop to drop a symbol from the palette; drag to reposition.</li>
+    <li><strong>Select</strong> — click a placed symbol to edit its label and link it to a product.</li>
+    <li><strong>Connect</strong> — draw a run between two symbols (click the first, click empty space to add corners so the run follows walls, click the second to finish; Esc cancels).</li>
+  </ul>
+  <p>The <strong>electrical palette</strong> includes sockets (single/double), switches (1-way, 2-way, dimmer), the distribution board, data/RJ45, TV/SAT, dedicated points, junction boxes and earth points — drawn as standard IEC-style glyphs in the PDF. Plumbing and lighting have their own symbol sets.</p>
+
+  <h3>Symbols → products → a schedule</h3>
+  <p>In <strong>select</strong> mode, a symbol can be linked to a <strong>product</strong> from your catalogue (search by name). A linked symbol shows a green dot, so across forty sockets you can see which still need a product. When you render, the PDF counts symbols per linked product and prints a <strong>SCHEDULE</strong> — <em>qty × product name</em>, most-used first — plus a note of how many symbols aren't yet linked. That schedule is a real take-off you can order from; it's the whole reason a symbol carries a product.</p>
+
+  <h3>Runs</h3>
+  <p>A <strong>run</strong> is the primitive that connects two symbols — a lighting or socket circuit, a dedicated line, a switch leg (electrical), or cold/hot/waste (plumbing). Runs are what let the sheet compute anything: on a <strong>sized backdrop</strong> the runs list shows each run's length in metres and a total. On an unscaled (image) backdrop it shows “—” and tells you to use room dimensions — it will not print a length it can't measure, because a confident wrong number in front of someone about to buy cable is worse than none.</p>
+
+  <h3>Voltage-drop checks — and an honest refusal</h3>
+  <p>For an <strong>electrical</strong> plan on a sized backdrop, each run has a small check: enter the <strong>design current (A)</strong>, the <strong>cable size (mm²)</strong> and pick single- or three-phase, and the sheet computes the <strong>voltage drop</strong> from first principles (Ohm's law, copper at 70 °C) and marks it <strong>pass/fail</strong> against the conventional <strong>3 % (lighting) / 5 % (power)</strong> limits. The same check re-derives in the PDF's <strong>CHECKS</strong> block.</p>
+  <div class="callout warn"><p><strong>What it will <em>not</em> do — by design.</strong> The tool computes only what it can derive honestly. It deliberately does <strong>not</strong> size cables or pipes, apply diversity factors, or quote current-carrying capacities — those need transcribed standards tables, and a fabricated table would produce an authoritative-looking wrong number. Every coefficient it does use (voltage, resistivity, the 3 %/5 % limits) is a stated default you can see, and the checks carry the basis line <em>“conventional limits — not a substitute for design sign-off.”</em> <strong>Nothing here replaces a qualified engineer's sign-off.</strong></p></div>
+
+  <h2>Title block &amp; branding</h2>
+  <p>Every sheet carries a <strong>title block</strong> at the foot of the PDF. On the canvas you set <strong>Prepared by</strong>, <strong>Checked by</strong>, a <strong>revision</strong> (e.g. “A”) and the issue <strong>date</strong>. Sensible defaults fill only the blanks — your name into <em>Prepared by</em>, today into the date — so a sheet someone else prepared is never silently re-attributed, and the date is stored (not stamped fresh) so re-printing an issued drawing doesn't move its date. The block also shows the <strong>project</strong>, <strong>client</strong>, sheet type, and your <strong>studio branding</strong> (company name, contact line and logo) pulled from your <a href="finance-settings-business-identity.html">business identity</a>.</p>
+
+  <h2>Export</h2>
+  <p>Click <strong>Render PDF</strong> — the canvas saves your work and generates the sheet: the plan area (backdrop with runs drawn under symbols), then a right-hand column with the <strong>LEGEND</strong>, a <strong>SERVICES</strong> key of the run types used, the electrical <strong>CHECKS</strong>, and the <strong>SCHEDULE</strong>, over the title block. The PDF can be shared via a link, and is rebuilt on demand if a storage-retention sweep has purged the file.</p>
+
+  <h2>Cost</h2>
+  <p>Each technical plan (electrical / plumbing / lighting) costs <strong>3 credits</strong>, charged when the draft is created and <strong>refunded automatically</strong> if creation or rendering fails. Drawing, editing and re-rendering the same sheet don't cost more.</p>
+
+  <div class="callout tip"><p><strong>Worked example — an electrical layout you can order and check.</strong> Open the project → <strong>Sheets</strong> → <strong>New technical plan</strong> → <em>Electrical</em> → pick a <strong>project room</strong> (so it's scaled). On the canvas, <strong>place</strong> sockets, switches and the DB; in <strong>select</strong> mode link each to a catalogue product; switch to <strong>connect</strong> and draw the socket and lighting circuits back to the board. For each circuit enter the current and cable size to get a voltage-drop verdict. Fill <strong>Prepared by / Checked by / Rev</strong>, then <strong>Render PDF</strong> — you get the drawing, a counted <strong>SCHEDULE</strong> to order from, the voltage-drop <strong>CHECKS</strong>, and your branded title block.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

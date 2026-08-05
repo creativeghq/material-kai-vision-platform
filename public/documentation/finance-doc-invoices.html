@@ -181,6 +181,15 @@
   <h2>"Issue now" vs. draft</h2>
   <div class="callout warn"><p><strong>Draft vs. issued:</strong> "Issue now" assigns the official myDATA number — drafts can be edited freely; issued documents are legal records. Leave it off while you're still working on the document, and turn it on only when the document is final.</p></div>
 
+  <h2>Payment details on the document — IBAN, @revtag &amp; the RF code</h2>
+  <p>An issued invoice (and a proforma) carries a <strong>payment block</strong> so the customer can pay by bank transfer even if they never open the online pay link. What appears there fills itself from your <a href="finance-settings-payments.html">payment setup</a>:</p>
+  <ul class="feat">
+    <li><strong>IBAN</strong> — any bank account you've marked <em>show on invoice</em> prints here. If you've connected <a href="banking.html">Revolut Business</a>, your EUR pocket's IBAN is filled and shown automatically.</li>
+    <li><strong>Revolut @revtag</strong> — if set, a “Revolut · @tag — instant in-app payment” line appears next to the IBANs.</li>
+    <li><strong>RF bank-transfer code</strong> — if you use <a href="finance-settings-payments.html">Viva</a> with the RF method, a structured <strong>RF reference</strong> is printed next to the IBANs.</li>
+  </ul>
+  <div class="callout"><p><strong>Why the RF code matters — it reconciles itself.</strong> The RF reference is minted <em>per invoice</em> for the amount due, and it's the <strong>same code</strong> on the PDF, the email and the online pay page. When the customer's bank transfer arrives quoting it, the invoice is <strong>settled automatically</strong> — no manual matching. It's amount-aware (if you edit a proforma's total before issuing, the code refreshes) and it only appears when there's a balance to collect and Viva is connected for EUR; otherwise the document simply omits it. See <a href="finance-settings-payments.html">Settings → Payments</a> to enable it.</p></div>
+
   <h2>Worked example: create &amp; issue an invoice</h2>
   <p>The full happy path, end to end, from opening the tab to handing the customer a way to pay:</p>
   <ol>

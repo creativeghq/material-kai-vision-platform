@@ -45,8 +45,16 @@
 
   <div class="callout tip"><p><strong>Worked example — a bathroom remodel.</strong> Open the project → <strong>Rooms</strong> → <strong>Add a room</strong> → set <strong>Room name</strong> to <em>Master Bath</em>, choose its <strong>Type</strong>, set the <strong>Budget</strong> for that space, pick a <strong>Date</strong>, and save. Repeat for the kitchen and the living room — each space now has its own allocated budget, so you can see where the money is going room by room instead of as one figure.</p></div>
 
+  <h2>Room geometry &amp; scale</h2>
+  <p><strong>What it is —</strong> a room can carry <strong>real dimensions</strong>, so it becomes a measurable basis for drawings. <strong>Why it matters —</strong> a sized room can be used as a <strong>scaled backdrop</strong> for a <a href="projects-technical-plans.html">technical plan</a> (electrical / plumbing / lighting), which is what lets those sheets compute run lengths and voltage-drop checks. You can set geometry two ways:</p>
+  <ul class="feat">
+    <li><strong>Typed dimensions</strong> — enter the room's <strong>width, length and height in millimetres</strong>. For a rectangular room this is exact and all a plan needs.</li>
+    <li><strong>A calibrated floor plan</strong> — upload an image of the room's plan and set its scale. Because an image carries no scale of its own (and any dimension text drawn on it can't be trusted), you calibrate it the one honest way: <strong>draw a single line across something of known real length and type that length</strong> — with an explicit <strong>mm / m</strong> unit toggle so “4” metres is never mistaken for “4” millimetres. The scale is derived from that line.</li>
+  </ul>
+  <div class="callout"><p><strong>A built-in sanity check.</strong> If the scale you calibrate implies a floor area more than twice off from the dimensions you typed, the tool <em>warns</em> you (it never silently “corrects”) — catching a metres-for-millimetres slip before it turns into a wildly wrong measurement downstream.</p></div>
+
   <h2>What it affects</h2>
-  <p>Rooms give the project a per-space structure and per-room budgets, so the project is organised and costed by area rather than as a single figure. Repeat for each space in the job.</p>
+  <p>Rooms give the project a per-space structure and per-room budgets, so the project is organised and costed by area rather than as a single figure. A room with <strong>dimensions set</strong> can also be picked as a scaled backdrop when you start a <a href="projects-technical-plans.html">technical plan</a>. Repeat for each space in the job.</p>
 
   <div class="callout"><p><strong>In short:</strong> add one room per space — name, type, budget and date — to mirror how the building is laid out and how clients think about their own project, and to track the budget area by area. See the <a href="projects.html">Projects overview</a> for how Rooms fits alongside the project's other tabs.</p></div>
 </main>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bank Feed & Reconciliation | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="banking.html">Banking</a> / Bank feed &amp; reconciliation</div>
+  <h1>Bank feed &amp; reconciliation</h1>
+  <div class="routes"><span class="badge route">/finance → Settings → Accounts</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">Once <a href="banking.html">Revolut is connected</a>, every transaction on your account flows into a <strong>bank feed</strong>, and the platform tries to <strong>reconcile</strong> each one automatically: an incoming transfer is matched to the <a href="finance-doc-invoices.html">invoice</a> it settles, an outgoing one to the <a href="finance-doc-expenses.html">supplier bill</a> it pays. The matches it's confident about are applied for you; the uncertain ones wait in a <strong>review queue</strong> for one click. Crucially, settling <em>always</em> goes through the platform's single money path — so a reconciled payment books exactly like a manually recorded one, and never over-pays.</p>
+
+  <div class="callout"><p><strong>Where:</strong> <strong>Finance → Settings → Accounts</strong> → the <strong>Bank feed</strong> card (under your bank accounts). The feed refreshes on a schedule and whenever you press <strong>Sync</strong>.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/banking/accounts.png" alt="The Accounts tab with the bank feed">
+    <figcaption>The <strong>Bank feed</strong> sits under your bank accounts on the Accounts tab — each line shows direction, counterparty, a match state, and the amount. <strong>Needs review</strong> filters to what wants your attention; <strong>Match now</strong> re-runs reconciliation; <strong>Sync</strong> pulls fresh from Revolut.</figcaption>
+  </figure>
+
+  <h2>Reading the feed</h2>
+  <p>Each line shows an arrow for direction (incoming vs outgoing), the counterparty name, the date and reference, the signed amount, and a plain-word <strong>match state</strong>:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>State</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Matched</strong></td><td>Reconciled to an invoice or bill (a matched incoming line shows <em>→ &lt;invoice number&gt;</em>).</td></tr>
+      <tr><td><strong>Needs review</strong></td><td>The platform has one or more likely candidates but isn't certain — waiting for you to confirm.</td></tr>
+      <tr><td><strong>Unmatched</strong></td><td>Nothing plausible was found (see the flow alert below).</td></tr>
+      <tr><td><strong>Ignored</strong></td><td>You've marked it as not-to-reconcile (an owner drawing, an internal transfer).</td></tr>
+    </tbody>
+  </table></div>
+  <p>The header's <strong>Needs review</strong> toggle filters the feed to just the incoming lines that want attention, so you're not scrolling past everything already handled.</p>
+
+  <h2>How incoming transfers match to invoices</h2>
+  <p>After every sync the platform runs a matching ladder, most-certain first, and only <strong>auto-applies</strong> the top two rungs:</p>
+  <ol>
+    <li><strong>Reference match</strong> — the transfer text contains exactly one open invoice's number → matched automatically.</li>
+    <li><strong>Amount + name</strong> — exactly one open invoice whose balance equals the transfer to the cent <em>and</em> whose customer name matches the sender → matched automatically. (Names are transliterated, so a Greek bank statement still matches a Latin-script CRM name.)</li>
+    <li><strong>Weaker signals</strong> — amount-only or name-only gives up to five candidate invoices and the line goes to <strong>Needs review</strong> rather than guessing.</li>
+    <li><strong>Nothing</strong> — the line stays <strong>Unmatched</strong>.</li>
+  </ol>
+
+  <h3>Clearing the review queue</h3>
+  <p>For a line that needs review, the feed gives you, inline:</p>
+  <ul class="feat">
+    <li><strong>Settle &lt;invoice#&gt;</strong> — one-click buttons for the top suggestion(s).</li>
+    <li><strong>Pick invoice</strong> — a search dialog to find the right open invoice by number if the suggestion is wrong.</li>
+    <li><strong>Ignore</strong> — mark the line as not-a-customer-payment (and <em>Unignore</em> to undo).</li>
+  </ul>
+  <p>Confirming a match records the payment against the invoice through the same routine as a manual payment — it books to <a href="finance-rp-receivables.html">receivables</a>, allocates correctly, and never over-collects.</p>
+
+  <h2>Outgoing transfers → supplier bills</h2>
+  <p>Completed <strong>outgoing</strong> transfers reconcile the same way against your <a href="finance-doc-expenses.html">supplier bills</a> — by bill number in the reference, or a cent-equal amount plus a supplier-name match — writing the payment and allocation so the bill's paid/outstanding figures derive correctly. This is how a batched <a href="banking-money-out.html">supplier bill run</a> marks its bills paid once it actually executes at the bank. It's automatic and idempotent — a re-delivered transaction repairs rather than double-books.</p>
+
+  <h2>When nothing matches — the alert</h2>
+  <p>An incoming transfer that matches no open invoice emits the <strong>Unmatched Bank Payment</strong> event <em>once</em>, which you can route through <a href="flows.html">Flows</a> to notify whoever should chase it (e.g. “money arrived we can't tie to an invoice — is it a deposit, a wrong reference, or a new customer?”). It fires a single time per line so it never nags.</p>
+
+  <div class="callout"><p><strong>Self-healing sync.</strong> After each pull the platform asks Revolut which webhook deliveries failed and re-pulls anything missed, so a dropped webhook can't leave a gap in your feed — the sync <em>is</em> the repair.</p></div>
+
+  <div class="callout tip"><p><strong>Day-to-day:</strong> open <strong>Finance → Settings → Accounts</strong>, hit <strong>Sync</strong>, flip on <strong>Needs review</strong>, and clear the queue with the <em>Settle</em> buttons (or <em>Pick invoice</em> where a reference was missing). Everything confident is already matched; you only touch the ambiguous few.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

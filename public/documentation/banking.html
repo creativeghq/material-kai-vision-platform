@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banking (Revolut) | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Banking</div>
+  <h1>Banking — Revolut <span class="badge gated">Pro add-on · BYOK</span></h1>
+  <div class="routes"><span class="badge route">/finance → Settings → Accounts</span> <span class="badge route">/profile?tab=keys</span></div>
+  <p class="lead">Banking connects your workspace to <strong>Revolut Business</strong> so the platform can see your <em>own</em> bank account and act on it: a live <strong>transaction feed</strong>, automatic <strong>reconciliation</strong> of incoming transfers against your invoices and outgoing ones against supplier bills, <strong>money-out</strong> (pay suppliers, send payout links) with payee verification, and <strong>team cards</strong> whose spend flows into expense reports. It is <strong>bring-your-own-key (BYOK)</strong> and per-workspace — every tenant connects its <em>own</em> Revolut account; there is no shared platform bank. This page explains the two Revolut modules, how you connect, and how it's gated; the sub-pages go deep on each capability.</p>
+
+  <div class="callout"><p><strong>Two different Revolut modules</strong> — don't confuse them:</p>
+  <ul class="feat">
+    <li><strong>Revolut Business</strong> (this section) — <em>your</em> bank account. Feed, reconciliation, money-out, cards. Home: <strong>Finance → Settings → Accounts</strong>; connected in <strong>Profile → Keys</strong>.</li>
+    <li><strong><a href="finance-settings-payments.html">Revolut Checkout</a></strong> — a way for <em>your customers</em> to pay you at checkout (cards, Revolut Pay, Apple/Google Pay, Pay by Bank), alongside <a href="finance-settings-payments.html">Stripe and Viva</a>. Home: <strong>Finance → Settings → Payments</strong>.</li>
+  </ul></div>
+
+  <h2>Connecting Revolut Business — the BYOK setup</h2>
+  <p>You connect once, in <strong>Profile → Keys → Finance &amp; Tax</strong> (the same card also appears under the module's admin settings). It's a strict four-step ladder — each step unlocks the next.</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/banking/revolut-config.png" alt="The Revolut Business connection setup">
+    <figcaption>The Revolut Business card — <strong>1. Signing key</strong> (generate the certificate to paste into Revolut, with your redirect URI), <strong>2. Application</strong> (Client ID, environment, optional @revtag), then <strong>3. Authorise</strong> and <strong>4. Map accounts</strong>.</figcaption>
+  </figure>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Step</th><th>What you do</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1. Signing key</strong></td><td>Click <strong>Generate keys</strong>. The platform mints a key pair <em>server-side</em> — the <strong>private key never leaves the server</strong>. Copy the <strong>certificate</strong> (public key) and the <strong>redirect URI</strong> shown, and add them in your Revolut dashboard → <em>Settings → API</em>.</td></tr>
+      <tr><td><strong>2. Application</strong></td><td>Paste the <strong>Client ID</strong> Revolut gives you back, choose the <strong>environment</strong> (Sandbox / Production), and optionally your <strong>@revtag</strong> (Revolut username) — which then prints on your invoices for instant in-app payment. Save.</td></tr>
+      <tr><td><strong>3. Authorise</strong></td><td>Click <strong>Authorise with Revolut</strong> — a standard OAuth consent that returns to the platform and completes the connection server-side (the webhook registers itself automatically). This is also where you later find <em>Sync now</em>, <em>Re-register webhook</em>, <em>Sync labels</em> and <em>Disconnect</em>.</td></tr>
+      <tr><td><strong>4. Map accounts</strong></td><td><strong>Load Revolut accounts</strong> shows each currency pocket with its live balance; map each to a Finance <a href="finance-op-customers-suppliers.html">bank account</a>. Mapping also <strong>auto-fills that account's IBAN/BIC</strong> from Revolut when it's blank.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout tip"><p><strong>Your keys stay yours.</strong> The connection secrets live in a per-workspace store that has <em>no read path to the browser</em> — the private key and tokens can never be fetched by the app, only used server-side. Disconnecting drops the tokens and webhook but keeps your key pair and Client ID so you can reconnect without redoing Revolut's dashboard.</p></div>
+
+  <h2>What you get once connected</h2>
+  <div class="cards">
+    <a class="card" href="banking-reconciliation.html"><div class="ico">🔁</div><h3>Bank feed &amp; reconciliation</h3><p>A live transaction feed that auto-matches incoming transfers to your invoices (and outgoing ones to supplier bills), with a review queue for the uncertain ones.</p></a>
+    <a class="card" href="banking-money-out.html"><div class="ico">💸</div><h3>Money-out &amp; payouts</h3><p>Pay a supplier bill or a CRM counterparty, batch a bill run, or send a payout link — with Verification-of-Payee name checks before money moves.</p></a>
+    <a class="card" href="banking-cards.html"><div class="ico">💳</div><h3>Team cards &amp; expenses</h3><p>Issue virtual cards, set spend limits, freeze/unfreeze, and import card spend (with receipts) straight into each person's expense report.</p></a>
+  </div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/banking/accounts.png" alt="Finance Settings — Accounts tab">
+    <figcaption>The home for it all: <strong>Finance → Settings → Accounts</strong> — your <strong>bank accounts</strong> and balances at the top, the <strong>Bank feed</strong> below (with <em>Needs review</em>, <em>Match now</em>, <em>Sync</em>), and the money-out panel beneath.</figcaption>
+  </figure>
+
+  <h2>Invoice payment details fill themselves</h2>
+  <p>Once connected, invoices and proformas need no manual bank block. Your Revolut pockets are auto-provisioned as bank accounts; the <strong>EUR</strong> one is marked to show on invoices and its <strong>IBAN prints automatically</strong>. If you set a <strong>@revtag</strong>, a “Revolut · @tag — instant in-app payment” line is added next to the IBANs. (Separately, if you use <a href="finance-settings-payments.html">Viva</a>, a Greek <strong>RF bank-transfer code</strong> can also print on the document and auto-reconcile — see <a href="finance-doc-invoices.html">Invoices</a>.)</p>
+
+  <h2>Verification of Payee (VoP) in CRM</h2>
+  <p>When Revolut is connected, each <a href="crm-companies.html">CRM</a> bank account gets a <strong>Verify holder</strong> button. It checks the account holder's name against the IBAN with Revolut and shows a plain verdict — <em>matches</em>, <em>close match</em> (with the bank's actual name), <em>does not match</em>, or <em>couldn't be checked</em>. This is the same check that gates outgoing payments (see <a href="banking-money-out.html">Money-out</a>), so verifying a supplier's details in CRM up front means paying them later is one click.</p>
+
+  <h2>Gating &amp; cost</h2>
+  <ul class="feat">
+    <li><strong>Pro add-on, per workspace.</strong> Banking (<code>banking-revolut</code>) and Revolut Checkout (<code>payments-revolut</code>) are separate paid add-ons; enable them from the <a href="apps.html">App Launcher</a> / <a href="finance-settings-payments.html">Finance → Settings → Payments</a>. Only a workspace <strong>owner</strong> can activate a paid add-on; others can request it.</li>
+    <li><strong>Finance-manager gated.</strong> All banking actions require the <code>finance.manage</code> capability and run under your workspace's own permissions; the connection secrets are writable only by finance managers and never readable by the browser.</li>
+    <li><strong>No credit metering.</strong> Banking actions aren't credit-metered — they're gated by the add-on entitlement, not charged per action.</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

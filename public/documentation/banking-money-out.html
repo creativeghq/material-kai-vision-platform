@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Money-out & Payouts | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="banking.html">Banking</a> / Money-out &amp; payouts</div>
+  <h1>Money-out &amp; payouts</h1>
+  <div class="routes"><span class="badge route">/finance → Settings → Accounts</span> <span class="badge gated">finance.manage</span></div>
+  <p class="lead">Money-out is how you <strong>pay people</strong> from your connected <a href="banking.html">Revolut</a> account without leaving the platform — a supplier, a CRM counterparty, a whole run of due bills, or someone who has no IBAN at all. Every instruction is <strong>audited before Revolut is even called</strong>, and — because paying the wrong account is unrecoverable — the platform puts a <strong>Verification-of-Payee (VoP)</strong> name check in front of it. By default it prepares a <strong>draft</strong> that a human approves in the Revolut app, so nothing moves money unattended.</p>
+
+  <div class="callout"><p><strong>Where:</strong> <strong>Finance → Settings → Accounts</strong> → the <strong>Money-out</strong> card (below the bank feed; shown only when the connection is live). Each instruction you send is listed there with its state.</p></div>
+
+  <h2>Verification of Payee — the gate in front of every payment</h2>
+  <p><strong>What it is —</strong> before you can pay a CRM bank account, it must be registered with Revolut as a <strong>counterparty</strong>, and creating one runs a <strong>name check</strong>: Revolut compares the holder name you have on file against the name the receiving bank has for that IBAN. <strong>Why it matters —</strong> a bank transfer to the wrong account is gone; VoP catches a typo'd IBAN or a mismatched name <em>before</em> the money leaves. The verdict is one of:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Verdict</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Matches</strong></td><td>Good to pay.</td></tr>
+      <tr><td><strong>Close match</strong></td><td>Allowed, but the UI warns and shows the bank's actual name so you can eyeball it.</td></tr>
+      <tr><td><strong>Does not match</strong></td><td><strong>Hard-blocked</strong> — you can only proceed by explicitly ticking a “the holder name does NOT match this IBAN — proceed anyway” confirmation.</td></tr>
+      <tr><td><strong>Couldn't be checked</strong></td><td>The receiving bank doesn't support the check; proceed with your own judgement.</td></tr>
+    </tbody>
+  </table></div>
+  <p>You can run this check ahead of time from a <a href="crm-companies.html">CRM</a> bank account's <strong>Verify holder</strong> button, so a supplier is pre-verified before you ever pay them.</p>
+
+  <h2>Pay a CRM counterparty</h2>
+  <p>Pick the recipient (a saved CRM bank account), the source pocket, an amount and a reference. Then choose how it goes out:</p>
+  <ul class="feat">
+    <li><strong>Payment draft (default)</strong> — prepared here, but a person approves it in the Revolut app before any money moves. This is the safe default: the platform never moves money unattended.</li>
+    <li><strong>Send immediately</strong> — tick this to make it a direct payment that executes straight away (still VoP-gated).</li>
+  </ul>
+
+  <h2>Supplier bill run — pay everything due at once</h2>
+  <p><strong>Draft all due bills</strong> prepares a single multi-payment run covering every <a href="finance-doc-expenses.html">supplier bill</a> that's due today or earlier and whose supplier has a VoP-verified counterparty. One approval in the Revolut app pays the whole run. Bills whose supplier isn't linked to a verified bank account are <strong>skipped and listed</strong> — never guessed at — so you can go fix those and re-run. When the transfers complete, they <a href="banking-reconciliation.html">reconcile back</a> to the bills automatically and mark them paid.</p>
+
+  <h2>Payout links — pay someone without an IBAN</h2>
+  <p>Need to refund a customer or pay someone whose bank details you don't have? A <strong>payout link</strong> takes just a name and an amount; the platform creates a claim link (auto-copied to your clipboard) that the recipient opens to receive the money into their own account. The link's lifecycle — created → claimed / expired / cancelled — is kept up to date automatically from Revolut, and every payout link is recorded in the money-out audit.</p>
+
+  <h2>Moving money between your own pockets (FX)</h2>
+  <p>The connection can also fetch a live <strong>FX rate</strong> and <strong>exchange</strong> between your business's own currency pockets — useful treasury plumbing when you invoice in one currency and pay in another. (These run under the connection; they aren't customer-facing.)</p>
+
+  <div class="callout"><p><strong>Everything is audited first.</strong> Each instruction — draft, direct payment, bill run, payout link, exchange — is written to the money-out log with a unique request id <em>before</em> Revolut is called, so a network hiccup can never create a duplicate payment, and you always have a record of what was instructed and its current state.</p></div>
+
+  <div class="callout tip"><p><strong>Worked example — paying a supplier safely.</strong> In <a href="crm-companies.html">CRM</a>, open the supplier's bank account and click <strong>Verify holder</strong> → it comes back <em>Matches</em>. Later, in <strong>Finance → Settings → Accounts → Money-out</strong>, choose that counterparty, enter the amount and the bill reference, leave it as a <strong>draft</strong>, and send. Approve the one draft in your Revolut app; when it clears, the platform reconciles it against the bill and marks it paid.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
