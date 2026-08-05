@@ -247,11 +247,14 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
     // safely persisted and the next pass (or a manual reconcile) retries.
     let autoMatched = 0, suggested = 0;
     try {
-      const { reconcileWorkspaceRevolut } = await import('./reconcile.ts');
+      const { reconcileWorkspaceRevolut, reconcileOutgoingRevolut } = await import('./reconcile.ts');
       const rec = await reconcileWorkspaceRevolut(service, workspaceId);
       autoMatched = rec.autoMatched;
       suggested = rec.suggested;
       if (rec.errors.length) console.warn(`[revolut-sync] ${workspaceId} reconcile errors:`, rec.errors.slice(0, 3));
+      const outRec = await reconcileOutgoingRevolut(service, workspaceId);
+      autoMatched += outRec.settled;
+      if (outRec.errors.length) console.warn(`[revolut-sync] ${workspaceId} outgoing errors:`, outRec.errors.slice(0, 3));
     } catch (err) {
       console.warn('[revolut-sync] reconcile pass failed:', err instanceof Error ? err.message : err);
     }

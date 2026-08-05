@@ -286,10 +286,12 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
     }
 
     case 'reconcile': {
-      // Re-run the matcher over unmatched incoming lines (auto after every sync too).
-      const { reconcileWorkspaceRevolut } = await import('../_shared/revolut/reconcile.ts');
+      // Re-run both matchers (auto after every sync too): incoming → invoices,
+      // outgoing transfers → supplier bills.
+      const { reconcileWorkspaceRevolut, reconcileOutgoingRevolut } = await import('../_shared/revolut/reconcile.ts');
       const rec = await reconcileWorkspaceRevolut(service, workspaceId);
-      return jsonResponse({ ok: true, ...rec });
+      const outRec = await reconcileOutgoingRevolut(service, workspaceId);
+      return jsonResponse({ ok: true, ...rec, billsSettled: outRec.settled, outgoingErrors: outRec.errors });
     }
 
     case 'confirm-match': {
@@ -676,6 +678,43 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         await service.from('revolut_payouts').update({ state: 'failed', updated_at: new Date().toISOString() }).eq('id', audit.id);
         throw err;
       }
+    }
+
+    case 'sync-labels': {
+      // One-way push: platform finance categories → a "Platform categories" Revolut
+      // label group, so staff labelling transactions in Revolut sees the SAME
+      // vocabulary the platform's P&L uses. Names only; never deletes.
+      const cfg = await requireConfig(service, workspaceId);
+      const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
+      const { data: cats } = await service
+        .from('finance_categories')
+        .select('name')
+        .eq('workspace_id', workspaceId)
+        .limit(200);
+      const wanted = [...new Set((cats ?? []).map((c: any) => String(c.name ?? '').trim()).filter(Boolean))];
+      if (wanted.length === 0) return jsonResponse({ ok: true, created: 0, note: 'No finance categories to sync.' });
+
+      const groups = await revolutJson<Array<{ id: string; name: string }>>(service, cfg, issuer, '/label-groups');
+      let group = (groups ?? []).find((g) => g.name === 'Platform categories');
+      if (!group) {
+        group = await revolutJson<{ id: string; name: string }>(service, cfg, issuer, '/label-groups', {
+          method: 'POST',
+          body: JSON.stringify({ name: 'Platform categories' }),
+        });
+      }
+      const labels = await revolutJson<Array<{ id: string; name: string }>>(
+        service, cfg, issuer, `/label-groups/${group.id}/labels`,
+      ).catch(() => [] as Array<{ id: string; name: string }>);
+      const existing = new Set((labels ?? []).map((l) => l.name));
+      let created = 0;
+      for (const name of wanted) {
+        if (existing.has(name)) continue;
+        await revolutJson(service, cfg, issuer, `/label-groups/${group.id}/labels`, {
+          method: 'POST',
+          body: JSON.stringify({ name: name.slice(0, 50) }),
+        }).then(() => { created++; }).catch((err) => console.warn('[revolut-api] label create failed:', err?.message ?? err));
+      }
+      return jsonResponse({ ok: true, group_id: group.id, created, total: wanted.length });
     }
 
     case 'team-members': {

@@ -121,6 +121,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'recommendations-api', label: 'recommendations-api', sublabel: 'Collaborative filtering interaction tracking, recommendations, and analytics.' },
   { id: 'reset-platform', label: 'reset-platform', sublabel: 'Destructively clear all user-generated data while preserving system config' },
   { id: 'revolut-api', label: 'revolut-api', sublabel: 'Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync' },
+  { id: 'revolut-merchant-webhooks', label: 'revolut-merchant-webhooks', sublabel: 'Revolut Merchant (checkout) webhook receiver + per-workspace webhook setup' },
   { id: 'revolut-sync', label: 'revolut-sync', sublabel: 'Revolut transaction sync sweep — cron backstop over every connected workspace' },
   { id: 'revolut-webhooks', label: 'revolut-webhooks', sublabel: 'Revolut Business webhooks v2 receiver — signed transaction events, per-workspace secret' },
   { id: 'role-upgrade-requests', label: 'role-upgrade-requests', sublabel: 'Dealer/factory role promotion workflow — submit, approve, and reject requests.' },

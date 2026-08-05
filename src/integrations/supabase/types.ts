@@ -29544,6 +29544,50 @@ export type Database = {
           },
         ]
       }
+      workspace_revolut_merchant_config: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          environment: string
+          secret_key: string | null
+          updated_at: string
+          webhook_id: string | null
+          webhook_signing_secret: string | null
+          webhook_verified_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          environment?: string
+          secret_key?: string | null
+          updated_at?: string
+          webhook_id?: string | null
+          webhook_signing_secret?: string | null
+          webhook_verified_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          environment?: string
+          secret_key?: string | null
+          updated_at?: string
+          webhook_id?: string | null
+          webhook_signing_secret?: string | null
+          webhook_verified_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_revolut_merchant_config_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_shipping_credentials: {
         Row: {
           api_key: string | null
@@ -32157,6 +32201,17 @@ export type Database = {
           oauth_redirect_uri: string
           public_key: string
           sync_watermark: string
+          updated_at: string
+          webhook_ready: boolean
+        }[]
+      }
+      get_workspace_revolut_merchant_status: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          configured: boolean
+          enabled: boolean
+          environment: string
+          has_secret_key: boolean
           updated_at: string
           webhook_ready: boolean
         }[]

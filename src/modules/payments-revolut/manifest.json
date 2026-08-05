@@ -1,0 +1,11 @@
+{
+  "slug": "payments-revolut",
+  "name": "Revolut Checkout",
+  "description": "Accept cards, Revolut Pay, Apple Pay / Google Pay and Pay by Bank at checkout via the workspace's own Revolut Merchant account (BYOK). Third checkout provider alongside Stripe and Viva; separate from the banking-revolut feed module.",
+  "category": "core",
+  "parent": "payments",
+  "priceTier": "pro",
+  "icon": "CreditCard",
+  "version": "0.1.0",
+  "provides": { "payments": true }
+}

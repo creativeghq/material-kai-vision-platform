@@ -82,7 +82,7 @@
     "workspace_inbound_credentials", "workspace_invites", "workspace_member_credit_limits",
     "workspace_members", "workspace_module_entitlements", "workspace_module_subscriptions",
     "workspace_payment_config", "workspace_pdf_templates", "workspace_permissions",
-    "workspace_revolut_config", "workspace_shipping_credentials", "workspace_storefront",
+    "workspace_revolut_config", "workspace_revolut_merchant_config", "workspace_shipping_credentials", "workspace_storefront",
     "workspace_user_levels", "workspace_viva_config", "xml_mapping_templates"
   ]
 }

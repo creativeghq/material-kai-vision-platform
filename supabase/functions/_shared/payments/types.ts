@@ -14,7 +14,7 @@
  */
 
 /** Provider slug — always matches the module slug suffix (`payments-<slug>`). */
-export type PaymentProviderSlug = 'stripe' | 'viva';
+export type PaymentProviderSlug = 'stripe' | 'viva' | 'revolut';
 
 /** A concrete way to pay, as offered to the customer. */
 export type PaymentMethodKind = 'card' | 'bank_reference';

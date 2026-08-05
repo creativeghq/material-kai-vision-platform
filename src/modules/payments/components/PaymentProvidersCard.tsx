@@ -22,6 +22,7 @@ const PROVIDER_PANELS: Record<string, React.ComponentType<{ embedded?: boolean }
   'payments-stripe': lazy(() => import('@/modules/payments-stripe/components/StripeConfigPanel').then((m) => ({ default: m.StripeConfigPanel }))),
   'payments-viva': lazy(() => import('@/modules/payments-viva/components/VivaSettingsPanel').then((m) => ({ default: m.VivaSettingsPanel }))),
   'banking-revolut': lazy(() => import('@/modules/banking-revolut/components/RevolutSettingsPanel').then((m) => ({ default: m.RevolutSettingsPanel }))),
+  'payments-revolut': lazy(() => import('@/modules/payments-revolut/components/RevolutMerchantSettingsPanel').then((m) => ({ default: m.RevolutMerchantSettingsPanel }))),
 };
 
 export const PaymentProvidersCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {

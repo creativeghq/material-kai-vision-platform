@@ -22,11 +22,13 @@
 import { isWorkspaceEntitled } from '../entitlement.ts';
 import { stripeProvider } from './stripe-provider.ts';
 import { vivaProvider } from './viva-provider.ts';
+import { revolutProvider } from './revolut-provider.ts';
 import type { AvailableProvider, PaymentProvider, PaymentProviderSlug } from './types.ts';
 
 const PROVIDERS: Record<string, PaymentProvider> = {
   stripe: stripeProvider,
   viva: vivaProvider,
+  revolut: revolutProvider,
 };
 
 export function getPaymentProvider(slug: string): PaymentProvider | null {
