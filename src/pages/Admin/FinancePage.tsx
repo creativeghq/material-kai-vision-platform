@@ -83,7 +83,8 @@ import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsM
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import SupplierPortalPage from '@/pages/SupplierPortalPage';
-import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch } from 'lucide-react';
+import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch, Pencil } from 'lucide-react';
+import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -208,6 +209,8 @@ const FinancePage: React.FC = () => {
   const [payExpenseId, setPayExpenseId] = useState<string | null>(null);
   /** Expense whose payment history is open (from the Bill # link in Payables). */
   const [paymentsExpenseId, setPaymentsExpenseId] = useState<string | null>(null);
+  /** Expense whose document metadata is being edited (backfill Bill #, dates, category). */
+  const [editBillId, setEditBillId] = useState<string | null>(null);
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
 
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
@@ -1165,6 +1168,10 @@ const FinancePage: React.FC = () => {
                                 <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setScnBillId(r.id); setScnOpen(true); }} title="Record a supplier credit note against this bill">
                                   <FileMinus className="h-3.5 w-3.5 mr-1" /> Credit
                                 </Button>
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditBillId(r.id)} title="Edit details — bill #, dates, category, notes">
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  <span className="sr-only">Edit details</span>
+                                </Button>
                               </span>
                             )}
                           </td>
@@ -1339,6 +1346,15 @@ const FinancePage: React.FC = () => {
         onOpenChange={(v) => { if (!v) setPaymentsExpenseId(null); }}
         onChanged={async () => { if (workspaceId) await loadAll(workspaceId); }}
       />
+      {workspaceId && (
+        <EditSupplierBillDialog
+          workspaceId={workspaceId}
+          billId={editBillId}
+          onOpenChange={(v) => { if (!v) setEditBillId(null); }}
+          onSaved={async () => { if (workspaceId) await loadAll(workspaceId); }}
+          categories={expenseCats}
+        />
+      )}
     </div>
   );
 };

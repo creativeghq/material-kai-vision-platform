@@ -1677,6 +1677,34 @@ const _financeServiceCore = {
   },
 
   /**
+   * Edit a bill's DOCUMENT metadata after creation — the fields the supplier's paper/PDF
+   * invoice supplies (bill #, issue/due dates) plus category and notes. Bills recorded
+   * manually from an order usually lack the supplier's own invoice number (myDATA-created
+   * ones get `IN-<MARK>` stamped automatically); this is the backfill path.
+   *
+   * Deliberately NOT editable: amounts (net/VAT/total — payments already allocate against
+   * them and the P&L read them), supplier identity, and status/amount_paid (derived from
+   * `payment_allocations` by trigger — writing them here would be a second derivation).
+   */
+  async updateSupplierBillMeta(supplierBillId: string, patch: {
+    supplierBillNumber?: string | null;
+    issuedAt?: string | null;
+    dueAt?: string | null;
+    categoryId?: string | null;
+    notes?: string | null;
+  }): Promise<void> {
+    const row: Record<string, string | null> = {};
+    if ('supplierBillNumber' in patch) row.supplier_bill_number = patch.supplierBillNumber?.trim() || null;
+    if ('issuedAt' in patch) row.issued_at = patch.issuedAt || null;
+    if ('dueAt' in patch) row.due_at = patch.dueAt || null;
+    if ('categoryId' in patch) row.category_id = patch.categoryId || null;
+    if ('notes' in patch) row.notes = patch.notes?.trim() || null;
+    if (Object.keys(row).length === 0) return;
+    const { error } = await supabase.from('supplier_bills').update(row).eq('id', supplierBillId);
+    if (error) throw error;
+  },
+
+  /**
    * Record a business operating expense (rent, utilities, fees, …). An expense IS a supplier
    * bill — the canonical spend record that feeds Payables (AP aging) and the P&L per category.
    * Party is optional (many operating costs have no CRM supplier). When `paidNow` is set, the
