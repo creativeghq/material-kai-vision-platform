@@ -23,6 +23,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { assertEntitled } from '../../_shared/entitlement.ts';
 import { zernioApi, zernioKey, publicAppUrl, resolveWorkspaceProfile } from '../zernio.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -110,6 +111,26 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
       }, 400);
     }
 
+    // workspace_id comes from the body — bind it to the caller before touching Zernio
+    // (resolveWorkspaceProfile find-or-creates a Zernio profile for the workspace, so an
+    // unchecked id let any user attach OAuth flows to another tenant).
+    if (userId) {
+      const { data: membership } = await supabase
+        .from('workspace_members')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('workspace_id', workspace_id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (!membership) {
+        return jsonResponse({ success: false, error: 'Not a member of this workspace' }, 403);
+      }
+    }
+
+    // Connecting an account consumes the platform's Zernio subscription — paid module (#212).
+    const connectEnt = await assertEntitled(supabase, workspace_id, 'social-media');
+    if (!connectEnt.ok) return connectEnt.response;
+
     try {
       // Resolve (find-or-create) the workspace's Zernio profile.
       const profileId = await resolveWorkspaceProfile(supabase, workspace_id);
@@ -168,6 +189,9 @@ export async function handleZernioOauth(req: Request, body: any): Promise<Respon
         return jsonResponse({ success: false, error: 'Not a member of this workspace' }, 403);
       }
     }
+
+    const callbackEnt = await assertEntitled(supabase, workspace_id, 'social-media');
+    if (!callbackEnt.ok) return callbackEnt.response;
 
     try {
       // Zernio: GET /v1/accounts/{accountId} → { account: SocialAccount }

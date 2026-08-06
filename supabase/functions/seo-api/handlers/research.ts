@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
 import type { SEOResearchRequest, SEOResearchResponse } from '../../_shared/seo-types.ts';
 import { fetchOpportunitiesStateless } from '../../_shared/mention-opportunities-client.ts';
@@ -84,6 +85,12 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     const locationCode = body.location_code || 2840;
     const languageCode = body.language_code || 'en';
 
+    // Entitlement gate BEFORE the debit and the upstream calls (#212 + invariant 10).
+    // Also resolves the workspace the research is filed under (was a late `.single()`
+    // lookup, which errors → null for multi-workspace users — same bug pipeline.ts fixed).
+    const { workspaceId, response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    if (entResponse) return entResponse;
+
     // Debit credits
     const { data: debitResult, error: debitError } = await supabase.rpc(
       'debit_credits',
@@ -147,14 +154,6 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
     } else {
       console.log('[seo-research] opportunities enrichment unavailable — continuing baseline');
     }
-
-    // Get workspace ID for the user
-    const { data: memberData } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', userId)
-      .single();
-    const workspaceId = memberData?.workspace_id || null;
 
     // File this research under a connected website — explicit body.website_id when the
     // agent picked one, else the workspace's default site (null when none connected).

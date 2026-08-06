@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { assertEntitled } from '../../_shared/entitlement.ts';
 import { zernioApi } from '../zernio.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -66,6 +67,10 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
   if (!(await userCanAccessWorkspace(supabase, auth.user.id, post.workspace_id))) {
     return jsonResponse({ success: false, error: 'You are not a member of this workspace' }, 403);
   }
+
+  // Publishing consumes the platform's Zernio subscription — paid module (#212).
+  const ent = await assertEntitled(supabase, post.workspace_id, 'social-media');
+  if (!ent.ok) return ent.response;
 
   try {
     // Build Zernio createPost payload (POST /v1/posts).

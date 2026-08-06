@@ -207,17 +207,16 @@ export function filterNavItems(
   ctx: NavGateContext,
 ): SidebarNavItem[] {
   return items.filter((item) => {
-    // Scoped invited roles see a focused subset only (overrides the gates below).
-    if (ctx.isAccountant) return item.id === 'dashboard' || item.id === 'finance';
+    // Scoped invited roles see a focused subset only. The subset narrows what CAN show —
+    // it does not bypass the gates below, so a paid module (Finance, Quotes, Real Estate)
+    // still hides when the workspace isn't entitled to it (#212).
+    if (ctx.isAccountant && item.id !== 'dashboard' && item.id !== 'finance') return false;
     // The Sales portal itself MUST be in this subset: `sales.portal` is held by no other persona,
     // so omitting it here made the "Sales" entry unreachable for everyone — reps landed on /sales
     // only via the Index redirect and had no way back to it.
-    // The Sales portal itself MUST be in this subset: `sales.portal` is held by no other persona,
-    // so omitting it here made the "Sales" entry unreachable for everyone — reps landed on /sales
-    // only via the Index redirect and had no way back to it.
-    if (ctx.isSalesRep) return item.id === 'dashboard' || item.id === 'sales' || item.id === 'quotes';
+    if (ctx.isSalesRep && item.id !== 'dashboard' && item.id !== 'sales' && item.id !== 'quotes') return false;
     // Estate Agent: Real Estate surface only (their own listings/leads + open-for-all).
-    if (ctx.isRealEstateAgent) return item.id === 'dashboard' || item.id === 'real-estate';
+    if (ctx.isRealEstateAgent && item.id !== 'dashboard' && item.id !== 'real-estate') return false;
     if (item.requirePlatform && !ctx.isPlatformOperator) return false;
     // Factory analytics is for verified factories only — not dealers/operators.
     if (item.requireRole === 'factory' && !ctx.isFactory) return false;

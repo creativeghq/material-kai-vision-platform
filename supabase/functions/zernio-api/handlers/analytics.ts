@@ -13,6 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { assertEntitled } from '../../_shared/entitlement.ts';
 import { zernioApi } from '../zernio.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -35,6 +36,12 @@ export async function handleZernioAnalytics(req: Request, body: any): Promise<Re
       .eq('status', 'active')
       .maybeSingle();
     if (!membership) return jsonResponse({ success: false, error: 'Not a member of this workspace' }, 403);
+
+    // Analytics sync hits the Zernio API on the workspace's behalf — paid module (#212).
+    // (By-id paths below stay membership-bound via callerWorkspaceIds; the UI always passes
+    // workspace_id, so this is the user-facing gate. Secret/cron callers skip it.)
+    const ent = await assertEntitled(supabase, workspace_id, 'social-media');
+    if (!ent.ok) return ent.response;
   }
 
   // The check above only runs when workspace_id is passed. Precompute

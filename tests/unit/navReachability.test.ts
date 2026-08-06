@@ -75,4 +75,19 @@ describe('sidebar nav reachability', () => {
       expect(ids, `${persona} should not see the Sales entry`).not.toContain('sales');
     }
   });
+
+  it('entitlement gates every moduleSlug entry — including the scoped-persona subsets (#212)', () => {
+    // The regression this pins: the accountant / sales-rep / estate-agent early returns used to
+    // BYPASS the entitlement gate, so Finance/Quotes/Real-Estate showed in workspaces that never
+    // bought those modules. With nothing entitled, no moduleSlug entry may render for ANY persona.
+    const nothingEntitled = (ctx: NavGateContext): NavGateContext =>
+      ({ ...ctx, isModuleAvailable: () => false });
+    for (const ctx of ALL_CONTEXTS) {
+      const leaked = filterNavItems(SIDEBAR_NAV_ITEMS, nothingEntitled(ctx))
+        .filter((i) => i.moduleSlug)
+        .map((i) => i.id);
+      expect(leaked, `module-gated entries visible without entitlement: ${leaked.join(', ')}`)
+        .toEqual([]);
+    }
+  });
 });

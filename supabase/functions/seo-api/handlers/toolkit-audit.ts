@@ -25,6 +25,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
+import { assertEntitled } from '../../_shared/entitlement.ts';
+import { SEO_MODULE } from './entitlement.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -103,6 +105,13 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
     if (!td) return jsonResponse({ ok: false, error: 'tracked_domain not found' }, 404);
     if ((td as any).user_id !== userId) {
       return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+    }
+
+    // Paid module — refuse before firing the MIVAA composite audit (#212). Cron batch
+    // (Branch A) is operator-driven and stays ungated.
+    if ((td as any).workspace_id) {
+      const ent = await assertEntitled(sb, (td as any).workspace_id, SEO_MODULE);
+      if (!ent.ok) return ent.response;
     }
 
     const result = await runAuditFor(sb, td, source);

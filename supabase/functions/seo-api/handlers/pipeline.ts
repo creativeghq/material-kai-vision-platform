@@ -15,6 +15,8 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { assertEntitled } from '../../_shared/entitlement.ts';
+import { SEO_MODULE } from './entitlement.ts';
 import { generateStandardEmbedding } from '../../_shared/embedding-utils.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
 import type {
@@ -132,6 +134,12 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     if (requestedWs && !workspaceId) {
       // Asked for a workspace they are not a member of — 404, not 403 (no id enumeration).
       return jsonResponse({ success: false, error: 'Not found' }, 404);
+    }
+
+    // Paid module — refuse before creating the article or debiting any stage credits (#212).
+    if (workspaceId) {
+      const ent = await assertEntitled(supabase, workspaceId, SEO_MODULE);
+      if (!ent.ok) return ent.response;
     }
 
     // Resolve the connected website this article belongs to — explicit body.website_id

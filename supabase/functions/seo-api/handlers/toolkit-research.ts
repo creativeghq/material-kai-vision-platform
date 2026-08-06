@@ -19,6 +19,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
 import { resolveWebsite } from '../../_shared/seo-website.ts';
+import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -62,6 +63,15 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
       return jsonResponse({ ok: false, error: 'subject and params required' }, 400);
     }
 
+    // Persist via service-role (so insert works regardless of RLS, but with
+    // explicit user_id from the verified JWT)
+    const sbAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Paid module — refuse BEFORE firing the MIVAA/DataForSEO engine (#212). Also resolves
+    // the workspace the run is filed under (was a late `.maybeSingle()` lookup below).
+    const { workspaceId, response: entResponse } = await resolveAndAssertSeoEntitled(sbAdmin, userId);
+    if (entResponse) return entResponse;
+
     const start = Date.now();
     // Fire the MIVAA opportunities-stateless engine
     const url = `${PYTHON_BACKEND_URL.replace(/\/+$/, '')}/api/v1/mention-monitoring/opportunities-stateless`;
@@ -80,18 +90,8 @@ export async function handleToolkitResearch(req: Request, body: any): Promise<Re
     const ok = resp.ok && mivaaJson?.success;
     const data = mivaaJson?.data;
 
-    // Persist via service-role (so insert works regardless of RLS, but with
-    // explicit user_id from the verified JWT)
-    const sbAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
     // File the run under the workspace + connected website so it surfaces in the
     // website's SEO dashboard. website_id: explicit body.website_id → default site.
-    const { data: memberData } = await sbAdmin
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', userId)
-      .maybeSingle();
-    const workspaceId = memberData?.workspace_id || null;
     const website = await resolveWebsite(sbAdmin, { workspaceId, explicitWebsiteId: body.website_id });
 
     const { data: row, error: insertErr } = await sbAdmin

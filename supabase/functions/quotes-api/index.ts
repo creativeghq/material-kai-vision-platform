@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
+import { assertEntitled } from '../_shared/entitlement.ts';
 
 async function parseJsonBody(req: Request): Promise<any> {
   try {
@@ -48,17 +49,46 @@ Deno.serve(withApiLogging('quotes-api', async (req) => {
 
     const user = auth.user;
     const userId = auth.userId;
+    if (!user) {
+      // Every route below is scoped to the caller's own rows — a secret-key caller with no
+      // user identity has nothing to scope against.
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: corsHeaders },
+      );
+    }
 
     // POST /api/quote-requests - Create quote request
     if (method === 'POST' && path[0] === 'quote-requests') {
       const body = await parseJsonBody(req);
-      const { quote_id, workspace_id, notes } = body; // Changed from cart_id
+      const { quote_id, notes } = body; // Changed from cart_id
 
       if (!quote_id) {
         return new Response(
           JSON.stringify({ error: 'Missing quote_id' }), // Changed from cart_id
           { status: 400, headers: corsHeaders },
         );
+      }
+
+      // The quote's workspace comes from the quote row, never the request body (#250 inv. 1),
+      // and 404 (not 403) hides quote-id existence from non-owners.
+      const { data: quoteRow, error: quoteRowError } = await supabase
+        .from('quotes')
+        .select('id, user_id, workspace_id')
+        .eq('id', quote_id)
+        .single();
+
+      if (quoteRowError || !quoteRow || quoteRow.user_id !== user.id) {
+        return new Response(
+          JSON.stringify({ error: 'Quote not found' }),
+          { status: 404, headers: corsHeaders },
+        );
+      }
+
+      // Workspace-owned quotes require the workspace to own the quotes module (#212).
+      if (quoteRow.workspace_id) {
+        const ent = await assertEntitled(supabase, quoteRow.workspace_id, 'quotes');
+        if (!ent.ok) return ent.response;
       }
 
       // Get quote items count
@@ -80,7 +110,7 @@ Deno.serve(withApiLogging('quotes-api', async (req) => {
         .insert({
           user_id: user.id,
           quote_id, // Changed from cart_id
-          workspace_id: workspace_id || null,
+          workspace_id: quoteRow.workspace_id,
           status: 'pending',
           items_count: quoteItems?.length || 0, // Changed from cartItems
           notes: notes || null,

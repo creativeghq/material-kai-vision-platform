@@ -14,6 +14,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace, isCronAuthorized } from '../_shared/auth.ts';
+import { assertEntitled } from '../_shared/entitlement.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
@@ -230,6 +231,9 @@ Deno.serve(withApiLogging('seo-domain-tracker', async (req: Request) => {
   const { data: website } = await supabase.from('user_websites').select('id, workspace_id, url').eq('id', websiteId).maybeSingle();
   if (!website) return json({ error: 'Website not found' }, 404);
   if (!(await userCanAccessWorkspace(supabase, auth.userId, website.workspace_id))) return json({ error: 'Website not found' }, 404);
+  // Paid module — refuse before the DataForSEO snapshot (#212). Cron branch stays ungated.
+  const ent = await assertEntitled(supabase, website.workspace_id, 'seo-toolkit');
+  if (!ent.ok) return ent.response;
   const r = await trackWebsite(supabase, website);
   return json(r, r.ok ? 200 : 400);
 }));

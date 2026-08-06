@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
+import { resolveAndAssertSeoEntitled } from './entitlement.ts';
 import { getToolPrompt } from '../../_shared/prompt-utils.ts';
 import { generateWithGemini } from '../../_shared/ai-client.ts';
 import type {
@@ -74,6 +75,10 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         400,
       );
     }
+
+    // Paid module — refuse before the debit and the LLM call (#212 + invariant 10).
+    const { response: entResponse } = await resolveAndAssertSeoEntitled(supabase, userId);
+    if (entResponse) return entResponse;
 
     // Debit credits for initial analysis
     const { data: debitResult, error: debitError } = await supabase.rpc(

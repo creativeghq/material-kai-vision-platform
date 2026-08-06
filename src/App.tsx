@@ -303,9 +303,11 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <CapabilityGuard capability="crm.view">
-                        <Layout>
-                          <CRMPage />
-                        </Layout>
+                        <EntitlementGuard moduleSlug="crm" moduleName="CRM">
+                          <Layout>
+                            <CRMPage />
+                          </Layout>
+                        </EntitlementGuard>
                       </CapabilityGuard>
                     </AuthGuard>
                   }
@@ -576,9 +578,11 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <CapabilityGuard capability="inbox.use">
-                        <Layout>
-                          <InboxPage />
-                        </Layout>
+                        <EntitlementGuard moduleSlug="inbox" moduleName="Inbox">
+                          <Layout>
+                            <InboxPage />
+                          </Layout>
+                        </EntitlementGuard>
                       </CapabilityGuard>
                     </AuthGuard>
                   }
