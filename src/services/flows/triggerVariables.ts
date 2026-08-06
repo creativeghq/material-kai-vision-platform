@@ -278,6 +278,14 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'sales_order_id', label: 'Sales order ID', note: 'The mirrored sales order created in the supplier workspace.' },
     { key: 'purchase_order_id', label: 'Purchase order ID', note: 'The reseller-side purchase order paired to the sales order.' },
   ]),
+  // A buyer handed a purchase order off in-app to this workspace's claimed supplier identity;
+  // a draft sales order was created here for review.
+  supplier_po_received: withStandard([
+    { key: 'admin_ids', label: 'Admin IDs', note: 'Array of SUPPLIER-workspace admins to notify — iterate with a Loop ({{item}} = each admin id).' },
+    { key: 'buyer_name', label: 'Buyer name', note: 'The buying workspace’s registered business name.' },
+    { key: 'sales_order_id', label: 'Sales order ID', note: 'The draft sales order created in this (supplier) workspace.' },
+    { key: 'purchase_order_id', label: 'Purchase order ID', note: 'The buyer-side purchase order paired to the sales order.' },
+  ]),
   'seo.ranking_movement': withStandard([
     { key: 'website_id', label: 'Website ID', note: 'The connected website whose rankings moved.' },
     { key: 'domain', label: 'Domain', note: 'The website domain.', example: 'flobali.gr' },

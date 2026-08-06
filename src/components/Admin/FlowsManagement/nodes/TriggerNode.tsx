@@ -118,6 +118,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   rfq_lines_requested: Send,
   rfq_lines_priced: CheckCircle2,
   upstream_order_created: ShoppingCart,
+  supplier_po_received: ShoppingCart,
   'realestate.buyer_matches_found': Home,
   'realestate.new_listing_for_buyer': Home,
   'seo.ranking_movement': Search,

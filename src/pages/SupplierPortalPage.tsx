@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, PackageCheck, Truck, RefreshCw, Inbox } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Loader2, PackageCheck, Truck, RefreshCw, Inbox, FileText } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
 import { Button } from '@/components/core/ui/button';
@@ -141,6 +142,15 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
               <Button size="sm" className="rounded-full h-8" disabled={busyId === o.order_id || o.supplier_status === 'shipped'} onClick={() => act(o.order_id, 'shipped')}>
                 {busyId === o.order_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Truck className="h-3.5 w-3.5 mr-1" /> Mark shipped</>}
               </Button>
+              {/* In-app handoff: the buyer's PO already materialized a draft sales order in THIS
+                  workspace — fulfil it with the normal order machinery, don't retype it. */}
+              {o.linked_order_id && (
+                <Button size="sm" variant="ghost" className="rounded-full h-8" asChild>
+                  <Link to={`/finance?tab=orders&order=${o.linked_order_id}`}>
+                    <FileText className="h-3.5 w-3.5 mr-1" /> Open draft order
+                  </Link>
+                </Button>
+              )}
               {o.supplier_eta && <span className="text-xs text-muted-foreground ml-auto">ETA {new Date(o.supplier_eta).toLocaleDateString()}</span>}
             </div>
           </CardContent>

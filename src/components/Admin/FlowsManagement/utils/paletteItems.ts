@@ -366,6 +366,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'upstream_order_created', group: 'Finance',
     label: 'Reseller Order Created', description: 'A reseller accepted a quote with operator-catalog lines → a mirrored sales order + draft invoice was created in the supplier workspace (notify the supplier admins)', icon: 'ShoppingCart', color: 'emerald',
     defaultData: { label: 'Reseller Order Created', category: 'trigger', triggerType: 'upstream_order_created', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'supplier_po_received', group: 'Finance',
+    label: 'Supplier PO Received', description: 'A buyer handed a purchase order off in-app to this workspace\'s claimed supplier identity → a draft sales order was created for review (notify the supplier admins)', icon: 'PackageOpen', color: 'emerald',
+    defaultData: { label: 'Supplier PO Received', category: 'trigger', triggerType: 'supplier_po_received', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

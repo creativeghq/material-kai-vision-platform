@@ -1436,6 +1436,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const [showPayAudit, setShowPayAudit] = useState(false);
   // Purchase-order 3-way match (PO × goods received × supplier bill).
   const [match, setMatch] = useState<ThreeWayMatch | null>(null);
+  // In-app handoff: whether this PO's supplier has a claimed platform identity to send to.
+  const [handoff, setHandoff] = useState<{ available: boolean; supplierWorkspaceName?: string } | null>(null);
   // The order's own party (customer / supplier) name — the order row carries only the id, and the
   // header has to say WHO this order is with before it can offer to open their CRM record.
   const [partyName, setPartyName] = useState<string | null>(null);
@@ -1450,7 +1452,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       // Everything the panel needs, in ONE wave. `getThreeWayMatch` used to be awaited after this
       // block, so opening an order cost two sequential round-trips where one would do — the
       // straggler depended on nothing in here.
-      const [finance, lp, names, exposure, accounts, audit, buyer, party, prodNames, threeWay] = await Promise.all([
+      const [finance, lp, names, exposure, accounts, audit, buyer, party, prodNames, threeWay, handoffInfo] = await Promise.all([
         ordersService.getOrderFinance(id),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
         ordersService.getCompanyNames(supplierIds).catch(() => new Map<string, string>()),
@@ -1472,6 +1474,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         res.order.order_type === 'purchase'
           ? ordersService.getThreeWayMatch(id).catch(() => null)
           : Promise.resolve(null),
+        res.order.order_type === 'purchase' && !res.order.paired_order_id
+          ? ordersService.supplierHandoffAvailable(id).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setProductNames(prodNames);
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
@@ -1480,13 +1485,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       setPayAuditFailed(!audit.ok);
       setBuyerIdentity(buyer); setPartyName(party);
       setMatch(threeWay);
+      setHandoff(handoffInfo);
     } catch (err: any) {
       toast({ title: 'Failed to load order', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setPartyName(null); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setHandoff(null); setPartyName(null); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -1869,6 +1875,22 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     finally { setSaving(false); }
   };
 
+  // Hand the PO off in-app: a draft sales order materializes in the supplier's claimed
+  // workspace and their admins are notified. Their confirm/fulfil rounds back onto this PO.
+  const sendToSupplierInApp = async () => {
+    if (!order) return;
+    setSaving(true);
+    try {
+      await ordersService.handoffToSupplier(order.id);
+      await load(order.id); onChanged();
+      toast({
+        title: 'Sent in-app',
+        description: `A draft sales order is waiting in ${handoff?.supplierWorkspaceName ?? "the supplier"}'s workspace. You'll see their acknowledgement here.`,
+      });
+    } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
+    finally { setSaving(false); }
+  };
+
   // Email the purchase order to the supplier (PDF), mark it placed.
   const sendToSupplier = async () => {
     if (!order) return;
@@ -1976,6 +1998,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             <div className="flex flex-wrap items-center gap-2">
               <span className={`text-sm font-semibold capitalize ${order.order_type === 'sales' ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`}>{order.order_type}</span>
               <span className="text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[order.payment_status]}</span>
+              {/* Supplier round-trip on a PO: paired = sent in-app; supplier_status comes back from
+                  their portal ack/ship or their mirror order's progress. Plain colored words. */}
+              {order.order_type === 'purchase' && (order.paired_order_id || order.supplier_status) && (
+                <span className="text-xs" title={order.supplier_eta ? `Supplier ETA ${order.supplier_eta}` : undefined}>
+                  {order.supplier_status === 'shipped'
+                    ? <span className="font-medium text-emerald-600 dark:text-emerald-400">Supplier shipped</span>
+                    : order.supplier_status === 'acknowledged'
+                      ? <span className="font-medium text-blue-600 dark:text-blue-400">Supplier acknowledged{order.supplier_eta ? ` · ETA ${order.supplier_eta}` : ''}</span>
+                      : <span className="text-muted-foreground">Sent in-app · awaiting acknowledgement</span>}
+                </span>
+              )}
               <div className="ml-auto flex flex-wrap items-center gap-2">
                 {/* Which project this order belongs to — inline, ahead of Status. Only projects are
                     offered: the order already knows its party, so re-picking one here would just be
@@ -2071,9 +2104,21 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         <FileText className="h-3.5 w-3.5 mr-2" /> {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'}
                       </DropdownMenuItem>
                     )}
-                    {order.order_type === 'purchase' && (
+                    {/* In-app first when the supplier is on the platform (claimed identity); the
+                        email PDF stays as the universal fallback. Once handed off, neither shows —
+                        the round-trip status in the header is the record. */}
+                    {order.order_type === 'purchase' && handoff?.available && !order.paired_order_id && (
+                      <DropdownMenuItem className="items-start" onClick={sendToSupplierInApp}>
+                        <Send className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-primary" />
+                        <span className="flex flex-col">
+                          <span>Send in-app{handoff.supplierWorkspaceName ? ` to ${handoff.supplierWorkspaceName}` : ''}</span>
+                          <span className="text-[10px] text-muted-foreground">This supplier uses the platform — a draft sales order lands in their workspace and their reply tracks here.</span>
+                        </span>
+                      </DropdownMenuItem>
+                    )}
+                    {order.order_type === 'purchase' && !order.paired_order_id && (
                       <DropdownMenuItem onClick={sendToSupplier}>
-                        <Send className="h-3.5 w-3.5 mr-2" /> Send to supplier
+                        <Send className="h-3.5 w-3.5 mr-2" /> {handoff?.available ? 'Email to supplier (PDF)' : 'Send to supplier'}
                       </DropdownMenuItem>
                     )}
                     {order.order_type === 'purchase' && order.status !== 'fulfilled' && order.status !== 'cancelled' && (

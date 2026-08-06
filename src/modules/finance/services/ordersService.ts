@@ -50,6 +50,18 @@ export interface Order {
   expected_payment_date: string | null;
   /** Purchase-order 3-way match verdict (denormalized; null for sales orders). */
   three_way_match_status: ThreeWayMatchStatus | null;
+  /**
+   * In-app pairing: the mirrored order in the OTHER workspace (reseller network, or a purchase
+   * order handed off to a claimed supplier — `handoff_purchase_order_to_supplier`). On a PO,
+   * non-null means "sent in-app"; the paired row is the supplier's sales order.
+   */
+  paired_order_id: string | null;
+  paired_workspace_id: string | null;
+  /** What the supplier reported back on a PO — via the portal or their mirror order's progress. */
+  supplier_status: 'acknowledged' | 'shipped' | null;
+  supplier_acknowledged_at: string | null;
+  supplier_eta: string | null;
+  supplier_note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -486,6 +498,29 @@ export const ordersService = {
     if (error) throw error;
     const { data: items } = await supabase.from('order_items').select('*').eq('order_id', id).order('sort_order', { ascending: true });
     return { order: order as Order, items: (items ?? []) as OrderItem[] };
+  },
+
+  /**
+   * Can this purchase order be handed off in-app? True only when its supplier company is linked
+   * to a CLAIMED platform identity (VAT-verified, operator-approved) owned by another workspace.
+   */
+  async supplierHandoffAvailable(orderId: string): Promise<{ available: boolean; supplierWorkspaceName?: string }> {
+    const { data, error } = await supabase.rpc('supplier_handoff_available', { p_order: orderId });
+    if (error) throw error;
+    const d = (data ?? {}) as { available?: boolean; supplier_workspace_name?: string };
+    return { available: !!d.available, supplierWorkspaceName: d.supplier_workspace_name ?? undefined };
+  },
+
+  /**
+   * Hand the PO off in-app: a DRAFT sales order materializes in the supplier's workspace (paired
+   * both ways via paired_order_id) and their admins are notified. The supplier's confirm/fulfil
+   * then round-trips onto this PO as supplier_status acknowledged/shipped.
+   */
+  async handoffToSupplier(orderId: string): Promise<{ salesOrderId: string }> {
+    const { data, error } = await supabase.rpc('handoff_purchase_order_to_supplier', { p_order: orderId });
+    if (error) throw error;
+    const d = (data ?? {}) as { sales_order_id?: string };
+    return { salesOrderId: d.sales_order_id ?? '' };
   },
 
   /** 3-way match for a purchase order: PO net × goods received × supplier-bill net. */

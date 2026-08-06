@@ -137,6 +137,9 @@ export type TriggerType =
   // A reseller accepted a quote with operator-catalog lines, auto-creating a mirrored
   // SALES order + draft invoice in the supplier/operator workspace (notify the supplier admins)
   | 'upstream_order_created'
+  // A buyer handed a purchase order off in-app to a workspace's CLAIMED supplier identity —
+  // a draft sales order materialized there (notify the supplier admins)
+  | 'supplier_po_received'
   | 'realestate.buyer_matches_found'
   | 'realestate.new_listing_for_buyer'
   // SEO movement alerts — detected week-over-week by the seo-domain-tracker / seo-site-audit
@@ -182,6 +185,7 @@ export interface JobAlertTriggeredTriggerConfig {}
 export interface RfqLinesRequestedTriggerConfig {}
 export interface RfqLinesPricedTriggerConfig {}
 export interface UpstreamOrderCreatedTriggerConfig {}
+export interface SupplierPoReceivedTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface FreightQuoteRequestedTriggerConfig {}
 export interface OrderDispatchedTriggerConfig {}
@@ -409,6 +413,7 @@ export type TriggerConfigMap = {
   rfq_lines_requested: RfqLinesRequestedTriggerConfig;
   rfq_lines_priced: RfqLinesPricedTriggerConfig;
   upstream_order_created: UpstreamOrderCreatedTriggerConfig;
+  supplier_po_received: SupplierPoReceivedTriggerConfig;
   'realestate.buyer_matches_found': RealestateBuyerMatchesFoundTriggerConfig;
   'realestate.new_listing_for_buyer': RealestateNewListingForBuyerTriggerConfig;
   'seo.ranking_movement': SeoRankingMovementTriggerConfig;

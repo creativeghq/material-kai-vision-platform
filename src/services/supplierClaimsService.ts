@@ -85,5 +85,7 @@ export interface SupplierInboundOrder {
   supplier_status: 'acknowledged' | 'shipped' | null;
   supplier_acknowledged_at: string | null;
   supplier_eta: string | null;
+  /** The draft sales order an in-app handoff created in THIS (supplier) workspace, if any. */
+  linked_order_id: string | null;
   lines: SupplierInboundOrderLine[];
 }
