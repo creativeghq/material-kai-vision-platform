@@ -31275,6 +31275,7 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string
       }
+      ensure_own_workspace: { Args: never; Returns: Json }
       escalate_request: { Args: { p_request_id: string }; Returns: string }
       expire_due_listings: { Args: never; Returns: number }
       expire_due_quotes: { Args: never; Returns: number }

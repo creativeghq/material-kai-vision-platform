@@ -184,7 +184,26 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     }
 
-    const rows = (data ?? []).map(mapMembership).filter(Boolean) as WorkspaceMembership[];
+    let rows = (data ?? []).map(mapMembership).filter(Boolean) as WorkspaceMembership[];
+
+    // Safety net (#211): a user with zero memberships is stranded — the invite-first
+    // signup path skips own-workspace creation, so if the invite then failed to redeem
+    // (revoked/expired between signup and first load), nothing owns them a workspace.
+    // ensure_own_workspace() idempotently provisions the personal workspace the signup
+    // trigger would have made; then re-read memberships once.
+    if (rows.length === 0) {
+      try {
+        await supabase.rpc('ensure_own_workspace');
+        const { data: retry } = await supabase
+          .from('workspace_members')
+          .select(
+            'role, status, workspace:workspaces(id, name, slug, is_root, parent_workspace_id, can_supply_products, catalog_access)',
+          )
+          .eq('user_id', user.id)
+          .eq('status', 'active');
+        rows = (retry ?? []).map(mapMembership).filter(Boolean) as WorkspaceMembership[];
+      } catch { /* fail soft — the next context load retries */ }
+    }
     setMemberships(rows);
 
     // Account role (the access tier set under Users), already resolved by the embed in the
