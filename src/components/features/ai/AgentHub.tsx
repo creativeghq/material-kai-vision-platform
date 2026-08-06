@@ -6,9 +6,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo, memo, lazy, Suspense } from 'react';
 import { getErrorMessage } from '@/core/errors/utils';
 import {
-  Bot,
   Palette,
-  Package,
   Send,
   Mic,
   Paperclip,
@@ -31,14 +29,8 @@ import {
   Pencil,
   FileText,
   Loader2,
-  TrendingUp,
-  Share2,
-  Boxes,
   ChevronDown,
   Check,
-  Code2,
-  ShieldCheck,
-  Building2,
 } from 'lucide-react';
 import { logger } from '@/config';
 
@@ -138,6 +130,7 @@ import { moodboardAPI } from '@/services/moodboardAPI';
 import { ActiveMoodboardProvider, type ActiveMoodboard } from '@/contexts/ActiveMoodboardContext';
 import { GeminiEditModal } from './GeminiEditModal';
 import { RegionEditCanvas, type RegionEditResult } from './RegionEditCanvas';
+import { AgentAvatar } from './AgentAvatar';
 import { onEnterOrSpace } from '@/utils/a11y';
 
 import { useEscapeKey } from '@/hooks/useEscapeKey';
@@ -146,7 +139,7 @@ interface AgentDefinition {
   id: string;
   name: string;
   description: string;
-  icon: React.ComponentType<{ className?: string }>;
+  /** Tailwind text-color class driving the AgentAvatar face via currentColor. */
   color: string;
   requiredRole: 'viewer' | 'member' | 'admin' | 'owner';
   available: boolean;
@@ -166,7 +159,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'orchestrator',
     name: 'JARVIS',
     description: 'Orchestrator — routes you to the right specialist automatically',
-    icon: Bot,
     color: 'text-blue-500',
     requiredRole: 'member',
     available: true,
@@ -176,7 +168,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'interior-designer',
     name: 'Vision',
     description: 'Interior design, image & 3D generation, staging, moodboards',
-    icon: Sparkles,
     color: 'text-violet-500',
     requiredRole: 'member',
     available: true,
@@ -186,7 +177,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'product-business',
     name: 'Pepper',
     description: 'Catalogs, B2B research, product knowledge-graph, tech radar, jobs',
-    icon: Package,
     color: 'text-amber-500',
     requiredRole: 'member',
     available: true,
@@ -196,7 +186,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'marketing',
     name: 'Edith',
     description: 'SEO research & audits, content, brand-mention & LLM visibility',
-    icon: TrendingUp,
     color: 'text-emerald-500',
     requiredRole: 'member',
     available: true,
@@ -206,7 +195,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'property-advisor',
     name: 'Estate',
     description: 'Real estate — listings, valuations, viewings, offers, leads, lettings',
-    icon: Building2,
     color: 'text-teal-500',
     requiredRole: 'member',
     available: true,
@@ -216,7 +204,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'erp',
     name: 'Trinity',
     description: 'Finance & quotes — build quotes + branded PDFs, account overviews',
-    icon: FileText,
     color: 'text-rose-500',
     requiredRole: 'member',
     available: true,
@@ -226,7 +213,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'social-media',
     name: 'Hermes',
     description: 'Publish & schedule social posts, read social analytics',
-    icon: Share2,
     color: 'text-sky-500',
     requiredRole: 'member',
     available: true,
@@ -236,7 +222,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'demo',
     name: 'Demo',
     description: 'Platform showcase demos',
-    icon: Boxes,
     color: 'text-cyan-500',
     requiredRole: 'admin',
     available: true,
@@ -249,7 +234,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'developer',
     name: 'Stark',
     description: 'Autonomous code & build agent — writes, runs, and ships changes in a sandbox',
-    icon: Code2,
     color: 'text-orange-500',
     requiredRole: 'member',
     available: false,
@@ -260,7 +244,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'qa-reviewer',
     name: 'Veritas',
     description: 'QA & code-review agent — verifies, tests, and audits work in a sandbox',
-    icon: ShieldCheck,
     color: 'text-teal-500',
     requiredRole: 'member',
     available: false,
@@ -274,7 +257,6 @@ const AGENTS: AgentDefinition[] = [
     id: 'kai',
     name: 'JARVIS',
     description: 'Generalist — material intelligence & everything not owned by a specialist',
-    icon: Bot,
     color: 'text-blue-500',
     requiredRole: 'member',
     available: false,
@@ -3892,7 +3874,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // identical. The PDF is NOT digested into the product DB.
 
   const currentAgent = AGENTS.find((a) => a.id === selectedAgent);
-  const AgentIcon = currentAgent?.icon || Bot;
   const currentConversationTitle = conversations.find((c) => c.id === currentConversationId)?.title;
 
   // Async multi-model room-generation grid (ProgressiveImageGrid, self-polling).
@@ -4637,9 +4618,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       <div className="min-h-full flex flex-col items-center justify-center py-6">
         {withHero && (
           <div className="text-center space-y-4 mb-6">
-            <div className="w-16 h-16 mx-auto rounded-full bg-primary/20 flex items-center justify-center">
-              <AgentIcon className={`h-8 w-8 ${currentAgent?.color}`} />
-            </div>
+            <AgentAvatar agentId={currentAgent?.id} className={cn('w-16 h-16 mx-auto', currentAgent?.color)} />
             <div>
               <h3 className="text-lg font-semibold">
                 Welcome to {currentAgent?.name}
@@ -4732,9 +4711,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       >
         {/* Studio header — agent identity + conversation manager launcher */}
         <div className="flex items-center gap-3 px-3 sm:px-4 py-2.5 border-b border-white/8 shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner flex-shrink-0">
-            <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
-          </div>
+          <AgentAvatar agentId={currentAgent?.id} className={cn('w-9 h-9 flex-shrink-0', currentAgent?.color)} />
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold tracking-tight leading-tight truncate">{currentAgent?.name}</h3>
             {currentConversationTitle && (
@@ -4988,17 +4965,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   {message.role === 'assistant' && (
-                    <div className="flex-shrink-0">
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center border-2"
-                        style={{
-                          backgroundColor: 'hsl(var(--primary))',
-                          borderColor: 'hsl(var(--primary))',
-                        }}
-                      >
-                        <Bot className="h-4 w-4" style={{ color: '#fff' }} />
-                      </div>
-                    </div>
+                    <AgentAvatar agentId={currentAgent?.id} className={cn('w-8 h-8', currentAgent?.color)} />
                   )}
                   <div
                     className={`${message.demoData || message.materialData || message.worldData || message.videoData || message.virtualStagingData || message.materialsBoardData || message.inspirationData || message.sheetCanvasData || message.actionConfirmationData || message.sheetPdfData || message.mentionSummaryData || message.llmVisibilityData || message.mentionFeedData || message.seoResearchData || message.seoGenericData || message.catalogExtractionData || message.catalogImageCandidatesData || message.sourcingOptionsData || message.purchaseOrderCreatedData || message.purchaseOrderSentData || message.agentResultData || message.techRadarData || message.jobFindingsData || message.articleData ? 'max-w-full' : 'max-w-[88%] sm:max-w-[75%]'} min-w-0 ${canvasShown ? 'overflow-x-auto' : ''} rounded-2xl p-3.5 sm:p-5 ${
@@ -5560,11 +5527,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               {/* Loading/Thinking Animation - Reasoning Trace Style */}
               {isLoading && (
                 <div className="flex gap-3 justify-start animate-fade-in">
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary shadow-lg shadow-primary/20">
-                      <Bot className="h-4 w-4 text-white animate-pulse" />
-                    </div>
-                  </div>
+                  <AgentAvatar agentId={currentAgent?.id} className={cn('w-8 h-8 animate-pulse', currentAgent?.color)} />
                   <div className="min-w-0 max-w-[88%] sm:max-w-[80%] rounded-2xl p-3.5 sm:p-5 bg-primary/5 border border-primary/20">
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-3">
@@ -5984,10 +5947,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-muted/60 hover:bg-muted text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         title="Switch agent"
                       >
-                        {(() => {
-                          const Icon = currentAgent?.icon || Bot;
-                          return <Icon className={cn('h-3.5 w-3.5', currentAgent?.color)} />;
-                        })()}
+                        <AgentAvatar agentId={currentAgent?.id} className={cn('h-4 w-4', currentAgent?.color)} />
                         <span>{currentAgent?.name || 'JARVIS'}</span>
                         {selectedAgent === 'orchestrator' && (
                           <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
@@ -6006,16 +5966,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                       <DropdownMenuSeparator />
                       {availableAgents.map((agent) => {
-                        const Icon = agent.icon;
                         const isActive = selectedAgent === agent.id;
                         const isOrchestrator = agent.id === 'orchestrator';
                         return (
                           <DropdownMenuItem
                             key={agent.id}
                             onSelect={() => setSelectedAgent(agent.id)}
-                            className="flex items-start gap-2 py-2 cursor-pointer"
+                            className="flex items-start gap-2.5 py-2 cursor-pointer"
                           >
-                            <Icon className={cn('h-4 w-4 mt-0.5 shrink-0', agent.color)} />
+                            <AgentAvatar agentId={agent.id} className={cn('h-7 w-7 mt-0.5', agent.color)} />
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-medium">{agent.name}</span>
@@ -6035,15 +5994,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         <>
                           <DropdownMenuSeparator />
                           {comingSoonAgents.map((agent) => {
-                            const Icon = agent.icon;
                             return (
                               <DropdownMenuItem
                                 key={agent.id}
                                 disabled
                                 onSelect={(e) => e.preventDefault()}
-                                className="flex items-start gap-2 py-2 opacity-100 data-[disabled]:opacity-100"
+                                className="flex items-start gap-2.5 py-2 opacity-100 data-[disabled]:opacity-100"
                               >
-                                <Icon className={cn('h-4 w-4 mt-0.5 shrink-0 opacity-60', agent.color)} />
+                                <AgentAvatar agentId={agent.id} className={cn('h-7 w-7 mt-0.5 opacity-60', agent.color)} />
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-sm font-medium text-muted-foreground">{agent.name}</span>
