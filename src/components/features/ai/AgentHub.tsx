@@ -4618,7 +4618,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       <div className="min-h-full flex flex-col items-center justify-center py-6">
         {withHero && (
           <div className="text-center space-y-4 mb-6">
-            <AgentAvatar agentId={currentAgent?.id} className={cn('w-16 h-16 mx-auto', currentAgent?.color)} />
+            <AgentAvatar agentId={currentAgent?.id} className={cn('w-24 h-24 mx-auto', currentAgent?.color)} />
             <div>
               <h3 className="text-lg font-semibold">
                 Welcome to {currentAgent?.name}
