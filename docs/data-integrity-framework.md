@@ -37,9 +37,11 @@ Adding a check is a **migration**, not a row an admin types in. That is delibera
 
 | Domain | Checks | Auto-healable |
 |---|---|---|
-| `finance` | 8 | 4 |
-| `ops` | 3 | 0 |
-| `tenancy` | 2 | 1 |
+| `finance` | 14 | 4 |
+| `ops` | 14 | 0 |
+| `tenancy` | 3 | 2 |
+| `catalog` | 3 | 0 |
+| `stock` | 2 | 1 |
 | `credits` | 1 | 0 |
 | `crm` | 1 | 0 |
 | `security` | 1 | 0 |
@@ -48,7 +50,7 @@ Adding a check is a **migration**, not a row an admin types in. That is delibera
 
 `order_payment_status_drift` is the canonical example of the "wrong number" class. Order settlement was implemented five times across SQL and TypeScript; four applied the rule correctly (a **sales** order settles on money **in**, a **purchase** order on money **out**), one netted the two directions. The result was a fully-paid sales order showing `Payment: Paid` beside `Outstanding: €945` — the *supplier's* figure. The stored data was flawless, so no integrity check on the rows themselves could see it. The fix was to make `get_order_settlements(uuid[])` the single derivation and then add a drift check comparing every cached copy against it. See the anti-regression rules in [CLAUDE.md](../CLAUDE.md).
 
-**tenancy** — `order_item_workspace`, `payment_order_workspace`: a child row whose `workspace_id` disagrees with its parent's. Cross-tenant contamination is silent by construction, so it must be asserted.
+**tenancy** — `order_item_workspace`, `payment_order_workspace`: a child row whose `workspace_id` disagrees with its parent's. Cross-tenant contamination is silent by construction, so it must be asserted. `workspace_orphaned` (#211): a consumer workspace >7 days old with zero members — the shell left when an account is deleted (`workspace_members` cascades away, the workspace does not). Heal deletes only workspaces holding no business data and no claimable invites; one with data stays open for review.
 
 **security** — `security.invariant_violation` wraps the `check_security_invariants()` RPC, which surfaces live DB violations of invariants 2–4 (SECURITY DEFINER without `search_path`/revoke, tenant views without `security_invoker`, tables without RLS).
 
