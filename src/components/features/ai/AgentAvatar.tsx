@@ -1,20 +1,40 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
 /**
- * Playful character avatars for the agent roster — one hand-drawn SVG face per
- * agent, replacing the generic lucide glyphs (a trending-up arrow is a metric,
- * not a colleague). Every face is built from the same base (tinted circle,
- * rounded head, eyes, smile) plus one signature accessory so the family reads
- * as a set: JARVIS an antenna, Edith her round glasses (she IS the glasses),
- * Hermes a winged helmet, Estate a roof, Demo a party hat, and so on.
+ * Playful character avatars for the agent roster — chibi robot mascots
+ * (public/avatars/agents/*.webp, generated 2026-08-06 with the platform's
+ * Gemini image pipeline in one consistent sticker style: JARVIS the butler,
+ * Edith with her chart-glasses, Hermes with the winged helmet, Estate with a
+ * roof hat, and so on). Each is a 256px square on a flat pastel field, masked
+ * round here — regenerate in the same style if the roster grows.
  *
- * Color comes from `currentColor` — pass the agent's existing `text-*-500`
- * class and the whole face inherits it, so avatars track the roster palette
- * and both themes for free. Facial cutouts (eyes, mouth, lenses, visor) use
- * `hsl(var(--background))` so they read as punched-out silhouette at any size.
+ * The hand-drawn SVG faces below are the FALLBACK — they render for unknown
+ * agent ids and when an image fails to load, so the picker never shows a
+ * broken-image glyph. They take their color from `currentColor` (pass the
+ * agent's `text-*-500` class); facial cutouts use `hsl(var(--background))`.
  */
+
+/** Agents with a generated mascot image in public/avatars/agents/. */
+const MASCOT_IDS = new Set([
+  'orchestrator',
+  'interior-designer',
+  'product-business',
+  'marketing',
+  'property-advisor',
+  'erp',
+  'social-media',
+  'demo',
+  'developer',
+  'qa-reviewer',
+]);
+
+/** kai is the hidden generalist behind JARVIS — same face on purpose. */
+const mascotIdFor = (agentId?: string): string | undefined => {
+  if (agentId === 'kai') return 'orchestrator';
+  return agentId && MASCOT_IDS.has(agentId) ? agentId : undefined;
+};
 
 const BG = 'hsl(var(--background))';
 
@@ -177,6 +197,22 @@ interface AgentAvatarProps {
 }
 
 export const AgentAvatar: React.FC<AgentAvatarProps> = ({ agentId, className }) => {
+  const mascotId = mascotIdFor(agentId);
+  const [brokenId, setBrokenId] = useState<string | null>(null);
+
+  if (mascotId && brokenId !== mascotId) {
+    return (
+      <img
+        src={`/avatars/agents/${mascotId}.webp`}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        onError={() => setBrokenId(mascotId)}
+        className={cn('shrink-0 rounded-full object-cover select-none', className)}
+      />
+    );
+  }
+
   const Face = (agentId && FACES[agentId]) || JarvisFace;
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" className={cn('shrink-0', className)}>
