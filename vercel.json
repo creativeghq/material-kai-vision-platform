@@ -19,7 +19,7 @@
       "destination": "/api/sitemap"
     },
     {
-      "source": "/((?!api|assets|models|static|documentation|favicon.ico|robots.txt|sitemap.xml|llms.txt).*)",
+      "source": "/((?!api|assets|avatars|models|static|documentation|favicon.ico|robots.txt|sitemap.xml|llms.txt).*)",
       "destination": "/index.html"
     }
   ],
