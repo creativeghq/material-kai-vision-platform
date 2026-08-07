@@ -157,7 +157,10 @@ export function toPublic(p: any): Record<string, unknown> {
     // agent (public)
     agent_license_no: p.agent_license_no, agency_logo_url: p.agency_logo_url,
     agent_name: p.agent_name, agent_phone: p.agent_phone, agent_email: p.agent_email, agent_website: p.agent_website,
-    listing_date: p.listing_date, days_on_market: p.days_on_market, view_count: p.view_count,
+    // No days_on_market here: it is DERIVED by get_property_performance, not a column. The column it
+    // used to read was never written by anything, so this shipped a permanent null to the public page
+    // and to every portal feed.
+    listing_date: p.listing_date, view_count: p.view_count,
     previous_price: p.previous_price, price_reduced: p.price_reduced, is_new_development: p.is_new_development, construction_status: p.construction_status,
     // facetable physical (safe subset)
     area_built: p.area_built, area_plot: p.area_plot, plot_area: p.plot_area,

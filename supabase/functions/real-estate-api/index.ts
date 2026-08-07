@@ -446,6 +446,32 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ photo: data });
       }
 
+      // ── Listing performance (#281 gap 8) ───────────────────────────────
+      case 'listing-performance': {
+        // One listing (workbench Performance tab) or the whole book (Listings tab ranking).
+        const propertyId = String(body.property_id ?? '');
+        let ids: string[];
+        if (propertyId) {
+          await loadProperty(propertyId); // view-scoped 404
+          ids = [propertyId];
+        } else {
+          const { data: rows } = await supabase.from('properties')
+            .select('id, listing_agent_id, created_by, open_for_all')
+            .eq('workspace_id', workspaceId).in('listing_status', ['active', 'under_offer']).limit(300);
+          // Same scoping as every other list: an agent sees their own book, not the agency's.
+          ids = (rows ?? []).filter((r: any) => access.isBroker || canViewProperty(r)).map((r: any) => r.id);
+        }
+        if (!ids.length) return json({ performance: [], series: [] });
+        const { data: perf, error } = await supabase.rpc('get_property_performance', { p_property_ids: ids });
+        if (error) throw new HttpError(400, error.message);
+        // The daily series backs the sparkline. 90 days is what the Performance tab charts; the
+        // vendor report only ever asks for one listing, so this stays small either way.
+        const since = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
+        const { data: series } = await supabase.from('property_daily_stats')
+          .select('property_id, day, views').in('property_id', ids).gte('day', since).order('day');
+        return json({ performance: perf ?? [], series: series ?? [] });
+      }
+
       // ── Listing paperwork ──────────────────────────────────────────────
       // `property_documents` existed and was READ by get-property, but had no write path and no UI,
       // so it stayed empty forever. That mattered beyond the dead table: the GR publish gate asserts
@@ -1492,12 +1518,16 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (town) cq = cq.ilike('town', town);
         if (propertyId) cq = cq.neq('id', propertyId);
         const { data: raw } = await cq.limit(60);
+        // Days-on-market comes from the shared derivation, not a second inline copy. This used to
+        // compute `sold_at − created_at` here, which both disagreed with the (never-written) column
+        // it was routing around and measured from creation rather than from publication.
+        const { data: perfRows } = await supabase.rpc('get_property_performance', { p_property_ids: (raw ?? []).map((c: any) => c.id) });
+        const domById = new Map((perfRows ?? []).map((r: any) => [r.property_id, r.days_on_market]));
         const comps = (raw ?? []).map((c: any) => {
           const a = Number(c.area_built ?? c.plot_area ?? 0);
           const effPrice = c.listing_status === 'sold' && c.sold_price != null ? Number(c.sold_price) : Number(c.price);
           const pps = a > 0 ? effPrice / a : null;
-          const dom = c.listing_status === 'sold' && c.sold_at ? Math.max(0, Math.round((new Date(c.sold_at).getTime() - new Date(c.created_at).getTime()) / 864e5)) : null;
-          return { id: c.id, title: c.title, town: c.town, price: effPrice, area: a || null, bedrooms: c.bedrooms ?? null, price_per_sqm: pps ? Math.round(pps) : null, listing_status: c.listing_status, days_on_market: dom, currency: c.currency ?? 'EUR' };
+          return { id: c.id, title: c.title, town: c.town, price: effPrice, area: a || null, bedrooms: c.bedrooms ?? null, price_per_sqm: pps ? Math.round(pps) : null, listing_status: c.listing_status, days_on_market: domById.get(c.id) ?? null, currency: c.currency ?? 'EUR' };
         }).filter((c: any) => c.price_per_sqm != null).sort((a: any, b: any) => a.price_per_sqm - b.price_per_sqm);
         const pps = comps.map((c: any) => c.price_per_sqm as number);
         const median = pps.length ? pps[Math.floor(pps.length / 2)] : null;

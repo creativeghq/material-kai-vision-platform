@@ -104,6 +104,20 @@ export interface RentCharge {
   settled: number; outstanding: number;
   settlement_source: 'invoice' | 'manual' | 'waived' | 'stale';
 }
+/** Derived by `get_property_performance` — the single source, including days_on_market.
+ *  Never re-compute a DOM or a view total from columns in a consumer. */
+export interface ListingPerformance {
+  property_id: string;
+  days_on_market: number | null;
+  views_total: number; views_7d: number; views_30d: number;
+  inquiries_total: number; inquiries_30d: number;
+  viewings_total: number; viewings_completed: number;
+  offers_total: number;
+  price_changes: number; first_price: number | null; current_price: number | null; price_change_pct: number | null;
+  lead_sources: Record<string, number>;
+}
+export interface ListingViewPoint { property_id: string; day: string; views: number }
+
 /** Listing paperwork. `url` is a short-lived signed URL minted on read — never persist it. */
 export interface PropertyDocument {
   id: string; property_id: string; storage_bucket: string; storage_path: string;
@@ -366,6 +380,10 @@ export const realEstateService = {
     if (error) throw error;
     return this.addPhoto(ws, propertyId, path, kind);
   },
+
+  /** Listing performance. Omit `propertyId` for the whole (agent-scoped) book. */
+  listingPerformance: (ws: string, propertyId?: string) =>
+    call<{ performance: ListingPerformance[]; series: ListingViewPoint[] }>(ws, 'listing-performance', { property_id: propertyId }),
 
   // Documents — listing paperwork (private bucket; `url` is a 1h signed URL, never persisted).
   listDocuments: (ws: string, propertyId: string) =>
