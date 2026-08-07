@@ -1,4 +1,4 @@
-import { FileText, FolderKanban, Palette, Receipt } from 'lucide-react';
+import { ArrowUpCircle, FileSignature, FileText, FolderKanban, Palette, Receipt, ShoppingCart } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { projectsService } from '@/modules/projects/services/projectsService';
@@ -351,3 +351,213 @@ export const moodboardAdapter: TemplateAdapter<MoodboardTemplatePayload> = {
     return out;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Order — prefill. `ordersService.reorderPrefill` already makes the argument for
+// this exact shape: an order inserted behind the operator skips numbering, stock
+// reservation, three-way match and the order-created notification, and re-books a
+// stale price as if it were current. A template is staler still.
+// ---------------------------------------------------------------------------
+
+export interface OrderTemplatePayload {
+  order_type?: string | null;
+  currency?: string | null;
+  notes?: string | null;
+  discount_type?: string | null;
+  discount_value?: number | null;
+  order_items?: Record<string, unknown>[];
+}
+
+/**
+ * A prefill line for `NewOrderModal`.
+ *
+ * `vat_percent` rather than the form's `vat_code`: the percent→code table (`VAT_CATEGORIES` /
+ * `vatCodeOf`) lives in OrdersPanel with the form that uses it. Duplicating it here would be a
+ * second copy of the VAT vocabulary, so the caller maps it and drops this field.
+ */
+export interface OrderPrefillLine {
+  product_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  unit_cost: number | null;
+  unit_code?: string;
+  vat_percent: number | null;
+}
+
+export interface OrderPrefill {
+  orderType: 'sales' | 'purchase';
+  currency: string;
+  notes: string;
+  lines: OrderPrefillLine[];
+}
+
+const orderKind = oneOf(['sales', 'purchase'] as const);
+
+export const orderAdapter: TemplateAdapter<OrderTemplatePayload> = {
+  type: 'order',
+  icon: ShoppingCart,
+  ...TEMPLATE_SCHEMAS.order,
+  capture: (sourceId) => captureRecord<OrderTemplatePayload>(orderAdapter, sourceId),
+  async apply(_payload, ctx): Promise<TemplateApplyResult> {
+    return {
+      kind: 'prefill',
+      route: `/finance?tab=doc_orders&new=order&template=${ctx.templateId}`,
+      message: 'Opening a new order pre-filled from this template — pick the party to continue.',
+    };
+  },
+  summary(payload) {
+    const lines = childRows(payload as never, 'order_items').length;
+    const out = [`${lines} line${lines === 1 ? '' : 's'}`];
+    const k = orderKind(payload.order_type);
+    if (k) out.push(k === 'sales' ? 'Sales' : 'Purchase');
+    if (payload.currency) out.push(String(payload.currency));
+    return out;
+  },
+};
+
+/** Turn an order template payload into the props `NewOrderModal` already accepts. */
+export async function buildOrderPrefill(payload: OrderTemplatePayload): Promise<OrderPrefill> {
+  const rows = childRows(payload as never, 'order_items');
+  const visible = await filterVisibleIds('products', rows.map((r) => r.product_id as string | null));
+  const lines: OrderPrefillLine[] = rows.map((r) => ({
+    product_id: typeof r.product_id === 'string' && visible.has(r.product_id) ? r.product_id : null,
+    description: str(r.description) ?? '',
+    quantity: positiveQty(r.quantity),
+    unit_price: num(r.unit_price, 0),
+    // Cost is deliberately not carried (see the schema note); the form resolves today's.
+    unit_cost: null,
+    unit_code: str(r.measurement_unit_code) ?? undefined,
+    vat_percent: r.vat_percent != null ? num(r.vat_percent) : null,
+  })).filter((l) => l.description.length > 0);
+
+  return {
+    orderType: orderKind(payload.order_type) ?? 'purchase',
+    currency: str(payload.currency) ?? 'EUR',
+    notes: str(payload.notes) ?? '',
+    lines,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Contract — prefill. A template supplies the WORDS, never the party, and
+// `contracts_subject_ck` requires a subject on every row: an hr contract needs an
+// employee, a project contract a project, a finance contract at least a
+// counterparty name. So there is no honest "create it from the template alone" —
+// the terms fill the real form, which already knows what it is mounted under.
+// ---------------------------------------------------------------------------
+
+export interface ContractTemplatePayload {
+  context?: string | null;
+  contract_type?: string | null;
+  title?: string | null;
+  body_markdown?: string | null;
+  currency?: string | null;
+}
+
+/**
+ * `contracts_context_check` accepts only these three. `ContractContext` in contractsService also
+ * lists 'realestate', but the constraint does not — a template must not carry a value the insert
+ * will reject.
+ */
+const contractContext = oneOf(['hr', 'finance', 'project'] as const);
+const CONTEXT_LABEL: Record<string, string> = { hr: 'HR', finance: 'Finance', project: 'Project' };
+
+export const contractAdapter: TemplateAdapter<ContractTemplatePayload> = {
+  type: 'contract',
+  icon: FileSignature,
+  ...TEMPLATE_SCHEMAS.contract,
+  capture: (sourceId) => captureRecord<ContractTemplatePayload>(contractAdapter, sourceId),
+  async apply(_payload, ctx): Promise<TemplateApplyResult> {
+    return {
+      kind: 'prefill',
+      route: `/contracts?new=contract&template=${ctx.templateId}`,
+      message: 'Opening a new contract with these terms — add the counterparty to continue.',
+    };
+  },
+  summary(payload) {
+    const out: string[] = [];
+    const c = contractContext(payload.context);
+    if (c) out.push(CONTEXT_LABEL[c]);
+    if (payload.contract_type) out.push(String(payload.contract_type).replace(/_/g, ' '));
+    const words = str(payload.body_markdown)?.split(/\s+/).length ?? 0;
+    if (words) out.push(`${words} words`);
+    return out;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Expense — prefill into the real payable form, which owns the payee pick, the
+// VAT split and the pay-now-or-book-as-payable decision.
+// ---------------------------------------------------------------------------
+
+export interface ExpenseTemplatePayload {
+  currency?: string | null;
+  notes?: string | null;
+  category_id?: string | null;
+  /**
+   * Synthetic keys — see SYNTHETIC_PAYLOAD_FIELDS. On a bill these are typed inputs rather than
+   * derivations, but a payload key literally called `subtotal_net` would be indistinguishable
+   * from the stored-total mistake tests/unit/templateRegistry.test.ts exists to catch.
+   */
+  default_amount?: number | null;
+  default_vat_amount?: number | null;
+}
+
+export interface ExpensePrefill {
+  amount?: number;
+  vatAmount?: number;
+  description?: string;
+  categoryId?: string;
+}
+
+export const expenseAdapter: TemplateAdapter<ExpenseTemplatePayload> = {
+  type: 'expense',
+  icon: ArrowUpCircle,
+  ...TEMPLATE_SCHEMAS.expense,
+  async capture(sourceId) {
+    const base = await captureRecord<ExpenseTemplatePayload>(expenseAdapter, sourceId);
+    const { data, error } = await supabase
+      .from('supplier_bills')
+      .select('subtotal_net, vat_amount')
+      .eq('id', sourceId)
+      .maybeSingle();
+    if (error) throw error;
+    const row = (data ?? {}) as { subtotal_net?: number | null; vat_amount?: number | null };
+    return {
+      ...base,
+      default_amount: row.subtotal_net != null ? num(row.subtotal_net) : null,
+      default_vat_amount: row.vat_amount != null ? num(row.vat_amount) : null,
+    };
+  },
+  async apply(_payload, ctx): Promise<TemplateApplyResult> {
+    return {
+      kind: 'prefill',
+      route: `/finance?tab=doc_expenses&new=expense&template=${ctx.templateId}`,
+      message: 'Opening a new expense pre-filled from this template — pick the payee to continue.',
+    };
+  },
+  summary(payload) {
+    const out: string[] = [];
+    if (payload.default_amount != null) out.push(`${payload.default_amount} net`);
+    if (payload.default_vat_amount != null) out.push(`${payload.default_vat_amount} VAT`);
+    if (payload.currency) out.push(String(payload.currency));
+    return out.length ? out : ['No default amount'];
+  },
+};
+
+/** Turn an expense template payload into the props `NewExpenseDialog` already accepts. */
+export async function buildExpensePrefill(payload: ExpenseTemplatePayload): Promise<ExpensePrefill> {
+  // A category is a workspace-scoped row: a template copied between workspaces (or outliving the
+  // category) must not carry a dangling id into the form's Select.
+  const visible = await filterVisibleIds('finance_categories', [payload.category_id ?? null]);
+  const categoryId = typeof payload.category_id === 'string' && visible.has(payload.category_id)
+    ? payload.category_id
+    : undefined;
+  return {
+    amount: payload.default_amount != null ? num(payload.default_amount) : undefined,
+    vatAmount: payload.default_vat_amount != null ? num(payload.default_vat_amount) : undefined,
+    description: str(payload.notes) ?? undefined,
+    categoryId,
+  };
+}

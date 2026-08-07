@@ -2,7 +2,7 @@
 // Pass a `subject` (e.g. { customer_company_id } or { hr_employee_id } or { project_id }) when
 // mounting under a specific entity; omit it for a standalone workspace-wide list (finance).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, FileSignature, Plus, Link2, Ban, CheckCircle2, Send, Download } from 'lucide-react';
+import { Loader2, FileSignature, Plus, Link2, Ban, CheckCircle2, Send, Download, Layers } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -11,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { FilterBar, useFilters, type FilterGroupDef } from '@/components/core/filters';
+import { entityTemplatesService } from '@/services/entityTemplatesService';
+import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
+import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 import { contractsService, type Contract, type ContractContext, type ContractStatus } from '@/services/contractsService';
 
 const STATUS_TONE: Record<ContractStatus, string> = {
@@ -53,7 +56,14 @@ export const ContractsSection: React.FC<{
    * would gain nothing from a filter bar.
    */
   filterGroups?: (rows: Contract[]) => FilterGroupDef[];
-}> = ({ workspaceId, context, subject, heading = 'Contracts', defaultCounterparty, filterGroups: buildGroups }) => {
+  /**
+   * Open the create dialog pre-filled from this contract template (#322). Only the standalone
+   * Contracts page passes it — it comes from `/contracts?new=contract&template=<id>`, which is
+   * where the Template Library sends a contract template. A contract needs a subject
+   * (`contracts_subject_ck`), so a template fills this form rather than creating a row of its own.
+   */
+  openWithTemplateId?: string | null;
+}> = ({ workspaceId, context, subject, heading = 'Contracts', defaultCounterparty, filterGroups: buildGroups, openWithTemplateId }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,6 +183,41 @@ export const ContractsSection: React.FC<{
   };
 
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  /** Reuse boilerplate terms (#322). The picker fills THIS form rather than creating a contract of
+   *  its own, because the panel already knows the context and the subject it is mounted under. */
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [saveTemplateFor, setSaveTemplateFor] = useState<Contract | null>(null);
+
+  /** Apply a contract template's terms to this form. Shared by the picker and the deep-link. */
+  const applyTemplatePayload = useCallback((payload: unknown, ctxNow: ContractContext) => {
+    const p = (payload ?? {}) as { title?: string; contract_type?: string; body_markdown?: string; currency?: string };
+    if (p.title) setTitle(p.title);
+    if (p.contract_type && TYPE_OPTIONS[ctxNow].includes(p.contract_type)) setType(p.contract_type);
+    if (p.body_markdown) setBodyText(p.body_markdown);
+    if (p.currency) setCurrency(p.currency);
+  }, []);
+
+  /**
+   * Deep-link from the Template Library: `/contracts?new=contract&template=<id>` opens this form
+   * with the template's terms already in it. Consumed once — a failed load must still leave a
+   * usable blank form rather than nothing at all.
+   */
+  useEffect(() => {
+    if (!openWithTemplateId || !canCreate) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const tpl = await entityTemplatesService.get(openWithTemplateId);
+        if (!cancelled && tpl) applyTemplatePayload(tpl.payload, createContext);
+      } catch {
+        // fall through to a blank form
+      } finally {
+        if (!cancelled) openCreate();
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openWithTemplateId, canCreate]);
   const downloadPdf = async (c: Contract) => {
     setPdfBusy(c.id);
     try {
@@ -239,6 +284,9 @@ export const ContractsSection: React.FC<{
                     {pdfBusy === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Download className="h-3.5 w-3.5 mr-1" /> PDF</>}
                   </Button>
                 )}
+                {canCreate && (
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => setSaveTemplateFor(c)} title="Save these terms as a reusable template"><Layers className="h-3.5 w-3.5" /></Button>
+                )}
                 {c.status !== 'signed' && c.status !== 'void' && (
                   <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => voidContract(c)} title="Void"><Ban className="h-3.5 w-3.5" /></Button>
                 )}
@@ -252,6 +300,9 @@ export const ContractsSection: React.FC<{
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>New {createContext} contract</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            <Button variant="outline" className="w-full rounded-full" disabled={busy} onClick={() => setTemplatePickerOpen(true)}>
+              <Layers className="h-4 w-4 mr-2" /> Start from a template
+            </Button>
             {pickCategory && (
               <div className="space-y-1"><Label>Category</Label>
                 <Select value={createContext} onValueChange={(v) => changeCategory(v as ContractContext)}>
@@ -293,6 +344,24 @@ export const ContractsSection: React.FC<{
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Fills the form above — the counterparty and dates stay this contract's own. */}
+      <TemplatePickerDialog
+        entityType="contract"
+        open={templatePickerOpen}
+        onOpenChange={setTemplatePickerOpen}
+        onSelect={(tpl) => applyTemplatePayload(tpl.payload, createContext)}
+      />
+
+      {saveTemplateFor && (
+        <SaveAsTemplateDialog
+          entityType="contract"
+          sourceId={saveTemplateFor.id}
+          open
+          onOpenChange={(v) => { if (!v) setSaveTemplateFor(null); }}
+          defaultTitle={saveTemplateFor.title}
+        />
+      )}
     </div>
   );
 };

@@ -24,7 +24,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  LIVE_TEMPLATE_TYPES, PLANNED_TEMPLATE_TYPES, TEMPLATE_ENTITY_TYPES, TEMPLATE_SCHEMAS,
+  LIVE_TEMPLATE_TYPES, PLANNED_TEMPLATE_TYPES, SYNTHETIC_PAYLOAD_FIELDS, TEMPLATE_ENTITY_TYPES,
+  TEMPLATE_SCHEMAS,
 } from '@/services/templates/schema';
 import { FORBIDDEN_CAPTURE_FIELDS } from '@/services/templates/types';
 
@@ -101,6 +102,16 @@ describe('capture allowlists carry no identity, fiscal or derived-money field', 
           schema.captureFields.includes(f.key),
           `${type}: editable field "${f.key}" is not captured, so editing it would write a key the adapter never reads`,
         ).toBe(true);
+      }
+    });
+
+    it(`${type}: synthetic payload keys are distinct from captured columns and are not forbidden`, () => {
+      // A synthetic key is how an adapter stores a value under a name that is NOT a column — the
+      // expense adapter keeps a bill's amount as `default_amount` precisely so no payload key is
+      // ever called `subtotal_net`. That only works while the two namespaces stay disjoint.
+      for (const f of SYNTHETIC_PAYLOAD_FIELDS[type] ?? []) {
+        expect(schema.captureFields, `${type}: "${f.key}" is both synthetic and captured`).not.toContain(f.key);
+        expect(forbidden.has(f.key), `${type}: synthetic key "${f.key}" is on the forbidden list`).toBe(false);
       }
     });
   }

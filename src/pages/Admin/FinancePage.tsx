@@ -88,8 +88,9 @@ import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplie
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { entityTemplatesService } from '@/services/entityTemplatesService';
-import { buildInvoicePrefill, type InvoicePrefill } from '@/services/templates/registry';
+import { buildExpensePrefill, buildInvoicePrefill, type ExpensePrefill, type InvoicePrefill } from '@/services/templates/registry';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
+import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 
 const DOC_TABS: { value: string; type: any; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'doc_orders', type: 'orders', label: 'Orders', icon: ShoppingCart },
@@ -203,27 +204,36 @@ const FinancePage: React.FC = () => {
    */
   const [invoicePrefill, setInvoicePrefill] = useState<InvoicePrefill | null>(null);
   const [invoiceTemplatePickerOpen, setInvoiceTemplatePickerOpen] = useState(false);
+  const [expensePrefill, setExpensePrefill] = useState<ExpensePrefill | null>(null);
+  const [expenseTemplatePickerOpen, setExpenseTemplatePickerOpen] = useState(false);
+  const [saveExpenseTemplateFor, setSaveExpenseTemplateFor] = useState<{ id: string; name: string | null } | null>(null);
 
   // App Launcher deep-link: /finance?new=invoice opens the New Invoice modal.
   useEffect(() => {
     if (isAccountant) return; // read-only role cannot create
-    if (searchParams.get('new') !== 'invoice') return;
+    const what = searchParams.get('new');
+    if (what !== 'invoice' && what !== 'expense') return;
     const templateId = searchParams.get('template');
     const p = new URLSearchParams(searchParams);
     p.delete('new');
     p.delete('template');
     setSearchParams(p, { replace: true });
 
-    if (!templateId) { setInvoicePrefill(null); setNewInvoiceOpen(true); return; }
+    const openBlank = () => {
+      if (what === 'invoice') { setInvoicePrefill(null); setNewInvoiceOpen(true); }
+      else { setExpensePrefill(null); setNewExpenseOpen(true); }
+    };
+    if (!templateId) { openBlank(); return; }
     (async () => {
       try {
         const tpl = await entityTemplatesService.get(templateId);
-        setInvoicePrefill(tpl ? await buildInvoicePrefill(tpl.payload as never) : null);
+        if (what === 'invoice') setInvoicePrefill(tpl ? await buildInvoicePrefill(tpl.payload as never) : null);
+        else setExpensePrefill(tpl ? await buildExpensePrefill(tpl.payload as never) : null);
       } catch {
-        // A template that will not load must not block creating an invoice by hand.
-        setInvoicePrefill(null);
+        // A template that will not load must not block creating the document by hand.
+        if (what === 'invoice') setInvoicePrefill(null); else setExpensePrefill(null);
       } finally {
-        setNewInvoiceOpen(true);
+        if (what === 'invoice') setNewInvoiceOpen(true); else setNewExpenseOpen(true);
       }
     })();
   }, [searchParams, setSearchParams, isAccountant]);
@@ -1101,7 +1111,14 @@ const FinancePage: React.FC = () => {
                     </Button>
                   )}
                   {!isAccountant && <Button size="sm" variant="outline" onClick={() => { setScnBillId(undefined); setScnOpen(true); }}><FileMinus className="h-4 w-4 mr-1" /> Supplier credit note</Button>}
-                  {!isAccountant && <Button size="sm" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>}
+                  {!isAccountant && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => setExpenseTemplatePickerOpen(true)}>
+                        <Layers className="h-4 w-4 mr-1" /> From template
+                      </Button>
+                      <Button size="sm" onClick={() => setNewExpenseOpen(true)}><ArrowUpCircle className="h-4 w-4 mr-1" /> Add expense</Button>
+                    </>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -1200,6 +1217,11 @@ const FinancePage: React.FC = () => {
                                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditBillId(r.id)} title="Edit details — bill #, dates, category, notes">
                                   <Pencil className="h-3.5 w-3.5" />
                                   <span className="sr-only">Edit details</span>
+                                </Button>
+                                {/* Recurring bill you re-enter by hand? Keep its shape (#322). */}
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setSaveExpenseTemplateFor({ id: r.id, name: r.party_name ?? null })} title="Save as a reusable expense template">
+                                  <Layers className="h-3.5 w-3.5" />
+                                  <span className="sr-only">Save as template</span>
                                 </Button>
                               </span>
                             )}
@@ -1365,11 +1387,35 @@ const FinancePage: React.FC = () => {
         initialNotes={invoicePrefill?.notes}
         onCreated={(invoiceId) => { setNewInvoiceOpen(false); setInvoicePrefill(null); navigate(`${financeBase}/invoices/${invoiceId}`); }}
       />
+      {saveExpenseTemplateFor && (
+        <SaveAsTemplateDialog
+          entityType="expense"
+          sourceId={saveExpenseTemplateFor.id}
+          open
+          onOpenChange={(v) => { if (!v) setSaveExpenseTemplateFor(null); }}
+          defaultTitle={saveExpenseTemplateFor.name ?? undefined}
+        />
+      )}
+      <TemplatePickerDialog
+        entityType="expense"
+        open={expenseTemplatePickerOpen}
+        onOpenChange={setExpenseTemplatePickerOpen}
+        onSelect={async (tpl) => {
+          try {
+            setExpensePrefill(await buildExpensePrefill(tpl.payload as never));
+          } catch {
+            setExpensePrefill(null);
+          } finally {
+            setNewExpenseOpen(true);
+          }
+        }}
+      />
       <NewExpenseDialog
         workspaceId={workspaceId}
         open={newExpenseOpen}
-        onOpenChange={setNewExpenseOpen}
-        onCreated={async () => { setNewExpenseOpen(false); if (workspaceId) await loadAll(workspaceId); }}
+        onOpenChange={(v) => { setNewExpenseOpen(v); if (!v) setExpensePrefill(null); }}
+        prefill={expensePrefill ?? undefined}
+        onCreated={async () => { setNewExpenseOpen(false); setExpensePrefill(null); if (workspaceId) await loadAll(workspaceId); }}
       />
       <NewSupplierCreditNoteDialog
         workspaceId={workspaceId}

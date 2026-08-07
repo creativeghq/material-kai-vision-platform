@@ -16,8 +16,8 @@ import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import {
   entityTemplatesService, type EntityTemplate, type EntityTemplateVersion,
 } from '@/services/entityTemplatesService';
-import { getAdapter } from '@/services/templates/registry';
-import type { TemplateChildSpec } from '@/services/templates/types';
+import { getAdapter, isLiveTemplateType, SYNTHETIC_PAYLOAD_FIELDS } from '@/services/templates/registry';
+import type { TemplateChildSpec, TemplateEditableField } from '@/services/templates/types';
 
 /**
  * Template editor (issue #322).
@@ -75,6 +75,12 @@ export const TemplateEditorPage: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const childSpecs = useMemo<readonly TemplateChildSpec[]>(() => adapter?.captureChildren ?? [], [adapter]);
+
+  /** Column-backed defaults plus the adapter's synthetic keys (e.g. an expense's default amount). */
+  const editableFields = useMemo<readonly TemplateEditableField[]>(() => {
+    const synthetic = tpl && isLiveTemplateType(tpl.entity_type) ? SYNTHETIC_PAYLOAD_FIELDS[tpl.entity_type] ?? [] : [];
+    return [...(adapter?.editableFields ?? []), ...synthetic];
+  }, [adapter, tpl]);
 
   const setPayloadKey = (key: string, value: unknown) => setPayload((p) => ({ ...p, [key]: value }));
 
@@ -180,14 +186,14 @@ export const TemplateEditorPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {(adapter.editableFields?.length ?? 0) > 0 && (
+        {editableFields.length > 0 && (
           <Card className="dashboard-card">
             <CardHeader>
               <CardTitle className="text-base">Defaults</CardTitle>
               <CardDescription>Applied every time this template is used.</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {(adapter.editableFields ?? []).map((f) => {
+              {editableFields.map((f) => {
                 const value = payload[f.key];
                 if (f.kind === 'boolean') {
                   return (

@@ -1,7 +1,8 @@
 // Dedicated top-level Contracts page (#module: contracts). Contracts span HR, Finance and Projects,
 // so their home is here — not under Finance. Filter tabs switch context; the per-entity sections
 // (project detail, employee dialog, customer) remain as contextual sub-views that also feed this list.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { FileSignature } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -23,6 +24,22 @@ export default function ContractsPage() {
   const { activeWorkspaceId, loading } = useWorkspace();
   const [tab, setTab] = useState<TabValue>('all');
   const ws = activeWorkspaceId ?? '';
+
+  /**
+   * `/contracts?new=contract&template=<id>` — where the Template Library sends a contract
+   * template (#322). Consumed once into state so the create dialog does not reopen on every
+   * render, and the params are stripped so a refresh does not repeat it.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+  useEffect(() => {
+    if (searchParams.get('new') !== 'contract') return;
+    setPendingTemplateId(searchParams.get('template'));
+    const p = new URLSearchParams(searchParams);
+    p.delete('new');
+    p.delete('template');
+    setSearchParams(p, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   if (loading) return <div className="p-6"><Skeleton className="h-64 w-full" /></div>;
 
@@ -50,6 +67,9 @@ export default function ContractsPage() {
                 context={t.value}
                 heading={t.value === 'all' ? 'All contracts' : `${t.label} contracts`}
                 filterGroups={buildContractFilters}
+                // Only the visible tab gets it — otherwise all four mounted sections would each
+                // pop their own create dialog for the same template.
+                openWithTemplateId={t.value === tab ? pendingTemplateId : null}
               />
             </TabsContent>
           ))}

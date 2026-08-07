@@ -3,21 +3,31 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-import { invoiceAdapter, moodboardAdapter, projectAdapter, quoteAdapter } from './adapters';
+import {
+  contractAdapter, expenseAdapter, invoiceAdapter, moodboardAdapter, orderAdapter, projectAdapter, quoteAdapter,
+} from './adapters';
 import { LIVE_TEMPLATE_TYPES, type LiveTemplateEntityType } from './schema';
 import type { TemplateAdapter } from './types';
 
 export * from './types';
 export {
-  LIVE_TEMPLATE_TYPES, PLANNED_TEMPLATE_TYPES, TEMPLATE_ENTITY_TYPES, TEMPLATE_SCHEMAS,
-  type LiveTemplateEntityType, type TemplateSchema,
+  LIVE_TEMPLATE_TYPES, PLANNED_TEMPLATE_TYPES, SYNTHETIC_PAYLOAD_FIELDS, TEMPLATE_ENTITY_TYPES,
+  TEMPLATE_SCHEMAS, type LiveTemplateEntityType, type TemplateSchema,
 } from './schema';
 export {
+  buildExpensePrefill,
   buildInvoicePrefill,
+  buildOrderPrefill,
+  type ContractTemplatePayload,
+  type ExpensePrefill,
+  type ExpenseTemplatePayload,
   type InvoicePrefill,
   type InvoicePrefillLine,
   type InvoiceTemplatePayload,
   type MoodboardTemplatePayload,
+  type OrderPrefill,
+  type OrderPrefillLine,
+  type OrderTemplatePayload,
   type ProjectTemplatePayload,
   type QuoteTemplatePayload,
 } from './adapters';
@@ -39,6 +49,9 @@ export const TEMPLATE_ADAPTERS: Record<LiveTemplateEntityType, TemplateAdapter<n
   quote: quoteAdapter as unknown as TemplateAdapter<never>,
   project: projectAdapter as unknown as TemplateAdapter<never>,
   moodboard: moodboardAdapter as unknown as TemplateAdapter<never>,
+  order: orderAdapter as unknown as TemplateAdapter<never>,
+  contract: contractAdapter as unknown as TemplateAdapter<never>,
+  expense: expenseAdapter as unknown as TemplateAdapter<never>,
 };
 
 export const isLiveTemplateType = (t: string): t is LiveTemplateEntityType =>

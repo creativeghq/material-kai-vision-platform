@@ -21,16 +21,17 @@ export const TEMPLATE_ENTITY_TYPES = [
 ] as const satisfies readonly TemplateEntityType[];
 
 /** Types with a shipped adapter. */
-export const LIVE_TEMPLATE_TYPES = ['invoice', 'quote', 'project', 'moodboard'] as const;
+export const LIVE_TEMPLATE_TYPES = [
+  'invoice', 'quote', 'project', 'moodboard', 'order', 'contract', 'expense',
+] as const;
 export type LiveTemplateEntityType = (typeof LIVE_TEMPLATE_TYPES)[number];
 
 /**
- * Accepted by the DB, not yet offered in the UI: phase 2 of #322 is order / contract / expense,
- * phase 3 is hr_onboarding / crm_company / property_listing. Declaring the gap keeps the guard
- * test able to tell "not built yet" apart from "forgotten".
+ * Accepted by the DB, not yet offered in the UI. Declaring the gap keeps the guard test able to
+ * tell "not built yet" apart from "forgotten".
  */
 export const PLANNED_TEMPLATE_TYPES = [
-  'order', 'contract', 'expense', 'hr_onboarding', 'crm_company', 'property_listing',
+  'hr_onboarding', 'crm_company', 'property_listing',
 ] as const satisfies readonly TemplateEntityType[];
 
 export interface TemplateSchema {
@@ -163,4 +164,78 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
       { key: 'is_public', label: 'Public board', kind: 'boolean' },
     ],
   },
+
+  order: {
+    label: 'Order',
+    plural: 'Orders',
+    description: 'A standing basket — the lines you buy or sell together every time.',
+    sourceTable: 'orders',
+    capability: 'finance.manage',
+    moduleSlug: 'sales-finance',
+    captureFields: ['order_type', 'currency', 'notes', 'discount_type', 'discount_value'],
+    captureChildren: [{
+      table: 'order_items',
+      fk: 'order_id',
+      // No `unit_cost`: `ordersService.reorderPrefill` already argues that re-booking an old cost
+      // silently mis-states margin on the first line. A template is staler than a past order.
+      // No net_value / vat_amount / line_total either — computeOrderLines derives all three.
+      fields: [
+        'description', 'quantity', 'unit_price', 'measurement_unit_code', 'vat_percent',
+        'vat_category', 'discount_pct', 'sort_order', 'product_id', 'update_warehouse',
+      ],
+      orderBy: 'sort_order',
+      label: 'Line items',
+    }],
+    editableFields: [
+      { key: 'notes', label: 'Notes', kind: 'textarea' },
+      { key: 'currency', label: 'Currency', kind: 'text' },
+    ],
+  },
+
+  contract: {
+    label: 'Contract',
+    plural: 'Contracts',
+    description: 'Boilerplate terms you re-issue — NDA, service agreement, supplier framework.',
+    moduleSlug: 'contracts',
+    sourceTable: 'contracts',
+    // No counterparty, no dates, and deliberately no `value`: a contract's agreed sum belongs to
+    // one deal. A template that carries last year's number into a new agreement is worse than one
+    // that carries none.
+    captureFields: ['context', 'contract_type', 'title', 'body_markdown', 'currency'],
+    editableFields: [
+      { key: 'title', label: 'Default contract title', kind: 'text' },
+      { key: 'contract_type', label: 'Contract type', kind: 'text' },
+      { key: 'body_markdown', label: 'Terms (markdown)', kind: 'textarea' },
+    ],
+  },
+
+  expense: {
+    label: 'Expense',
+    plural: 'Expenses',
+    description: 'A payable you enter again and again — rent, retainers, subscriptions.',
+    sourceTable: 'supplier_bills',
+    capability: 'finance.manage',
+    moduleSlug: 'sales-finance',
+    // Amounts are captured by the adapter under `default_amount` / `default_vat_amount`, NOT under
+    // the column names: on a bill they are typed inputs rather than derivations, but a payload key
+    // called `subtotal_net` would be indistinguishable from the stored-total mistake the guard
+    // test exists to catch. `notes` is the description shown on the bill.
+    captureFields: ['currency', 'notes', 'category_id'],
+    editableFields: [
+      { key: 'notes', label: 'Description', kind: 'textarea' },
+      { key: 'currency', label: 'Currency', kind: 'text' },
+    ],
+  },
+};
+
+/**
+ * Payload keys an adapter writes itself rather than copying from a column. They are listed here so
+ * the guard test can tell a deliberate synthetic key from a typo, and so the editor knows they are
+ * editable even though no column is called that.
+ */
+export const SYNTHETIC_PAYLOAD_FIELDS: Partial<Record<LiveTemplateEntityType, readonly TemplateEditableField[]>> = {
+  expense: [
+    { key: 'default_amount', label: 'Amount (net)', kind: 'number' },
+    { key: 'default_vat_amount', label: 'VAT amount', kind: 'number', hint: 'The tax on the net above — not folded into it.' },
+  ],
 };
