@@ -99,6 +99,22 @@ export interface ProjectTask {
   created_at: string;
   updated_at: string;
   completed_at: string | null;
+  /** WS3 #285 scheduling. `due_date` is kept — it is the deadline, these are the planned span. */
+  start_date: string | null;
+  end_date: string | null;
+  progress_pct: number;
+  is_milestone: boolean;
+}
+
+/** A sequencing edge between two tasks of the same project. Cycles are rejected by the DB. */
+export interface ProjectTaskDependency {
+  id: string;
+  project_id: string;
+  predecessor_id: string;
+  successor_id: string;
+  /** Finish-to-start by default; the other three are accepted but not yet scheduled differently. */
+  dep_type: 'FS' | 'SS' | 'FF' | 'SF';
+  created_at: string;
 }
 
 export interface ProjectTaskWithSubtasks extends ProjectTask {
@@ -342,6 +358,10 @@ export interface CreateTaskInput {
   due_date?: string | null;
   visibility?: TaskVisibility;
   sort_order?: number;
+  start_date?: string | null;
+  end_date?: string | null;
+  progress_pct?: number;
+  is_milestone?: boolean;
 }
 
 export interface UpdateTaskInput {
@@ -353,6 +373,10 @@ export interface UpdateTaskInput {
   visibility?: TaskVisibility;
   room_id?: string | null;
   sort_order?: number;
+  start_date?: string | null;
+  end_date?: string | null;
+  progress_pct?: number;
+  is_milestone?: boolean;
 }
 
 // =====================================================
@@ -755,6 +779,47 @@ class ProjectsService {
       .single();
     if (error) throw error;
     return data as ProjectTask;
+  }
+
+  // ---------- TASK DEPENDENCIES (WS3 #285) ----------
+
+  async listTaskDependencies(projectId: string): Promise<ProjectTaskDependency[]> {
+    const { data, error } = await (supabase as any)
+      .from('project_task_dependencies')
+      .select('*')
+      .eq('project_id', projectId);
+    if (error) throw error;
+    return (data || []) as ProjectTaskDependency[];
+  }
+
+  /**
+   * Link two tasks. The DB rejects self-edges, cross-project edges and anything that would
+   * close a cycle — a cycle makes the schedule pass non-terminating, so it is refused at write
+   * time rather than defended against on every read.
+   */
+  async addTaskDependency(
+    projectId: string, predecessorId: string, successorId: string,
+    depType: ProjectTaskDependency['dep_type'] = 'FS',
+  ): Promise<ProjectTaskDependency> {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await (supabase as any)
+      .from('project_task_dependencies')
+      .insert({
+        project_id: projectId,
+        predecessor_id: predecessorId,
+        successor_id: successorId,
+        dep_type: depType,
+        created_by: user?.id ?? null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as ProjectTaskDependency;
+  }
+
+  async removeTaskDependency(id: string): Promise<void> {
+    const { error } = await (supabase as any).from('project_task_dependencies').delete().eq('id', id);
+    if (error) throw error;
   }
 
   async deleteTask(id: string): Promise<void> {

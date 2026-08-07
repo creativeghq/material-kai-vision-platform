@@ -48,7 +48,7 @@ import { RoomsTab } from '../components/tabs/RoomsTab';
 import { MoodboardsTab } from '../components/tabs/MoodboardsTab';
 import { QuotesTab } from '../components/tabs/QuotesTab';
 import { BillingTab } from '../components/tabs/BillingTab';
-import { TasksTab } from '../components/tabs/TasksTab';
+import { TasksAndScheduleTab } from '../components/tabs/TasksAndScheduleTab';
 import { TimelineTab } from '../components/tabs/TimelineTab';
 import { SheetsTab } from '../components/tabs/SheetsTab';
 import { ClientViewTab } from '../components/tabs/ClientViewTab';
@@ -307,7 +307,7 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="sheets"><SheetsTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           {isOwner && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isOwner} /></TabsContent>}
           {isOwner && <TabsContent value="contracts"><ModuleTabGate moduleSlug="contracts" moduleName="Contracts & e-Signature" blurb="Draft and e-sign contracts for this project."><ContractsSection workspaceId={project.workspace_id} context="project" subject={{ project_id: project.id }} heading="Project contracts" defaultCounterparty={{ name: project.client_contact?.name || project.client_company?.name, email: project.client_contact?.email }} /></ModuleTabGate></TabsContent>}
-          <TabsContent value="tasks"><TasksTab projectId={project.id} isOwner={isOwner} /></TabsContent>
+          <TabsContent value="tasks"><TasksAndScheduleTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
         </Tabs>
       </main>
