@@ -37,6 +37,7 @@ import { ProductFiscalCard } from '@/components/business/marketplace/ProductFisc
 import { ProductStockPanel } from '@/components/business/marketplace/ProductStockPanel';
 import { ProductCostCard } from '@/components/business/marketplace/ProductCostCard';
 import { ProductPackagingCard } from '@/components/business/marketplace/ProductPackagingCard';
+import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
 import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -2575,6 +2576,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
             );
           })()}
+
+          {/* 3D model management (#321) — own-workspace products only. Buyers of
+              someone else's catalog see the viewer, not the upload surface. */}
+          {isOwnProduct && activeWorkspaceId && (
+            <div className="mt-6">
+              <Product3DModelCard productId={product.id} workspaceId={activeWorkspaceId} />
+            </div>
+          )}
 
       </TabsContent>
 

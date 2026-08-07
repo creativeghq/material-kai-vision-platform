@@ -1,20 +1,21 @@
 /**
  * ARPreviewModal Component
- * Full-screen 3D material swatch viewer using React Three Fiber.
- * Shows a PBR-textured plane with orbit controls, environment lighting,
- * and a tiling scale slider. Works on all platforms as a baseline 3D preview.
+ * Full-screen 3D product viewer using React Three Fiber.
  *
- * Future enhancements:
- * - WebXR: integrate @react-three/xr for immersive-ar sessions
- * - iOS Quick Look: generate USDZ and use <a rel="ar"> for native AR
- * - model-viewer: load from CDN for cross-platform AR fallback
+ * Two rendering paths (#321 asset foundation):
+ * - A real glb/gltf model exists in `product_3d_models` → render it via
+ *   ProductModelStage. On iOS, a usdz row additionally lights up a native
+ *   AR Quick Look link (<a rel="ar">).
+ * - No model → the original PBR-textured swatch plane with the tiling slider.
+ *
+ * Still future: WebXR immersive-ar sessions (@react-three/xr v5 — R3F v8 line).
  */
 
-import React, { Suspense, useState, useMemo, useRef } from 'react';
+import React, { Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import { TextureLoader, RepeatWrapping } from 'three';
-import { X, Download, RotateCcw, Smartphone, ZoomIn } from 'lucide-react';
+import { X, Download, RotateCcw, Smartphone, ZoomIn, View } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/core/ui/button';
 import { Slider } from '@/components/core/ui/slider';
@@ -24,6 +25,8 @@ import {
   DialogTitle,
 } from '@/components/core/ui/dialog';
 import { useARSupport } from './useARSupport';
+import { ProductModelStage } from './ProductModelViewer';
+import { product3dService, modelPublicUrl, type Product3DModel } from '@/services/product3dService';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -222,13 +225,36 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
   const [tileScale, setTileScale] = useState(2);
   const linkRef = useRef<HTMLAnchorElement>(null);
 
+  // Real 3D models for this product, if any. null = still loading — the swatch
+  // renders immediately as the fast path and is swapped out when a model lands.
+  const [models, setModels] = useState<Product3DModel[] | null>(null);
+  useEffect(() => {
+    if (!isOpen || !productId) return;
+    let live = true;
+    product3dService
+      .listModels(productId)
+      .then((rows) => { if (live) setModels(rows.filter((m) => m.status === 'ready')); })
+      .catch(() => { if (live) setModels([]); });
+    return () => { live = false; };
+  }, [isOpen, productId]);
+
+  const glbModel = models?.find((m) => m.format === 'glb') ?? models?.find((m) => m.format === 'gltf');
+  const usdzModel = models?.find((m) => m.format === 'usdz');
+  const modelUrl = glbModel ? modelPublicUrl(glbModel) : null;
+  const usdzUrl = usdzModel ? modelPublicUrl(usdzModel) : null;
+
   // Determine the best albedo source: tileable PBR > raw product image
   const albedoUrl = pbrMaps?.tileable_url || productImage;
 
   const handleDownload = () => {
     if (!linkRef.current) return;
-    linkRef.current.href = albedoUrl;
-    linkRef.current.download = `${productName || 'material'}-texture.jpg`;
+    if (modelUrl && glbModel) {
+      linkRef.current.href = modelUrl;
+      linkRef.current.download = `${productName || 'product'}.${glbModel.format}`;
+    } else {
+      linkRef.current.href = albedoUrl;
+      linkRef.current.download = `${productName || 'material'}-texture.jpg`;
+    }
     linkRef.current.click();
   };
 
@@ -283,13 +309,17 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
                 gl={{ antialias: true, alpha: true }}
                 style={{ width: '100%', height: '100%' }}
               >
-                <Scene
-                  albedoUrl={albedoUrl}
-                  normalUrl={pbrMaps?.normal_url}
-                  roughnessUrl={pbrMaps?.roughness_url}
-                  metalnessUrl={pbrMaps?.metalness_url}
-                  tileScale={tileScale}
-                />
+                {modelUrl ? (
+                  <ProductModelStage url={modelUrl} />
+                ) : (
+                  <Scene
+                    albedoUrl={albedoUrl}
+                    normalUrl={pbrMaps?.normal_url}
+                    roughnessUrl={pbrMaps?.roughness_url}
+                    metalnessUrl={pbrMaps?.metalness_url}
+                    tileScale={tileScale}
+                  />
+                )}
               </Canvas>
             </Suspense>
           </ThreeErrorBoundary>
@@ -326,35 +356,53 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
             </div>
           )}
 
-          {/* iOS Quick Look hint */}
-          {mode === 'quicklook' && (
+          {/* iOS Quick Look. With a USDZ on file this is a native AR launch:
+              Safari opens Quick Look in place when the tapped <a rel="ar">'s
+              first child is an <img>. Without one, the old "coming soon" hint. */}
+          {mode === 'quicklook' && usdzUrl && (
+            /* eslint-disable-next-line jsx-a11y/anchor-is-valid */
+            <a
+              rel="ar"
+              href={usdzUrl}
+              className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-xs font-medium text-white shadow-lg"
+            >
+              <img src={productImage} alt="" className="hidden" />
+              <View className="h-4 w-4" />
+              View in your space
+            </a>
+          )}
+          {mode === 'quicklook' && !usdzUrl && (
             <div className="absolute left-4 top-4 max-w-xs rounded-lg bg-blue-600/80 px-3 py-2 text-xs text-white backdrop-blur-sm">
-              <Smartphone className="mb-1 inline h-3 w-3" /> AR Quick Look
-              support coming soon. Use 3D preview below for now.
+              <Smartphone className="mb-1 inline h-3 w-3" /> No AR model for this
+              product yet. Use the 3D preview below for now.
             </div>
           )}
         </div>
 
         {/* Bottom controls bar */}
         <div className="flex flex-col gap-3 border-t bg-background/80 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
-          {/* Tile scale slider */}
-          <div className="flex items-center gap-3">
-            <span id="ar-tile-scale-label" className="whitespace-nowrap text-xs text-muted-foreground">
-              Tile Scale
-            </span>
-            <Slider
-              aria-labelledby="ar-tile-scale-label"
-              value={[tileScale]}
-              onValueChange={([v]) => setTileScale(v)}
-              min={1}
-              max={8}
-              step={0.5}
-              className="w-32"
-            />
-            <span className="min-w-[2rem] text-xs text-muted-foreground">
-              {tileScale}x
-            </span>
-          </div>
+          {/* Tile scale slider — tiling only applies to the swatch plane */}
+          {modelUrl ? (
+            <span className="text-xs text-muted-foreground">3D model preview</span>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span id="ar-tile-scale-label" className="whitespace-nowrap text-xs text-muted-foreground">
+                Tile Scale
+              </span>
+              <Slider
+                aria-labelledby="ar-tile-scale-label"
+                value={[tileScale]}
+                onValueChange={([v]) => setTileScale(v)}
+                min={1}
+                max={8}
+                step={0.5}
+                className="w-32"
+              />
+              <span className="min-w-[2rem] text-xs text-muted-foreground">
+                {tileScale}x
+              </span>
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="flex items-center gap-2">
@@ -365,7 +413,7 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
               onClick={handleDownload}
             >
               <Download className="mr-1.5 h-4 w-4" />
-              Download texture
+              {modelUrl ? 'Download model' : 'Download texture'}
             </Button>
             <Button
               variant="default"

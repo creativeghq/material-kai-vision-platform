@@ -17991,6 +17991,75 @@ export type Database = {
           },
         ]
       }
+      product_3d_models: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          depth_m: number | null
+          file_size_bytes: number | null
+          format: string
+          height_m: number | null
+          id: string
+          product_id: string
+          source: string
+          status: string
+          storage_bucket: string
+          storage_path: string
+          updated_at: string
+          width_m: number | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          depth_m?: number | null
+          file_size_bytes?: number | null
+          format: string
+          height_m?: number | null
+          id?: string
+          product_id: string
+          source?: string
+          status?: string
+          storage_bucket?: string
+          storage_path: string
+          updated_at?: string
+          width_m?: number | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          depth_m?: number | null
+          file_size_bytes?: number | null
+          format?: string
+          height_m?: number | null
+          id?: string
+          product_id?: string
+          source?: string
+          status?: string
+          storage_bucket?: string
+          storage_path?: string
+          updated_at?: string
+          width_m?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_3d_models_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_3d_models_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_document_relationships: {
         Row: {
           created_at: string | null
@@ -33805,6 +33874,10 @@ export type Database = {
           url: string
           website_id: string
         }[]
+      }
+      material_quota_remaining: {
+        Args: { p_workspace_id: string }
+        Returns: number
       }
       materialize_upstream_orders: {
         Args: { p_quote_id: string }
