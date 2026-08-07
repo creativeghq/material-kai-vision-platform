@@ -131,7 +131,7 @@ function pushView(typedArray, target) {
 
 function pushAccessor(typedArray, type, componentType, target, withBounds) {
   const view = pushView(typedArray, target);
-  const comps = type === 'VEC3' ? 3 : 1;
+  const comps = type === 'VEC3' ? 3 : type === 'VEC2' ? 2 : 1;
   const acc = { bufferView: view, componentType, count: typedArray.length / comps, type };
   if (withBounds) {
     const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
@@ -157,6 +157,15 @@ for (const part of parts) {
   const posAcc = pushAccessor(new Float32Array(geo.attributes.position.array), 'VEC3', 5126, 34962, true);
   const nrmAcc = pushAccessor(new Float32Array(geo.attributes.normal.array), 'VEC3', 5126, 34962, false);
   const primitive = { attributes: { POSITION: posAcc, NORMAL: nrmAcc }, material: part.material, mode: 4 };
+  // TEXCOORD_0 is not optional for a product model. Without UVs no texture can
+  // ever bind — an albedo/normal/roughness map silently samples one texel and
+  // the surface renders as flat colour, which is exactly how the first realism
+  // pass "failed": the maps were never applied at all. It also blocks the #260
+  // material swap, whose whole job is putting a fabric map on a named part.
+  if (geo.attributes.uv) {
+    primitive.attributes.TEXCOORD_0 =
+      pushAccessor(new Float32Array(geo.attributes.uv.array), 'VEC2', 5126, 34962, false);
+  }
   if (geo.index) {
     primitive.indices = pushAccessor(new Uint16Array(geo.index.array), 'SCALAR', 5123, 34963, false);
   }

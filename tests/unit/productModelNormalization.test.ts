@@ -50,6 +50,19 @@ describe('product 3D model normalization', () => {
     expect(meshes.length).toBeGreaterThan(0);
   });
 
+  it('carries UVs on every mesh, without which no texture can ever bind', () => {
+    // A model with no TEXCOORD_0 still loads, still renders, and still passes
+    // every other assertion here — it just silently ignores any albedo/normal/
+    // roughness map, sampling a single texel and showing flat colour. That is
+    // indistinguishable from "the texture looks wrong" until you check, and it
+    // makes the #260 material swap a no-op. The fixture shipped without UVs.
+    const missing: string[] = [];
+    scene.traverse((o: any) => {
+      if (o.isMesh && !o.geometry.attributes.uv) missing.push(o.name);
+    });
+    expect(missing).toEqual([]);
+  });
+
   it('keeps named sub-meshes intact for per-part material swaps (#260)', () => {
     const meshes: string[] = [];
     scene.traverse((o: any) => { if (o.isMesh) meshes.push(o.name); });
