@@ -12,10 +12,34 @@
  */
 import React, { useMemo } from 'react';
 import { useGLTF, OrbitControls, Environment } from '@react-three/drei';
-import { Box3, Vector3 } from 'three';
+import { Box3, Vector3, type Object3D } from 'three';
 
 /** Scene units the model's largest dimension is normalized to. */
-const TARGET_SIZE = 2.5;
+export const TARGET_SIZE = 2.5;
+
+/**
+ * Turntable placement for an arbitrary model: uniform scale so its largest
+ * dimension is TARGET_SIZE, and an offset that centers it on x/z and rests its
+ * bounding-box bottom on y=0. Exported as a pure function so the guard test can
+ * exercise this exact code against a real GLB rather than a copy of the math.
+ */
+export function normalizeModelTransform(object: Object3D): { scale: number; offset: Vector3 } {
+  const box = new Box3().setFromObject(object);
+  // An empty box (a GLB that parses but holds no renderable mesh — lights and
+  // empty nodes only, a real exporter artifact) has min = +Infinity. getSize()
+  // and getCenter() special-case that, but reading box.min directly does not,
+  // and -Infinity in the offset poisons the whole scene graph's matrices.
+  if (box.isEmpty()) return { scale: 1, offset: new Vector3(0, 0, 0) };
+
+  const size = box.getSize(new Vector3());
+  const center = box.getCenter(new Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  const scale = TARGET_SIZE / maxDim;
+  return {
+    scale,
+    offset: new Vector3(-center.x * scale, -box.min.y * scale, -center.z * scale),
+  };
+}
 
 interface ProductModelProps {
   url: string;
@@ -23,20 +47,7 @@ interface ProductModelProps {
 
 const ProductModel: React.FC<ProductModelProps> = ({ url }) => {
   const gltf = useGLTF(url);
-
-  const { scale, offset } = useMemo(() => {
-    const box = new Box3().setFromObject(gltf.scene);
-    const size = box.getSize(new Vector3());
-    const center = box.getCenter(new Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    const s = TARGET_SIZE / maxDim;
-    // Center horizontally, rest the bounding box's bottom on y=0 so the model
-    // sits "on the floor" instead of floating around its own origin.
-    return {
-      scale: s,
-      offset: new Vector3(-center.x * s, -box.min.y * s, -center.z * s),
-    };
-  }, [gltf.scene]);
+  const { scale, offset } = useMemo(() => normalizeModelTransform(gltf.scene), [gltf.scene]);
 
   return (
     <group position={offset} scale={scale}>
