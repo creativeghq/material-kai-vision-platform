@@ -118,6 +118,22 @@ export interface ListingPerformance {
 }
 export interface ListingViewPoint { property_id: string; day: string; views: number }
 
+/** What the instructing vendor is told about their own property. Same payload the weekly email
+ *  renders, so the preview and the send cannot disagree. */
+export interface VendorReport {
+  property: { id: string; title: string | null; town: string | null; price: number | null; currency: string; public_token: string | null };
+  vendor: { id: string; name: string | null; email: string | null } | null;
+  performance: ListingPerformance | null;
+  feedback: { at: string; feedback: string }[];
+  market: {
+    comps_count: number; median_per_sqm: number | null; avg_days_on_market: number | null;
+    suggestion: { estimate: number; low: number; high: number } | null;
+  };
+  recommendation: string | null;
+  period_since: string | null;
+  generated_at: string;
+}
+
 /** Listing paperwork. `url` is a short-lived signed URL minted on read — never persist it. */
 export interface PropertyDocument {
   id: string; property_id: string; storage_bucket: string; storage_path: string;
@@ -380,6 +396,12 @@ export const realEstateService = {
     if (error) throw error;
     return this.addPhoto(ws, propertyId, path, kind);
   },
+
+  /** The vendor report the seller receives — preview it before sending. */
+  vendorReport: (ws: string, propertyId: string) =>
+    call<VendorReport>(ws, 'vendor-report', { property_id: propertyId }),
+  sendVendorReport: (ws: string, propertyId: string) =>
+    call<{ ok: true; to: string }>(ws, 'send-vendor-report', { property_id: propertyId }),
 
   /** Listing performance. Omit `propertyId` for the whole (agent-scoped) book. */
   listingPerformance: (ws: string, propertyId?: string) =>

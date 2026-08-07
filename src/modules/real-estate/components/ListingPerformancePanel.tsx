@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Mail, Loader2 } from 'lucide-react';
+import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { realEstateService, type ListingPerformance, type ListingViewPoint } from '../services/realEstateService';
+import { useToast } from '@/hooks/use-toast';
+import { realEstateService, type ListingPerformance, type ListingViewPoint, type VendorReport } from '../services/realEstateService';
 
 /**
  * Listing performance (#281 gap 8). Everything here is READ from
@@ -68,9 +71,12 @@ const Sparkline: React.FC<{ points: { day: string; views: number }[] }> = ({ poi
   );
 };
 
-export const ListingPerformancePanel: React.FC<{ ws: string | null; propertyId: string }> = ({ ws, propertyId }) => {
+export const ListingPerformancePanel: React.FC<{ ws: string | null; propertyId: string; canManage?: boolean }> = ({ ws, propertyId, canManage }) => {
+  const { toast } = useToast();
   const [perf, setPerf] = useState<ListingPerformance | null | undefined>(undefined);
   const [series, setSeries] = useState<ListingViewPoint[]>([]);
+  const [vendor, setVendor] = useState<VendorReport | null>(null);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,9 +87,23 @@ export const ListingPerformancePanel: React.FC<{ ws: string | null; propertyId: 
         if (cancelled) return;
         setPerf(r.performance[0] ?? null); setSeries(r.series);
       } catch { if (!cancelled) setPerf(null); }
+      // The vendor report is a separate, heavier read (comps) — it must not delay the tab, and its
+      // failure must not blank the metrics above it.
+      try {
+        const v = await realEstateService.vendorReport(ws, propertyId);
+        if (!cancelled) setVendor(v);
+      } catch { /* preview simply stays hidden */ }
     })();
     return () => { cancelled = true; };
   }, [ws, propertyId]);
+
+  const sendReport = async () => {
+    if (!ws) return;
+    setSending(true);
+    try { const r = await realEstateService.sendVendorReport(ws, propertyId); toast({ title: 'Vendor report sent', description: r.to }); }
+    catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setSending(false); }
+  };
 
   // Fill the gaps: a day with no traffic has no row, and skipping it would compress the x-axis and
   // draw a flat line through a quiet week as if it were busy.
@@ -141,6 +161,47 @@ export const ListingPerformancePanel: React.FC<{ ws: string | null; propertyId: 
           </div>
         )}
       </CardContent></Card>
+
+      {/* The vendor report — what the seller is told, and the button that tells them. Shown as a
+          preview first: an agent should never send a client a number they haven't seen. */}
+      {vendor && (
+        <Card><CardContent className="p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-sm font-semibold">Vendor report</div>
+              <div className="text-xs text-muted-foreground">
+                {vendor.vendor?.email
+                  ? <>Goes to {vendor.vendor.name || vendor.vendor.email} · sent automatically every Monday</>
+                  : <>No vendor contact with an email on this listing — set one to enable the weekly report.</>}
+              </div>
+            </div>
+            {canManage && vendor.vendor?.email && (
+              <Button size="sm" variant="outline" className="rounded-full" disabled={sending} onClick={sendReport}>
+                {sending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Mail className="mr-1 h-4 w-4" />} Send now
+              </Button>
+            )}
+          </div>
+          {vendor.recommendation && (
+            <p className="mt-3 rounded-lg border bg-muted/40 p-3 text-sm">{vendor.recommendation}</p>
+          )}
+          {vendor.market.suggestion && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Based on {vendor.market.comps_count} comparable local propert{vendor.market.comps_count === 1 ? 'y' : 'ies'}
+              {vendor.market.avg_days_on_market != null ? `, which took an average of ${vendor.market.avg_days_on_market} days to sell` : ''}.
+            </p>
+          )}
+          {vendor.feedback.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Viewer feedback included</div>
+              <div className="space-y-1">
+                {vendor.feedback.slice(0, 3).map((f, i) => (
+                  <div key={i} className="text-sm text-muted-foreground">“{f.feedback.slice(0, 160)}”</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent></Card>
+      )}
     </div>
   );
 };

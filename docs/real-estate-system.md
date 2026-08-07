@@ -139,11 +139,22 @@ Before this existed the enforcement was live and the capture was not, so every l
 |---|---|---|
 | `real-estate-rent-invoicing-daily` | 06:00 | Drafts Finance invoices for rent charges due within 7 days (500/run, drafts only). |
 | `real-estate-buyer-digests-daily` | 08:00 | Emails saved-search digests to buyers with new matches. |
+| `real-estate-vendor-reports-weekly` | Mon 07:00 | Emails each instructing vendor a performance report on their own listing. |
 | `public-realestate-submissions-prune` | 03:15 | Prunes the hashed-IP throttle counters. |
 
 Both edge crons use the shared `isCronAuthorized` gate (`x-cron-secret` **or** service-role bearer) and fail closed.
 
-## 9. Integrity checks
+## 9. Listing performance and the vendor report
+
+`get_property_performance(uuid[])` is the SINGLE derivation for how a listing is doing — days-on-market included. `property_daily_stats` is the time series behind it (one row per listing per day, written only by `increment_property_view_count`, so traffic cannot be forged from a client). The workbench **Performance** tab reads both.
+
+**`days_on_market` is derived, never stored.** The column of that name was dropped: nothing had ever written it, `toPublic()` shipped it to the public page and every portal feed as a permanent null, and the CMA had routed around it with its own inline `sold_at − created_at` that measured from creation rather than publication. Read the derivation.
+
+The **vendor report** is what the instructing seller is told: traffic, viewings and their feedback, and a comps-based price recommendation. `buildVendorReport` / `sendVendorReport` are shared by the in-app preview, the manual "Send now" and the weekly cron, so the seller and the agent can never be looking at different numbers. Comps come from `buildCompsReport`, the same engine behind the CMA — deliberately, so the two documents cannot quote different valuations.
+
+It is a **service communication** under the agency agreement, not marketing: gated per listing on `properties.vendor_reports_enabled`, not on `crm_contacts.marketing_consent` (which would be the wrong legal basis). `last_vendor_report_at` is stamped only on a successful send, so a failed week retries rather than being skipped.
+
+## 10. Integrity checks
 
 | Key | Watches |
 |---|---|

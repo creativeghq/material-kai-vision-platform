@@ -3,6 +3,8 @@
 // (token page). Keeping the publish gate and the public projection here makes them the SINGLE source
 // for compliance + field visibility across every surface (a security control, not cosmetics).
 
+import { escapeHtml } from './html.ts';
+
 const GR = new Set(['EL', 'GR', 'GRC']); // ΑΑΔΕ uses 'EL'; ISO alpha-2 'GR'
 
 /**
@@ -65,6 +67,182 @@ export async function withRentSettlements(supabase: any, charges: any[]): Promis
   }
   const byId = new Map((data ?? []).map((r: any) => [r.charge_id, r]));
   return charges.map((c) => ({ ...c, ...(byId.get(c.id) ?? {}) }));
+}
+
+/**
+ * Comps + stats + suggested asking price from the agency's OWN stock. SINGLE source for the CMA
+ * report and the vendor report — the vendor report's "what your property is worth now" line has to
+ * be the same number the CMA would print, or the agent and the seller are reading two valuations.
+ *
+ * Days-on-market comes from `get_property_performance`, never re-derived here.
+ */
+export async function buildCompsReport(supabase: any, args: {
+  workspaceId: string; propertyType: string; town: string; area: number;
+  excludePropertyId?: string; bandPct?: number;
+}): Promise<{ comps: any[]; stats: any; suggestion: { estimate: number; low: number; high: number } | null }> {
+  let cq = supabase.from('properties')
+    .select('id, title, town, price, area_built, plot_area, listing_status, sold_price, sold_at, created_at, currency, bedrooms')
+    .eq('workspace_id', args.workspaceId).eq('property_type', args.propertyType)
+    .in('listing_status', ['active', 'under_offer', 'sold']).not('price', 'is', null);
+  if (args.town) cq = cq.ilike('town', args.town);
+  if (args.excludePropertyId) cq = cq.neq('id', args.excludePropertyId);
+  const { data: raw } = await cq.limit(60);
+
+  const { data: perfRows } = await supabase.rpc('get_property_performance', { p_property_ids: (raw ?? []).map((c: any) => c.id) });
+  const domById = new Map((perfRows ?? []).map((r: any) => [r.property_id, r.days_on_market]));
+
+  const comps = (raw ?? []).map((c: any) => {
+    const a = Number(c.area_built ?? c.plot_area ?? 0);
+    // A sold comp is worth what it SOLD for, not what it was asking — using the asking price would
+    // bias every valuation upward by the market's typical discount.
+    const effPrice = c.listing_status === 'sold' && c.sold_price != null ? Number(c.sold_price) : Number(c.price);
+    const pps = a > 0 ? effPrice / a : null;
+    return {
+      id: c.id, title: c.title, town: c.town, price: effPrice, area: a || null, bedrooms: c.bedrooms ?? null,
+      price_per_sqm: pps ? Math.round(pps) : null, listing_status: c.listing_status,
+      days_on_market: domById.get(c.id) ?? null, currency: c.currency ?? 'EUR',
+    };
+  }).filter((c: any) => c.price_per_sqm != null).sort((a: any, b: any) => a.price_per_sqm - b.price_per_sqm);
+
+  const pps = comps.map((c: any) => c.price_per_sqm as number);
+  const median = pps.length ? pps[Math.floor(pps.length / 2)] : null;
+  const domVals = comps.map((c: any) => c.days_on_market).filter((d: any): d is number => d != null);
+  const stats = {
+    count: comps.length,
+    sold_count: comps.filter((c: any) => c.listing_status === 'sold').length,
+    min_per_sqm: pps[0] ?? null,
+    median_per_sqm: median,
+    max_per_sqm: pps[pps.length - 1] ?? null,
+    avg_days_on_market: domVals.length ? Math.round(domVals.reduce((a: number, b: number) => a + b, 0) / domVals.length) : null,
+  };
+  return { comps, stats, suggestion: estimateFromMedianPerSqm(median, args.area, args.bandPct ?? 0.1) };
+}
+
+/**
+ * The vendor report payload: how the vendor's own property is performing, the feedback from the
+ * people who viewed it, and what the comps say it should be asking now.
+ *
+ * SINGLE builder for the in-app preview, the manual send and the weekly cron — a seller who reads
+ * the emailed number and then hears a different one from their agent stops trusting both.
+ */
+export async function buildVendorReport(supabase: any, property: any): Promise<any> {
+  const [{ data: perfRows }, { data: viewings }, { data: vendor }] = await Promise.all([
+    supabase.rpc('get_property_performance', { p_property_ids: [property.id] }),
+    supabase.from('property_viewings')
+      .select('scheduled_at, status, feedback')
+      .eq('property_id', property.id).eq('status', 'completed').not('feedback', 'is', null)
+      .order('scheduled_at', { ascending: false }).limit(6),
+    property.vendor_contact_id
+      ? supabase.from('crm_contacts').select('id, name, email').eq('id', property.vendor_contact_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const perf = (perfRows ?? [])[0] ?? null;
+
+  const area = Number(property.area_built ?? property.plot_area ?? 0);
+  const { stats, suggestion } = await buildCompsReport(supabase, {
+    workspaceId: property.workspace_id, propertyType: property.property_type,
+    town: property.town ?? '', area, excludePropertyId: property.id, bandPct: 0.1,
+  });
+
+  // The one judgement the report makes. Deliberately conservative and only offered when there is
+  // both enough evidence and a real gap — an agent nudging every vendor to cut on two comps is how
+  // this feature loses its credibility.
+  let recommendation: string | null = null;
+  if (suggestion && property.price != null && stats.count >= 3) {
+    const gap = (Number(property.price) - suggestion.estimate) / suggestion.estimate;
+    if (gap > 0.1) recommendation = 'The asking price is above what comparable local sales support. A reduction toward the range below would widen the buyer pool.';
+    else if (gap < -0.1) recommendation = 'The asking price sits below comparable local sales — there may be room to hold firm on offers.';
+    else recommendation = 'The asking price is in line with comparable local sales.';
+  }
+
+  return {
+    property: {
+      id: property.id, title: property.title, town: property.town,
+      price: property.price, currency: property.currency ?? 'EUR',
+      public_token: property.public_listing_token ?? null,
+    },
+    vendor: vendor ? { id: vendor.id, name: vendor.name, email: vendor.email } : null,
+    performance: perf,
+    feedback: (viewings ?? []).map((v: any) => ({ at: v.scheduled_at, feedback: v.feedback })),
+    market: { comps_count: stats.count, median_per_sqm: stats.median_per_sqm, avg_days_on_market: stats.avg_days_on_market, suggestion },
+    recommendation,
+    period_since: property.last_vendor_report_at ?? null,
+    generated_at: new Date().toISOString(),
+  };
+}
+
+/**
+ * Build + email the vendor report, and stamp the listing. Shared by the manual "Send now" action and
+ * the weekly cron so there is one email body and one stamping rule.
+ *
+ * Returns a reason rather than throwing when there is simply nobody to send to — the cron sweeps
+ * hundreds of listings and a missing vendor email is an ordinary state, not an error.
+ */
+export async function sendVendorReport(supabase: any, property: any): Promise<{ ok: boolean; reason?: string; to?: string }> {
+  const report = await buildVendorReport(supabase, property);
+  const to = report.vendor?.email as string | undefined;
+  if (!to) return { ok: false, reason: 'This listing has no vendor contact with an email address.' };
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const appUrl = Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
+  const p = report.performance ?? {};
+  const money = (n: number | null | undefined, ccy: string) =>
+    n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(Number(n));
+
+  const stat = (label: string, value: string) =>
+    `<td style="padding:10px 12px;border:1px solid #eee;border-radius:10px">
+       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#888">${escapeHtml(label)}</div>
+       <div style="font-size:20px;font-weight:600">${escapeHtml(value)}</div>
+     </td>`;
+
+  const feedbackHtml = report.feedback.length
+    ? `<h3 style="margin:22px 0 6px;font-size:15px">What viewers said</h3>` +
+      report.feedback.map((f: any) =>
+        `<div style="padding:8px 0;border-bottom:1px solid #eee">
+           <div style="font-size:14px">“${escapeHtml(String(f.feedback).slice(0, 400))}”</div>
+           <div style="font-size:12px;color:#999">${new Date(f.at).toLocaleDateString('en-GB')}</div>
+         </div>`).join('')
+    : '';
+
+  const marketHtml = report.market.suggestion
+    ? `<h3 style="margin:22px 0 6px;font-size:15px">The local market</h3>
+       <p style="font-size:14px;margin:0 0 6px">Based on ${report.market.comps_count} comparable local propert${report.market.comps_count === 1 ? 'y' : 'ies'}, we would expect
+       <strong>${escapeHtml(money(report.market.suggestion.low, report.property.currency))} – ${escapeHtml(money(report.market.suggestion.high, report.property.currency))}</strong>.
+       ${report.market.avg_days_on_market != null ? `They took an average of ${report.market.avg_days_on_market} days to sell.` : ''}</p>
+       ${report.recommendation ? `<p style="font-size:14px;margin:0">${escapeHtml(report.recommendation)}</p>` : ''}`
+    : '';
+
+  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;color:#222">
+    <h2 style="margin:0 0 2px">Your property update</h2>
+    <p style="color:#666;font-size:14px;margin:0 0 16px">${escapeHtml(report.property.title || 'Your property')}${report.property.town ? ` — ${escapeHtml(report.property.town)}` : ''} · asking ${escapeHtml(money(report.property.price, report.property.currency))}</p>
+    <table style="width:100%;border-collapse:separate;border-spacing:6px 0"><tr>
+      ${stat('Views (30d)', String(p.views_30d ?? 0))}
+      ${stat('Enquiries', String(p.inquiries_total ?? 0))}
+      ${stat('Viewings', String(p.viewings_total ?? 0))}
+      ${stat('Days listed', p.days_on_market != null ? String(p.days_on_market) : '—')}
+    </tr></table>
+    ${feedbackHtml}
+    ${marketHtml}
+    ${report.property.public_token ? `<p style="margin:20px 0"><a href="${appUrl}/p/${encodeURIComponent(report.property.public_token)}" style="background:#b0106a;color:#fff;text-decoration:none;padding:10px 18px;border-radius:999px;font-size:14px">View your listing</a></p>` : ''}
+    <p style="color:#999;font-size:12px;margin-top:22px">You're receiving this because we're marketing this property for you. Reply to this email to speak to your agent.</p>
+  </div>`;
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/email-api`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+    body: JSON.stringify({
+      action: 'send', to, subject: `Your property update — ${report.property.title || report.property.town || 'this week'}`,
+      html, emailType: 'transactional',
+      tags: { feature: 'vendor_report', property_id: report.property.id },
+      workspace_id: property.workspace_id,
+    }),
+  });
+  if (!res.ok) return { ok: false, reason: `email send failed (${res.status})` };
+
+  // Stamp only after a successful send, so a failed week retries rather than being skipped.
+  await supabase.from('properties').update({ last_vendor_report_at: new Date().toISOString() }).eq('id', property.id);
+  return { ok: true, to };
 }
 
 export async function createRentInvoiceForCharge(supabase: any, args: {

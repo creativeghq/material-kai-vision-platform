@@ -9715,6 +9715,22 @@
     "response": "{ success, buyers_considered, emails_sent, listings_matched }"
   },
   {
+    "name": "real-estate-vendor-reports",
+    "tag": "Real Estate",
+    "summary": "Weekly cron — emails the instructing vendor a performance report on their own listing",
+    "description": "For every `active` listing with `vendor_reports_enabled` and a vendor contact carrying an email, builds the vendor report (views/enquiries/viewings and days-on-market from `get_property_performance`, recent completed-viewing feedback, and a comps-based price recommendation from the agency's own stock) and emails it. A service communication under the agency agreement rather than marketing, so it is gated per listing on `vendor_reports_enabled` — not on `crm_contacts.marketing_consent`. Stamps `last_vendor_report_at` only on a successful send, so a failed week retries instead of being skipped, and re-sends no sooner than 6 days. Runs weekly (Mondays 07:00 UTC) via pg_cron; auth is the shared cron gate (`x-cron-secret` **or** service-role bearer).",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": "api/real-estate-api.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{ ok, candidates, sent, skipped, failed }"
+  },
+  {
     "name": "real-estate-rent-invoicing",
     "tag": "Real Estate",
     "summary": "Daily cron — drafts Finance invoices for rent charges coming due",

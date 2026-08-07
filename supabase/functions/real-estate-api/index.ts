@@ -18,7 +18,10 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
-import { checkPublishRequirements, matchesCriteria, createRentInvoiceForCharge, estimateFromMedianPerSqm, withRentSettlements } from '../_shared/real-estate.ts';
+import {
+  checkPublishRequirements, matchesCriteria, createRentInvoiceForCharge, estimateFromMedianPerSqm,
+  withRentSettlements, buildCompsReport, buildVendorReport, sendVendorReport,
+} from '../_shared/real-estate.ts';
 import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
 import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
 import { refreshListingEmbedding } from '../_shared/real-estate-embedding.ts';
@@ -1511,40 +1514,36 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           area = Number(subject.area_built ?? subject.plot_area ?? 0);
         }
         if (!propertyType) return json({ error: 'property_type or property_id is required' }, 400);
-        let cq = supabase.from('properties')
-          .select('id, title, town, price, area_built, plot_area, listing_status, sold_price, sold_at, created_at, currency, bedrooms')
-          .eq('workspace_id', workspaceId).eq('property_type', propertyType)
-          .in('listing_status', ['active', 'under_offer', 'sold']).not('price', 'is', null);
-        if (town) cq = cq.ilike('town', town);
-        if (propertyId) cq = cq.neq('id', propertyId);
-        const { data: raw } = await cq.limit(60);
-        // Days-on-market comes from the shared derivation, not a second inline copy. This used to
-        // compute `sold_at − created_at` here, which both disagreed with the (never-written) column
-        // it was routing around and measured from creation rather than from publication.
-        const { data: perfRows } = await supabase.rpc('get_property_performance', { p_property_ids: (raw ?? []).map((c: any) => c.id) });
-        const domById = new Map((perfRows ?? []).map((r: any) => [r.property_id, r.days_on_market]));
-        const comps = (raw ?? []).map((c: any) => {
-          const a = Number(c.area_built ?? c.plot_area ?? 0);
-          const effPrice = c.listing_status === 'sold' && c.sold_price != null ? Number(c.sold_price) : Number(c.price);
-          const pps = a > 0 ? effPrice / a : null;
-          return { id: c.id, title: c.title, town: c.town, price: effPrice, area: a || null, bedrooms: c.bedrooms ?? null, price_per_sqm: pps ? Math.round(pps) : null, listing_status: c.listing_status, days_on_market: domById.get(c.id) ?? null, currency: c.currency ?? 'EUR' };
-        }).filter((c: any) => c.price_per_sqm != null).sort((a: any, b: any) => a.price_per_sqm - b.price_per_sqm);
-        const pps = comps.map((c: any) => c.price_per_sqm as number);
-        const median = pps.length ? pps[Math.floor(pps.length / 2)] : null;
-        const domVals = comps.map((c: any) => c.days_on_market).filter((d: any): d is number => d != null);
-        const stats = {
-          count: comps.length,
-          sold_count: comps.filter((c: any) => c.listing_status === 'sold').length,
-          min_per_sqm: pps[0] ?? null,
-          median_per_sqm: median,
-          max_per_sqm: pps[pps.length - 1] ?? null,
-          avg_days_on_market: domVals.length ? Math.round(domVals.reduce((a: number, b: number) => a + b, 0) / domVals.length) : null,
-        };
-        const suggestion = estimateFromMedianPerSqm(median, area, 0.1);
+        // Comps engine is shared with the vendor report — the seller must not be quoted a different
+        // number by the two documents.
+        const { comps, stats, suggestion } = await buildCompsReport(supabase, {
+          workspaceId, propertyType, town, area, excludePropertyId: propertyId || undefined, bandPct: 0.1,
+        });
         return json({
           subject: { property_id: propertyId || null, title: subject?.title ?? null, property_type: propertyType, town, area: area || null, price: subject?.price ?? null, currency: subject?.currency ?? 'EUR' },
           comps, stats, suggestion, generated_at: new Date().toISOString(),
         });
+      }
+
+      // ── Vendor (seller) report ─────────────────────────────────────────
+      // What the instructing vendor is told about their own property: traffic, viewings and the
+      // feedback from them, and what the comps say the asking price should be now. Same builder the
+      // weekly cron uses, so the in-app preview and the email can never disagree.
+      case 'vendor-report': {
+        const propertyId = String(body.property_id ?? '');
+        if (!propertyId) return json({ error: 'property_id is required' }, 400);
+        const property = await loadProperty(propertyId); // view-scoped 404
+        return json(await buildVendorReport(supabase, property));
+      }
+
+      case 'send-vendor-report': {
+        requireManage();
+        const propertyId = String(body.property_id ?? '');
+        if (!propertyId) return json({ error: 'property_id is required' }, 400);
+        const property = await loadEditable(propertyId);
+        const sent = await sendVendorReport(supabase, property);
+        if (!sent.ok) return json({ error: sent.reason }, 400);
+        return json({ ok: true, to: sent.to });
       }
 
       // ── Deal pipeline — stage board + per-deal tasks ────────────────

@@ -115,6 +115,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'quotes-api', label: 'quotes-api', sublabel: 'REST API for quote requests and proposals (customer-facing)' },
   { id: 'real-estate-api', label: 'real-estate-api', sublabel: 'Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals' },
   { id: 'real-estate-buyer-digests', label: 'real-estate-buyer-digests', sublabel: 'Daily cron — emails saved-search digests to buyers with a matching new listing' },
+  { id: 'real-estate-vendor-reports', label: 'real-estate-vendor-reports', sublabel: 'Weekly cron — emails the instructing vendor a performance report on their own listing' },
   { id: 'real-estate-feed', label: 'real-estate-feed', sublabel: 'Tokenized XML syndication feed (Kyero / OpenImmo / generic) for property portals' },
   { id: 'real-estate-public', label: 'real-estate-public', sublabel: 'Anonymous, token-gated public listing pages, buyer portal, discovery and lead capture' },
   { id: 'real-estate-rent-invoicing', label: 'real-estate-rent-invoicing', sublabel: 'Daily cron — drafts Finance invoices for rent charges coming due' },

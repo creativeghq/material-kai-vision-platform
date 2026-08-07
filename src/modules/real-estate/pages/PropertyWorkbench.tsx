@@ -779,7 +779,7 @@ export default function PropertyWorkbench() {
           </TabsContent>
 
           <TabsContent value="documents"><DocumentsTab ws={ws} propertyId={id} canManage={editable} /></TabsContent>
-          <TabsContent value="performance"><ListingPerformancePanel ws={ws} propertyId={id} /></TabsContent>
+          <TabsContent value="performance"><ListingPerformancePanel ws={ws} propertyId={id} canManage={editable} /></TabsContent>
         </Tabs>
       </div>
       {ws && <CmaReportDialog ws={ws} propertyId={id} open={cmaOpen} onOpenChange={setCmaOpen} />}
