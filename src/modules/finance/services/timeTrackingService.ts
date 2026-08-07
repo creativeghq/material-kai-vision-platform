@@ -11,6 +11,10 @@ export interface TimeEntry {
   user_id: string | null;
   customer_company_id: string | null;
   customer_contact_id: string | null;
+  /** Optional project the hours were worked on (WS1 #285). Independent of the customer columns. */
+  project_id: string | null;
+  /** Optional task within `project_id`. Requires `project_id` (enforced by a DB trigger). */
+  task_id: string | null;
   work_date: string;
   minutes: number;
   hourly_rate: number;
@@ -24,11 +28,64 @@ export interface TimeEntry {
 export interface NewTimeEntry {
   customer_company_id?: string | null;
   customer_contact_id?: string | null;
+  project_id?: string | null;
+  task_id?: string | null;
   work_date: string;
   minutes: number;
   hourly_rate: number;
   description: string;
   is_billable?: boolean;
+}
+
+/** Per-user slice of a project's labor roll-up. Derived in SQL by `get_project_labor`. */
+export interface ProjectLaborByUser {
+  user_id: string | null;
+  minutes: number;
+  cost: number;
+  billable_minutes: number;
+  billable_cost: number;
+}
+
+/**
+ * A project's labor roll-up. This is READ from `get_project_labor` — the single SQL derivation
+ * of labor cost — and never recomputed here. `get_project_pnl` reads the same function, so the
+ * P&L card and the labor strip can never disagree.
+ */
+export interface ProjectLabor {
+  total_minutes: number;
+  total_cost: number;
+  billable_minutes: number;
+  billable_cost: number;
+  billed_cost: number;
+  entry_count: number;
+  by_user: ProjectLaborByUser[];
+}
+
+/** jsonb numerics can arrive as strings; coerce at the boundary rather than at each use site. */
+const num = (v: unknown): number => (v == null ? 0 : Number(v));
+
+export const EMPTY_PROJECT_LABOR: ProjectLabor = {
+  total_minutes: 0, total_cost: 0, billable_minutes: 0, billable_cost: 0,
+  billed_cost: 0, entry_count: 0, by_user: [],
+};
+
+export function parseProjectLabor(raw: any): ProjectLabor {
+  if (!raw) return EMPTY_PROJECT_LABOR;
+  return {
+    total_minutes: num(raw.total_minutes),
+    total_cost: num(raw.total_cost),
+    billable_minutes: num(raw.billable_minutes),
+    billable_cost: num(raw.billable_cost),
+    billed_cost: num(raw.billed_cost),
+    entry_count: num(raw.entry_count),
+    by_user: (raw.by_user ?? []).map((u: any) => ({
+      user_id: u.user_id ?? null,
+      minutes: num(u.minutes),
+      cost: num(u.cost),
+      billable_minutes: num(u.billable_minutes),
+      billable_cost: num(u.billable_cost),
+    })),
+  };
 }
 
 import { round2 } from '@/utils/decimal';
@@ -45,14 +102,31 @@ export interface TimeReportContactRow {
 }
 
 export const timeTrackingService = {
-  async list(workspaceId: string, opts?: { onlyUnbilled?: boolean; customerId?: string; from?: string; to?: string }): Promise<TimeEntry[]> {
+  async list(workspaceId: string, opts?: { onlyUnbilled?: boolean; customerId?: string; from?: string; to?: string; projectId?: string }): Promise<TimeEntry[]> {
     let q = supabase.from('time_entries').select('*').eq('workspace_id', workspaceId).order('work_date', { ascending: false });
     if (opts?.onlyUnbilled) q = q.is('billed_invoice_id', null).eq('is_billable', true);
     if (opts?.from) q = q.gte('work_date', opts.from);
     if (opts?.to) q = q.lte('work_date', opts.to);
+    if (opts?.projectId) q = q.eq('project_id', opts.projectId);
     const { data, error } = await q;
     if (error) throw error;
     return (data ?? []) as TimeEntry[];
+  },
+
+  /** Entries logged against one project, newest first. */
+  async listByProject(workspaceId: string, projectId: string): Promise<TimeEntry[]> {
+    return this.list(workspaceId, { projectId });
+  },
+
+  /**
+   * A project's labor roll-up, derived in SQL. Deliberately an RPC and not a client-side sum:
+   * labor cost feeds `get_project_pnl`, and two independent implementations of the same money
+   * quantity is exactly the drift this codebase has been bitten by before.
+   */
+  async getProjectLabor(projectId: string): Promise<ProjectLabor> {
+    const { data, error } = await (supabase as any).rpc('get_project_labor', { p_project_id: projectId });
+    if (error) throw error;
+    return parseProjectLabor(data);
   },
 
   async create(workspaceId: string, entry: NewTimeEntry): Promise<TimeEntry> {
@@ -62,6 +136,8 @@ export const timeTrackingService = {
       user_id: auth.user?.id ?? null,
       customer_company_id: entry.customer_company_id ?? null,
       customer_contact_id: entry.customer_contact_id ?? null,
+      project_id: entry.project_id ?? null,
+      task_id: entry.task_id ?? null,
       work_date: entry.work_date,
       minutes: entry.minutes,
       hourly_rate: entry.hourly_rate,

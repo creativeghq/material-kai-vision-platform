@@ -12,6 +12,7 @@ import { parsePlanGeometry, type PlanGeometry } from '@/utils/planGeometry';
 const ROOM_PLAN_BUCKET = 'generation-images';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
+import { parseProjectLabor, type ProjectLabor } from '@/modules/finance/services/timeTrackingService';
 
 // =====================================================
 // TYPES
@@ -203,6 +204,33 @@ export interface ProjectFinanceSummary {
     payable_total: number;
     payable_due: number;
   };
+}
+
+/**
+ * Project job costing (WS2 #285). Every figure here is DERIVED by `get_project_pnl`; nothing in
+ * this file recomputes any of it. Note `contracted_revenue` and `billed_revenue` are two separate
+ * views of revenue and must never be added together — an invoice normally derives from a quote.
+ */
+export interface ProjectPnl {
+  /** Accepted quotes — what the client agreed to. */
+  contracted_revenue: number;
+  /** Issued (non-draft, non-void) invoices — what we actually billed. */
+  billed_revenue: number;
+  /** Open purchase-order value: PO total minus bills already received against it. */
+  committed_cost: number;
+  supplier_cost: number;
+  labor_cost: number;
+  /** supplier_cost + labor_cost. */
+  actual_cost: number;
+  margin_amount: number;
+  margin_pct: number | null;
+  forecast_margin_amount: number;
+  forecast_margin_pct: number | null;
+  /** Cost incurred but not yet billed. */
+  wip: number;
+  labor: ProjectLabor;
+  /** Distinct currencies behind the figures — >1 means the totals mix money. */
+  currencies: string[];
 }
 
 // ---------- PURCHASE ITEMS (made-to-order doors / windows) ----------
@@ -1012,6 +1040,30 @@ class ProjectsService {
     const { data, error } = await (supabase as any).rpc('get_project_finance_summary', { p_project_id: projectId });
     if (error) throw error;
     return (data || { receivables: [], payables: [], totals: { receivable_total: 0, receivable_due: 0, payable_total: 0, payable_due: 0 } }) as ProjectFinanceSummary;
+  }
+
+  /** Job costing for a project. Read-only view over `get_project_pnl` — see ProjectPnl. */
+  async getProjectPnl(projectId: string): Promise<ProjectPnl> {
+    const { data, error } = await (supabase as any).rpc('get_project_pnl', { p_project_id: projectId });
+    if (error) throw error;
+    const r = (data || {}) as Record<string, any>;
+    const n = (v: unknown): number => (v == null ? 0 : Number(v));
+    const nOrNull = (v: unknown): number | null => (v == null ? null : Number(v));
+    return {
+      contracted_revenue: n(r.contracted_revenue),
+      billed_revenue: n(r.billed_revenue),
+      committed_cost: n(r.committed_cost),
+      supplier_cost: n(r.supplier_cost),
+      labor_cost: n(r.labor_cost),
+      actual_cost: n(r.actual_cost),
+      margin_amount: n(r.margin_amount),
+      margin_pct: nOrNull(r.margin_pct),
+      forecast_margin_amount: n(r.forecast_margin_amount),
+      forecast_margin_pct: nOrNull(r.forecast_margin_pct),
+      wip: n(r.wip),
+      labor: parseProjectLabor(r.labor),
+      currencies: (r.currencies ?? []) as string[],
+    };
   }
 
   /**

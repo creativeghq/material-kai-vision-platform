@@ -39,6 +39,8 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
   const [rate, setRate] = useState('50');
   const [desc, setDesc] = useState('');
   const [saving, setSaving] = useState(false);
+  const [projectId, setProjectId] = useState('');
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [billing, setBilling] = useState(false);
@@ -83,6 +85,20 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
   };
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [workspaceId]);
 
+  // Projects available to attribute time to. Queried directly (rather than via projectsService)
+  // to keep the finance bundle from pulling in the whole projects service for two columns.
+  // Filtered to this workspace because the DB trigger rejects a cross-workspace project_id.
+  useEffect(() => {
+    if (!workspaceId) { setProjects([]); return; }
+    void (async () => {
+      const { data } = await supabase
+        .from('projects').select('id, name')
+        .eq('workspace_id', workspaceId)
+        .order('last_activity_at', { ascending: false });
+      setProjects((data ?? []) as { id: string; name: string }[]);
+    })();
+  }, [workspaceId]);
+
   // customer search
   useEffect(() => {
     const term = search.trim();
@@ -109,6 +125,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
       await timeTrackingService.create(workspaceId, {
         customer_company_id: customer?.type === 'company' ? customer.id : null,
         customer_contact_id: customer?.type === 'contact' ? customer.id : null,
+        project_id: projectId || null,
         work_date: workDate, minutes: Math.round(h * 60), hourly_rate: Number.isFinite(r) ? r : 0,
         description: desc.trim(),
       });
@@ -124,6 +141,8 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
     try { await timeTrackingService.remove(e.id); await load(); void loadReport(); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
+
+  const projectNameById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p.name])), [projects]);
 
   const unbilled = useMemo(() => entries.filter((e) => e.is_billable && !e.billed_invoice_id), [entries]);
   const billed = useMemo(() => entries.filter((e) => e.billed_invoice_id), [entries]);
@@ -219,9 +238,22 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
               {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} Log
             </Button>
           </div>
-          <div className="space-y-1 md:col-span-6">
+          <div className="space-y-1 md:col-span-4">
             <Label className="text-xs">What did you do?</Label>
             <Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. On-site measurement & consultation" />
+          </div>
+          {/* Attributing the hours to a project is what makes them show up as labor cost in the
+              project's job-cost card. Optional — customer-only billing is unchanged. */}
+          <div className="space-y-1 md:col-span-2">
+            <Label className="text-xs">Project (optional)</Label>
+            <select
+              className="h-9 w-full rounded-md border border-border/60 bg-background px-2 text-sm"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+            >
+              <option value="">No project</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
           </div>
         </CardContent>
       </Card>
@@ -259,7 +291,14 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                 <label key={e.id} className="flex cursor-pointer items-center gap-3 px-4 py-2 text-sm hover:bg-muted/30">
                   <Checkbox checked={selected.has(e.id)} onCheckedChange={() => toggle(e.id)} />
                   <div className="w-20 text-xs text-muted-foreground">{e.work_date}</div>
-                  <div className="min-w-0 flex-1 truncate">{e.description}</div>
+                  <div className="min-w-0 flex-1 truncate">
+                    {e.description}
+                    {e.project_id && (
+                      <span className="ml-2 text-[11px] text-muted-foreground">
+                        · {projectNameById[e.project_id] ?? 'Project'}
+                      </span>
+                    )}
+                  </div>
                   <div className="w-28 truncate text-xs text-muted-foreground">{names[partyKey(e)] || (partyKey(e) ? '—' : 'No customer')}</div>
                   <div className="w-16 text-right text-xs">{hoursOf(e.minutes)}h</div>
                   <div className="w-20 text-right tabular-nums">{formatMoney(hoursOf(e.minutes) * Number(e.hourly_rate))}</div>

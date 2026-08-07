@@ -279,3 +279,192 @@ describe('quote totals have exactly one derivation', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * Rent received — the THIRD money quantity to acquire the same shape, found reviewing #281.
+ *
+ * `property_rent_charges` carries a hand-set `status`/`paid_amount`, set from the Lettings tab. It
+ * can ALSO carry an `invoice_id`, and then the tenant's money arrives in Finance as a
+ * `payment_allocations` row that the rent charge never hears about. Two answers to "how much rent
+ * has this tenancy actually received", nothing reconciling them:
+ *
+ *   - `landlord-statement` summed `status === 'paid'`, so a tenant who paid the rent invoice by
+ *     card left the landlord statement reporting the rent as still outstanding and `net_to_landlord`
+ *     short by exactly that amount — while Finance showed the invoice paid.
+ *
+ * Same signature as the order bug: stored data flawless, derived number wrong, invisible to both
+ * the typecheck and every stored-data integrity check.
+ *
+ * `public.get_rent_charge_settlements(uuid[])` is now the single source (invoiced → the ledger;
+ * uninvoiced → the manual flag, which is then the only record of the money), read through
+ * `withRentSettlements`. `realestate.rent_charge_status_drift` guards the SQL half.
+ */
+describe('rent settlement has exactly one derivation', () => {
+  const posix = (p: string) => relative(ROOT, p).split('\\').join('/');
+  // Both halves of the module: the edge function is where the offending sum actually lived, so a
+  // scan limited to src/ would have reported this clean.
+  const files = [
+    ...walk(join(ROOT, 'src/modules/real-estate')),
+    ...walk(join(ROOT, 'supabase/functions/real-estate-api')),
+    ...walk(join(ROOT, 'supabase/functions/real-estate-rent-invoicing')),
+    ...walk(join(ROOT, 'supabase/functions/_shared/real-estate.ts')),
+    join(ROOT, 'supabase/functions/_shared/real-estate.ts'),
+  ].filter((f) => { try { return statSync(f).isFile(); } catch { return false; } });
+
+  /** The one sanctioned reader of the RPC — the helper every consumer goes through. */
+  const RENT_SETTLEMENT_SOURCE = 'supabase/functions/_shared/real-estate.ts';
+
+  it('finds real-estate sources to scan', () => {
+    expect(files.length).toBeGreaterThan(3);
+  });
+
+  /**
+   * The historical offender, verbatim in shape: filter the charges by the stored paid flag, then
+   * reduce them into a money total. Matching filter+reduce on one line is what `landlord-statement`
+   * did; the multi-line form is caught by the structural test below.
+   */
+  it('never totals rent by filtering on the stored paid flag', () => {
+    const offenders: string[] = [];
+    const RE = /\.filter\([^\n]*status\s*===?\s*['"](?:paid|waived)['"][^\n]*\)[^\n]*\.reduce\(/;
+    for (const f of files) {
+      if (posix(f) === RENT_SETTLEMENT_SOURCE) continue; // holds the documented fallback
+      const src = stripComments(readFileSync(f, 'utf8'));
+      for (const [i, line] of src.split('\n').entries()) {
+        if (RE.test(line)) offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+      }
+    }
+    expect(
+      offenders,
+      'An invoiced rent charge is settled by the Finance ledger — its stored `status` does not ' +
+      'move when the tenant pays. Sum `settled` / `outstanding` from `withRentSettlements()` ' +
+      '(get_rent_charge_settlements) instead.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  /**
+   * The structural claim, which naming cannot dodge (the lesson from the OrdersPanel reintroduction):
+   * rent received is a value you READ from the derivation, never one you ASSIGN from arithmetic.
+   */
+  it('assigns rent received only by reading the derivation', () => {
+    const offenders: string[] = [];
+    const DECL = /\b(?:const|let|var)\s+(?:rentReceived|rent_received|rentSettled|rentOutstanding|rent_outstanding)\s*(?::[^=]+)?=\s*(.+)$/;
+    for (const f of files) {
+      if (posix(f) === RENT_SETTLEMENT_SOURCE) continue;
+      const src = stripComments(readFileSync(f, 'utf8'));
+      for (const [i, line] of src.split('\n').entries()) {
+        const m = DECL.exec(line);
+        if (!m) continue;
+        // A read reduces over the DERIVED fields; anything else is arithmetic on raw charge rows.
+        if (!/\b(?:settled|outstanding|payment_status)\b/.test(m[1])) {
+          offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'Rent received/outstanding is derived ONCE, in `get_rent_charge_settlements`. Read `settled` ' +
+      'and `outstanding` off the rows `withRentSettlements()` returns.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  /** Nothing outside the shared helper should hand-roll the allocation sum for rent. */
+  it('reads rent settlement only through the shared helper', () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      if (posix(f) === RENT_SETTLEMENT_SOURCE) continue;
+      const src = stripComments(readFileSync(f, 'utf8'));
+      if (/from\(['"]payment_allocations['"]\)/.test(src)) offenders.push(posix(f));
+    }
+    expect(
+      offenders,
+      'Summing payment_allocations IS the settlement rule. Call `withRentSettlements()` so there ' +
+      'stays exactly one copy of it.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+});
+
+/**
+ * Project job cost — the FOURTH money quantity, added with WS2 of #285.
+ *
+ * Project margin has the same latent shape as the three above: it is assembled from four inputs
+ * that each already live somewhere else (accepted quotes, issued invoices, supplier bills, logged
+ * time), so the tempting move is to fetch the four lists into the Finance tab and subtract. That
+ * is precisely how the order bug was written. Two specific traps here:
+ *
+ *   - `contracted_revenue` (accepted quotes) and `billed_revenue` (issued invoices) are two views
+ *     of the SAME revenue. An invoice normally derives from a quote, so adding them double-counts.
+ *   - `committed_cost` (open POs) and `supplier_cost` (bills) overlap the moment a bill is received
+ *     against a PO. `get_project_pnl` nets the bill off the commitment; a client-side sum would not.
+ *
+ * `public.get_project_pnl(uuid)` is the single source and delegates labor to
+ * `public.get_project_labor(uuid)` rather than re-summing `time_entries`, so the job-cost card and
+ * the labor strip are incapable of disagreeing. These tests fail the build if the projects module
+ * starts doing any of that arithmetic itself.
+ */
+describe('project job cost has exactly one derivation', () => {
+  const posix = (p: string) => relative(ROOT, p).split('\\').join('/');
+  const files = walk(join(ROOT, 'src/modules/projects'));
+
+  it('finds project sources to scan', () => {
+    expect(files.length).toBeGreaterThan(5);
+  });
+
+  /**
+   * Structural claim, the one naming cannot dodge: every P&L figure is READ from the derivation,
+   * never ASSIGNED from arithmetic.
+   */
+  const PNL_DECL =
+    /\b(?:const|let|var)\s+(?:marginAmount|margin_amount|marginPct|laborCost|labor_cost|actualCost|actual_cost|committedCost|committed_cost|billedRevenue|contractedRevenue|projectWip)\s*(?::[^=]+)?=\s*(.+)$/;
+
+  /** Querying the raw inputs inside the projects module IS a private job-cost derivation. */
+  const RAW_INPUT_QUERY = /from\(['"](?:time_entries)['"]\)/;
+
+  it('the patterns actually match a violation', () => {
+    // A guard that cannot fail reports the codebase clean forever. Both rules are pinned against
+    // the shape they exist to catch, written the way someone would naturally write it.
+    const badDecl = '    const marginAmount = billedRevenue - (supplierCost + laborCost);';
+    const m = PNL_DECL.exec(badDecl);
+    expect(m, 'declaration pattern must match hand-rolled margin').not.toBeNull();
+    expect(/[-+*/]|Math\./.test(m![1])).toBe(true);
+
+    const goodDecl = '    const marginAmount = pnl.margin_amount;';
+    const g = PNL_DECL.exec(goodDecl);
+    expect(/[-+*/]|Math\./.test(g![1])).toBe(false);
+
+    expect(RAW_INPUT_QUERY.test(`supabase.from('time_entries').select('minutes, hourly_rate')`)).toBe(true);
+  });
+
+  it('assigns P&L figures only by reading the derivation', () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      const src = stripComments(readFileSync(f, 'utf8'));
+      for (const [i, line] of src.split('\n').entries()) {
+        const m = PNL_DECL.exec(line);
+        if (!m) continue;
+        if (/[-+*/]|Math\./.test(m[1].replace(/\?\?/g, ''))) {
+          offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'Project margin, labor and committed cost are derived ONCE, in `public.get_project_pnl`. ' +
+      'Read them off `projectsService.getProjectPnl()` — do not subtract here.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  it('never re-sums time_entries for labor cost in the projects module', () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      const src = stripComments(readFileSync(f, 'utf8'));
+      if (RAW_INPUT_QUERY.test(src)) offenders.push(posix(f));
+    }
+    expect(
+      offenders,
+      'Labor cost is derived by `public.get_project_labor`, which `get_project_pnl` calls. Read ' +
+      'it via `timeTrackingService.getProjectLabor()` rather than summing minutes x rate here — ' +
+      'a second copy is how the job-cost card and the labor strip start disagreeing.\n' +
+      offenders.join('\n'),
+    ).toEqual([]);
+  });
+});

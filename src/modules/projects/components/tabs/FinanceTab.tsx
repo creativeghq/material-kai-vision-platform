@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
+import { JobCostCard } from '../JobCostCard';
 import {
   projectsService,
   type ProjectFinanceRow,
@@ -122,6 +123,9 @@ export const FinanceTab: React.FC<{ projectId: string }> = ({ projectId }) => {
 
   return (
     <div className="space-y-4">
+      {/* Job cost first: margin is the question this tab exists to answer. AR/AP is the detail. */}
+      <JobCostCard projectId={projectId} />
+
       <div className="grid grid-cols-2 gap-3">
         <Card className="dashboard-card"><CardContent className="p-4">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1"><ArrowDownLeft className="h-3 w-3" /> Receivable due</p>
