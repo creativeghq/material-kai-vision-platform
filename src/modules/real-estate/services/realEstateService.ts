@@ -42,6 +42,8 @@ export interface PropertyPhoto {
 export interface PropertyInquiry {
   id: string; property_id: string; crm_contact_id: string | null; name: string | null; email: string | null;
   phone: string | null; message: string | null; status: string; source: string; created_at: string;
+  /** Set by the routing rules at creation. Null means no rule matched and the lead is unowned. */
+  assigned_user_id: string | null; assigned_at: string | null;
   property?: { id: string; title: string | null; reference_code: string | null; listing_agent_id: string | null } | null;
 }
 export interface PropertyViewing {
@@ -117,6 +119,16 @@ export interface ListingPerformance {
   lead_sources: Record<string, number>;
 }
 export interface ListingViewPoint { property_id: string; day: string; views: number }
+
+/** Territory / round-robin routing for inbound leads. Highest-priority matching rule wins; within a
+ *  rule, the lead goes to the next agent after `last_assigned_user_id`. An empty match array means
+ *  "don't care", so a rule with no criteria is the catch-all. */
+export interface LeadRoutingRule {
+  id: string; workspace_id: string; name: string;
+  match_towns: string[]; match_regions: string[]; match_postcode_prefixes: string[];
+  agent_user_ids: string[]; last_assigned_user_id: string | null;
+  priority: number; is_active: boolean; created_at: string;
+}
 
 /** Bulk listing import. `dry_run` reports the same shape without writing anything. */
 export interface ImportResult {
@@ -403,6 +415,14 @@ export const realEstateService = {
     if (error) throw error;
     return this.addPhoto(ws, propertyId, path, kind);
   },
+
+  // Lead routing (broker-only writes — routing decides who GETS the leads)
+  listRoutingRules: (ws: string) =>
+    call<{ rules: LeadRoutingRule[] }>(ws, 'list-routing-rules', {}).then((r) => r.rules),
+  upsertRoutingRule: (ws: string, fields: Partial<LeadRoutingRule> & { rule_id?: string }) =>
+    call<{ rule: LeadRoutingRule }>(ws, 'upsert-routing-rule', fields).then((r) => r.rule),
+  deleteRoutingRule: (ws: string, ruleId: string) =>
+    call<{ ok: true }>(ws, 'delete-routing-rule', { rule_id: ruleId }),
 
   /** Bulk import from a CSV (rows parsed in the browser) or a Kyero XML feed. Always preview with
    *  `dryRun` first — it returns the per-row verdict without writing. */

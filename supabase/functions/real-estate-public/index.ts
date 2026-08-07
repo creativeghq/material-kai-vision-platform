@@ -160,11 +160,18 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     const { data: p } = await supabase.from('properties').select('id').eq('id', propertyId).eq('workspace_id', reqmt.workspace_id).eq('is_public', true).maybeSingle();
     if (!p) return json({ error: 'not found' }, 404);
     const { data: contact } = await supabase.from('crm_contacts').select('name, email, phone').eq('id', reqmt.crm_contact_id).maybeSingle();
+    // Same routing as the listing-page enquiry — a viewing request is the hottest lead the module
+    // takes, and it must not be the one shape that lands unowned.
+    const { data: assignee } = await supabase.rpc('route_property_lead', {
+      p_workspace_id: reqmt.workspace_id, p_property_id: propertyId,
+    });
     const { error } = await supabase.from('property_inquiries').insert({
       workspace_id: reqmt.workspace_id, property_id: propertyId,
       name: contact?.name ?? 'Buyer (portal)', email: contact?.email ?? null, phone: contact?.phone ?? null,
       message: String(body?.message ?? '').slice(0, 1000) || 'Viewing requested via buyer portal',
       status: 'new', crm_contact_id: reqmt.crm_contact_id, source: 'buyer_portal',
+      assigned_user_id: assignee ?? null,
+      assigned_at: assignee ? new Date().toISOString() : null,
     });
     if (error) throw new HttpError(400, error.message);
     return json({ ok: true });
@@ -382,11 +389,19 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     const rl = await enforceLeadRateLimit(supabase, req, 'inquire', property.workspace_id);
     if (rl) return rl;
     // property_id + workspace_id come from the resolved token, NEVER the request body (anti-IDOR).
+    // Route the lead at creation. Response time is the whole game on a buyer enquiry, and an
+    // unrouted lead sits on the listing until somebody happens to look. Workspace and property come
+    // from the resolved token, never the body, so the RPC cannot be pointed at another tenant.
+    const { data: assignee } = await supabase.rpc('route_property_lead', {
+      p_workspace_id: property.workspace_id, p_property_id: property.id,
+    });
     const { error: insErr } = await supabase.from('property_inquiries').insert({
       workspace_id: property.workspace_id, property_id: property.id,
       name, email, phone: String(body?.phone ?? '').slice(0, 40) || null,
       message: String(body?.message ?? '').slice(0, 4000) || null,
       source: 'listing_page', gdpr_consent: true,
+      assigned_user_id: assignee ?? null,
+      assigned_at: assignee ? new Date().toISOString() : null,
       // Separate, OPTIONAL marketing opt-in. `convert-inquiry` carries it onto the crm_contact, which
       // is what the direct-to-buyer alert and the digest cron gate on. Absent this the enquirer is
       // opted out for good (crm_contacts.marketing_consent is NOT NULL DEFAULT false) and the alert

@@ -3,6 +3,7 @@ import { formatMoney } from '@/utils/decimal';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil, Upload } from 'lucide-react';
 import { ImportListingsDialog } from '../components/ImportListingsDialog';
+import { LeadRoutingCard } from '../components/LeadRoutingCard';
 import { PipelineBoard } from '../components/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
@@ -98,7 +99,7 @@ export default function RealEstatePage() {
           <TabsContent value="overview"><DashboardPanel ws={ws} /></TabsContent>
           <TabsContent value="pipeline"><PipelineBoard ws={ws} canManage={canManage} /></TabsContent>
           <TabsContent value="listings"><ListingsPanel ws={ws} canManage={canManage} creating={creating} onCreate={createDraft} /></TabsContent>
-          <TabsContent value="leads"><LeadsPanel ws={ws} /></TabsContent>
+          <TabsContent value="leads"><LeadsPanel ws={ws} canManage={canManage} /></TabsContent>
           <TabsContent value="buyers"><BuyersPanel ws={ws} /></TabsContent>
           <TabsContent value="sellers"><SellersPanel ws={ws} /></TabsContent>
           <TabsContent value="viewings"><ViewingsPanel ws={ws} /></TabsContent>
@@ -290,7 +291,7 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
   );
 };
 
-const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
+const LeadsPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, canManage }) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [rows, setRows] = useState<PropertyInquiry[] | null>(null);
@@ -311,12 +312,14 @@ const LeadsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
   ) : null;
 
   if (rows === null) return <>{header}<InlineLoader /></>;
-  if (rows.length === 0) return <>{header}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No leads yet. Add one here, or they arrive from your public listing pages.</div></>;
+  const routing = <div className="mt-4"><LeadRoutingCard ws={ws} canManage={canManage} /></div>;
+  if (rows.length === 0) return <>{header}<div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No leads yet. Add one here, or they arrive from your public listing pages.</div>{routing}</>;
   return (
     <>{header}
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
       {rows.map((q) => <LeadRow key={q.id} ws={ws as string} q={q} onChanged={load} />)}
     </div></CardContent></Card>
+    {routing}
     </>
   );
 };

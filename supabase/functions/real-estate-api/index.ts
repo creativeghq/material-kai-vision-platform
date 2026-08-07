@@ -470,6 +470,67 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ photo: data });
       }
 
+      // ── Lead routing rules ─────────────────────────────────────────────
+      case 'list-routing-rules': {
+        const { data, error } = await supabase.from('realestate_lead_routing_rules')
+          .select('*').eq('workspace_id', workspaceId).order('priority').order('created_at');
+        if (error) throw new HttpError(400, error.message);
+        return json({ rules: data ?? [] });
+      }
+
+      case 'upsert-routing-rule': {
+        // Broker-level, not agent-level: routing decides who GETS the leads, so an agent editing it
+        // would be handing themselves the desk.
+        if (!access.isBroker) return json({ error: 'Only a workspace owner or admin can change lead routing.' }, 403);
+        const ruleId = String(body.rule_id ?? '');
+        const arr = (v: unknown): string[] =>
+          Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean)
+            : String(v ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+        const payload: Record<string, unknown> = {};
+        if (body.name !== undefined) payload.name = String(body.name).slice(0, 120);
+        if (body.match_towns !== undefined) payload.match_towns = arr(body.match_towns);
+        if (body.match_regions !== undefined) payload.match_regions = arr(body.match_regions);
+        if (body.match_postcode_prefixes !== undefined) payload.match_postcode_prefixes = arr(body.match_postcode_prefixes);
+        if (body.priority !== undefined) payload.priority = Number(body.priority) || 100;
+        if (body.is_active !== undefined) payload.is_active = body.is_active === true;
+        if (body.agent_user_ids !== undefined) {
+          // Every id must be an ACTIVE member of this workspace. Without this check a broker could
+          // route their leads to a user id from another tenant, who would then see the lead.
+          const ids = arr(body.agent_user_ids);
+          if (ids.length) {
+            const { data: members } = await supabase.from('workspace_members')
+              .select('user_id').eq('workspace_id', workspaceId).in('user_id', ids);
+            const ok = new Set((members ?? []).map((m: any) => m.user_id));
+            const strangers = ids.filter((id) => !ok.has(id));
+            if (strangers.length) return json({ error: 'Every agent on a routing rule must be a member of this workspace.' }, 400);
+          }
+          payload.agent_user_ids = ids;
+        }
+
+        if (ruleId) {
+          payload.updated_at = new Date().toISOString();
+          const { data, error } = await supabase.from('realestate_lead_routing_rules')
+            .update(payload).eq('id', ruleId).eq('workspace_id', workspaceId).select('*').single();
+          if (error) throw new HttpError(400, error.message);
+          return json({ rule: data });
+        }
+        if (!payload.name) return json({ error: 'name is required' }, 400);
+        const { data, error } = await supabase.from('realestate_lead_routing_rules')
+          .insert({ ...payload, workspace_id: workspaceId, created_by: userId }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ rule: data });
+      }
+
+      case 'delete-routing-rule': {
+        if (!access.isBroker) return json({ error: 'Only a workspace owner or admin can change lead routing.' }, 403);
+        const ruleId = String(body.rule_id ?? '');
+        if (!ruleId) return json({ error: 'rule_id is required' }, 400);
+        const { error } = await supabase.from('realestate_lead_routing_rules')
+          .delete().eq('id', ruleId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
       // ── Listing import (#281) — the onboarding path ────────────────────
       case 'import-listings': {
         requireManage();
@@ -760,8 +821,11 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (body.property_id) q = q.eq('property_id', String(body.property_id));
         const { data, error } = await q;
         if (error) throw new HttpError(400, error.message);
-        // Non-broker agent sees only inquiries on the listings they own (D7).
-        const rows = (data ?? []).filter((r: any) => access.isBroker || r.property?.listing_agent_id === userId);
+        // Non-broker agent sees inquiries on the listings they own (D7) — OR routed to them.
+        // Without the second clause, routing a lead to agent B on agent A's listing would hide it
+        // from the very person it was assigned to, which makes the whole routing feature useless.
+        const rows = (data ?? []).filter((r: any) =>
+          access.isBroker || r.property?.listing_agent_id === userId || r.assigned_user_id === userId);
         return json({ inquiries: rows });
       }
 
@@ -813,10 +877,13 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         // reads by `property.listing_agent_id === userId`; scoping the write the same way is what
         // stops read and write permissions disagreeing.
         const { data: inqRow, error: inqErr } = await supabase
-          .from('property_inquiries').select('property_id').eq('id', inqId).eq('workspace_id', workspaceId).maybeSingle();
+          .from('property_inquiries').select('property_id, assigned_user_id').eq('id', inqId).eq('workspace_id', workspaceId).maybeSingle();
         if (inqErr) throw new HttpError(400, inqErr.message);
         if (!inqRow) throw new HttpError(404, 'not found');
-        if (inqRow.property_id) await loadEditable(String(inqRow.property_id));
+        // The assignee may work their own lead even on someone else's listing — routing would be
+        // pointless otherwise, and this keeps the write rule matching the read rule in
+        // `list-inquiries`. Everyone else still has to be able to edit the parent listing.
+        if (inqRow.property_id && inqRow.assigned_user_id !== userId) await loadEditable(String(inqRow.property_id));
 
         const patch: Record<string, unknown> = {};
         if (body.status !== undefined) {
@@ -858,9 +925,17 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         }).select('id').single();
         if (cErr) throw new HttpError(400, cErr.message);
 
+        // A walk-in or phone lead routes like any other. The agent recording it is the natural
+        // owner, so they are the fallback when no territory rule matches — that is the one path
+        // where an unowned lead would be strictly worse than the status quo.
+        const { data: routed } = await supabase.rpc('route_property_lead', {
+          p_workspace_id: workspaceId, p_property_id: propertyId,
+        });
+        const assignee = routed ?? userId;
         const { data: inq, error } = await supabase.from('property_inquiries').insert({
           workspace_id: workspaceId, property_id: propertyId, name, email, phone, message,
           status: 'new', source: 'manual', gdpr_consent: true, crm_contact_id: contact.id,
+          assigned_user_id: assignee, assigned_at: new Date().toISOString(),
         }).select('*').single();
         if (error) throw new HttpError(400, error.message);
 
