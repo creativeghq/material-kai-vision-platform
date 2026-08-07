@@ -236,7 +236,15 @@ export interface ProjectPnl {
   committed_cost: number;
   supplier_cost: number;
   labor_cost: number;
-  /** supplier_cost + labor_cost. */
+  /**
+   * Approved project-tagged expense claims. Counted regardless of `billable` — billable says the
+   * cost can be on-charged to the client, not whether it was a cost.
+   */
+  expense_cost: number;
+  /** Claims awaiting review. Reported so they are visible, but deliberately NOT in actual_cost. */
+  pending_expense_cost: number;
+  expense_count: number;
+  /** supplier_cost + labor_cost + expense_cost. */
   actual_cost: number;
   margin_amount: number;
   margin_pct: number | null;
@@ -1120,6 +1128,9 @@ class ProjectsService {
       committed_cost: n(r.committed_cost),
       supplier_cost: n(r.supplier_cost),
       labor_cost: n(r.labor_cost),
+      expense_cost: n(r.expense_cost),
+      pending_expense_cost: n(r.pending_expense_cost),
+      expense_count: n(r.expense_count),
       actual_cost: n(r.actual_cost),
       margin_amount: n(r.margin_amount),
       margin_pct: nOrNull(r.margin_pct),

@@ -455,6 +455,10 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           bankAccountId: paidNow ? (bankAccountId || null) : null,
           paymentMethod: method,
           notes: notes || undefined,
+          // The repeat inherits the same "what is this for?" link as the one-off expense, so every
+          // generated bill lands on the same project/order instead of floating unattributed.
+          projectId: linkProjectId,
+          orderId: effectiveOrderId ?? null,
         });
         } catch (recErr: any) {
           recurringError = recErr?.message ?? 'the recurring template could not be created';

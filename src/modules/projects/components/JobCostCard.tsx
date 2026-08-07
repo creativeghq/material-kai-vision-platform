@@ -91,7 +91,7 @@ export const JobCostCard: React.FC<{ projectId: string }> = ({ projectId }) => {
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <Stat label="Contracted" value={money(pnl.contracted_revenue, currency)} hint="accepted quotes" />
           <Stat label="Billed" value={money(pnl.billed_revenue, currency)} hint="issued invoices" />
-          <Stat label="Actual cost" value={money(pnl.actual_cost, currency)} hint="bills + labor" />
+          <Stat label="Actual cost" value={money(pnl.actual_cost, currency)} hint="bills + labor + expenses" />
           <Stat
             label="Margin"
             value={money(pnl.margin_amount, currency)}
@@ -105,6 +105,14 @@ export const JobCostCard: React.FC<{ projectId: string }> = ({ projectId }) => {
           <Row label="Supplier bills" value={money(pnl.supplier_cost, currency)} />
           <Row label="Labor" value={money(pnl.labor_cost, currency)}
             hint={pnl.labor.total_minutes > 0 ? `${hoursOf(pnl.labor.total_minutes)}h logged` : 'no time logged'} />
+          <Row label="Expenses" value={money(pnl.expense_cost, currency)}
+            hint={pnl.expense_count > 0 ? 'approved claims' : 'no claims on this project'} />
+          {/* Pending claims are shown but excluded from cost: an unreviewed claim should be
+              visible without silently moving the margin. */}
+          {pnl.pending_expense_cost > 0 && (
+            <Row label="Pending claims" value={money(pnl.pending_expense_cost, currency)}
+              hint="awaiting approval — not counted yet" muted />
+          )}
           <Row label="Committed (open POs)" value={money(pnl.committed_cost, currency)}
             hint="ordered, not yet billed" muted />
           <Row

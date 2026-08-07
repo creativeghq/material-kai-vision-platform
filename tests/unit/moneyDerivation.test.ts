@@ -414,7 +414,7 @@ describe('project job cost has exactly one derivation', () => {
    * never ASSIGNED from arithmetic.
    */
   const PNL_DECL =
-    /\b(?:const|let|var)\s+(?:marginAmount|margin_amount|marginPct|laborCost|labor_cost|actualCost|actual_cost|committedCost|committed_cost|billedRevenue|contractedRevenue|projectWip)\s*(?::[^=]+)?=\s*(.+)$/;
+    /\b(?:const|let|var)\s+(?:marginAmount|margin_amount|marginPct|laborCost|labor_cost|actualCost|actual_cost|committedCost|committed_cost|billedRevenue|contractedRevenue|projectWip|expenseCost|expense_cost)\s*(?::[^=]+)?=\s*(.+)$/;
 
   /** Querying the raw inputs inside the projects module IS a private job-cost derivation. */
   const RAW_INPUT_QUERY = /from\(['"](?:time_entries)['"]\)/;
@@ -426,6 +426,13 @@ describe('project job cost has exactly one derivation', () => {
     const m = PNL_DECL.exec(badDecl);
     expect(m, 'declaration pattern must match hand-rolled margin').not.toBeNull();
     expect(/[-+*/]|Math\./.test(m![1])).toBe(true);
+
+    // Expense cost is the newest component of actual_cost and the easiest to re-sum by hand,
+    // because trip_expense_items sits right there with an `amount` column.
+    const badExpense = '    const expenseCost = items.reduce((s, e) => s + e.amount, 0);';
+    const me = PNL_DECL.exec(badExpense);
+    expect(me, 'declaration pattern must match a hand-rolled expense sum').not.toBeNull();
+    expect(/[-+*/]|Math\./.test(me![1])).toBe(true);
 
     const goodDecl = '    const marginAmount = pnl.margin_amount;';
     const g = PNL_DECL.exec(goodDecl);

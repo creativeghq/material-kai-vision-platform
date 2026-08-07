@@ -424,6 +424,13 @@ export interface RecurringExpense {
   payment_method: string | null;
   is_active: boolean;
   notes: string | null;
+  /**
+   * Defaults stamped onto each generated supplier_bill by `run_due_recurring_expenses`.
+   * The BILL carries the real link — job costing reads the bill, never this template — so these
+   * are a convenience, not a second place the project/order association lives.
+   */
+  project_id: string | null;
+  order_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -2131,6 +2138,9 @@ const _financeServiceCore = {
     bankAccountId?: string | null;
     paymentMethod?: string | null;
     notes?: string | null;
+    /** Stamped onto every generated bill — see RecurringExpense.project_id. */
+    projectId?: string | null;
+    orderId?: string | null;
   }): Promise<RecurringExpense> {
     if (!input.supplierCompanyId && !input.supplierContactId) {
       throw new Error('A recurring expense needs a supplier / payee.');
@@ -2153,6 +2163,8 @@ const _financeServiceCore = {
       bank_account_id: input.bankAccountId ?? null,
       payment_method: input.paymentMethod ?? null,
       notes: input.notes ?? null,
+      project_id: input.projectId ?? null,
+      order_id: input.orderId ?? null,
     } as any).select().single();
     if (error) throw error;
     return data as RecurringExpense;

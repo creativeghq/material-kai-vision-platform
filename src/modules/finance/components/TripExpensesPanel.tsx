@@ -645,7 +645,9 @@ const AddExpenseDialog: React.FC<{
   const [projects, setProjects] = useState<Array<{ id: string; name: string | null }>>([]);
   const [saving, setSaving] = useState(false);
 
-  // Projects, so a billable expense can be tagged to the job it belongs to (→ rebill to its client).
+  // Projects, so any expense can be tagged to the job it belongs to. Note this is INDEPENDENT of
+  // `billable`: the project says which job bears the cost, `billable` says whether we on-charge it.
+  // Tying them together hid every absorbed cost — our own travel to site — from that job's margin.
   useEffect(() => {
     if (!open || !workspaceId) return;
     void supabase.from('projects').select('id, name').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(200)
@@ -661,7 +663,7 @@ const AddExpenseDialog: React.FC<{
         report_id: reportId, expense_date: date, category,
         description: description.trim() || null, vendor: vendor.trim() || null,
         amount: amt, currency, payment_method: method,
-        billable, project_id: billable ? (projectId || null) : null,
+        billable, project_id: projectId || null,
       });
       setDescription(''); setVendor(''); setAmount(''); setBillable(false); setProjectId('');
       onOpenChange(false);
@@ -723,18 +725,22 @@ const AddExpenseDialog: React.FC<{
             <span className="text-xs">Billable to client <span className="text-muted-foreground">— on-charge this cost to a project's client</span></span>
             <Checkbox checked={billable} onCheckedChange={(v) => setBillable(v === true)} className="h-4 w-4"  />
           </label>
-          {billable && (
-            <div className="space-y-1">
-              <label htmlFor="tripexpensespanel-project" className="text-xs text-muted-foreground">Project</label>
-              <Select value={projectId || '__none__'} onValueChange={(v) => setProjectId(v === '__none__' ? '' : v)}>
-                <SelectTrigger id="tripexpensespanel-project"><SelectValue placeholder="Pick the project to bill" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— No project —</SelectItem>
-                  {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name || p.id.slice(0, 8)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* Always offered, billable or not — an absorbed cost still belongs to a job. */}
+          <div className="space-y-1">
+            <label htmlFor="tripexpensespanel-project" className="text-xs text-muted-foreground">
+              Project <span className="text-muted-foreground">— which job bears this cost</span>
+            </label>
+            <Select value={projectId || '__none__'} onValueChange={(v) => setProjectId(v === '__none__' ? '' : v)}>
+              <SelectTrigger id="tripexpensespanel-project"><SelectValue placeholder="Pick the project this cost belongs to" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— No project —</SelectItem>
+                {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name || p.id.slice(0, 8)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Counts towards the project&apos;s cost once approved.
+            </p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
