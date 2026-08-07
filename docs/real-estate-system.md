@@ -144,6 +144,7 @@ Before this existed the enforcement was live and the capture was not, so every l
 | `real-estate-rent-invoicing-daily` | 06:00 | Drafts Finance invoices for rent charges due within 7 days (500/run, drafts only). |
 | `real-estate-buyer-digests-daily` | 08:00 | Emails saved-search digests to buyers with new matches. |
 | `real-estate-vendor-reports-weekly` | Mon 07:00 | Emails each instructing vendor a performance report on their own listing. |
+| `real-estate-ical-sync-hourly` | :20 hourly | Pulls each linked channel calendar and imports its bookings. |
 | `public-realestate-submissions-prune` | 03:15 | Prunes the hashed-IP throttle counters. |
 
 Both edge crons use the shared `isCronAuthorized` gate (`x-cron-secret` **or** service-role bearer) and fail closed.
@@ -174,7 +175,17 @@ Lettings shipped the core — tenancy, rent schedule, maintenance, landlord stat
 
 **`/tenant/:token`** gives the tenant their own rent status and a way to report a fault, with no account. Rent status comes from `withRentSettlements` — the same derivation the workbench reads, because a tenant told they still owe rent they have already paid is the worst thing that page could do. The reported priority is fixed at `normal` rather than taken from the tenant: self-declared urgency would make the field meaningless to whoever triages it. Rotating the token revokes the old link with no grace window; `revoke: true` clears it entirely, so a tenancy that has ended keeps no live link to the ledger.
 
-## 12. Integrity checks
+## 12. Short-let operations
+
+A short-let property is a stream of stays, not a term, so it gets `property_bookings` rather than a tenancy. **Dates are half-open `[check_in, check_out)`** — check-out is the morning of departure, so a back-to-back changeover is two touching bookings and not a clash.
+
+**The double booking is prevented by a GiST exclusion constraint, not by a check in code.** Two channel syncs land concurrently and a read-then-write would happily accept both; `property_bookings_no_overlap` refuses the second, and a cancelled booking releases its nights. Verified against all three cases (back-to-back allowed, cross-channel overlap refused, cancelled nights reusable).
+
+`real-estate-ical` is the whole channel integration, because channels speak iCalendar and nothing else. **GET** serves the availability feed a channel pulls — **blocked nights only**, never a guest name, contact detail or price, since that URL is a bearer capability handed to a third party. **POST** (hourly cron) pulls each `property_channel_links.ical_import_url` through the shared SSRF guard *at read time as well as write time*, and upserts on `(property, channel, UID)` so a channel republishing its full calendar every poll does not duplicate every stay. An exclusion violation on import is reported as a date conflict rather than swallowed — that *is* a double booking, and only the operator can resolve it on the channel that sold it twice.
+
+[tests/unit/shortLetIcal.test.ts](../tests/unit/shortLetIcal.test.ts) pins the thing that would otherwise break silently: **iCal `DTEND` is exclusive**. Reading it as the last night is the classic off-by-one and it manufactures a phantom overlap on every changeover, which the exclusion constraint would then reject.
+
+## 13. Integrity checks
 
 | Key | Watches |
 |---|---|

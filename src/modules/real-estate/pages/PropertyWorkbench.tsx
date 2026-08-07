@@ -35,6 +35,7 @@ import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog'
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ListingPerformancePanel } from '../components/ListingPerformancePanel';
 import { KycPanel } from '../components/KycPanel';
+import { ShortLetTab } from '../components/ShortLetTab';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
@@ -301,7 +302,8 @@ export default function PropertyWorkbench() {
   // drift: a conditional trigger added without a matching entry here would silently reintroduce
   // the blank-page state this exists to prevent.
   const availableTabs = [
-    'overview', 'media', 'inquiries', 'offers', 'viewings',
+    'overview', 'media', 'inquiries', 'offers', 'viewings', 'documents', 'performance',
+    ...(isShortLet ? ['shortlet'] : []),
     ...(canManage && isRental && pmEnabled ? ['lettings'] : []),
     ...(canManage && investEnabled ? ['investment'] : []),
     ...(canManage ? ['transaction'] : []),
@@ -358,6 +360,7 @@ export default function PropertyWorkbench() {
             <TabsTrigger value="viewings" className={RE_TAB}><CalendarClock className="h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="documents" className={RE_TAB}><FileText className="h-4 w-4" /> Documents</TabsTrigger>
             <TabsTrigger value="performance" className={RE_TAB}><LineChart className="h-4 w-4" /> Performance</TabsTrigger>
+            {isShortLet && <TabsTrigger value="shortlet" className={RE_TAB}><CalendarClock className="h-4 w-4" /> Short-let</TabsTrigger>}
             {canManage && isRental && pmEnabled && <TabsTrigger value="lettings" className={RE_TAB}><KeyRound className="h-4 w-4" /> Lettings</TabsTrigger>}
             {canManage && investEnabled && <TabsTrigger value="investment" className={RE_TAB}><LineChart className="h-4 w-4" /> Investment</TabsTrigger>}
             {canManage && <TabsTrigger value="transaction" className={RE_TAB}><FileSignature className="h-4 w-4" /> Transaction</TabsTrigger>}
@@ -784,6 +787,7 @@ export default function PropertyWorkbench() {
 
           <TabsContent value="documents"><DocumentsTab ws={ws} propertyId={id} canManage={editable} /></TabsContent>
           <TabsContent value="performance"><ListingPerformancePanel ws={ws} propertyId={id} canManage={editable} /></TabsContent>
+          {isShortLet && <TabsContent value="shortlet"><ShortLetTab ws={ws} propertyId={id} icalToken={property.ical_token ?? null} canManage={editable} onChanged={load} /></TabsContent>}
         </Tabs>
       </div>
       {ws && <CmaReportDialog ws={ws} propertyId={id} open={cmaOpen} onOpenChange={setCmaOpen} />}

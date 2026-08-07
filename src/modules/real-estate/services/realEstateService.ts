@@ -128,6 +128,36 @@ export interface ListingPerformance {
 }
 export interface ListingViewPoint { property_id: string; day: string; views: number }
 
+/** A short-let stay. Dates are half-open: `check_out` is the morning of departure, so a back-to-back
+ *  changeover is two touching bookings, not an overlap. */
+export interface Booking {
+  id: string; property_id: string; channel: 'direct' | 'airbnb' | 'booking_com' | 'vrbo' | 'other';
+  external_ref: string | null; guest_name: string | null; guest_email: string | null; guest_phone: string | null;
+  guests_count: number | null; check_in: string; check_out: string;
+  nightly_rate: number | null; total_amount: number | null; currency: string;
+  status: 'tentative' | 'confirmed' | 'cancelled' | 'completed' | 'blocked'; notes: string | null;
+}
+export interface BookingTask {
+  id: string; property_id: string; booking_id: string | null;
+  task_type: 'cleaning' | 'linen' | 'maintenance' | 'check_in' | 'check_out' | 'restock';
+  due_at: string; assignee_name: string | null; status: 'open' | 'in_progress' | 'done' | 'skipped';
+  cost: number | null; notes: string | null; completed_at: string | null;
+}
+export interface ChannelLink {
+  id: string; property_id: string; channel: 'airbnb' | 'booking_com' | 'vrbo' | 'other';
+  ical_import_url: string | null; is_active: boolean;
+  last_synced_at: string | null; last_sync_status: string | null; last_sync_message: string | null; imported_count: number;
+}
+export const CHANNEL_LABELS: Record<string, string> = {
+  direct: 'Direct', airbnb: 'Airbnb', booking_com: 'Booking.com', vrbo: 'Vrbo', other: 'Other',
+};
+
+/** The availability feed a channel pulls. Blocked nights only — never guest identity. */
+export function icalFeedUrl(token: string): string {
+  const base = (supabase as any).supabaseUrl || '';
+  return `${base}/functions/v1/real-estate-ical?token=${encodeURIComponent(token)}`;
+}
+
 /** What a tenant sees at /tenant/:token. Rent status is the SAME derivation the agent's workbench
  *  reads — a tenant told they still owe rent they have already paid is the worst thing this can do. */
 export interface TenantPortal {
@@ -487,6 +517,19 @@ export const realEstateService = {
     if (error) throw error;
     return this.addPhoto(ws, propertyId, path, kind);
   },
+
+  // Short-let operations
+  listBookings: (ws: string, propertyId: string, from?: string) =>
+    call<{ bookings: Booking[]; tasks: BookingTask[]; channels: ChannelLink[] }>(ws, 'list-bookings', { property_id: propertyId, from }),
+  upsertBooking: (ws: string, fields: Record<string, unknown>) =>
+    call<{ booking: Booking }>(ws, 'upsert-booking', fields).then((r) => r.booking),
+  deleteBooking: (ws: string, bookingId: string) => call<{ ok: true }>(ws, 'delete-booking', { booking_id: bookingId }),
+  upsertBookingTask: (ws: string, fields: Record<string, unknown>) =>
+    call<{ task: BookingTask }>(ws, 'upsert-booking-task', fields).then((r) => r.task),
+  upsertChannelLink: (ws: string, fields: Record<string, unknown>) =>
+    call<{ channel_link: ChannelLink }>(ws, 'upsert-channel-link', fields).then((r) => r.channel_link),
+  rotateIcalToken: (ws: string, propertyId: string, revoke = false) =>
+    call<{ property: { id: string; ical_token: string | null } }>(ws, 'rotate-ical-token', { property_id: propertyId, revoke }).then((r) => r.property),
 
   // Tenancy lifecycle — deposit protection, rent review, notice, inspections, tenant portal
   updateTenancyLifecycle: (ws: string, tenancyId: string, fields: Record<string, unknown>) =>

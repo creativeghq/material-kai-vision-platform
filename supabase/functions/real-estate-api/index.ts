@@ -28,6 +28,7 @@ import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
 import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
 import { refreshListingEmbedding } from '../_shared/real-estate-embedding.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 
 /** Member-entered link fields render as hrefs on the ANONYMOUS public page — enforce http(s)
  *  at write time so a stored `javascript:` URL can never exist (the page also guards on render). */
@@ -172,6 +173,9 @@ const KYC_CHECK_TYPES = ['identity', 'source_of_funds', 'pep_sanctions'];
 const KYC_STATUSES = ['pending', 'passed', 'failed', 'waived'];
 /** Tenancy inspection points. Mirrors the CHECK on property_tenancy_inspections. */
 const INSPECTION_TYPES = ['check_in', 'routine', 'check_out'];
+/** Short-let vocabulary. Mirrors the CHECKs on property_bookings. */
+const BOOKING_CHANNELS = ['direct', 'airbnb', 'booking_com', 'vrbo', 'other'];
+const BOOKING_STATUSES = ['tentative', 'confirmed', 'cancelled', 'completed', 'blocked'];
 // `virtual` added 2026-08-01. The scheduling dialog has always offered
 // in_person | virtual | open_house, but the allowlist held viewing | tour | open_house and
 // SUBSTITUTED rather than rejected — so `in_person` and `virtual`, two of the three options and
@@ -475,6 +479,169 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         }).select('*').single();
         if (error) throw new HttpError(400, error.message);
         return json({ photo: data });
+      }
+
+      // ── Short-let operations (#281 gap 7) ──────────────────────────────
+      case 'list-bookings': {
+        const propertyId = String(body.property_id ?? '');
+        if (!propertyId) return json({ error: 'property_id is required' }, 400);
+        await loadProperty(propertyId); // view-scoped 404
+        const from = String(body.from ?? new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10));
+        const { data, error } = await supabase.from('property_bookings')
+          .select('*').eq('property_id', propertyId).eq('workspace_id', workspaceId)
+          .gte('check_out', from).order('check_in');
+        if (error) throw new HttpError(400, error.message);
+        const { data: tasks } = await supabase.from('property_booking_tasks')
+          .select('*').eq('property_id', propertyId).eq('workspace_id', workspaceId).order('due_at');
+        const { data: channels } = await supabase.from('property_channel_links')
+          .select('*').eq('property_id', propertyId).eq('workspace_id', workspaceId);
+        return json({ bookings: data ?? [], tasks: tasks ?? [], channels: channels ?? [] });
+      }
+
+      case 'upsert-booking': {
+        requireManage();
+        const bookingId = String(body.booking_id ?? '');
+        const propertyId = String(body.property_id ?? '');
+        const patch: Record<string, unknown> = {};
+        for (const k of ['guest_name', 'guest_email', 'guest_phone', 'external_ref', 'notes']) {
+          if (body[k] !== undefined) patch[k] = body[k] ? String(body[k]).slice(0, 400) : null;
+        }
+        for (const k of ['check_in', 'check_out']) if (body[k] !== undefined) patch[k] = body[k];
+        for (const k of ['nightly_rate', 'total_amount', 'guests_count']) {
+          if (body[k] !== undefined) patch[k] = body[k] === null || body[k] === '' ? null : Number(body[k]);
+        }
+        if (body.guest_contact_id !== undefined) patch.guest_contact_id = body.guest_contact_id || null;
+        if (body.currency !== undefined) patch.currency = String(body.currency).slice(0, 8);
+        if (body.channel !== undefined) {
+          const c = String(body.channel);
+          if (!BOOKING_CHANNELS.includes(c)) return json({ error: `channel must be one of ${BOOKING_CHANNELS.join(', ')}` }, 400);
+          patch.channel = c;
+        }
+        if (body.status !== undefined) {
+          const st = String(body.status);
+          if (!BOOKING_STATUSES.includes(st)) return json({ error: `status must be one of ${BOOKING_STATUSES.join(', ')}` }, 400);
+          patch.status = st;
+        }
+
+        // A double booking is refused by a GiST exclusion constraint, not by a check here: two
+        // channel syncs land concurrently and a read-then-write would happily accept both. Translate
+        // the constraint violation into something an operator can act on.
+        const overlapMessage = 'Those dates overlap an existing booking for this property.';
+        if (bookingId) {
+          const { data: row } = await supabase.from('property_bookings')
+            .select('property_id').eq('id', bookingId).eq('workspace_id', workspaceId).maybeSingle();
+          if (!row) return json({ error: 'not found' }, 404);
+          await loadEditable(row.property_id);
+          patch.updated_at = new Date().toISOString();
+          const { data, error } = await supabase.from('property_bookings')
+            .update(patch).eq('id', bookingId).eq('workspace_id', workspaceId).select('*').single();
+          if (error) return json({ error: error.code === '23P01' ? overlapMessage : error.message }, error.code === '23P01' ? 409 : 400);
+          return json({ booking: data });
+        }
+        if (!propertyId || !patch.check_in || !patch.check_out) {
+          return json({ error: 'property_id, check_in and check_out are required' }, 400);
+        }
+        await loadEditable(propertyId);
+        const { data, error } = await supabase.from('property_bookings')
+          .insert({ ...patch, workspace_id: workspaceId, property_id: propertyId, created_by: userId }).select('*').single();
+        if (error) return json({ error: error.code === '23P01' ? overlapMessage : error.message }, error.code === '23P01' ? 409 : 400);
+
+        // The changeover is a different person's job with a different deadline: the clean has to be
+        // done before the NEXT check-in, so it is due on this checkout morning.
+        await supabase.from('property_booking_tasks').insert({
+          workspace_id: workspaceId, property_id: propertyId, booking_id: data.id,
+          task_type: 'cleaning', due_at: `${data.check_out}T10:00:00Z`,
+        });
+        return json({ booking: data });
+      }
+
+      case 'delete-booking': {
+        requireManage();
+        const bookingId = String(body.booking_id ?? '');
+        if (!bookingId) return json({ error: 'booking_id is required' }, 400);
+        const { data: row } = await supabase.from('property_bookings')
+          .select('property_id').eq('id', bookingId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!row) return json({ error: 'not found' }, 404);
+        await loadEditable(row.property_id);
+        const { error } = await supabase.from('property_bookings').delete().eq('id', bookingId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
+      case 'upsert-booking-task': {
+        requireManage();
+        const taskId = String(body.task_id ?? '');
+        const patch: Record<string, unknown> = {};
+        if (body.task_type !== undefined) patch.task_type = String(body.task_type);
+        if (body.due_at !== undefined) patch.due_at = body.due_at;
+        if (body.assignee_name !== undefined) patch.assignee_name = body.assignee_name ? String(body.assignee_name).slice(0, 200) : null;
+        if (body.cost !== undefined) patch.cost = body.cost === null || body.cost === '' ? null : Number(body.cost);
+        if (body.notes !== undefined) patch.notes = body.notes ? String(body.notes).slice(0, 2000) : null;
+        if (body.status !== undefined) {
+          const st = String(body.status);
+          if (!['open', 'in_progress', 'done', 'skipped'].includes(st)) return json({ error: 'invalid status' }, 400);
+          patch.status = st;
+          patch.completed_at = st === 'done' ? new Date().toISOString() : null;
+        }
+        if (taskId) {
+          const { data: row } = await supabase.from('property_booking_tasks')
+            .select('property_id').eq('id', taskId).eq('workspace_id', workspaceId).maybeSingle();
+          if (!row) return json({ error: 'not found' }, 404);
+          await loadEditable(row.property_id);
+          patch.updated_at = new Date().toISOString();
+          const { data, error } = await supabase.from('property_booking_tasks')
+            .update(patch).eq('id', taskId).eq('workspace_id', workspaceId).select('*').single();
+          if (error) throw new HttpError(400, error.message);
+          return json({ task: data });
+        }
+        const propertyId = String(body.property_id ?? '');
+        if (!propertyId || !patch.due_at) return json({ error: 'property_id and due_at are required' }, 400);
+        await loadEditable(propertyId);
+        const { data, error } = await supabase.from('property_booking_tasks')
+          .insert({ ...patch, workspace_id: workspaceId, property_id: propertyId, booking_id: body.booking_id || null })
+          .select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ task: data });
+      }
+
+      case 'upsert-channel-link': {
+        requireManage();
+        const propertyId = String(body.property_id ?? '');
+        const channel = String(body.channel ?? '');
+        if (!propertyId || !['airbnb', 'booking_com', 'vrbo', 'other'].includes(channel)) {
+          return json({ error: 'property_id and a valid channel are required' }, 400);
+        }
+        await loadEditable(propertyId);
+        const patch: Record<string, unknown> = { workspace_id: workspaceId, property_id: propertyId, channel };
+        if (body.is_active !== undefined) patch.is_active = body.is_active === true;
+        if (body.ical_import_url !== undefined) {
+          const url = body.ical_import_url ? String(body.ical_import_url).trim() : null;
+          if (url) {
+            // Invariant 7 — this URL is fetched server-side, so it goes through the shared guard at
+            // WRITE time as well as read time. Storing an unvalidated internal address would just
+            // defer the SSRF to the sync job.
+            try { await assertSafeUrl(url, { allowSchemes: ['https:', 'webcal:'] }); }
+            catch (e) { return json({ error: `That calendar URL is not accepted: ${e instanceof Error ? e.message : 'invalid'}` }, 400); }
+          }
+          patch.ical_import_url = url;
+        }
+        patch.updated_at = new Date().toISOString();
+        const { data, error } = await supabase.from('property_channel_links')
+          .upsert(patch, { onConflict: 'property_id,channel' }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ channel_link: data });
+      }
+
+      case 'rotate-ical-token': {
+        requireManage();
+        const propertyId = String(body.property_id ?? '');
+        if (!propertyId) return json({ error: 'property_id is required' }, 400);
+        await loadEditable(propertyId);
+        const token = body.revoke === true ? null : (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');
+        const { data, error } = await supabase.from('properties')
+          .update({ ical_token: token }).eq('id', propertyId).eq('workspace_id', workspaceId).select('id, ical_token').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ property: data });
       }
 
       // ── Tenancy lifecycle (#281) ───────────────────────────────────────

@@ -9715,6 +9715,26 @@
     "response": "{ success, buyers_considered, emails_sent, listings_matched }"
   },
   {
+    "name": "real-estate-ical",
+    "tag": "Real Estate",
+    "summary": "Short-let channel sync — availability feed out (GET, token) and channel calendars in (POST, cron)",
+    "description": "Booking channels all speak iCalendar and nothing else, so this one function is the whole integration. **GET ?token=…** serves the availability feed a channel pulls, authorised solely by the per-listing `ical_token`; it publishes BLOCKED NIGHTS ONLY — no guest name, email or price — because that URL is a bearer capability handed to third parties. **POST** (shared cron gate) pulls every active `property_channel_links.ical_import_url`, re-validating each through the shared SSRF guard at read time as well as write time, and upserts on `(property, channel, UID)` so a channel republishing its whole calendar every poll does not duplicate every stay. A `23P01` exclusion violation on import is reported as a date conflict rather than swallowed — that IS a double booking, and only the operator can resolve it on the channel that sold it twice. Runs hourly.",
+    "security": [
+      "icalToken",
+      "cronSecret"
+    ],
+    "docs": "api/real-estate-api.md",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      "token"
+    ],
+    "response": "text/calendar (GET) | { ok, links, imported, conflicts, failed } (POST)"
+  },
+  {
     "name": "real-estate-inbound-lead",
     "tag": "Real Estate",
     "summary": "Public tokenised endpoint — turns a forwarded portal enquiry email into a CRM lead",
