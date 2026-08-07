@@ -22,6 +22,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import {
   generateImageWithGemini,
+  generateImageWithGrok,
   editImageWithGrok,
   type GeminiImageModel,
   type ImageAspectRatio,
@@ -349,7 +350,7 @@ const PRICING_KEY_BY_LABEL: Record<string, string> = {
   'grok-aurora': 'xai-aurora',
 };
 
-type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot';
+type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot' | 'product-lifestyle' | 'material-texture';
 type BoardMode = 'presentation-board' | 'selection-board' | 'photorealistic-render';
 
 interface GenerateInteriorRequest {
@@ -370,8 +371,10 @@ interface GenerateInteriorRequest {
   style_reference_url?: string;
   // Materials Selection Board
   board_mode?: BoardMode;
-  // Product shot (purchase-sheet doors/windows): a clean studio render of ONE made-to-order
-  // item, driven by its structured spec rather than a room scene.
+  // Product shot (purchase-sheet doors/windows, and catalog products): a clean studio
+  // render of ONE item, driven by its structured spec rather than a room scene.
+  // `item_name` + `spec` are reused by product-lifestyle and material-texture, which
+  // describe the same "one named thing" rather than a room.
   item_type?: 'door' | 'window' | string;
   item_name?: string;
   spec?: Record<string, unknown>;
@@ -571,6 +574,47 @@ ${specLines || '- a flush interior door with a satin finish'}
 Show the door leaf within its frame, with the handle/hardware on the correct side per the handing. Accurate finish colour, wood grain or paint texture as specified, realistic materials. Sharp focus, high detail, no text, no watermark, no dimension labels. ${extraPrompt ?? ''}`.trim();
 }
 
+/**
+ * Product staged in a room. When a reference photo is supplied the product must survive
+ * the edit unchanged — the room is what gets invented, not the item being sold. That
+ * instruction is load-bearing: without it the model redesigns the product too, and the
+ * result is a lifestyle shot of something the customer cannot actually buy.
+ */
+function buildProductLifestylePrompt(
+  name: string,
+  roomType?: string,
+  style?: string,
+  extraPrompt?: string,
+  hasReference?: boolean,
+): string {
+  const room = (roomType || 'living room').replace(/_/g, ' ');
+  const look = style ? `${style.replace(/_/g, ' ')} ` : '';
+  const fidelity = hasReference
+    ? `The product in the supplied image is the subject. Reproduce it EXACTLY — identical shape, proportions, colour, material and detailing. Do NOT restyle, recolour, or redesign it. Place that same product, unchanged, into the scene.`
+    : `The subject is a ${name || 'product'}.`;
+
+  return `Photorealistic interior lifestyle photograph: a ${look}${room} furnished around a single hero product.
+
+${fidelity}
+
+Scene: a believable ${look}${room} with natural daylight from a window, soft realistic shadows, complementary furniture and styling that flatters but never obscures the product. The product is clearly the focal point, fully visible, at a natural viewing angle and true to its real-world scale against the room.
+
+Editorial interior-magazine quality: shallow depth of field, accurate materials, no text, no watermark, no people, no duplicated product. ${extraPrompt ?? ''}`.trim();
+}
+
+/**
+ * A seamless tileable material swatch, framed flat-on so it can be used as a texture map
+ * rather than looked at as a picture. Perspective, props and vignetting are all disqualifying
+ * here — anything that reads as "a photograph of fabric" tiles visibly when repeated.
+ */
+function buildMaterialTexturePrompt(name: string, extraPrompt?: string): string {
+  return `A seamless, tileable material texture swatch of ${name || 'woven upholstery fabric'}, photographed perfectly flat and straight-on from directly above.
+
+Fills the entire frame edge to edge with the material only. Absolutely flat orthographic view — no perspective, no curvature, no folds, no draping, no stitching, no edges of the material, no background, no props, no objects, no hands, no text, no watermark.
+
+Completely even, diffuse lighting with no highlights, no hotspots, no vignetting and no directional shadow, so the tile repeats invisibly. Uniform scale across the whole frame. Sharp macro detail showing the true weave, fibre and surface structure at consistent density. ${extraPrompt ?? ''}`.trim();
+}
+
 Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
@@ -675,8 +719,68 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       );
       const shotRatio = (body.aspect_ratio
         ?? (itemType.toLowerCase() === 'window' ? '4:3' : '3:4')) as ImageAspectRatio;
-      const result = await generateImageWithGemini(shotPrompt, { model, aspectRatio: shotRatio });
+      // Honour model_tier here too. This mode was Gemini-only, so asking for Grok
+      // silently billed the Grok rate and ran Gemini anyway.
+      const result = useGrok
+        ? await generateImageWithGrok(shotPrompt)
+        : await generateImageWithGemini(shotPrompt, { model, aspectRatio: shotRatio });
       imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+    }
+
+    // ── Mode: product-lifestyle ────────────────────────────────────────────
+    // A catalog product staged in a room. With a reference photo the product is
+    // preserved and only the room is generated around it.
+    else if (mode === 'product-lifestyle') {
+      const lifePrompt = buildProductLifestylePrompt(
+        body.item_name ?? '',
+        body.room_type,
+        body.style,
+        body.prompt,
+        Boolean(body.reference_image_url),
+      );
+      const lifeRatio = (body.aspect_ratio ?? '4:3') as ImageAspectRatio;
+
+      if (body.reference_image_url) {
+        const productBuffer = await fetchImageBuffer(body.reference_image_url);
+        const result = useGrok
+          ? await editImageWithGrok(lifePrompt, productBuffer)
+          : await generateImageWithGemini(
+              { text: lifePrompt, images: [productBuffer] },
+              { model, aspectRatio: lifeRatio },
+            );
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+      } else {
+        const result = useGrok
+          ? await generateImageWithGrok(lifePrompt)
+          : await generateImageWithGemini(lifePrompt, { model, aspectRatio: lifeRatio });
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+      }
+    }
+
+    // ── Mode: material-texture ─────────────────────────────────────────────
+    // A seamless swatch destined for a 3D material slot (#321/#260), not for display.
+    // Square by default — a non-square tile distorts when repeated across UVs.
+    else if (mode === 'material-texture') {
+      const texPrompt = buildMaterialTexturePrompt(body.item_name ?? body.prompt ?? '', body.prompt);
+      const texRatio = (body.aspect_ratio ?? '1:1') as ImageAspectRatio;
+
+      if (body.reference_image_url) {
+        // Flatten a real supplier swatch into a tileable version of ITSELF, rather
+        // than inventing a material that the customer will not receive.
+        const swatchBuffer = await fetchImageBuffer(body.reference_image_url);
+        const result = useGrok
+          ? await editImageWithGrok(texPrompt, swatchBuffer)
+          : await generateImageWithGemini(
+              { text: texPrompt, images: [swatchBuffer] },
+              { model, aspectRatio: texRatio },
+            );
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+      } else {
+        const result = useGrok
+          ? await generateImageWithGrok(texPrompt)
+          : await generateImageWithGemini(texPrompt, { model, aspectRatio: texRatio });
+        imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+      }
     }
 
     // ── Mode 2: image-edit ─────────────────────────────────────────────────

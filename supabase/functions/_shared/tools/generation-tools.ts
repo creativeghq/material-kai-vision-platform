@@ -231,7 +231,7 @@ export const createGeminiGenerationTool = (
   conversationId?: string, // Per-session storage folder key
 ) => {
   return tool(
-    async ({ prompt: rawPrompt, roomType, style, mode, referenceImageUrl, modelTier: agentModelTier, materialImages, sqm, boardMode }) => {
+    async ({ prompt: rawPrompt, roomType, style, mode, referenceImageUrl, modelTier: agentModelTier, materialImages, sqm, boardMode, productName }) => {
       try {
         // Strip [model:grok] or [model:pro] prefix injected by the edit modal for auto-submit
         // The prefix encodes the model tier chosen by the user without going through the agent.
@@ -426,6 +426,20 @@ export const createGeminiGenerationTool = (
             : resolvedMode !== 'redesign' && resolvedMode !== 'copy-style'
               ? { ...(floorPlanImageUrl ? { reference_image_url: floorPlanImageUrl } : {}) }
               : {}),
+          // Product modes: the subject is one named item, not a room. The reference
+          // image (a real product/swatch photo) is what keeps the output tied to
+          // something the customer can actually buy, so pass it whenever we have one.
+          ...(resolvedMode === 'product-shot' || resolvedMode === 'product-lifestyle' || resolvedMode === 'material-texture'
+            ? {
+                ...(productName ? { item_name: productName } : {}),
+                ...((() => {
+                  // An uploaded photo outranks an earlier generation: "make a hero shot
+                  // of THIS" means the thing they just attached.
+                  const ref = referenceImageUrl || images[0] || conversationImages[conversationImages.length - 1];
+                  return ref ? { reference_image_url: ref } : {};
+                })()),
+              }
+            : {}),
           // Style reference (legacy: floor-plan-render / image-edit with 2 images)
           ...(styleReferenceUrl ? { style_reference_url: styleReferenceUrl } : {}),
           // For image-edit mode, the prompt IS the edit instruction
@@ -541,14 +555,23 @@ Mode routing (auto-detected if not set explicitly):
 - floor-plan-render (floor plan image uploaded) → photorealistic eye-level perspective render
 - floor-plan-text (no image, user describes layout or provides sqm) → 2D floor plan diagram
 - text-to-image (no images, pure text description) → new room generation
-- materials-selection-board → professional materials board from a generated design`,
+- materials-selection-board → professional materials board from a generated design
+
+PRODUCT modes — the subject is ONE item, not a room. Set productName, and pass the
+product's photo as referenceImageUrl (or let an uploaded image be picked up):
+- product-shot ("hero shot", "on white", "catalog image of this product") → the product alone on seamless white
+- product-lifestyle ("show it in a room", "styled", "in situ") → the product staged in a room; with a reference photo the PRODUCT is preserved and only the room is generated around it
+- material-texture ("fabric swatch", "tileable texture", "make a material out of this") → a seamless flat swatch suitable for a 3D material, NOT a picture of fabric
+
+All three honour modelTier, so the same product can be rendered on Gemini or Grok and compared.`,
       schema: z.object({
         prompt: z.string().describe('Design description or edit instruction (e.g. "change the floor to marble and make walls warmer")'),
         roomType: z.string().optional().describe('ALWAYS extract from user message when present. Room type: bedroom, living_room, kitchen, bathroom, dining_room, home_office, hallway, studio, outdoor, kids_room, basement'),
         style: z.string().optional().describe('ALWAYS extract from user message when present. Design style: modern, minimalist, scandinavian, industrial, luxury, bohemian, traditional, mediterranean, japandi, art_deco, rustic, coastal'),
-        mode: z.enum(['text-to-image', 'image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board']).optional().describe('Generation mode. redesign=Flux Depth Pro full redesign (1 image). copy-style=Flux Depth Pro copy aesthetic from inspiration (2 images). image-edit=Gemini targeted change. Omit to auto-detect.'),
-        referenceImageUrl: z.string().optional().describe('URL of image to edit or floor plan to render. Leave empty when user has uploaded an image — it is used automatically.'),
-        modelTier: z.enum(['fast', 'pro', 'grok']).optional().describe('fast=Gemini Flash (6 credits), pro=Gemini Pro (15 credits), grok=Aurora best spatial accuracy (15 credits). Use pro or grok when user requests maximum quality. materials-selection-board always uses pro.'),
+        mode: z.enum(['text-to-image', 'image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board', 'product-shot', 'product-lifestyle', 'material-texture']).optional().describe('Generation mode. redesign=Flux Depth Pro full redesign (1 image). copy-style=Flux Depth Pro copy aesthetic from inspiration (2 images). image-edit=Gemini targeted change. product-shot=one product on seamless white. product-lifestyle=product staged in a room. material-texture=seamless tileable swatch. Omit to auto-detect.'),
+        referenceImageUrl: z.string().optional().describe('URL of image to edit, floor plan to render, or the product/swatch photo for the product modes. Leave empty when user has uploaded an image — it is used automatically.'),
+        productName: z.string().optional().describe('Name of the single item being rendered, for product-shot / product-lifestyle / material-texture (e.g. "Fenwick lounge chair", "olive green boucle").'),
+        modelTier: z.enum(['fast', 'pro', 'grok']).optional().describe('fast=Gemini Flash (6 credits), pro=Gemini Pro (15 credits), grok=Aurora best spatial accuracy (15 credits). Use pro or grok when user requests maximum quality. materials-selection-board always uses pro. If the user names a model ("use Grok", "try Gemini Pro"), honour it; if they ask to compare, call once per tier so they can pick.'),
         materialImages: z.array(z.string()).optional().describe('URLs of catalog material images to incorporate into the design (up to 14)'),
         sqm: z.number().optional().describe('Floor area in sqm for floor-plan-text generation'),
         boardMode: z.enum(['presentation-board', 'selection-board', 'photorealistic-render']).optional().describe('Board layout when mode=materials-selection-board. presentation-board=fitment + isometric + material column; selection-board=cutaway view with swatches; photorealistic-render=magazine-quality 16:9 render. Defaults to selection-board.'),
