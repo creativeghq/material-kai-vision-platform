@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil, Upload } from 'lucide-react';
+import { ImportListingsDialog } from '../components/ImportListingsDialog';
 import { PipelineBoard } from '../components/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
@@ -234,6 +235,7 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
   const navigate = useNavigate();
   const { toast } = useToast();
   const [rows, setRows] = useState<PropertyListItem[] | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const load = useCallback(async () => {
     if (!ws) return;
     try { setRows(await realEstateService.listProperties(ws)); }
@@ -241,15 +243,33 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
   }, [ws, toast]);
   useEffect(() => { void load(); }, [load]);
 
+  // The importer belongs on BOTH states. An agency arriving with an existing book hits the empty
+  // screen first, and "create your first property" is the wrong instruction for someone holding a
+  // 300-row export.
+  const importer = <ImportListingsDialog ws={ws} open={importOpen} onOpenChange={setImportOpen} onImported={load} />;
+
   if (rows === null) return <InlineLoader />;
   if (rows.length === 0) return (
     <div className="dashboard-card p-10 text-center">
       <Building2 className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
-      <p className="text-sm text-muted-foreground">No listings yet.{canManage ? ' Create your first property to get started.' : ''}</p>
-      {canManage && <Button onClick={onCreate} disabled={creating} className="mt-4 rounded-full"><Plus className="mr-2 h-4 w-4" /> New listing</Button>}
+      <p className="text-sm text-muted-foreground">No listings yet.{canManage ? ' Create your first property, or import the book you already have.' : ''}</p>
+      {canManage && (
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <Button onClick={onCreate} disabled={creating} className="rounded-full"><Plus className="mr-2 h-4 w-4" /> New listing</Button>
+          <Button variant="outline" onClick={() => setImportOpen(true)} className="rounded-full"><Upload className="mr-2 h-4 w-4" /> Import listings</Button>
+        </div>
+      )}
+      {importer}
     </div>
   );
   return (
+    <>
+    {canManage && (
+      <div className="mb-3 flex justify-end">
+        <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} className="rounded-full"><Upload className="mr-1.5 h-4 w-4" /> Import</Button>
+      </div>
+    )}
+    {importer}
     <Card><CardContent className="p-0"><div className="divide-y divide-border">
       {rows.map((r) => (
         <button key={r.id} onClick={() => navigate(`/properties/${r.id}`)} className="flex w-full items-center gap-4 px-4 py-3 text-left hover:bg-muted/40">
@@ -266,6 +286,7 @@ const ListingsPanel: React.FC<{ ws: string | null; canManage: boolean; creating:
         </button>
       ))}
     </div></CardContent></Card>
+    </>
   );
 };
 

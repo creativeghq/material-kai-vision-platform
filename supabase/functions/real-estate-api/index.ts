@@ -22,6 +22,8 @@ import {
   checkPublishRequirements, matchesCriteria, createRentInvoiceForCharge, estimateFromMedianPerSqm,
   withRentSettlements, buildCompsReport, buildVendorReport, sendVendorReport,
 } from '../_shared/real-estate.ts';
+import { normaliseImportRow } from '../_shared/real-estate-import.ts';
+import { parseKyeroXml } from '../_shared/real-estate-import-xml.ts';
 import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
 import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
 import { refreshListingEmbedding } from '../_shared/real-estate-embedding.ts';
@@ -466,6 +468,79 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         }).select('*').single();
         if (error) throw new HttpError(400, error.message);
         return json({ photo: data });
+      }
+
+      // ── Listing import (#281) — the onboarding path ────────────────────
+      case 'import-listings': {
+        requireManage();
+        // Two inputs, one pipeline: tabular rows (CSV parsed in the browser) or Kyero XML.
+        let rows: Record<string, unknown>[] = [];
+        if (typeof body.xml === 'string' && body.xml.trim()) {
+          try { rows = parseKyeroXml(body.xml); }
+          catch (e) { throw new HttpError(400, `Could not parse that XML: ${e instanceof Error ? e.message : 'unknown error'}`); }
+        } else if (Array.isArray(body.rows)) {
+          rows = body.rows as Record<string, unknown>[];
+        } else {
+          return json({ error: 'rows[] or xml is required' }, 400);
+        }
+        if (!rows.length) return json({ error: 'nothing to import' }, 400);
+        // A hard cap, reported rather than silently truncated: a 5,000-row paste would otherwise
+        // half-import and leave the agency guessing which half.
+        if (rows.length > 500) return json({ error: `That file has ${rows.length} rows; import up to 500 at a time.` }, 400);
+
+        const dryRun = body.dry_run === true;
+        const results: any[] = [];
+
+        for (const [i, raw] of rows.entries()) {
+          const { payload, errors } = normaliseImportRow(raw);
+          const ref = (payload.reference_code as string) ?? null;
+          if (errors.length) { results.push({ row: i + 1, reference_code: ref, action: 'skipped', errors }); continue; }
+
+          // Idempotence on the agency's own reference. Re-running an import must update the same
+          // listing, not duplicate the book — the failure that makes people distrust an importer.
+          let existing: any = null;
+          if (ref) {
+            const { data } = await supabase.from('properties')
+              .select('id, listing_agent_id, created_by, open_for_all')
+              .eq('workspace_id', workspaceId).eq('reference_code', ref).maybeSingle();
+            existing = data;
+          }
+          // An agent may not overwrite another agent's listing through the importer either.
+          if (existing && !access.isBroker && !canViewProperty(existing)) {
+            results.push({ row: i + 1, reference_code: ref, action: 'skipped', errors: ['a listing with this reference belongs to another agent'] });
+            continue;
+          }
+          if (dryRun) {
+            results.push({ row: i + 1, reference_code: ref, action: existing ? 'updated' : 'created', errors: [] });
+            continue;
+          }
+
+          if (existing) {
+            const { data, error } = await supabase.from('properties')
+              .update(payload).eq('id', existing.id).eq('workspace_id', workspaceId).select('id').single();
+            if (error) results.push({ row: i + 1, reference_code: ref, action: 'skipped', errors: [error.message] });
+            else results.push({ row: i + 1, reference_code: ref, action: 'updated', errors: [], property_id: data.id });
+          } else {
+            const { data, error } = await supabase.from('properties').insert({
+              ...payload,
+              workspace_id: workspaceId, created_by: userId, listing_agent_id: userId,
+              // Imported listings land as unpublished drafts, always. They have not been through
+              // checkPublishRequirements, and a bulk import that silently pushed 300 listings to the
+              // public site and the portal feeds would be unrecoverable in the way that matters.
+              listing_status: 'draft', is_public: false, in_discovery: false,
+            }).select('id').single();
+            if (error) results.push({ row: i + 1, reference_code: ref, action: 'skipped', errors: [error.message] });
+            else results.push({ row: i + 1, reference_code: ref, action: 'created', errors: [], property_id: data.id });
+          }
+        }
+
+        const summary = {
+          total: rows.length,
+          created: results.filter((r) => r.action === 'created').length,
+          updated: results.filter((r) => r.action === 'updated').length,
+          skipped: results.filter((r) => r.action === 'skipped').length,
+        };
+        return json({ dry_run: dryRun, summary, results });
       }
 
       // ── Listing performance (#281 gap 8) ───────────────────────────────

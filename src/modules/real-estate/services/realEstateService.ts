@@ -118,6 +118,13 @@ export interface ListingPerformance {
 }
 export interface ListingViewPoint { property_id: string; day: string; views: number }
 
+/** Bulk listing import. `dry_run` reports the same shape without writing anything. */
+export interface ImportResult {
+  dry_run: boolean;
+  summary: { total: number; created: number; updated: number; skipped: number };
+  results: { row: number; reference_code: string | null; action: 'created' | 'updated' | 'skipped'; errors: string[]; property_id?: string }[];
+}
+
 /** What the instructing vendor is told about their own property. Same payload the weekly email
  *  renders, so the preview and the send cannot disagree. */
 export interface VendorReport {
@@ -396,6 +403,11 @@ export const realEstateService = {
     if (error) throw error;
     return this.addPhoto(ws, propertyId, path, kind);
   },
+
+  /** Bulk import from a CSV (rows parsed in the browser) or a Kyero XML feed. Always preview with
+   *  `dryRun` first — it returns the per-row verdict without writing. */
+  importListings: (ws: string, input: { rows: Record<string, string>[] } | { xml: string }, dryRun: boolean) =>
+    call<ImportResult>(ws, 'import-listings', { ...input, dry_run: dryRun }),
 
   /** The vendor report the seller receives — preview it before sending. */
   vendorReport: (ws: string, propertyId: string) =>
