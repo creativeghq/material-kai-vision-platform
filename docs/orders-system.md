@@ -75,13 +75,33 @@ detail links to the Dispatch board for sales orders.
 
 **Single decrement ledger (2026-07-26).** Issuing a dispatch note no longer writes stock movements
 directly when the note fulfils an order — `issue_delivery_note` resolves the order (via `order_id` or
-`invoices.order_id`) and routes each matched line through **`deliver_order_line`**, which moves stock
+`invoices.order_id`) and routes each matched line through the delivered-qty ledger, which moves stock
 by the *delta* against `order_items.quantity_delivered`. So a line ships **exactly once** whether the
-user sets delivered on the order OR cuts the dispatch note (setting both is now idempotent, not a
-double-decrement). `update_warehouse=false` / ad-hoc lines are skipped automatically. Standalone
-warehouse issues/receipts (a delivery note with no order) keep the direct `record_stock_movement`
-path. The board pins the matched warehouse onto `order_items.warehouse_id` so the delta ships from the
-same stock row.
+goods were dispatched by note or by invoice. `update_warehouse=false` / ad-hoc lines are skipped
+automatically. Standalone warehouse issues/receipts (a delivery note with no order) keep the direct
+`record_stock_movement` path. The board pins the matched warehouse onto `order_items.warehouse_id` so
+the delta ships from the same stock row.
+
+**Stock moves only against a fiscal document (#320, 2026-08-07).** Greek law requires an accompanying
+document for goods leaving the warehouse (#236 locked decision), so the *delivered quantity is a
+picking marker*: it drives `recompute_order_fulfilment` and moves no stock. Three document contexts
+move stock, all through `_deliver_order_line_core(..., p_move_stock => true)`:
+
+| Context | Document | Direction |
+|---|---|---|
+| `issue_delivery_note` | Δελτίο Αποστολής (myDATA 9.3) | sales out |
+| `mark_invoice_issued` on an order-linked invoice | τιμολόγιο–δελτίο αποστολής | sales out |
+| `receive_order_into_warehouse` | supplier's document on receipt | purchase in |
+
+The public `deliver_order_line` RPC passes a hard `false` and the core is REVOKEd from
+`authenticated`, so the gate is the absence of a reachable parameter, not a default. All three route
+through the same `quantity_delivered` ledger, so ship-then-invoice cannot double-decrement — the
+invoice finds those lines already at quantity and moves nothing.
+
+Two checks back this up: `finance.order_delivered_without_document` (goods picked >7d with no invoice
+and no delivery note — also the probe on the gate's own silent-zero risk, that operators keep picking
+and never issue anything) and `finance.stock_bypasses_document_gate` (the SQL shape guard, verified to
+fire both when `deliver_order_line` writes stock again and when a non-document function passes `true`).
 
 ### Business-contact rollup (XOR-aware)
 A quote/invoice created for a contact who belongs to a business rolls up to that **company**
