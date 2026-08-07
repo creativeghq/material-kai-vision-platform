@@ -89,17 +89,54 @@ rules:
   # become a column value — workspace_id, price, is_verified. Every adapter must build an explicit
   # object literal. (tests/unit/templateRegistry.test.ts asserts the same thing over adapters.ts;
   # this rule covers every OTHER file that grows a materializer later.)
+  #
+  # Anchored to PROVENANCE, not to the variable name. The first cut matched `...payload` on sight
+  # and produced 9 findings, every one of them safe: real-estate-api builds its payload with
+  # `pick(body, PROPERTY_WRITABLE)`, the importer with an `IMPORT_WRITABLE` loop, the rest field by
+  # field, and BusinessSection's is a local form-state literal that never touches a request body.
+  # Zero true positives, nine false ones — the same mistake no-swallowed-write made below, and the
+  # same lesson: it was measuring a naming convention, not the defect. A gate that is wrong nine
+  # times out of nine is a gate people learn to force through.
+  #
+  # Taint mode was tried and is worse here: semgrep's taint is not field-sensitive, so
+  # `caption: body.caption` inside a fully explicit literal taints the whole object and `pick()`
+  # as a sanitizer does not clear it. It flagged MORE safe code, not less.
+  #
+  # So the rule binds the same metavariable to the assignment AND the spread: it fires only when
+  # the thing being spread IS the raw parsed body or the stored jsonb, with no allowlist in
+  # between. Verified against fixtures — fires on all three unsafe shapes (raw body spread, raw
+  # body as a whole update, stored `row.payload` spread) and stays silent on the allowlisted
+  # form — and across all 1335 scanned files it now reports 0.
   - id: no-mass-assignment-from-stored-payload
     languages: [typescript]
     severity: ERROR
     message: >
-      Mass-assignment (#322 / invariant 8): a stored jsonb payload is untrusted input — never
-      spread it into a DB write. Build an allowlisted object literal, field by field.
+      Mass-assignment (#322 / invariant 8): this is the RAW request body or a stored jsonb payload
+      going straight into a DB write, so any key the caller invents becomes a column value —
+      workspace_id, user_id, role, price, is_verified. Put an allowlist in between
+      (`pick(body, WRITABLE)`) or build the object literal field by field.
     pattern-either:
-      - pattern: $T.insert({..., ...$P.payload, ...})
-      - pattern: $T.insert({..., ...payload, ...})
-      - pattern: $T.update({..., ...$P.payload, ...})
-      - pattern: $T.update({..., ...payload, ...})
+      # The raw parsed request body, spread or written whole.
+      - patterns:
+          - pattern-inside: |
+              const $P = await $REQ.json();
+              ...
+          - pattern-either:
+              - pattern: $T.insert({..., ...$P, ...})
+              - pattern: $T.update({..., ...$P, ...})
+              - pattern: $T.insert($P)
+              - pattern: $T.update($P)
+      # A stored jsonb payload read back out of the database (#322's own hazard):
+      # untrusted when it went in, still untrusted coming out.
+      - patterns:
+          - pattern-inside: |
+              const $P = $ROW.payload;
+              ...
+          - pattern-either:
+              - pattern: $T.insert({..., ...$P, ...})
+              - pattern: $T.update({..., ...$P, ...})
+              - pattern: $T.insert($P)
+              - pattern: $T.update($P)
 
   # ── #309 item 6 · Swallowed failure in money / payment paths ───────────────
   # 7 of the 8 swallowed-failure findings across the whole audit were ONE shape: a bare

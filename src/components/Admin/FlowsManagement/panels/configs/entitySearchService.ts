@@ -58,6 +58,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'email-contacts-sync-cron', label: 'email-contacts-sync-cron', sublabel: 'Daily cron: push CRM contacts to each workspace\'s Resend audience' },
   { id: 'email-unsubscribe', label: 'email-unsubscribe', sublabel: 'Public one-click marketing email opt-out (RFC 8058 List-Unsubscribe).' },
   { id: 'email-webhooks', label: 'email-webhooks', sublabel: 'Receives Resend delivery event webhooks and updates email_logs.' },
+  { id: 'facets-recanonicalize', label: 'facets-recanonicalize', sublabel: 'Bulk facet re-canonicalization sweep — replays attributes_raw to repair degraded products (#316).' },
   { id: 'finance-customer-documents', label: 'finance-customer-documents', sublabel: 'Customer self-service view of their own invoices, receipts and orders' },
   { id: 'finance-digest-aggregate', label: 'finance-digest-aggregate', sublabel: 'Send finance digest emails and dispatch quote follow-up bell notifications' },
   { id: 'finance-fiscal-offline-recovery', label: 'finance-fiscal-offline-recovery', sublabel: 'Re-query connector for pending MARK on offline-accepted fiscal documents' },

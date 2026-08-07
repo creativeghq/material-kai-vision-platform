@@ -65,7 +65,50 @@ export async function createWorkspace(svc: SupabaseClient, label: string, rid: s
     .select('id')
     .single();
   if (error) throw new Error(`createWorkspace(${label}): ${error.message}`);
+  await grantUnlimitedPlan(svc, ownerId);
   return data.id;
+}
+
+/**
+ * Put the fixture's owner on an unlimited plan.
+ *
+ * #214 added `enforce_material_quota`, which caps a workspace at its plan's `max_materials`.
+ * `workspace_quota` resolves that from the OWNER's active subscription and falls back to the
+ * `free` plan — 10 materials — when there is none. A fixture owner has no subscription, so from
+ * the moment that trigger shipped every suite that creates more than ten products died with
+ * `quota_exceeded`, and since the whole deploy job runs these tests, NOTHING has deployed since.
+ * That is how a correct feature took production offline: the cap was right, the fixtures were
+ * invisible to it.
+ *
+ * Deliberately done through the REAL mechanism — a real `user_subscriptions` row on the real
+ * `enterprise` plan — rather than exempting fixtures inside the trigger. An `is_fixture` bypass
+ * in `enforce_material_quota` would be a quota escape hatch living in production code, keyed on a
+ * column, one RLS mistake away from being a free upgrade for anyone who can create a workspace.
+ * A subscription row is what a paying tenant genuinely looks like, which is also what these tests
+ * should be exercising.
+ */
+export async function grantUnlimitedPlan(svc: SupabaseClient, userId: string): Promise<void> {
+  const { data: plan, error: planErr } = await svc
+    .from('subscription_plans')
+    .select('id')
+    .eq('name', 'enterprise')
+    .maybeSingle();
+  // Fail loudly. Silently skipping leaves the suite to die 20 lines later on a quota error that
+  // says nothing about the plan lookup that actually went wrong.
+  if (planErr) throw new Error(`grantUnlimitedPlan(plan lookup): ${planErr.message}`);
+  if (!plan) throw new Error("grantUnlimitedPlan: no 'enterprise' plan — fixtures would hit the free-plan cap");
+
+  const { error } = await svc
+    .from('user_subscriptions')
+    .insert({
+      user_id: userId,
+      plan_id: plan.id,
+      status: 'active',
+      current_period_start: new Date().toISOString(),
+      // A year out: a suite running across a period boundary must not start failing on quota.
+      current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+  if (error) throw new Error(`grantUnlimitedPlan: ${error.message}`);
 }
 
 // is_workspace_member() requires status='active', so set it explicitly. Upsert because a

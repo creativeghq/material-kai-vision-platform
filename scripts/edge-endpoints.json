@@ -1064,6 +1064,77 @@
     "response": "{success:true, event_type:string}"
   },
   {
+    "name": "facets-recanonicalize",
+    "tag": "Internal",
+    "summary": "Bulk facet re-canonicalization sweep (proxy to MIVAA)",
+    "description": "Internal-only proxy to MIVAA's POST /api/admin/facets/recanonicalize (#316). Replays products.attributes_raw through the canonicalizer so a similarity-threshold change, a curated alias, or an outage-degraded product can be repaired without re-ingesting any source PDF. Driven nightly at 03:40 by the facets-recanonicalize-degraded cron with degraded_only=true; a full catalog re-sweep costs a Voyage embedding per raw value and must be requested explicitly. Requires service-role or x-cron-secret (isCronAuthorized) — an open proxy here would be an open Voyage spend. Returns `remaining` so the caller knows whether to run again.",
+    "security": [
+      "service_role"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "degraded_only": {
+          "type": "boolean",
+          "description": "Default TRUE. Only replay products flagged degraded by a failed run. Pass false for a full catalog re-sweep after a rules change."
+        },
+        "max_products": {
+          "type": "integer",
+          "description": "Hard cap for one call (1-5000, default 200). Check `remaining` in the response to decide whether to call again."
+        },
+        "batch_size": {
+          "type": "integer",
+          "description": "Rows fetched per batch (1-200, default 25)"
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Optional — scope the sweep to one tenant"
+        },
+        "target_version": {
+          "type": "integer",
+          "description": "Optional — sweep products below this facet_canonicalization_version. Defaults to MIVAA's CURRENT_FACET_CANONICALIZATION_VERSION."
+        }
+      },
+      "required": []
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "scanned": {
+          "type": "integer",
+          "description": "Products examined this call"
+        },
+        "updated": {
+          "type": "integer",
+          "description": "Products whose canonical attributes were rewritten"
+        },
+        "degraded": {
+          "type": "integer",
+          "description": "Still failing; deliberately NOT version-bumped so they stay eligible and are retried first"
+        },
+        "skipped_no_raw": {
+          "type": "integer",
+          "description": "Nothing lossless to replay; version bumped so they are not rescanned forever"
+        },
+        "failed": {
+          "type": "integer",
+          "description": "Canonicalize or write raised"
+        },
+        "remaining": {
+          "type": "integer",
+          "description": "Products still below target_version. -1 means the count itself failed — explicitly unknown, never a comforting 0."
+        },
+        "target_version": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  {
     "name": "finance-digest-aggregate",
     "tag": "Finance",
     "summary": "Send finance digest emails and dispatch quote follow-up bell notifications",
