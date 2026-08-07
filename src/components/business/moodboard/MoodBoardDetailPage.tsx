@@ -22,6 +22,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { Badge } from '@/components/core/ui/badge';
 import { PageHeader } from '@/components/shared/PageHeader';
 
@@ -96,6 +97,7 @@ export const MoodBoardDetailPage: React.FC = () => {
   const [creatingProposal, setCreatingProposal] = useState(false);
   const [showPinterestImport, setShowPinterestImport] = useState(false);
   const [showProductSearch, setShowProductSearch] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
 
   const [relatedQuotes, setRelatedQuotes] = useState<any[]>([]);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -320,15 +322,27 @@ export const MoodBoardDetailPage: React.FC = () => {
         title="Moodboards"
         subtitle="Organize and curate your favourite materials"
         actions={
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-full gap-1.5"
-            onClick={() => navigate('/moodboard')}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            All moodboards
-          </Button>
+          <>
+            {/* Reuse this board's slots on the next client (#322). */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full gap-1.5"
+              onClick={() => setSaveTemplateOpen(true)}
+            >
+              <Layers className="h-4 w-4" />
+              Save as template
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full gap-1.5"
+              onClick={() => navigate('/moodboard')}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              All moodboards
+            </Button>
+          </>
         }
       />
 
@@ -671,6 +685,16 @@ export const MoodBoardDetailPage: React.FC = () => {
           moodboardTitle={moodboard.title}
           existingMaterialIds={items.map((i) => i.material_id).filter((x): x is string => !!x)}
           onAdded={() => { loadMoodboardDetails(); }}
+        />
+      )}
+
+      {moodboard && (
+        <SaveAsTemplateDialog
+          entityType="moodboard"
+          sourceId={moodboard.id}
+          open={saveTemplateOpen}
+          onOpenChange={setSaveTemplateOpen}
+          defaultTitle={moodboard.title}
         />
       )}
     </div>

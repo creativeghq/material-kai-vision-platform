@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { edgeErrorMessage } from '@/utils/edgeError';
-import { MoreVertical, Eye, CreditCard, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download } from 'lucide-react';
+import { MoreVertical, Eye, CreditCard, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download, Layers } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -29,6 +29,7 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 import { usePermissions } from '@/hooks/usePermissions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
+import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 
 interface Props {
   invoiceId: string;
@@ -56,6 +57,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
   const [detailBusy, setDetailBusy] = useState(false);
 
   // Dialog open flags + edit state
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [descOpen, setDescOpen] = useState(false);
   const [descValue, setDescValue] = useState('');
   const [catOpen, setCatOpen] = useState(false);
@@ -99,10 +101,12 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     toast({ title: 'Link copied' });
   };
 
-  const useAsTemplate = async () => {
+  /** One-shot copy of THIS document into a fresh draft. Distinct from "Save as template", which
+   *  stores a reusable named shape in the library (#322) rather than another invoice. */
+  const duplicateAsDraft = async () => {
     try {
       const newId = await financeService.duplicateInvoice(invoiceId);
-      toast({ title: 'Draft created from template' });
+      toast({ title: 'Draft created from this invoice' });
       navigate(`${financeBase}/invoices/${newId}`);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -237,10 +241,19 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
 
         <DropdownMenuSeparator />
         {!isAccountant && <DropdownMenuItem onClick={() => go('?action=credit_note')}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>}
-        {!isAccountant && <DropdownMenuItem onClick={useAsTemplate}><Files className="h-4 w-4 mr-2" /> Use as template</DropdownMenuItem>}
+        {!isAccountant && <DropdownMenuItem onClick={duplicateAsDraft}><Files className="h-4 w-4 mr-2" /> Duplicate as draft</DropdownMenuItem>}
+        {!isAccountant && <DropdownMenuItem onClick={() => setSaveTemplateOpen(true)}><Layers className="h-4 w-4 mr-2" /> Save as template</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={sendEmail}><Mail className="h-4 w-4 mr-2" /> Send email</DropdownMenuItem>}
       </DropdownMenuContent>
     </DropdownMenu>
+
+    {/* Save as template (#322) — stores the reusable shape, not another invoice. */}
+    <SaveAsTemplateDialog
+      entityType="invoice"
+      sourceId={invoiceId}
+      open={saveTemplateOpen}
+      onOpenChange={setSaveTemplateOpen}
+    />
 
     {/* Change description */}
     <Dialog open={descOpen} onOpenChange={setDescOpen}>

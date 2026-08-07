@@ -133,6 +133,14 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'My flows', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:My%20flows', icon: ListChecks },
     { label: 'Pause a flow', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:Pause%20a%20flow', icon: PauseCircle },
   ],
+  // Templates (#322). The library filters on ?type=, whose values are the LIVE_TEMPLATE_TYPES keys
+  // in src/services/templates/schema.ts — not a tab list. Keep these in step with that array.
+  templates: [
+    { label: 'Invoice templates', to: '/templates?type=invoice', icon: Receipt },
+    { label: 'Quote templates', to: '/templates?type=quote', icon: FilePlus },
+    { label: 'Project templates', to: '/templates?type=project', icon: FolderPlus },
+    { label: 'Moodboard templates', to: '/templates?type=moodboard', icon: LayoutTemplate },
+  ],
   // Sales/Inbox have no URL tabs → Open-only. My HR is Open-only too: EmployeeSelfServicePage uses
   // Tabs `defaultValue` and never reads ?tab=, so a tab deep-link would be inert.
 };

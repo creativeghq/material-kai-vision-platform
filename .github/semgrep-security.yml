@@ -81,6 +81,26 @@ rules:
       - pattern: $T.insert(**$REQ.dict())
       - pattern: $T.insert(**$REQ.model_dump())
 
+  # ── #322 · Mass assignment from a STORED payload (invariant 8, TS side) ─────
+  # The Python rule above catches a request body spread into a write. The template engine
+  # introduced the same hazard from a different direction: `entity_templates.payload` is jsonb
+  # read back out of the database, i.e. input that was untrusted when it went in and is untrusted
+  # when it comes out. `.insert({ ...payload })` would let any key that ever landed in that column
+  # become a column value — workspace_id, price, is_verified. Every adapter must build an explicit
+  # object literal. (tests/unit/templateRegistry.test.ts asserts the same thing over adapters.ts;
+  # this rule covers every OTHER file that grows a materializer later.)
+  - id: no-mass-assignment-from-stored-payload
+    languages: [typescript]
+    severity: ERROR
+    message: >
+      Mass-assignment (#322 / invariant 8): a stored jsonb payload is untrusted input — never
+      spread it into a DB write. Build an allowlisted object literal, field by field.
+    pattern-either:
+      - pattern: $T.insert({..., ...$P.payload, ...})
+      - pattern: $T.insert({..., ...payload, ...})
+      - pattern: $T.update({..., ...$P.payload, ...})
+      - pattern: $T.update({..., ...payload, ...})
+
   # ── #309 item 6 · Swallowed failure in money / payment paths ───────────────
   # 7 of the 8 swallowed-failure findings across the whole audit were ONE shape: a bare
   # `catch {}` (or a discarded `error`) followed by an unconditional success toast. The user is

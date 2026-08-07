@@ -1,0 +1,125 @@
+/**
+ * Universal entity templates (#322) — registry guard.
+ *
+ * Two failure shapes this feature is exposed to, neither of which TypeScript can see:
+ *
+ *  1. **Two-copy drift.** The list of template types lives in `schema.ts` AND in the DB CHECK
+ *     `entity_templates_entity_type_check`. Add a type to one only and it fails at the worst
+ *     moment: the UI happily offers "Save as template" and the INSERT throws a CHECK violation
+ *     when the user presses Save. This is the same shape that made every `sales` /
+ *     `realestate_agent` invite fail at redemption (see workspaceRoles.test.ts).
+ *
+ *  2. **A leaky allowlist.** A payload is a snapshot of a real record. The moment an adapter
+ *     captures the wrong column, the template quietly carries something it must not: a myDATA
+ *     `fiscal_mark` (cloning a *legal* document), a `public_share_token` (a stranger inherits
+ *     access to the new record), or a derived `total` (a second derivation of a money quantity —
+ *     the exact bug moneyDerivation.test.ts exists to stop). None of those are type errors; every
+ *     one of them is a valid string.
+ *
+ * The declarative half of the registry (`schema.ts`) imports nothing but types precisely so this
+ * test can inspect the allowlists directly instead of regexing source.
+ */
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import {
+  LIVE_TEMPLATE_TYPES, PLANNED_TEMPLATE_TYPES, TEMPLATE_ENTITY_TYPES, TEMPLATE_SCHEMAS,
+} from '@/services/templates/schema';
+import { FORBIDDEN_CAPTURE_FIELDS } from '@/services/templates/types';
+
+const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8').replace(/\r\n/g, '\n');
+
+/**
+ * The live values of `entity_templates_entity_type_check`, transcribed from the applied migration
+ * `entity_templates_engine`. Verify with:
+ *   select pg_get_constraintdef(oid) from pg_constraint
+ *    where conname = 'entity_templates_entity_type_check';
+ */
+const DB_ALLOWED_ENTITY_TYPES = [
+  'invoice', 'quote', 'project', 'moodboard', 'order',
+  'contract', 'expense', 'hr_onboarding', 'crm_company', 'property_listing',
+];
+
+describe('template entity types ↔ DB CHECK constraint', () => {
+  it('the TS union and the DB CHECK list are the same set', () => {
+    expect([...TEMPLATE_ENTITY_TYPES].sort()).toEqual([...DB_ALLOWED_ENTITY_TYPES].sort());
+  });
+
+  it('every type is either live (has an adapter) or explicitly planned — none is simply missing', () => {
+    const accounted = new Set<string>([...LIVE_TEMPLATE_TYPES, ...PLANNED_TEMPLATE_TYPES]);
+    const unaccounted = TEMPLATE_ENTITY_TYPES.filter((t) => !accounted.has(t));
+    expect(unaccounted, `types with neither an adapter nor a PLANNED_TEMPLATE_TYPES entry: ${unaccounted.join(', ')}`).toEqual([]);
+  });
+
+  it('live and planned do not overlap', () => {
+    const overlap = LIVE_TEMPLATE_TYPES.filter((t) => (PLANNED_TEMPLATE_TYPES as readonly string[]).includes(t));
+    expect(overlap).toEqual([]);
+  });
+
+  it('every live type has a schema entry', () => {
+    for (const t of LIVE_TEMPLATE_TYPES) {
+      expect(TEMPLATE_SCHEMAS[t], `no schema for live type "${t}"`).toBeTruthy();
+      expect(TEMPLATE_SCHEMAS[t].sourceTable.length).toBeGreaterThan(0);
+      expect(TEMPLATE_SCHEMAS[t].label.length).toBeGreaterThan(0);
+      expect(TEMPLATE_SCHEMAS[t].captureFields.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('capture allowlists carry no identity, fiscal or derived-money field', () => {
+  const forbidden = new Set<string>(FORBIDDEN_CAPTURE_FIELDS);
+
+  for (const type of LIVE_TEMPLATE_TYPES) {
+    const schema = TEMPLATE_SCHEMAS[type];
+
+    it(`${type}: parent fields are clean`, () => {
+      const bad = schema.captureFields.filter((f) => forbidden.has(f));
+      expect(bad, `${type}.captureFields must not include ${bad.join(', ')}`).toEqual([]);
+    });
+
+    it(`${type}: child fields are clean`, () => {
+      for (const child of schema.captureChildren ?? []) {
+        const bad = child.fields.filter((f) => forbidden.has(f));
+        expect(bad, `${type} → ${child.table}.fields must not include ${bad.join(', ')}`).toEqual([]);
+        // The FK back to the parent is supplied by the writer, never captured.
+        expect(child.fields).not.toContain(child.fk);
+      }
+    });
+
+    it(`${type}: a nested child stores parent_index, never the parent's id`, () => {
+      for (const child of schema.captureChildren ?? []) {
+        if (!child.hierarchy) continue;
+        expect(child.fields).not.toContain(child.hierarchy.idField);
+        expect(child.fields).not.toContain(child.hierarchy.parentField);
+      }
+    });
+
+    it(`${type}: editable fields all exist in the capture allowlist`, () => {
+      for (const f of schema.editableFields ?? []) {
+        expect(
+          schema.captureFields.includes(f.key),
+          `${type}: editable field "${f.key}" is not captured, so editing it would write a key the adapter never reads`,
+        ).toBe(true);
+      }
+    });
+  }
+});
+
+describe('adapters never mass-assign a stored payload', () => {
+  const ADAPTERS = read('src/services/templates/adapters.ts');
+
+  it('no payload spread reaches an insert', () => {
+    // Security invariant 8. The payload is jsonb read back out of the DB — untrusted input — so
+    // `.insert({ ...payload })` would let anything that ever landed in the column become a column
+    // value, including workspace_id or a price.
+    const spreads = ADAPTERS.match(/\.insert\(\s*\{[^}]*\.\.\.\s*(payload|p)\b/g) ?? [];
+    expect(spreads, `mass assignment of a template payload: ${spreads.join(' | ')}`).toEqual([]);
+  });
+
+  it('every live adapter is exported from adapters.ts', () => {
+    for (const t of LIVE_TEMPLATE_TYPES) {
+      expect(ADAPTERS).toContain(`export const ${t}Adapter`);
+    }
+  });
+});

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Palette, FileText, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Palette, FileText, Trash2, Loader2, Layers } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import {
@@ -32,11 +32,13 @@ import { createProposalFromMoodboard } from '@/components/business/moodboard/cre
 import { useNavigate } from 'react-router-dom';
 import { DashboardCard } from '@/components/core/DesignSystem/DashboardCard';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 
 export const MoodBoardPage = () => {
   const [moodboards, setMoodboards] = useState<MoodBoard[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [creatingProposal, setCreatingProposal] = useState<string | null>(null);
   const { toast } = useToast();
@@ -162,14 +164,27 @@ export const MoodBoardPage = () => {
         title="MoodBoards"
         subtitle="Organize and curate your favorite materials"
         actions={
-          <Button
-            onClick={() => setShowCreateDialog(true)}
-            variant="outline" size="sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New MoodBoard
-          </Button>
+          <>
+            {/* Board shells you always start from (#322). */}
+            <Button onClick={() => setTemplatePickerOpen(true)} variant="outline" size="sm">
+              <Layers className="h-4 w-4 mr-2" />
+              From template
+            </Button>
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              variant="outline" size="sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New MoodBoard
+            </Button>
+          </>
         }
+      />
+
+      <TemplatePickerDialog
+        entityType="moodboard"
+        open={templatePickerOpen}
+        onOpenChange={setTemplatePickerOpen}
       />
 
       {/* Main Content */}

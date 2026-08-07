@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Layers } from 'lucide-react';
 
 import {
   Dialog,
@@ -17,6 +17,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { quotesService } from '../services/QuotesService';
 import { ProjectPickerInline } from '@/modules/projects/components/ProjectPickerInline';
 import { CustomerPicker, type QuoteCustomer } from '@/modules/quotes/components/CustomerPicker';
+import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
+import { entityTemplatesService } from '@/services/entityTemplatesService';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CreateQuoteModalProps {
   open: boolean;
@@ -33,11 +37,44 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
   defaultProjectId = null,
 }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [quoteName, setQuoteName] = useState('');
   const [notes, setNotes] = useState('');
   const [projectId, setProjectId] = useState<string | null>(defaultProjectId);
   const [customer, setCustomer] = useState<QuoteCustomer | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+
+  /**
+   * Start from a saved quote shape (#322). The template brings its own line items, so it creates
+   * the draft outright rather than filling this form — the project + customer chosen here are
+   * carried onto it.
+   */
+  const createFromTemplate = async (templateId: string) => {
+    const workspaceId = getActiveWorkspaceId(user?.id);
+    if (!workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
+    try {
+      setProcessing(true);
+      const result = await entityTemplatesService.apply(templateId, {
+        workspaceId,
+        title: quoteName.trim() || undefined,
+        projectId,
+        customer: {
+          companyId: customer?.type === 'company' ? customer.id : null,
+          contactId: customer?.type === 'contact' ? customer.id : null,
+        },
+      });
+      if (result.kind !== 'created') return;
+      toast({ title: 'Quote created from template' });
+      onSuccess(result.id, quoteName.trim() || 'Quote');
+      setQuoteName(''); setNotes(''); setCustomer(null);
+      onClose();
+    } catch (error) {
+      toast({ title: 'Error', description: String((error as Error)?.message ?? error), variant: 'destructive' });
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   // When a project is picked and no customer is set yet, inherit the project's client so pricing +
   // email + invoicing all resolve against the right party.
@@ -113,6 +150,15 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
+          <Button
+            variant="outline"
+            className="w-full rounded-full"
+            disabled={processing}
+            onClick={() => setTemplatePickerOpen(true)}
+          >
+            <Layers className="h-4 w-4 mr-2" /> Start from a template
+          </Button>
+
           <div>
             <Label>Quote Name *</Label>
             <Input
@@ -174,6 +220,13 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
             </Button>
           </div>
         </div>
+
+        <TemplatePickerDialog
+          entityType="quote"
+          open={templatePickerOpen}
+          onOpenChange={setTemplatePickerOpen}
+          onSelect={(tpl) => createFromTemplate(tpl.id)}
+        />
       </DialogContent>
     </Dialog>
   );

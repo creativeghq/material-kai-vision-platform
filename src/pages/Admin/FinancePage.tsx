@@ -83,10 +83,13 @@ import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsM
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import SupplierPortalPage from '@/pages/SupplierPortalPage';
-import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch, Pencil } from 'lucide-react';
+import { FileText, FileMinus, Banknote, Truck, FileSignature, PackageCheck, ShoppingCart, PackageSearch, Pencil, Layers } from 'lucide-react';
 import { EditSupplierBillDialog } from '@/modules/finance/components/EditSupplierBillDialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { entityTemplatesService } from '@/services/entityTemplatesService';
+import { buildInvoicePrefill, type InvoicePrefill } from '@/services/templates/registry';
+import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 
 const DOC_TABS: { value: string; type: any; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'doc_orders', type: 'orders', label: 'Orders', icon: ShoppingCart },
@@ -193,15 +196,36 @@ const FinancePage: React.FC = () => {
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
 
+  /**
+   * Template prefill (#322). An invoice template never creates the document itself — it opens
+   * this dialog pre-filled so the operator still picks the customer and passes the buyer-risk
+   * gate. The Template Library links here as `?new=invoice&template=<id>`.
+   */
+  const [invoicePrefill, setInvoicePrefill] = useState<InvoicePrefill | null>(null);
+  const [invoiceTemplatePickerOpen, setInvoiceTemplatePickerOpen] = useState(false);
+
   // App Launcher deep-link: /finance?new=invoice opens the New Invoice modal.
   useEffect(() => {
     if (isAccountant) return; // read-only role cannot create
-    if (searchParams.get('new') === 'invoice') {
-      setNewInvoiceOpen(true);
-      const p = new URLSearchParams(searchParams);
-      p.delete('new');
-      setSearchParams(p, { replace: true });
-    }
+    if (searchParams.get('new') !== 'invoice') return;
+    const templateId = searchParams.get('template');
+    const p = new URLSearchParams(searchParams);
+    p.delete('new');
+    p.delete('template');
+    setSearchParams(p, { replace: true });
+
+    if (!templateId) { setInvoicePrefill(null); setNewInvoiceOpen(true); return; }
+    (async () => {
+      try {
+        const tpl = await entityTemplatesService.get(templateId);
+        setInvoicePrefill(tpl ? await buildInvoicePrefill(tpl.payload as never) : null);
+      } catch {
+        // A template that will not load must not block creating an invoice by hand.
+        setInvoicePrefill(null);
+      } finally {
+        setNewInvoiceOpen(true);
+      }
+    })();
   }, [searchParams, setSearchParams, isAccountant]);
   const [scnOpen, setScnOpen] = useState(false);
   const [scnBillId, setScnBillId] = useState<string | undefined>(undefined);
@@ -889,7 +913,12 @@ const FinancePage: React.FC = () => {
                     title="Filter receivables"
                   />
                   {!isAccountant && (
-                    <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => setInvoiceTemplatePickerOpen(true)}>
+                        <Layers className="h-4 w-4 mr-1" /> From template
+                      </Button>
+                      <Button size="sm" onClick={() => setNewInvoiceOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
+                    </>
                   )}
                 </div>
               </CardHeader>
@@ -1311,11 +1340,30 @@ const FinancePage: React.FC = () => {
         </Tabs>
       </div>
 
+      {/* Start from an invoice template (#322). The template pre-fills this form; it never
+          creates the document, so the customer pick and buyer-risk gate still happen here. */}
+      <TemplatePickerDialog
+        entityType="invoice"
+        open={invoiceTemplatePickerOpen}
+        onOpenChange={setInvoiceTemplatePickerOpen}
+        onSelect={async (tpl) => {
+          try {
+            setInvoicePrefill(await buildInvoicePrefill(tpl.payload as never));
+          } catch {
+            setInvoicePrefill(null);
+          } finally {
+            setNewInvoiceOpen(true);
+          }
+        }}
+      />
       <NewInvoiceDialog
         workspaceId={workspaceId}
         open={newInvoiceOpen}
-        onOpenChange={setNewInvoiceOpen}
-        onCreated={(invoiceId) => { setNewInvoiceOpen(false); navigate(`${financeBase}/invoices/${invoiceId}`); }}
+        onOpenChange={(v) => { setNewInvoiceOpen(v); if (!v) setInvoicePrefill(null); }}
+        initialItems={invoicePrefill?.items ?? null}
+        initialDocType={invoicePrefill?.documentType}
+        initialNotes={invoicePrefill?.notes}
+        onCreated={(invoiceId) => { setNewInvoiceOpen(false); setInvoicePrefill(null); navigate(`${financeBase}/invoices/${invoiceId}`); }}
       />
       <NewExpenseDialog
         workspaceId={workspaceId}

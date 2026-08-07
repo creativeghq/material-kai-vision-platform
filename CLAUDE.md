@@ -117,6 +117,16 @@ stay in sync (guarded by [tests/unit/toolkitCoverage.test.ts](tests/unit/toolkit
 Every new tool's `onChunk` type MUST be registered in `AGENT_RESULT_TITLES` in `AgentHub.tsx`, or the output is
 silently dropped.
 
+## Templates — one table, one registry, an allowlist per type
+"Reusable starting point for a record" is **one** system (`entity_templates`, issue #322), not a table per
+entity. Adding a type = an adapter in `src/services/templates/` + a value in the CHECK constraint
+`entity_templates_entity_type_check` — two copies, guarded by
+[tests/unit/templateRegistry.test.ts](tests/unit/templateRegistry.test.ts). Do NOT add a `<thing>_templates` table.
+- **`captureFields` is an allowlist and the guard test reads it.** Never capture ids, `status`, `*_token`, `fiscal_*`, `legal_number`, or a derived total (`total`, `vat_amount`, `amount_paid`) — a cloned MARK is a fake legal document, a cloned share token hands a stranger the new record, and a stored total is a second derivation of a money quantity.
+- **`apply()` builds an explicit object literal.** A payload is stored jsonb = untrusted input; `.insert({...payload})` is mass assignment (invariant 8, semgrep `no-mass-assignment-from-stored-payload`). Narrow every enum value through `oneOf` in `templates/coerce.ts` — a value a CHECK rejects fails *partway* through and leaves half a record.
+- **Money documents return `{kind:'prefill'}`, never `{kind:'created'}`** — same reason `ordersService.reorderPrefill` returns a prefill: an invoice conjured behind the operator skips numbering, buyer-risk and myDATA classification.
+- The existing per-feature template systems (email, messaging, catalog design, PDF, XML mappings, blueprints) stay where they are; the hub link-outs to them live in `EXTERNAL_TEMPLATE_SOURCES`.
+
 ## Workspace roles — the vocabulary lives in four places at once
 `src/auth/workspaceRoles.ts` is the catalog (label + portal + description + module gate). A role must ALSO exist
 in `workspace_members_role_check`, `workspace_invites_role_check`, and the allowlists inside

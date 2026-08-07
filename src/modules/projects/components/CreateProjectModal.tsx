@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Loader2, X, Home } from 'lucide-react';
+import { Plus, Loader2, X, Home, Layers } from 'lucide-react';
 
 import {
   Dialog,
@@ -27,6 +27,10 @@ import {
 } from '../services/projectsService';
 import { ClientPicker, type ClientPickerValue } from './ClientPicker';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
+import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
+import { entityTemplatesService } from '@/services/entityTemplatesService';
+import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CreateProjectModalProps {
   open: boolean;
@@ -68,7 +72,9 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 }) => {
   const { toast } = useToast();
   const { isAdmin } = useUserRole();
+  const { user } = useAuth();
   const [processing, setProcessing] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const clientLocked = lockClient ?? !!initialClient;
 
   const [name, setName] = useState('');
@@ -173,6 +179,16 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-5 mt-2">
+          {/* Start from a saved project shape (#322) — rooms + the whole task tree come with it. */}
+          <Button
+            variant="outline"
+            className="w-full rounded-full"
+            disabled={processing}
+            onClick={() => setTemplatePickerOpen(true)}
+          >
+            <Layers className="h-4 w-4 mr-2" /> Start from a template
+          </Button>
+
           {/* Basics */}
           <div className="space-y-3">
             <div>
@@ -347,6 +363,31 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             </Button>
           </div>
         </div>
+
+        <TemplatePickerDialog
+          entityType="project"
+          open={templatePickerOpen}
+          onOpenChange={setTemplatePickerOpen}
+          onSelect={async (tpl) => {
+            const workspaceId = getActiveWorkspaceId(user?.id);
+            if (!workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
+            try {
+              setProcessing(true);
+              const result = await entityTemplatesService.apply(tpl.id, {
+                workspaceId,
+                title: name.trim() || undefined,
+              });
+              if (result.kind !== 'created') return;
+              toast({ title: 'Project created from template' });
+              onSuccess(result.id, name.trim() || tpl.title);
+              onClose();
+            } catch (e) {
+              toast({ title: 'Error', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+            } finally {
+              setProcessing(false);
+            }
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

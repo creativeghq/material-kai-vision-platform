@@ -7306,6 +7306,103 @@ export type Database = {
           },
         ]
       }
+      entity_template_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          payload: Json
+          template_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          payload: Json
+          template_id: string
+          version: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          payload?: Json
+          template_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "entity_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entity_templates: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          entity_type: string
+          id: string
+          is_platform_starter: boolean
+          last_used_at: string | null
+          payload: Json
+          status: string
+          title: string
+          updated_at: string
+          usage_count: number
+          version: number
+          workspace_id: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          entity_type: string
+          id?: string
+          is_platform_starter?: boolean
+          last_used_at?: string | null
+          payload?: Json
+          status?: string
+          title: string
+          updated_at?: string
+          usage_count?: number
+          version?: number
+          workspace_id?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          entity_type?: string
+          id?: string
+          is_platform_starter?: boolean
+          last_used_at?: string | null
+          payload?: Json
+          status?: string
+          title?: string
+          updated_at?: string
+          usage_count?: number
+          version?: number
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entity_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ergani_leave_types: {
         Row: {
           category: string
@@ -31355,6 +31452,7 @@ export type Database = {
           ref: string
         }[]
       }
+      bump_template_usage: { Args: { p_template_id: string }; Returns: undefined }
       calculate_generation_cost: { Args: { p_job_id: string }; Returns: number }
       calculate_layout_stats: { Args: { p_product_id: string }; Returns: Json }
       calculate_price_change: {

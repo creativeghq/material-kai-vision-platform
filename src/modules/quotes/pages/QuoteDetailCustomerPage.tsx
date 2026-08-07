@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, Tag, Boxes, Milestone, RotateCcw, CreditCard } from 'lucide-react';
+import { ArrowLeft, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, Tag, Boxes, Milestone, RotateCcw, CreditCard, Layers } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney } from '@/modules/finance/services/financeService';
 
@@ -22,6 +22,7 @@ import { QuoteShareButton } from '../components/QuoteShareButton';
 import { QuoteEmailButton } from '../components/QuoteEmailButton';
 import { useQuoteDocument } from '../hooks/useQuoteDocument';
 import { trackQuoteView } from '@/services/quoteAnalyticsService';
+import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 
 /**
  * Customer-facing Quote Detail Page
@@ -39,6 +40,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const [updatingUpsell, setUpdatingUpsell] = useState<string | null>(null);
   const [acceptingQuote, setAcceptingQuote] = useState(false);
   const [submittingQuote, setSubmittingQuote] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [showAddProducts, setShowAddProducts] = useState(false);
   const [openInvoice, setOpenInvoice] = useState<{ id: string; internal_number: string; amount_due: number; currency: string; status: string } | null>(null);
   const [payingNow, setPayingNow] = useState(false);
@@ -258,6 +260,10 @@ export const QuoteDetailCustomerPage: React.FC = () => {
         actions={
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <QuoteStatusBadge status={quote.status} />
+            {/* Reuse this quote's shape on the next job (#322). */}
+            <Button variant="outline" size="sm" className="rounded-full" onClick={() => setSaveTemplateOpen(true)}>
+              <Layers className="h-4 w-4 mr-2" /> Save as template
+            </Button>
             {quote.status === 'draft' && (
               <Button
                 onClick={handleSubmitQuote}
@@ -720,6 +726,15 @@ export const QuoteDetailCustomerPage: React.FC = () => {
         customerCompanyId={(quote as any).customer_company_id}
         customerContactId={(quote as any).customer_contact_id}
         onProductsAdded={loadQuoteDetails}
+      />
+
+      {/* Save this quote's shape for reuse (#322). */}
+      <SaveAsTemplateDialog
+        entityType="quote"
+        sourceId={quote.id}
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        defaultTitle={quote.name || undefined}
       />
     </div>
   );

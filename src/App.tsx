@@ -54,6 +54,8 @@ const SalesPage = lazy(() => import('./pages/Sales/SalesPage'));
 const EmployeeSelfServicePage = lazy(() => import('./modules/hr/pages/EmployeeSelfServicePage'));
 const BlueprintLibraryPage = lazy(() => import('./pages/Blueprints/BlueprintLibraryPage').then(m => ({ default: m.BlueprintLibraryPage })));
 const BlueprintEditorPage = lazy(() => import('./pages/Blueprints/BlueprintEditorPage').then(m => ({ default: m.BlueprintEditorPage })));
+const TemplateLibraryPage = lazy(() => import('./pages/Templates/TemplateLibraryPage').then(m => ({ default: m.TemplateLibraryPage })));
+const TemplateEditorPage = lazy(() => import('./pages/Templates/TemplateEditorPage').then(m => ({ default: m.TemplateEditorPage })));
 
 // Feature pages
 const MaterialRecognition = lazy(() => import('./components/features/recognition/MaterialRecognition').then(m => ({ default: m.MaterialRecognition })));
@@ -705,6 +707,27 @@ const App = () => (
                     <AuthGuard>
                       <Layout>
                         <BlueprintEditorPage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                {/* Universal entity templates (#322) — one library for every record type. */}
+                <Route
+                  path="/templates"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <TemplateLibraryPage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/templates/:id"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <TemplateEditorPage />
                       </Layout>
                     </AuthGuard>
                   }

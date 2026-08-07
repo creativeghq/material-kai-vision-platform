@@ -25,6 +25,7 @@ import {
   FileSignature,
   FileStack,
   MessageSquare,
+  Layers,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -63,6 +64,7 @@ import { FinanceTab } from '../components/tabs/FinanceTab';
 import { PlanTab } from '../components/tabs/PlanTab';
 import { PurchaseItemsTab } from '../components/tabs/PurchaseItemsTab';
 import { InviteCollaboratorsModal } from '../components/InviteCollaboratorsModal';
+import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
   planning: 'Planning',
@@ -90,6 +92,7 @@ export const ProjectDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'overview' | 'rooms' | 'products' | 'purchases' | 'plan' | 'moodboards' | 'quotes' | 'finance' | 'sheets' | 'client-view' | 'contracts' | 'tasks' | 'timeline'>('overview');
   const [showInvite, setShowInvite] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
 
   // Ownership: project.user_id is the creator. Anyone else who can read the project
   // got here via a project_collaborators row (RLS guarantees this). Owner gets the
@@ -194,6 +197,13 @@ export const ProjectDetailPage: React.FC = () => {
               <Button size="sm" onClick={() => setShowInvite(true)} className="rounded-full">
                 <UserPlus className="h-4 w-4 mr-1" />
                 Invite client
+              </Button>
+            )}
+            {/* Reuse this project's rooms + task tree on the next job (#322). */}
+            {isOwner && (
+              <Button variant="outline" size="sm" onClick={() => setSaveTemplateOpen(true)}>
+                <Layers className="h-4 w-4 mr-1" />
+                Save as template
               </Button>
             )}
             {isOwner && project.status !== 'archived' && (
@@ -340,6 +350,16 @@ export const ProjectDetailPage: React.FC = () => {
           projectName={project.name}
           open={showInvite}
           onClose={() => setShowInvite(false)}
+        />
+      )}
+
+      {isOwner && (
+        <SaveAsTemplateDialog
+          entityType="project"
+          sourceId={project.id}
+          open={saveTemplateOpen}
+          onOpenChange={setSaveTemplateOpen}
+          defaultTitle={project.name}
         />
       )}
     </div>

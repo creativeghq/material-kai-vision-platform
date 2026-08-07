@@ -25,6 +25,7 @@ import {
   BookOpen,
   ImagePlus,
   Building2,
+  Layers,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
@@ -180,6 +181,18 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     hub: 'sales',
     description: 'Supplier demand and engagement analytics.',
   },
+  // Templates (#322) — one library for every record type: invoices, quotes, projects, moodboards,
+  // plus link-outs to the template systems that have their own editors. No `hub` on purpose: it is
+  // not a business module, it cuts across all of them, so it belongs in the launcher's catch-all
+  // "More" group. No capability gate either — every persona that can create a record can reuse one.
+  {
+    id: 'templates',
+    label: 'Templates',
+    path: '/templates',
+    icon: Layers,
+    surface: 'app',
+    description: 'Reusable starting points for invoices, quotes, projects and moodboards.',
+  },
   // Blueprints live under Projects. Supplier portal lives under Finance → Payables /
   // Profile → Supplier Portal. Admin moved to the profile menu (operator-only). Network is on the
   // workspace switcher.
@@ -273,6 +286,8 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'social',
   'seo',
   'automations',
+  // Cross-cutting
+  'templates',
   // Niche / role-specific
   'factory-analytics',
 ];
