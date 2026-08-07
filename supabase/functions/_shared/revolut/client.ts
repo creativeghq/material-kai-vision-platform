@@ -372,6 +372,15 @@ export function listTransactions(
   return revolutJson<RevolutTransaction[]>(supabase, cfg, issuerDomain, `/transactions?${q.toString()}`);
 }
 
+/**
+ * One transaction by id. Needed because `/transactions?from=` filters on CREATION time:
+ * a line that was pending when we last pulled and completed afterwards is never returned
+ * again by the list endpoint, so the sync backstop has to re-read it explicitly.
+ */
+export function getTransaction(supabase: any, cfg: RevolutConfigRow, issuerDomain: string, id: string) {
+  return revolutJson<RevolutTransaction>(supabase, cfg, issuerDomain, `/transaction/${id}`);
+}
+
 // ---------------------------------------------------------------------------
 // Money-out (PAY/WRITE scopes) — thin wrappers; auditing lives in revolut_payouts.
 // ---------------------------------------------------------------------------

@@ -103,7 +103,16 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         .limit(100);
       if (provider) query = query.eq('provider', provider);
       if (direction) query = query.eq('direction', direction);
-      if (statusF === 'review') query = query.in('match_status', ['suggested', 'unmatched']).eq('provider', 'revolut').eq('direction', 'in');
+      // Review = anything reconcilable that found no home, BOTH directions: money paid
+      // out by hand in the Revolut app needs a human as much as an unmatched receipt
+      // does. `type=transfer` mirrors the matcher, so own-money lines (top-ups,
+      // exchanges, fees) never turn up here asking to be matched to an invoice.
+      if (statusF === 'review') {
+        query = query
+          .in('match_status', ['suggested', 'unmatched'])
+          .eq('provider', 'revolut')
+          .eq('type', 'transfer');
+      }
       else if (statusF) query = query.eq('match_status', statusF);
       if (from) query = query.gte('booked_at', `${from}T00:00:00Z`);
       if (to) query = query.lte('booked_at', `${to}T23:59:59Z`);

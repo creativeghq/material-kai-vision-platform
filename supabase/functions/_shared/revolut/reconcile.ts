@@ -2,6 +2,18 @@
  * Revolut feed reconciliation (#315 phase 2) — match incoming statement lines to open
  * invoices and settle them through the ONE money path.
  *
+ * WHAT EVEN ENTERS THE MATCHER. Two filters run before the ladder, because the feed is
+ * per-LEG and carries every kind of money movement, not just customer payments:
+ *   - `type = 'transfer'` only. A `topup`, `exchange` credit, `card_refund`, `refund` or
+ *     `fee` leg is not a customer paying an invoice; letting those in filled the review
+ *     queue with own-money and fired one "unmatched bank payment" alert per line.
+ *   - Transactions with an `out` leg of ours are INTERNAL movements (pocket→pocket), whose
+ *     `in` leg is otherwise indistinguishable from an incoming customer payment. They are
+ *     stamped `ignored` so they leave the review surface instead of being re-scanned and
+ *     re-suggested on every pass. A transaction with more than one `in` leg is ambiguous
+ *     (which leg is the payment?) and is never auto-settled — it can still be matched by
+ *     hand from the feed.
+ *
  * Matching ladder, most→least certain:
  *   1. `reference` — the transfer text contains exactly one open invoice's
  *      internal_number → AUTO-match.
@@ -24,12 +36,21 @@
 import { recordInvoicePayment } from '../payments/record-payment.ts';
 import { emitFlowEvent } from '../flow-events.ts';
 import { transliterateToLatin } from '../transliterate.ts';
+import { financeNotifyRecipient } from './notify.ts';
+
+/**
+ * The only transaction type that can be a counterparty paying us (or us paying a
+ * supplier). Everything else in the feed is own-money and must never reach the ladder.
+ */
+export const RECONCILABLE_TX_TYPE = 'transfer';
 
 export interface ReconcileResult {
   scanned: number;
   autoMatched: number;
   suggested: number;
   unmatched: number;
+  /** Internal pocket→pocket movements stamped `ignored` rather than offered for matching. */
+  internal: number;
   errors: string[];
 }
 
@@ -74,17 +95,38 @@ async function loadOpenInvoices(service: any, workspaceId: string): Promise<Open
   })).filter((i: OpenInvoice) => i.internal_number.length > 0);
 }
 
-/** The workspace owner's user id — recipient of unmatched-payment notifications. */
-async function workspaceOwnerId(service: any, workspaceId: string): Promise<string | null> {
-  const { data } = await service
-    .from('workspace_members')
-    .select('user_id')
-    .eq('workspace_id', workspaceId)
-    .eq('role', 'owner')
-    .eq('status', 'active')
-    .limit(1)
-    .maybeSingle();
-  return data?.user_id ?? null;
+export interface LegShape {
+  /** Legs of this transaction that credit one of our accounts. */
+  inLegs: number;
+  /** Legs that debit one of our accounts — their presence means the money never left us. */
+  outLegs: number;
+}
+
+/**
+ * Group the feed's per-leg rows back onto their parent transaction.
+ *
+ * A single Revolut transaction becomes N rows (`<txid>:<legid>`), so amount-matching a
+ * row in isolation is matching a fragment. The shape of the whole transaction is what
+ * says whether its `in` leg is real incoming money (external counterparty → one in leg,
+ * no out leg) or an internal pocket move (in AND out legs, both ours).
+ */
+export async function loadLegShapes(service: any, workspaceId: string, transactionIds: string[]): Promise<Map<string, LegShape>> {
+  const shapes = new Map<string, LegShape>();
+  if (transactionIds.length === 0) return shapes;
+  for (let i = 0; i < transactionIds.length; i += 200) {
+    const { data } = await service
+      .from('revolut_bank_transactions')
+      .select('transaction_id, direction')
+      .eq('workspace_id', workspaceId)
+      .eq('provider', 'revolut')
+      .in('transaction_id', transactionIds.slice(i, i + 200));
+    for (const row of (data ?? []) as Array<{ transaction_id: string; direction: string }>) {
+      const cur = shapes.get(row.transaction_id) ?? { inLegs: 0, outLegs: 0 };
+      if (row.direction === 'in') cur.inLegs++; else cur.outLegs++;
+      shapes.set(row.transaction_id, cur);
+    }
+  }
+  return shapes;
 }
 
 /** Settle one line against one invoice and stamp the row. Shared by auto + manual. */
@@ -129,9 +171,14 @@ export async function settleTransaction(
  *   - or exactly one open bill with cent-equal amount_due AND supplier-name match → settle
  * The payments row + payment_allocations.supplier_bill_id write mirrors the manual
  * bank-payment path; bill amount_paid/amount_due derive from allocations as always.
+ *
+ * What does NOT match is now announced. Money leaving the account with no bill behind it
+ * — a transfer someone made by hand in the Revolut app — used to be visible only to
+ * whoever thought to browse the feed; it now raises the same one-per-line
+ * `bank_payment_unmatched` alert the incoming side has always raised.
  */
-export async function reconcileOutgoingRevolut(service: any, workspaceId: string): Promise<{ settled: number; errors: string[] }> {
-  const out = { settled: 0, errors: [] as string[] };
+export async function reconcileOutgoingRevolut(service: any, workspaceId: string): Promise<{ settled: number; unmatched: number; errors: string[] }> {
+  const out = { settled: 0, unmatched: 0, errors: [] as string[] };
   const { data: txs } = await service
     .from('revolut_bank_transactions')
     .select('*')
@@ -140,11 +187,14 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
     .eq('match_status', 'unmatched')
     .eq('direction', 'out')
     .eq('state', 'completed')
-    .eq('type', 'transfer')
+    .eq('type', RECONCILABLE_TX_TYPE)
     .is('reconciled_payment_id', null)
     .order('booked_at', { ascending: true })
     .limit(200);
   if (!txs?.length) return out;
+
+  const shapes = await loadLegShapes(service, workspaceId, [...new Set<string>(txs.map((t: any) => String(t.transaction_id)))]);
+  const recipientId = await financeNotifyRecipient(service, workspaceId);
 
   const { data: billRows } = await service
     .from('supplier_bills')
@@ -159,6 +209,17 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
   })).filter((b: any) => b.numberKey.length > 0 || b.nameKeyed.length > 0);
 
   for (const tx of txs as any[]) {
+    // The mirror of the incoming guard: an out leg whose transaction also credits one of
+    // our accounts is a pocket→pocket move, not a supplier payment.
+    const shape = shapes.get(String(tx.transaction_id)) ?? { inLegs: 0, outLegs: 1 };
+    if (shape.inLegs > 0) {
+      await service
+        .from('revolut_bank_transactions')
+        .update({ match_status: 'ignored', updated_at: new Date().toISOString() })
+        .eq('id', tx.id);
+      continue;
+    }
+
     const refText = nameKey(String(tx.reference ?? ''));
     const cpName = nameKey(String(tx.counterparty_name ?? ''));
     const txCurrency = String(tx.currency ?? 'EUR').toUpperCase();
@@ -175,7 +236,17 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
     } else if (byNumber.length === 0 && byAmountName.length === 1) {
       bill = byAmountName[0]; method = 'amount_name';
     }
-    if (!bill || !method) continue;
+    if (!bill || !method) {
+      out.unmatched++;
+      // Only escalate when the tenant actually tracks payables. With no open bill to
+      // match against, "outgoing money with no bill behind it" describes rent, payroll
+      // and tax as much as it describes a missed supplier payment — the review queue
+      // shows those; a notification each would train people to ignore the alert.
+      if (recipientId && bills.length > 0 && !tx.unmatched_notified_at) {
+        await notifyUnmatched(service, workspaceId, recipientId, tx, 'out');
+      }
+      continue;
+    }
 
     try {
       // Idempotent payments row (provider, provider_ref unique). On a duplicate, pick
@@ -253,7 +324,7 @@ export async function reconcileOutgoingRevolut(service: any, workspaceId: string
 }
 
 export async function reconcileWorkspaceRevolut(service: any, workspaceId: string): Promise<ReconcileResult> {
-  const result: ReconcileResult = { scanned: 0, autoMatched: 0, suggested: 0, unmatched: 0, errors: [] };
+  const result: ReconcileResult = { scanned: 0, autoMatched: 0, suggested: 0, unmatched: 0, internal: 0, errors: [] };
 
   const { data: txs, error: txErr } = await service
     .from('revolut_bank_transactions')
@@ -265,6 +336,8 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
     .eq('match_status', 'unmatched')
     .eq('direction', 'in')
     .eq('state', 'completed')
+    // Own-money movements (top-ups, exchanges, refunds, fees) are not invoice payments.
+    .eq('type', RECONCILABLE_TX_TYPE)
     .is('reconciled_payment_id', null)
     .order('booked_at', { ascending: true })
     .limit(500);
@@ -276,10 +349,30 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
   result.scanned = lines.length;
   if (lines.length === 0) return result;
 
+  const shapes = await loadLegShapes(service, workspaceId, [...new Set<string>(lines.map((l: any) => String(l.transaction_id)))]);
   let invoices = await loadOpenInvoices(service, workspaceId);
-  const ownerId = await workspaceOwnerId(service, workspaceId);
+  const recipientId = await financeNotifyRecipient(service, workspaceId);
+  if (!recipientId) {
+    console.warn(`[revolut/reconcile] ${workspaceId}: no active member — unmatched-payment alerts cannot be delivered`);
+  }
 
   for (const tx of lines) {
+    const shape = shapes.get(String(tx.transaction_id)) ?? { inLegs: 1, outLegs: 0 };
+    // Both sides of the transaction are ours → pocket→pocket move, not a payment. Stamp
+    // it so it stops coming back on every pass instead of silently re-suggesting.
+    // Safe because Revolut carries transfer fees as leg ATTRIBUTES, not as extra legs, so
+    // a genuine incoming transfer has exactly one leg — and because `ignored` is not a
+    // dead end: the row stays visible in the feed and is still matchable by hand.
+    if (shape.outLegs > 0) {
+      const { error } = await service
+        .from('revolut_bank_transactions')
+        .update({ match_status: 'ignored', updated_at: new Date().toISOString() })
+        .eq('id', tx.id);
+      if (error) result.errors.push(`${tx.provider_ref}: internal stamp failed: ${error.message}`);
+      else result.internal++;
+      continue;
+    }
+
     const refText = nameKey(String(tx.reference ?? ''));
     const cpName = nameKey(String(tx.counterparty_name ?? ''));
     const txCurrency = String(tx.currency ?? 'EUR').toUpperCase();
@@ -291,11 +384,16 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
     const byAmount = sameCurrency.filter((i) => centsEqual(i.amount_due, Number(tx.amount)));
     const byName = cpName ? sameCurrency.filter((i) => namesMatch(i.customer_name, cpName)) : [];
 
+    // A transaction split across several incoming legs cannot be auto-settled: this row
+    // is a fragment of the payment, so its amount matches nothing and its reference
+    // matches everything. Candidates still surface for a human.
+    const singleLeg = shape.inLegs === 1;
+
     let settled = false;
-    if (byNumber.length === 1) {
+    if (singleLeg && byNumber.length === 1) {
       const s = await settleTransaction(service, tx, byNumber[0].id, 'reference');
       if (s.ok) { result.autoMatched++; settled = true; } else result.errors.push(`${tx.provider_ref}: ${s.error}`);
-    } else if (byAmount.length === 1 && byName.some((i) => i.id === byAmount[0].id)) {
+    } else if (singleLeg && byAmount.length === 1 && byName.some((i) => i.id === byAmount[0].id)) {
       const s = await settleTransaction(service, tx, byAmount[0].id, 'amount_name');
       if (s.ok) { result.autoMatched++; settled = true; } else result.errors.push(`${tx.provider_ref}: ${s.error}`);
     }
@@ -323,25 +421,47 @@ export async function reconcileWorkspaceRevolut(service: any, workspaceId: strin
 
     result.unmatched++;
     // One notification per line, ever.
-    if (ownerId && !tx.unmatched_notified_at) {
-      await emitFlowEvent('bank_payment_unmatched', {
-        user_id: ownerId,
-        type: 'bank_payment_unmatched',
-        title: 'Unmatched bank payment',
-        body: `${txCurrency} ${Number(tx.amount).toFixed(2)} from ${tx.counterparty_name ?? 'unknown sender'} — no invoice matched. Review the bank feed.`,
-        action_url: '/finance?tab=settings&section=banks',
-        workspace_id: workspaceId,
-        amount: Number(tx.amount),
-        currency: txCurrency,
-        counterparty: tx.counterparty_name ?? null,
-        reference: tx.reference ?? null,
-      }).catch((err) => console.warn('[revolut/reconcile] flow emit failed:', err?.message ?? err));
-      await service
-        .from('revolut_bank_transactions')
-        .update({ unmatched_notified_at: new Date().toISOString() })
-        .eq('id', tx.id);
+    if (recipientId && !tx.unmatched_notified_at) {
+      await notifyUnmatched(service, workspaceId, recipientId, tx, 'in');
     }
   }
 
   return result;
+}
+
+/**
+ * One `bank_payment_unmatched` event per feed line, ever (stamped via
+ * `unmatched_notified_at`). Both directions use the same trigger — the payload's
+ * `direction` lets a flow branch — so adding the money-out side needed no new trigger
+ * type and no second seeded flow.
+ */
+async function notifyUnmatched(
+  service: any,
+  workspaceId: string,
+  recipientId: string,
+  tx: any,
+  direction: 'in' | 'out',
+): Promise<void> {
+  const currency = String(tx.currency ?? 'EUR').toUpperCase();
+  const amount = Number(tx.amount);
+  const party = tx.counterparty_name ?? (direction === 'in' ? 'unknown sender' : 'unknown recipient');
+  await emitFlowEvent('bank_payment_unmatched', {
+    user_id: recipientId,
+    type: 'bank_payment_unmatched',
+    title: direction === 'in' ? 'Unmatched bank payment' : 'Unmatched outgoing payment',
+    body: direction === 'in'
+      ? `${currency} ${amount.toFixed(2)} from ${party} — no invoice matched. Review the bank feed.`
+      : `${currency} ${amount.toFixed(2)} paid to ${party} — no supplier bill matched. Review the bank feed.`,
+    action_url: '/finance?tab=settings&section=banks',
+    workspace_id: workspaceId,
+    direction,
+    amount,
+    currency,
+    counterparty: tx.counterparty_name ?? null,
+    reference: tx.reference ?? null,
+  }).catch((err: any) => console.warn('[revolut/reconcile] flow emit failed:', err?.message ?? err));
+  await service
+    .from('revolut_bank_transactions')
+    .update({ unmatched_notified_at: new Date().toISOString() })
+    .eq('id', tx.id);
 }

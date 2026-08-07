@@ -237,6 +237,7 @@ Full reference: `.claude/design-system.md`.
 | Units of measure / quantity pricing | [docs/units-and-quantity-pricing.md](docs/units-and-quantity-pricing.md) |
 | Customs / TARIC codes | [docs/taric-customs-classification.md](docs/taric-customs-classification.md) |
 | Finance / orders / quotes | [docs/finance-system.md](docs/finance-system.md), [docs/orders-system.md](docs/orders-system.md), [docs/quotes-system-architecture.md](docs/quotes-system-architecture.md) |
+| Bank feed & reconciliation (Revolut Business) | [docs/banking-revolut.md](docs/banking-revolut.md) — the feed is **per-leg**: match a row in isolation and an internal pocket move settles a customer invoice |
 | CRM / HR / Projects / Real estate | [docs/crm-system.md](docs/crm-system.md), [docs/hr-system.md](docs/hr-system.md), [docs/projects.md](docs/projects.md), [docs/real-estate-system.md](docs/real-estate-system.md) |
 | Knowledge base | [docs/knowledge-base-implementation.md](docs/knowledge-base-implementation.md) |
 | XML import | [docs/xml-import-orchestrator.md](docs/xml-import-orchestrator.md) |

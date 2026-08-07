@@ -560,6 +560,8 @@ Complete documentation for Material Kai Vision Platform.
 
 **[payments-stripe.md](payments-stripe.md)** - Stripe integration reference (checkout, portal, webhooks, Connect)
 
+**[banking-revolut.md](banking-revolut.md)** - Revolut Business ✨ NEW (2026-08) — per-workspace BYOK bank feed, per-leg reconciliation into invoices/supplier bills, drafts/payouts/FX, virtual cards & expense import
+
 **[hr-system.md](hr-system.md)** - HR module ✨ NEW (2026-07) — first paid tenant add-on; employees as tagged `crm_contacts` + `hr_employees`/`hr_absences`, gated `hr-api`
 
 **[contracts-system.md](contracts-system.md)** - Contracts & e-signature ✨ NEW (2026-07) — one entity across `hr`/`finance`/`project` contexts, public `/sign/:token` page, context-branched RLS

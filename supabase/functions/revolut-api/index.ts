@@ -318,7 +318,13 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       const { reconcileWorkspaceRevolut, reconcileOutgoingRevolut } = await import('../_shared/revolut/reconcile.ts');
       const rec = await reconcileWorkspaceRevolut(service, workspaceId);
       const outRec = await reconcileOutgoingRevolut(service, workspaceId);
-      return jsonResponse({ ok: true, ...rec, billsSettled: outRec.settled, outgoingErrors: outRec.errors });
+      return jsonResponse({
+        ok: true,
+        ...rec,
+        billsSettled: outRec.settled,
+        outgoingUnmatched: outRec.unmatched,
+        outgoingErrors: outRec.errors,
+      });
     }
 
     case 'confirm-match': {
