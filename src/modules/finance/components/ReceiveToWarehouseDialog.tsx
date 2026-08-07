@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/core/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import {
@@ -147,6 +148,7 @@ export const ReceiveToWarehouseDialog: React.FC<{
   onDone: () => void;
 }> = ({ doc, workspaceId, onOpenChange, onDone }) => {
   const { toast } = useToast();
+  const handleQuota = useQuotaErrorHandler();
   const [items, setItems] = useState<WarehouseItem[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [targetWh, setTargetWh] = useState('');
@@ -615,6 +617,8 @@ export const ReceiveToWarehouseDialog: React.FC<{
       });
       onDone();
     } catch (e: any) {
+      // A plan-quota refusal gets the dedicated "Upgrade" toast instead of the failure blob.
+      if (handleQuota(e)) return; // finally below still clears busy
       // Name what survived. No stock moved (the receipt RPC is all-or-nothing and runs last), but
       // anything created before the failure is real and will be duplicated by a blind retry.
       const leftBehind = createdNames.length > 0

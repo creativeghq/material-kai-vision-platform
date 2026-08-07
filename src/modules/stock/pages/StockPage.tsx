@@ -4,6 +4,7 @@ import { Warehouse as WarehouseIcon, LayoutDashboard, Boxes, ArrowLeftRight, Cli
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { WorkspaceQuotaBadge } from '@/components/core/WorkspaceQuotaBadge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import { WarehousePanel } from '@/modules/finance/components/WarehousePanel';
@@ -55,6 +56,10 @@ export default function StockPage() {
       <PageHeader icon={WarehouseIcon} title="Warehouse" subtitle="Inventory, movements, dispatch, resupply & stocktake" />
 
       <div className="p-3 sm:p-6">
+        {/* Materials plan cap ("X / Y materials") — services don't count, matching enforce_material_quota. */}
+        <div className="mb-3 flex justify-end">
+          <WorkspaceQuotaBadge table="products" quotaKey="max_materials" label="materials" notEq={{ column: 'item_type', value: 'service' }} />
+        </div>
         <Tabs value={tab} onValueChange={setTab} orientation="vertical" className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <TabsList className="finance-tabs-list flex h-auto w-full shrink-0 flex-row flex-wrap gap-1 bg-transparent p-0 lg:w-56 lg:flex-col lg:flex-nowrap">
             <TabsTrigger value="overview" className="w-full justify-start"><LayoutDashboard className="h-4 w-4 mr-2" /> Overview</TabsTrigger>

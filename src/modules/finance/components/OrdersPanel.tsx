@@ -17,6 +17,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from '@/components/core/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import {
   formatMoney, financeService, VAT_CATEGORIES,
@@ -2894,6 +2895,7 @@ const LineStockDialog: React.FC<{
   onApply: (patch: { productId?: string | null; updateWarehouse?: boolean }, note: string) => void;
 }> = ({ workspaceId, label, unitCode, unitCost, currentProductId, currentProductName, updateWarehouse, supplierCompanyId, onClose, onApply }) => {
   const { toast } = useToast();
+  const handleQuota = useQuotaErrorHandler();
   const [term, setTerm] = useState(label);
   const [opts, setOpts] = useState<Array<{ id: string; name: string }>>([]);
   const [busy, setBusy] = useState(false);
@@ -2927,7 +2929,9 @@ const LineStockDialog: React.FC<{
       }
       onApply({ productId, updateWarehouse: true }, `“${name}” added to the catalog and linked.`);
     } catch (err: any) {
-      toast({ title: 'Could not create the product', description: err?.message, variant: 'destructive' });
+      if (!handleQuota(err)) {
+        toast({ title: 'Could not create the product', description: err?.message, variant: 'destructive' });
+      }
       setBusy(false);
     }
   };

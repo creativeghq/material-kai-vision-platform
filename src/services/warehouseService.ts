@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { isQuotaError } from '@/hooks/useQuotaErrorHandler';
 import { PRODUCT_IMAGE_SELECT, getProductImageUrl, getProductName } from '@/utils/productMetadata';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { dealerProductsService, type ManualImageRef } from '@/services/dealerProductsService';
@@ -342,7 +343,10 @@ export const warehouseService = {
         source: 'warehouse_intake',
       });
       return { productId, embedded: true };
-    } catch {
+    } catch (e) {
+      // A quota refusal is final — the local fallback insert would hit the same
+      // enforce_material_quota trigger. Rethrow so the caller shows the upgrade prompt (#214).
+      if (isQuotaError(e)) throw e;
       const productId = await this.createProduct({
         workspaceId: input.workspaceId, name: input.name, sku: input.sku ?? null,
         externalSku: input.externalSku ?? null, unit: input.unit, cost: input.cost,
