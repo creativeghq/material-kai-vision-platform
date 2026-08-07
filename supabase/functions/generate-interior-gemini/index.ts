@@ -34,6 +34,7 @@ import {
   buildDualReferenceStylePrompt,
 } from '../_shared/interior-prompt-builder.ts';
 import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
+import { resolveGenerationRouting } from '../_shared/generation-routing.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
@@ -332,23 +333,8 @@ async function callFluxDepthPro(
   throw new Error('Flux Depth Pro timed out after 3 minutes');
 }
 
-// ── Credit costs ──────────────────────────────────────────────────────────────
-
-// Credit costs
-const CREDIT_COSTS: Record<string, number> = {
-  'gemini-3.1-flash-image': 6,
-  'gemini-3-pro-image': 15,
-  'flux-depth-pro': 20,
-  'grok-aurora': 15,
-};
-
-// Label → `ai_model_pricing.model_key`, for the one case where the two differ.
-// Contains NO prices — it is an identity map, so there is still exactly one place
-// a USD figure is defined. Only add an entry when a label genuinely cannot be renamed
-// (here, `grok-aurora` is part of the response payload shape at the bottom of this file).
-const PRICING_KEY_BY_LABEL: Record<string, string> = {
-  'grok-aurora': 'xai-aurora',
-};
+// Credit costs and provider routing now live in _shared/generation-routing.ts so the
+// billed model and the invoked model come from one derivation.
 
 type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot' | 'product-lifestyle' | 'material-texture';
 type BoardMode = 'presentation-board' | 'selection-board' | 'photorealistic-render';
@@ -655,20 +641,16 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
 
   const jobId = crypto.randomUUID();
   const uploadCtx: Partial<SessionPathCtx> = { userId: resolvedUserId, conversationId: body.conversation_id };
-  const useGrok = body.model_tier === 'grok';
-  const model: GeminiImageModel =
-    body.model_tier === 'pro'
-      ? 'gemini-3-pro-image'
-      : 'gemini-3.1-flash-image';
   const aspectRatio: ImageAspectRatio = body.aspect_ratio ?? '16:9';
   const mode: GenerationMode = body.mode ?? detectMode(body);
-  const isFluxMode = (mode === 'redesign') || (mode === 'copy-style' && !useGrok);
-  const credits = isFluxMode
-    ? CREDIT_COSTS['flux-depth-pro']
-    : useGrok
-    ? CREDIT_COSTS['grok-aurora']
-    : CREDIT_COSTS[model];
-  const modelLabel = isFluxMode ? 'flux-depth-pro' : useGrok ? 'grok-aurora' : model;
+  // Single source for provider + price (see _shared/generation-routing.ts): credits
+  // are keyed off the label of the model that actually runs, so the two can't drift.
+  const routing = resolveGenerationRouting(mode, body.model_tier);
+  const useGrok = routing.provider === 'grok';
+  const isFluxMode = routing.provider === 'flux';
+  const model: GeminiImageModel = routing.geminiModel;
+  const credits = routing.credits;
+  const modelLabel = routing.modelLabel;
 
   let debited = false;
   try {
@@ -1053,7 +1035,7 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
     // It also logged `model` (always a Gemini id) rather than `modelLabel`, so redesign
     // and copy-style runs — which actually invoke flux-depth-pro or Grok — were attributed
     // to Gemini. Cost per model was wrong for exactly the modes that cost the most.
-    const pricingKey = PRICING_KEY_BY_LABEL[modelLabel] ?? modelLabel;
+    const pricingKey = routing.pricingKey;
     const imagePricing = await getServicePricing(supabase, pricingKey);
     if (!imagePricing) {
       console.warn(`[generate-interior-gemini] no ai_model_pricing row for "${pricingKey}" — cost logged as null`);
