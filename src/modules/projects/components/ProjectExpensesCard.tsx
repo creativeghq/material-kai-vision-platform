@@ -20,8 +20,7 @@ import { Label } from '@/components/core/ui/label';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { formatMoney } from '@/utils/decimal';
-import { parseDecimal } from '@/utils/decimal';
+import { formatMoney, parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
 import {
   tripExpenseService, TRIP_EXPENSE_CATEGORIES, type TripExpenseItem,
