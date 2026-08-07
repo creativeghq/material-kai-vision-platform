@@ -98,6 +98,16 @@ The public `deliver_order_line` RPC passes a hard `false` and the core is REVOKE
 through the same `quantity_delivered` ledger, so ship-then-invoice cannot double-decrement — the
 invoice finds those lines already at quantity and moves nothing.
 
+**Where the numbers live.** The hand-typed delivered quantity is written to
+`order_items.quantity_delivered` and nothing else — that column is both the picking record and the
+thing that stops a second document re-shipping the same goods. The stock movement is a separate row
+in `stock_movements`, and it **cites the document that authorised it**: `source_type` is `invoice` or
+`delivery_note` with that document's id, and `reason` carries its human number (`Invoice INV-2026-777`,
+`Δελτίο Αποστολής 9.3-45`). It briefly did not — the first cut stamped `source_type='order'`, which
+could prove a movement happened but not which paper justified it, and that is the only fact an audit
+asks for. The document parameters have no defaults, so a caller cannot move stock while staying
+anonymous in the ledger.
+
 Two checks back this up: `finance.order_delivered_without_document` (goods picked >7d with no invoice
 and no delivery note — also the probe on the gate's own silent-zero risk, that operators keep picking
 and never issue anything) and `finance.stock_bypasses_document_gate` (the SQL shape guard, verified to

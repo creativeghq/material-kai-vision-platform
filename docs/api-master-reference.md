@@ -363,6 +363,7 @@ Reference: the JARVIS agent exposes `seo_*` sub-agent tools that call these.
 |----------|--------|------|---------|
 | `kb-generate-embedding` | POST | JWT or service-role | Generate Voyage AI 1024D embedding for a `kb_docs` row (triggered on insert/content change). Idempotent via content hash. |
 | `canonicalize-attributes` | POST | internal (agents) | Thin proxy → MIVAA `/api/admin/facets/canonicalize`. Called by `material-tagger` / `product-enrichment` agents to canonicalize raw product attributes (3-layer facet pipeline: normalize → Voyage cosine cluster → `facet_canonical_values`). Local-fast-path then external MIVAA URL. |
+| `facets-recanonicalize` | POST | internal (cron / service-role) | Thin proxy → MIVAA `/api/admin/facets/recanonicalize`, the **bulk** sweep (#316). Replays `products.attributes_raw` so a threshold change, a curated alias, or an outage-degraded product can be repaired without re-ingesting any PDF. `degraded_only` defaults to **true** — the nightly `facets-recanonicalize-degraded` cron (03:40) fixes what is broken now; a full catalog re-sweep costs a Voyage embedding per raw value and must be asked for explicitly (`degraded_only: false`, after bumping `CURRENT_FACET_CANONICALIZATION_VERSION` in MIVAA). Returns `remaining`, so the caller knows whether to go again. Backstopped by `catalog.facet_canonicalization_degraded`, which fires only after the cron has had two goes — so it measures the janitor, not the arrival of the mess. |
 
 ### 1.5 Search & Re-rank
 
