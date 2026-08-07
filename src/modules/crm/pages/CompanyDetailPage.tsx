@@ -439,11 +439,13 @@ export const CompanyDetailPage: React.FC = () => {
     try {
       const saved = await companiesAPI.updateCompany(id, updates);
       // The DB normalizes country/country_code/state on write (crm_normalize_country) — typing
-      // "Greece" fills the VAT country as EL. Merge those three back so the Tax & VAT tab shows
-      // the derived value immediately instead of only after a reload. Deliberately NOT a whole-row
-      // overwrite: another field may have been edited optimistically while this request was in flight.
+      // "Greece" fills the VAT country as EL, and a Greek postal code fills State with the region.
+      // Merge those three back so the derived value shows immediately instead of only after a
+      // reload. postal_code is in the trigger list because it is an INPUT to the state derivation:
+      // editing the ΤΚ alone changes State. Deliberately NOT a whole-row overwrite: another field
+      // may have been edited optimistically while this request was in flight.
       const row = (saved as { data?: Partial<Company> } | undefined)?.data;
-      if (row && ('country' in updates || 'country_code' in updates || 'state' in updates)) {
+      if (row && ('country' in updates || 'country_code' in updates || 'state' in updates || 'postal_code' in updates)) {
         setCompany((prev) => prev
           ? { ...prev, country: row.country ?? null, country_code: row.country_code ?? null, state: row.state ?? null }
           : prev);
@@ -460,6 +462,9 @@ export const CompanyDetailPage: React.FC = () => {
   };
 
   const bumpActivity = () => setActivityRefresh((n) => n + 1);
+
+  /** Greek rows get their State/Province derived from the postal code by crm_normalize_country. */
+  const isGreek = (company?.country_code || '').toUpperCase() === 'EL';
 
   // Supplier↔factory pin. Persist the new pin list, then claim: re-point every matching
   // product's brand_company_id onto this company + fold in any duplicate auto-created brand
@@ -785,7 +790,14 @@ export const CompanyDetailPage: React.FC = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
                           <InlineText alwaysEdit={isNew} label="Street Address" value={company.address} onSave={(v) => patchInline({ address: v })} placeholder="123 Main Street" />
                           <InlineText alwaysEdit={isNew} label="City" value={company.city} onSave={(v) => patchInline({ city: v })} placeholder="San Francisco" />
-                          <InlineText alwaysEdit={isNew} label="State / Province" value={company.state} onSave={(v) => patchInline({ state: v })} placeholder="CA" />
+                          <InlineText
+                            alwaysEdit={isNew}
+                            label="State / Province"
+                            value={company.state}
+                            onSave={(v) => patchInline({ state: v })}
+                            placeholder={isGreek ? 'Attica' : 'CA'}
+                            hint={isGreek ? 'Derived from the ΤΚ (περιφέρεια) when left blank. Type a value to override.' : undefined}
+                          />
                           <InlineText alwaysEdit={isNew} label="Postal Code" value={company.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="94102" />
                           <InlineText alwaysEdit={isNew} label="Country" value={company.country} onSave={(v) => patchInline({ country: v })} placeholder="United States" />
                         </div>

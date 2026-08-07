@@ -51,6 +51,18 @@ Organisation records (manufacturers, suppliers, clients). Also where a user's ow
 
 **Business-profile fields** (populated by VIES + ΑΑΔΕ auto-fill): `vat_number`, `tax_office`, `profession`, `country_code`, `street`, `street_number`, `postal_code`, `city`, `country`.
 
+**Address derivations run in SQL, in the `crm_normalize_country` BEFORE-write trigger** on
+`crm_companies` / `crm_contacts` / `crm_address_units` — not in the form, because seven writers touch
+these tables. It (a) fills whichever of `country` / `country_code` is missing from the other and folds
+ISO spellings to the VAT prefix (Greece → `EL`); (b) clears a `state` that merely repeats the row's own
+country code; (c) for `country_code = 'EL'` **only**, fills a blank `state` with the περιφέρεια derived
+from `postal_code` via `greek_region_for_postal_code(text)` — the ΤΚ's first two digits identify the
+prefecture, prefectures group into the 13 regions. Every derivation fills a *missing* side only: a
+hand-typed `state` (say the prefecture `Thessaloniki`, where the derivation would say
+`Central Macedonia`) is never overwritten, and an unassigned TK range leaves `state` NULL rather than
+guessing. ΑΑΔΕ returns no region field and VIES is not consulted for `EL`, so before this the one
+country whose companies we hold most of was also the only one whose State never filled.
+
 **VAT validation cache** (written by `vies-validate` and `myaade-rgwspublic2`): `vat_validated boolean`, `vat_validated_at timestamptz`, `vat_validated_name text`, `vat_validated_address text`, `vat_validation_source text` (today: `vies` or `aade`), plus `vat_validated_name_latin text`, `vat_validated_address_latin text`.
 
 **VIES has no English/language option — do not go looking for one.** VIES is a proxy: it forwards the

@@ -187,7 +187,9 @@ export const ContactDetailPage: React.FC = () => {
   // Opens the shared Activity email composer from the sidebar / Details quick-actions.
   const activityRef = useRef<CrmRecordActivityHandle>(null);
   const bumpActivity = () => setActivityRefresh((n) => n + 1);
-  const logActivity = (activity_type: string, title: string, description?: string, metadata?: Record<string, unknown>) => {
+  /** Greek rows get their State/Province derived from the postal code by crm_normalize_country. */
+  const isGreek = (contact?.country_code || '').toUpperCase() === 'EL';
+  const logActivity =(activity_type: string, title: string, description?: string, metadata?: Record<string, unknown>) => {
     if (!id || isNew) return;
     crmActivitiesService
       .log({ kind: 'contact', id }, { activity_type, title, description, metadata })
@@ -421,11 +423,13 @@ export const ContactDetailPage: React.FC = () => {
     try {
       const saved = await contactsAPI.updateContact(id, updates);
       // The DB normalizes country/country_code/state on write (crm_normalize_country) — typing
-      // "Greece" fills the VAT country as EL. Merge those three back so the Commercial & VAT tab
-      // shows the derived value immediately instead of only after a reload. Deliberately NOT a
-      // whole-row overwrite: another field may have been edited optimistically mid-flight.
+      // "Greece" fills the VAT country as EL, and a Greek postal code fills State with the region.
+      // Merge those three back so the derived value shows immediately instead of only after a
+      // reload. postal_code is in the trigger list because it is an INPUT to the state derivation:
+      // editing the ΤΚ alone changes State. Deliberately NOT a whole-row overwrite: another field
+      // may have been edited optimistically mid-flight.
       const row = (saved as { data?: Partial<Contact> } | undefined)?.data;
-      if (row && ('country' in updates || 'country_code' in updates || 'state' in updates)) {
+      if (row && ('country' in updates || 'country_code' in updates || 'state' in updates || 'postal_code' in updates)) {
         setContact((prev) => prev
           ? { ...prev, country: row.country ?? null, country_code: row.country_code ?? null, state: row.state ?? null }
           : prev);
@@ -890,7 +894,14 @@ export const ContactDetailPage: React.FC = () => {
                           </div>
                           <InlineText alwaysEdit={isNew} label="City" value={contact.city} onSave={(v) => patchInline({ city: v })} placeholder="London" />
                           <InlineText alwaysEdit={isNew} label="Postal Code" value={contact.postal_code} onSave={(v) => patchInline({ postal_code: v })} placeholder="N21 1QP" />
-                          <InlineText alwaysEdit={isNew} label="State / Province" value={contact.state} onSave={(v) => patchInline({ state: v })} placeholder="Greater London" />
+                          <InlineText
+                            alwaysEdit={isNew}
+                            label="State / Province"
+                            value={contact.state}
+                            onSave={(v) => patchInline({ state: v })}
+                            placeholder={isGreek ? 'Attica' : 'Greater London'}
+                            hint={isGreek ? 'Derived from the ΤΚ (περιφέρεια) when left blank. Type a value to override.' : undefined}
+                          />
                           <InlineText alwaysEdit={isNew} label="Country" value={contact.country} onSave={(v) => patchInline({ country: v })} placeholder="United Kingdom" />
                         </div>
                       </CardContent></Card>
