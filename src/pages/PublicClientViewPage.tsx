@@ -19,6 +19,8 @@ interface CvSheet { id: string; sheet_type: string; title: string; }
 interface CvFfeItem { room: string | null; name: string; dimensions: string | null; quantity: number; unit_price: number | null; line_total: number | null; }
 interface CvFfe { currency: string; subtotal: number | null; vat_rate: number | null; vat_amount: number | null; grand_total: number | null; items: CvFfeItem[]; }
 interface CvVrWorld { id: string; status: string; splat_url_100k: string | null; splat_url_500k: string | null; splat_url_full: string | null; panorama_url: string | null; thumbnail_url: string | null; }
+/** WS4 #285 — handover snag list. The edge function sends only `client_visible` snags. */
+interface CvSnag { id: string; title: string; status: string; room: string | null; resolved: boolean; photo_urls: string[]; }
 
 interface ClientViewData {
   id: string;
@@ -34,6 +36,7 @@ interface ClientViewData {
   vr_world: CvVrWorld | null;
   ffe: CvFfe | null;
   lighting_image_url: string | null;
+  snags?: CvSnag[];
 }
 
 const LIGHTING_PRESETS: { label: string; filter: string }[] = [
@@ -266,6 +269,37 @@ export default function PublicClientViewPage() {
                   </tfoot>
                 </table>
               </div>
+            </Card>
+          </section>
+        )}
+
+        {/* Handover snag list (WS4 #285) — only the snags the designer marked client-visible. */}
+        {view.snags && view.snags.length > 0 && (
+          <section>
+            <h2 className="text-lg font-semibold mb-3">Outstanding items</h2>
+            <Card className="dashboard-card divide-y divide-white/8">
+              {view.snags.map((s) => (
+                <div key={s.id} className="flex items-start gap-3 p-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className={s.resolved ? 'text-muted-foreground line-through' : 'font-medium'}>{s.title}</p>
+                      {s.room && <span className="text-[11px] text-muted-foreground">· {s.room}</span>}
+                    </div>
+                    {s.photo_urls.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {s.photo_urls.map((u) => (
+                          <a key={u} href={u} target="_blank" rel="noreferrer">
+                            <img src={u} alt="" loading="lazy" className="h-16 w-16 rounded-md border border-white/10 object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <span className={`shrink-0 text-xs ${s.resolved ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {s.resolved ? 'Done' : 'In progress'}
+                  </span>
+                </div>
+              ))}
             </Card>
           </section>
         )}

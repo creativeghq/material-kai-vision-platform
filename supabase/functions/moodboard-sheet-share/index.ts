@@ -208,6 +208,27 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       };
     }
 
+    // WS4 #285 — the handover snag list. ONLY client_visible snags, and only the fields a client
+    // needs: no assignee, no internal description, no severity triage. This runs on the service
+    // role, so the `client_visible` filter here IS the access control — RLS is not in play.
+    const { data: snagRows } = await supabase
+      .from('project_snags')
+      .select('id, title, status, room_id, photo_paths, resolved_at, project_rooms(name)')
+      .eq('project_id', view.project_id)
+      .eq('client_visible', true)
+      .order('created_at', { ascending: true });
+
+    const snags = (snagRows || []).map((s: any) => ({
+      id: s.id,
+      title: s.title,
+      status: s.status,
+      room: s.project_rooms?.name ?? null,
+      resolved: ['fixed', 'verified', 'wont_fix'].includes(s.status),
+      photo_urls: (s.photo_paths || []).map(
+        (p: string) => supabase.storage.from('generation-images').getPublicUrl(p).data.publicUrl,
+      ),
+    }));
+
     return jsonResponse({
       not_found: false,
       client_view: {
@@ -224,6 +245,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
         vr_world,
         ffe,
         lighting_image_url: view.embed_lighting ? lightingImageUrl : null,
+        snags,
       },
     });
   }

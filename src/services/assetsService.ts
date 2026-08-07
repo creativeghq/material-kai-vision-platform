@@ -12,7 +12,7 @@ const sb = supabase as any;
 export type AssetCategory = 'vehicle' | 'phone' | 'laptop' | 'payment_card' | 'equipment' | 'other';
 export type AssetStatus = 'active' | 'in_repair' | 'retired' | 'returned';
 export type AcquisitionType = 'owned' | 'leased' | 'financed';
-export type DepreciationMethod = 'none' | 'straight_line';
+export type DepreciationMethod = 'none' | 'straight_line' | 'declining_balance';
 
 export const ASSET_CATEGORY_LABEL: Record<AssetCategory, string> = {
   vehicle: 'Vehicle',
@@ -62,13 +62,18 @@ export interface CompanyAsset {
   recurring_expense_label: string | null;
   finance_category_id: string | null;
   notes: string | null;
-  // Depreciation (owned assets only). Straight-line; book value computed on read.
+  // Depreciation (owned assets only). DERIVED by `get_asset_book_values` — never computed here.
   depreciation_method: DepreciationMethod;
   useful_life_months: number | null;
   salvage_value: number;
   depreciation_start: string | null;
-  book_value: number | null;          // computed: cost − accumulated depreciation
-  monthly_depreciation: number | null; // computed: per-month straight-line amount
+  disposed_on: string | null;
+  disposal_proceeds: number | null;
+  source_supplier_bill_id: string | null;
+  book_value: number | null;            // derived: cost − accumulated depreciation
+  monthly_depreciation: number | null;  // derived: this period's charge
+  accumulated_depreciation: number | null;
+  fully_depreciated: boolean;
   created_at: string;
   updated_at: string;
   // Current holder (active assignment, returned_at IS NULL), resolved for display.
@@ -92,6 +97,10 @@ export interface AssetInput {
   useful_life_months?: number | null;
   salvage_value?: number | null;
   depreciation_start?: string | null;
+  disposed_on?: string | null;
+  disposal_proceeds?: number | null;
+  /** The supplier bill this asset was acquired on, when it came in through Finance. */
+  source_supplier_bill_id?: string | null;
 }
 
 export interface EmployeeOption { id: string; name: string; }
@@ -104,33 +113,38 @@ function contactName(c: any): string | null {
   return c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.billing_name || null;
 }
 
-/** Whole months elapsed between a start date and today (never negative). */
-function monthsElapsed(startISO: string): number {
-  const start = new Date(startISO);
-  const now = new Date();
-  if (isNaN(start.getTime()) || now < start) return 0;
-  let m = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-  if (now.getDate() < start.getDate()) m -= 1; // not a full month yet
-  return Math.max(0, m);
-}
 
 /**
- * Straight-line book value for an owned asset.
- * monthly = (cost − salvage) / life; accumulated caps at (cost − salvage); book = cost − accumulated.
- * Returns nulls when depreciation doesn't apply / can't be computed.
+ * Book value is DERIVED IN SQL by `public.get_asset_book_values`, not here.
+ *
+ * It used to be a local straight-line calculation. That is the shape this codebase has been bitten
+ * by repeatedly (see tests/unit/moneyDerivation.test.ts): a money quantity computed in TypeScript
+ * drifts from every other answer to the same question, and no integrity check can see it because
+ * the stored data is fine. The SQL version also handles declining balance and stops depreciating
+ * on `disposed_on` — both of which the TS copy silently got wrong.
  */
-function computeDepreciation(row: any): { book: number | null; monthly: number | null } {
-  if (row.depreciation_method !== 'straight_line') return { book: null, monthly: null };
-  const cost = row.acquisition_cost;
-  const life = row.useful_life_months;
-  if (cost == null || !life || life <= 0) return { book: null, monthly: null };
-  const salvage = row.salvage_value ?? 0;
-  const depreciable = Math.max(0, cost - salvage);
-  const monthly = depreciable / life;
-  const start = row.depreciation_start || row.acquired_at;
-  const elapsed = start ? monthsElapsed(start) : 0;
-  const accumulated = Math.min(depreciable, elapsed * monthly);
-  return { book: Math.round((cost - accumulated) * 100) / 100, monthly: Math.round(monthly * 100) / 100 };
+interface AssetBookValue {
+  asset_id: string;
+  monthly_depreciation: number | null;
+  accumulated: number | null;
+  book_value: number | null;
+  fully_depreciated: boolean;
+}
+
+async function fetchBookValues(ids: string[]): Promise<Map<string, AssetBookValue>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await (sb as any).rpc('get_asset_book_values', { p_asset_ids: ids });
+  if (error) throw error;
+  const num = (v: unknown) => (v == null ? null : Number(v));
+  return new Map(
+    (data ?? []).map((r: any) => [r.asset_id, {
+      asset_id: r.asset_id,
+      monthly_depreciation: num(r.monthly_depreciation),
+      accumulated: num(r.accumulated),
+      book_value: num(r.book_value),
+      fully_depreciated: !!r.fully_depreciated,
+    } as AssetBookValue]),
+  );
 }
 
 class AssetsService {
@@ -152,6 +166,8 @@ class AssetsService {
       .order('created_at', { ascending: false });
     if (error) throw error;
 
+    const bookValues = await fetchBookValues((data || []).map((r: any) => r.id));
+
     return (data || []).map((row: any): CompanyAsset => {
       const active = (row.assignments || []).find((a: any) => !a.returned_at) || null;
       let holder: AssetAssignment | null = null;
@@ -172,7 +188,7 @@ class AssetsService {
         ? [rec.description, rec.subtotal_net != null ? `${rec.subtotal_net} ${rec.currency || ''}`.trim() : null, rec.cadence]
             .filter(Boolean).join(' · ')
         : null;
-      const dep = computeDepreciation(row);
+      const dep = bookValues.get(row.id);
       return {
         id: row.id,
         workspace_id: row.workspace_id,
@@ -194,8 +210,13 @@ class AssetsService {
         useful_life_months: row.useful_life_months ?? null,
         salvage_value: row.salvage_value ?? 0,
         depreciation_start: row.depreciation_start ?? null,
-        book_value: dep.book,
-        monthly_depreciation: dep.monthly,
+        disposed_on: row.disposed_on ?? null,
+        disposal_proceeds: row.disposal_proceeds ?? null,
+        source_supplier_bill_id: row.source_supplier_bill_id ?? null,
+        book_value: dep?.book_value ?? null,
+        monthly_depreciation: dep?.monthly_depreciation ?? null,
+        accumulated_depreciation: dep?.accumulated ?? null,
+        fully_depreciated: dep?.fully_depreciated ?? false,
         created_at: row.created_at,
         updated_at: row.updated_at,
         current_holder: holder,
@@ -223,6 +244,9 @@ class AssetsService {
       useful_life_months: input.useful_life_months ?? null,
       salvage_value: input.salvage_value ?? 0,
       depreciation_start: input.depreciation_start || null,
+      disposed_on: input.disposed_on || null,
+      disposal_proceeds: input.disposal_proceeds ?? null,
+      source_supplier_bill_id: input.source_supplier_bill_id || null,
       created_by: auth?.user?.id ?? null,
     };
     const { data, error } = await sb.from('company_assets').insert(payload).select('id').single();

@@ -40,6 +40,10 @@ interface Props {
   context?: 'finance' | 'hr';
 }
 
+/** Methods that actually depreciate — i.e. that need a life / salvage / start date. */
+const depreciates = (m: DepreciationMethod | undefined) =>
+  m === 'straight_line' || m === 'declining_balance';
+
 const EMPTY_FORM: AssetInput = {
   category: 'vehicle', name: '', identifier: '', status: 'active',
   acquisition_type: 'owned', acquisition_cost: null, currency: 'EUR', acquired_at: '',
@@ -134,9 +138,9 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
         ...form,
         acquisition_cost: costText.trim() ? parseDecimal(costText) : null,
         depreciation_method: owned ? (form.depreciation_method || 'none') : 'none',
-        useful_life_months: owned && form.depreciation_method === 'straight_line' ? (form.useful_life_months || null) : null,
-        salvage_value: owned && form.depreciation_method === 'straight_line' && salvageText.trim() ? parseDecimal(salvageText) : (owned ? 0 : 0),
-        depreciation_start: owned && form.depreciation_method === 'straight_line' ? (form.depreciation_start || null) : null,
+        useful_life_months: owned && depreciates(form.depreciation_method) ? (form.useful_life_months || null) : null,
+        salvage_value: owned && depreciates(form.depreciation_method) && salvageText.trim() ? parseDecimal(salvageText) : 0,
+        depreciation_start: owned && depreciates(form.depreciation_method) ? (form.depreciation_start || null) : null,
       };
       if (editing) { await assetsService.updateAsset(editing.id, payload); toast({ title: 'Asset updated' }); }
       else { await assetsService.createAsset(workspaceId, payload); toast({ title: 'Asset added' }); }
@@ -360,10 +364,11 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       <SelectItem value="straight_line">Straight-line</SelectItem>
+                      <SelectItem value="declining_balance">Declining balance</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                {form.depreciation_method === 'straight_line' && (
+                {depreciates(form.depreciation_method) && (
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1">
                       <Label>Useful life (months)</Label>

@@ -467,4 +467,66 @@ describe('project job cost has exactly one derivation', () => {
       offenders.join('\n'),
     ).toEqual([]);
   });
+
+});
+
+/**
+ * Asset book value — the FIFTH, and the one that was already live when WS8 of #285 found it.
+ *
+ * `assetsService.computeDepreciation` computed straight-line book value in TypeScript. It was the
+ * only implementation, so nothing disagreed with it *yet* — but it silently returned null for
+ * `declining_balance` and kept depreciating an asset after it had been disposed of, because a
+ * client-side helper has no reason to know about `disposed_on`. `public.get_asset_book_values` is
+ * now the single source and handles both.
+ */
+describe('asset book value has exactly one derivation', () => {
+  const posix = (p: string) => relative(ROOT, p).split('\\').join('/');
+  const files = [
+    join(ROOT, 'src/services/assetsService.ts'),
+    ...walk(join(ROOT, 'src/components/business/assets')),
+  ].filter((f) => { try { return statSync(f).isFile(); } catch { return false; } });
+
+  it('finds asset sources to scan', () => {
+    expect(files.length).toBeGreaterThan(1);
+  });
+
+  /** Book value / accumulated depreciation are READ from the RPC, never assigned from arithmetic. */
+  const DECL =
+    /\b(?:const|let|var)\s+(?:bookValue|book_value|accumulated|accumulatedDepreciation|monthlyDepreciation|monthly|depreciable)\s*(?::[^=]+)?=\s*(.+)$/;
+
+  it('the pattern actually matches the code it replaced', () => {
+    // These are the real lines from the deleted computeDepreciation helper. If the pattern stops
+    // matching them, the guard has quietly stopped guarding.
+    for (const bad of [
+      '  const depreciable = Math.max(0, cost - salvage);',
+      '  const monthly = depreciable / life;',
+      '  const accumulated = Math.min(depreciable, elapsed * monthly);',
+    ]) {
+      const m = DECL.exec(bad);
+      expect(m, `pattern must match: ${bad}`).not.toBeNull();
+      expect(/[-+*/]|Math\./.test(m![1])).toBe(true);
+    }
+    const good = '  const bookValue = row.book_value;';
+    expect(/[-+*/]|Math\./.test(DECL.exec(good)![1])).toBe(false);
+  });
+
+  it('assigns book value only by reading the derivation', () => {
+    const offenders: string[] = [];
+    for (const f of files) {
+      const src = stripComments(readFileSync(f, 'utf8'));
+      for (const [i, line] of src.split('\n').entries()) {
+        const m = DECL.exec(line);
+        if (!m) continue;
+        if (/[-+*/]|Math\./.test(m[1].replace(/\?\?/g, ''))) {
+          offenders.push(`${posix(f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'Book value is derived ONCE, in `public.get_asset_book_values` — which also handles ' +
+      'declining balance and stops at `disposed_on`. Read it; do not recompute it here.\n' +
+      offenders.join('\n'),
+    ).toEqual([]);
+  });
 });
