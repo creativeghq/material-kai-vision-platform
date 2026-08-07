@@ -4,7 +4,8 @@ import {
 import type { LucideIcon } from 'lucide-react';
 
 import {
-  contractAdapter, expenseAdapter, invoiceAdapter, moodboardAdapter, orderAdapter, projectAdapter, quoteAdapter,
+  contractAdapter, expenseAdapter, hrOnboardingAdapter, invoiceAdapter, moodboardAdapter, orderAdapter,
+  projectAdapter, propertyListingAdapter, quoteAdapter,
 } from './adapters';
 import { LIVE_TEMPLATE_TYPES, type LiveTemplateEntityType } from './schema';
 import type { TemplateAdapter } from './types';
@@ -18,6 +19,8 @@ export {
   buildExpensePrefill,
   buildInvoicePrefill,
   buildOrderPrefill,
+  type HrOnboardingTemplatePayload,
+  type PropertyListingTemplatePayload,
   type ContractTemplatePayload,
   type ExpensePrefill,
   type ExpenseTemplatePayload,
@@ -52,6 +55,8 @@ export const TEMPLATE_ADAPTERS: Record<LiveTemplateEntityType, TemplateAdapter<n
   order: orderAdapter as unknown as TemplateAdapter<never>,
   contract: contractAdapter as unknown as TemplateAdapter<never>,
   expense: expenseAdapter as unknown as TemplateAdapter<never>,
+  hr_onboarding: hrOnboardingAdapter as unknown as TemplateAdapter<never>,
+  property_listing: propertyListingAdapter as unknown as TemplateAdapter<never>,
 };
 
 export const isLiveTemplateType = (t: string): t is LiveTemplateEntityType =>

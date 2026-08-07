@@ -33,9 +33,11 @@ export const TemplatePickerDialog: React.FC<{
   customer?: { companyId?: string | null; contactId?: string | null };
   /** Name the new record, when the calling form already has one typed. */
   title?: string;
+  /** The employee an onboarding checklist is applied to. */
+  hrEmployeeId?: string | null;
   /** Take over instead of applying — receives the chosen template. */
   onSelect?: (template: EntityTemplate) => void;
-}> = ({ entityType, open, onOpenChange, projectId, customer, title, onSelect }) => {
+}> = ({ entityType, open, onOpenChange, projectId, customer, title, hrEmployeeId, onSelect }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -64,7 +66,7 @@ export const TemplatePickerDialog: React.FC<{
     if (!workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
     setBusyId(tpl.id);
     try {
-      const result = await entityTemplatesService.apply(tpl.id, { workspaceId, projectId, customer, title });
+      const result = await entityTemplatesService.apply(tpl.id, { workspaceId, projectId, customer, title, hrEmployeeId });
       onOpenChange(false);
       if (result.message) toast({ title: result.message });
       navigate(result.route);

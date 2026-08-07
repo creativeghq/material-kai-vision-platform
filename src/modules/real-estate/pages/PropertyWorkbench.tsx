@@ -6,13 +6,14 @@ import {
   Building2, ArrowLeft, Save, Globe, EyeOff, Upload, Star, Trash2, Copy, ExternalLink, Sparkles,
   FileText, UserPlus, Home, Tag, MapPin, Ruler, ListChecks, Zap, Loader2, ChevronLeft, ChevronRight,
   Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X, FileSignature, Send,
-  KeyRound, Wrench, Receipt, LineChart, RotateCw,
+  KeyRound, Wrench, Receipt, LineChart, RotateCw, Layers,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -184,6 +185,7 @@ export default function PropertyWorkbench() {
   const [canEdit, setCanEdit] = useState(true);
   const [cmaOpen, setCmaOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [photos, setPhotos] = useState<PropertyPhoto[]>([]);
   const [inquiries, setInquiries] = useState<PropertyInquiry[]>([]);
   const [viewings, setViewings] = useState<PropertyViewing[]>([]);
@@ -331,6 +333,8 @@ export default function PropertyWorkbench() {
               ? <Button variant="outline" size="sm" className="rounded-full" onClick={unpublish} disabled={busy}><EyeOff className="mr-1 h-4 w-4" /> Unpublish</Button>
               : <Button size="sm" className="rounded-full" onClick={publish} disabled={busy}><Globe className="mr-1 h-4 w-4" /> Publish</Button>)}
             {editable && <Button size="sm" className="rounded-full" onClick={save} disabled={saving}><Save className="mr-1 h-4 w-4" /> {saving ? 'Saving…' : 'Save'}</Button>}
+            {/* Reuse this listing's shape — type, condition, features, boilerplate copy (#322). */}
+            {editable && <Button variant="outline" size="sm" className="rounded-full" onClick={() => setSaveTemplateOpen(true)} title="Save the listing shape as a reusable template"><Layers className="mr-1 h-4 w-4" /> Template</Button>}
             {editable && <Button variant="ghost" size="sm" className="rounded-full text-red-500 hover:bg-red-500/10 hover:text-red-600" onClick={() => setDelOpen(true)} disabled={busy} title="Delete listing"><Trash2 className="mr-1 h-4 w-4" /> Delete</Button>}
           </div>
         } />
@@ -803,6 +807,14 @@ export default function PropertyWorkbench() {
         </Tabs>
       </div>
       {ws && <CmaReportDialog ws={ws} propertyId={id} open={cmaOpen} onOpenChange={setCmaOpen} />}
+      <SaveAsTemplateDialog
+        entityType="property_listing"
+        sourceId={id}
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        defaultTitle={property.title || undefined}
+      />
+
       <Dialog open={delOpen} onOpenChange={setDelOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Delete This Listing?</DialogTitle></DialogHeader>

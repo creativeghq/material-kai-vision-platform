@@ -217,6 +217,7 @@ class EntityTemplatesService {
       title?: string;
       projectId?: string | null;
       customer?: { companyId?: string | null; contactId?: string | null };
+      hrEmployeeId?: string | null;
     },
   ): Promise<TemplateApplyResult> {
     const tpl = await this.get(templateId);
@@ -232,6 +233,7 @@ class EntityTemplatesService {
       title: ctx.title,
       projectId: ctx.projectId ?? null,
       customer: ctx.customer,
+      hrEmployeeId: ctx.hrEmployeeId ?? null,
     });
 
     // Best-effort: a counter must never sink a successful create.

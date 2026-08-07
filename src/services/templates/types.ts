@@ -119,6 +119,8 @@ export interface TemplateApplyContext {
    * customer relationship — but the create form that applies one usually knows who it is for.
    */
   customer?: { companyId?: string | null; contactId?: string | null };
+  /** The employee an onboarding checklist is applied to. Never captured — a checklist is generic. */
+  hrEmployeeId?: string | null;
 }
 
 export interface TemplateAdapter<P = Record<string, unknown>> {

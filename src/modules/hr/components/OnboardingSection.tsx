@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Loader2, ClipboardCheck, Circle, CheckCircle2, Trash2 } from 'lucide-react';
+import { Plus, Loader2, ClipboardCheck, Circle, CheckCircle2, Trash2, Layers } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type OnboardingTask, type Employee } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
+import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
+import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 
 const empName = (e: Employee) => e.contact?.name || 'Unnamed';
 
@@ -19,6 +21,9 @@ export function OnboardingSection({ workspaceId, canManage }: { workspaceId: str
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  /** Checklists as templates (#322): apply a saved one to an employee, or keep one you have built. */
+  const [applyTo, setApplyTo] = useState<{ id: string; name: string } | null>(null);
+  const [saveFrom, setSaveFrom] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -67,9 +72,21 @@ export function OnboardingSection({ workspaceId, canManage }: { workspaceId: str
             return (
               <Card key={empId}>
                 <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="font-medium">{name}</div>
-                    <span className="text-xs text-muted-foreground">{done}/{list.length}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-muted-foreground">{done}/{list.length}</span>
+                      {canManage && (
+                        <>
+                          <button onClick={() => setApplyTo({ id: empId, name })} title="Apply a checklist template to this employee" className="text-muted-foreground hover:text-foreground cursor-pointer">
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => setSaveFrom({ id: empId, name })} title="Save this checklist as a reusable template" className="text-muted-foreground hover:text-foreground cursor-pointer">
+                            <Layers className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} /></div>
                   <div className="mt-3 space-y-1">
@@ -96,6 +113,24 @@ export function OnboardingSection({ workspaceId, canManage }: { workspaceId: str
             );
           })}
         </div>
+      )}
+
+      {applyTo && (
+        <TemplatePickerDialog
+          entityType="hr_onboarding"
+          open
+          onOpenChange={(v) => { if (!v) { setApplyTo(null); void load(); } }}
+          hrEmployeeId={applyTo.id}
+        />
+      )}
+      {saveFrom && (
+        <SaveAsTemplateDialog
+          entityType="hr_onboarding"
+          sourceId={saveFrom.id}
+          open
+          onOpenChange={(v) => { if (!v) setSaveFrom(null); }}
+          defaultTitle={`${saveFrom.name} onboarding`}
+        />
       )}
     </div>
   );

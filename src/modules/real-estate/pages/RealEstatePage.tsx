@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil, Upload, Percent } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil, Upload, Percent, Layers } from 'lucide-react';
 import { ImportListingsDialog } from '../components/ImportListingsDialog';
 import { LeadRoutingCard } from '../components/LeadRoutingCard';
 import { CalendarConnectCard } from '../components/CalendarConnectCard';
@@ -25,6 +25,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/t
 import { realEstateService, feedUrl, inboundLeadUrl, type PropertyListItem, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement, type PropertyInvestment, type InvestmentPortfolio } from '../services/realEstateService';
 import { statusTone } from '@/utils/statusTone';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
+import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 
 const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0 });
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
@@ -42,6 +43,7 @@ export default function RealEstatePage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const canManage = can('realestate.listings.manage');
   const ws = activeWorkspaceId;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -81,7 +83,15 @@ export default function RealEstatePage() {
   return (
     <div className="min-h-screen">
       <PageHeader icon={Building2} title="Real Estate" subtitle="Listings, leads and viewings"
-        actions={canManage ? <Button onClick={createDraft} disabled={creating} className="rounded-full"><Plus className="mr-2 h-4 w-4" /> New listing</Button> : undefined} />
+        actions={canManage ? (
+          <>
+            {/* Same draft, with the shape you always start from (#322). */}
+            <Button variant="outline" onClick={() => setTemplatePickerOpen(true)} className="rounded-full">
+              <Layers className="mr-2 h-4 w-4" /> From template
+            </Button>
+            <Button onClick={createDraft} disabled={creating} className="rounded-full"><Plus className="mr-2 h-4 w-4" /> New listing</Button>
+          </>
+        ) : undefined} />
 
       <div className="p-3 sm:p-6">
         <Tabs value={tab} onValueChange={(v) => setSearchParams(v === 'overview' ? {} : { tab: v }, { replace: true })}>
@@ -121,6 +131,12 @@ export default function RealEstatePage() {
           {canManage && <TabsContent value="syndication"><FeedCard ws={ws} /></TabsContent>}
         </Tabs>
       </div>
+
+      <TemplatePickerDialog
+        entityType="property_listing"
+        open={templatePickerOpen}
+        onOpenChange={setTemplatePickerOpen}
+      />
     </div>
   );
 }

@@ -58,12 +58,21 @@ describe('template entity types ↔ DB CHECK constraint', () => {
     expect(overlap).toEqual([]);
   });
 
-  it('every live type has a schema entry', () => {
+  it('every live type has a schema entry that captures SOMETHING', () => {
     for (const t of LIVE_TEMPLATE_TYPES) {
-      expect(TEMPLATE_SCHEMAS[t], `no schema for live type "${t}"`).toBeTruthy();
-      expect(TEMPLATE_SCHEMAS[t].sourceTable.length).toBeGreaterThan(0);
-      expect(TEMPLATE_SCHEMAS[t].label.length).toBeGreaterThan(0);
-      expect(TEMPLATE_SCHEMAS[t].captureFields.length).toBeGreaterThan(0);
+      const schema = TEMPLATE_SCHEMAS[t];
+      expect(schema, `no schema for live type "${t}"`).toBeTruthy();
+      expect(schema.sourceTable.length).toBeGreaterThan(0);
+      expect(schema.label.length).toBeGreaterThan(0);
+      // An EMPTY parent allowlist is legal — `hr_onboarding` has one deliberately, because its
+      // parent is an employee record (salary, AMKA, PIN hash) and none of that belongs in a
+      // reusable checklist. What is never legal is a type that captures nothing at all, which
+      // would be a template that silently produces an empty record.
+      const captures =
+        schema.captureFields.length +
+        (schema.captureChildren ?? []).length +
+        (SYNTHETIC_PAYLOAD_FIELDS[t] ?? []).length;
+      expect(captures, `"${t}" captures no parent fields, no children and no synthetic keys`).toBeGreaterThan(0);
     }
   });
 });
@@ -129,8 +138,11 @@ describe('adapters never mass-assign a stored payload', () => {
   });
 
   it('every live adapter is exported from adapters.ts', () => {
+    // Types are snake_case (they are DB values); the exports are camelCase TS identifiers.
+    const camel = (t: string) => t.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
     for (const t of LIVE_TEMPLATE_TYPES) {
-      expect(ADAPTERS).toContain(`export const ${t}Adapter`);
+      expect(ADAPTERS, `no \`export const ${camel(t)}Adapter\` in adapters.ts`)
+        .toContain(`export const ${camel(t)}Adapter`);
     }
   });
 });

@@ -23,15 +23,21 @@ export const TEMPLATE_ENTITY_TYPES = [
 /** Types with a shipped adapter. */
 export const LIVE_TEMPLATE_TYPES = [
   'invoice', 'quote', 'project', 'moodboard', 'order', 'contract', 'expense',
+  'hr_onboarding', 'property_listing',
 ] as const;
 export type LiveTemplateEntityType = (typeof LIVE_TEMPLATE_TYPES)[number];
 
 /**
  * Accepted by the DB, not yet offered in the UI. Declaring the gap keeps the guard test able to
  * tell "not built yet" apart from "forgotten".
+ *
+ * `crm_company` is intentionally still planned. A CRM party template would have to run through the
+ * duplicate search before creating anything (a company created silently is the exact failure the
+ * Greek-name lookup exists to prevent), and that create path is mid-rework — wiring a template
+ * hook into it now would fight the change rather than ride it.
  */
 export const PLANNED_TEMPLATE_TYPES = [
-  'hr_onboarding', 'crm_company', 'property_listing',
+  'crm_company',
 ] as const satisfies readonly TemplateEntityType[];
 
 export interface TemplateSchema {
@@ -224,6 +230,49 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
     editableFields: [
       { key: 'notes', label: 'Description', kind: 'textarea' },
       { key: 'currency', label: 'Currency', kind: 'text' },
+    ],
+  },
+
+  hr_onboarding: {
+    label: 'Onboarding checklist',
+    plural: 'Onboarding checklists',
+    description: 'The tasks every new starter goes through — applied to an employee in one step.',
+    sourceTable: 'hr_employees',
+    capability: 'hr.view',
+    moduleSlug: 'hr',
+    // EMPTY ON PURPOSE. The parent here is an employee, and an employee record is personal data:
+    // salary, AMKA, start date, PIN hash. None of it belongs in a reusable checklist, and the
+    // safest allowlist is the empty one. The checklist lives entirely in the child rows.
+    captureFields: [],
+    captureChildren: [{
+      table: 'hr_onboarding_tasks',
+      fk: 'employee_id',
+      // No due_date (an absolute date means nothing next hire), no assignee (a person), no status.
+      fields: ['title', 'description', 'sort_order'],
+      orderBy: 'sort_order',
+      label: 'Tasks',
+    }],
+  },
+
+  property_listing: {
+    label: 'Listing',
+    plural: 'Listings',
+    description: 'A listing shell — type, condition, boilerplate copy. Address and price stay per property.',
+    sourceTable: 'properties',
+    capability: 'realestate.view',
+    moduleSlug: 'real-estate',
+    // No address, no price, no reference_code, no tokens: those identify ONE property. What a
+    // template usefully carries is the kind of listing and the copy you always start from.
+    captureFields: [
+      'property_type', 'subtype', 'transaction_type', 'currency', 'country_code',
+      'condition', 'energy_class', 'heating_type', 'furnished', 'description_i18n',
+      'features', 'amenities',
+    ],
+    editableFields: [
+      { key: 'subtype', label: 'Subtype', kind: 'text' },
+      { key: 'condition', label: 'Condition', kind: 'text' },
+      { key: 'energy_class', label: 'Energy class', kind: 'text' },
+      { key: 'country_code', label: 'Country code', kind: 'text' },
     ],
   },
 };

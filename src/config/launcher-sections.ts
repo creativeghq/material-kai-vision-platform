@@ -136,10 +136,15 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // Templates (#322). The library filters on ?type=, whose values are the LIVE_TEMPLATE_TYPES keys
   // in src/services/templates/schema.ts — not a tab list. Keep these in step with that array.
   templates: [
-    { label: 'Invoice templates', to: '/templates?type=invoice', icon: Receipt },
-    { label: 'Quote templates', to: '/templates?type=quote', icon: FilePlus },
-    { label: 'Project templates', to: '/templates?type=project', icon: FolderPlus },
-    { label: 'Moodboard templates', to: '/templates?type=moodboard', icon: LayoutTemplate },
+    { label: 'Invoices', to: '/templates?type=invoice', icon: Receipt },
+    { label: 'Quotes', to: '/templates?type=quote', icon: FilePlus },
+    { label: 'Orders', to: '/templates?type=order', icon: ShoppingCart },
+    { label: 'Expenses', to: '/templates?type=expense', icon: ArrowUpCircle },
+    { label: 'Projects', to: '/templates?type=project', icon: FolderPlus },
+    { label: 'Moodboards', to: '/templates?type=moodboard', icon: LayoutTemplate },
+    { label: 'Contracts', to: '/templates?type=contract', icon: FileText },
+    { label: 'Onboarding', to: '/templates?type=hr_onboarding', icon: ClipboardList },
+    { label: 'Listings', to: '/templates?type=property_listing', icon: Building2 },
   ],
   // Sales/Inbox have no URL tabs → Open-only. My HR is Open-only too: EmployeeSelfServicePage uses
   // Tabs `defaultValue` and never reads ?tab=, so a tab deep-link would be inert.

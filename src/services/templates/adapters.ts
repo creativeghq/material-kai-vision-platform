@@ -1,6 +1,10 @@
-import { ArrowUpCircle, FileSignature, FileText, FolderKanban, Palette, Receipt, ShoppingCart } from 'lucide-react';
+import {
+  ArrowUpCircle, Building2, ClipboardCheck, FileSignature, FileText, FolderKanban, Palette, Receipt, ShoppingCart,
+} from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
+import { hrService } from '@/modules/hr/services/hrService';
+import { realEstateService } from '@/modules/real-estate/services/realEstateService';
 import { projectsService } from '@/modules/projects/services/projectsService';
 
 import { captureRecord, filterVisibleIds } from './capture';
@@ -561,3 +565,125 @@ export async function buildExpensePrefill(payload: ExpenseTemplatePayload): Prom
     categoryId,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Onboarding checklist — the tasks, applied to ONE employee.
+//
+// The parent allowlist is empty on purpose (see the schema note): an employee
+// record is personal data and none of it belongs in a template that gets copied
+// between workspaces.
+// ---------------------------------------------------------------------------
+
+export interface HrOnboardingTemplatePayload {
+  hr_onboarding_tasks?: Record<string, unknown>[];
+}
+
+export const hrOnboardingAdapter: TemplateAdapter<HrOnboardingTemplatePayload> = {
+  type: 'hr_onboarding',
+  icon: ClipboardCheck,
+  ...TEMPLATE_SCHEMAS.hr_onboarding,
+  capture: (sourceId) => captureRecord<HrOnboardingTemplatePayload>(hrOnboardingAdapter, sourceId),
+  async apply(payload, ctx): Promise<TemplateApplyResult> {
+    // A checklist belongs to somebody. Without an employee there is nothing to attach it to, so
+    // send the user to the place where they can pick one rather than inventing a subject.
+    if (!ctx.hrEmployeeId) {
+      return {
+        kind: 'prefill',
+        route: '/hr?tab=onboarding',
+        message: 'Pick an employee on the Onboarding board, then apply this checklist to them.',
+      };
+    }
+
+    const rows = childRows(payload as never, 'hr_onboarding_tasks');
+    let added = 0;
+    for (const t of rows) {
+      const title = str(t.title);
+      if (!title) continue;
+      await hrService.addOnboardingTask(ctx.workspaceId, {
+        employee_id: ctx.hrEmployeeId,
+        title,
+        description: str(t.description) ?? undefined,
+      });
+      added += 1;
+    }
+    return {
+      kind: 'created',
+      id: ctx.hrEmployeeId,
+      route: '/hr?tab=onboarding',
+      message: `${added} onboarding task${added === 1 ? '' : 's'} added.`,
+    };
+  },
+  summary(payload) {
+    const n = childRows(payload as never, 'hr_onboarding_tasks').length;
+    return [`${n} task${n === 1 ? '' : 's'}`];
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Property listing — created as a DRAFT, like the ordinary "New listing" button
+// (`RealEstatePage.createDraft`), just with the template's defaults instead of a
+// bare placeholder. A draft listing is private (`listing_status: 'draft'`,
+// `is_public: false`) and publishing stays a separate, gated decision, so there
+// is nothing here that needs the operator's sign-off first.
+//
+// The template is the KIND of listing and the copy you always start from; the
+// address, the price and the vendor belong to one property and are never captured.
+// ---------------------------------------------------------------------------
+
+export interface PropertyListingTemplatePayload {
+  property_type?: string | null;
+  subtype?: string | null;
+  transaction_type?: string | null;
+  currency?: string | null;
+  country_code?: string | null;
+  condition?: string | null;
+  energy_class?: string | null;
+  heating_type?: string | null;
+  furnished?: boolean | null;
+  description_i18n?: Record<string, unknown> | null;
+  features?: string[] | null;
+  amenities?: string[] | null;
+}
+
+export const propertyListingAdapter: TemplateAdapter<PropertyListingTemplatePayload> = {
+  type: 'property_listing',
+  icon: Building2,
+  ...TEMPLATE_SCHEMAS.property_listing,
+  capture: (sourceId) => captureRecord<PropertyListingTemplatePayload>(propertyListingAdapter, sourceId),
+  async apply(payload, ctx): Promise<TemplateApplyResult> {
+    // Field by field — `real-estate-api` allowlists on its side too, but the payload is stored
+    // jsonb and must not be handed over wholesale from this one either.
+    const property = await realEstateService.createProperty(ctx.workspaceId, {
+      title: ctx.title ?? 'Untitled listing',
+      property_type: str(payload.property_type) ?? 'residential',
+      subtype: str(payload.subtype),
+      transaction_type: str(payload.transaction_type) ?? 'sale',
+      listing_status: 'draft',
+      currency: str(payload.currency) ?? 'EUR',
+      country_code: str(payload.country_code) ?? 'GR',
+      condition: str(payload.condition),
+      energy_class: str(payload.energy_class),
+      heating_type: str(payload.heating_type),
+      furnished: payload.furnished === true,
+      description_i18n: payload.description_i18n && typeof payload.description_i18n === 'object'
+        ? payload.description_i18n : {},
+      features: Array.isArray(payload.features) ? payload.features.filter((f) => typeof f === 'string') : [],
+      amenities: Array.isArray(payload.amenities) ? payload.amenities.filter((a) => typeof a === 'string') : [],
+    });
+    return {
+      kind: 'created',
+      id: property.id,
+      route: `/properties/${property.id}`,
+      message: 'Draft listing created — add the address and price.',
+    };
+  },
+  summary(payload) {
+    const out: string[] = [];
+    if (payload.property_type) out.push(String(payload.property_type));
+    if (payload.transaction_type) out.push(String(payload.transaction_type) === 'sale' ? 'For sale' : 'To let');
+    const feats = (payload.features?.length ?? 0) + (payload.amenities?.length ?? 0);
+    if (feats) out.push(`${feats} feature${feats === 1 ? '' : 's'}`);
+    return out;
+  },
+};
+
