@@ -238,6 +238,69 @@ export const tripExpenseService = {
     return data as TripExpenseItem;
   },
 
+  // ---------- project attribution (#285) ----------
+  //
+  // An expense item is the claim; the PROJECT says which job bears its cost. These let a project
+  // pull costs to itself without leaving the job — the claim still lives in Expenses, keeps its
+  // receipt, and still goes through the same approval, because that is where reimbursement and
+  // review belong. Nothing here approves anything.
+
+  /** Every claim attributed to this project, newest first. */
+  async listByProject(projectId: string): Promise<TripExpenseItem[]> {
+    const { data, error } = await supabase
+      .from('trip_expense_items').select('*')
+      .eq('project_id', projectId)
+      .order('expense_date', { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as TripExpenseItem[];
+  },
+
+  /**
+   * Claims in this workspace not yet attributed to any project — the "link an existing expense"
+   * candidates. This is where imported card spend lands (the Revolut feed materialises into
+   * trip_expense_items), so it is how a fetched charge gets pulled onto a job.
+   * Already-billed claims are excluded: re-pointing one would move a cost the client was already
+   * invoiced for.
+   */
+  async listUnassigned(workspaceId: string): Promise<TripExpenseItem[]> {
+    const { data, error } = await supabase
+      .from('trip_expense_items').select('*')
+      .eq('workspace_id', workspaceId)
+      .is('project_id', null)
+      .is('billed_invoice_id', null)
+      .order('expense_date', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    return (data ?? []) as TripExpenseItem[];
+  },
+
+  /** Attribute a claim to a project, or clear it by passing null. */
+  async assignToProject(itemId: string, projectId: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('trip_expense_items').update({ project_id: projectId }).eq('id', itemId);
+    if (error) throw error;
+  },
+
+  /**
+   * The card that holds ad-hoc costs booked straight from a project. Reused rather than created
+   * per expense — one card per project keeps the reviewer's queue readable, and mirrors how the
+   * card importer reuses a single monthly card instead of one per charge.
+   */
+  async ensureProjectCard(workspaceId: string, projectId: string, projectName: string): Promise<string> {
+    const title = `Project — ${projectName}`;
+    const { data: existing } = await supabase
+      .from('trip_expense_reports').select('id')
+      .eq('workspace_id', workspaceId).eq('title', title)
+      .limit(1).maybeSingle();
+    if (existing?.id) return existing.id as string;
+
+    const report = await this.createReport({
+      workspaceId, card_type: 'other', title,
+      purpose: `Costs booked directly against project ${projectId}`,
+    });
+    return report.id;
+  },
+
   async updateItem(id: string, patch: Partial<Pick<TripExpenseItem,
     'expense_date' | 'category' | 'description' | 'vendor' | 'amount' | 'currency' | 'vat_amount' | 'payment_method' | 'billable' | 'project_id' | 'sort_order'>>): Promise<void> {
     const { error } = await supabase.from('trip_expense_items').update(patch).eq('id', id);

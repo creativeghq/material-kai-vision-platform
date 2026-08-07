@@ -19,6 +19,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { JobCostCard } from '../JobCostCard';
+import { ProjectExpensesCard } from '../ProjectExpensesCard';
 import {
   projectsService,
   type ProjectFinanceRow,
@@ -33,7 +34,7 @@ const KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', supplier_bill: 'Supplier bill',
 };
 
-export const FinanceTab: React.FC<{ projectId: string }> = ({ projectId }) => {
+export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> = ({ projectId, projectName }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { can } = usePermissions();
@@ -41,6 +42,8 @@ export const FinanceTab: React.FC<{ projectId: string }> = ({ projectId }) => {
   const [summary, setSummary] = useState<ProjectFinanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [picker, setPicker] = useState<'receivable' | 'payable' | null>(null);
+  // Bumped when an expense is booked or unlinked, so the job-cost card re-derives.
+  const [costToken, setCostToken] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -124,7 +127,15 @@ export const FinanceTab: React.FC<{ projectId: string }> = ({ projectId }) => {
   return (
     <div className="space-y-4">
       {/* Job cost first: margin is the question this tab exists to answer. AR/AP is the detail. */}
-      <JobCostCard projectId={projectId} />
+      <JobCostCard projectId={projectId} reloadToken={costToken} />
+
+      {/* Costs booked straight onto the job, plus linking imported card spend to it. */}
+      <ProjectExpensesCard
+        projectId={projectId}
+        projectName={projectName ?? 'this project'}
+        workspaceId={activeWorkspaceId ?? ''}
+        onChanged={() => setCostToken((t) => t + 1)}
+      />
 
       <div className="grid grid-cols-2 gap-3">
         <Card className="dashboard-card"><CardContent className="p-4">

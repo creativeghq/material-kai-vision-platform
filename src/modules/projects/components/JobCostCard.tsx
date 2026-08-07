@@ -28,7 +28,7 @@ const Stat: React.FC<{ label: string; value: string; hint?: string; tone?: strin
   </div>
 );
 
-export const JobCostCard: React.FC<{ projectId: string }> = ({ projectId }) => {
+export const JobCostCard: React.FC<{ projectId: string; reloadToken?: number }> = ({ projectId, reloadToken }) => {
   const { toast } = useToast();
   const [pnl, setPnl] = useState<ProjectPnl | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,7 +50,9 @@ export const JobCostCard: React.FC<{ projectId: string }> = ({ projectId }) => {
     } catch (err: any) {
       toast({ title: 'Failed to load job cost', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
-  }, [projectId, toast]);
+    // reloadToken is a deliberate dependency: booking an expense from the panel below must move
+    // the margin above it, or the two cards sit on the same screen disagreeing.
+  }, [projectId, toast, reloadToken]);
   useEffect(() => { void load(); }, [load]);
 
   if (loading) {
