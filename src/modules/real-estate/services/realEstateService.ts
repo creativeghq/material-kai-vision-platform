@@ -95,8 +95,34 @@ export interface Tenancy {
 }
 export interface RentCharge {
   id: string; tenancy_id: string; due_date: string; amount: number; currency: string;
+  /** The STORED flag. Meaningful only for uninvoiced charges — render `payment_status` instead. */
   status: 'due' | 'paid' | 'overdue' | 'waived'; paid_at: string | null; paid_amount: number | null; note: string | null;
   invoice_id: string | null;
+  /** Derived by get_rent_charge_settlements — invoiced charges settle from the Finance ledger,
+   *  uninvoiced ones from the stored flag. This is the number to display. */
+  payment_status: 'due' | 'paid' | 'partial' | 'overdue' | 'waived';
+  settled: number; outstanding: number;
+  settlement_source: 'invoice' | 'manual' | 'waived' | 'stale';
+}
+/** Listing paperwork. `url` is a short-lived signed URL minted on read — never persist it. */
+export interface PropertyDocument {
+  id: string; property_id: string; storage_bucket: string; storage_path: string;
+  doc_type: string; title: string | null; uploaded_by: string | null; created_at: string;
+  url?: string | null;
+}
+export const DOC_TYPE_LABELS: Record<string, string> = {
+  energy_certificate: 'Energy certificate (ΠΕΑ)',
+  building_id: 'Electronic building ID (Ηλ. Ταυτότητα)',
+  title_deed: 'Title deed',
+  floor_plan: 'Floor plan',
+  topographic: 'Topographic diagram',
+  agency_agreement: 'Agency agreement',
+  permit: 'Permit',
+  tax_clearance: 'Tax clearance',
+  other: 'Other',
+};
+export interface OpenHouse {
+  id: string; property_id: string; starts_at: string; ends_at: string | null; note: string | null; created_at: string;
 }
 export interface MaintenanceWorkOrder {
   id: string; property_id: string; tenancy_id: string | null; title: string; description: string | null;
@@ -191,7 +217,7 @@ export const realEstateService = {
   listProperties: (ws: string, filters: { status?: string; property_type?: string } = {}) =>
     call<{ properties: PropertyListItem[] }>(ws, 'list-properties', filters).then((r) => r.properties),
   getProperty: (ws: string, propertyId: string) =>
-    call<{ property: Property; can_edit: boolean; photos: PropertyPhoto[]; inquiries: PropertyInquiry[]; viewings: PropertyViewing[]; price_history: any[]; open_houses: any[]; documents: any[] }>(ws, 'get-property', { property_id: propertyId }),
+    call<{ property: Property; can_edit: boolean; photos: PropertyPhoto[]; inquiries: PropertyInquiry[]; viewings: PropertyViewing[]; price_history: any[]; open_houses: OpenHouse[]; documents: PropertyDocument[] }>(ws, 'get-property', { property_id: propertyId }),
   createProperty: (ws: string, fields: Record<string, unknown>) =>
     call<{ property: Property }>(ws, 'create-property', fields).then((r) => r.property),
   updateProperty: (ws: string, propertyId: string, fields: Record<string, unknown>) =>
@@ -340,6 +366,26 @@ export const realEstateService = {
     if (error) throw error;
     return this.addPhoto(ws, propertyId, path, kind);
   },
+
+  // Documents — listing paperwork (private bucket; `url` is a 1h signed URL, never persisted).
+  listDocuments: (ws: string, propertyId: string) =>
+    call<{ documents: PropertyDocument[] }>(ws, 'list-documents', { property_id: propertyId }).then((r) => r.documents),
+  deleteDocument: (ws: string, documentId: string) => call<{ ok: true }>(ws, 'delete-document', { document_id: documentId }),
+  /** Same two-step as uploadPhoto: signed upload URL → PUT the file → register the row. */
+  async uploadDocument(ws: string, propertyId: string, file: File, docType: string, title?: string): Promise<PropertyDocument> {
+    const ext = (file.name.split('.').pop() || 'pdf').toLowerCase();
+    const { path, token } = await call<{ path: string; token: string; signed_url: string }>(ws, 'document-upload-url', { property_id: propertyId, ext });
+    const { error } = await supabase.storage.from('property-media').uploadToSignedUrl(path, token, file, { contentType: file.type });
+    if (error) throw error;
+    return call<{ document: PropertyDocument }>(ws, 'add-document', {
+      property_id: propertyId, storage_path: path, doc_type: docType, title: title || file.name,
+    }).then((r) => r.document);
+  },
+
+  // Open houses
+  upsertOpenHouse: (ws: string, propertyId: string, fields: { open_house_id?: string; starts_at?: string; ends_at?: string | null; note?: string | null }) =>
+    call<{ open_house: OpenHouse }>(ws, 'upsert-open-house', { property_id: propertyId, ...fields }).then((r) => r.open_house),
+  deleteOpenHouse: (ws: string, openHouseId: string) => call<{ ok: true }>(ws, 'delete-open-house', { open_house_id: openHouseId }),
 };
 
 /** Detect the 422 publish-gate rejection so the UI can list the missing fields. */
@@ -360,7 +406,7 @@ export const realEstatePublic = {
     if (error) throw await edgeError(error);
     return data as PublicListing;
   },
-  async inquire(token: string, payload: { name: string; email: string; phone?: string; message?: string; gdpr_consent: boolean }): Promise<void> {
+  async inquire(token: string, payload: { name: string; email: string; phone?: string; message?: string; gdpr_consent: boolean; marketing_consent?: boolean }): Promise<void> {
     const { error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'inquire', token, ...payload } });
     if (error) throw await edgeError(error);
   },
@@ -378,17 +424,23 @@ export const realEstatePublic = {
     return (data as { listings: PublicListingCard[] }).listings;
   },
   /** Public seller lead-magnet: instant comps-based valuation + capture as a seller lead. */
-  async requestValuation(by: { workspaceId?: string; userId?: string }, payload: { name: string; email: string; phone?: string; address?: string; property_type?: string; town?: string; area?: number; gdpr_consent: boolean }): Promise<ValuationResult> {
+  async requestValuation(by: { workspaceId?: string; userId?: string }, payload: { name: string; email: string; phone?: string; address?: string; property_type?: string; town?: string; area?: number; gdpr_consent: boolean; marketing_consent?: boolean }): Promise<ValuationResult> {
     const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'request-valuation', workspace_id: by.workspaceId, user_id: by.userId, ...payload } });
     if (error) throw await edgeError(error);
     return data as ValuationResult;
   },
 
   // Buyer portal — token-scoped, no auth
-  async buyerPortal(token: string): Promise<{ requirement: { label: string | null; criteria: Record<string, any> }; agency: string | null; favorites: string[]; listings: PublicListingCard[] }> {
+  async buyerPortal(token: string): Promise<{ requirement: { label: string | null; criteria: Record<string, any> }; agency: string | null; favorites: string[]; alerts_enabled: boolean; listings: PublicListingCard[] }> {
     const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'buyer-portal', token } });
     if (error) throw await edgeError(error);
     return data as any;
+  },
+  /** The buyer's own opt-in/withdrawal for match emails — sets the saved search's digest flag AND the
+   *  contact's marketing_consent, which is what both alert paths gate on. */
+  async buyerSetConsent(token: string, enabled: boolean): Promise<void> {
+    const { error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'buyer-set-consent', token, enabled } });
+    if (error) throw await edgeError(error);
   },
   async buyerFavorite(token: string, propertyId: string, on: boolean): Promise<void> {
     const { error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'buyer-favorite', token, property_id: propertyId, on } });

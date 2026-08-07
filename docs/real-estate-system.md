@@ -68,8 +68,8 @@ A `realestate_agent` also gets a **reduced nav**: only Dashboard and Real Estate
 | `property_maintenance` | Maintenance jobs, contractor, cost. |
 | `property_investments` | Investment cases: purchase, costs, financing, projected yield. |
 | `property_price_history` | Price changes over the life of the listing. |
-| `property_open_houses` | Scheduled open-house events. |
-| `property_documents` | Listing paperwork. |
+| `property_open_houses` | Scheduled open-house events. Created from the workbench **Viewings** tab. |
+| `property_documents` | Listing paperwork (ΠΕΑ, Ηλ. Ταυτότητα, title deed, agency agreement…). Workbench **Documents** tab; private bucket, signed URL per read. |
 | `real_estate_settings` | Per-workspace: `feed_token`, `feed_enabled`, `feed_format`. |
 | `public_realestate_submissions` | Hashed-IP counters backing the anonymous lead throttle. |
 
@@ -104,6 +104,12 @@ A **buyer requirement** is a saved search: budget, area, bedrooms, property type
 
 Each requirement can carry a `portal_token`, giving the buyer their own `/buyer/:token` page (matches, favourites, request-a-viewing) with no account. Opting into the digest adds them to `real-estate-buyer-digests`, which emails only genuinely new matches and stamps `last_digest_at` so nothing re-sends. A buyer with nothing new gets no email at all.
 
+### Marketing consent
+
+Both buyer-facing sends — the immediate new-listing alert in `real-estate-api` and the nightly digest — gate on `crm_contacts.marketing_consent`, and that column is `NOT NULL DEFAULT false`. So the consent has to be **captured**, not just enforced: the public listing enquiry, the valuation widget and `convert-inquiry` each carry an optional marketing opt-in (`property_inquiries.marketing_consent`), kept as a **separate** checkbox from the required processing consent — bundling them would make the processing consent not freely given. The buyer portal's own toggle (`buyer-set-consent`) is the withdrawal path, and it writes both the requirement's `digest_enabled` and the contact's `marketing_consent`, because the two sends read different flags.
+
+Before this existed the enforcement was live and the capture was not, so every lead the module captured itself was permanently opted out and the alert path could never fire — a silent zero, not a policy.
+
 ---
 
 ## 6. Syndication
@@ -118,6 +124,7 @@ Each requirement can carry a `portal_token`, giving the buyer their own `/buyer/
 |---|---|
 | **CRM** | Leads convert to `crm_contacts`. `crm-lead-score` writes the *shared* `lead_score` / `health_score`, so CRM, Sales and Real Estate show one number rather than three. |
 | **Finance** | `complete-sale` → commission invoice via `link-sale-invoice`. Rent charges → **draft** invoices via `invoice-rent-charge` (manual) or the nightly `real-estate-rent-invoicing` cron. |
+| **Rent settlement** | `get_rent_charge_settlements(uuid[])` is the SINGLE derivation. An **invoiced** charge settles from `payment_allocations` (money IN against its invoice); an **uninvoiced** one from the manual `status`/`paid_amount`, which is then the only record of the money. `list-rent-charges` and `landlord-statement` read it through `withRentSettlements`; `mark-rent-paid` **409s** on an invoiced charge (record the payment, or a credit note to waive, in Finance). `realestate.rent_charge_status_drift` compares the stored flag against the derivation and heals it. Never sum `status = 'paid'` to answer "how much rent came in". |
 | **myDATA** | Rent drafts are **never** auto-transmitted. Automatic invoicing must not become automatic irrevocable fiscal transmission — the manager reviews VAT and document type and issues from Finance. |
 | **Flows** | Public leads and buyer requests emit workspace-scoped flow events (`emitFlowEventToWorkspaceRoles`), so notification routing is configurable rather than hardcoded. |
 | **Agent** | The `manage_real_estate` tool gives the JARVIS agent the same capabilities as the UI (capability-fabric parity). |
@@ -135,3 +142,12 @@ Each requirement can carry a `portal_token`, giving the buyer their own `/buyer/
 | `public-realestate-submissions-prune` | 03:15 | Prunes the hashed-IP throttle counters. |
 
 Both edge crons use the shared `isCronAuthorized` gate (`x-cron-secret` **or** service-role bearer) and fail closed.
+
+## 9. Integrity checks
+
+| Key | Watches |
+|---|---|
+| `realestate.rent_charge_status_drift` | An invoiced rent charge whose stored status disagrees with the ledger-derived settlement. Autoheals by restamping the cache from the derivation — never the other way round. |
+| `realestate.rent_never_invoiced` | The **output** of `real-estate-rent-invoicing`: a charge more than 2 days past due, on an active tenancy with a tenant, still carrying no `invoice_id`. The cron drafts these unconditionally, so this means it is not landing — and `cron.job_run_details` reports success either way. |
+
+The generic `ops.silent_zero` probes already cover these crons for "fires but never succeeds"; these two watch the work itself.

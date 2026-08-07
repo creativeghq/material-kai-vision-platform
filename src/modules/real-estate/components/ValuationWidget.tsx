@@ -14,6 +14,9 @@ export const ValuationWidget: React.FC<{ userId: string }> = ({ userId }) => {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ name: '', email: '', phone: '', address: '', town: '', property_type: 'residential', area: '' });
   const [consent, setConsent] = useState(false);
+  // Separate, optional marketing opt-in — see PublicListingPage.InquiryForm. Without it the seller
+  // lead lands with marketing_consent=false (the column default) and no automation can ever mail them.
+  const [marketing, setMarketing] = useState(false);
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
   const [result, setResult] = useState<ValuationResult | null>(null);
   const [err, setErr] = useState('');
@@ -27,7 +30,7 @@ export const ValuationWidget: React.FC<{ userId: string }> = ({ userId }) => {
       const r = await realEstatePublic.requestValuation({ userId }, {
         name: f.name, email: f.email, phone: f.phone || undefined, address: f.address || undefined,
         town: f.town || undefined, property_type: f.property_type, area: f.area ? Number(f.area) : undefined,
-        gdpr_consent: true,
+        gdpr_consent: true, marketing_consent: marketing,
       });
       setResult(r); setState('done');
     } catch (e2) { setErr((e2 as Error).message || 'Could not submit'); setState('error'); }
@@ -73,6 +76,10 @@ export const ValuationWidget: React.FC<{ userId: string }> = ({ userId }) => {
           <label className="col-span-full flex items-start gap-2 text-xs text-muted-foreground">
             <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} className="mt-0.5"  />
             I consent to being contacted about the valuation of my property.
+          </label>
+          <label className="col-span-full flex items-start gap-2 text-xs text-muted-foreground">
+            <Checkbox checked={marketing} onCheckedChange={(v) => setMarketing(v === true)} className="mt-0.5" />
+            Optional — send me market updates and properties that may interest me. Unsubscribe at any time.
           </label>
           {err && <p className="col-span-full text-xs text-destructive">{err}</p>}
           <Button type="submit" className="col-span-full rounded-full" disabled={state === 'sending'}>

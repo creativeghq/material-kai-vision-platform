@@ -38,6 +38,35 @@ export function estimateFromMedianPerSqm(median: number | null, area: number, ba
   return { estimate: round1k(base), low: round1k(base * (1 - bandPct)), high: round1k(base * (1 + bandPct)) };
 }
 
+/**
+ * Attach the DERIVED settlement to rent-charge rows: `settled`, `outstanding`, `payment_status` and
+ * `settlement_source`, from `get_rent_charge_settlements` — the single source (see the migration
+ * `realestate_rent_charge_settlement_derivation`). TypeScript formats, SQL derives: never re-compute
+ * rent received from `status`/`paid_amount` in a consumer, because an invoiced charge is settled by
+ * the Finance ledger and the stored flag on the row does not move when the tenant pays.
+ *
+ * Falls back to the stored flag ONLY if the RPC itself fails — a landlord statement that renders
+ * slightly stale beats one that renders nothing, and the drift check reports the disagreement either way.
+ */
+export async function withRentSettlements(supabase: any, charges: any[]): Promise<any[]> {
+  if (!charges.length) return [];
+  const ids = charges.map((c) => c.id).filter(Boolean);
+  if (!ids.length) return charges;
+  const { data, error } = await supabase.rpc('get_rent_charge_settlements', { p_charge_ids: ids });
+  if (error) {
+    console.error('[real-estate] rent settlement derivation failed, falling back to stored flag:', error.message);
+    return charges.map((c) => ({
+      ...c,
+      settled: c.status === 'paid' ? Number(c.paid_amount ?? c.amount ?? 0) : 0,
+      outstanding: c.status === 'paid' || c.status === 'waived' ? 0 : Number(c.amount ?? 0),
+      payment_status: c.status,
+      settlement_source: 'stale',
+    }));
+  }
+  const byId = new Map((data ?? []).map((r: any) => [r.charge_id, r]));
+  return charges.map((c) => ({ ...c, ...(byId.get(c.id) ?? {}) }));
+}
+
 export async function createRentInvoiceForCharge(supabase: any, args: {
   workspaceId: string; chargeId: string; tenantContactId: string;
   amount: number; currency: string; dueDate: string; propertyTitle: string;

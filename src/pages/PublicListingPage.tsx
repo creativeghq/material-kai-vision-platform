@@ -148,6 +148,10 @@ const Fact: React.FC<{ icon?: React.ReactNode; label: string; value: any }> = ({
 const InquiryForm: React.FC<{ token: string }> = ({ token }) => {
   const [f, setF] = useState({ name: '', email: '', phone: '', message: '' });
   const [consent, setConsent] = useState(false);
+  // Marketing opt-in is a SEPARATE, optional box, never pre-ticked and never bundled into the one
+  // above — bundling would make the required processing consent not freely given. It is also the only
+  // moment this is asked: the contact flag it feeds is what gates every match alert the buyer can get.
+  const [marketing, setMarketing] = useState(false);
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [err, setErr] = useState('');
 
@@ -155,7 +159,7 @@ const InquiryForm: React.FC<{ token: string }> = ({ token }) => {
     e.preventDefault();
     if (!consent) { setErr('Please accept the privacy consent.'); return; }
     setState('sending'); setErr('');
-    try { await realEstatePublic.inquire(token, { ...f, gdpr_consent: true }); setState('sent'); }
+    try { await realEstatePublic.inquire(token, { ...f, gdpr_consent: true, marketing_consent: marketing }); setState('sent'); }
     catch (e2) { setErr((e2 as Error).message || 'Could not send'); setState('error'); }
   };
 
@@ -176,6 +180,10 @@ const InquiryForm: React.FC<{ token: string }> = ({ token }) => {
       <label className="flex items-start gap-2 text-xs text-muted-foreground">
         <Checkbox checked={consent} onCheckedChange={(v) => setConsent(v === true)} className="mt-0.5"  />
         I consent to my details being used to respond to this enquiry.
+      </label>
+      <label className="flex items-start gap-2 text-xs text-muted-foreground">
+        <Checkbox checked={marketing} onCheckedChange={(v) => setMarketing(v === true)} className="mt-0.5" />
+        Optional — email me other properties that match what I’m looking for. You can unsubscribe at any time.
       </label>
       {err && <p className="text-xs text-destructive">{err}</p>}
       <Button type="submit" className="w-full rounded-full" disabled={state === 'sending'}>{state === 'sending' ? 'Sending…' : 'Send enquiry'}</Button>

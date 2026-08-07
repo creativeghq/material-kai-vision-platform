@@ -41,7 +41,11 @@ serve(withApiLogging('real-estate-buyer-digests', async (req) => {
     // GDPR: the digest is a marketing send — honor marketing_consent, exactly as the immediate
     // new-listing alert does (real-estate-api gates on the same flag). Without this a buyer with
     // consent=false still got the daily digest for listings the instant-alert path suppressed.
-    if (!email || (r as any).contact?.marketing_consent === false) { skipped++; continue; }
+    // Truthiness, not `=== false`: consent must be affirmative. The column is NOT NULL DEFAULT false
+    // today so the two agree, but `=== false` would silently start mailing unconsented buyers the day
+    // the flag becomes nullable or arrives absent from a new write path. Match the immediate-alert
+    // path in real-estate-api exactly, as the comment above claims.
+    if (!email || (r as any).contact?.marketing_consent !== true) { skipped++; continue; }
     const since = r.last_digest_at ?? '1970-01-01T00:00:00Z';
     // New public/active listings in this agency since the last digest.
     const { data: listings } = await supabase.from('properties')

@@ -18,7 +18,7 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
-import { checkPublishRequirements, matchesCriteria, createRentInvoiceForCharge, estimateFromMedianPerSqm } from '../_shared/real-estate.ts';
+import { checkPublishRequirements, matchesCriteria, createRentInvoiceForCharge, estimateFromMedianPerSqm, withRentSettlements } from '../_shared/real-estate.ts';
 import { resolveRealEstateAccess, PROPERTY_WRITABLE, pick } from './rbac.ts';
 import { draftListingCopy, analyzePropertyPhotos } from './ai.ts';
 import { refreshListingEmbedding } from '../_shared/real-estate-embedding.ts';
@@ -155,6 +155,11 @@ async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property:
 
 const INQUIRY_STATUSES = ['new', 'contacted', 'qualified', 'viewing_booked', 'closed', 'spam'];
 const VIEWING_STATUSES = ['scheduled', 'completed', 'cancelled', 'no_show'];
+/** Listing paperwork. The compliance types come first because they are the evidence behind the GR
+ *  publish gate — `energy_class` and `electronic_building_id` are claims until the certificate is
+ *  attached. Anything unrecognised is stored as 'other' rather than rejected. */
+const DOC_TYPES = ['energy_certificate', 'building_id', 'title_deed', 'floor_plan', 'topographic',
+  'agency_agreement', 'permit', 'tax_clearance', 'other'];
 // `virtual` added 2026-08-01. The scheduling dialog has always offered
 // in_person | virtual | open_house, but the allowlist held viewing | tour | open_house and
 // SUBSTITUTED rather than rejected — so `in_person` and `virtual`, two of the three options and
@@ -441,6 +446,110 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         return json({ photo: data });
       }
 
+      // ── Listing paperwork ──────────────────────────────────────────────
+      // `property_documents` existed and was READ by get-property, but had no write path and no UI,
+      // so it stayed empty forever. That mattered beyond the dead table: the GR publish gate asserts
+      // energy_class (ΠΕΑ) and electronic_building_id (Ηλ. Ταυτότητα) as bare text, with nowhere to
+      // attach the certificate that backs the claim, and the Transaction tab's signed agreements had
+      // no home on the listing either.
+      case 'document-upload-url': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        const ext = String(body.ext ?? 'pdf').replace(/[^a-z0-9]/gi, '').slice(0, 5) || 'pdf';
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        await loadEditable(id);
+        // Same private bucket as the media, under a `documents/` prefix — paperwork is never public,
+        // so it is read back through a short-lived signed URL, never a persisted one (pipeline §7).
+        const path = `${workspaceId}/${id}/documents/${crypto.randomUUID()}.${ext}`;
+        const { data, error } = await supabase.storage.from('property-media').createSignedUploadUrl(path);
+        if (error) throw new HttpError(400, error.message);
+        return json({ path, token: data.token, signed_url: data.signedUrl });
+      }
+
+      case 'add-document': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        const storagePath = String(body.storage_path ?? '');
+        if (!id || !storagePath) return json({ error: 'property_id and storage_path are required' }, 400);
+        await loadEditable(id);
+        const docType = DOC_TYPES.includes(String(body.doc_type)) ? String(body.doc_type) : 'other';
+        const { data, error } = await supabase.from('property_documents').insert({
+          workspace_id: workspaceId, property_id: id, storage_path: storagePath,
+          doc_type: docType, title: body.title ? String(body.title).slice(0, 200) : null, uploaded_by: userId,
+        }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ document: data });
+      }
+
+      case 'list-documents': {
+        const id = String(body.property_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        await loadProperty(id); // view-scoped 404
+        const { data, error } = await supabase.from('property_documents')
+          .select('*').eq('property_id', id).eq('workspace_id', workspaceId).order('created_at', { ascending: false });
+        if (error) throw new HttpError(400, error.message);
+        const docs = await Promise.all((data ?? []).map(async (d: any) => {
+          const { data: s } = await supabase.storage.from(d.storage_bucket || 'property-media').createSignedUrl(d.storage_path, 3600);
+          return { ...d, url: s?.signedUrl ?? null };
+        }));
+        return json({ documents: docs });
+      }
+
+      case 'delete-document': {
+        requireManage();
+        const docId = String(body.document_id ?? '');
+        if (!docId) return json({ error: 'document_id is required' }, 400);
+        // Resolve the parent property and prove agent ownership first — workspace scope alone does
+        // not separate two agents (same reasoning as delete-photo).
+        const { data: doc } = await supabase.from('property_documents')
+          .select('storage_path, storage_bucket, property_id').eq('id', docId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!doc) return json({ error: 'not found' }, 404);
+        await loadEditable(String((doc as any).property_id));
+        if (doc.storage_path) await supabase.storage.from(doc.storage_bucket || 'property-media').remove([doc.storage_path]);
+        const { error } = await supabase.from('property_documents').delete().eq('id', docId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
+      // ── Open houses ────────────────────────────────────────────────────
+      // Also read-only until now: get-property returned them and nothing could create one.
+      case 'upsert-open-house': {
+        requireManage();
+        const id = String(body.property_id ?? '');
+        const openHouseId = String(body.open_house_id ?? '');
+        if (!id) return json({ error: 'property_id is required' }, 400);
+        await loadEditable(id);
+        const startsAt = String(body.starts_at ?? '');
+        if (!openHouseId && !startsAt) return json({ error: 'starts_at is required' }, 400);
+        const payload: Record<string, unknown> = {};
+        if (startsAt) payload.starts_at = startsAt;
+        if (body.ends_at !== undefined) payload.ends_at = body.ends_at || null;
+        if (body.note !== undefined) payload.note = body.note ? String(body.note).slice(0, 1000) : null;
+        if (openHouseId) {
+          const { data, error } = await supabase.from('property_open_houses')
+            .update(payload).eq('id', openHouseId).eq('workspace_id', workspaceId).eq('property_id', id).select('*').single();
+          if (error) throw new HttpError(400, error.message);
+          return json({ open_house: data });
+        }
+        const { data, error } = await supabase.from('property_open_houses')
+          .insert({ ...payload, workspace_id: workspaceId, property_id: id }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ open_house: data });
+      }
+
+      case 'delete-open-house': {
+        requireManage();
+        const openHouseId = String(body.open_house_id ?? '');
+        if (!openHouseId) return json({ error: 'open_house_id is required' }, 400);
+        const { data: oh } = await supabase.from('property_open_houses')
+          .select('property_id').eq('id', openHouseId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!oh) return json({ error: 'not found' }, 404);
+        await loadEditable(String((oh as any).property_id));
+        const { error } = await supabase.from('property_open_houses').delete().eq('id', openHouseId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
       case 'analyze-photos': {
         requireManage();
         const id = String(body.property_id ?? '');
@@ -550,6 +659,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           workspace_id: workspaceId, name: inq.name || inq.email || 'Website lead', email: inq.email, phone: inq.phone,
           contact_type: 'buyer', lead_source: 'property_portal', lead_status: 'new',
           responsible_sales_user_ids: [userId],
+          // Carry the enquiry's marketing opt-in onto the contact. This is the ONLY bridge between the
+          // consent the buyer gave on the public page and the flag the direct-to-buyer alert and the
+          // digest cron gate on; dropping it here re-opts-out everyone the module converts.
+          marketing_consent: inq.marketing_consent === true,
         }).select('id').single();
         if (cErr) throw new HttpError(400, cErr.message);
 
@@ -1150,7 +1263,10 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const { data, error } = await supabase.from('property_rent_charges')
           .select('*').eq('tenancy_id', tenancyId).eq('workspace_id', workspaceId).order('due_date', { ascending: true });
         if (error) throw new HttpError(400, error.message);
-        return json({ charges: data ?? [] });
+        // Settlement is DERIVED, never re-computed here: an invoiced charge is settled by the Finance
+        // ledger and the stored `status` on the row can be stale the moment the tenant pays the invoice.
+        // The UI renders `payment_status` / `settled`; `status` stays for the manual/waived path only.
+        return json({ charges: await withRentSettlements(supabase, data ?? []) });
       }
 
       case 'generate-rent-schedule': {
@@ -1187,10 +1303,16 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         requireManage();
         const chargeId = String(body.charge_id ?? '');
         if (!chargeId) return json({ error: 'charge_id is required' }, 400);
-        const { data: charge } = await supabase.from('property_rent_charges').select('amount, tenancy_id').eq('id', chargeId).eq('workspace_id', workspaceId).maybeSingle();
+        const { data: charge } = await supabase.from('property_rent_charges').select('amount, tenancy_id, invoice_id').eq('id', chargeId).eq('workspace_id', workspaceId).maybeSingle();
         if (!charge) return json({ error: 'not found' }, 404);
-        const paid = body.status === 'waived';
-        const patch = paid
+        // Once a charge is invoiced the Finance ledger owns its settlement. Hand-setting the flag here
+        // would create a second answer that nothing reconciles — the money is recorded by registering
+        // a payment (or a credit note to waive), and get_rent_charge_settlements reads that back.
+        if (charge.invoice_id) {
+          return json({ error: 'This charge is invoiced — record the payment (or a credit note to waive it) in Finance. The rent ledger follows the invoice.' }, 409);
+        }
+        const isWaived = body.status === 'waived';
+        const patch = isWaived
           ? { status: 'waived' as const, paid_at: null, paid_amount: null, note: body.note ?? null }
           : { status: 'paid' as const, paid_at: new Date().toISOString(), paid_amount: Number(body.paid_amount ?? charge.amount), note: body.note ?? null };
         const { data, error } = await supabase.from('property_rent_charges').update(patch).eq('id', chargeId).eq('workspace_id', workspaceId).select('*').single();
@@ -1241,13 +1363,17 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (!t) return json({ error: 'not found' }, 404);
         if (!access.isBroker && !canViewProperty(t.property ?? {})) return json({ error: 'not found' }, 404);
         const [{ data: charges }, { data: wos }] = await Promise.all([
-          supabase.from('property_rent_charges').select('amount, paid_amount, status').eq('tenancy_id', tenancyId).eq('workspace_id', workspaceId),
+          supabase.from('property_rent_charges').select('id, amount, paid_amount, status, invoice_id, due_date, currency').eq('tenancy_id', tenancyId).eq('workspace_id', workspaceId),
           supabase.from('property_maintenance').select('cost, status').eq('tenancy_id', tenancyId).eq('workspace_id', workspaceId),
         ]);
         const num = (x: any) => Number(x ?? 0);
-        const rentCharged = (charges ?? []).filter((c: any) => c.status !== 'waived').reduce((s: number, c: any) => s + num(c.amount), 0);
-        const rentReceived = (charges ?? []).filter((c: any) => c.status === 'paid').reduce((s: number, c: any) => s + num(c.paid_amount), 0);
-        const outstanding = (charges ?? []).filter((c: any) => c.status === 'due' || c.status === 'overdue').reduce((s: number, c: any) => s + num(c.amount), 0);
+        // Rent received and outstanding come from the DERIVATION, not the stored flag. Summing
+        // `status = 'paid'` here is what made a landlord statement under-report every invoiced rent
+        // the tenant had actually paid through Finance, while showing it as still owed.
+        const settled = await withRentSettlements(supabase, charges ?? []);
+        const rentCharged = settled.filter((c: any) => c.payment_status !== 'waived').reduce((s: number, c: any) => s + num(c.amount), 0);
+        const rentReceived = settled.reduce((s: number, c: any) => s + num(c.settled), 0);
+        const outstanding = settled.reduce((s: number, c: any) => s + num(c.outstanding), 0);
         const maintenanceSpend = (wos ?? []).reduce((s: number, w: any) => s + num(w.cost), 0);
         return json({
           tenancy: t, currency: t.currency,

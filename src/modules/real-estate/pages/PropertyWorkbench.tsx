@@ -26,7 +26,7 @@ import {
   realEstateService, isPublishBlocked,
   type Property, type PropertyPhoto, type PropertyInquiry, type PropertyViewing, type PropertyOffer,
   type Tenancy, type RentCharge, type MaintenanceWorkOrder, type LandlordStatement, type PropertySale,
-  type InvestmentMetrics,
+  type InvestmentMetrics, type PropertyDocument, type OpenHouse, DOC_TYPE_LABELS,
 } from '../services/realEstateService';
 import { contractsService, type Contract } from '@/services/contractsService';
 import { statusTone } from '@/utils/statusTone';
@@ -37,6 +37,74 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
 const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
+
+/**
+ * Listing paperwork. `property_documents` had existed since the module shipped, was read by
+ * get-property, and had no write path or UI — so it was permanently empty. The gap that mattered:
+ * the GR publish gate hard-blocks on `energy_class` (ΠΕΑ) and `electronic_building_id`
+ * (Ηλ. Ταυτότητα), both plain text fields, with nowhere to attach the certificate behind the claim.
+ *
+ * The bucket is private: the download link is a 1h signed URL minted per read and never persisted
+ * (pipeline convention §7).
+ */
+const DocumentsTab: React.FC<{ ws: string | null; propertyId: string; canManage: boolean }> = ({ ws, propertyId, canManage }) => {
+  const { toast } = useToast();
+  const [docs, setDocs] = useState<PropertyDocument[] | null>(null);
+  const [docType, setDocType] = useState('energy_certificate');
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    if (!ws) return;
+    try { setDocs(await realEstateService.listDocuments(ws, propertyId)); } catch { setDocs([]); }
+  }, [ws, propertyId]);
+  useEffect(() => { void load(); }, [load]);
+
+  const upload = async (file: File) => {
+    if (!ws) return;
+    setBusy(true);
+    try { await realEstateService.uploadDocument(ws, propertyId, file, docType); await load(); toast({ title: 'Document uploaded' }); }
+    catch (e) { toast({ title: 'Upload failed', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+  const remove = async (docId: string) => {
+    if (!ws) return;
+    try { await realEstateService.deleteDocument(ws, docId); await load(); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  };
+
+  if (docs === null) return <div className="dashboard-card p-8 text-center text-sm text-muted-foreground">Loading…</div>;
+  return (
+    <div className="space-y-4">
+      {canManage && (
+        <div className="flex flex-wrap items-end gap-2">
+          <select className="h-9 rounded-md border bg-background px-2 text-sm" value={docType} onChange={(e) => setDocType(e.target.value)}>
+            {Object.entries(DOC_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          <input ref={fileRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} />
+          <Button size="sm" className="rounded-full" disabled={busy} onClick={() => fileRef.current?.click()}>
+            {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Upload className="mr-1 h-4 w-4" />} Upload document
+          </Button>
+          <span className="text-[11px] text-muted-foreground">Private — links expire after an hour.</span>
+        </div>
+      )}
+      {docs.length === 0 ? <div className="dashboard-card p-10 text-center text-sm text-muted-foreground">No documents yet. Attach the ΠΕΑ, building ID and agency agreement here.</div> : (
+        <Card><CardContent className="p-0"><div className="divide-y divide-border">
+          {docs.map((d) => (
+            <div key={d.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="font-medium">{d.title || 'Document'}</span>
+              <span className="text-xs text-muted-foreground">{DOC_TYPE_LABELS[d.doc_type] ?? d.doc_type}</span>
+              <span className="ml-auto text-xs text-muted-foreground">{new Date(d.created_at).toLocaleDateString()}</span>
+              {d.url && <a href={d.url} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-primary"><ExternalLink className="mr-1 h-3 w-3" /> Open</Button></a>}
+              {canManage && <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-destructive" onClick={() => remove(d.id)}><Trash2 className="h-3 w-3" /></Button>}
+            </div>
+          ))}
+        </div></CardContent></Card>
+      )}
+    </div>
+  );
+};
 
 // Lazy: the Spark/Three splat renderer only loads when a listing actually shows a VR world.
 const WorldViewer = React.lazy(() => import('@/components/features/ai/WorldViewer').then((m) => ({ default: m.WorldViewer })));
@@ -121,6 +189,9 @@ export default function PropertyWorkbench() {
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [newViewingAt, setNewViewingAt] = useState('');
+  const [openHouses, setOpenHouses] = useState<OpenHouse[]>([]);
+  const [newOpenHouseAt, setNewOpenHouseAt] = useState('');
+  const [newOpenHouseNote, setNewOpenHouseNote] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const ws = activeWorkspaceId;
@@ -130,6 +201,7 @@ export default function PropertyWorkbench() {
     try {
       const r = await realEstateService.getProperty(ws, id);
       setProperty(r.property); setCanEdit(r.can_edit !== false); setPhotos(r.photos); setInquiries(r.inquiries); setViewings(r.viewings);
+      setOpenHouses(r.open_houses ?? []);
       const f: Record<string, any> = {};
       for (const k of FORM_FIELDS) f[k] = ARRAY_FIELDS.has(k) ? (r.property[k] ?? []).join(', ') : r.property[k];
       f.description_en = r.property.description_i18n?.en ?? '';
@@ -282,6 +354,7 @@ export default function PropertyWorkbench() {
             <TabsTrigger value="inquiries" className={RE_TAB}><Contact className="h-4 w-4" /> Leads {inquiries.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{inquiries.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="offers" className={RE_TAB}><Gavel className="h-4 w-4" /> Offers</TabsTrigger>
             <TabsTrigger value="viewings" className={RE_TAB}><CalendarClock className="h-4 w-4" /> Viewings {viewings.length > 0 && <Badge className="ml-0.5 rounded-full border-0 bg-primary/15 text-[10px]">{viewings.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="documents" className={RE_TAB}><FileText className="h-4 w-4" /> Documents</TabsTrigger>
             {canManage && isRental && pmEnabled && <TabsTrigger value="lettings" className={RE_TAB}><KeyRound className="h-4 w-4" /> Lettings</TabsTrigger>}
             {canManage && investEnabled && <TabsTrigger value="investment" className={RE_TAB}><LineChart className="h-4 w-4" /> Investment</TabsTrigger>}
             {canManage && <TabsTrigger value="transaction" className={RE_TAB}><FileSignature className="h-4 w-4" /> Transaction</TabsTrigger>}
@@ -663,7 +736,47 @@ export default function PropertyWorkbench() {
                 ))}
               </div></CardContent></Card>
             )}
+
+            {/* Open houses — `property_open_houses` was also read-only (get-property returned them and
+                nothing could create one). This is the scheduling surface, so they live here. */}
+            <div className="pt-2">
+              <div className="mb-2 text-sm font-semibold">Open houses</div>
+              {editable && (
+                <div className="mb-3 flex flex-wrap items-end gap-2">
+                  <input type="datetime-local" value={newOpenHouseAt} onChange={(e) => setNewOpenHouseAt(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm" />
+                  <Input className="h-9 w-56" placeholder="Note (optional)" value={newOpenHouseNote} onChange={(e) => setNewOpenHouseNote(e.target.value)} />
+                  <Button size="sm" variant="outline" className="rounded-full" disabled={!newOpenHouseAt || busy} onClick={async () => {
+                    if (!ws || !newOpenHouseAt) return;
+                    setBusy(true);
+                    try {
+                      const oh = await realEstateService.upsertOpenHouse(ws, id, { starts_at: new Date(newOpenHouseAt).toISOString(), note: newOpenHouseNote || null });
+                      setOpenHouses((prev) => [...prev, oh].sort((a, b) => a.starts_at.localeCompare(b.starts_at)));
+                      setNewOpenHouseAt(''); setNewOpenHouseNote(''); toast({ title: 'Open house scheduled' });
+                    } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+                    finally { setBusy(false); }
+                  }}>Add open house</Button>
+                </div>
+              )}
+              {openHouses.length === 0 ? <div className="dashboard-card p-6 text-center text-sm text-muted-foreground">No open houses scheduled.</div> : (
+                <Card><CardContent className="p-0"><div className="divide-y divide-border">
+                  {openHouses.map((o) => (
+                    <div key={o.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                      <span>{new Date(o.starts_at).toLocaleString()}</span>
+                      {o.note && <span className="text-xs text-muted-foreground">{o.note}</span>}
+                      {editable && (
+                        <Button size="sm" variant="ghost" className="ml-auto h-7 rounded-full px-2 text-xs text-destructive" onClick={async () => {
+                          try { await realEstateService.deleteOpenHouse(ws!, o.id); setOpenHouses((prev) => prev.filter((x) => x.id !== o.id)); }
+                          catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+                        }}><Trash2 className="h-3 w-3" /></Button>
+                      )}
+                    </div>
+                  ))}
+                </div></CardContent></Card>
+              )}
+            </div>
           </TabsContent>
+
+          <TabsContent value="documents"><DocumentsTab ws={ws} propertyId={id} canManage={editable} /></TabsContent>
         </Tabs>
       </div>
       {ws && <CmaReportDialog ws={ws} propertyId={id} open={cmaOpen} onOpenChange={setCmaOpen} />}
@@ -829,18 +942,24 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
                 <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                   <span className="w-24 shrink-0 text-muted-foreground">{new Date(c.due_date).toLocaleDateString()}</span>
                   <span className="font-medium">{offerMoney(c.amount, c.currency)}</span>
-                  <span className={`text-[10px] capitalize ${statusTone(c.status)}`}>{c.status}</span>
+                  {/* The DERIVED status, not the stored flag: an invoiced charge settles in Finance and
+                      `status` on this row never moves when the tenant pays. */}
+                  <span className={`text-[10px] capitalize ${statusTone(c.payment_status)}`}>{c.payment_status}</span>
+                  {c.payment_status === 'partial' && <span className="text-[10px] text-muted-foreground">{offerMoney(c.settled, c.currency)} of {offerMoney(c.amount, c.currency)}</span>}
                   <div className="ml-auto flex items-center gap-1.5">
                     {c.invoice_id
                       ? <Link to={`/finance/invoices/${c.invoice_id}`}><Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-primary"><FileText className="mr-1 h-3 w-3" /> Invoice</Button></Link>
-                      : canManage && c.status !== 'waived' && <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => invoiceRent(c.id)}><FileText className="mr-1 h-3 w-3" /> Invoice</Button>}
-                    {canManage && c.status !== 'paid' && c.status !== 'waived' && (
+                      : canManage && c.payment_status !== 'waived' && <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => invoiceRent(c.id)}><FileText className="mr-1 h-3 w-3" /> Invoice</Button>}
+                    {/* Manual settlement is offered ONLY while the charge is uninvoiced. Once it is
+                        invoiced the ledger owns it — the API rejects the hand-set with a 409, so
+                        offering the button here would just be a button that always fails. */}
+                    {canManage && !c.invoice_id && c.payment_status !== 'paid' && c.payment_status !== 'waived' && (
                       <>
                         <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => markPaid(c.id, 'paid')}><Check className="mr-1 h-3 w-3" /> Paid</Button>
                         <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-muted-foreground" onClick={() => markPaid(c.id, 'waived')}>Waive</Button>
                       </>
                     )}
-                    {c.status === 'paid' && c.paid_at && <span className="text-xs text-muted-foreground">Paid {new Date(c.paid_at).toLocaleDateString()}</span>}
+                    {c.payment_status === 'paid' && c.paid_at && <span className="text-xs text-muted-foreground">Paid {new Date(c.paid_at).toLocaleDateString()}</span>}
                   </div>
                 </div>
               ))}

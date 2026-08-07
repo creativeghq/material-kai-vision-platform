@@ -94,7 +94,7 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
   async function loadRequirement(token: string): Promise<any> {
     if (!token) throw new HttpError(400, 'token is required');
     const { data } = await supabase.from('property_buyer_requirements')
-      .select('id, workspace_id, crm_contact_id, label, criteria, is_active')
+      .select('id, workspace_id, crm_contact_id, label, criteria, is_active, digest_enabled')
       .eq('portal_token', token).maybeSingle();
     if (!data || data.is_active === false) throw new HttpError(404, 'not found');
     return data;
@@ -108,12 +108,34 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     ]);
     const matched = (listings ?? []).filter((p: any) => matchesCriteria(req.criteria, p));
     const covers = await coverUrls(matched.map((r: any) => r.id));
+    // Both halves of the alert switch, so the portal can render its true state: the digest cron reads
+    // `digest_enabled`, and BOTH the digest and the immediate new-listing alert read the contact's
+    // `marketing_consent`. A buyer is emailed only when both are on.
+    const { data: c } = req.crm_contact_id
+      ? await supabase.from('crm_contacts').select('marketing_consent').eq('id', req.crm_contact_id).maybeSingle()
+      : { data: null };
     return json({
       requirement: { label: req.label, criteria: req.criteria },
       agency: ws?.name ?? null,
       favorites: (favs ?? []).map((f: any) => f.property_id),
+      alerts_enabled: req.digest_enabled !== false && c?.marketing_consent === true,
       listings: matched.map((r: any) => ({ ...toPublic(r), cover_url: covers[r.id] ?? null })),
     });
+  }
+  if (action === 'buyer-set-consent') {
+    // GDPR withdrawal + opt-in, self-service. Consent that can only be set by an agent inside the CRM
+    // is not withdrawable by the data subject, and there was no other surface where the buyer could
+    // turn these emails on or off. The portal token IS the capability — it resolves to exactly one
+    // requirement and its contact; workspace and ids are never taken from the body.
+    const reqmt = await loadRequirement(String(body?.token ?? ''));
+    const on = body?.enabled === true;
+    await supabase.from('property_buyer_requirements').update({ digest_enabled: on }).eq('id', reqmt.id);
+    // Withdrawal must reach the contact flag too — leaving marketing_consent=true would keep the
+    // immediate new-listing alert (a different code path) mailing a buyer who just unsubscribed.
+    if (reqmt.crm_contact_id) {
+      await supabase.from('crm_contacts').update({ marketing_consent: on }).eq('id', reqmt.crm_contact_id).eq('workspace_id', reqmt.workspace_id);
+    }
+    return json({ ok: true, alerts_enabled: on });
   }
   if (action === 'buyer-favorite') {
     const req = await loadRequirement(String(body?.token ?? ''));
@@ -289,6 +311,10 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
     const { data: contact, error: contactErr } = await supabase.from('crm_contacts').insert({
       workspace_id: workspaceId, name, email, phone: String(body?.phone ?? '').slice(0, 40) || null,
       contact_type: 'seller', lead_source: 'valuation_request', lead_status: 'new',
+      // Optional marketing opt-in, captured separately from the required processing consent above.
+      // This is the ONLY moment we can ask — the column is NOT NULL DEFAULT false, so a seller who
+      // opted in here but was written without it stays permanently unmailable by any automation.
+      marketing_consent: body?.marketing_consent === true,
     }).select('id').single();
     if (contactErr || !contact?.id) {
       console.error('[real-estate-public] valuation lead capture failed:', contactErr?.message);
@@ -361,6 +387,11 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
       name, email, phone: String(body?.phone ?? '').slice(0, 40) || null,
       message: String(body?.message ?? '').slice(0, 4000) || null,
       source: 'listing_page', gdpr_consent: true,
+      // Separate, OPTIONAL marketing opt-in. `convert-inquiry` carries it onto the crm_contact, which
+      // is what the direct-to-buyer alert and the digest cron gate on. Absent this the enquirer is
+      // opted out for good (crm_contacts.marketing_consent is NOT NULL DEFAULT false) and the alert
+      // path silently never fires for them. Strict === true: only an affirmative act is consent.
+      marketing_consent: body?.marketing_consent === true,
     });
     if (insErr) throw new HttpError(400, insErr.message);
     return json({ ok: true });

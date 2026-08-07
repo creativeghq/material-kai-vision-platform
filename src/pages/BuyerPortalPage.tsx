@@ -5,6 +5,7 @@ import { formatMoney } from '@/utils/decimal';
 import { useParams, Link } from 'react-router-dom';
 import { Heart, CalendarPlus, Home, Loader2, Building2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { realEstatePublic, type PublicListingCard } from '@/modules/real-estate/services/realEstateService';
 
@@ -27,12 +28,16 @@ export default function BuyerPortalPage() {
   const [error, setError] = useState<string | null>(null);
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [requested, setRequested] = useState<Set<string>>(new Set());
+  // Match-alert opt-in. This portal is the buyer's ONLY surface — the flag it writes was previously
+  // settable only by an agent inside the CRM, which meant the data subject could neither give nor
+  // withdraw the consent that gates their own emails.
+  const [alerts, setAlerts] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
     try {
       const d = await realEstatePublic.buyerPortal(token);
-      setData(d); setFavs(new Set(d.favorites));
+      setData(d); setFavs(new Set(d.favorites)); setAlerts(d.alerts_enabled === true);
     } catch (e) { setError((e as Error).message || 'This link is no longer active.'); }
   }, [token]);
   useEffect(() => { void load(); }, [load]);
@@ -43,6 +48,12 @@ export default function BuyerPortalPage() {
     setFavs((prev) => { const n = new Set(prev); on ? n.add(id) : n.delete(id); return n; });
     try { await realEstatePublic.buyerFavorite(token, id, on); }
     catch { setFavs((prev) => { const n = new Set(prev); on ? n.delete(id) : n.add(id); return n; }); toast({ title: 'Could not update favourite', variant: 'destructive' }); }
+  };
+  const toggleAlerts = async (on: boolean) => {
+    if (!token) return;
+    setAlerts(on);
+    try { await realEstatePublic.buyerSetConsent(token, on); toast({ title: on ? 'Match emails on' : 'Match emails off' }); }
+    catch (e) { setAlerts(!on); toast({ title: 'Could not update', description: (e as Error).message, variant: 'destructive' }); }
   };
   const requestViewing = async (id: string) => {
     if (!token) return;
@@ -64,10 +75,16 @@ export default function BuyerPortalPage() {
           {data.agency && <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Building2 className="h-3.5 w-3.5" /> {data.agency}</div>}
           <h1 className="mt-1 text-2xl font-display font-semibold">Your property matches</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{data.requirement.label || criteriaSummary(data.requirement.criteria)} · {data.listings.length} match{data.listings.length === 1 ? '' : 'es'}</p>
+          <label className="mt-3 flex items-center gap-2.5 text-sm">
+            <Switch checked={alerts} onCheckedChange={toggleAlerts} />
+            <span className="text-muted-foreground">Email me when new properties match this search</span>
+          </label>
         </div>
 
         {data.listings.length === 0 ? (
-          <div className="dashboard-card p-12 text-center text-sm text-muted-foreground">No matches right now — we'll email you when new listings fit your search.</div>
+          <div className="dashboard-card p-12 text-center text-sm text-muted-foreground">
+            {alerts ? "No matches right now — we'll email you when new listings fit your search." : 'No matches right now. Turn on match emails above and we’ll tell you when something fits.'}
+          </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {data.listings.map((l: PublicListingCard) => {
