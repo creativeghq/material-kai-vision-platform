@@ -165,6 +165,8 @@ const VIEWING_STATUSES = ['scheduled', 'completed', 'cancelled', 'no_show'];
  *  attached. Anything unrecognised is stored as 'other' rather than rejected. */
 const DOC_TYPES = ['energy_certificate', 'building_id', 'title_deed', 'floor_plan', 'topographic',
   'agency_agreement', 'permit', 'tax_clearance', 'other'];
+/** Who a commission split can pay. Mirrors the CHECK on property_sale_commission_splits. */
+const COMMISSION_PARTY_TYPES = ['listing_agent', 'buyer_agent', 'house', 'referral', 'external'];
 // `virtual` added 2026-08-01. The scheduling dialog has always offered
 // in_person | virtual | open_house, but the allowlist held viewing | tour | open_house and
 // SUBSTITUTED rather than rejected — so `in_person` and `virtual`, two of the three options and
@@ -468,6 +470,129 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         }).select('*').single();
         if (error) throw new HttpError(400, error.message);
         return json({ photo: data });
+      }
+
+      // ── Commission splits & agent payouts (#281 gap 6) ─────────────────
+      case 'list-commission-splits': {
+        const saleId = String(body.sale_id ?? '');
+        if (!saleId) return json({ error: 'sale_id is required' }, 400);
+        const { data: sale } = await supabase.from('property_sales')
+          .select('id, property_id, property:properties!property_sales_property_id_fkey ( listing_agent_id, created_by, open_for_all )')
+          .eq('id', saleId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!sale) return json({ error: 'not found' }, 404);
+        if (!access.isBroker && !canViewProperty((sale as any).property ?? {})) return json({ error: 'not found' }, 404);
+        // Amounts are DERIVED — a split row stores the rule (50%), never the figure. The fee moves
+        // when a sale price is corrected, and a stored amount would quietly stop adding up.
+        const { data, error } = await supabase.rpc('get_sale_commission_splits', { p_sale_ids: [saleId] });
+        if (error) throw new HttpError(400, error.message);
+        const rows = (data ?? []).filter((r: any) => r.split_id);
+        const head = (data ?? [])[0];
+        return json({
+          splits: rows,
+          totals: head
+            ? { currency: head.currency, commission_base: head.commission_base, allocated: head.allocated, unallocated: head.unallocated }
+            : null,
+        });
+      }
+
+      case 'upsert-commission-split': {
+        // Broker-level: who gets paid what out of a completed sale is not an agent's own call.
+        if (!access.isBroker) return json({ error: 'Only a workspace owner or admin can edit commission splits.' }, 403);
+        const saleId = String(body.sale_id ?? '');
+        const splitId = String(body.split_id ?? '');
+        if (!saleId && !splitId) return json({ error: 'sale_id or split_id is required' }, 400);
+
+        const payload: Record<string, unknown> = {};
+        if (body.party_type !== undefined) {
+          const pt = String(body.party_type);
+          if (!COMMISSION_PARTY_TYPES.includes(pt)) return json({ error: `party_type must be one of ${COMMISSION_PARTY_TYPES.join(', ')}` }, 400);
+          payload.party_type = pt;
+        }
+        if (body.basis !== undefined) {
+          const b = String(body.basis);
+          if (b !== 'pct' && b !== 'fixed') return json({ error: "basis must be 'pct' or 'fixed'" }, 400);
+          payload.basis = b;
+        }
+        if (body.pct !== undefined) payload.pct = body.pct === null || body.pct === '' ? null : Number(body.pct);
+        if (body.fixed_amount !== undefined) payload.fixed_amount = body.fixed_amount === null || body.fixed_amount === '' ? null : Number(body.fixed_amount);
+        if (body.label !== undefined) payload.label = body.label ? String(body.label).slice(0, 160) : null;
+        if (body.contact_id !== undefined) payload.contact_id = body.contact_id || null;
+        if (body.notes !== undefined) payload.notes = body.notes ? String(body.notes).slice(0, 2000) : null;
+        if (body.paid_at !== undefined) payload.paid_at = body.paid_at || null;
+        if (body.user_id !== undefined) {
+          const uid = body.user_id ? String(body.user_id) : null;
+          if (uid) {
+            // Paying a user id from another tenant would both leak the sale and misdirect money.
+            const { data: member } = await supabase.from('workspace_members')
+              .select('user_id').eq('workspace_id', workspaceId).eq('user_id', uid).maybeSingle();
+            if (!member) return json({ error: 'That user is not a member of this workspace.' }, 400);
+          }
+          payload.user_id = uid;
+        }
+
+        if (splitId) {
+          payload.updated_at = new Date().toISOString();
+          const { data, error } = await supabase.from('property_sale_commission_splits')
+            .update(payload).eq('id', splitId).eq('workspace_id', workspaceId).select('*').single();
+          if (error) throw new HttpError(400, error.message);
+          return json({ split: data });
+        }
+        const { data: sale } = await supabase.from('property_sales')
+          .select('id, property_id').eq('id', saleId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!sale) return json({ error: 'not found' }, 404);
+        const { data, error } = await supabase.from('property_sale_commission_splits')
+          .insert({ ...payload, workspace_id: workspaceId, sale_id: saleId, created_by: userId }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ split: data });
+      }
+
+      case 'delete-commission-split': {
+        if (!access.isBroker) return json({ error: 'Only a workspace owner or admin can edit commission splits.' }, 403);
+        const splitId = String(body.split_id ?? '');
+        if (!splitId) return json({ error: 'split_id is required' }, 400);
+        const { error } = await supabase.from('property_sale_commission_splits')
+          .delete().eq('id', splitId).eq('workspace_id', workspaceId);
+        if (error) throw new HttpError(400, error.message);
+        return json({ ok: true });
+      }
+
+      case 'agent-commission-statement': {
+        // "What am I owed for this period." An agent may always run their own; only a broker may
+        // run someone else's or the whole desk.
+        const targetUser = body.user_id ? String(body.user_id) : userId;
+        if (targetUser !== userId && !access.isBroker) {
+          return json({ error: "You can only run your own commission statement." }, 403);
+        }
+        const from = String(body.from ?? new Date(new Date().getUTCFullYear(), 0, 1).toISOString().slice(0, 10));
+        const to = String(body.to ?? new Date().toISOString().slice(0, 10));
+        const { data: sales } = await supabase.from('property_sales')
+          .select('id, property_id, sale_price, currency, completed_at, property:properties!property_sales_property_id_fkey ( title, reference_code )')
+          .eq('workspace_id', workspaceId).gte('completed_at', from).lte('completed_at', to);
+        if (!sales?.length) return json({ from, to, user_id: targetUser, lines: [], totals: { earned: 0, paid: 0, outstanding: 0, currency: 'EUR' } });
+
+        const { data: splits, error } = await supabase.rpc('get_sale_commission_splits', { p_sale_ids: sales.map((s: any) => s.id) });
+        if (error) throw new HttpError(400, error.message);
+        const saleById = new Map(sales.map((s: any) => [s.id, s]));
+        const mine = (splits ?? []).filter((r: any) => r.split_id && (body.all_agents === true ? true : r.user_id === targetUser));
+        const lines = mine.map((r: any) => {
+          const s: any = saleById.get(r.sale_id);
+          return {
+            sale_id: r.sale_id, split_id: r.split_id, user_id: r.user_id, party_type: r.party_type,
+            property_title: s?.property?.title ?? null, reference_code: s?.property?.reference_code ?? null,
+            completed_at: s?.completed_at ?? null, sale_price: s?.sale_price ?? null,
+            currency: r.currency, amount: r.amount, paid_at: r.paid_at,
+          };
+        });
+        const sum = (f: (l: any) => boolean) => Math.round(lines.filter(f).reduce((t: number, l: any) => t + Number(l.amount ?? 0), 0) * 100) / 100;
+        return json({
+          from, to, user_id: targetUser, lines,
+          totals: {
+            earned: sum(() => true),
+            paid: sum((l) => !!l.paid_at),
+            outstanding: sum((l) => !l.paid_at),
+            currency: lines[0]?.currency ?? 'EUR',
+          },
+        });
       }
 
       // ── Lead routing rules ─────────────────────────────────────────────

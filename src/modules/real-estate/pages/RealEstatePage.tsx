@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil, Upload } from 'lucide-react';
+import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil, Upload, Percent } from 'lucide-react';
 import { ImportListingsDialog } from '../components/ImportListingsDialog';
 import { LeadRoutingCard } from '../components/LeadRoutingCard';
+import { CommissionSplitsCard } from '../components/CommissionSplitsCard';
 import { PipelineBoard } from '../components/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
@@ -103,7 +104,7 @@ export default function RealEstatePage() {
           <TabsContent value="buyers"><BuyersPanel ws={ws} /></TabsContent>
           <TabsContent value="sellers"><SellersPanel ws={ws} /></TabsContent>
           <TabsContent value="viewings"><ViewingsPanel ws={ws} /></TabsContent>
-          <TabsContent value="sales"><SalesPanel ws={ws} /></TabsContent>
+          <TabsContent value="sales"><SalesPanel ws={ws} canManage={canManage} /></TabsContent>
           <TabsContent value="lettings">
             <ModuleTabGate moduleSlug="real-estate-management" moduleName="Property Management"
               blurb="Manage rentals end to end: tenancies, rent schedules & payments, maintenance work orders, and landlord statements.">
@@ -780,8 +781,11 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
 };
 
 // Completed sales + commission (the portfolio view of "how much have we earned").
-const SalesPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
+const SalesPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, canManage }) => {
   const navigate = useNavigate();
+  // Which sale's splits are expanded. Splits are per-sale detail, so they open in place rather than
+  // adding a column nobody reads at a glance.
+  const [openSplits, setOpenSplits] = useState<string | null>(null);
   const { toast } = useToast();
   const [rows, setRows] = useState<PropertySale[] | null>(null);
   const load = useCallback(() => {
@@ -802,7 +806,8 @@ const SalesPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
       </CardContent></Card>
       <Card><CardContent className="p-0"><div className="divide-y divide-border">
         {rows.map((s) => (
-          <div key={s.id} className="flex items-center hover:bg-muted/40">
+          <div key={s.id}>
+          <div className="flex items-center hover:bg-muted/40">
             <button onClick={() => navigate(`/properties/${s.property_id}`)} className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left">
               <Handshake className="h-4 w-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
@@ -816,7 +821,14 @@ const SalesPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
                   : <span className="text-[10px] text-muted-foreground">not invoiced</span>}
               </div>
             </button>
-            <div className="pr-3"><DeleteIconButton title="Delete sale" confirmText="Delete this completed sale? Its commission is removed from your reporting. This does not delete any linked invoice." onDelete={() => realEstateService.deleteSale(ws as string, s.id).then(load)} /></div>
+            <div className="flex shrink-0 items-center gap-1 pr-3">
+              <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs" onClick={() => setOpenSplits(openSplits === s.id ? null : s.id)}>
+                <Percent className="mr-1 h-3 w-3" /> Splits
+              </Button>
+              <DeleteIconButton title="Delete sale" confirmText="Delete this completed sale? Its commission is removed from your reporting. This does not delete any linked invoice." onDelete={() => realEstateService.deleteSale(ws as string, s.id).then(load)} />
+            </div>
+          </div>
+          {openSplits === s.id && <div className="border-t bg-muted/20 p-3"><CommissionSplitsCard ws={ws} saleId={s.id} canManage={canManage} /></div>}
           </div>
         ))}
       </div></CardContent></Card>

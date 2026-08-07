@@ -155,11 +155,20 @@ The **vendor report** is what the instructing seller is told: traffic, viewings 
 
 It is a **service communication** under the agency agreement, not marketing: gated per listing on `properties.vendor_reports_enabled`, not on `crm_contacts.marketing_consent` (which would be the wrong legal basis). `last_vendor_report_at` is stamped only on a successful send, so a failed week retries rather than being skipped.
 
-## 10. Integrity checks
+## 10. Commission splits, lead routing, import
+
+**Commission splits.** `property_sale_commission_splits` shares one sale's fee between the listing agent, the buyer agent, the house, a referral or an external party. A split row stores the **rule** (50%, or €500), never the figure: `get_sale_commission_splits(uuid[])` derives every amount, so correcting a sale price re-derives the shares instead of leaving stale numbers. Percentages are of **`commission_base`** — the fee net of VAT — because the VAT is remitted to the state, not shared with an agent. `agent-commission-statement` answers "what am I owed for this period"; an agent may always run their own, only a broker may run someone else's.
+
+**Lead routing.** `realestate_lead_routing_rules` matches the listing's town / region / postcode prefix (an empty array means "don't care", so a criteria-less rule is the catch-all), then deals round-robin inside the winning rule. `route_property_lead` picks and advances the cursor in one statement — deriving "who got the last one" from the inquiries table would make two simultaneous leads pick the same agent. Both `list-inquiries` and `update-inquiry` recognise the **assignee** as well as the listing owner, so a lead routed across desks is visible and workable by the person who got it.
+
+**Import.** `import-listings` takes CSV rows (parsed in the browser) or Kyero XML, normalises both through `normaliseImportRow`, and upserts on `reference_code`. The payload is built field by field from `IMPORT_WRITABLE` — deliberately narrower than `PROPERTY_WRITABLE`, and never a spread (invariant 8). Imported listings land as **unpublished drafts**: they have not been through `checkPublishRequirements`, and a bulk import that pushed 300 listings to the public site and the portal feeds is not undoable.
+
+## 11. Integrity checks
 
 | Key | Watches |
 |---|---|
 | `realestate.rent_charge_status_drift` | An invoiced rent charge whose stored status disagrees with the ledger-derived settlement. Autoheals by restamping the cache from the derivation — never the other way round. |
 | `realestate.rent_never_invoiced` | The **output** of `real-estate-rent-invoicing`: a charge more than 2 days past due, on an active tenancy with a tenant, still carrying no `invoice_id`. The cron drafts these unconditionally, so this means it is not landing — and `cron.job_run_details` reports success either way. |
+| `realestate.commission_over_allocated` | Splits on a completed sale summing beyond `commission_base`. Not a display bug — the brokerage has promised out more than it earned. No autoheal: which split is wrong is a business decision. |
 
 The generic `ops.silent_zero` probes already cover these crons for "fires but never succeeds"; these two watch the work itself.

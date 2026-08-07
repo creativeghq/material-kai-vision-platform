@@ -120,6 +120,26 @@ export interface ListingPerformance {
 }
 export interface ListingViewPoint { property_id: string; day: string; views: number }
 
+/** One share of a sale's commission. `amount` is DERIVED by `get_sale_commission_splits` — the row
+ *  stores the rule (50% / €500), never the figure, because the fee moves when a sale price or
+ *  commission percentage is corrected. Percentages are of the COMMISSION, not the sale price. */
+export interface CommissionSplit {
+  sale_id: string; split_id: string; party_type: 'listing_agent' | 'buyer_agent' | 'house' | 'referral' | 'external';
+  user_id: string | null; contact_id: string | null; label: string | null;
+  amount: number; paid_at: string | null; currency: string;
+  commission_base: number; allocated: number; unallocated: number;
+}
+export interface CommissionTotals { currency: string; commission_base: number; allocated: number; unallocated: number }
+export interface AgentCommissionStatement {
+  from: string; to: string; user_id: string;
+  lines: {
+    sale_id: string; split_id: string; user_id: string | null; party_type: string;
+    property_title: string | null; reference_code: string | null; completed_at: string | null;
+    sale_price: number | null; currency: string; amount: number; paid_at: string | null;
+  }[];
+  totals: { earned: number; paid: number; outstanding: number; currency: string };
+}
+
 /** Territory / round-robin routing for inbound leads. Highest-priority matching rule wins; within a
  *  rule, the lead goes to the next agent after `last_assigned_user_id`. An empty match array means
  *  "don't care", so a rule with no criteria is the catch-all. */
@@ -415,6 +435,16 @@ export const realEstateService = {
     if (error) throw error;
     return this.addPhoto(ws, propertyId, path, kind);
   },
+
+  // Commission splits (broker-only writes) + the per-agent statement
+  listCommissionSplits: (ws: string, saleId: string) =>
+    call<{ splits: CommissionSplit[]; totals: CommissionTotals | null }>(ws, 'list-commission-splits', { sale_id: saleId }),
+  upsertCommissionSplit: (ws: string, fields: Record<string, unknown>) =>
+    call<{ split: unknown }>(ws, 'upsert-commission-split', fields),
+  deleteCommissionSplit: (ws: string, splitId: string) =>
+    call<{ ok: true }>(ws, 'delete-commission-split', { split_id: splitId }),
+  agentCommissionStatement: (ws: string, opts: { from?: string; to?: string; user_id?: string; all_agents?: boolean } = {}) =>
+    call<AgentCommissionStatement>(ws, 'agent-commission-statement', opts),
 
   // Lead routing (broker-only writes — routing decides who GETS the leads)
   listRoutingRules: (ws: string) =>
