@@ -119,6 +119,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'real-estate-listing-social', label: 'real-estate-listing-social', sublabel: 'Flow action — drafts a social post for a newly published listing, one per connected account' },
   { id: 'real-estate-inbound-lead', label: 'real-estate-inbound-lead', sublabel: 'Public tokenised endpoint — turns a forwarded portal enquiry email into a CRM lead' },
   { id: 'real-estate-ical', label: 'real-estate-ical', sublabel: 'Short-let channel sync — availability feed out (GET, token) and channel calendars in (POST, cron)' },
+  { id: 'real-estate-calendar', label: 'real-estate-calendar', sublabel: "Pushes viewings into the agent's own Google Calendar (per-user OAuth)" },
   { id: 'real-estate-feed', label: 'real-estate-feed', sublabel: 'Tokenized XML syndication feed (Kyero / OpenImmo / generic) for property portals' },
   { id: 'real-estate-public', label: 'real-estate-public', sublabel: 'Anonymous, token-gated public listing pages, buyer portal, discovery and lead capture' },
   { id: 'real-estate-rent-invoicing', label: 'real-estate-rent-invoicing', sublabel: 'Daily cron — drafts Finance invoices for rent charges coming due' },

@@ -185,7 +185,15 @@ A short-let property is a stream of stays, not a term, so it gets `property_book
 
 [tests/unit/shortLetIcal.test.ts](../tests/unit/shortLetIcal.test.ts) pins the thing that would otherwise break silently: **iCal `DTEND` is exclusive**. Reading it as the last night is the classic off-by-one and it manufactures a phantom overlap on every changeover, which the exclusion constraint would then reject.
 
-## 13. Integrity checks
+## 13. Google Calendar
+
+Viewings already sync to the platform calendar (`crm_meetings`); what an agent lives in is Google Calendar on their phone, and a viewing they cannot see there is one they miss. `real-estate-calendar` reuses the platform's existing `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` and the token/refresh shape already proven in `gsc-api`, so Google is configured **once** rather than once per feature.
+
+The connection is **per user** and its RLS is owner-only — it holds one person's OAuth tokens, and workspace membership deliberately grants nothing. `state` is HMAC-signed with the service key and carries user + workspace, so the callback cannot be replayed to bind someone else's Google account; `prompt=consent` forces a `refresh_token` even on a reconnect, without which a stored connection dies within the hour.
+
+Pushes are **best-effort at the call site**: a calendar problem must never stop a viewing being booked. The failure is recorded in `last_sync_error` instead of being swallowed, because a calendar that silently stops syncing looks exactly like one with no viewings. Cancelling a viewing cancels the Google event rather than leaving a ghost appointment. If the platform has no Google credentials, the connect card does not render at all — telling agents to connect something the operator hasn't set up is noise they cannot act on.
+
+## 14. Integrity checks
 
 | Key | Watches |
 |---|---|

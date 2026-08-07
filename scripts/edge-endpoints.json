@@ -9715,6 +9715,31 @@
     "response": "{ success, buyers_considered, emails_sent, listings_matched }"
   },
   {
+    "name": "real-estate-calendar",
+    "tag": "Real Estate",
+    "summary": "Pushes viewings into the agent's own Google Calendar (per-user OAuth)",
+    "description": "Viewings already sync to the platform calendar (`crm_meetings`); what an agent lives in is Google Calendar on their phone, and a viewing they cannot see there is one they miss. Reuses the platform GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET and the token/refresh shape already proven in `gsc-api`, so Google is configured once rather than once per feature. Actions: `status`, `connect` (returns the consent URL), `disconnect`, `push-viewing`. The GET path is Google's OAuth callback. The connection is per USER and its RLS is owner-only — it holds one person's tokens and workspace membership deliberately grants nothing. `state` is HMAC-signed with the service key and carries user + workspace, so the callback cannot be replayed to bind someone else's Google account; `prompt=consent` forces a refresh_token even on reconnect, without which a stored connection dies within the hour. `push-viewing` re-checks the caller may see the viewing before writing to any calendar, cancels the Google event when the viewing is cancelled, and records `last_sync_error` rather than swallowing it — a calendar that silently stops syncing looks exactly like one with no viewings.",
+    "security": [
+      "userJwt"
+    ],
+    "docs": "api/real-estate-api.md",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "actions": [
+      "status",
+      "connect",
+      "disconnect",
+      "push-viewing"
+    ],
+    "request": [
+      "workspace_id",
+      "viewing_id"
+    ],
+    "response": "{ connected, google_email, last_sync_at, last_sync_error, configured } | { auth_url } | { ok, event_id }"
+  },
+  {
     "name": "real-estate-ical",
     "tag": "Real Estate",
     "summary": "Short-let channel sync — availability feed out (GET, token) and channel calendars in (POST, cron)",

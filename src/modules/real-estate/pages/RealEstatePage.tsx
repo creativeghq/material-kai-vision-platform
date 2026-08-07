@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Plus, Eye, Globe, Inbox, CalendarClock, LayoutDashboard, Loader2, Store, Handshake, KeyRound, Users, Wrench, Lock, LineChart, Columns3, Link as LinkIcon, Trash2, Pencil, Upload, Percent } from 'lucide-react';
 import { ImportListingsDialog } from '../components/ImportListingsDialog';
 import { LeadRoutingCard } from '../components/LeadRoutingCard';
+import { CalendarConnectCard } from '../components/CalendarConnectCard';
 import { CommissionSplitsCard } from '../components/CommissionSplitsCard';
 import { PipelineBoard } from '../components/PipelineBoard';
 import { CmaReportDialog } from '../components/CmaReportDialog';
@@ -103,7 +104,7 @@ export default function RealEstatePage() {
           <TabsContent value="leads"><LeadsPanel ws={ws} canManage={canManage} /></TabsContent>
           <TabsContent value="buyers"><BuyersPanel ws={ws} /></TabsContent>
           <TabsContent value="sellers"><SellersPanel ws={ws} /></TabsContent>
-          <TabsContent value="viewings"><ViewingsPanel ws={ws} /></TabsContent>
+          <TabsContent value="viewings" className="space-y-4"><CalendarConnectCard ws={ws} /><ViewingsPanel ws={ws} /></TabsContent>
           <TabsContent value="sales"><SalesPanel ws={ws} canManage={canManage} /></TabsContent>
           <TabsContent value="lettings">
             <ModuleTabGate moduleSlug="real-estate-management" moduleName="Property Management"

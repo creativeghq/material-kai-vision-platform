@@ -72,6 +72,15 @@ async function call<T>(workspaceId: string, action: string, extra: Record<string
   return data as T;
 }
 
+/** `real-estate-calendar` is its own function (per-user Google OAuth), so it needs its own caller. */
+async function callCalendar<T>(workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('real-estate-calendar', {
+    body: { action, workspace_id: workspaceId, ...extra },
+  });
+  if (error) throw await edgeError(error);
+  return data as T;
+}
+
 export interface PropertyOffer {
   id: string; property_id: string; buyer_contact_id: string | null; buyer_name: string | null;
   amount: number; currency: string; status: 'offered' | 'countered' | 'accepted' | 'rejected' | 'withdrawn';
@@ -517,6 +526,16 @@ export const realEstateService = {
     if (error) throw error;
     return this.addPhoto(ws, propertyId, path, kind);
   },
+
+  // Google Calendar (per-user OAuth; reuses the platform GOOGLE_CLIENT_ID/SECRET)
+  calendarStatus: (ws: string) =>
+    callCalendar<{ connected: boolean; google_email: string | null; last_sync_at: string | null; last_sync_error: string | null; configured: boolean }>(ws, 'status'),
+  calendarConnect: (ws: string) => callCalendar<{ auth_url: string }>(ws, 'connect'),
+  calendarDisconnect: (ws: string) => callCalendar<{ ok: true }>(ws, 'disconnect'),
+  /** Best-effort push of one viewing. Callers ignore the failure: a calendar problem must never
+   *  stop a viewing being booked, and last_sync_error records it either way. */
+  calendarPushViewing: (ws: string, viewingId: string) =>
+    callCalendar<{ ok: true; event_id: string }>(ws, 'push-viewing', { viewing_id: viewingId }),
 
   // Short-let operations
   listBookings: (ws: string, propertyId: string, from?: string) =>

@@ -723,7 +723,14 @@ export default function PropertyWorkbench() {
                 <Button size="sm" className="rounded-full" disabled={!newViewingAt || busy} onClick={async () => {
                   if (!ws || !newViewingAt) return;
                   setBusy(true);
-                  try { await realEstateService.createViewing(ws, { property_id: id, scheduled_at: new Date(newViewingAt).toISOString() }); setNewViewingAt(''); await load(); toast({ title: 'Viewing scheduled' }); }
+                  try {
+                    const created = await realEstateService.createViewing(ws, { property_id: id, scheduled_at: new Date(newViewingAt).toISOString() });
+                    // Push to the agent's Google Calendar if they've connected one. Best-effort by
+                    // design: a calendar problem must never stop a viewing being booked, and the
+                    // connection records last_sync_error either way.
+                    realEstateService.calendarPushViewing(ws, created.id).catch(() => {});
+                    setNewViewingAt(''); await load(); toast({ title: 'Viewing scheduled' });
+                  }
                   catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
                   finally { setBusy(false); }
                 }}><CalendarClock className="mr-1 h-4 w-4" /> Schedule viewing</Button>
@@ -737,7 +744,12 @@ export default function PropertyWorkbench() {
                     <div className="flex-1">{new Date(v.scheduled_at).toLocaleString()} · <span className="capitalize text-muted-foreground">{v.type.replace('_', ' ')}</span></div>
                     {editable && (
                       <select className="rounded-md border bg-background px-2 py-1 text-xs" value={v.status}
-                        onChange={async (e) => { const upd = await realEstateService.updateViewing(ws!, v.id, { status: e.target.value }); setViewings((prev) => prev.map((x) => x.id === v.id ? upd : x)); }}>
+                        onChange={async (e) => {
+                          const upd = await realEstateService.updateViewing(ws!, v.id, { status: e.target.value });
+                          setViewings((prev) => prev.map((x) => x.id === v.id ? upd : x));
+                          // Cancelling here must clear it from the agent's phone, not leave a ghost.
+                          realEstateService.calendarPushViewing(ws!, v.id).catch(() => {});
+                        }}>
                         {['scheduled', 'completed', 'cancelled', 'no_show'].map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
                       </select>
                     )}
