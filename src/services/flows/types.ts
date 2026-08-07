@@ -117,6 +117,9 @@ export type TriggerType =
   | 'social_post_failed'
   // Project Client Views: a client approved / requested changes / commented on a deliverable
   | 'client_view_feedback_received'
+  // Project Requests: a client/teammate raised a request, or the team answered one
+  | 'project_request_raised'
+  | 'project_request_answered'
   // CRM: a new contact / company was created
   | 'crm_contact_created'
   | 'crm_company_created'
@@ -171,6 +174,8 @@ export interface EmailComplainedTriggerConfig {}
 export interface SocialPostPublishedTriggerConfig {}
 export interface SocialPostFailedTriggerConfig {}
 export interface ClientViewFeedbackReceivedTriggerConfig {}
+export interface ProjectRequestRaisedTriggerConfig {}
+export interface ProjectRequestAnsweredTriggerConfig {}
 export interface CrmContactCreatedTriggerConfig {}
 export interface CrmCompanyCreatedTriggerConfig {}
 /** Opens/clicks are HIGH-VOLUME. Each event fires a metered flow run — pair with a
@@ -401,6 +406,8 @@ export type TriggerConfigMap = {
   social_post_published: SocialPostPublishedTriggerConfig;
   social_post_failed: SocialPostFailedTriggerConfig;
   client_view_feedback_received: ClientViewFeedbackReceivedTriggerConfig;
+  project_request_raised: ProjectRequestRaisedTriggerConfig;
+  project_request_answered: ProjectRequestAnsweredTriggerConfig;
   crm_contact_created: CrmContactCreatedTriggerConfig;
   crm_company_created: CrmCompanyCreatedTriggerConfig;
   email_opened: EmailOpenedTriggerConfig;

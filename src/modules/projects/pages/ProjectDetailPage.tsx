@@ -24,6 +24,7 @@ import {
   Hammer,
   FileSignature,
   FileStack,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -52,6 +53,7 @@ import { BillingTab } from '../components/tabs/BillingTab';
 import { TasksAndScheduleTab } from '../components/tabs/TasksAndScheduleTab';
 import { SiteTab } from '../components/tabs/SiteTab';
 import { DocumentsTab } from '../components/tabs/DocumentsTab';
+import { RequestsTab } from '../components/tabs/RequestsTab';
 import { TimelineTab } from '../components/tabs/TimelineTab';
 import { SheetsTab } from '../components/tabs/SheetsTab';
 import { ClientViewTab } from '../components/tabs/ClientViewTab';
@@ -298,6 +300,11 @@ export const ProjectDetailPage: React.FC = () => {
               <FileStack className="h-3.5 w-3.5" />
               Docs
             </TabsTrigger>
+            {/* Requests are client-facing by design, so collaborators get this tab too. */}
+            <TabsTrigger value="requests" className="flex items-center gap-2">
+              <MessageSquare className="h-3.5 w-3.5" />
+              Requests
+            </TabsTrigger>
             {/* Timeline is owner-only — it would expose internal task + status churn to clients. */}
             {isOwner && (
               <TabsTrigger value="timeline" className="flex items-center gap-2">
@@ -322,6 +329,7 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="tasks"><TasksAndScheduleTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           <TabsContent value="site"><SiteTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           <TabsContent value="documents"><DocumentsTab projectId={project.id} isOwner={isOwner} /></TabsContent>
+          <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isOwner} /></TabsContent>
           {isOwner && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
         </Tabs>
       </main>

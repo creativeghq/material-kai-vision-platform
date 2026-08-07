@@ -314,6 +314,13 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'client_view_feedback_received', group: 'Projects',
     label: 'Client View Feedback', description: 'A client approved / requested changes / commented on a shared deliverable', icon: 'ClipboardCheck', color: 'emerald',
     defaultData: { label: 'Client View Feedback', category: 'trigger', triggerType: 'client_view_feedback_received', config: {} } as TriggerNodeData },
+  // Project Requests
+  { type: 'triggerNode', category: 'trigger', subType: 'project_request_raised', group: 'Projects',
+    label: 'Request Raised', description: 'Someone raised a question / change request against a project or moodboard', icon: 'MessageSquarePlus', color: 'emerald',
+    defaultData: { label: 'Request Raised', category: 'trigger', triggerType: 'project_request_raised', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'project_request_answered', group: 'Projects',
+    label: 'Request Answered', description: 'The team answered or resolved a project request', icon: 'MessageSquareReply', color: 'blue',
+    defaultData: { label: 'Request Answered', category: 'trigger', triggerType: 'project_request_answered', config: {} } as TriggerNodeData },
   // CRM
   { type: 'triggerNode', category: 'trigger', subType: 'crm_contact_created', group: 'CRM',
     label: 'Contact Created', description: 'A new CRM contact was created (payload carries lead_source so imports can be filtered out)', icon: 'UserPlus', color: 'emerald',

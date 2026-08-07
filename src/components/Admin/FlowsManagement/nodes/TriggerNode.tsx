@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
   Zap, Globe, UserPlus, Clock, FileText, Hand,
   LogIn, CheckCircle2, XCircle, ClipboardCheck, Image, FileCheck, Package,
+  MessageSquarePlus, MessageSquareReply,
   Search, Box, Orbit,
   SearchCheck, ScanEye, PackagePlus,
   LayoutGrid, ImagePlus, Share2, Inbox, Send,
@@ -106,6 +107,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   social_post_published: Share2,
   social_post_failed: XCircle,
   client_view_feedback_received: ClipboardCheck,
+  project_request_raised: MessageSquarePlus,
+  project_request_answered: MessageSquareReply,
   crm_contact_created: UserPlus,
   crm_company_created: Building2,
   email_opened: MailOpen,
