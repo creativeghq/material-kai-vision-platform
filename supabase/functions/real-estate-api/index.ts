@@ -394,6 +394,25 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         if (error) throw new HttpError(400, error.message);
         await emitBuyerMatchAlert(supabase, workspaceId, data, 'new_listing'); // D10 — alert agent of matching buyers
         await refreshListingEmbedding(supabase, data); // semantic Discovery search (best-effort, never blocks publish)
+        // "The listing went live" as a governable event rather than a hardcoded announcement. The
+        // seeded system-default flow turns it into a social post; an agency that wants it to also
+        // ping a Teams webhook or skip Sundays edits the flow instead of waiting on a deploy.
+        // Best-effort: a marketing side-effect must never fail the publish itself.
+        try {
+          const { data: cover } = await supabase.from('property_photos')
+            .select('storage_path').eq('property_id', id).order('is_cover', { ascending: false }).order('sort_order').limit(1).maybeSingle();
+          await emitFlowEvent('realestate.listing_published', {
+            workspace_id: workspaceId, user_id: userId, type: 'realestate_listing_published',
+            property_id: id,
+            title: 'Listing published',
+            body: `${data.title || 'A listing'}${data.town ? ` in ${data.town}` : ''} is now live.`,
+            action_url: `/properties/${id}`,
+            listing_title: data.title, town: data.town, price: data.price, currency: data.currency ?? 'EUR',
+            bedrooms: data.bedrooms, property_type: data.property_type, transaction_type: data.transaction_type,
+            public_url: data.public_listing_token ? `/p/${data.public_listing_token}` : null,
+            cover_storage_path: cover?.storage_path ?? null,
+          });
+        } catch (e) { console.error('[real-estate-api] listing_published emit failed (non-fatal):', e); }
         return json({ property: data, warnings: gate.warnings });
       }
 

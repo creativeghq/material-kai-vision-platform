@@ -9715,6 +9715,24 @@
     "response": "{ success, buyers_considered, emails_sent, listings_matched }"
   },
   {
+    "name": "real-estate-listing-social",
+    "tag": "Real Estate",
+    "summary": "Flow action — drafts a social post for a newly published listing, one per connected account",
+    "description": "Invoked by the seeded `realestate.listing_published` flow via `run_edge_function`. Builds a caption from the listing's own fields (no AI, no credits — an unreviewed generated caption on a property ad is where fair-housing language goes wrong), signs the cover photo out of the private `property-media` bucket, and inserts a **draft** `social_posts` row per active connected account. Deliberately stops at draft: `zernio-api` authorises publishing against a real workspace member, and this runs service-role from a flow with no user — publishing here would mean weakening the check that stops one tenant posting through another tenant's account. Idempotent (an existing post carrying the same `metadata.property_id` short-circuits) and skips listings that are not publicly live. Auth is the shared cron gate (`x-cron-secret` **or** service-role bearer).",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": "api/real-estate-api.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      "property_id"
+    ],
+    "response": "{ ok, posts, drafted_for, has_image } | { ok, skipped }"
+  },
+  {
     "name": "real-estate-vendor-reports",
     "tag": "Real Estate",
     "summary": "Weekly cron — emails the instructing vendor a performance report on their own listing",

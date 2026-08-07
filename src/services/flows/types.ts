@@ -145,6 +145,7 @@ export type TriggerType =
   | 'supplier_po_received'
   | 'realestate.buyer_matches_found'
   | 'realestate.new_listing_for_buyer'
+  | 'realestate.listing_published'
   // SEO movement alerts — detected week-over-week by the seo-domain-tracker / seo-site-audit
   // crons and fanned out to the site's workspace members (payload-only, server-only events)
   | 'seo.ranking_movement'
@@ -156,6 +157,7 @@ export interface ModuleAccessRequestedTriggerConfig {}
 export interface HrLateCheckinTriggerConfig {}
 export interface RealestateBuyerMatchesFoundTriggerConfig {}
 export interface RealestateNewListingForBuyerTriggerConfig {}
+export interface RealestateListingPublishedTriggerConfig {}
 export interface SeoRankingMovementTriggerConfig {}
 export interface SeoBacklinkMovementTriggerConfig {}
 export interface SeoSiteHealthChangedTriggerConfig {}
@@ -423,6 +425,7 @@ export type TriggerConfigMap = {
   supplier_po_received: SupplierPoReceivedTriggerConfig;
   'realestate.buyer_matches_found': RealestateBuyerMatchesFoundTriggerConfig;
   'realestate.new_listing_for_buyer': RealestateNewListingForBuyerTriggerConfig;
+  'realestate.listing_published': RealestateListingPublishedTriggerConfig;
   'seo.ranking_movement': SeoRankingMovementTriggerConfig;
   'seo.backlink_movement': SeoBacklinkMovementTriggerConfig;
   'seo.site_health_changed': SeoSiteHealthChangedTriggerConfig;

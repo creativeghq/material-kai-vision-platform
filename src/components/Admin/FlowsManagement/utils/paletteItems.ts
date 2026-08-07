@@ -195,6 +195,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'realestate.new_listing_for_buyer', group: 'Real Estate',
     label: 'New Listing for Buyer', description: 'A new listing matches a consented buyer\'s saved search — alert the buyer', icon: 'Home', color: 'emerald',
     defaultData: { label: 'New Listing for Buyer', category: 'trigger', triggerType: 'realestate.new_listing_for_buyer', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'realestate.listing_published', group: 'Real Estate',
+    label: 'Listing Published', description: 'A listing went live — announce it (social post, portal push, alert the team)', icon: 'Home', color: 'emerald',
+    defaultData: { label: 'Listing Published', category: 'trigger', triggerType: 'realestate.listing_published', config: {} } as TriggerNodeData },
 
   // Surplus marketplace
   { type: 'triggerNode', category: 'trigger', subType: 'marketplace_want_match', group: 'Marketplace',
