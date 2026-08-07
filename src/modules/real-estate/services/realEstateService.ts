@@ -229,7 +229,18 @@ export interface PropertySale {
   seller?: { id: string; name: string | null; email: string | null } | null;
 }
 
-export interface FeedSettings { workspace_id: string; feed_token: string; feed_enabled: boolean; feed_format: string }
+export interface FeedSettings {
+  workspace_id: string; feed_token: string; feed_enabled: boolean; feed_format: string;
+  /** Inbound portal-lead ingestion. The token IS the credential for writing leads into this
+   *  workspace, so rotating it revokes every forwarder immediately — no grace window. */
+  inbound_lead_token: string | null; inbound_leads_enabled: boolean;
+}
+
+/** The URL an inbound-email service posts forwarded portal mail to. */
+export function inboundLeadUrl(token: string): string {
+  const base = (supabase as any).supabaseUrl || '';
+  return `${base}/functions/v1/real-estate-inbound-lead?token=${encodeURIComponent(token)}`;
+}
 
 /** Public syndication feed URL a portal can pull. */
 export function feedUrl(token: string, format: string): string {
@@ -294,9 +305,10 @@ export const realEstateService = {
   dashboard: (ws: string) => call<RealEstateDashboard>(ws, 'dashboard'),
   // Syndication feed
   getFeedSettings: (ws: string) => call<{ settings: FeedSettings | null }>(ws, 'get-feed-settings').then((r) => r.settings),
-  updateFeedSettings: (ws: string, patch: { feed_enabled?: boolean; feed_format?: string }) =>
+  updateFeedSettings: (ws: string, patch: { feed_enabled?: boolean; feed_format?: string; inbound_leads_enabled?: boolean }) =>
     call<{ settings: FeedSettings }>(ws, 'update-feed-settings', patch).then((r) => r.settings),
   rotateFeedToken: (ws: string) => call<{ settings: FeedSettings }>(ws, 'rotate-feed-token').then((r) => r.settings),
+  rotateInboundToken: (ws: string) => call<{ settings: FeedSettings }>(ws, 'rotate-inbound-token').then((r) => r.settings),
   // Properties
   listProperties: (ws: string, filters: { status?: string; property_type?: string } = {}) =>
     call<{ properties: PropertyListItem[] }>(ws, 'list-properties', filters).then((r) => r.properties),

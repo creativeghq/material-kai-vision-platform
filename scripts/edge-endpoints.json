@@ -9715,6 +9715,27 @@
     "response": "{ success, buyers_considered, emails_sent, listings_matched }"
   },
   {
+    "name": "real-estate-inbound-lead",
+    "tag": "Real Estate",
+    "summary": "Public tokenised endpoint — turns a forwarded portal enquiry email into a CRM lead",
+    "description": "Syndication pushes listings out; the enquiries portals generate come back as email. An agency points any inbound-email service (Resend, Mailgun routes, SendGrid Inbound Parse, Cloudflare Email Workers) at this URL and forwards portal mail to it. The per-workspace `inbound_lead_token` IS the credential and is checked BEFORE anything is parsed or written — the From address is spoofable and is used only to guess which portal sent it. Fails closed: unknown token or ingestion disabled both return the same 401, so probing cannot confirm a valid token. `workspace_id` comes from the token and `property_id` from the listing's own `reference_code`; nothing identifying is taken from the payload. Parses name / email / phone / reference / message, skipping the portal's own no-reply address, routes the lead through `route_property_lead`, and keeps the parsed source in `inbound_raw` because portal formats change silently. A message with no contactable details returns 200 (a digest or receipt must not be retried forever).",
+    "security": [
+      "inboundLeadToken"
+    ],
+    "docs": "api/real-estate-api.md",
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      "from",
+      "subject",
+      "text",
+      "html"
+    ],
+    "response": "{ ok, inquiry_id, portal, matched_listing, assigned } | { ok, skipped }"
+  },
+  {
     "name": "real-estate-listing-social",
     "tag": "Real Estate",
     "summary": "Flow action — drafts a social post for a newly published listing, one per connected account",

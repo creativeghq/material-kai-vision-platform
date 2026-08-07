@@ -116,6 +116,8 @@ Before this existed the enforcement was live and the capture was not, so every l
 
 `real-estate-feed` serves `GET ?token=…&format=kyero|openimmo|generic` as XML. The `feed_token` is the only credential; `rotate-feed-token` revokes every portal holding the old URL **immediately**, with no grace window — a leaked feed URL is a data-exposure event, and a grace period would just extend it.
 
+**Inbound is the other direction.** `real-estate-inbound-lead` turns a forwarded portal enquiry email into a lead: the agency points any inbound-email service (Resend, Mailgun routes, SendGrid Inbound Parse, Cloudflare Email Workers) at their tokenised URL. `inbound_lead_token` is the credential and is checked **before** anything is parsed or written — the From address is spoofable and is used only to guess which portal sent it. Unknown token and disabled ingestion return the same 401, so probing cannot confirm a valid token. The listing is matched by its own `reference_code`; an unmatched lead lands on the most recent live listing flagged for re-pointing rather than being dropped. Parsing is guarded by [tests/unit/inboundLead.test.ts](../tests/unit/inboundLead.test.ts) — chiefly that the buyer's address is taken and the portal's own no-reply is not, which is the failure that looks like it is working.
+
 ---
 
 ## 7. Where the module touches the rest of the platform

@@ -1616,6 +1616,9 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           if (!['kyero', 'generic', 'openimmo'].includes(String(body.feed_format))) return json({ error: 'invalid feed_format' }, 400);
           patch.feed_format = body.feed_format;
         }
+        // Inbound ingestion is off until a token exists — enabling it with no token would leave the
+        // endpoint rejecting everything while the UI claimed it was on.
+        if (body.inbound_leads_enabled !== undefined) patch.inbound_leads_enabled = !!body.inbound_leads_enabled;
         const { data, error } = await supabase.from('real_estate_settings')
           .upsert({ workspace_id: workspaceId, ...patch }, { onConflict: 'workspace_id' }).select('*').single();
         if (error) throw new HttpError(400, error.message);
@@ -1627,6 +1630,18 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         const token = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');
         const { data, error } = await supabase.from('real_estate_settings')
           .upsert({ workspace_id: workspaceId, feed_token: token }, { onConflict: 'workspace_id' }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ settings: data });
+      }
+
+      case 'rotate-inbound-token': {
+        // Same no-grace-period rule as the feed token: the token IS the credential for writing leads
+        // into this workspace, so a leaked one is revoked immediately and every forwarder is
+        // re-pointed by hand. A grace window would just extend the exposure.
+        requireManage();
+        const token = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');
+        const { data, error } = await supabase.from('real_estate_settings')
+          .upsert({ workspace_id: workspaceId, inbound_lead_token: token }, { onConflict: 'workspace_id' }).select('*').single();
         if (error) throw new HttpError(400, error.message);
         return json({ settings: data });
       }

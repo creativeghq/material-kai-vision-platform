@@ -21,7 +21,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/core/ui/tabs';
-import { realEstateService, feedUrl, type PropertyListItem, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement, type PropertyInvestment, type InvestmentPortfolio } from '../services/realEstateService';
+import { realEstateService, feedUrl, inboundLeadUrl, type PropertyListItem, type PropertyInquiry, type PropertyViewing, type RealEstateDashboard, type FeedSettings, type SellerLead, type PropertySale, type Tenancy, type MaintenanceWorkOrder, type BuyerRequirement, type PropertyInvestment, type InvestmentPortfolio } from '../services/realEstateService';
 import { statusTone } from '@/utils/statusTone';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
 
@@ -196,13 +196,14 @@ const FeedCard: React.FC<{ ws: string | null }> = ({ ws }) => {
   useEffect(() => { if (ws) realEstateService.getFeedSettings(ws).then(setS).catch(() => {}); }, [ws]);
   if (!ws) return null;
 
-  const patch = async (p: { feed_enabled?: boolean; feed_format?: string }) => {
+  const patch = async (p: { feed_enabled?: boolean; feed_format?: string; inbound_leads_enabled?: boolean }) => {
     setBusy(true);
     try { setS(await realEstateService.updateFeedSettings(ws, p)); } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); } finally { setBusy(false); }
   };
   const url = s ? feedUrl(s.feed_token, s.feed_format) : '';
 
   return (
+    <>
     <Card><CardContent className="p-4">
       <div className="mb-3 flex items-center gap-2">
         <Rss className="h-4 w-4 text-primary" />
@@ -230,6 +231,36 @@ const FeedCard: React.FC<{ ws: string | null }> = ({ ws }) => {
         </>
       )}
     </CardContent></Card>
+
+    {/* Inbound is the other direction, and it belongs beside the feed: an agency thinking about
+        portals is thinking about both halves at once. */}
+    <Card className="mt-4"><CardContent className="p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Inbox className="h-4 w-4 text-primary" />
+        <span className="text-sm font-semibold">Inbound portal leads</span>
+        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+          <Checkbox checked={!!s?.inbound_leads_enabled} disabled={busy || !s?.inbound_lead_token}
+            onCheckedChange={(v) => patch({ inbound_leads_enabled: v === true })} /> Enabled
+        </label>
+      </div>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Forward portal enquiry emails to this address and they become leads automatically — matched to the listing by its
+        reference code and routed by your rules. Works with any inbound-email service (Resend, Mailgun, SendGrid, Cloudflare).
+        {!s?.inbound_lead_token && ' Generate a token to begin.'}
+      </p>
+      {s && (
+        <div className="flex items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded-md border bg-muted/40 px-2 py-1.5 text-[11px]">
+            {s.inbound_lead_token && s.inbound_leads_enabled ? inboundLeadUrl(s.inbound_lead_token) : s.inbound_lead_token ? 'Enable inbound leads to reveal the URL' : 'No token yet'}
+          </code>
+          <Button variant="ghost" size="sm" className="rounded-full" disabled={!s.inbound_lead_token || !s.inbound_leads_enabled}
+            onClick={() => { void navigator.clipboard.writeText(inboundLeadUrl(s.inbound_lead_token as string)); toast({ title: 'Inbound URL copied' }); }}><Copy className="h-3.5 w-3.5" /></Button>
+          <Button variant="ghost" size="sm" className="rounded-full" disabled={busy} title={s.inbound_lead_token ? 'Rotate token' : 'Generate token'}
+            onClick={async () => { setBusy(true); try { setS(await realEstateService.rotateInboundToken(ws)); toast({ title: s.inbound_lead_token ? 'Token rotated — re-point your forwarders' : 'Token generated' }); } catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); } finally { setBusy(false); } }}><RefreshCw className="h-3.5 w-3.5" /></Button>
+        </div>
+      )}
+    </CardContent></Card>
+    </>
   );
 };
 
