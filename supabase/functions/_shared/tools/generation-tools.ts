@@ -563,7 +563,15 @@ product's photo as referenceImageUrl (or let an uploaded image be picked up):
 - product-lifestyle ("show it in a room", "styled", "in situ") → the product staged in a room; with a reference photo the PRODUCT is preserved and only the room is generated around it
 - material-texture ("fabric swatch", "tileable texture", "make a material out of this") → a seamless flat swatch suitable for a 3D material, NOT a picture of fabric
 
-All three honour modelTier, so the same product can be rendered on Gemini or Grok and compared.`,
+product-shot and product-lifestyle honour modelTier, so the same product can be
+rendered on Gemini or Grok and compared.
+
+material-texture is BLOCKED on Gemini: measured 2026-08-07, 0 images in 13 attempts,
+every one refused with IMAGE_RECITATION (flat repeating material macros read as
+memorised training data). Both flash and pro, with and without a source photo, and
+retrying does not help. Set modelTier:'grok' for this mode, and if the user has no
+Grok access say the swatch cannot be generated rather than burning their credits on
+a call that will be refused.`,
       schema: z.object({
         prompt: z.string().describe('Design description or edit instruction (e.g. "change the floor to marble and make walls warmer")'),
         roomType: z.string().optional().describe('ALWAYS extract from user message when present. Room type: bedroom, living_room, kitchen, bathroom, dining_room, home_office, hallway, studio, outdoor, kids_room, basement'),

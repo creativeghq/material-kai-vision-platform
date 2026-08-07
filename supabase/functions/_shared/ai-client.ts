@@ -637,7 +637,23 @@ async function generateMultiImageWithGemini(
   );
 
   if (!imagePart?.inlineData) {
-    throw new Error('Gemini multi-image: no image in response');
+    // Say WHY. A 200 with no image part is almost never "the model had nothing to
+    // say" — it is a refusal, and the reason is in finishReason. IMAGE_RECITATION
+    // (output too close to memorised training data) is the common one and it is
+    // deterministic per prompt: measured 0 images in 13 attempts for a flat,
+    // repeating fabric macro, on both flash and pro, with and without a source
+    // image. Retrying does not help; the prompt has to change. Reporting only
+    // "no image in response" sent every one of those to Sentry as a mystery.
+    const cand = result.candidates?.[0];
+    const reason = cand?.finishReason ?? 'unknown';
+    const blocked = result.promptFeedback?.blockReason;
+    throw new Error(
+      `Gemini multi-image: no image in response (finishReason=${reason}` +
+      `${blocked ? `, blockReason=${blocked}` : ''})` +
+      (reason === 'IMAGE_RECITATION'
+        ? ' — the model refused as too close to training data. Generic, flat, repeating subjects (plain material swatches) trigger this reliably; make the prompt more specific or use a different provider.'
+        : ''),
+    );
   }
 
   return {
