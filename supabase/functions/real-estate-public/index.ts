@@ -13,7 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
-import { toPublic, matchesCriteria, estimateFromMedianPerSqm } from '../_shared/real-estate.ts';
+import { toPublic, matchesCriteria, estimateFromMedianPerSqm, withRentSettlements } from '../_shared/real-estate.ts';
 import { embedText } from '../_shared/real-estate-embedding.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
@@ -122,6 +122,75 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
       listings: matched.map((r: any) => ({ ...toPublic(r), cover_url: covers[r.id] ?? null })),
     });
   }
+  // ── Tenant portal — a tenancy's own rent view + raise a repair, no account ──────────
+  async function loadTenancy(token: string): Promise<any> {
+    if (!token) throw new HttpError(400, 'token is required');
+    const { data } = await supabase.from('property_tenancies')
+      .select('id, workspace_id, property_id, status, rent_amount, rent_frequency, currency, start_date, end_date, deposit, tenant_contact_id')
+      .eq('portal_token', token).maybeSingle();
+    // A revoked token (set to null) simply stops resolving — same 404 as one that never existed.
+    if (!data) throw new HttpError(404, 'not found');
+    return data;
+  }
+
+  if (action === 'tenant-portal') {
+    const t = await loadTenancy(String(body?.token ?? ''));
+    const [{ data: property }, { data: charges }, { data: jobs }] = await Promise.all([
+      supabase.from('properties').select('title, address, town, region').eq('id', t.property_id).maybeSingle(),
+      supabase.from('property_rent_charges')
+        .select('id, due_date, amount, currency, status, paid_amount, invoice_id')
+        .eq('tenancy_id', t.id).order('due_date', { ascending: false }).limit(24),
+      supabase.from('property_maintenance')
+        .select('id, title, status, priority, reported_at, resolved_at')
+        .eq('tenancy_id', t.id).order('reported_at', { ascending: false }).limit(20),
+    ]);
+    // Settlement is DERIVED, exactly as it is for the agent — the tenant must not be shown a
+    // different "still owed" figure from the one in the workbench.
+    const settled = await withRentSettlements(supabase, charges ?? []);
+    const outstanding = settled.reduce((s: number, c: any) => s + Number(c.outstanding ?? 0), 0);
+    return json({
+      tenancy: {
+        rent_amount: t.rent_amount, rent_frequency: t.rent_frequency, currency: t.currency,
+        start_date: t.start_date, end_date: t.end_date, deposit: t.deposit, status: t.status,
+      },
+      // The tenant lives there — the address is not a disclosure. Internal fields never are.
+      property: property ? { title: property.title, address: property.address, town: property.town, region: property.region } : null,
+      charges: settled.map((c: any) => ({
+        id: c.id, due_date: c.due_date, amount: c.amount, currency: c.currency,
+        payment_status: c.payment_status, settled: c.settled, outstanding: c.outstanding,
+      })),
+      outstanding: Math.round(outstanding * 100) / 100,
+      maintenance: jobs ?? [],
+    });
+  }
+
+  if (action === 'tenant-raise-issue') {
+    const t = await loadTenancy(String(body?.token ?? ''));
+    const title = String(body?.title ?? '').trim();
+    if (!title) return json({ error: 'title is required' }, 400);
+    const rl = await enforceLeadRateLimit(supabase, req, 'tenant-raise-issue', t.workspace_id);
+    if (rl) return rl;
+    // workspace/property/tenancy all come from the resolved token. Priority is NOT taken from the
+    // tenant: "urgent" would otherwise be self-declared on every ticket and the field would stop
+    // meaning anything to the agent triaging it.
+    const { data, error } = await supabase.from('property_maintenance').insert({
+      workspace_id: t.workspace_id, property_id: t.property_id, tenancy_id: t.id,
+      title: title.slice(0, 200),
+      description: String(body?.description ?? '').slice(0, 4000) || null,
+      status: 'open', priority: 'normal', reported_at: new Date().toISOString(),
+    }).select('id').single();
+    if (error) throw new HttpError(400, error.message);
+    // The agency has to know a repair was reported — a ticket nobody sees is worse than a phone call.
+    try {
+      await emitFlowEventToWorkspaceRoles(t.workspace_id, ['owner', 'admin'], 'crm_contact_created', (uid: string) => ({
+        type: 'realestate_maintenance_reported', workspace_id: t.workspace_id, user_id: uid,
+        title: 'Repair reported by a tenant', body: title.slice(0, 200),
+        action_url: `/properties/${t.property_id}?tab=lettings`,
+      }));
+    } catch { /* best-effort */ }
+    return json({ ok: true, work_order_id: data.id });
+  }
+
   if (action === 'buyer-set-consent') {
     // GDPR withdrawal + opt-in, self-service. Consent that can only be set by an agent inside the CRM
     // is not withdrawable by the data subject, and there was no other surface where the buyer could

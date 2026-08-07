@@ -91,6 +91,14 @@ export interface Tenancy {
   id: string; property_id: string; tenant_contact_id: string | null; landlord_contact_id: string | null;
   rent_amount: number; currency: string; rent_frequency: RentFrequency; deposit: number | null;
   start_date: string; end_date: string | null; status: 'pending' | 'active' | 'ended' | 'terminated'; notes: string | null;
+  // Lifecycle. `notice_given_at` is stamped server-side — it is the field in a termination someone
+  // would be tempted to backdate, and a notice date is what a dispute turns on.
+  deposit_scheme: string | null; deposit_reference: string | null; deposit_protected_at: string | null;
+  next_rent_review_date: string | null;
+  notice_given_at: string | null; notice_given_by: 'landlord' | 'tenant' | null;
+  notice_period_days: number | null; termination_date: string | null;
+  /** Capability for /tenant/:token. Null means the tenant has no live link. */
+  portal_token: string | null;
   property?: { id: string; title: string | null; reference_code: string | null; town: string | null } | null;
   tenant?: { id: string; name: string | null; email: string | null; phone: string | null } | null;
   landlord?: { id: string; name: string | null } | null;
@@ -119,6 +127,23 @@ export interface ListingPerformance {
   lead_sources: Record<string, number>;
 }
 export interface ListingViewPoint { property_id: string; day: string; views: number }
+
+/** What a tenant sees at /tenant/:token. Rent status is the SAME derivation the agent's workbench
+ *  reads — a tenant told they still owe rent they have already paid is the worst thing this can do. */
+export interface TenantPortal {
+  tenancy: { rent_amount: number; rent_frequency: string; currency: string; start_date: string | null; end_date: string | null; deposit: number | null; status: string };
+  property: { title: string | null; address: string | null; town: string | null; region: string | null } | null;
+  charges: { id: string; due_date: string; amount: number; currency: string; payment_status: string; settled: number; outstanding: number }[];
+  outstanding: number;
+  maintenance: { id: string; title: string; status: string; priority: string; reported_at: string; resolved_at: string | null }[];
+}
+
+/** Check-in / routine / check-out condition record — what a deposit dispute turns on. */
+export interface TenancyInspection {
+  id: string; tenancy_id: string; inspection_type: 'check_in' | 'routine' | 'check_out';
+  scheduled_for: string | null; completed_at: string | null;
+  condition_rating: 'good' | 'fair' | 'poor' | null; findings: string | null;
+}
 
 /** AML/KYC. `satisfied` already accounts for the workspace policy being off, and for a passed check
  *  whose `expires_at` has gone by — a stale verdict does not clear the gate. */
@@ -463,6 +488,16 @@ export const realEstateService = {
     return this.addPhoto(ws, propertyId, path, kind);
   },
 
+  // Tenancy lifecycle — deposit protection, rent review, notice, inspections, tenant portal
+  updateTenancyLifecycle: (ws: string, tenancyId: string, fields: Record<string, unknown>) =>
+    call<{ tenancy: Tenancy }>(ws, 'update-tenancy-lifecycle', { tenancy_id: tenancyId, ...fields }).then((r) => r.tenancy),
+  rotateTenantPortalToken: (ws: string, tenancyId: string, revoke = false) =>
+    call<{ tenancy: Tenancy }>(ws, 'rotate-tenant-portal-token', { tenancy_id: tenancyId, revoke }).then((r) => r.tenancy),
+  listInspections: (ws: string, tenancyId: string) =>
+    call<{ inspections: TenancyInspection[] }>(ws, 'list-inspections', { tenancy_id: tenancyId }).then((r) => r.inspections),
+  upsertInspection: (ws: string, fields: Record<string, unknown>) =>
+    call<{ inspection: TenancyInspection }>(ws, 'upsert-inspection', fields).then((r) => r.inspection),
+
   // AML / KYC (broker-only writes — an agent signing off their own buyer is the conflict the check manages)
   kycStatus: (ws: string, contactId: string | null) =>
     call<{ status: KycStatus; checks: KycCheck[] }>(ws, 'kyc-status', { contact_id: contactId }),
@@ -577,6 +612,17 @@ export const realEstatePublic = {
    *  contact's marketing_consent, which is what both alert paths gate on. */
   async buyerSetConsent(token: string, enabled: boolean): Promise<void> {
     const { error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'buyer-set-consent', token, enabled } });
+    if (error) throw await edgeError(error);
+  },
+
+  // Tenant portal — token-scoped, no auth
+  async tenantPortal(token: string): Promise<TenantPortal> {
+    const { data, error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'tenant-portal', token } });
+    if (error) throw await edgeError(error);
+    return data as TenantPortal;
+  },
+  async tenantRaiseIssue(token: string, title: string, description?: string): Promise<void> {
+    const { error } = await supabase.functions.invoke('real-estate-public', { body: { action: 'tenant-raise-issue', token, title, description } });
     if (error) throw await edgeError(error);
   },
   async buyerFavorite(token: string, propertyId: string, on: boolean): Promise<void> {

@@ -170,6 +170,8 @@ const COMMISSION_PARTY_TYPES = ['listing_agent', 'buyer_agent', 'house', 'referr
 /** AML/KYC vocabulary. Mirrors the CHECKs on property_kyc_checks. */
 const KYC_CHECK_TYPES = ['identity', 'source_of_funds', 'pep_sanctions'];
 const KYC_STATUSES = ['pending', 'passed', 'failed', 'waived'];
+/** Tenancy inspection points. Mirrors the CHECK on property_tenancy_inspections. */
+const INSPECTION_TYPES = ['check_in', 'routine', 'check_out'];
 // `virtual` added 2026-08-01. The scheduling dialog has always offered
 // in_person | virtual | open_house, but the allowlist held viewing | tour | open_house and
 // SUBSTITUTED rather than rejected — so `in_person` and `virtual`, two of the three options and
@@ -473,6 +475,114 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         }).select('*').single();
         if (error) throw new HttpError(400, error.message);
         return json({ photo: data });
+      }
+
+      // ── Tenancy lifecycle (#281) ───────────────────────────────────────
+      case 'update-tenancy-lifecycle': {
+        requireManage();
+        const tenancyId = String(body.tenancy_id ?? '');
+        if (!tenancyId) return json({ error: 'tenancy_id is required' }, 400);
+        const { data: t } = await supabase.from('property_tenancies')
+          .select('id, property_id, start_date').eq('id', tenancyId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!t) return json({ error: 'not found' }, 404);
+        await loadEditable(t.property_id);
+
+        const patch: Record<string, unknown> = {};
+        for (const k of ['deposit_scheme', 'deposit_reference', 'deposit_protected_at', 'next_rent_review_date', 'termination_date']) {
+          if (body[k] !== undefined) patch[k] = body[k] || null;
+        }
+        if (body.notice_given_by !== undefined) {
+          const by = body.notice_given_by ? String(body.notice_given_by) : null;
+          if (by && by !== 'landlord' && by !== 'tenant') return json({ error: "notice_given_by must be 'landlord' or 'tenant'" }, 400);
+          patch.notice_given_by = by;
+          // Serving notice stamps the date server-side. A client-supplied "notice given on" is the
+          // one field in a termination that someone would be tempted to backdate.
+          patch.notice_given_at = by ? new Date().toISOString().slice(0, 10) : null;
+          if (by) {
+            const days = Number(body.notice_period_days ?? 0);
+            patch.notice_period_days = days > 0 ? days : null;
+            if (days > 0 && body.termination_date === undefined) {
+              patch.termination_date = new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
+            }
+          }
+        }
+        if (Object.keys(patch).length === 0) return json({ error: 'nothing to update' }, 400);
+        patch.updated_at = new Date().toISOString();
+        const { data, error } = await supabase.from('property_tenancies')
+          .update(patch).eq('id', tenancyId).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ tenancy: data });
+      }
+
+      case 'rotate-tenant-portal-token': {
+        requireManage();
+        const tenancyId = String(body.tenancy_id ?? '');
+        if (!tenancyId) return json({ error: 'tenancy_id is required' }, 400);
+        const { data: t } = await supabase.from('property_tenancies')
+          .select('id, property_id').eq('id', tenancyId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!t) return json({ error: 'not found' }, 404);
+        await loadEditable(t.property_id);
+        // `null` revokes without minting a replacement — a tenancy that has ended should not keep a
+        // live link to the rent ledger.
+        const token = body.revoke === true ? null : (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');
+        const { data, error } = await supabase.from('property_tenancies')
+          .update({ portal_token: token }).eq('id', tenancyId).eq('workspace_id', workspaceId).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ tenancy: data });
+      }
+
+      case 'list-inspections': {
+        const tenancyId = String(body.tenancy_id ?? '');
+        if (!tenancyId) return json({ error: 'tenancy_id is required' }, 400);
+        const { data, error } = await supabase.from('property_tenancy_inspections')
+          .select('*').eq('tenancy_id', tenancyId).eq('workspace_id', workspaceId)
+          .order('scheduled_for', { ascending: false, nullsFirst: false });
+        if (error) throw new HttpError(400, error.message);
+        return json({ inspections: data ?? [] });
+      }
+
+      case 'upsert-inspection': {
+        requireManage();
+        const inspectionId = String(body.inspection_id ?? '');
+        const tenancyId = String(body.tenancy_id ?? '');
+        const patch: Record<string, unknown> = {};
+        if (body.inspection_type !== undefined) {
+          const it = String(body.inspection_type);
+          if (!INSPECTION_TYPES.includes(it)) return json({ error: `inspection_type must be one of ${INSPECTION_TYPES.join(', ')}` }, 400);
+          patch.inspection_type = it;
+        }
+        if (body.scheduled_for !== undefined) patch.scheduled_for = body.scheduled_for || null;
+        if (body.findings !== undefined) patch.findings = body.findings ? String(body.findings).slice(0, 4000) : null;
+        if (body.document_id !== undefined) patch.document_id = body.document_id || null;
+        if (body.condition_rating !== undefined) {
+          const cr = body.condition_rating ? String(body.condition_rating) : null;
+          if (cr && !['good', 'fair', 'poor'].includes(cr)) return json({ error: 'invalid condition_rating' }, 400);
+          patch.condition_rating = cr;
+        }
+        if (body.completed === true) { patch.completed_at = new Date().toISOString(); patch.inspector_user_id = userId; }
+        if (body.completed === false) { patch.completed_at = null; }
+
+        if (inspectionId) {
+          const { data: row } = await supabase.from('property_tenancy_inspections')
+            .select('property_id').eq('id', inspectionId).eq('workspace_id', workspaceId).maybeSingle();
+          if (!row) return json({ error: 'not found' }, 404);
+          await loadEditable(row.property_id);
+          patch.updated_at = new Date().toISOString();
+          const { data, error } = await supabase.from('property_tenancy_inspections')
+            .update(patch).eq('id', inspectionId).eq('workspace_id', workspaceId).select('*').single();
+          if (error) throw new HttpError(400, error.message);
+          return json({ inspection: data });
+        }
+        if (!tenancyId) return json({ error: 'tenancy_id is required' }, 400);
+        const { data: t } = await supabase.from('property_tenancies')
+          .select('id, property_id').eq('id', tenancyId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!t) return json({ error: 'not found' }, 404);
+        await loadEditable(t.property_id);
+        const { data, error } = await supabase.from('property_tenancy_inspections')
+          .insert({ ...patch, workspace_id: workspaceId, tenancy_id: tenancyId, property_id: t.property_id, created_by: userId })
+          .select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ inspection: data });
       }
 
       // ── AML / KYC (#281 gap 10) ────────────────────────────────────────

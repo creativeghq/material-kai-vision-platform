@@ -875,6 +875,23 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
     try { await realEstateService.renewTenancy(ws, tenancy.id, { new_end_date: newEnd || undefined, new_rent: newRent ? Number(newRent) : undefined }); await load(); toast({ title: 'Tenancy renewed' }); }
     catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
   };
+  const saveLifecycle = async (fields: Record<string, unknown>) => {
+    if (!ws || !tenancy) return;
+    try { await realEstateService.updateTenancyLifecycle(ws, tenancy.id, fields); await load(); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  };
+  const serveNotice = async (by: 'landlord' | 'tenant') => {
+    const days = window.prompt('Notice period in days (the termination date is calculated from today):', '30');
+    if (days === null) return;
+    // notice_given_at is stamped SERVER-side — it is the one field in a termination someone would
+    // be tempted to backdate, and a notice date is what a dispute turns on.
+    await saveLifecycle({ notice_given_by: by, notice_period_days: Number(days) || 30 });
+  };
+  const rotateTenantLink = async (revoke: boolean) => {
+    if (!ws || !tenancy) return;
+    try { await realEstateService.rotateTenantPortalToken(ws, tenancy.id, revoke); await load(); toast({ title: revoke ? 'Tenant link revoked' : 'Tenant link ready' }); }
+    catch (e) { toast({ title: 'Failed', description: (e as Error).message, variant: 'destructive' }); }
+  };
   const addWo = async () => {
     if (!ws || !wf.title) return;
     setBusy(true);
@@ -926,6 +943,66 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
               <Button size="sm" variant="ghost" className="rounded-full" onClick={() => setEditing(true)}>Edit</Button>
             </div>
           )}
+        </CardContent></Card>
+      )}
+
+      {/* Lifecycle: the things that happen to a tenancy that are not "collect the rent". Deposit
+          protection first because holding a deposit outside a scheme carries a statutory penalty —
+          it is the one here with a legal deadline attached. */}
+      {tenancy && canManage && (
+        <Card><CardContent className="space-y-3 p-4">
+          <div className="text-sm font-semibold">Tenancy lifecycle</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <Label className="text-xs">Deposit scheme</Label>
+              <Input className="h-9" defaultValue={tenancy.deposit_scheme ?? ''} placeholder="e.g. TDS, DPS"
+                onBlur={(e) => void saveLifecycle({ deposit_scheme: e.target.value || null })} />
+            </div>
+            <div>
+              <Label className="text-xs">Scheme reference</Label>
+              <Input className="h-9" defaultValue={tenancy.deposit_reference ?? ''}
+                onBlur={(e) => void saveLifecycle({ deposit_reference: e.target.value || null })} />
+            </div>
+            <div>
+              <Label className="text-xs">Protected on</Label>
+              <Input className="h-9" type="date" defaultValue={tenancy.deposit_protected_at ?? ''}
+                onBlur={(e) => void saveLifecycle({ deposit_protected_at: e.target.value || null })} />
+            </div>
+            <div>
+              <Label className="text-xs">Next rent review</Label>
+              <Input className="h-9" type="date" defaultValue={tenancy.next_rent_review_date ?? ''}
+                onBlur={(e) => void saveLifecycle({ next_rent_review_date: e.target.value || null })} />
+            </div>
+            <div className="sm:col-span-2">
+              <Label className="text-xs">Notice</Label>
+              {tenancy.notice_given_at ? (
+                <div className="flex h-9 items-center gap-2 text-sm">
+                  <span className="capitalize">{tenancy.notice_given_by} gave notice {new Date(tenancy.notice_given_at).toLocaleDateString()}</span>
+                  {tenancy.termination_date && <span className="text-muted-foreground">· ends {new Date(tenancy.termination_date).toLocaleDateString()}</span>}
+                  <Button size="sm" variant="ghost" className="ml-auto h-7 rounded-full px-2 text-xs" onClick={() => void saveLifecycle({ notice_given_by: null })}>Withdraw</Button>
+                </div>
+              ) : (
+                <div className="flex h-9 items-center gap-2">
+                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => void serveNotice('landlord')}>Landlord serves notice</Button>
+                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => void serveNotice('tenant')}>Tenant gave notice</Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* The tenant's own link. Generated on demand rather than always — a tenancy with no
+              tenant contact has nobody to send it to. */}
+          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+            <span className="text-xs text-muted-foreground">Tenant portal</span>
+            <code className="min-w-0 flex-1 truncate rounded-md border bg-muted/40 px-2 py-1.5 text-[11px]">
+              {tenancy.portal_token ? `${window.location.origin}/tenant/${tenancy.portal_token}` : 'Not shared yet'}
+            </code>
+            {tenancy.portal_token && (
+              <Button size="sm" variant="ghost" className="rounded-full" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}/tenant/${tenancy.portal_token}`); toast({ title: 'Tenant link copied' }); }}>Copy</Button>
+            )}
+            <Button size="sm" variant="outline" className="rounded-full" onClick={() => void rotateTenantLink(false)}>{tenancy.portal_token ? 'Rotate' : 'Create link'}</Button>
+            {tenancy.portal_token && <Button size="sm" variant="ghost" className="rounded-full text-destructive" onClick={() => void rotateTenantLink(true)}>Revoke</Button>}
+          </div>
         </CardContent></Card>
       )}
 

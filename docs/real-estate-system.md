@@ -27,6 +27,7 @@ The two sub-modules mount **additional tabs on the same `/properties` route** ra
 | `/properties/:id` | same | `PropertyWorkbench` — the single-listing workspace |
 | `/p/:token` | **public** | `PublicListingPage` — the shareable listing page |
 | `/buyer/:token` | **public** | `BuyerPortalPage` — a buyer's matched listings + favourites |
+| `/tenant/:token` | **public** | `TenantPortalPage` — a tenant's rent status + report a repair |
 
 Nav registration is `{ moduleSlug: 'real-estate', requireCapability: 'realestate.view' }`, so the item is absent — not disabled — for workspaces without the module.
 
@@ -165,7 +166,15 @@ It is a **service communication** under the agency agreement, not marketing: gat
 
 **Import.** `import-listings` takes CSV rows (parsed in the browser) or Kyero XML, normalises both through `normaliseImportRow`, and upserts on `reference_code`. The payload is built field by field from `IMPORT_WRITABLE` — deliberately narrower than `PROPERTY_WRITABLE`, and never a spread (invariant 8). Imported listings land as **unpublished drafts**: they have not been through `checkPublishRequirements`, and a bulk import that pushed 300 listings to the public site and the portal feeds is not undoable.
 
-## 11. Integrity checks
+## 11. Tenancy lifecycle & the tenant portal
+
+Lettings shipped the core — tenancy, rent schedule, maintenance, landlord statement — and deferred everything around it. That gap is now closed: **deposit protection** (scheme, reference, and the date, because holding a deposit outside a scheme carries a statutory penalty in most jurisdictions this module targets), **rent review** dates, **notice** and termination, and **`property_tenancy_inspections`** (check-in / routine / check-out with a condition rating and an evidence document — what a deposit dispute turns on).
+
+`notice_given_at` is stamped **server-side**. It is the one field in a termination someone would be tempted to backdate, and the notice date is exactly what a dispute turns on.
+
+**`/tenant/:token`** gives the tenant their own rent status and a way to report a fault, with no account. Rent status comes from `withRentSettlements` — the same derivation the workbench reads, because a tenant told they still owe rent they have already paid is the worst thing that page could do. The reported priority is fixed at `normal` rather than taken from the tenant: self-declared urgency would make the field meaningless to whoever triages it. Rotating the token revokes the old link with no grace window; `revoke: true` clears it entirely, so a tenancy that has ended keeps no live link to the ledger.
+
+## 12. Integrity checks
 
 | Key | Watches |
 |---|---|
