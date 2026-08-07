@@ -34,6 +34,7 @@ import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDr
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { CmaReportDialog } from '../components/CmaReportDialog';
 import { ListingPerformancePanel } from '../components/ListingPerformancePanel';
+import { KycPanel } from '../components/KycPanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
@@ -698,6 +699,9 @@ export default function PropertyWorkbench() {
           {/* ── Offers ── */}
           <TabsContent value="offers" className="space-y-6">
             <CommissionPanel ws={ws} propertyId={id} property={property} canManage={editable} onCompleted={load} />
+            {/* AML checks sit ABOVE the offers, because accept-offer refuses on them — finding out
+                at the moment of acceptance is the failure this placement avoids. */}
+            <KycPanel ws={ws} contactId={property.vendor_contact_id ?? null} canManage={editable} />
             <OffersTab ws={ws} propertyId={id} canManage={editable} onAccepted={load} />
           </TabsContent>
 

@@ -120,6 +120,21 @@ export interface ListingPerformance {
 }
 export interface ListingViewPoint { property_id: string; day: string; views: number }
 
+/** AML/KYC. `satisfied` already accounts for the workspace policy being off, and for a passed check
+ *  whose `expires_at` has gone by — a stale verdict does not clear the gate. */
+export interface KycStatus { required: boolean; satisfied: boolean; missing: string[] }
+export interface KycCheck {
+  id: string; contact_id: string; check_type: 'identity' | 'source_of_funds' | 'pep_sanctions';
+  status: 'pending' | 'passed' | 'failed' | 'waived';
+  reference: string | null; notes: string | null; expires_at: string | null;
+  verified_by: string | null; verified_at: string | null;
+}
+export const KYC_TYPE_LABELS: Record<string, string> = {
+  identity: 'Identity',
+  source_of_funds: 'Source of funds',
+  pep_sanctions: 'PEP & sanctions',
+};
+
 /** One share of a sale's commission. `amount` is DERIVED by `get_sale_commission_splits` — the row
  *  stores the rule (50% / €500), never the figure, because the fee moves when a sale price or
  *  commission percentage is corrected. Percentages are of the COMMISSION, not the sale price. */
@@ -435,6 +450,14 @@ export const realEstateService = {
     if (error) throw error;
     return this.addPhoto(ws, propertyId, path, kind);
   },
+
+  // AML / KYC (broker-only writes — an agent signing off their own buyer is the conflict the check manages)
+  kycStatus: (ws: string, contactId: string | null) =>
+    call<{ status: KycStatus; checks: KycCheck[] }>(ws, 'kyc-status', { contact_id: contactId }),
+  upsertKycCheck: (ws: string, fields: { contact_id: string; check_type: string; status: string; reference?: string; notes?: string; expires_at?: string | null }) =>
+    call<{ check: KycCheck }>(ws, 'upsert-kyc-check', fields).then((r) => r.check),
+  updateKycPolicy: (ws: string, fields: { kyc_required_for_offers?: boolean; kyc_required_types?: string[] }) =>
+    call<{ policy: { kyc_required_for_offers: boolean; kyc_required_types: string[] } }>(ws, 'update-kyc-policy', fields),
 
   // Commission splits (broker-only writes) + the per-agent statement
   listCommissionSplits: (ws: string, saleId: string) =>

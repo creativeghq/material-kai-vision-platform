@@ -167,6 +167,9 @@ const DOC_TYPES = ['energy_certificate', 'building_id', 'title_deed', 'floor_pla
   'agency_agreement', 'permit', 'tax_clearance', 'other'];
 /** Who a commission split can pay. Mirrors the CHECK on property_sale_commission_splits. */
 const COMMISSION_PARTY_TYPES = ['listing_agent', 'buyer_agent', 'house', 'referral', 'external'];
+/** AML/KYC vocabulary. Mirrors the CHECKs on property_kyc_checks. */
+const KYC_CHECK_TYPES = ['identity', 'source_of_funds', 'pep_sanctions'];
+const KYC_STATUSES = ['pending', 'passed', 'failed', 'waived'];
 // `virtual` added 2026-08-01. The scheduling dialog has always offered
 // in_person | virtual | open_house, but the allowlist held viewing | tour | open_house and
 // SUBSTITUTED rather than rejected — so `in_person` and `virtual`, two of the three options and
@@ -470,6 +473,68 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         }).select('*').single();
         if (error) throw new HttpError(400, error.message);
         return json({ photo: data });
+      }
+
+      // ── AML / KYC (#281 gap 10) ────────────────────────────────────────
+      case 'kyc-status': {
+        const contactId = String(body.contact_id ?? '');
+        const { data, error } = await supabase.rpc('property_kyc_status', {
+          p_workspace_id: workspaceId, p_contact_id: contactId || null,
+        });
+        if (error) throw new HttpError(400, error.message);
+        const { data: checks } = contactId
+          ? await supabase.from('property_kyc_checks').select('*').eq('workspace_id', workspaceId).eq('contact_id', contactId)
+          : { data: [] };
+        return json({ status: (data ?? [])[0] ?? { required: false, satisfied: true, missing: [] }, checks: checks ?? [] });
+      }
+
+      case 'upsert-kyc-check': {
+        // Broker-level. An agent recording their own buyer's AML verdict is the conflict of interest
+        // the check exists to manage.
+        if (!access.isBroker) return json({ error: 'Only a workspace owner or admin can record an AML/KYC verdict.' }, 403);
+        const contactId = String(body.contact_id ?? '');
+        const checkType = String(body.check_type ?? '');
+        if (!contactId || !KYC_CHECK_TYPES.includes(checkType)) {
+          return json({ error: `contact_id and a check_type of ${KYC_CHECK_TYPES.join(', ')} are required` }, 400);
+        }
+        const status = String(body.status ?? 'pending');
+        if (!KYC_STATUSES.includes(status)) return json({ error: `status must be one of ${KYC_STATUSES.join(', ')}` }, 400);
+        // The contact must belong to this workspace — otherwise a broker could stamp a verdict onto
+        // another tenant's contact row.
+        const { data: contact } = await supabase.from('crm_contacts')
+          .select('id').eq('id', contactId).eq('workspace_id', workspaceId).maybeSingle();
+        if (!contact) return json({ error: 'not found' }, 404);
+
+        const verdictReached = status === 'passed' || status === 'failed' || status === 'waived';
+        const { data, error } = await supabase.from('property_kyc_checks').upsert({
+          workspace_id: workspaceId, contact_id: contactId, check_type: checkType, status,
+          document_id: body.document_id || null,
+          reference: body.reference ? String(body.reference).slice(0, 200) : null,
+          notes: body.notes ? String(body.notes).slice(0, 2000) : null,
+          expires_at: body.expires_at || null,
+          // Who signed it off, stamped server-side — an audit needs the real reviewer, not a body field.
+          verified_by: verdictReached ? userId : null,
+          verified_at: verdictReached ? new Date().toISOString() : null,
+          created_by: userId, updated_at: new Date().toISOString(),
+        }, { onConflict: 'workspace_id,contact_id,check_type' }).select('*').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ check: data });
+      }
+
+      case 'update-kyc-policy': {
+        if (!access.isBroker) return json({ error: 'Only a workspace owner or admin can change the AML policy.' }, 403);
+        const patch: Record<string, unknown> = { workspace_id: workspaceId };
+        if (body.kyc_required_for_offers !== undefined) patch.kyc_required_for_offers = body.kyc_required_for_offers === true;
+        if (body.kyc_required_types !== undefined) {
+          const types = (Array.isArray(body.kyc_required_types) ? body.kyc_required_types : [])
+            .map((t: unknown) => String(t)).filter((t: string) => KYC_CHECK_TYPES.includes(t));
+          if (!types.length) return json({ error: 'At least one check type is required.' }, 400);
+          patch.kyc_required_types = types;
+        }
+        const { data, error } = await supabase.from('real_estate_settings')
+          .upsert(patch, { onConflict: 'workspace_id' }).select('kyc_required_for_offers, kyc_required_types').single();
+        if (error) throw new HttpError(400, error.message);
+        return json({ policy: data });
       }
 
       // ── Commission splits & agent payouts (#281 gap 6) ─────────────────
@@ -1303,9 +1368,30 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
       case 'accept-offer': {
         const offerId = String(body.offer_id ?? '');
         if (!offerId) return json({ error: 'offer_id is required' }, 400);
-        const { data: offer } = await supabase.from('property_offers').select('property_id').eq('id', offerId).eq('workspace_id', workspaceId).maybeSingle();
+        const { data: offer } = await supabase.from('property_offers').select('property_id, buyer_contact_id').eq('id', offerId).eq('workspace_id', workspaceId).maybeSingle();
         if (!offer) return json({ error: 'not found' }, 404);
         await loadEditable(offer.property_id);
+
+        // AML/KYC gate. Accepting is the point of no return — it rejects every competing offer,
+        // moves the listing to under_offer and cancels its future viewings. Doing that for a buyer
+        // nobody has identified is what the EU AML rules on estate agency exist to stop, and it is a
+        // real commercial position to unwind if it turns out badly. Off unless the broker enables it.
+        const { data: kycRows } = await supabase.rpc('property_kyc_status', {
+          p_workspace_id: workspaceId, p_contact_id: offer.buyer_contact_id ?? null,
+        });
+        const kyc = (kycRows ?? [])[0];
+        if (kyc?.required && !kyc.satisfied) {
+          // Name what is missing rather than refusing flatly — the agent's next action is to collect
+          // exactly these, and "not allowed" would send them hunting.
+          return json({
+            code: 'kyc_required',
+            error: offer.buyer_contact_id
+              ? `This buyer still needs: ${(kyc.missing ?? []).join(', ').replace(/_/g, ' ')}.`
+              : 'Link a buyer contact to this offer before accepting — AML checks are recorded against the contact.',
+            missing: kyc.missing ?? [],
+          }, 422);
+        }
+
         // Accept-cascade: mark accepted, reject the other live offers, move the listing to under_offer,
         // and cancel its future viewings (+ their calendar meetings).
         await supabase.from('property_offers').update({ status: 'accepted' }).eq('id', offerId).eq('workspace_id', workspaceId);
