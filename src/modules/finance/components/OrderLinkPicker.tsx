@@ -40,6 +40,13 @@ export const OrderLinkPicker: React.FC<{
   /** Offer the customers group at all. Off for a sales order, which already has a customer. */
   allowCustomer?: boolean;
   /**
+   * Offer the projects group at all. On everywhere except a picker that exists to answer ONE
+   * question — the order detail's "For customer" control, where a project row would resolve to
+   * `project_id` under a label promising a customer, which is the same confusion that split the
+   * project control off from the covers control in the first place.
+   */
+  allowProject?: boolean;
+  /**
    * Offer "New sales order for X" inside an expanded customer. Separate from `allowCustomer`
    * because a caller can be able to LINK to a customer's existing order while having nothing to
    * raise a new one from — the order detail panel, where the lines already belong to this order.
@@ -68,7 +75,7 @@ export const OrderLinkPicker: React.FC<{
   hint?: React.ReactNode;
 }> = ({
   workspaceId, value, onChange, orderType, partyCompanyId, partyContactId, currency,
-  allowCustomer = true, allowRaiseCustomerOrder = true, allowMerge = true, allowCostOf = false,
+  allowCustomer = true, allowProject = true, allowRaiseCustomerOrder = true, allowMerge = true, allowCostOf = false,
   compact = false, label = 'What is this for?', disabled, hint,
 }) => {
   const [query, setQuery] = useState('');
@@ -127,6 +134,7 @@ export const OrderLinkPicker: React.FC<{
     setExpanded(null);
   }, [onChange]);
 
+  const projects = allowProject ? res.projects : [];
   const customers = allowCustomer ? res.customers : [];
   const mergeTargets = allowMerge ? res.merge_targets : [];
   // An order that may be MERGED into is offered as a merge and nothing else — the same row under
@@ -134,7 +142,12 @@ export const OrderLinkPicker: React.FC<{
   const costOfTargets = allowCostOf
     ? costTargets.filter((o) => !mergeTargets.some((m) => m.id === o.id))
     : [];
-  const empty = res.projects.length === 0 && customers.length === 0 && mergeTargets.length === 0 && costOfTargets.length === 0;
+  const empty = projects.length === 0 && customers.length === 0 && mergeTargets.length === 0 && costOfTargets.length === 0;
+  // Name what this instance can actually find. A field that says "Project, customer, or an order"
+  // while offering only customers reads as a broken search rather than a scoped one.
+  const placeholder = !allowProject && allowCustomer
+    ? (compact ? 'Customer or their order…' : 'The customer this was bought for…')
+    : compact ? 'Link a project…' : 'Project, customer, or an order to add this to…';
 
   const orderLine = (o: LinkOrderSummary) => (
     <>
@@ -171,7 +184,7 @@ export const OrderLinkPicker: React.FC<{
         <Search className={`absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground ${compact ? 'h-3 w-3' : 'h-3.5 w-3.5'}`} />
         <Input
           className={compact ? 'h-8 w-48 pl-6 text-xs' : 'pl-7'}
-          placeholder={compact ? 'Link a project…' : 'Project, customer, or an order to add this to…'}
+          placeholder={placeholder}
           value={query}
           disabled={disabled}
           onFocus={() => setOpen(true)}
@@ -191,10 +204,10 @@ export const OrderLinkPicker: React.FC<{
               </div>
             )}
 
-            {res.projects.length > 0 && (
+            {projects.length > 0 && (
               <GroupHeading icon={<FolderOpen className="h-3 w-3" />} text="Projects" />
             )}
-            {res.projects.map((p) => (
+            {projects.map((p) => (
               <button
                 key={p.id}
                 type="button"

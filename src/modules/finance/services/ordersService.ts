@@ -1271,6 +1271,41 @@ export const ordersService = {
     if (error) throw error;
   },
 
+  /**
+   * The customs identity of a line: its commodity code and its net mass.
+   *
+   * Like `setOrderItemStock`, and for the same reason, this is deliberately NOT part of
+   * `updateItems`. Neither field is a figure — they change nothing about what was ordered, billed
+   * or owed — so they must stay editable after a supplier bill has been derived from the lines,
+   * which is precisely when a clearance turns out to need them and `updateItems` refuses.
+   *
+   * `order_items.taric_code` is a SNAPSHOT, not a lookup: the nomenclature is republished monthly
+   * and a past order must keep the code it was cleared under. That is why this writes the line and
+   * not the product — and why the Customs card reads the line rather than re-reading the catalog.
+   */
+  async setOrderItemCustoms(itemId: string, patch: { taricCode?: string | null; netMassKg?: number | null }): Promise<void> {
+    const upd: Record<string, unknown> = {};
+    if ('taricCode' in patch) upd.taric_code = patch.taricCode || null;
+    if ('netMassKg' in patch) upd.net_mass_kg = patch.netMassKg ?? null;
+    if (Object.keys(upd).length === 0) return;
+    const { error } = await supabase.from('order_items').update(upd).eq('id', itemId);
+    if (error) throw error;
+  },
+
+  /** The lines a clearance would stall on: no commodity code, or no net mass. Both are required —
+   *  the customs preview counts them, so the card that reports the gap can also close it. */
+  async listUnclassifiedLines(orderId: string): Promise<Array<{
+    id: string; description: string; quantity: number; taric_code: string | null; net_mass_kg: number | null;
+  }>> {
+    const { data, error } = await supabase.from('order_items')
+      .select('id, description, quantity, taric_code, net_mass_kg')
+      .eq('order_id', orderId)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return ((data ?? []) as Array<{ id: string; description: string; quantity: number; taric_code: string | null; net_mass_kg: number | null }>)
+      .filter((l) => !l.taric_code || l.net_mass_kg == null);
+  },
+
   /** Product id → catalog name, so a linked order line can say WHAT it points at. */
   async getProductNames(productIds: string[]): Promise<Map<string, string>> {
     const ids = [...new Set(productIds.filter(Boolean))];

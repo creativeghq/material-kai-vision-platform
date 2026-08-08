@@ -1656,6 +1656,99 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     return () => { cancelled = true; };
   }, [order?.id, order?.order_type]);
 
+  /**
+   * The FORWARD view, and its control: the customer's sales order this purchase was made to serve.
+   *
+   * `raise_cover_purchase_orders` sets `covers_order_id` when the sale comes first, and the New
+   * Order dialog sets it when the purchase is raised for a customer in one go. Neither helps the
+   * ordinary case — a PO placed first, and only later revealed to have been bought for someone —
+   * which had no path at all: the service could write the column, and nothing in the UI called it.
+   */
+  const [covers, setCovers] = useState<{ id: string; order_number: string | null; status: string; total: number; currency: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!order?.covers_order_id) { setCovers(null); return; }
+      const { data } = await supabase.from('orders')
+        .select('id, order_number, status, total, currency')
+        .eq('id', order.covers_order_id).maybeSingle();
+      if (!cancelled) setCovers((data ?? null) as any);
+    })();
+    return () => { cancelled = true; };
+  }, [order?.id, order?.covers_order_id]);
+
+  /** The picker's value — derived from `covers`, so it can never disagree with the block below it. */
+  const coversValue: OrderLinkTarget = covers
+    ? { kind: 'sales_order', orderId: covers.id, projectId: null, label: covers.order_number ?? covers.id.slice(0, 8) }
+    : { kind: 'none' };
+
+  /**
+   * Point this purchase at the customer it was bought for — either an order they already have, or
+   * a new one raised from these lines.
+   *
+   * The new order is a MIRROR, never a move: `mirrorLinesForSale` re-prices every catalog line
+   * through the pricing resolver, so the customer is charged their price and not our supplier's.
+   * Ad-hoc lines have nothing to look up and are reported back rather than sold at cost in silence.
+   * The purchase keeps its own lines untouched — a purchase settles on money OUT and a sale on
+   * money IN, and merging the two is the mistake `OrderLinkPicker` exists to make unavailable.
+   */
+  const linkToCustomer = async (v: OrderLinkTarget) => {
+    if (!order) return;
+    if (v.kind === 'none') { await saveMeta({ coversOrderId: null }); return; }
+    if (v.kind === 'sales_order') {
+      // A sale already knows its project; inheriting it keeps the purchase reported under the same
+      // job. Only when this order has none — never overwrite a project someone chose deliberately.
+      await saveMeta({
+        coversOrderId: v.orderId,
+        ...(order.project_id ? {} : (v.projectId ? { projectId: v.projectId } : {})),
+      });
+      return;
+    }
+    if (v.kind !== 'customer') return;
+    setSaving(true);
+    try {
+      const mirrored = await ordersService.mirrorLinesForSale({
+        workspaceId: order.workspace_id,
+        items: items.map((it) => ({
+          product_id: it.product_id ?? null,
+          description: it.description,
+          quantity: Number(it.quantity),
+          unit_price: Number(it.unit_price),
+          unit_cost: it.unit_cost != null ? Number(it.unit_cost) : null,
+          measurement_unit_code: it.measurement_unit_code ?? null,
+          vat_percent: Number(it.vat_percent ?? 0),
+          vat_category: it.vat_category ?? null,
+          supplier_company_id: null,
+          update_warehouse: it.update_warehouse ?? true,
+        })),
+        companyId: v.party.party_type === 'company' ? v.party.id : null,
+        contactId: v.party.party_type === 'contact' ? v.party.id : null,
+      });
+      const salesOrderId = await ordersService.create({
+        workspaceId: order.workspace_id,
+        orderType: 'sales',
+        status: 'draft',
+        currency: order.currency,
+        projectId: order.project_id ?? null,
+        customerCompanyId: v.party.party_type === 'company' ? v.party.id : null,
+        customerContactId: v.party.party_type === 'contact' ? v.party.id : null,
+        notes: `Raised from purchase ${order.order_number ?? order.id.slice(0, 8)}.`,
+        items: mirrored.items,
+      });
+      await ordersService.updateMeta(order.id, { coversOrderId: salesOrderId });
+      setOrder({ ...order, covers_order_id: salesOrderId });
+      onChanged();
+      toast({
+        title: `Customer order drafted for ${v.party.name ?? 'the customer'}`,
+        description: mirrored.unpriced.length
+          ? `${mirrored.unpriced.length} line(s) had no catalog price and carry cost — price them before sending: ${mirrored.unpriced.slice(0, 3).join(', ')}.`
+          : 'Drafted at their selling price. Open it to review and confirm.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Could not raise the customer order', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   // Set a line's delivered quantity; the order's fulfilment status auto-advances
   // (none → confirmed, some → partially delivered, all → completed).
   const setLineDelivered = async (itemId: string, qty: number) => {
@@ -1930,7 +2023,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       await load(order.id); onChanged();
       toast({
         title: 'Sent in-app',
-        description: `A draft sales order is waiting in ${handoff?.supplierWorkspaceName ?? "the supplier"}'s workspace. You'll see their acknowledgement here.`,
+        description: `A draft sales order is waiting in ${handoff?.supplierWorkspaceName ?? 'the supplier'}'s workspace. You'll see their acknowledgement here.`,
       });
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setSaving(false); }
@@ -2074,6 +2167,30 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   compact
                   disabled={saving}
                 />
+                {/* Who this purchase was bought FOR. Purchase-only and deliberately separate from
+                    Project: they answer different questions and write different columns, and the
+                    one control that tried to do both printed a customer's order number under the
+                    word "Project". Projects are switched off here for the same reason.
+                    Sales orders are excluded — a sale IS the customer's order; pointing it at
+                    another one would invert the direction the whole link is defined by. */}
+                {order.order_type === 'purchase' && (
+                  <>
+                    <Label className="text-xs text-muted-foreground">For customer</Label>
+                    <OrderLinkPicker
+                      workspaceId={order.workspace_id}
+                      value={coversValue}
+                      onChange={(v) => void linkToCustomer(v)}
+                      currency={order.currency}
+                      allowProject={false}
+                      allowCustomer
+                      allowRaiseCustomerOrder
+                      allowMerge={false}
+                      allowCostOf={false}
+                      compact
+                      disabled={saving}
+                    />
+                  </>
+                )}
                 <Label className="text-xs text-muted-foreground">Status</Label>
                 {/* Only the statuses a human actually owns. `partially_fulfilled` and `fulfilled`
                     are DERIVED from the delivered quantities — deliver_order_line and
@@ -2263,6 +2380,21 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 <p className="text-[11px] text-muted-foreground max-w-xs">Un-invoiced orders age in Receivables/Payables against the expected payment date.</p>
               )}
             </div>
+
+            {/* The forward view, from the purchase side: the customer order this was bought to
+                serve. The header picker SETS it; this states it as a link, because "which sale is
+                this for" is only useful if you can open that sale. Mirrors "Covered by" below. */}
+            {order.order_type === 'purchase' && covers && (
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Bought for</span>
+                <div className="mt-1">
+                  <Link to={`${financeBase}/orders/${covers.id}`} className="text-xs hover:underline">
+                    <span className="font-medium">{covers.order_number ?? covers.id.slice(0, 8)}</span>
+                    <span className="text-muted-foreground"> · {covers.status} · {formatMoney(Number(covers.total), covers.currency)}</span>
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* The project link moved inline into the header row above (beside Status), so all that
                 remains here is the reverse view: which purchase orders were raised to cover this
