@@ -140,6 +140,7 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -220,15 +221,17 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
             </Button>
           </div>
         </div>
-
-        <TemplatePickerDialog
-          entityType="quote"
-          open={templatePickerOpen}
-          onOpenChange={setTemplatePickerOpen}
-          onSelect={(tpl) => createFromTemplate(tpl.id)}
-        />
       </DialogContent>
     </Dialog>
+
+    {/* Sibling, not a child — nesting two Radix dialogs fights over the focus trap and Esc. */}
+    <TemplatePickerDialog
+      entityType="quote"
+      open={templatePickerOpen}
+      onOpenChange={setTemplatePickerOpen}
+      onSelect={(tpl) => createFromTemplate(tpl.id)}
+    />
+    </>
   );
 };
 

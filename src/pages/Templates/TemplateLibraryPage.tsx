@@ -9,6 +9,8 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useEntitlements } from '@/hooks/useEntitlements';
 import { entityTemplatesService, type EntityTemplate } from '@/services/entityTemplatesService';
 import {
   EXTERNAL_TEMPLATE_SOURCES, LIVE_TEMPLATE_TYPES, TEMPLATE_ADAPTERS, getAdapter,
@@ -28,7 +30,25 @@ export const TemplateLibraryPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const workspaceId = getActiveWorkspaceId(user?.id);
+  const { can } = usePermissions();
+  const { isModuleAvailable } = useEntitlements();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  /**
+   * Types this persona can actually act on. The adapters declare a `capability` / `moduleSlug`;
+   * without this they were declared and ignored, so a member with no finance access still saw
+   * Invoice templates and a "Use" button that lands on a page they cannot open — the inert-UI
+   * shape `navReachability.test.ts` exists to prevent elsewhere.
+   */
+  const usableTypes = useMemo(
+    () => LIVE_TEMPLATE_TYPES.filter((t) => {
+      const a = TEMPLATE_ADAPTERS[t];
+      if (a.capability && !can(a.capability)) return false;
+      if (a.moduleSlug && !isModuleAvailable(a.moduleSlug)) return false;
+      return true;
+    }),
+    [can, isModuleAvailable],
+  );
 
   const typeFilter = searchParams.get('type');
   const [loading, setLoading] = useState(true);
@@ -38,19 +58,21 @@ export const TemplateLibraryPage: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setTemplates(await entityTemplatesService.list());
+      setTemplates(await entityTemplatesService.list({ workspaceId }));
     } catch (e) {
       toast({ title: 'Failed to load templates', description: String((e as Error)?.message ?? e), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, workspaceId]);
 
   useEffect(() => { load(); }, [load]);
 
   const visible = useMemo(
-    () => templates.filter((t) => (!typeFilter || t.entity_type === typeFilter) && getAdapter(t.entity_type)),
-    [templates, typeFilter],
+    () => templates.filter((t) =>
+      (!typeFilter || t.entity_type === typeFilter)
+      && (usableTypes as readonly string[]).includes(t.entity_type)),
+    [templates, typeFilter, usableTypes],
   );
   const own = visible.filter((t) => !t.is_platform_starter);
   const starters = visible.filter((t) => t.is_platform_starter);
@@ -171,7 +193,7 @@ export const TemplateLibraryPage: React.FC = () => {
           >
             All
           </Button>
-          {LIVE_TEMPLATE_TYPES.map((t: LiveTemplateEntityType) => {
+          {usableTypes.map((t: LiveTemplateEntityType) => {
             const adapter = TEMPLATE_ADAPTERS[t];
             const Icon = adapter.icon;
             const count = templates.filter((x) => x.entity_type === t).length;
@@ -223,7 +245,7 @@ export const TemplateLibraryPage: React.FC = () => {
                 These have their own editors — the links go straight there.
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {EXTERNAL_TEMPLATE_SOURCES.map((s) => {
+                {EXTERNAL_TEMPLATE_SOURCES.filter((x) => !x.moduleSlug || isModuleAvailable(x.moduleSlug)).map((s) => {
                   const Icon = s.icon;
                   return (
                     <Card key={s.id} className="dashboard-card cursor-pointer" onClick={() => navigate(s.route)}>

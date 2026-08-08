@@ -10,7 +10,7 @@
  * These are the narrowings that keep a bad payload value from becoming a failed import.
  */
 import { describe, expect, it } from 'vitest';
-import { childRows, depositPct, num, oneOf, positiveQty, str } from '@/services/templates/coerce';
+import { childRows, depositPct, num, oneOf, parentSelect, pickDeclared, positiveQty, str } from '@/services/templates/coerce';
 
 describe('num', () => {
   it('passes finite numbers and numeric strings through', () => {
@@ -108,5 +108,35 @@ describe('childRows', () => {
     expect(childRows({}, 'quote_items')).toEqual([]);
     expect(childRows({ quote_items: 'nope' } as Record<string, unknown>, 'quote_items')).toEqual([]);
     expect(childRows({ quote_items: null } as Record<string, unknown>, 'quote_items')).toEqual([]);
+  });
+});
+
+describe('parentSelect — the empty-allowlist trap', () => {
+  it('returns null for an empty allowlist, so no query is issued', () => {
+    // `[].join(', ')` is `''`, and PostgREST reads `?select=` as `*` — verified against the live
+    // API, which returned every column. That turned `hr_onboarding`'s deliberately empty parent
+    // allowlist into "capture the whole employee row": salary, AMKA, clock_pin_hash, workspace_id.
+    // The declaration said capture nothing and the query did the opposite.
+    expect(parentSelect([])).toBeNull();
+  });
+
+  it('joins a non-empty allowlist', () => {
+    expect(parentSelect(['a', 'b'])).toBe('a, b');
+  });
+});
+
+describe('pickDeclared — the allowlist is enforced on the way out too', () => {
+  const row = { title: 'x', monthly_salary: 4000, amka: '123', id: 'uuid', project_tasks: [{ t: 1 }] };
+
+  it('drops anything not declared, whatever the query returned', () => {
+    expect(pickDeclared(row, ['title'])).toEqual({ title: 'x' });
+  });
+
+  it('keeps declared child collections', () => {
+    expect(pickDeclared(row, ['title'], ['project_tasks'])).toEqual({ title: 'x', project_tasks: [{ t: 1 }] });
+  });
+
+  it('an empty allowlist keeps nothing — not everything', () => {
+    expect(pickDeclared(row, [])).toEqual({});
   });
 });

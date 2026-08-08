@@ -51,13 +51,13 @@ export const TemplatePickerDialog: React.FC<{
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setTemplates(await entityTemplatesService.list({ entityType }));
+      setTemplates(await entityTemplatesService.list({ entityType, workspaceId }));
     } catch (e) {
       toast({ title: 'Failed to load templates', description: String((e as Error)?.message ?? e), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [entityType, toast]);
+  }, [entityType, workspaceId, toast]);
 
   useEffect(() => { if (open) load(); }, [open, load]);
 

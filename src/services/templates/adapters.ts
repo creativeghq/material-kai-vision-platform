@@ -639,11 +639,16 @@ export interface PropertyListingTemplatePayload {
   condition?: string | null;
   energy_class?: string | null;
   heating_type?: string | null;
-  furnished?: boolean | null;
+  /** TEXT on `properties`, not a boolean — the form's own placeholder is "yes / no / partial". */
+  furnished?: string | null;
   description_i18n?: Record<string, unknown> | null;
   features?: string[] | null;
   amenities?: string[] | null;
 }
+
+/** `properties_property_type_check` / `properties_transaction_type_check`. */
+const propertyType = oneOf(['residential', 'commercial', 'land', 'other'] as const);
+const transactionType = oneOf(['sale', 'rent', 'short_let', 'business_transfer', 'auction'] as const);
 
 export const propertyListingAdapter: TemplateAdapter<PropertyListingTemplatePayload> = {
   type: 'property_listing',
@@ -655,16 +660,16 @@ export const propertyListingAdapter: TemplateAdapter<PropertyListingTemplatePayl
     // jsonb and must not be handed over wholesale from this one either.
     const property = await realEstateService.createProperty(ctx.workspaceId, {
       title: ctx.title ?? 'Untitled listing',
-      property_type: str(payload.property_type) ?? 'residential',
+      property_type: propertyType(payload.property_type) ?? 'residential',
       subtype: str(payload.subtype),
-      transaction_type: str(payload.transaction_type) ?? 'sale',
+      transaction_type: transactionType(payload.transaction_type) ?? 'sale',
       listing_status: 'draft',
       currency: str(payload.currency) ?? 'EUR',
       country_code: str(payload.country_code) ?? 'GR',
       condition: str(payload.condition),
       energy_class: str(payload.energy_class),
       heating_type: str(payload.heating_type),
-      furnished: payload.furnished === true,
+      furnished: str(payload.furnished),
       description_i18n: payload.description_i18n && typeof payload.description_i18n === 'object'
         ? payload.description_i18n : {},
       features: Array.isArray(payload.features) ? payload.features.filter((f) => typeof f === 'string') : [],
@@ -680,7 +685,8 @@ export const propertyListingAdapter: TemplateAdapter<PropertyListingTemplatePayl
   summary(payload) {
     const out: string[] = [];
     if (payload.property_type) out.push(String(payload.property_type));
-    if (payload.transaction_type) out.push(String(payload.transaction_type) === 'sale' ? 'For sale' : 'To let');
+    const tx = transactionType(payload.transaction_type);
+    if (tx) out.push(tx === 'sale' ? 'For sale' : tx === 'rent' ? 'To let' : tx.replace(/_/g, ' '));
     const feats = (payload.features?.length ?? 0) + (payload.amenities?.length ?? 0);
     if (feats) out.push(`${feats} feature${feats === 1 ? '' : 's'}`);
     return out;

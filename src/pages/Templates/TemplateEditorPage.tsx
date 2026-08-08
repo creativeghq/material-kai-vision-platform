@@ -30,8 +30,15 @@ import type { TemplateChildSpec, TemplateEditableField } from '@/services/templa
  * Platform starters are read-only here; "Copy to edit" in the library makes an editable copy.
  */
 
-/** Child columns that are numbers rather than free text. */
-const NUMERIC_FIELD = /(quantity|price|amount|_pct|position|sort_order|code|version|rate)$/;
+/**
+ * Child columns that are numbers rather than free text.
+ *
+ * `code` is deliberately NOT in here. `order_items.measurement_unit_code` is TEXT ('pcs', 'm2')
+ * while `invoice_items.measurement_unit_code` is an integer — a number input on the former blanks
+ * the value the moment anyone edits it, and the integer case round-trips fine through a text input
+ * because the dialog parses it anyway.
+ */
+const NUMERIC_FIELD = /(quantity|price|amount|_pct|position|sort_order|version|rate)$/;
 
 export const TemplateEditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();

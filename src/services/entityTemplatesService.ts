@@ -42,11 +42,19 @@ export interface EntityTemplateVersion {
 }
 
 class EntityTemplatesService {
-  /** Every template the caller can see: own-workspace + platform starters. */
-  async list(opts?: { entityType?: TemplateEntityType; includeArchived?: boolean }): Promise<EntityTemplate[]> {
+  /**
+   * Templates for ONE workspace: that workspace's own, plus the platform starters.
+   *
+   * RLS alone would return the templates of every workspace the caller belongs to, which is not a
+   * leak (they are a member of all of them) but is wrong on screen: you would see another
+   * workspace's invoice shapes in this one's library, and "Use" would materialise them here.
+   * The active workspace is the scope the rest of the app works in, so it is the scope here too.
+   */
+  async list(opts?: { entityType?: TemplateEntityType; includeArchived?: boolean; workspaceId?: string | null }): Promise<EntityTemplate[]> {
     let q = supabase.from('entity_templates').select('*').order('updated_at', { ascending: false });
     if (opts?.entityType) q = q.eq('entity_type', opts.entityType);
     if (!opts?.includeArchived) q = q.eq('status', 'active');
+    if (opts?.workspaceId) q = q.or(`is_platform_starter.eq.true,workspace_id.eq.${opts.workspaceId}`);
     const { data, error } = await q;
     if (error) throw error;
     return (data ?? []) as unknown as EntityTemplate[];

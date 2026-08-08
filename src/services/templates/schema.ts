@@ -271,6 +271,7 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
     editableFields: [
       { key: 'subtype', label: 'Subtype', kind: 'text' },
       { key: 'condition', label: 'Condition', kind: 'text' },
+      { key: 'furnished', label: 'Furnished', kind: 'text', hint: 'Free text on the listing — yes / no / partial.' },
       { key: 'energy_class', label: 'Energy class', kind: 'text' },
       { key: 'country_code', label: 'Country code', kind: 'text' },
     ],

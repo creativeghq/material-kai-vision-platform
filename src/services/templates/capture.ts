@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { parentSelect, pickDeclared } from './coerce';
 import type { TemplateAdapter, TemplateChildSpec } from './types';
 
 /**
@@ -25,14 +26,19 @@ export async function captureParent<T extends Record<string, unknown>>(
   fields: readonly string[],
   sourceId: string,
 ): Promise<T> {
+  // An EMPTY allowlist means "capture nothing from the parent" — never "capture everything".
+  // PostgREST reads `select=` as `*`, so the query is skipped outright rather than sent.
+  const select = parentSelect(fields);
+  if (select === null) return {} as T;
+
   const { data, error } = await supabase
     .from(table as never)
-    .select(fields.join(', '))
+    .select(select)
     .eq('id', sourceId)
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error(`${table} record not found (or not visible to you)`);
-  return data as T;
+  return pickDeclared(data as Record<string, unknown>, fields) as T;
 }
 
 /**
@@ -53,7 +59,7 @@ export async function captureChildren(spec: TemplateChildSpec, sourceId: string)
   if (error) throw error;
   const rows = (data ?? []) as unknown as Record<string, unknown>[];
 
-  if (!needsTree) return rows.map((r) => ({ ...r }));
+  if (!needsTree) return rows.map((r) => pickDeclared(r, spec.fields));
 
   const { idField, parentField } = spec.hierarchy!;
   const indexById = new Map<string, number>();
@@ -83,7 +89,12 @@ export async function captureRecord<P>(
   for (const spec of adapter.captureChildren ?? []) {
     out[spec.table] = await captureChildren(spec, sourceId);
   }
-  return out as P;
+  // Enforce the declaration on the way out too, not just in the query.
+  return pickDeclared(
+    out,
+    adapter.captureFields,
+    (adapter.captureChildren ?? []).map((c) => c.table),
+  ) as P;
 }
 
 /**
@@ -105,4 +116,4 @@ export async function filterVisibleIds(table: string, ids: (string | null | unde
 
 // Payload coercion lives in ./coerce (dependency-free so it is unit-testable); re-exported here
 // because every adapter already imports its capture helpers from this module.
-export { childRows, depositPct, num, oneOf, positiveQty, str } from './coerce';
+export { childRows, depositPct, num, oneOf, pickDeclared, positiveQty, str } from './coerce';

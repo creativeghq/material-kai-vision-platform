@@ -169,6 +169,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -363,32 +364,34 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
             </Button>
           </div>
         </div>
-
-        <TemplatePickerDialog
-          entityType="project"
-          open={templatePickerOpen}
-          onOpenChange={setTemplatePickerOpen}
-          onSelect={async (tpl) => {
-            const workspaceId = getActiveWorkspaceId(user?.id);
-            if (!workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
-            try {
-              setProcessing(true);
-              const result = await entityTemplatesService.apply(tpl.id, {
-                workspaceId,
-                title: name.trim() || undefined,
-              });
-              if (result.kind !== 'created') return;
-              toast({ title: 'Project created from template' });
-              onSuccess(result.id, name.trim() || tpl.title);
-              onClose();
-            } catch (e) {
-              toast({ title: 'Error', description: String((e as Error)?.message ?? e), variant: 'destructive' });
-            } finally {
-              setProcessing(false);
-            }
-          }}
-        />
       </DialogContent>
     </Dialog>
+
+    {/* Sibling, not a child — nesting two Radix dialogs fights over the focus trap and Esc. */}
+    <TemplatePickerDialog
+      entityType="project"
+      open={templatePickerOpen}
+      onOpenChange={setTemplatePickerOpen}
+      onSelect={async (tpl) => {
+        const workspaceId = getActiveWorkspaceId(user?.id);
+        if (!workspaceId) { toast({ title: 'No active workspace', variant: 'destructive' }); return; }
+        try {
+          setProcessing(true);
+          const result = await entityTemplatesService.apply(tpl.id, {
+            workspaceId,
+            title: name.trim() || undefined,
+          });
+          if (result.kind !== 'created') return;
+          toast({ title: 'Project created from template' });
+          onSuccess(result.id, name.trim() || tpl.title);
+          onClose();
+        } catch (e) {
+          toast({ title: 'Error', description: String((e as Error)?.message ?? e), variant: 'destructive' });
+        } finally {
+          setProcessing(false);
+        }
+      }}
+    />
+    </>
   );
 };

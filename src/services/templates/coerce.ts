@@ -57,6 +57,38 @@ export const depositPct = (v: unknown): number | null => {
   return n > 0 && n <= 100 ? n : null;
 };
 
+/**
+ * The PostgREST `select=` clause for an allowlist — or `null` when there is nothing to select.
+ *
+ * `fields.join(', ')` on an empty array is `''`, and PostgREST treats `?select=` as **`*`**:
+ * verified against the live API, which returned every column of the row. That turns an empty
+ * allowlist — the strongest possible declaration, used by `hr_onboarding` precisely because its
+ * parent is an employee record — into "capture the whole employee", salary and AMKA and PIN hash
+ * included. The declaration said one thing and the query did the opposite.
+ *
+ * `null` means: do not issue the query at all.
+ */
+export const parentSelect = (fields: readonly string[]): string | null =>
+  (fields.length ? fields.join(', ') : null);
+
+/**
+ * Keep only the keys an adapter declared.
+ *
+ * Belt and braces on top of `parentSelect`: the allowlist is enforced on the way OUT of the query
+ * as well as on the way in, so a wider-than-expected response (an embedded relation, a future
+ * PostgREST quirk, a hand-written capture) still cannot widen what gets stored.
+ */
+export const pickDeclared = (
+  row: Record<string, unknown>,
+  fields: readonly string[],
+  childTables: readonly string[] = [],
+): Record<string, unknown> => {
+  const allowed = new Set<string>([...fields, ...childTables]);
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) if (allowed.has(k)) out[k] = v;
+  return out;
+};
+
 /** Read a child array out of an untrusted payload without assuming anything about its shape. */
 export const childRows = (payload: Record<string, unknown>, table: string): Record<string, unknown>[] => {
   const v = payload[table];
