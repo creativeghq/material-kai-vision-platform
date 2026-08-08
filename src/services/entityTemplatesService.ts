@@ -103,6 +103,23 @@ class EntityTemplatesService {
     });
   }
 
+  /**
+   * Re-capture a record over an EXISTING template.
+   *
+   * The counterpart to capture-first authoring: you refine the real record, then push the refined
+   * shape back over the template rather than accumulating "Bathroom quote v2 (final)" copies.
+   * `update()` snapshots the outgoing payload and bumps the version in the same write, so the
+   * previous shape is always one Restore away.
+   */
+  async updateFrom(input: { templateId: string; sourceId: string }): Promise<EntityTemplate> {
+    const tpl = await this.get(input.templateId);
+    if (!tpl) throw new Error('Template not found');
+    if (tpl.is_platform_starter) throw new Error('Starter examples are read-only — copy it first.');
+    const adapter = requireAdapter(tpl.entity_type);
+    const payload = await adapter.capture(input.sourceId);
+    return this.update(input.templateId, { payload: payload as Record<string, unknown> });
+  }
+
   async create(input: {
     entityType: TemplateEntityType;
     workspaceId: string;

@@ -147,7 +147,10 @@ export const TemplateLibraryPage: React.FC = () => {
             <div className="text-xs text-muted-foreground">{facts.join(' · ')}</div>
           )}
           {tpl.usage_count > 0 && (
-            <div className="text-[11px] text-muted-foreground">Used {tpl.usage_count} time{tpl.usage_count === 1 ? '' : 's'}</div>
+            <div className="text-[11px] text-muted-foreground">
+              Used {tpl.usage_count} time{tpl.usage_count === 1 ? '' : 's'}
+              {tpl.last_used_at && ` · last ${new Date(tpl.last_used_at).toLocaleDateString()}`}
+            </div>
           )}
 
           <div className="mt-auto pt-2 flex items-center gap-2">
