@@ -305,6 +305,36 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'list_price', label: 'New list price', note: 'What the factory now ASKS. Not a cost until the operator accepts it.' },
     { key: 'currency', label: 'Currency', note: 'Currency of the published ask.', example: 'EUR' },
   ]),
+  // #210 — HR labour lifecycle. The Ergani document code is carried on the payload so a flow
+  // can branch on it (e.g. route an Ε6 termination to Finance but not an Ε5 resignation).
+  'hr.departure_recorded': withStandard([
+    { key: 'employee_id', label: 'Employee ID', note: 'The hr_employees row that is leaving.' },
+    { key: 'employee_name', label: 'Employee name', note: 'Display name of the departing employee.' },
+    { key: 'separation_id', label: 'Departure ID', note: 'The hr_separations row.' },
+    { key: 'separation_type', label: 'Departure type', note: 'voluntary | termination | expiry.', example: 'termination' },
+    { key: 'ergani_code', label: 'Ergani document', note: 'The document this files as — derived from the type.', example: 'E6' },
+    { key: 'effective_date', label: 'Effective date', note: 'Last day of employment.', example: '2026-09-30' },
+    { key: 'reason', label: 'Reason', note: 'Reason recorded for the departure (may be empty).' },
+  ]),
+  'hr.overtime_recorded': withStandard([
+    { key: 'employee_id', label: 'Employee ID', note: 'The employee who worked the overtime.' },
+    { key: 'employee_name', label: 'Employee name', note: 'Display name of the employee.' },
+    { key: 'overtime_id', label: 'Overtime ID', note: 'The hr_overtime row.' },
+    { key: 'work_date', label: 'Work date', note: 'The date the overtime was worked.', example: '2026-09-14' },
+    { key: 'hours', label: 'Hours', note: 'Duration, derived in SQL from the start/end times.', example: '2.5' },
+    { key: 'overtime_reason', label: 'Justification', note: 'Why the overtime was worked — Ergani requires one.' },
+  ]),
+  // A REJECTED statutory filing. Before this existed the failure only ever landed as a row in
+  // hr_ergani_submissions, so nobody was told an Ε3/Ε4/Ε8 never reached the ministry.
+  'hr.ergani_filing_failed': withStandard([
+    { key: 'submission_type', label: 'Ergani document', note: 'The document code that was rejected.', example: 'E3' },
+    { key: 'entity_type', label: 'Entity type', note: 'What was being filed.', example: 'separation' },
+    { key: 'entity_id', label: 'Entity ID', note: 'The record the filing was for (may be empty for a batch).' },
+    { key: 'employee_id', label: 'Employee ID', note: 'The employee concerned (empty when the filing covered several).' },
+    { key: 'employee_name', label: 'Employee name', note: 'Display name of the employee concerned, when there is exactly one.' },
+    { key: 'environment', label: 'Environment', note: 'trial or production — a production failure is the urgent one.', example: 'production' },
+    { key: 'error', label: 'Ergani error', note: 'The rejection message returned by the ministry, verbatim.' },
+  ]),
   'seo.ranking_movement': withStandard([
     { key: 'website_id', label: 'Website ID', note: 'The connected website whose rankings moved.' },
     { key: 'domain', label: 'Domain', note: 'The website domain.', example: 'flobali.gr' },

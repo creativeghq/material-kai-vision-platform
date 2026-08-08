@@ -62,6 +62,8 @@ import {
   CreditCard,
   ShieldAlert,
   BatteryLow,
+  UserMinus,
+  Timer,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
@@ -174,6 +176,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'hr.employee_added': UserPlus,
   'hr.absence_requested': CalendarOff,
   'hr.absence_reviewed': CalendarCheck,
+  'hr.departure_recorded': UserMinus,
+  'hr.overtime_recorded': Timer,
+  'hr.ergani_filing_failed': Landmark,
   order_created: ShoppingCart,
   order_status_changed: Package,
   document_published: BookOpen,
@@ -290,6 +295,9 @@ const triggerLabels: Record<TriggerType, string> = {
   'hr.employee_added': 'HR — Employee Added',
   'hr.absence_requested': 'HR — Absence Requested',
   'hr.absence_reviewed': 'HR — Absence Reviewed',
+  'hr.departure_recorded': 'HR — Departure Recorded',
+  'hr.overtime_recorded': 'HR — Overtime Recorded',
+  'hr.ergani_filing_failed': 'HR — Ergani Filing Failed',
   order_created: 'Order Created',
   order_status_changed: 'Order Status Changed',
   document_published: 'Document Published',

@@ -107,6 +107,12 @@ export type TriggerType =
   | 'hr.employee_added'
   | 'hr.absence_requested'
   | 'hr.absence_reviewed'
+  | 'hr.departure_recorded'
+  | 'hr.overtime_recorded'
+  // HR compliance: an Ergani (ΠΣ Εργάνη) submission was REJECTED by the ministry. Until this
+  // existed a failed statutory filing only ever landed as a row in hr_ergani_submissions —
+  // nobody was told, and an unfiled Ε3/Ε4/Ε8 is a compliance exposure, not a UI nicety.
+  | 'hr.ergani_filing_failed'
   // Finance — order lifecycle (sales/purchase orders)
   | 'order_created'
   | 'order_status_changed'
@@ -178,6 +184,9 @@ export interface HrApplicantStageChangedTriggerConfig {}
 export interface HrEmployeeAddedTriggerConfig {}
 export interface HrAbsenceRequestedTriggerConfig {}
 export interface HrAbsenceReviewedTriggerConfig {}
+export interface HrDepartureRecordedTriggerConfig {}
+export interface HrOvertimeRecordedTriggerConfig {}
+export interface HrErganiFilingFailedTriggerConfig {}
 export interface OrderCreatedTriggerConfig {}
 export interface OrderStatusChangedTriggerConfig {}
 export interface DocumentPublishedTriggerConfig {}
@@ -418,6 +427,9 @@ export type TriggerConfigMap = {
   'hr.employee_added': HrEmployeeAddedTriggerConfig;
   'hr.absence_requested': HrAbsenceRequestedTriggerConfig;
   'hr.absence_reviewed': HrAbsenceReviewedTriggerConfig;
+  'hr.departure_recorded': HrDepartureRecordedTriggerConfig;
+  'hr.overtime_recorded': HrOvertimeRecordedTriggerConfig;
+  'hr.ergani_filing_failed': HrErganiFilingFailedTriggerConfig;
   order_created: OrderCreatedTriggerConfig;
   order_status_changed: OrderStatusChangedTriggerConfig;
   document_published: DocumentPublishedTriggerConfig;

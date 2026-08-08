@@ -140,8 +140,15 @@ Defined in `src/services/flows/types.ts` (`TriggerType`). Beyond the originals
 **Module lifecycle triggers** (each wired to a real emit point — a trigger with no
 emitter is not shipped):
 - **HR** (`hr-api`): `hr.employee_added` (create-employee), `hr.absence_requested`
-  (record-absence), `hr.absence_reviewed` (approve/reject-absence), plus the existing
+  (record-absence), `hr.absence_reviewed` (approve/reject-absence), `hr.departure_recorded`
+  (create-separation), `hr.overtime_recorded` (create-overtime), plus the existing
   `hr_late_checkin` (cron) and `hr.applicant_stage_changed` (ATS).
+  `hr.ergani_filing_failed` is emitted from the **audit chokepoint** in `ergani.ts` — every
+  Ε-document rejection, in one place, rather than per handler. It is deliberately NOT emitted
+  for work-card punches (`workcard.ts` has its own audit path): punches fail transiently by the
+  dozen, so alerting on those would be noise. A rejected Ε3/Ε4/Ε5/Ε6/Ε7/Ε8 is the signal —
+  before this, that failure only ever landed as a row in `hr_ergani_submissions` and nobody
+  was told the filing never reached the ministry.
 - **Finance** (`ordersService`): `order_created` (order create), `order_status_changed`
   (status transition) — alongside the existing invoice/receipt/payment/expense/PO events.
 - **Docs** (`docsService`): `document_published` (draft→published transition, fires once),

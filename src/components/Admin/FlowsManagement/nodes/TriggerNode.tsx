@@ -17,6 +17,8 @@ import {
   CreditCard,
   ShieldAlert,
   BatteryLow,
+  UserMinus,
+  Timer,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -100,6 +102,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'hr.employee_added': UserPlus,
   'hr.absence_requested': CalendarOff,
   'hr.absence_reviewed': CalendarCheck,
+  'hr.departure_recorded': UserMinus,
+  'hr.overtime_recorded': Timer,
+  'hr.ergani_filing_failed': Landmark,
   order_created: ShoppingCart,
   order_status_changed: Package,
   document_published: BookOpen,

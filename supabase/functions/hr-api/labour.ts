@@ -8,6 +8,7 @@
 // an explicit column allowlist (invariant 8 — never spread a request body into a DB write).
 import { jsonResponse as json } from '../_shared/http.ts';
 import { HttpError } from '../_shared/api-logger.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import type { Ctx } from './expansion.ts';
 
 export const SEPARATION_TYPES = ['voluntary', 'termination', 'expiry'] as const;
@@ -88,6 +89,14 @@ function normalizeShifts(raw: unknown): any[] {
   });
 }
 
+/** Display name for a Flows payload. Best-effort — a missing name must never fail the write. */
+function displayName(row: any): string {
+  return row?.employee?.contact?.name || 'Employee';
+}
+
+/** voluntary → Ε5, termination → Ε6, expiry → Ε7. Carried on the event so a flow can branch on it. */
+const SEPARATION_CODES: Record<string, string> = { voluntary: 'E5', termination: 'E6', expiry: 'E7' };
+
 /** A submitted filing is the government's copy — editing or deleting our record would desync it. */
 function assertDraft(row: any, what: string): void {
   if (row?.status === 'submitted') {
@@ -128,6 +137,23 @@ export async function handleLabour(action: string, ctx: Ctx): Promise<Response |
         ...payload, workspace_id: workspaceId, employee_id: employeeId, created_by: userId,
       }).select(`*, ${EMPLOYEE_JOIN}`).single();
       if (error) throw new HttpError(400, error.message);
+
+      // Flows — a departure is a lifecycle event payroll/finance need to see. Best-effort:
+      // never block the write on notification delivery.
+      try {
+        const name = displayName(data);
+        const code = SEPARATION_CODES[String(data.separation_type)] ?? '';
+        await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'hr.departure_recorded',
+          (recipientUserId) => ({
+            user_id: recipientUserId, workspace_id: workspaceId, type: 'hr.departure_recorded',
+            employee_id: employeeId, employee_name: name,
+            separation_id: data.id, separation_type: data.separation_type, ergani_code: code,
+            effective_date: data.effective_date, reason: data.reason ?? '',
+            title: `Departure recorded: ${name}`,
+            body: `${name} leaves on ${data.effective_date}. File the ${code || 'Ergani'} declaration when ready.`,
+            action_url: '/hr?tab=separations',
+          }), { excludeUserId: userId });
+      } catch { /* best-effort */ }
       return json({ separation: data });
     }
 
@@ -195,6 +221,21 @@ export async function handleLabour(action: string, ctx: Ctx): Promise<Response |
         ...payload, workspace_id: workspaceId, employee_id: employeeId, created_by: userId,
       }).select(`*, ${EMPLOYEE_JOIN}`).single();
       if (error) throw new HttpError(400, error.message);
+
+      // Flows — overtime is a cost and a statutory filing obligation. Best-effort.
+      try {
+        const name = displayName(data);
+        await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'hr.overtime_recorded',
+          (recipientUserId) => ({
+            user_id: recipientUserId, workspace_id: workspaceId, type: 'hr.overtime_recorded',
+            employee_id: employeeId, employee_name: name,
+            overtime_id: data.id, work_date: data.work_date, hours: data.hours,
+            overtime_reason: data.reason ?? '',
+            title: `Overtime logged: ${name}`,
+            body: `${data.hours}h on ${data.work_date} — ${data.reason}. File it to Ergani as an Ε8.`,
+            action_url: '/hr?tab=overtime',
+          }), { excludeUserId: userId });
+      } catch { /* best-effort */ }
       return json({ overtime: data });
     }
 

@@ -21,6 +21,7 @@ import {
   getSubmittedPdf, executeService, ErganiApiError, type ErganiCredentials,
 } from '../_shared/ergani/client.ts';
 import { fileWorkcardPunch, toHttp } from '../_shared/ergani/workcard.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { buildErganiDocument, splitName, toErganiTime, type ErganiValues } from '../_shared/ergani/document.ts';
 
 export interface ErganiCtx {
@@ -65,6 +66,34 @@ async function recordAudit(supabase: any, workspaceId: string, userId: string, r
       error: row.error ?? null,
       created_by: userId,
     }).select('id').single();
+
+    // Flows — a REJECTED statutory filing. Until this existed the failure only ever landed in
+    // this table, so nobody was told an Ε3/Ε4/Ε8 never reached the ministry. Scoped to the
+    // documents an operator files deliberately: work-card punches audit through workcard.ts and
+    // fail transiently by the dozen, so notifying on those would be noise, not signal.
+    if (row.status === 'failed') {
+      try {
+        let name = '';
+        if (row.employee_id) {
+          const { data: emp } = await supabase
+            .from('hr_employees')
+            .select('contact:crm_contacts!hr_employees_crm_contact_id_fkey ( name )')
+            .eq('id', row.employee_id).eq('workspace_id', workspaceId).maybeSingle();
+          name = (emp as any)?.contact?.name ?? '';
+        }
+        const who = name ? ` for ${name}` : '';
+        await emitFlowEventToWorkspaceRoles(workspaceId, ['owner', 'admin'], 'hr.ergani_filing_failed',
+          (recipientUserId) => ({
+            user_id: recipientUserId, workspace_id: workspaceId, type: 'hr.ergani_filing_failed',
+            submission_type: row.submission_type, entity_type: row.entity_type ?? '',
+            entity_id: row.entity_id ?? '', employee_id: row.employee_id ?? '', employee_name: name,
+            environment: row.environment, error: row.error ?? '',
+            title: `Ergani rejected ${row.submission_type}${who}`,
+            body: `${row.error ?? 'The submission was rejected.'} Nothing was filed — fix it and re-submit from the Ergani tab.`,
+            action_url: '/hr?tab=ergani',
+          }));
+      } catch { /* best-effort — the audit row is the record of truth, not the notification */ }
+    }
     return data?.id ?? null;
   } catch (_e) { return null; }
 }

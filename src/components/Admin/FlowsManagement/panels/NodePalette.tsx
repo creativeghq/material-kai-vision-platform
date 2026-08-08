@@ -17,7 +17,7 @@ import {
   CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
   MailX, MailWarning, MailOpen, MousePointerClick, AtSign, Briefcase,
   Ship, Truck, Home,
-  Landmark, CreditCard, ShieldAlert, BatteryLow,
+  Landmark, CreditCard, ShieldAlert, BatteryLow, UserMinus,
 } from 'lucide-react';
 import {
   Accordion,
@@ -49,6 +49,7 @@ const iconMap: Record<string, React.ElementType> = {
   // Landmark/CreditCard were referenced by the banking palette items but never registered
   // here, so those two rendered the `Globe` fallback instead of their own icon.
   Landmark, CreditCard, ShieldAlert, BatteryLow,
+  UserMinus,
 };
 
 const categoryColors: Record<string, string> = {
