@@ -7,7 +7,7 @@ import {
   Search, Box, Orbit,
   SearchCheck, ScanEye, PackagePlus,
   LayoutGrid, ImagePlus, Share2, Inbox, Send,
-  CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2,
+  CalendarOff, CalendarCheck, ShoppingCart, BookOpen, FilePlus2, Boxes, DollarSign,
   Megaphone, MailX, MailWarning,
   Building2, MailOpen, MousePointerClick, TrendingDown, AtSign, Briefcase,
   Ship, Truck,
@@ -15,6 +15,8 @@ import {
   Undo2,
   Landmark,
   CreditCard,
+  ShieldAlert,
+  BatteryLow,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -84,6 +86,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   material_alert: Zap,
   finance_follow_up: Zap,
   invoice_paid: CheckCircle2,
+  fiscal_document_rejected: ShieldAlert,
+  fiscal_credits_low: BatteryLow,
   bank_payment_unmatched: Landmark,
   card_spend_threshold: CreditCard,
   module_access_requested: LayoutGrid,
@@ -122,6 +126,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   rfq_lines_priced: CheckCircle2,
   upstream_order_created: ShoppingCart,
   supplier_po_received: ShoppingCart,
+  catalog_master_updated: Boxes,
+  supplier_price_changed: DollarSign,
   'realestate.buyer_matches_found': Home,
   'realestate.listing_published': Home,
   'realestate.new_listing_for_buyer': Home,

@@ -253,6 +253,14 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'card_spend_threshold', group: 'Finance',
     label: 'Large Card Spend', description: 'A company-card payment of ≥€100 landed on the bank feed', icon: 'CreditCard', color: 'amber',
     defaultData: { label: 'Large Card Spend', category: 'trigger', triggerType: 'card_spend_threshold', config: {} } as TriggerNodeData },
+  // e-Invoicing (#193). Both are operator/finance-facing: a legal document that did not reach
+  // AADE, and the provider credit pool that every tenant's invoicing depends on.
+  { type: 'triggerNode', category: 'trigger', subType: 'fiscal_document_rejected', group: 'Finance',
+    label: 'myDATA Document Rejected', description: 'AADE refused a document, or it has been stuck offline with no MARK', icon: 'ShieldAlert', color: 'red',
+    defaultData: { label: 'myDATA Document Rejected', category: 'trigger', triggerType: 'fiscal_document_rejected', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'fiscal_credits_low', group: 'Finance',
+    label: 'Provider Credits Low', description: 'The platform e-invoicing provider credit pool crossed a low tier', icon: 'BatteryLow', color: 'amber',
+    defaultData: { label: 'Provider Credits Low', category: 'trigger', triggerType: 'fiscal_credits_low', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'bank_payment_unmatched', group: 'Finance',
     label: 'Unmatched Bank Payment', description: 'An incoming bank transfer matched no open invoice', icon: 'Landmark', color: 'amber',
     defaultData: { label: 'Unmatched Bank Payment', category: 'trigger', triggerType: 'bank_payment_unmatched', config: {} } as TriggerNodeData },
@@ -379,6 +387,12 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'supplier_po_received', group: 'Finance',
     label: 'Supplier PO Received', description: 'A buyer handed a purchase order off in-app to this workspace\'s claimed supplier identity → a draft sales order was created for review (notify the supplier admins)', icon: 'PackageOpen', color: 'emerald',
     defaultData: { label: 'Supplier PO Received', category: 'trigger', triggerType: 'supplier_po_received', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'catalog_master_updated', group: 'Finance',
+    label: 'Manufacturer Updated Product Data', description: 'A verified manufacturer published product facts to the shared master catalog — these supersede our own extraction platform-wide (notify the operator)', icon: 'Boxes', color: 'emerald',
+    defaultData: { label: 'Manufacturer Updated Product Data', category: 'trigger', triggerType: 'catalog_master_updated', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'supplier_price_changed', group: 'Finance',
+    label: 'Manufacturer Changed a Price', description: 'A verified manufacturer published a new price. It is an offer to the OPERATOR only — no tenant cost changes until the operator accepts it (notify the operator)', icon: 'DollarSign', color: 'amber',
+    defaultData: { label: 'Manufacturer Changed a Price', category: 'trigger', triggerType: 'supplier_price_changed', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

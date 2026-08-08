@@ -1704,6 +1704,8 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'stripe_payment_succeeded', 'stripe_payment_failed',
   'role_upgrade_approved', 'role_upgrade_rejected', 'role_upgrade_request_submitted',
   'finance_follow_up', 'finance_document_requested', 'module_access_requested',
+  // #193 — both assert a fact about a LEGAL document / the operator's provider account.
+  'fiscal_document_rejected', 'fiscal_credits_low',
   'hr_late_checkin', 'hr.applicant_stage_changed', 'background_agent_failed',
   'material_alert', 'inventory_low_stock', 'freight_quote_requested', 'order_dispatched', 'marketplace_want_match',
   'purchase_order.sent', 'quote_pdf_generated',

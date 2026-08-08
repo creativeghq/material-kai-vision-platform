@@ -87,6 +87,13 @@ export type TriggerType =
   | 'material_alert'
   | 'finance_follow_up'
   | 'invoice_paid'
+  // e-Invoicing (#193): a legal document did not land on myDATA — AADE refused it on delayed
+  // transmission, or it has been stuck offline so long it needs a human. `reason` in the
+  // payload separates the two. Both burn a legal number, so both are loud.
+  | 'fiscal_document_rejected'
+  // e-Invoicing (#193): the OPERATOR's provider credit pool crossed a low tier. Not a tenant
+  // event — when this pool empties, every tenant stops invoicing at once.
+  | 'fiscal_credits_low'
   // Banking (#315): an incoming bank transfer matched no invoice (payload-only)
   | 'bank_payment_unmatched'
   // Banking (#315): a company-card spend of ≥€100 landed (filter higher via amount)
@@ -143,6 +150,12 @@ export type TriggerType =
   // A buyer handed a purchase order off in-app to a workspace's CLAIMED supplier identity —
   // a draft sales order materialized there (notify the supplier admins)
   | 'supplier_po_received'
+  // A verified manufacturer published product FACTS to the shared master catalog (#324) —
+  // these supersede our own extraction platform-wide
+  | 'catalog_master_updated'
+  // A verified manufacturer published a new PRICE. It is an offer to the OPERATOR only;
+  // no tenant's negotiated cost changes until the operator accepts it
+  | 'supplier_price_changed'
   | 'realestate.buyer_matches_found'
   | 'realestate.new_listing_for_buyer'
   | 'realestate.listing_published'
@@ -193,6 +206,8 @@ export interface RfqLinesRequestedTriggerConfig {}
 export interface RfqLinesPricedTriggerConfig {}
 export interface UpstreamOrderCreatedTriggerConfig {}
 export interface SupplierPoReceivedTriggerConfig {}
+export interface CatalogMasterUpdatedTriggerConfig {}
+export interface SupplierPriceChangedTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface FreightQuoteRequestedTriggerConfig {}
 export interface OrderDispatchedTriggerConfig {}
@@ -216,6 +231,10 @@ export interface PurchaseOrderReceivedTriggerConfig {}
 export interface MaterialAlertTriggerConfig {}
 export interface FinanceFollowUpTriggerConfig {}
 export interface InvoicePaidTriggerConfig {}
+/** Payload-only. `reason` is 'rejected' (AADE refused it) or 'stuck_offline' (no verdict). */
+export interface FiscalDocumentRejectedTriggerConfig {}
+/** Payload-only. Carries `balance` + the `tier` that was crossed. */
+export interface FiscalCreditsLowTriggerConfig {}
 export interface BankPaymentUnmatchedTriggerConfig {}
 export interface CardSpendThresholdTriggerConfig {}
 export interface ReviewSubmittedTriggerConfig {}
@@ -389,6 +408,8 @@ export type TriggerConfigMap = {
   material_alert: MaterialAlertTriggerConfig;
   finance_follow_up: FinanceFollowUpTriggerConfig;
   invoice_paid: InvoicePaidTriggerConfig;
+  fiscal_document_rejected: FiscalDocumentRejectedTriggerConfig;
+  fiscal_credits_low: FiscalCreditsLowTriggerConfig;
   bank_payment_unmatched: BankPaymentUnmatchedTriggerConfig;
   card_spend_threshold: CardSpendThresholdTriggerConfig;
   module_access_requested: ModuleAccessRequestedTriggerConfig;
@@ -423,6 +444,8 @@ export type TriggerConfigMap = {
   rfq_lines_priced: RfqLinesPricedTriggerConfig;
   upstream_order_created: UpstreamOrderCreatedTriggerConfig;
   supplier_po_received: SupplierPoReceivedTriggerConfig;
+  catalog_master_updated: CatalogMasterUpdatedTriggerConfig;
+  supplier_price_changed: SupplierPriceChangedTriggerConfig;
   'realestate.buyer_matches_found': RealestateBuyerMatchesFoundTriggerConfig;
   'realestate.new_listing_for_buyer': RealestateNewListingForBuyerTriggerConfig;
   'realestate.listing_published': RealestateListingPublishedTriggerConfig;

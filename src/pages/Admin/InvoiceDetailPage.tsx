@@ -559,9 +559,33 @@ const InvoiceDetailPage: React.FC = () => {
                   <ExternalLink className="h-3 w-3 mr-1" /> View on AADE
                 </Button>
               )}
+              {/* Why it did not land. Kept above the status prose because on a rejected or
+                  stalled document this is the only actionable thing on the card. */}
+              {f.fiscal_error && f.fiscal_status !== 'accepted' && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                  <p className="text-xs font-medium text-destructive">Provider response</p>
+                  <p className="mt-1 text-xs text-muted-foreground break-words">{f.fiscal_error}</p>
+                </div>
+              )}
               {f.fiscal_status === 'offline' && (
-                <p className="text-xs text-muted-foreground">
-                  AADE was offline at submission. The provider will transmit automatically and the final MARK will appear shortly.
+                // Only promise the MARK while the wait is still normal. Past the point where the
+                // recovery cron starts alerting, saying "shortly" is what kept a stalled document
+                // looking healthy for as long as it sat there (#193 / M6).
+                Date.now() - new Date(f.fiscal_submitted_at ?? f.updated_at ?? Date.now()).getTime() < 24 * 3600 * 1000 ? (
+                  <p className="text-xs text-muted-foreground">
+                    AADE was offline at submission. The provider will transmit automatically and the final MARK will appear shortly.
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-500">
+                    This document has been awaiting transmission for over 24 hours. It holds a legal number but has no MARK —
+                    check the provider portal before re-issuing.
+                  </p>
+                )
+              )}
+              {f.fiscal_status === 'rejected' && (
+                <p className="text-xs text-destructive">
+                  AADE refused this document, so its legal number is burned. Fix the cause and re-submit, or void it and
+                  issue a credit note.
                 </p>
               )}
             </CardContent>

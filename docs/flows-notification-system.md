@@ -171,6 +171,15 @@ emitter is not shipped):
   via `pg_net` (same pattern as `_notify_want_match`), resolving `workspace_id` from the
   tracked subject. This finally routes the monitoring channel fan-out through Flows.
 
+- **e-Invoicing** (`finance-fiscal-offline-recovery`, #193): `fiscal_document_rejected` — a
+  legal document burned a series number but never reached AADE, either because AADE refused it
+  on delayed transmission or because it has sat offline with no verdict (`reason` in the payload
+  separates the two). `fiscal_credits_low` — the **operator's** provider credit pool crossed a
+  low tier; unlike every other Finance trigger this one is not about a tenant's document but
+  about the shared pool all tenants transmit through. Both are seeded **active + locked**
+  (unlike the optional module-lifecycle triggers below) because the failure they report is
+  otherwise silent: the document keeps a legal number and the invoice page keeps looking normal.
+
 > **myAADE** is intentionally NOT given a trigger — it's a synchronous registry-lookup
 > helper (fill a business profile from ΑΦΜ), not a lifecycle with an automatable event.
 

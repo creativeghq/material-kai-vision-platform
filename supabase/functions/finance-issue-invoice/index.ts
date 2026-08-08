@@ -522,6 +522,10 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           fiscal_mark: result.mark ?? null,
           fiscal_uid: result.uid ?? null,
           fiscal_qr_url: result.qrUrl ?? null,
+          // Offline documents are aged from here by finance-fiscal-offline-recovery, which
+          // cannot tell "submitted 5 minutes ago" from "stuck since last month" without it.
+          fiscal_submitted_at: new Date().toISOString(),
+          fiscal_error: result.errorMessage ?? null,
           status: accepted ? 'submitted' : 'failed',
           updated_at: new Date().toISOString(),
         }).eq('id', body.credit_note_id);
@@ -601,6 +605,9 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
           fiscal_mark: result.mark ?? null,
           fiscal_uid: result.uid ?? null,
           fiscal_qr_url: result.qrUrl ?? null,
+          // See the credit-note path: the offline-recovery sweep ages documents from this.
+          fiscal_submitted_at: new Date().toISOString(),
+          fiscal_error: result.errorMessage ?? null,
           updated_at: new Date().toISOString(),
         }).eq('id', body.delivery_note_id);
 
@@ -788,10 +795,17 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
                   fiscal_qr_url: result.qrUrl ?? null,
                   fiscal_connector_slug: resolved.resolved.slug,
                   fiscal_submitted_at: new Date().toISOString(),
+                  fiscal_error: null,
                 })
                 .eq('id', invoiceId);
             } else {
-              await supabase.from('invoices').update({ fiscal_status: result.status }).eq('id', invoiceId);
+              // Keep the refusal reason ON the document, not only in fiscal_submissions —
+              // otherwise the invoice page can say "rejected" but never why.
+              await supabase.from('invoices').update({
+                fiscal_status: result.status,
+                fiscal_submitted_at: new Date().toISOString(),
+                fiscal_error: result.errorMessage ?? null,
+              }).eq('id', invoiceId);
             }
 
             // The transmission was reserved (debited) up-front. Operator root reserves
