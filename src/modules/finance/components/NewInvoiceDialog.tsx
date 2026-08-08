@@ -19,11 +19,11 @@ import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 import { formatAddressLine } from '@/services/crm.service';
+import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { servicesService, type ServiceItem } from '@/modules/finance/services/servicesService';
 import { financeService, formatMoney, VAT_CATEGORIES, vatPctForCat, extractNet } from '@/modules/finance/services/financeService';
@@ -31,6 +31,7 @@ import { vatOfRaw, round2 } from '@/modules/finance/lib/vatMath';
 import { buyerIsConsumer as isConsumerBuyer } from '@/modules/finance/utils/salesDocumentKind';
 import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
 import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
+import { MYDATA_TYPE_FAMILY } from '@/modules/finance/components/mydataTypes';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { validateVatViaVies } from '@/services/viesService';
 import { parseDecimalOr } from '@/utils/decimal';
@@ -72,6 +73,8 @@ interface LineItem {
   other_taxes: string;
   deductions: string;
   line_comments: string;
+  /** myDATA invoiceDetailType — '1' clearance / '2' fee. Only offered on doc type 1.5. */
+  invoice_detail_type: string;
   product_id?: string | null;
   expanded?: boolean;
   advancedOpen?: boolean;
@@ -92,12 +95,6 @@ interface Props {
   initialNotes?: string;
 }
 
-const DOC_FAMILY: Record<string, string> = {
-  '1': 'Sales invoices', '2': 'Service invoices', '3': 'Proof of expense', '5': 'Credit notes',
-  '6': 'Self-billing', '7': 'Contracts', '8': 'Rents / Special', '9': 'Delivery notes',
-  '11': 'Retail receipts', '13': 'Retail / Expenses', '14': 'Cross-border', '15': 'Contractor',
-  '16': 'Other', '17': 'Other',
-};
 function groupDocTypes(types: { code: string; description: string }[]) {
   const groups = new Map<string, { code: string; description: string }[]>();
   for (const t of types) {
@@ -105,9 +102,26 @@ function groupDocTypes(types: { code: string; description: string }[]) {
     if (!groups.has(fam)) groups.set(fam, []);
     groups.get(fam)!.push(t);
   }
+  // Family labels come from the shared MYDATA_TYPE_FAMILY map, never a local copy — the
+  // second copy that used to live here is how this picker offered family 6 as "Self-billing"
+  // while listing "Self-Delivery Record" / "Self-Supply Record" underneath it.
   return Array.from(groups.entries()).sort(([a], [b]) => Number(a) - Number(b))
-    .map(([family, items]) => ({ family, label: DOC_FAMILY[family] ?? `Type ${family}.x`, items }));
+    .map(([family, items]) => ({ family, label: MYDATA_TYPE_FAMILY[family] ?? `Type ${family}.x`, items }));
 }
+
+/**
+ * myDATA `invoiceDetailType` (Appendix Par.11 "Remarks") — which kind of line this is inside
+ * a 1.5 document, the only type that carries both kinds at once ("Clearance of Sales on Behalf
+ * of Third Parties – Fees from Sales on Behalf of Third Parties"). The Novus dev doc glosses
+ * the field as "self-billing remark"; its two allowed values are the 1.5 ones below, so it is
+ * NOT the αυτοτιμολόγηση flag (that is the header checkbox → `invoices.self_pricing`, #278).
+ */
+const INVOICE_DETAIL_TYPES: [string, string][] = [
+  ['1', 'Third-party sales clearance'],
+  ['2', 'Fee from third-party sales'],
+];
+/** The only document type on which myDATA accepts a line-level `invoiceDetailType`. */
+const DETAIL_TYPE_DOC_CODES = new Set(['1.5']);
 
 
 // The four document types offered as quick-pick chips; everything else lives in the "More types" dropdown.
@@ -144,6 +158,7 @@ const emptyLine = (g?: Partial<LineItem>): LineItem => ({
   income_classification_category: '',
   fees_category: '', stamp_duty_category: '', other_taxes_category: '',
   fees: '', stamp_duty: '', other_taxes: '', deductions: '', line_comments: '',
+  invoice_detail_type: '',
   // Merge any provided fields last so globals (unit/VAT/income class) AND prefills
   // (a real-estate commission line's description + unit_price) both apply.
   ...g,
@@ -162,7 +177,6 @@ function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string
 
 export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, initialCustomer, initialItems, initialDocType, initialNotes }) => {
   const { toast } = useToast();
-  const handleQuotaError = useQuotaErrorHandler();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
@@ -214,8 +228,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [issuer, setIssuer] = useState<any>(null);
   const [previewBanks, setPreviewBanks] = useState<Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>>([]);
   // Inline "add client"
-  const [addingClient, setAddingClient] = useState(false);
-  const [newClient, setNewClient] = useState({ name: '', vat: '', email: '' });
+  // Creating the buyer is delegated to the shared QuickAddCompanyDialog (VAT/ΑΦΜ → ΑΑΔΕ/ΓΕΜΗ/
+  // VIES → web research). This used to be three inline inputs — name, VAT, email — which put an
+  // UNVERIFIED VAT on the buyer of a fiscal document, and then on the myDATA submission. The
+  // dialog resolves the registered identity and dedupes by VAT before it will create anything.
+  const [clientDialogOpen, setClientDialogOpen] = useState(false);
 
   // Header
   const [documentType, setDocumentType] = useState('1.1');
@@ -306,7 +323,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     // Pre-select the buyer when opened from a party page; the [customer] effect
     // below loads its address. Otherwise start blank.
     setCustomer(initialCustomer ?? null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
-    setAddingClient(false); setNewClient({ name: '', vat: '', email: '' });
+    setClientDialogOpen(false);
     setDocumentType(initialDocType || '1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
     setIssueDate(new Date().toISOString().slice(0, 10)); setNotes(initialNotes ?? ''); setIssueNow(true);
     setCategoryId(''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
@@ -529,17 +546,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const useHqAddress = () => setShipFrom(fmtAddr(issuer));
   const useCustomerDelivery = () => setShipTo(fmtAddr(customerAddr));
 
-  const createClient = async () => {
-    if (!newClient.name.trim()) { toast({ title: 'Client name required', variant: 'destructive' }); return; }
-    const { data, error } = await supabase.from('crm_companies').insert({
-      workspace_id: workspaceId, name: newClient.name.trim(), vat_number: newClient.vat || null, email: newClient.email || null,
-      // Explicit: is_customer no longer defaults to true at the column (it used to file every
-      // supplier as a customer as well). We are invoicing this party — they are the customer.
-      is_customer: true,
-    }).select('id, name').single();
-    if (error) { if (!handleQuotaError(error)) toast({ title: 'Failed to add client', description: error.message, variant: 'destructive' }); return; }
-    setCustomer({ type: 'company', id: data.id, label: `${data.name} (company)` });
-    setAddingClient(false); setNewClient({ name: '', vat: '', email: '' });
+  // Adopt whatever the shared dialog created (or matched). The ' (company)' suffix is load-bearing
+  // — the preview strips exactly that to print the buyer's name (see the `customer` memo below).
+  const adoptCreatedClient = (company: { id: string; name: string }) => {
+    setCustomer({ type: 'company', id: company.id, label: `${company.name} (company)` });
+    setCustomerSearch(''); setCustomerOptions([]);
   };
 
   // Pick a billing party from the search results. Business rollup: if the chosen
@@ -814,6 +825,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           withheld_category: withholdingCode && withheldByLine[li] > 0 ? parseInt(withholdingCode, 10) : null,
           withheld_amount: withheldByLine[li],
           line_comments: l.line_comments || null,
+          // myDATA line kind for a 1.5 third-party-sales clearance. Cleared on every other
+          // document type: the picker is hidden there, so a value could only be a leftover
+          // from switching type mid-edit, and myDATA rejects the field outside 1.5.
+          invoice_detail_type: DETAIL_TYPE_DOC_CODES.has(documentType) && l.invoice_detail_type
+            ? parseInt(l.invoice_detail_type, 10)
+            : null,
           product_id: l.product_id || null,
         };
       });
@@ -910,6 +927,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const itemCount = useMemo(() => lines.filter((l) => l.description.trim()).length, [lines]);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[98vw] max-w-[1500px] h-[96vh] max-h-[96vh] overflow-hidden p-0 flex flex-col">
         <DialogHeader className="border-b border-border/60 px-5 py-3 shrink-0">
@@ -933,19 +951,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">Billed to</Label>
-                {!addingClient && <button type="button" className="text-xs text-primary hover:underline" onClick={() => setAddingClient(true)}>+ Add new client</button>}
+                <button type="button" className="text-xs text-primary hover:underline" onClick={() => setClientDialogOpen(true)}>+ Add new client</button>
               </div>
-              {addingClient ? (
-                <div className="grid grid-cols-3 gap-2 rounded-md border border-border/60 p-3">
-                  <Input className="h-8 text-xs col-span-3" placeholder="Company name" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} />
-                  <Input className="h-8 text-xs" placeholder="VAT no." value={newClient.vat} onChange={(e) => setNewClient({ ...newClient, vat: e.target.value })} />
-                  <Input className="h-8 text-xs col-span-2" placeholder="Email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} />
-                  <div className="col-span-3 flex justify-end gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => setAddingClient(false)}>Cancel</Button>
-                    <Button size="sm" onClick={createClient}>Add client</Button>
-                  </div>
-                </div>
-              ) : customer ? (
+              {customer ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
                     <span className="text-sm">{customer.label}</span>
@@ -1027,6 +1035,17 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         </button>
                       ))}
                     </div>
+                  )}
+                  {/* Searched and it isn't there yet — offer the create from the term already
+                      typed, rather than making them clear the box and find "Add new client". */}
+                  {customerSearch.trim().length >= 2 && customerOptions.length === 0 && (
+                    <button
+                      type="button"
+                      className="mt-1 text-xs text-primary hover:underline"
+                      onClick={() => setClientDialogOpen(true)}
+                    >
+                      + Add “{customerSearch.trim()}” as a new client
+                    </button>
                   )}
                 </div>
               )}
@@ -1303,6 +1322,21 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                               <Input className="h-7 text-xs" type="number" min="1" max="31" value={l.vat_exemption} onChange={(e) => update(idx, { vat_exemption: e.target.value })} placeholder="Required for 0% VAT" />
                             </div>
                           )}
+                          {/* A 1.5 document carries clearance lines and commission-fee lines together;
+                              myDATA needs each line to say which it is. Offered on 1.5 only — it is the
+                              only type that accepts invoiceDetailType. */}
+                          {DETAIL_TYPE_DOC_CODES.has(documentType) && (
+                            <div className="space-y-1">
+                              <Label className="text-[10px] text-muted-foreground">Line kind (third-party sales)</Label>
+                              <Select value={l.invoice_detail_type || 'none'} onValueChange={(v) => update(idx, { invoice_detail_type: v === 'none' ? '' : v })}>
+                                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">—</SelectItem>
+                                  {INVOICE_DETAIL_TYPES.map(([code, label]) => <SelectItem key={code} value={code}>{label}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                           <div className="space-y-1 sm:col-span-2">
                             <Label className="text-[10px] text-muted-foreground">Line comments</Label>
                             <Input className="h-7 text-xs" value={l.line_comments} onChange={(e) => update(idx, { line_comments: e.target.value })} placeholder="Shown on this line of the invoice" />
@@ -1526,5 +1560,18 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Sibling, not a child — nesting two Radix dialogs fights over the focus trap and Esc. */}
+    <QuickAddCompanyDialog
+      open={clientDialogOpen}
+      onOpenChange={setClientDialogOpen}
+      workspaceId={workspaceId}
+      initialName={customerSearch.trim()}
+      role="customer"
+      title="New client"
+      description="Look the VAT / ΑΦΜ up to pull the registered name and address — the buyer identity that goes on the invoice and into myDATA."
+      onCreated={adoptCreatedClient}
+    />
+    </>
   );
 };

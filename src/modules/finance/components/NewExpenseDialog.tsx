@@ -24,6 +24,7 @@ import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { crmBankAccountsAPI, type CrmBankAccount } from '@/services/crm.service';
+import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
 import { useSessionDraft } from '@/hooks/useSessionDraft';
 import { parseDecimalOr } from '@/utils/decimal';
 
@@ -87,7 +88,10 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [party, setParty] = useState<Party | null>(null);
   const [partySearch, setPartySearch] = useState('');
   const [partyOptions, setPartyOptions] = useState<Party[]>([]);
-  const [creatingParty, setCreatingParty] = useState(false);
+  // Creating the BUSINESS payee is delegated to the shared QuickAddCompanyDialog (VAT/ΑΦΜ →
+  // ΑΑΔΕ/ΓΕΜΗ/VIES → web research), so a supplier born here carries the same identity as one
+  // added from CRM. Creating a PERSON payee stays inline — there is no registry for a person.
+  const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
   const [creatingContact, setCreatingContact] = useState(false);
   // The payee's own bank accounts — offered on a Bank Payment so you record which of THEIR banks
   // you paid to (managed on their CRM record → Tax & VAT → Bank Accounts).
@@ -174,6 +178,10 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // line/order, everything else resets to defaults. The Order category is applied by the load effect.
   useEffect(() => {
     if (!open) return;
+    // Before the mode branches below — both of them `return` early, so anything that must run on
+    // EVERY open belongs here. The create-business dialog is a child overlay, never part of the
+    // draft: it should never be showing when this form opens.
+    setCompanyDialogOpen(false);
     if (orderId) {
       setSubtotalNet(prefill?.amount != null ? String(prefill.amount) : '0');
       setVatAmount(prefill?.vatAmount != null ? String(prefill.vatAmount) : '0');
@@ -286,35 +294,14 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setParty(o);
   };
 
-  // Quick-create a supplier from the typed name (supplier bills require a counterparty —
-  // for myDATA / statements / spend-per-supplier). Find-or-create by name to avoid dupes.
-  const createParty = async () => {
-    const name = partySearch.trim();
-    if (name.length < 2) return;
-    setCreatingParty(true);
-    try {
-      const existing = await supabase.from('crm_companies').select('id, name')
-        .eq('workspace_id', workspaceId).ilike('name', name).limit(1).maybeSingle();
-      let id = existing.data?.id as string | undefined;
-      if (!id) {
-        const ins = await supabase.from('crm_companies')
-          // is_customer explicitly false — the column DEFAULTS TO TRUE, so a supplier created
-          // here silently became a customer too (see InboundDocActionsMenu).
-          .insert({ workspace_id: workspaceId, name, is_supplier: true, is_customer: false } as any)
-          .select('id').single();
-        if (ins.error) throw ins.error;
-        id = ins.data.id;
-      } else {
-        // Ensure it's flagged as a supplier so it shows in future searches.
-        await supabase.from('crm_companies').update({ is_supplier: true } as any).eq('id', id);
-      }
-      setParty({ type: 'company', id: id!, label: `${name} (company)`, isSupplier: true });
-      setPartySearch(''); setPartyOptions([]);
-    } catch (err: any) {
-      toast({ title: 'Could not create supplier', description: err?.message, variant: 'destructive' });
-    } finally {
-      setCreatingParty(false);
-    }
+  // A supplier bill requires a counterparty (myDATA, statements, spend-per-supplier), and the
+  // one created here used to be a name and two booleans — the same company added from CRM
+  // arrived with its registered name, address, ΔΟΥ, ΚΑΔ, Γ.Ε.ΜΗ. number and website. Same table,
+  // same business, a quarter of the record depending on which screen you were on. The shared
+  // dialog does the identity lookup + the dedupe; we only adopt what it hands back.
+  const adoptCreatedCompany = (company: { id: string; name: string }) => {
+    setParty({ type: 'company', id: company.id, label: `${company.name} (company)`, isSupplier: true });
+    setPartySearch(''); setPartyOptions([]);
   };
 
   // Quick-create a PERSON payee (freelancer, landlord, accountant…) — the counterpart of
@@ -490,10 +477,11 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   };
 
   return (
-    // Every dismissal routes through here. clearDraft() used to run only on Cancel and on
-    // a successful save, so Esc, the X and an overlay click left the sessionStorage draft
-    // intact — the next open silently repopulated an abandoned payee, amount, category and
-    // Paid-now state, which is how an abandoned form becomes an accidental second booking.
+    <>
+    {/* Every dismissal routes through here. clearDraft() used to run only on Cancel and on
+        a successful save, so Esc, the X and an overlay click left the sessionStorage draft
+        intact — the next open silently repopulated an abandoned payee, amount, category and
+        Paid-now state, which is how an abandoned form becomes an accidental second booking. */}
     <Dialog open={open} onOpenChange={(v) => { if (!v) clearDraft(); onOpenChange(v); }}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
@@ -552,12 +540,14 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 )}
                 {partySearch.trim().length >= 2 && (
                   <div className="mt-1 flex flex-wrap gap-2">
-                    <Button type="button" size="sm" variant="outline" disabled={creatingParty || creatingContact} onClick={createParty}>
-                      {creatingParty ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+                    {/* Opens the shared business-identity dialog — VAT/ΑΦΜ lookup, dedupe, then
+                        the create. Same control as CRM → Add company. */}
+                    <Button type="button" size="sm" variant="outline" disabled={creatingContact} onClick={() => setCompanyDialogOpen(true)}>
+                      <Plus className="h-3.5 w-3.5 mr-1" />
                       Create company “{partySearch.trim()}”
                     </Button>
                     {/* The payee is a person, not a business — books the bill against the contact. */}
-                    <Button type="button" size="sm" variant="outline" disabled={creatingParty || creatingContact} onClick={createContactParty}>
+                    <Button type="button" size="sm" variant="outline" disabled={creatingContact} onClick={createContactParty}>
                       {creatingContact ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
                       Create person “{partySearch.trim()}”
                     </Button>
@@ -696,5 +686,19 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Sibling, not a child of the expense dialog — nesting two Radix dialogs fights over the
+        focus trap and the Esc handler. */}
+    <QuickAddCompanyDialog
+      open={companyDialogOpen}
+      onOpenChange={setCompanyDialogOpen}
+      workspaceId={workspaceId}
+      initialName={partySearch.trim()}
+      role="supplier"
+      title="New supplier / payee"
+      description="Look the VAT / ΑΦΜ up to pull the official name, address and registry details — or just type a name."
+      onCreated={adoptCreatedCompany}
+    />
+    </>
   );
 };

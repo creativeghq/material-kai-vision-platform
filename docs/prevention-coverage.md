@@ -124,6 +124,21 @@ Closely related to shape 1, but at the aggregate rather than the row.
 - **Guarded by:** `get_order_settlements` for orders only
 - **Blind spot:** any new aggregate. The rule in CLAUDE.md ("derive it in SQL, return it derived, add a drift check") is prose, not a mechanism.
 
+### 8. Parallel create — the same record, made N ways, each one thinner
+A sibling of shape 1, but on the WRITE side and with no wrong number to find. "Create a company"
+existed three times: CRM → Add company ran ΑΑΔΕ → ΓΕΜΗ → web research and produced ~25 populated
+columns; Expenses → payee wrote a name and two booleans; Invoices → add client wrote a name, an
+**unverified** VAT and an email — on the buyer of a fiscal document, headed for myDATA. Same table,
+same counterparty, three depths of record depending on which screen you were on.
+
+Nothing can see this from the data: a thin row is a *valid* row. No typecheck, no integrity probe
+and no drift check fires, because nothing is inconsistent — the CRM is just quietly worse, and only
+where the record was born.
+
+- **Guarded by:** [tests/unit/companyIdentity.test.ts](../tests/unit/companyIdentity.test.ts) — pins the payload/dedupe derivations, asserts each create-a-business surface routes through the shared `CompanyIdentityLookup`/`QuickAddCompanyDialog`, and **ratchets the set of files inserting `crm_companies` directly** (one entry: the own-workspace business profile).
+- **Proven to fire:** 2026-08-07 — a throwaway `src/__ratchet_probe.ts` with a raw `crm_companies` insert was added and the ratchet named it, then removed. The test also asserts its own source scan matched >500 files first, so an inert glob fails loudly instead of passing vacuously (shape 4, applied to the guard itself).
+- **Blind spot:** `crm_contacts` has the same shape and no ratchet. The guard is per-table and per-verb — a thin create that goes through an RPC or an edge function rather than a client-side `.insert(` is invisible to it.
+
 ---
 
 ## Mechanism inventory
@@ -144,9 +159,10 @@ Closely related to shape 1, but at the aggregate rather than the row.
 | `pdf.product_resume_incomplete` | nightly | shape 4b | no — but it was watched to fire on a planted marker before shipping |
 | [tests/unit/escapeHtmlParity.test.ts](../tests/unit/escapeHtmlParity.test.ts) | `npm test`, blocking | invariant 11 — the three `escapeHtml` twins (Vite / Deno edge / Vercel `api/`) stay byte-equivalent | **yes** — imports all three and diffs them over a shared corpus, so a twin that stops matching fails the build rather than reporting clean |
 | `lint_plpgsql_errors()` via `db.plpgsql-lint` | smoke monitor, 2-hourly | every `public` plpgsql function still compiles against the live schema | yes — baseline is a strict **zero**, so any new breakage fails instead of blending into a known-broken list |
+| [tests/unit/companyIdentity.test.ts](../tests/unit/companyIdentity.test.ts) | `npm test`, blocking | shape 8 — one identity lookup for every create-a-business surface, `crm_companies` direct-insert ratchet | **yes** — asserts its own scan matched >500 files before trusting the verdict, so an inert glob fails instead of reporting clean |
 
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
-what it found. Five of thirteen qualify. That is the gap.
+what it found. Six of fourteen qualify. That is the gap.
 
 > **`db.plpgsql-lint` has one known false-positive shape: runtime-created temp tables.**
 > `plpgsql_check` analyses statically, so a `create temporary table X` inside a function makes it
