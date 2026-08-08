@@ -28,6 +28,10 @@
       "description": "Social publishing + AI content/image/video generation (Zernio)."
     },
     {
+      "name": "Search",
+      "description": "Search re-ranking and relevance."
+    },
+    {
       "name": "MIVAA Gateway",
       "description": "Proxy to the MIVAA Python backend (RAG, search, AI services)."
     },
@@ -367,6 +371,109 @@
                     "description": "Limit update to one provider (anthropic, openai, voyage, google, firecrawl)"
                   }
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-rerank": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Reorder search results by relevance to a query",
+        "operationId": "post_ai_rerank",
+        "description": "Cross-encoder style reranking over candidates the caller already holds. Fuses the platform's six per-aspect embedding scores (visual/colour/texture/style/material/understanding) into one ordering using claude-haiku-4-5. Degrades to the SOURCE ORDER on every failure path - fewer than 2 candidates, no API key, model error, or a model reply naming ids that were not sent - and reports which happened in `reranked`/`reason`, so a caller never mistakes an unranked list for a ranked one. Ranks by id rather than index, so a shifted candidate list cannot silently reorder the wrong results. The same logic runs in-process for the agent's material_search, visual_search and knowledge_base_search tools; this endpoint is for callers outside the agent runtime. Prompt is editable at /admin/ai-configs (prompts.category='ai_rerank').\n\n**Response:** `{results:[...], reranked:boolean, reason?:string, explanations?:{[id]:string}, model:string}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "The user's original search query"
+                  },
+                  "results": {
+                    "type": "array",
+                    "description": "Candidates to reorder (max 200; only the first 40 are ranked). Each: {id, name, description?, category?, relevanceScore?, semanticScore?, understandingScore?}"
+                  },
+                  "maxResults": {
+                    "type": "number",
+                    "description": "Truncate AFTER reranking, so the model still sees the full set"
+                  },
+                  "includeExplanations": {
+                    "type": "boolean",
+                    "description": "Return a one-line rationale per result (default false)"
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "Override the model (default claude-haiku-4-5)"
+                  }
+                },
+                "required": [
+                  "query",
+                  "results"
+                ]
               }
             }
           }
@@ -2381,6 +2488,49 @@
                   "created_at",
                   "data"
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/facets-recanonicalize": {
+      "post": {
+        "tags": [
+          "Internal"
+        ],
+        "summary": "Bulk facet re-canonicalization sweep (proxy to MIVAA)",
+        "operationId": "post_facets_recanonicalize",
+        "description": "Internal-only proxy to MIVAA's POST /api/admin/facets/recanonicalize (#316). Replays products.attributes_raw through the canonicalizer so a similarity-threshold change, a curated alias, or an outage-degraded product can be repaired without re-ingesting any source PDF. Driven nightly at 03:40 by the facets-recanonicalize-degraded cron with degraded_only=true; a full catalog re-sweep costs a Voyage embedding per raw value and must be requested explicitly. Requires service-role or x-cron-secret (isCronAuthorized) — an open proxy here would be an open Voyage spend. Returns `remaining` so the caller knows whether to run again.\n\n**Response:** `[object Object]`",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
             }
           }
@@ -11703,6 +11853,10 @@
                       "manager_contact_id": {
                         "type": "string",
                         "description": "Manager (must be in workspace)"
+                      },
+                      "ergani_e3": {
+                        "type": "object",
+                        "description": "Exact Ergani template-key to value map for codes we cannot derive (specialty, contract type); prefills later filings"
                       }
                     },
                     "description": "Returns: { employee }"
@@ -11728,6 +11882,10 @@
                       "contact": {
                         "type": "object",
                         "description": "HR-relevant contact fields to update too"
+                      },
+                      "ergani_e3": {
+                        "type": "object",
+                        "description": "Exact Ergani template-key to value map for codes we cannot derive (specialty, contract type); prefills later filings"
                       }
                     },
                     "description": "Returns: { employee }"
@@ -13469,6 +13627,532 @@
                       }
                     },
                     "description": "Returns: { url }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-submit-hire"
+                        ],
+                        "description": "File the E3 hire announcement for an employee, built from Ergani's live E3 template. Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee to declare"
+                      },
+                      "comments": {
+                        "type": "string",
+                        "description": "Free-text comments on the declaration"
+                      },
+                      "preview": {
+                        "type": "boolean",
+                        "description": "Return the built document + unfilled keys without submitting"
+                      },
+                      "document": {
+                        "type": "object",
+                        "description": "Fully-built override payload (bypasses the template builder)"
+                      }
+                    },
+                    "description": "Returns: { ok, result } | { preview: true, code, document, filled, unfilled }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "schedule_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-submit-schedule"
+                        ],
+                        "description": "File a work schedule as E4 (WTOWeek / WTODaily) or a change (WKChgWK), one detail row per working shift. Flips the schedule to submitted. Requires hr.manage."
+                      },
+                      "schedule_id": {
+                        "type": "string",
+                        "description": "hr_work_schedules row to file"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "description": "schedule_weekly | schedule_daily | change (defaults from schedule_type)"
+                      },
+                      "comments": {
+                        "type": "string",
+                        "description": "Free-text comments on the declaration"
+                      },
+                      "preview": {
+                        "type": "boolean",
+                        "description": "Return the built document + unfilled keys without submitting"
+                      },
+                      "document": {
+                        "type": "object",
+                        "description": "Fully-built override payload (bypasses the template builder)"
+                      }
+                    },
+                    "description": "Returns: { ok, result } | { preview: true, code, document, filled, unfilled }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "separation_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-submit-separation"
+                        ],
+                        "description": "File a departure as E5 (voluntary), E6 (termination) or E7 (fixed-term expiry) — the code is derived from separation_type. On success also marks the employee terminated and sets end_date. Requires hr.manage."
+                      },
+                      "separation_id": {
+                        "type": "string",
+                        "description": "hr_separations row to file"
+                      },
+                      "preview": {
+                        "type": "boolean",
+                        "description": "Return the built document + unfilled keys without submitting"
+                      },
+                      "document": {
+                        "type": "object",
+                        "description": "Fully-built override payload (bypasses the template builder)"
+                      }
+                    },
+                    "description": "Returns: { ok, result } | { preview: true, code, document, filled, unfilled }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "overtime_ids"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "ergani-submit-overtime"
+                        ],
+                        "description": "File overtime as a single batched E8 carrying every selected entry. Requires hr.manage."
+                      },
+                      "overtime_ids": {
+                        "type": "array",
+                        "description": "hr_overtime ids to file (max 100); or pass overtime_id for one"
+                      },
+                      "comments": {
+                        "type": "string",
+                        "description": "Free-text comments on the declaration"
+                      },
+                      "preview": {
+                        "type": "boolean",
+                        "description": "Return the built document + unfilled keys without submitting"
+                      },
+                      "document": {
+                        "type": "object",
+                        "description": "Fully-built override payload (bypasses the template builder)"
+                      }
+                    },
+                    "description": "Returns: { ok, result, filed } | { preview: true, code, document, filled, unfilled }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-schedules"
+                        ],
+                        "description": "List work-time rosters (newest effective_from first, max 500)."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Filter by employee"
+                      }
+                    },
+                    "description": "Returns: { schedules: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id",
+                      "schedule_type",
+                      "effective_from",
+                      "details"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-schedule"
+                        ],
+                        "description": "Create a roster. details is an array of shifts { day 0-6 (0=Sunday), off, start, end, break_start?, break_end?, date?, note? }, rebuilt field-by-field server-side. Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee the roster belongs to"
+                      },
+                      "schedule_type": {
+                        "type": "string",
+                        "description": "weekly | daily"
+                      },
+                      "effective_from": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "details": {
+                        "type": "array",
+                        "description": "Shift rows (max 62)"
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Label, e.g. 'Summer roster'"
+                      },
+                      "effective_to": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      }
+                    },
+                    "description": "Returns: { schedule }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-schedule"
+                        ],
+                        "description": "Patch a roster. 409 once it has been filed to Ergani. Requires hr.manage."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Schedule id"
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Label"
+                      },
+                      "schedule_type": {
+                        "type": "string",
+                        "description": "weekly | daily"
+                      },
+                      "effective_from": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "effective_to": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "details": {
+                        "type": "array",
+                        "description": "Shift rows"
+                      }
+                    },
+                    "description": "Returns: { schedule }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-schedule"
+                        ],
+                        "description": "Delete a roster. 409 once it has been filed to Ergani. Requires hr.manage."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Schedule id"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-overtime"
+                        ],
+                        "description": "List overtime entries (newest work_date first, max 500)."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Filter by employee"
+                      },
+                      "from": {
+                        "type": "string",
+                        "description": "work_date >="
+                      },
+                      "to": {
+                        "type": "string",
+                        "description": "work_date <="
+                      }
+                    },
+                    "description": "Returns: { overtime: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id",
+                      "work_date",
+                      "start_time",
+                      "end_time",
+                      "reason"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-overtime"
+                        ],
+                        "description": "Record an overtime block. hours is a generated column and is never accepted from the body; end_time must be after start_time (Ergani files overtime within one work date). Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee who worked the overtime"
+                      },
+                      "work_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "start_time": {
+                        "type": "string",
+                        "description": "HH:MM"
+                      },
+                      "end_time": {
+                        "type": "string",
+                        "description": "HH:MM"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "description": "Justification — Ergani rejects a declaration without one"
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "Internal note"
+                      }
+                    },
+                    "description": "Returns: { overtime }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-overtime"
+                        ],
+                        "description": "Patch an overtime entry. 409 once it has been filed to Ergani. Requires hr.manage."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Overtime id"
+                      },
+                      "work_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "start_time": {
+                        "type": "string",
+                        "description": "HH:MM"
+                      },
+                      "end_time": {
+                        "type": "string",
+                        "description": "HH:MM"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "description": "Justification"
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "Internal note"
+                      }
+                    },
+                    "description": "Returns: { overtime }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-overtime"
+                        ],
+                        "description": "Delete an overtime entry. 409 once it has been filed to Ergani. Requires hr.manage."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Overtime id"
+                      }
+                    },
+                    "description": "Returns: { ok }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-separations"
+                        ],
+                        "description": "List departures (newest effective_date first, max 500)."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Filter by employee"
+                      }
+                    },
+                    "description": "Returns: { separations: [...] }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "employee_id",
+                      "separation_type",
+                      "effective_date"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "create-separation"
+                        ],
+                        "description": "Record a departure. separation_type is 1:1 with the Ergani document (voluntary=E5, termination=E6, expiry=E7). The employee stays active until it is filed. Requires hr.manage."
+                      },
+                      "employee_id": {
+                        "type": "string",
+                        "description": "Employee leaving"
+                      },
+                      "separation_type": {
+                        "type": "string",
+                        "description": "voluntary | termination | expiry"
+                      },
+                      "effective_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "notice_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "description": "Reason shown on the declaration"
+                      },
+                      "severance_amount": {
+                        "type": "number",
+                        "description": "Severance / compensation"
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "Internal note"
+                      }
+                    },
+                    "description": "Returns: { separation }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "update-separation"
+                        ],
+                        "description": "Patch a departure. 409 once it has been filed to Ergani. Requires hr.manage."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Separation id"
+                      },
+                      "separation_type": {
+                        "type": "string",
+                        "description": "voluntary | termination | expiry"
+                      },
+                      "effective_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "notice_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "description": "Reason"
+                      },
+                      "severance_amount": {
+                        "type": "number",
+                        "description": "Severance"
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "Internal note"
+                      }
+                    },
+                    "description": "Returns: { separation }"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "delete-separation"
+                        ],
+                        "description": "Delete a departure. 409 once it has been filed to Ergani. Requires hr.manage."
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "Separation id"
+                      }
+                    },
+                    "description": "Returns: { ok }"
                   }
                 ],
                 "discriminator": {
@@ -15804,7 +16488,7 @@
         ],
         "summary": "Viva event delivery (1796 / 1797 / 1798 / 2054)",
         "operationId": "post_viva_webhooks",
-        "description": "#273 Phase 2 - Viva.com webhooks, multi-tenant BYOK. Two surfaces:\n\n- GET  - the verification-key handshake Viva performs at webhook registration. The key is per-merchant, so the caller passes ?workspace_id=<uuid> to say which tenant is registering; the function fetches that workspace's key from Viva and echoes it back.\n- POST - the event deliveries: 1796 payment created, 1797 reversal created, 1798 payment failed, 2054 account transaction (merchant-level, covers incoming RF bank transfers).\n\nSECURITY: Viva payment webhooks carry NO per-message signature (Viva-Signature-256 exists only on their Data Services contract, which has a shared secret; payment webhooks have none), so there is nothing to verify per delivery. Invariant #6 is satisfied differently and more strongly: THE WEBHOOK IS A TRIGGER, NEVER DATA - the handler reads the transaction back from Viva's API and acts on that, so a forged delivery cannot inject state.\n\n**Response:** `{ ok } (always 200 to Viva once accepted; processing errors are logged, not surfaced)`",
+        "description": "#273 Phase 2 - Viva.com webhooks, multi-tenant BYOK. Two surfaces:\n\n- GET  - the verification-key handshake Viva performs at webhook registration. The key is per-merchant, so the caller passes ?workspace_id=<uuid> to say which tenant is registering; the function fetches that workspace's key from Viva and echoes it back.\n- POST - the event deliveries: 1796 payment created, 1797 reversal created, 1798 payment failed, 2054 account transaction (merchant-level, covers incoming RF bank transfers).\n\nSECURITY: Viva payment webhooks carry NO per-message signature (Viva-Signature-256 exists only on their Data Services contract, which has a shared secret; payment webhooks have none), so there is nothing to verify per delivery. Invariant #6 is satisfied differently and more strongly: THE WEBHOOK IS A TRIGGER, NEVER DATA - the handler reads the transaction back from Viva's API and acts on that, so a forged delivery cannot inject state. Settled 1796/RF payments are mirrored into the unified bank feed (provider viva, informational).\n\n**Response:** `{ ok } (always 200 to Viva once accepted; processing errors are logged, not surfaced)`",
         "security": [],
         "responses": {
           "200": {
@@ -18329,6 +19013,445 @@
         }
       }
     },
+    "/real-estate-calendar": {
+      "get": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Pushes viewings into the agent's own Google Calendar (per-user OAuth)",
+        "operationId": "get_real_estate_calendar",
+        "description": "Viewings already sync to the platform calendar (`crm_meetings`); what an agent lives in is Google Calendar on their phone, and a viewing they cannot see there is one they miss. Reuses the platform GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET and the token/refresh shape already proven in `gsc-api`, so Google is configured once rather than once per feature. Actions: `status`, `connect` (returns the consent URL), `disconnect`, `push-viewing`. The GET path is Google's OAuth callback. The connection is per USER and its RLS is owner-only — it holds one person's tokens and workspace membership deliberately grants nothing. `state` is HMAC-signed with the service key and carries user + workspace, so the callback cannot be replayed to bind someone else's Google account; `prompt=consent` forces a refresh_token even on reconnect, without which a stored connection dies within the hour. `push-viewing` re-checks the caller may see the viewing before writing to any calendar, cancels the Google event when the viewing is cancelled, and records `last_sync_error` rather than swallowing it — a calendar that silently stops syncing looks exactly like one with no viewings.\n\n**Response:** `{ connected, google_email, last_sync_at, last_sync_error, configured } | { auth_url } | { ok, event_id }`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Pushes viewings into the agent's own Google Calendar (per-user OAuth)",
+        "operationId": "post_real_estate_calendar",
+        "description": "Viewings already sync to the platform calendar (`crm_meetings`); what an agent lives in is Google Calendar on their phone, and a viewing they cannot see there is one they miss. Reuses the platform GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET and the token/refresh shape already proven in `gsc-api`, so Google is configured once rather than once per feature. Actions: `status`, `connect` (returns the consent URL), `disconnect`, `push-viewing`. The GET path is Google's OAuth callback. The connection is per USER and its RLS is owner-only — it holds one person's tokens and workspace membership deliberately grants nothing. `state` is HMAC-signed with the service key and carries user + workspace, so the callback cannot be replayed to bind someone else's Google account; `prompt=consent` forces a refresh_token even on reconnect, without which a stored connection dies within the hour. `push-viewing` re-checks the caller may see the viewing before writing to any calendar, cancels the Google event when the viewing is cancelled, and records `last_sync_error` rather than swallowing it — a calendar that silently stops syncing looks exactly like one with no viewings.\n\n**Response:** `{ connected, google_email, last_sync_at, last_sync_error, configured } | { auth_url } | { ok, event_id }`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/real-estate-ical": {
+      "get": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Short-let channel sync — availability feed out (GET, token) and channel calendars in (POST, cron)",
+        "operationId": "get_real_estate_ical",
+        "description": "Booking channels all speak iCalendar and nothing else, so this one function is the whole integration. **GET ?token=…** serves the availability feed a channel pulls, authorised solely by the per-listing `ical_token`; it publishes BLOCKED NIGHTS ONLY — no guest name, email or price — because that URL is a bearer capability handed to third parties. **POST** (shared cron gate) pulls every active `property_channel_links.ical_import_url`, re-validating each through the shared SSRF guard at read time as well as write time, and upserts on `(property, channel, UID)` so a channel republishing its whole calendar every poll does not duplicate every stay. A `23P01` exclusion violation on import is reported as a date conflict rather than swallowed — that IS a double booking, and only the operator can resolve it on the channel that sold it twice. Runs hourly.\n\n**Response:** `text/calendar (GET) | { ok, links, imported, conflicts, failed } (POST)`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Short-let channel sync — availability feed out (GET, token) and channel calendars in (POST, cron)",
+        "operationId": "post_real_estate_ical",
+        "description": "Booking channels all speak iCalendar and nothing else, so this one function is the whole integration. **GET ?token=…** serves the availability feed a channel pulls, authorised solely by the per-listing `ical_token`; it publishes BLOCKED NIGHTS ONLY — no guest name, email or price — because that URL is a bearer capability handed to third parties. **POST** (shared cron gate) pulls every active `property_channel_links.ical_import_url`, re-validating each through the shared SSRF guard at read time as well as write time, and upserts on `(property, channel, UID)` so a channel republishing its whole calendar every poll does not duplicate every stay. A `23P01` exclusion violation on import is reported as a date conflict rather than swallowed — that IS a double booking, and only the operator can resolve it on the channel that sold it twice. Runs hourly.\n\n**Response:** `text/calendar (GET) | { ok, links, imported, conflicts, failed } (POST)`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/real-estate-inbound-lead": {
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Public tokenised endpoint — turns a forwarded portal enquiry email into a CRM lead",
+        "operationId": "post_real_estate_inbound_lead",
+        "description": "Syndication pushes listings out; the enquiries portals generate come back as email. An agency points any inbound-email service (Resend, Mailgun routes, SendGrid Inbound Parse, Cloudflare Email Workers) at this URL and forwards portal mail to it. The per-workspace `inbound_lead_token` IS the credential and is checked BEFORE anything is parsed or written — the From address is spoofable and is used only to guess which portal sent it. Fails closed: unknown token or ingestion disabled both return the same 401, so probing cannot confirm a valid token. `workspace_id` comes from the token and `property_id` from the listing's own `reference_code`; nothing identifying is taken from the payload. Parses name / email / phone / reference / message, skipping the portal's own no-reply address, routes the lead through `route_property_lead`, and keeps the parsed source in `inbound_raw` because portal formats change silently. A message with no contactable details returns 200 (a digest or receipt must not be retried forever).\n\n**Response:** `{ ok, inquiry_id, portal, matched_listing, assigned } | { ok, skipped }`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/real-estate-listing-social": {
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Flow action — drafts a social post for a newly published listing, one per connected account",
+        "operationId": "post_real_estate_listing_social",
+        "description": "Invoked by the seeded `realestate.listing_published` flow via `run_edge_function`. Builds a caption from the listing's own fields (no AI, no credits — an unreviewed generated caption on a property ad is where fair-housing language goes wrong), signs the cover photo out of the private `property-media` bucket, and inserts a **draft** `social_posts` row per active connected account. Deliberately stops at draft: `zernio-api` authorises publishing against a real workspace member, and this runs service-role from a flow with no user — publishing here would mean weakening the check that stops one tenant posting through another tenant's account. Idempotent (an existing post carrying the same `metadata.property_id` short-circuits) and skips listings that are not publicly live. Auth is the shared cron gate (`x-cron-secret` **or** service-role bearer).\n\n**Response:** `{ ok, posts, drafted_for, has_image } | { ok, skipped }`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/real-estate-vendor-reports": {
+      "post": {
+        "tags": [
+          "Real Estate"
+        ],
+        "summary": "Weekly cron — emails the instructing vendor a performance report on their own listing",
+        "operationId": "post_real_estate_vendor_reports",
+        "description": "For every `active` listing with `vendor_reports_enabled` and a vendor contact carrying an email, builds the vendor report (views/enquiries/viewings and days-on-market from `get_property_performance`, recent completed-viewing feedback, and a comps-based price recommendation from the agency's own stock) and emails it. A service communication under the agency agreement rather than marketing, so it is gated per listing on `vendor_reports_enabled` — not on `crm_contacts.marketing_consent`. Stamps `last_vendor_report_at` only on a successful send, so a failed week retries instead of being skipped, and re-sends no sooner than 6 days. Runs weekly (Mondays 07:00 UTC) via pg_cron; auth is the shared cron gate (`x-cron-secret` **or** service-role bearer).\n\n**Response:** `{ ok, candidates, sent, skipped, failed }`\n\n📖 [docs/api/real-estate-api.md](real-estate-api.md)",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/real-estate-rent-invoicing": {
       "post": {
         "tags": [
@@ -18921,6 +20044,344 @@
                 ],
                 "discriminator": {
                   "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/revolut-api": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync",
+        "operationId": "post_revolut_api",
+        "description": "#315. Actions on one POST surface: init (mint RSA keypair server-side; private key never leaves the server), authorize-url (Revolut consent URL), oauth-complete (exchange the auth code via JWT client assertion), register-webhook (webhooks v2 subscription + signing secret), accounts (live Revolut accounts + finance_bank_accounts mapping), map-account (link a Revolut currency pocket to a bank account row), sync-now (shared sync core for this workspace), disconnect. Caller must be a finance manager of the target workspace (RLS-checked; 404 on mismatch) and the workspace must be entitled to banking-revolut (402 otherwise). validate-account-name proxies Revolut CoP/VoP so the CRM bank area can confirm an IBAN belongs to the named counterparty; map-account auto-fills the finance row IBAN/BIC from /accounts/{id}/bank-details when empty. Phase 2 adds reconciliation: reconcile re-runs the invoice matcher; confirm-match settles a statement line against an invoice through record-payment; ignore-transaction parks a line. Phase 3 adds money-out: create-counterparty mirrors a CRM bank row as a Revolut counterparty (VoP-gated; not_matched blocks unless force=true); send-payment creates a draft (human approves in-app) or a direct transfer; create-payout-link pays without an IBAN; fx-rate/exchange convert between pockets. Every instruction is audited in revolut_payouts with an idempotent request_id before Revolut is called. Phase 4 adds team cards (issue virtual, freeze/unfreeze) and card-expense browsing with on-demand receipt passthrough (never persisted). import-expenses attributes card expenses to employees (card→holder email→HR roster) into monthly expense reports with receipts; also runs with the cron sweep, which additionally freezes cards of offboarded employees. pay-due-bills drafts ONE multi-payment run over due supplier_bills (suppliers without a VoP-linked counterparty are skipped and reported); set-card-limit patches weekly/monthly spending caps; create-card-invitation invites a new member by email. sync-labels pushes platform finance categories into a \"Platform categories\" Revolut label group (names only, never deletes). reconcile also settles OUTGOING transfers against supplier_bills (reference-quotes-bill-number or exact-amount+supplier-name; payments direction out + payment_allocations.supplier_bill_id). confirm-bill-match manually settles an OUTGOING revolut feed line against a supplier bill. The feed table is now multi-provider (revolut|stripe|viva); stripe/viva rows are informational mirrors of webhook-settled money and are guarded against re-matching.\n\n**Response:** `{ok: true, ...action-specific fields (public_key, url, accounts, fetched/upserted)}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "description": "init | authorize-url | oauth-complete | register-webhook | accounts | map-account | validate-account-name | reconcile | confirm-match | ignore-transaction | create-counterparty | send-payment | create-payout-link | fx-rate | exchange | sync-now | disconnect | team-members | cards | create-card | freeze-card | unfreeze-card | expenses | expense-receipt | import-expenses | pay-due-bills | set-card-limit | create-card-invitation | sync-labels | confirm-bill-match"
+                  },
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "Target workspace; caller must be its finance manager. (uuid)"
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "init only. The OAuth redirect URI registered in the Revolut dashboard; its domain becomes the JWT assertion issuer. (string (https URL))"
+                  },
+                  "force": {
+                    "type": "boolean",
+                    "description": "init only. Regenerate over an existing keypair (invalidates the current connection)."
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "oauth-complete only. Authorisation code from the consent redirect."
+                  },
+                  "revolut_account_id": {
+                    "type": "string",
+                    "description": "map-account only. Revolut account (currency pocket) id."
+                  },
+                  "bank_account_id": {
+                    "type": "string",
+                    "description": "map-account only. finance_bank_accounts row to link, or null to unlink. (one of: uuid | null)"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "validate-account-name only. The holder name to check (company by default; company=false splits into first/last)."
+                  },
+                  "iban": {
+                    "type": "string",
+                    "description": "validate-account-name only. IBAN to check (or account_no + sort_code)."
+                  }
+                },
+                "required": [
+                  "action",
+                  "workspace_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/revolut-sync": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Revolut transaction sync sweep — cron backstop over every connected workspace",
+        "operationId": "post_revolut_sync",
+        "description": "#315. Pulls transactions since each workspace's watermark (first run: 365 days) and upserts statement lines into revolut_bank_transactions, deduped on workspace + '<txid>:<legid>'. Dual auth like finance-inbound-sync: x-cron-secret/service-role for the cron path; a JWT user path restricted to the caller's own workspaces. Skips workspaces whose banking-revolut entitlement lapsed. Failures land in workspace_revolut_config.last_sync_error (explicit failure marker, never a silent zero). The sweep also pulls Stripe balance transactions (Connect workspaces) into the unified feed as informational rows.\n\n**Response:** `{ok, workspaces, fetched, upserted, failures: [{workspace_id, error}]}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/revolut-webhooks": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Revolut Business webhooks v2 receiver — signed transaction events, per-workspace secret",
+        "operationId": "post_revolut_webhooks",
+        "description": "#315. Registered per workspace with ?ws=<workspace_id>; the config row's webhook_signing_secret verifies each delivery (HMAC-SHA256 over v1.<timestamp>.<body>, 5-minute replay window, timing-safe compare). Fail-closed: no stored secret → 503, bad signature/stale timestamp → 400, unknown ws → bland 200 so workspace ids cannot be enumerated. TransactionCreated upserts statement lines into revolut_bank_transactions (silver layer); TransactionStateChanged updates state. Reconciliation into payments is a separate explicit step — the webhook never writes money tables. Also handles PayoutLinkCreated/StateChanged to keep the revolut_payouts audit state live.\n\n**Response:** `{ok: true} | {ok: true, ignored: true}`",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ws": {
+                    "type": "string",
+                    "description": "Workspace whose signing secret verifies this delivery. (uuid (query))"
+                  }
+                },
+                "required": [
+                  "ws"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/revolut-merchant-webhooks": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Revolut Merchant (checkout) webhook receiver + per-workspace webhook setup",
+        "operationId": "post_revolut_merchant_webhooks",
+        "description": "#315 payments-revolut. Two surfaces: POST ?setup=1 (user JWT, finance manager, module entitlement) registers the merchant webhook with the tenant's own secret key and stores the signing secret; POST ?ws=<workspace_id> receives signed deliveries (HMAC v1.<timestamp>.<body>, 5-min window, fail-closed 503 without a stored secret). On ORDER_COMPLETED the order is re-read from the Merchant API with the tenant's key (webhook-as-trigger doctrine) and settled through record-payment; intent status paid, duplicate-safe, cross-tenant guarded.\n\n**Response:** `{ok: true} | {ok: true, ignored: true}`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "setup": {
+                    "type": "string",
+                    "description": "Setup surface: register the webhook for body.workspace_id. (1 (query))"
+                  },
+                  "ws": {
+                    "type": "string",
+                    "description": "Delivery surface: workspace whose signing secret verifies this delivery. (uuid (query))"
+                  }
                 }
               }
             }

@@ -5871,6 +5871,12 @@
             "type": "string",
             "required": false,
             "desc": "Manager (must be in workspace)"
+          },
+          {
+            "name": "ergani_e3",
+            "type": "object",
+            "required": false,
+            "desc": "Exact Ergani template-key to value map for codes we cannot derive (specialty, contract type); prefills later filings"
           }
         ],
         "response": "{ employee }"
@@ -5890,6 +5896,12 @@
             "type": "object",
             "required": false,
             "desc": "HR-relevant contact fields to update too"
+          },
+          {
+            "name": "ergani_e3",
+            "type": "object",
+            "required": false,
+            "desc": "Exact Ergani template-key to value map for codes we cannot derive (specialty, contract type); prefills later filings"
           }
         ],
         "response": "{ employee }"
@@ -7146,6 +7158,490 @@
           }
         ],
         "response": "{ url }"
+      },
+      {
+        "action": "ergani-submit-hire",
+        "description": "File the E3 hire announcement for an employee, built from Ergani's live E3 template. Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee to declare"
+          },
+          {
+            "name": "comments",
+            "type": "string",
+            "required": false,
+            "desc": "Free-text comments on the declaration"
+          },
+          {
+            "name": "preview",
+            "type": "boolean",
+            "required": false,
+            "desc": "Return the built document + unfilled keys without submitting"
+          },
+          {
+            "name": "document",
+            "type": "object",
+            "required": false,
+            "desc": "Fully-built override payload (bypasses the template builder)"
+          }
+        ],
+        "response": "{ ok, result } | { preview: true, code, document, filled, unfilled }"
+      },
+      {
+        "action": "ergani-submit-schedule",
+        "description": "File a work schedule as E4 (WTOWeek / WTODaily) or a change (WKChgWK), one detail row per working shift. Flips the schedule to submitted. Requires hr.manage.",
+        "params": [
+          {
+            "name": "schedule_id",
+            "type": "string",
+            "required": true,
+            "desc": "hr_work_schedules row to file"
+          },
+          {
+            "name": "kind",
+            "type": "string",
+            "required": false,
+            "desc": "schedule_weekly | schedule_daily | change (defaults from schedule_type)"
+          },
+          {
+            "name": "comments",
+            "type": "string",
+            "required": false,
+            "desc": "Free-text comments on the declaration"
+          },
+          {
+            "name": "preview",
+            "type": "boolean",
+            "required": false,
+            "desc": "Return the built document + unfilled keys without submitting"
+          },
+          {
+            "name": "document",
+            "type": "object",
+            "required": false,
+            "desc": "Fully-built override payload (bypasses the template builder)"
+          }
+        ],
+        "response": "{ ok, result } | { preview: true, code, document, filled, unfilled }"
+      },
+      {
+        "action": "ergani-submit-separation",
+        "description": "File a departure as E5 (voluntary), E6 (termination) or E7 (fixed-term expiry) — the code is derived from separation_type. On success also marks the employee terminated and sets end_date. Requires hr.manage.",
+        "params": [
+          {
+            "name": "separation_id",
+            "type": "string",
+            "required": true,
+            "desc": "hr_separations row to file"
+          },
+          {
+            "name": "preview",
+            "type": "boolean",
+            "required": false,
+            "desc": "Return the built document + unfilled keys without submitting"
+          },
+          {
+            "name": "document",
+            "type": "object",
+            "required": false,
+            "desc": "Fully-built override payload (bypasses the template builder)"
+          }
+        ],
+        "response": "{ ok, result } | { preview: true, code, document, filled, unfilled }"
+      },
+      {
+        "action": "ergani-submit-overtime",
+        "description": "File overtime as a single batched E8 carrying every selected entry. Requires hr.manage.",
+        "params": [
+          {
+            "name": "overtime_ids",
+            "type": "array",
+            "required": true,
+            "desc": "hr_overtime ids to file (max 100); or pass overtime_id for one"
+          },
+          {
+            "name": "comments",
+            "type": "string",
+            "required": false,
+            "desc": "Free-text comments on the declaration"
+          },
+          {
+            "name": "preview",
+            "type": "boolean",
+            "required": false,
+            "desc": "Return the built document + unfilled keys without submitting"
+          },
+          {
+            "name": "document",
+            "type": "object",
+            "required": false,
+            "desc": "Fully-built override payload (bypasses the template builder)"
+          }
+        ],
+        "response": "{ ok, result, filed } | { preview: true, code, document, filled, unfilled }"
+      },
+      {
+        "action": "list-schedules",
+        "description": "List work-time rosters (newest effective_from first, max 500).",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by employee"
+          }
+        ],
+        "response": "{ schedules: [...] }"
+      },
+      {
+        "action": "create-schedule",
+        "description": "Create a roster. details is an array of shifts { day 0-6 (0=Sunday), off, start, end, break_start?, break_end?, date?, note? }, rebuilt field-by-field server-side. Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee the roster belongs to"
+          },
+          {
+            "name": "schedule_type",
+            "type": "string",
+            "required": true,
+            "desc": "weekly | daily"
+          },
+          {
+            "name": "effective_from",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "details",
+            "type": "array",
+            "required": true,
+            "desc": "Shift rows (max 62)"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "required": false,
+            "desc": "Label, e.g. 'Summer roster'"
+          },
+          {
+            "name": "effective_to",
+            "type": "string",
+            "required": false,
+            "desc": "YYYY-MM-DD"
+          }
+        ],
+        "response": "{ schedule }"
+      },
+      {
+        "action": "update-schedule",
+        "description": "Patch a roster. 409 once it has been filed to Ergani. Requires hr.manage.",
+        "params": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "desc": "Schedule id"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "required": false,
+            "desc": "Label"
+          },
+          {
+            "name": "schedule_type",
+            "type": "string",
+            "required": false,
+            "desc": "weekly | daily"
+          },
+          {
+            "name": "effective_from",
+            "type": "string",
+            "required": false,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "effective_to",
+            "type": "string",
+            "required": false,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "details",
+            "type": "array",
+            "required": false,
+            "desc": "Shift rows"
+          }
+        ],
+        "response": "{ schedule }"
+      },
+      {
+        "action": "delete-schedule",
+        "description": "Delete a roster. 409 once it has been filed to Ergani. Requires hr.manage.",
+        "params": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "desc": "Schedule id"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "list-overtime",
+        "description": "List overtime entries (newest work_date first, max 500).",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by employee"
+          },
+          {
+            "name": "from",
+            "type": "string",
+            "required": false,
+            "desc": "work_date >="
+          },
+          {
+            "name": "to",
+            "type": "string",
+            "required": false,
+            "desc": "work_date <="
+          }
+        ],
+        "response": "{ overtime: [...] }"
+      },
+      {
+        "action": "create-overtime",
+        "description": "Record an overtime block. hours is a generated column and is never accepted from the body; end_time must be after start_time (Ergani files overtime within one work date). Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee who worked the overtime"
+          },
+          {
+            "name": "work_date",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "start_time",
+            "type": "string",
+            "required": true,
+            "desc": "HH:MM"
+          },
+          {
+            "name": "end_time",
+            "type": "string",
+            "required": true,
+            "desc": "HH:MM"
+          },
+          {
+            "name": "reason",
+            "type": "string",
+            "required": true,
+            "desc": "Justification — Ergani rejects a declaration without one"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "desc": "Internal note"
+          }
+        ],
+        "response": "{ overtime }"
+      },
+      {
+        "action": "update-overtime",
+        "description": "Patch an overtime entry. 409 once it has been filed to Ergani. Requires hr.manage.",
+        "params": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "desc": "Overtime id"
+          },
+          {
+            "name": "work_date",
+            "type": "string",
+            "required": false,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "start_time",
+            "type": "string",
+            "required": false,
+            "desc": "HH:MM"
+          },
+          {
+            "name": "end_time",
+            "type": "string",
+            "required": false,
+            "desc": "HH:MM"
+          },
+          {
+            "name": "reason",
+            "type": "string",
+            "required": false,
+            "desc": "Justification"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "desc": "Internal note"
+          }
+        ],
+        "response": "{ overtime }"
+      },
+      {
+        "action": "delete-overtime",
+        "description": "Delete an overtime entry. 409 once it has been filed to Ergani. Requires hr.manage.",
+        "params": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "desc": "Overtime id"
+          }
+        ],
+        "response": "{ ok }"
+      },
+      {
+        "action": "list-separations",
+        "description": "List departures (newest effective_date first, max 500).",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": false,
+            "desc": "Filter by employee"
+          }
+        ],
+        "response": "{ separations: [...] }"
+      },
+      {
+        "action": "create-separation",
+        "description": "Record a departure. separation_type is 1:1 with the Ergani document (voluntary=E5, termination=E6, expiry=E7). The employee stays active until it is filed. Requires hr.manage.",
+        "params": [
+          {
+            "name": "employee_id",
+            "type": "string",
+            "required": true,
+            "desc": "Employee leaving"
+          },
+          {
+            "name": "separation_type",
+            "type": "string",
+            "required": true,
+            "desc": "voluntary | termination | expiry"
+          },
+          {
+            "name": "effective_date",
+            "type": "string",
+            "required": true,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "notice_date",
+            "type": "string",
+            "required": false,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "reason",
+            "type": "string",
+            "required": false,
+            "desc": "Reason shown on the declaration"
+          },
+          {
+            "name": "severance_amount",
+            "type": "number",
+            "required": false,
+            "desc": "Severance / compensation"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "desc": "Internal note"
+          }
+        ],
+        "response": "{ separation }"
+      },
+      {
+        "action": "update-separation",
+        "description": "Patch a departure. 409 once it has been filed to Ergani. Requires hr.manage.",
+        "params": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "desc": "Separation id"
+          },
+          {
+            "name": "separation_type",
+            "type": "string",
+            "required": false,
+            "desc": "voluntary | termination | expiry"
+          },
+          {
+            "name": "effective_date",
+            "type": "string",
+            "required": false,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "notice_date",
+            "type": "string",
+            "required": false,
+            "desc": "YYYY-MM-DD"
+          },
+          {
+            "name": "reason",
+            "type": "string",
+            "required": false,
+            "desc": "Reason"
+          },
+          {
+            "name": "severance_amount",
+            "type": "number",
+            "required": false,
+            "desc": "Severance"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "desc": "Internal note"
+          }
+        ],
+        "response": "{ separation }"
+      },
+      {
+        "action": "delete-separation",
+        "description": "Delete a departure. 409 once it has been filed to Ergani. Requires hr.manage.",
+        "params": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "desc": "Separation id"
+          }
+        ],
+        "response": "{ ok }"
       }
     ],
     "request": [],

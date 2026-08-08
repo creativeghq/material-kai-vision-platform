@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (109)
+## 1. Supabase Edge Functions (120)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -72,6 +72,12 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `zernio-api` _(GET + POST)_ | JWT | Social media publishing, OAuth account management, and analytics via Zernio. |
 | `zernio-webhook-handler` | sig | Receives Zernio webhooks for social post events and WhatsApp messaging events. |
 
+**Search**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `ai-rerank` | JWT | Reorder search results by relevance to a query |
+
 **MIVAA Gateway**
 
 | Function | Auth | Summary |
@@ -103,6 +109,9 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `generate-contract-pdf` | JWT | Render a signed/draft contract to PDF |
 | `generate-purchase-sheet-pdf` | JWT / secret | Render a project purchase sheet (doors/windows + other purchase items) to PDF |
 | `parse-supplier-cost-list` | JWT | Parse a KB doc supplier cost list and apply costs to matching products |
+| `revolut-api` | JWT | Revolut Business connection management (per-workspace BYOK) — keys, OAuth, accounts, mapping, sync |
+| `revolut-sync` | JWT / cron | Revolut transaction sync sweep — cron backstop over every connected workspace |
+| `revolut-webhooks` | revolutSignature | Revolut Business webhooks v2 receiver — signed transaction events, per-workspace secret |
 | `supplier-orders-api` _(GET + POST)_ | kai_* | Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back |
 | `trip-expense-ops` | JWT | Sales trip-expense receipts: upload, sign, and render the expense PDF |
 
@@ -110,6 +119,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `revolut-merchant-webhooks` | JWT / revolutSignature | Revolut Merchant (checkout) webhook receiver + per-workspace webhook setup |
 | `stripe-api` | JWT | Stripe Checkout and Customer Portal session creator |
 | `stripe-connect` | JWT | Stripe Connect onboarding and status for per-workspace payouts |
 | `stripe-webhooks` | sig | Stripe webhook receiver for subscription, payment, and invoice events |
@@ -150,9 +160,14 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `real-estate-api` | JWT | Real Estate module — listings, leads, viewings, offers, sales, lettings, investments and deals |
 | `real-estate-buyer-digests` | cron | Daily cron — emails saved-search digests to buyers with a matching new listing |
+| `real-estate-calendar` _(GET + POST)_ | userJwt | Pushes viewings into the agent's own Google Calendar (per-user OAuth) |
 | `real-estate-feed` _(GET + POST)_ | token / public | Tokenized XML syndication feed (Kyero / OpenImmo / generic) for property portals |
+| `real-estate-ical` _(GET + POST)_ | icalToken / cron | Short-let channel sync — availability feed out (GET, token) and channel calendars in (POST, cron) |
+| `real-estate-inbound-lead` | inboundLeadToken | Public tokenised endpoint — turns a forwarded portal enquiry email into a CRM lead |
+| `real-estate-listing-social` | cron | Flow action — drafts a social post for a newly published listing, one per connected account |
 | `real-estate-public` | token / public | Anonymous, token-gated public listing pages, buyer portal, discovery and lead capture |
 | `real-estate-rent-invoicing` | cron | Daily cron — drafts Finance invoices for rent charges coming due |
+| `real-estate-vendor-reports` | cron | Weekly cron — emails the instructing vendor a performance report on their own listing |
 
 **Catalogs**
 
@@ -290,6 +305,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `canonicalize-attributes` | public | Proxy product attribute canonicalization to MIVAA facet service |
+| `facets-recanonicalize` | service_role | Bulk facet re-canonicalization sweep (proxy to MIVAA) |
 
 **Customs**
 

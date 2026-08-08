@@ -11,7 +11,7 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / <a href="hr.html">HR</a> / Ergani</div>
   <h1>HR · Ergani filing <span class="badge gated">owner / admin · BYOK</span></h1>
   <div class="routes"><span class="badge route">/hr</span></div>
-  <p class="lead">Greek employers must file employment events — hires, work schedules, leave and attendance punches — to the labour authority's <strong>ΠΣ Εργάνη</strong> (Ergani) system. HR connects directly to the <strong>Ergani II Web API</strong> so those filings happen from inside the platform: an employee clocking in at the kiosk, or a leave you approve, is submitted to Ergani and comes back with an official <strong>protocol number</strong>. This is a <strong>bring-your-own-key (BYOK)</strong> integration — it uses <em>your company's</em> Ergani Web API credentials, because filings are made under your employer identity. This page covers exactly what to add, where, and what gets filed.</p>
+  <p class="lead">Greek employers must file employment events — hires, work schedules, overtime, departures, leave and attendance punches — to the labour authority's <strong>ΠΣ Εργάνη</strong> (Ergani) system. HR connects directly to the <strong>Ergani II Web API</strong> so those filings happen from inside the platform: an employee clocking in at the kiosk, or a leave you approve, is submitted to Ergani and comes back with an official <strong>protocol number</strong>. This is a <strong>bring-your-own-key (BYOK)</strong> integration — it uses <em>your company's</em> Ergani Web API credentials, because filings are made under your employer identity. This page covers exactly what to add, where, and what gets filed.</p>
 
   <div class="callout warn"><p><strong>These are special Ergani <em>Web API</em> credentials</strong> — not your normal Ergani/ΕΦΚΑ web login. You obtain a dedicated API username and password for your employer (ΑΦΜ) from the Ergani Web API registration, and enter them here. Filings are made <strong>as your company</strong>, so the credentials must be your own.</p></div>
 
@@ -28,8 +28,8 @@
     <li>Your <strong>Branch number (Παράρτημα)</strong> — the establishment/branch the filings are for (the head office is typically branch <code>0</code>).</li>
   </ul>
 
-  <h2>Step 2 — Enter them in HR → Ergani — exactly what to add</h2>
-  <p><strong>Where:</strong> open <strong>HR → Ergani</strong> and fill the <strong>Ergani credentials</strong> card:</p>
+  <h2>Step 2 — Enter them in Profile → Keys — exactly what to add</h2>
+  <p><strong>Where:</strong> open <strong>Profile → Keys</strong> and fill the <strong>Ergani credentials</strong> card. (<strong>HR → Ergani</strong> shows your connection status and links straight here when nothing is configured yet.)</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
     <tbody>
@@ -50,9 +50,17 @@
     <tbody>
       <tr><td><strong>Attendance punches</strong> (arrival / departure)</td><td>Every clock-in / clock-out at the <a href="hr-attendance.html">kiosk</a> or the employee <a href="hr-self-service.html">portal</a> is filed; the row then shows <strong>Ergani ✓</strong> with its protocol. (Manual correction punches are <em>not</em> filed.)</td></tr>
       <tr><td><strong>Leave / time-off</strong></td><td>When you approve an absence you can <strong>File leave to Ergani</strong>, choosing the matching <strong>Ergani leave type</strong> (an official leave code — see below). See <a href="hr-timeoff.html">Time-off</a>.</td></tr>
-      <tr><td><strong>Hires &amp; work schedules</strong></td><td>Employment events for your staff are submitted under the supported Ergani submission types.</td></tr>
+      <tr><td><strong>Ε3 — Hire announcement</strong> (αναγγελία πρόσληψης)</td><td><strong>HR → Employees</strong>: each person shows a <strong>File Ε3</strong> action, prefilled from their employee record. Once filed the row shows the protocol instead.</td></tr>
+      <tr><td><strong>Ε4 — Work schedule</strong> (πίνακας ωρών εργασίας)</td><td><strong>HR → Schedules</strong>: build a weekly roster (or copy the employee's contract hours), then file it. Weekly rosters file as <code>WTOWeek</code>, daily ones as <code>WTODaily</code>, and an amendment to a roster Ergani already holds as <code>WKChgWK</code>.</td></tr>
+      <tr><td><strong>Ε5 / Ε6 / Ε7 — Departures</strong></td><td><strong>HR → Departures</strong>: record a voluntary departure (<strong>Ε5</strong>), a contract termination (<strong>Ε6</strong>) or a fixed-term expiry (<strong>Ε7</strong>) — the document is chosen from the departure type, never by hand. Filing also marks the employee as terminated and sets their end date.</td></tr>
+      <tr><td><strong>Ε8 — Overtime</strong> (αναγγελία υπερωρίας)</td><td><strong>HR → Overtime</strong>: log the hours worked beyond the schedule (a reason is required — Ergani rejects a declaration without one), tick the entries you want, and file them together as a single Ε8.</td></tr>
     </tbody>
   </table></div>
+
+  <h3>Review before you file</h3>
+  <p>Ergani publishes the exact field layout of each document only inside its own samples pack, and it differs from employer to employer. So rather than guessing, MaterialsHub <strong>fetches your employer's own live template</strong> for the document and fills in the fields it recognises from your records. Anything it can't match is listed for you at the top of the filing window.</p>
+  <p>That's why every filing opens a <strong>review step</strong>: you see exactly what will be sent, complete anything left blank, and only then submit. Values you fill in repeatedly for the same person — their specialty code, contract type — can be saved onto the employee so they prefill next time. <strong>Nothing is sent to the authority until you press File.</strong></p>
+  <div class="callout tip"><p>Once a schedule, departure or overtime entry has been filed, it becomes <strong>read-only</strong> — the filed copy belongs to the authority, so editing ours would put the two out of step. Cancel it in Ergani first if it needs to change.</p></div>
 
   <h3>Ergani leave types</h3>
   <p>Ergani classifies leave by an official <strong>code</strong> (each with a Greek and English description, a category/subcategory, and whether it's hourly). When you file a time-off, you map your absence to the right Ergani leave code so the authority records the correct category. HR loads the current list of leave types for you to pick from.</p>
