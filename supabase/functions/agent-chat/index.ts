@@ -1457,14 +1457,18 @@ async function executeAgent(
     const lowerInput = userInput.toLowerCase();
 
     // Detect what demo data to return based on keywords
-    // B2B check FIRST — must precede generic product keywords (e.g. 'tile' appears in "Tiles companies")
-    if (lowerInput.includes('compan') || lowerInput.includes('manufactur') || lowerInput.includes('spain') || lowerInput.includes('find me')) {
+    // B2B check FIRST — must precede generic product keywords (e.g. 'tile' appears in "Tiles companies").
+    // Every trigger here must be a B2B *noun*. Never a generic verb phrase or a place name: 'find me'
+    // and 'spain' were both in this list and swallowed ordinary product queries, so
+    // "Find me cement tiles" showed manufacturer research instead of the product grid.
+    const B2B_KEYWORDS = ['compan', 'manufactur', 'supplier', 'wholesal', 'distribut', 'exporter', 'b2b'];
+    if (B2B_KEYWORDS.some((k) => lowerInput.includes(k))) {
       return { text: "Searching for B2B manufacturers using web search...\n\nFound **8 verified manufacturers** matching your criteria with full contact details, revenue data, certifications, and lead times.\n\nDEMO_DATA: {\"data\":{\"command\":\"b2b_results\"}}" };
     } else if (lowerInput.includes('article') || lowerInput.includes('marketing') || lowerInput.includes('seo') || lowerInput.includes('content')) {
       return { text: "I'm creating a comprehensive SEO article for you. Our AI pipeline analyzed 12 high-value keywords (45,200 combined monthly searches), structured content for featured snippets, and optimized for top-3 ranking potential.\n\n**Article: The Ultimate Guide to Accessories Marketing**\n\nKeyword targeting, content structure, meta tags, and readability score all optimized.\n\nDEMO_DATA: {\"data\":{\"command\":\"seo_article\"}}" };
     } else if (lowerInput.includes('heat') || lowerInput.includes('pump') || lowerInput.includes('hvac')) {
       return { text: "Here's a comparison of our heat pump models.\n\nDEMO_DATA: {\"data\":{\"command\":\"heat_pumps\"}}" };
-    } else if (lowerInput.includes('3d') || lowerInput.includes('design') || lowerInput.includes('room')) {
+    } else if (lowerInput.includes('3d') || lowerInput.includes('render') || lowerInput.includes('room design') || lowerInput.includes('interior design')) {
       return { text: "Here's a modern living room 3D design.\n\nDEMO_DATA: {\"data\":{\"command\":\"3d_design\"}}" };
     } else if (lowerInput.includes('wood') || lowerInput.includes('green') || lowerInput.includes('egger')) {
       return { text: "Here are 5 Egger wood materials in green tones, ideal for sustainable projects.\n\nDEMO_DATA: {\"data\":{\"command\":\"green_wood\"}}" };
