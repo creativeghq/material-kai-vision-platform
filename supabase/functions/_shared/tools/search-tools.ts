@@ -390,6 +390,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
             totalResults: data.total_results || 0,
             articles: [] as any[],
             products: [] as any[],
+            entities: [] as any[],
           };
 
           // Process chunks as articles/documentation
@@ -437,6 +438,22 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
               description: product.description,
               metadata: normalizeMetadataForAgent(product.metadata),
               relevanceScore: product.relevance_score || 0,
+            }));
+          }
+
+          // Certificates / logos / specifications extracted from PDFs. The endpoint has
+          // always returned these; this tool dropped them on the floor, so even once
+          // entity search worked the agent could never see a certificate. Not in the
+          // default searchTypes — asked for explicitly, or not at all.
+          if (data.entities && data.entities.length > 0) {
+            results.found = true;
+            results.entities = data.entities.map((entity: any) => ({
+              entityType: entity.entity_type,
+              name: entity.name,
+              description: entity.description,
+              content: entity.content,
+              pageRange: entity.page_range ?? null,
+              relevanceScore: entity.relevance_score || 0,
             }));
           }
 
@@ -512,7 +529,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
       description: 'Search the Knowledge Base for articles, guides, installation instructions, and documentation. Use this FIRST when users ask how-to questions, troubleshooting, or general information queries. If articles are found, use them to provide accurate answers. If no articles are found, proceed to answer using your general knowledge. Optional category filters scope the search (e.g. categorySlug="pricing" to search only pricing docs). Each result is ONE SECTION of a document and carries source + docId + chunkIndex + heading. PDF results (source="pdf") already arrive with the neighbouring sections merged in around the match, so a table or spec split across sections reads whole. When a section is still clearly the right place but its text is cut off mid-topic, continues into the next section, or refers to something stated just before it, call read_document_section with that docId, chunkIndex and source (and productId, if present) to read the surrounding sections IN ORDER — do not re-run this search with reworded keywords.',
       schema: z.object({
         query: z.string().describe('Search query - describe what information the user is looking for'),
-        searchTypes: z.array(z.string()).default(['kb_docs', 'chunks', 'products']).describe('Types to search: kb_docs (authored Knowledge Base articles/docs), chunks (text extracted from ingested PDFs), products. Keep the default unless the user is clearly asking only about PDFs or products.'),
+        searchTypes: z.array(z.string()).default(['kb_docs', 'chunks', 'products']).describe('Types to search: kb_docs (authored Knowledge Base articles/docs), chunks (text extracted from ingested PDFs), products, entities (certificates, logos and specification sheets pulled out of PDFs — add this when the user asks about a certification, standard, or compliance document). Keep the default unless the user is clearly asking only about PDFs, products, or certificates.'),
         topK: z.number().default(5).describe('Maximum number of results to return'),
         categorySlug: z.string().optional().describe('Restrict search to a category by slug (e.g. "pricing")'),
         categoryId: z.string().optional().describe('Restrict search to a category by UUID'),
