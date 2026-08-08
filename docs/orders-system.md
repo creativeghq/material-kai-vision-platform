@@ -98,9 +98,27 @@ The public `deliver_order_line` RPC passes a hard `false` and the core is REVOKE
 through the same `quantity_delivered` ledger, so ship-then-invoice cannot double-decrement — the
 invoice finds those lines already at quantity and moves nothing.
 
-**Where the numbers live.** The hand-typed delivered quantity is written to
-`order_items.quantity_delivered` and nothing else — that column is both the picking record and the
-thing that stops a second document re-shipping the same goods. The stock movement is a separate row
+**Two quantities, because picking and shipping stopped being the same fact.**
+
+| Column | Means | Moves stock? |
+|---|---|---|
+| `order_items.quantity_delivered` | what has been **picked** — free to move up and down, drives `recompute_order_fulfilment` | no |
+| `order_items.quantity_shipped` | what has physically **left**, always under a fiscal document | yes — the delta on this is the movement |
+
+The first cut of #320 used one column for both and created a silent zero: `issue_delivery_note`
+selected lines by `quantity_delivered < quantity`, so a line the operator had already ticked as
+fully picked was invisible to the document meant to ship it — stock moved neither on the click
+(gated) nor on the note (skipped), and nothing complained because both columns held valid numbers.
+Caught by [tests/integration/stock-orders.test.ts](../tests/integration/stock-orders.test.ts),
+which drives the whole loop against a real database; the single-path unit tests could not see it,
+because the bug only appears when the manual path runs *before* the document.
+
+Both document paths now select and target on `quantity_shipped`, shipping implies picking (the
+document raises `quantity_delivered` but never lowers it), and the manual path **refuses** to mark
+a line below what has already shipped — the goods are with the customer under a numbered document,
+and the correction for that is a credit note, not an edit.
+
+**Where the numbers live.** The stock movement is a separate row
 in `stock_movements`, and it **cites the document that authorised it**: `source_type` is `invoice` or
 `delivery_note` with that document's id, and `reason` carries its human number (`Invoice INV-2026-777`,
 `Δελτίο Αποστολής 9.3-45`). It briefly did not — the first cut stamped `source_type='order'`, which

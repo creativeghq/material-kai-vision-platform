@@ -53,6 +53,22 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     const { data } = await svc.from('stock_allocations').select('status, quantity').eq('demand_type', 'order_item').eq('demand_id', oiId);
     return (data ?? []).map((r: any) => ({ status: r.status, quantity: Number(r.quantity) }));
   }
+  async function shipped(oiId: string): Promise<{ picked: number; shipped: number }> {
+    const { data } = await svc.from('order_items').select('quantity_delivered, quantity_shipped').eq('id', oiId).single();
+    return { picked: Number(data!.quantity_delivered), shipped: Number(data!.quantity_shipped) };
+  }
+  /**
+   * Cut and issue a Δελτίο Αποστολής for an order — since #320 this (or issuing the invoice) is
+   * the ONLY thing that moves stock. Owner JWT: issue_delivery_note gates on
+   * is_workspace_finance_manager, which reads auth.uid().
+   */
+  async function shipViaNote(oId: string, productId: string, wiId: string, qty: number): Promise<void> {
+    const { data: dn } = await svc.from('delivery_notes')
+      .insert({ workspace_id: ws, kind: 'dispatch', order_id: oId, status: 'draft', branch_code: 0 }).select('id').single();
+    await svc.from('delivery_note_items').insert({ delivery_note_id: dn!.id, product_id: productId, warehouse_item_id: wiId, description: 'line', quantity: qty });
+    const { error } = await A.client.rpc('issue_delivery_note', { p_id: dn!.id });
+    if (error) throw new Error(`shipViaNote: ${error.message}`);
+  }
 
   beforeAll(async () => {
     svc = serviceClient();
@@ -101,17 +117,33 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     const { oId, oiId } = await makeConfirmedOrder(p, 10);
     expect((await qtys(wi)).reserved).toBe(10);
 
+    // #320: picking is NOT shipping. Marking the line delivered advances the order's status and
+    // the picking marker, and must leave the warehouse completely untouched — goods may only
+    // leave against a fiscal document (τιμολόγιο / Δελτίο Αποστολής, #236 locked decision).
     const { data: st1, error } = await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 10 });
     expect(error).toBeNull();
     expect(st1).toBe('fulfilled');
 
     let q = await qtys(wi);
-    expect(q.on_hand).toBe(90);        // moved once
-    expect(q.reserved).toBe(0);        // hold released
+    expect(q.on_hand).toBe(100);       // NOTHING moved — no document behind it
+    expect(q.reserved).toBe(10);       // still held for the customer
+    expect(await outMoves(wi)).toBe(0);
+    expect((await allocStatuses(oiId)).every((a) => a.status === 'reserved')).toBe(true);
+    expect(await shipped(oiId)).toEqual({ picked: 10, shipped: 0 });
+
+    // Now the document. This is also the regression guard for the bug that shipped with #320's
+    // first cut: the dispatch note selected lines by `quantity_delivered < quantity`, so a line
+    // the operator had already ticked as fully picked was invisible to it and the stock moved
+    // NEITHER on the click (gated) NOR on the note (skipped) — a silent zero created by the fix.
+    await shipViaNote(oId, p, wi, 10);
+    q = await qtys(wi);
+    expect(q.on_hand).toBe(90);        // moved once, and only now
+    expect(q.reserved).toBe(0);        // hold released by the dispatch
     expect(await outMoves(wi)).toBe(10);
     expect((await allocStatuses(oiId)).every((a) => a.status === 'dispatched')).toBe(true);
+    expect(await shipped(oiId)).toEqual({ picked: 10, shipped: 10 });
 
-    // Re-delivering the SAME quantity is a no-op (delta 0) — the core anti-double-decrement guarantee.
+    // Re-picking the SAME quantity is a no-op (delta 0) — the anti-double-decrement guarantee.
     await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 10 });
     q = await qtys(wi);
     expect(q.on_hand).toBe(90);
@@ -122,9 +154,9 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     const p = await makeProduct('dispatch-after');
     const wi = await makeStock(p, 50);
     const { oId, oiId } = await makeConfirmedOrder(p, 10);
-    // ship via the order UI first
+    // pick it in the order window first — since #320 this moves no stock on its own
     await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 10 });
-    expect((await qtys(wi)).on_hand).toBe(40);
+    expect((await qtys(wi)).on_hand).toBe(50);
 
     // now cut + issue a dispatch note linked to the SAME order
     const { data: dn } = await svc.from('delivery_notes')
@@ -133,7 +165,18 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     const { error } = await A.client.rpc('issue_delivery_note', { p_id: dn!.id });
     expect(error).toBeNull();
 
-    expect((await qtys(wi)).on_hand).toBe(40); // STILL 40 — the line was already delivered, so no second move
+    expect((await qtys(wi)).on_hand).toBe(40);   // the document moved it — once
+    expect(await outMoves(wi)).toBe(10);
+
+    // and a SECOND document over the same goods moves nothing: quantity_shipped is the single
+    // ledger both paths advance, so ship-then-invoice cannot decrement twice (#236's open question).
+    const { data: dn2 } = await svc.from('delivery_notes')
+      .insert({ workspace_id: ws, kind: 'dispatch', order_id: oId, status: 'draft', branch_code: 0 }).select('id').single();
+    await svc.from('delivery_note_items').insert({ delivery_note_id: dn2!.id, product_id: p, warehouse_item_id: wi, description: 'line', quantity: 10 });
+    await A.client.rpc('issue_delivery_note', { p_id: dn2!.id });
+    expect((await qtys(wi)).on_hand).toBe(40);
+    expect(await outMoves(wi)).toBe(10);
+
     const { data: issued } = await svc.from('delivery_notes').select('status').eq('id', dn!.id).single();
     expect(issued!.status).toBe('issued');
   });
@@ -220,7 +263,14 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     const { data: st } = await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 4 });
     expect(st).toBe('partially_fulfilled');
 
-    const q = await qtys(wi);
+    // Picked, not shipped: status moves, stock does not, and the whole 10 stays held.
+    let q = await qtys(wi);
+    expect(q.on_hand).toBe(50);
+    expect(q.reserved).toBe(10);
+
+    // The document is what splits the hold.
+    await shipViaNote(oId, p, wi, 4);
+    q = await qtys(wi);
     expect(q.on_hand).toBe(46);   // 4 shipped
     expect(q.reserved).toBe(6);   // 6 still held
 
@@ -231,17 +281,35 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     expect(reserved).toBe(6);
   });
 
-  it('un-delivering re-holds the freed quantity', async () => {
+  it('a picked line can be walked back; goods already shipped under a document cannot', async () => {
     const p = await makeProduct('undeliver');
     const wi = await makeStock(p, 100);
     const { oId, oiId } = await makeConfirmedOrder(p, 10);
-    await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 10 });
-    expect((await qtys(wi)).on_hand).toBe(90);
 
-    await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 6 }); // walk back to 6
-    const q = await qtys(wi);
-    expect(q.on_hand).toBe(94);   // 4 came back into stock
-    expect(q.reserved).toBe(4);   // and the 4 undelivered units are held again
+    // Nothing has shipped, so the picking marker is free to move in both directions and the
+    // warehouse never notices.
+    await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 10 });
+    expect((await qtys(wi)).on_hand).toBe(100);
+    await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 6 });
+    let q = await qtys(wi);
+    expect(q.on_hand).toBe(100);
+    expect(q.reserved).toBe(10);
+    expect(await shipped(oiId)).toEqual({ picked: 6, shipped: 0 });
+
+    // Ship 6 of them for real.
+    await shipViaNote(oId, p, wi, 6);
+    q = await qtys(wi);
+    expect(q.on_hand).toBe(94);
+    expect(q.reserved).toBe(4);
+
+    // Now the marker cannot be walked back below what physically left: those goods are with the
+    // customer under a numbered fiscal document, and the correction for that is a credit note,
+    // not an edit. Refused rather than silently clamped — a clamp would leave the UI showing a
+    // number the database disagrees with.
+    const { error } = await A.client.rpc('deliver_order_line', { p_order: oId, p_item: oiId, p_qty: 2 });
+    expect(error).not.toBeNull();
+    expect((await qtys(wi)).on_hand).toBe(94);
+    expect((await shipped(oiId)).shipped).toBe(6);
   });
 
   it('free stock (the picker figure) reflects reservations', async () => {
