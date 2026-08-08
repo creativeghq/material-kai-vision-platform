@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, ExternalLink, Loader2, Pencil, Users, Mail } from 'lucide-react';
+import { Plus, ExternalLink, Loader2, Pencil, Users, Mail, Send } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -13,9 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import {
   hrService, type Employee, type Department, type EmploymentType, type EmployeeStatus, type PayBasis,
-  EMPLOYMENT_TYPE_LABELS, EMPLOYEE_STATUS_LABELS, PAY_BASIS_LABELS,
+  type ErganiSubmission, EMPLOYMENT_TYPE_LABELS, EMPLOYEE_STATUS_LABELS, PAY_BASIS_LABELS,
 } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
+import { ErganiFilingDialog } from './ErganiFilingDialog';
 import { parseDecimal } from '@/utils/decimal';
 import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
@@ -31,6 +32,9 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Employee | null>(null);
   const [page, setPage] = useState(1);
+  // Ergani Ε3 (hire announcement) state — whether the workspace can file, and who already has been.
+  const [erganiOn, setErganiOn] = useState(false);
+  const [hireFilings, setHireFilings] = useState<Map<string, ErganiSubmission>>(new Map());
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLoading(false); return; }
@@ -41,7 +45,22 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
       setPage((p) => clampPage(p, e.employees.length));
     } catch (err) { toast({ title: 'Failed to load employees', description: (err as Error).message, variant: 'destructive' }); }
     finally { setLoading(false); }
-  }, [workspaceId, toast]);
+
+    // Secondary enrichment (edge round-trip) — loaded AFTER the roster is on screen so the
+    // direct-DB list never waits on it.
+    if (canManage) {
+      const [status, log] = await Promise.all([
+        hrService.getErganiStatus(workspaceId).catch(() => null),
+        hrService.erganiSubmissionsLog(workspaceId, { limit: 500 }).catch(() => ({ submissions: [] as ErganiSubmission[] })),
+      ]);
+      setErganiOn(!!status?.has_password && !!status?.enabled);
+      const m = new Map<string, ErganiSubmission>();
+      for (const s of log.submissions) {
+        if (s.entity_type === 'employee' && s.entity_id && !m.has(s.entity_id)) m.set(s.entity_id, s); // newest first
+      }
+      setHireFilings(m);
+    }
+  }, [workspaceId, canManage, toast]);
   useEffect(() => { void load(); }, [load]);
 
   const deptName = (id: string | null) => departments.find((d) => d.id === id)?.name ?? '—';
@@ -80,7 +99,8 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
               <TableHeader><TableRow>
                 <TableHead>Name</TableHead><TableHead>Position</TableHead><TableHead>Department</TableHead>
                 <TableHead>Type</TableHead><TableHead>Status</TableHead>
-                <TableHead className="text-right">Absence</TableHead><TableHead className="text-right">Leave left</TableHead><TableHead />
+                <TableHead className="text-right">Absence</TableHead><TableHead className="text-right">Leave left</TableHead>
+                {erganiOn && <TableHead>Ε3</TableHead>}<TableHead />
               </TableRow></TableHeader>
               <TableBody>
                 {paginate(filtered, page).map((e) => (
@@ -92,6 +112,22 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
                     <TableCell><span className={`text-sm capitalize ${statusTone(e.status)}`}>{EMPLOYEE_STATUS_LABELS[e.status]}</span></TableCell>
                     <TableCell className="text-right">{e.total_absence_days}</TableCell>
                     <TableCell className="text-right">{e.remaining_leave_days}</TableCell>
+                    {erganiOn && (
+                      <TableCell>
+                        {hireFilings.get(e.id)?.status === 'submitted'
+                          ? <span className="text-sm text-emerald-600 dark:text-emerald-400" title={`Protocol ${hireFilings.get(e.id)?.protocol}`}>Filed · {hireFilings.get(e.id)?.protocol}</span>
+                          : canManage && workspaceId
+                            ? <ErganiFilingDialog
+                                trigger={<Button size="sm" variant="outline" className="rounded-full h-7 text-xs"><Send className="h-3.5 w-3.5 mr-1" />File Ε3</Button>}
+                                title="File Hire Announcement"
+                                description="Built from Ergani’s live Ε3 template using this employee’s record. Review the values, complete anything left blank, then file. Codes you fill in repeatedly can be saved on the employee so they prefill next time."
+                                loadPreview={() => hrService.submitHire(workspaceId, { employee_id: e.id, preview: true })}
+                                submit={(document) => hrService.submitHire(workspaceId, { employee_id: e.id, document })}
+                                onDone={load}
+                              />
+                            : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {canManage && workspaceId && <InviteButton workspaceId={workspaceId} employee={e} onDone={load} />}

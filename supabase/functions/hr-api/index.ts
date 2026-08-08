@@ -18,6 +18,7 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { handleExpansion, handleSelfService } from './expansion.ts';
 import { handleErgani } from './ergani.ts';
+import { handleLabour } from './labour.ts';
 import { handleAccounting } from './accounting.ts';
 import { businessDaysInclusive } from './hr-util.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
@@ -54,7 +55,29 @@ const EMPLOYEE_WRITABLE = [
   'amka', // AMKA — social-security number, required for Ergani submissions
   'dependent_children', // drives the payroll income-tax credit
   'work_start_time', 'work_end_time', 'work_days', // working-time window (lateness + kiosk expected)
+  'ergani_e3', // per-employee Ergani field overrides (see normalizeErganiFields)
 ] as const;
+
+/**
+ * `hr_employees.ergani_e3` is an exact Ergani-template-key → value map: the codes we cannot derive
+ * (ΣΤΕΠ specialty, contract type, collective agreement), which an operator copies off the `unfilled`
+ * list of a filing preview. It is jsonb that ends up inside a government document, so it is rebuilt
+ * key-by-key with string values only rather than stored as sent.
+ */
+function normalizeErganiFields(raw: unknown): Record<string, string> {
+  if (raw == null) return {};
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, 'ergani_e3 must be an object');
+  const entries = Object.entries(raw as Record<string, unknown>);
+  if (entries.length > 60) throw new HttpError(400, 'ergani_e3 has too many fields (max 60)');
+  const out: Record<string, string> = {};
+  for (const [k, v] of entries) {
+    const key = k.trim().slice(0, 80);
+    if (!key || v == null || v === '') continue;
+    if (typeof v === 'object') throw new HttpError(400, `ergani_e3.${key} must be a scalar value`);
+    out[key] = String(v).slice(0, 200);
+  }
+  return out;
+}
 
 function pick(body: any, cols: readonly string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -191,6 +214,7 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
           return json({ error: 'invalid employment_type' }, 400);
         if (empFields.status && !EMPLOYEE_STATUSES.includes(String(empFields.status)))
           return json({ error: 'invalid status' }, 400);
+        if (empFields.ergani_e3 !== undefined) empFields.ergani_e3 = normalizeErganiFields(empFields.ergani_e3);
 
         // Resolve the underlying crm_contact: attach an existing (in-workspace) one, or create new.
         let contactId = body?.crm_contact_id ? String(body.crm_contact_id) : '';
@@ -253,6 +277,7 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
           return json({ error: 'invalid employment_type' }, 400);
         if (empFields.status && !EMPLOYEE_STATUSES.includes(String(empFields.status)))
           return json({ error: 'invalid status' }, 400);
+        if (empFields.ergani_e3 !== undefined) empFields.ergani_e3 = normalizeErganiFields(empFields.ergani_e3);
         if (empFields.manager_contact_id) {
           const { data: mgr } = await supabase
             .from('crm_contacts').select('id').eq('id', String(empFields.manager_contact_id))
@@ -396,9 +421,12 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
 
       // ── Overview ─────────────────────────────────────────────────────────
       default: {
-        // Ergani II (ΠΣ Ergani) submissions — work card, leaves, E3, schedules, audit.
+        // Ergani II (ΠΣ Ergani) submissions — work card, leaves, Ε3–Ε8, schedules, audit.
         const erganiHandled = await handleErgani(action, { supabase, workspaceId, userId, body, access });
         if (erganiHandled) return erganiHandled;
+        // Labour records behind those filings (separations, overtime, work schedules).
+        const labourHandled = await handleLabour(action, { supabase, workspaceId, userId, body, access });
+        if (labourHandled) return labourHandled;
         // Accounting documents (credit-metered Claude OCR + reconciliation).
         const acctHandled = await handleAccounting(action, { supabase, workspaceId, userId, body, access });
         if (acctHandled) return acctHandled;

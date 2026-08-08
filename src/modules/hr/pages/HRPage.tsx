@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Users, LayoutDashboard, CalendarDays, Network, Briefcase, ClipboardCheck, FolderOpen, Wallet, Clock, Receipt, Landmark, Package,
+  CalendarClock, Timer, UserMinus,
 } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -13,6 +14,9 @@ import { EmployeesSection } from '../components/EmployeesSection';
 import { DepartmentsSection } from '../components/DepartmentsSection';
 import { TimeOffSection } from '../components/TimeOffSection';
 import { AttendanceSection } from '../components/AttendanceSection';
+import { SchedulesSection } from '../components/SchedulesSection';
+import { OvertimeSection } from '../components/OvertimeSection';
+import { SeparationsSection } from '../components/SeparationsSection';
 import { ErganiSection } from '../components/ErganiSection';
 import { RecruitmentSection } from '../components/RecruitmentSection';
 import { OnboardingSection } from '../components/OnboardingSection';
@@ -87,6 +91,8 @@ export default function HRPage() {
             <TabsTrigger value="departments" className="w-full justify-start"><Network className="h-4 w-4 mr-2" /> Departments</TabsTrigger>
             <TabsTrigger value="timeoff" className="w-full justify-start"><CalendarDays className="h-4 w-4 mr-2" /> Time Off</TabsTrigger>
             <TabsTrigger value="attendance" className="w-full justify-start"><Clock className="h-4 w-4 mr-2" /> Attendance</TabsTrigger>
+            <TabsTrigger value="schedules" className="w-full justify-start"><CalendarClock className="h-4 w-4 mr-2" /> Schedules</TabsTrigger>
+            <TabsTrigger value="overtime" className="w-full justify-start"><Timer className="h-4 w-4 mr-2" /> Overtime</TabsTrigger>
 
             <SectionLabel>Recruiting</SectionLabel>
             <TabsTrigger value="recruitment" className="w-full justify-start"><Briefcase className="h-4 w-4 mr-2" /> Jobs &amp; Applicants</TabsTrigger>
@@ -99,6 +105,7 @@ export default function HRPage() {
             <TabsTrigger value="accounting" className="w-full justify-start"><Receipt className="h-4 w-4 mr-2" /> Accounting</TabsTrigger>
 
             <SectionLabel>Compliance</SectionLabel>
+            <TabsTrigger value="separations" className="w-full justify-start"><UserMinus className="h-4 w-4 mr-2" /> Departures</TabsTrigger>
             <TabsTrigger value="ergani" className="w-full justify-start"><Landmark className="h-4 w-4 mr-2" /> Ergani</TabsTrigger>
           </TabsList>
 
@@ -115,6 +122,9 @@ export default function HRPage() {
             <TabsContent value="departments" forceMount={fm('departments')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><DepartmentsSection {...sectionProps} /></TabsContent>
             <TabsContent value="timeoff" forceMount={fm('timeoff')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><TimeOffSection {...sectionProps} /></TabsContent>
             <TabsContent value="attendance" forceMount={fm('attendance')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><AttendanceSection {...sectionProps} /></TabsContent>
+            <TabsContent value="schedules" forceMount={fm('schedules')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><SchedulesSection {...sectionProps} /></TabsContent>
+            <TabsContent value="overtime" forceMount={fm('overtime')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><OvertimeSection {...sectionProps} /></TabsContent>
+            <TabsContent value="separations" forceMount={fm('separations')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><SeparationsSection {...sectionProps} /></TabsContent>
             <TabsContent value="recruitment" forceMount={fm('recruitment')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><RecruitmentSection {...sectionProps} /></TabsContent>
             <TabsContent value="onboarding" forceMount={fm('onboarding')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><OnboardingSection {...sectionProps} /></TabsContent>
             <TabsContent value="documents" forceMount={fm('documents')} className="mt-0 space-y-4 data-[state=inactive]:hidden"><DocumentsSection {...sectionProps} /></TabsContent>

@@ -6,11 +6,13 @@
 //  • Work Card (WRKCardSE) — fully modelled (the guide documents its exact JSON schema).
 //  • Backbone — submissions list, live document schema, cancel, PDF download, employer info (EX_BASE_01),
 //    audit log — all documented and implemented.
-//  • Leaves / E3 / schedules — the guide does NOT include their JSON field schemas (they ship in
-//    Ergani's HELP_FILES_SAMPLES.zip). We expose `ergani-document-schema` to fetch Ergani's OWN live
-//    template for a code, plus `ergani-submit` to POST an operator-reviewed payload for that code, and
-//    a turnkey leave path that maps an hr_absences row onto the common Documents envelope. We never
-//    fabricate field names — the type-specific detail comes from Ergani's schema or the caller.
+//  • Leaves / Ε3 / Ε4 / Ε5 / Ε6 / Ε7 / Ε8 — the guide does NOT include their JSON field schemas
+//    (they ship in Ergani's HELP_FILES_SAMPLES.zip and vary per employer). We never fabricate field
+//    names: each of these fetches the employer's OWN live template (Documents/{code} GET) and fills
+//    only the fields whose key names match documented Ergani conventions (_shared/ergani/document.ts).
+//    Every one supports `preview: true`, which returns the built document plus the list of keys we
+//    could NOT fill, so the operator reviews and completes it before anything reaches the Ministry.
+//    A fully-built `document` may always be passed to bypass the builder entirely.
 import { corsHeaders } from '../_shared/cors.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { HttpError } from '../_shared/api-logger.ts';
@@ -19,6 +21,7 @@ import {
   getSubmittedPdf, executeService, ErganiApiError, type ErganiCredentials,
 } from '../_shared/ergani/client.ts';
 import { fileWorkcardPunch, toHttp } from '../_shared/ergani/workcard.ts';
+import { buildErganiDocument, splitName, toErganiTime, type ErganiValues } from '../_shared/ergani/document.ts';
 
 export interface ErganiCtx {
   supabase: any;
@@ -67,19 +70,57 @@ async function recordAudit(supabase: any, workspaceId: string, userId: string, r
 }
 const audit = (ctx: ErganiCtx, row: AuditRow) => recordAudit(ctx.supabase, ctx.workspaceId, ctx.userId, row);
 
+interface LoadedEmployee {
+  id: string; amka: string | null; afm: string | null; name: string;
+  firstName: string; lastName: string; birthDate: string | null; specialty: string | null;
+  startDate: string | null; employmentType: string | null;
+  weeklyHours: number | null; monthlySalary: number | null;
+  /** Per-employee exact template-key overrides (Ergani codes we cannot derive). */
+  overrides: Record<string, unknown>;
+}
+
 /** Load an employee (+ contact identity) scoped to the workspace, or throw 404. */
-async function loadEmployee(ctx: ErganiCtx, employeeId: string): Promise<{ id: string; amka: string | null; afm: string | null; name: string }> {
+async function loadEmployee(ctx: ErganiCtx, employeeId: string): Promise<LoadedEmployee> {
   const { data } = await ctx.supabase
     .from('hr_employees')
-    .select('id, amka, contact:crm_contacts!hr_employees_crm_contact_id_fkey ( name, first_name, last_name, vat_number )')
+    .select(`id, amka, start_date, employment_type, weekly_hours, monthly_salary, ergani_e3,
+      contact:crm_contacts!hr_employees_crm_contact_id_fkey ( name, first_name, last_name, vat_number, date_of_birth, position )`)
     .eq('id', employeeId).eq('workspace_id', ctx.workspaceId).maybeSingle();
   if (!data) throw new HttpError(404, 'employee not found in this workspace');
+  const name = data.contact?.name ?? '';
+  const [splitLast, splitFirst] = splitName(name);
+  const e3 = data.ergani_e3;
   return {
     id: data.id,
     amka: data.amka ?? null,
     afm: data.contact?.vat_number ?? null,
-    name: data.contact?.name ?? '',
+    name,
+    // Prefer the structured contact fields; fall back to splitting the display name, which is what
+    // the work-card path does.
+    lastName: data.contact?.last_name || splitLast,
+    firstName: data.contact?.first_name || splitFirst,
+    birthDate: data.contact?.date_of_birth ?? null,
+    specialty: data.contact?.position ?? null,
+    startDate: data.start_date ?? null,
+    employmentType: data.employment_type ?? null,
+    weeklyHours: data.weekly_hours == null ? null : Number(data.weekly_hours),
+    monthlySalary: data.monthly_salary == null ? null : Number(data.monthly_salary),
+    overrides: e3 && typeof e3 === 'object' && !Array.isArray(e3) ? e3 as Record<string, unknown> : {},
   };
+}
+
+/** The person-identity slots every Ε-document shares. */
+function personValues(emp: LoadedEmployee): ErganiValues {
+  return {
+    afm: emp.afm, amka: emp.amka, lastName: emp.lastName, firstName: emp.firstName,
+    birthDate: emp.birthDate, overrides: emp.overrides,
+  };
+}
+
+/** Every filing needs a VAT on both sides — fail with the specific missing one. */
+function assertIdentity(creds: ErganiCredentials, emp: LoadedEmployee): void {
+  if (!creds.employerAfm) throw new HttpError(400, 'employer_afm is not set in your Ergani credentials.');
+  if (!emp.afm) throw new HttpError(400, `${emp.name || 'This employee'} has no VAT number (set the contact VAT number first).`);
 }
 
 /** Resolve the active submission code for a logical kind from Ergani's Lookup/Submissions. */
@@ -99,40 +140,78 @@ async function resolveCode(creds: ErganiCredentials, ws: string, kind: string): 
 }
 
 /**
- * Fill an Ergani document TEMPLATE (fetched live from Documents/{code} GET) using its OWN key names.
- * The template returns leaf placeholders (e.g. {"f_afm":"f_afm", ...}); we replace only the keys whose
- * names match documented Ergani conventions and leave every other placeholder untouched for the caller
- * to complete. This is deliberately conservative — we never invent structure, only substitute values
- * into fields Ergani itself declared. Ambiguous keys surface as an Ergani 400 (stored in the audit).
+ * One filing: build the document from Ergani's live template, then either return it for operator
+ * review (`preview: true`) or POST it and audit the outcome.
+ *
+ * The preview step is not a nicety. We can only fill template fields whose key names match
+ * documented Ergani conventions; the rest come back in `unfilled` for a human to complete.
+ * Submitting a partially-recognised government document unseen is the failure mode it avoids.
+ * A caller may also pass a fully-built `document`, which bypasses the builder entirely.
  */
-function fillErganiTemplate(node: any, v: {
-  employerAfm: string; branchAa: string; comments: string; afm: string; lastName: string; firstName: string;
-  leaveCode: string; startDate: string; endDate: string;
-}): any {
-  if (Array.isArray(node)) return node.map((n) => fillErganiTemplate(n, v));
-  if (node && typeof node === 'object') {
-    const out: any = {};
-    for (const [k, val] of Object.entries(node)) {
-      if (val !== null && typeof val === 'object') { out[k] = fillErganiTemplate(val, v); continue; }
-      const key = k.toLowerCase();
-      if (key === 'f_afm_ergodoti') out[k] = v.employerAfm;
-      else if (key === 'f_aa') out[k] = v.branchAa;
-      else if (key === 'f_comments') out[k] = v.comments;
-      else if (key === 'f_afm') out[k] = v.afm;
-      else if (key === 'f_eponymo') out[k] = v.lastName;
-      else if (key === 'f_onoma') out[k] = v.firstName;
-      else if (/adeia|leave/.test(key) && /typ|code|kind|eidos/.test(key)) out[k] = v.leaveCode;
-      else if (/(apo|from|start|reference|enarks)/.test(key) && /date|hmer|imer|imnia|hn/.test(key)) out[k] = v.startDate;
-      else if (/(eos|to|end|lixi|liks)/.test(key) && /date|hmer|imer|imnia|hn/.test(key)) out[k] = v.endDate;
-      else if (/date|hmer|imer|imnia/.test(key)) out[k] = v.startDate;
-      else out[k] = val; // unknown placeholder → caller completes / Ergani validates
-    }
-    return out;
+interface FilingSpec {
+  code: string;
+  header: ErganiValues;
+  rows: ErganiValues[];
+  entityType: string;
+  entityId: string | null;
+  employeeId: string | null;
+}
+type FilingOutcome =
+  | { kind: 'preview'; response: Response }
+  | { kind: 'submitted'; result: { id: string; protocol: string; submitDate: string }; document: unknown };
+
+async function fileDocument(ctx: ErganiCtx, creds: ErganiCredentials, spec: FilingSpec): Promise<FilingOutcome> {
+  const preview = ctx.body?.preview === true;
+  let document = ctx.body?.document;
+  let filled: string[] = [];
+  let unfilled: string[] = [];
+
+  if (document === undefined || document === null) {
+    let template: any;
+    try { template = await getDocumentSchema(creds, ctx.workspaceId, spec.code); }
+    catch (e) { throw toHttp(e); }
+    const built = buildErganiDocument(template, spec.header, spec.rows);
+    document = built.document; filled = built.filled; unfilled = built.unfilled;
   }
-  return node;
+
+  if (preview) {
+    return { kind: 'preview', response: json({ preview: true, code: spec.code, document, filled, unfilled }) };
+  }
+
+  try {
+    const result = await submitDocument(creds, ctx.workspaceId, spec.code, document);
+    await audit(ctx, {
+      submission_type: spec.code, entity_type: spec.entityType, entity_id: spec.entityId,
+      employee_id: spec.employeeId, environment: creds.environment, status: 'submitted',
+      protocol: result.protocol, ergani_id: result.id, submit_date: result.submitDate,
+      request: document, response: result,
+    });
+    return { kind: 'submitted', result, document };
+  } catch (e) {
+    const he = toHttp(e);
+    await audit(ctx, {
+      submission_type: spec.code, entity_type: spec.entityType, entity_id: spec.entityId,
+      employee_id: spec.employeeId, environment: creds.environment, status: 'failed',
+      request: document, error: he.message,
+    });
+    throw he;
+  }
 }
 
-/** Map an ErganiApiError → HttpError with a useful status (400 business error, 502 upstream). */
+/** Ε5 / Ε6 / Ε7 are one document each — the separation kind IS the document code. */
+const SEPARATION_CODES: Record<string, string> = { voluntary: 'E5', termination: 'E6', expiry: 'E7' };
+
+/**
+ * The concrete calendar date a weekly shift falls on: the first `day` (0=Sun … 6=Sat) on or after
+ * the schedule's effective_from. A weekly roster is stored as weekday + times, but every date-shaped
+ * field in an Ergani template expects a real date, so we resolve it here rather than filing a 0–6 index.
+ */
+function shiftDate(effectiveFrom: string, day: number): string {
+  const base = new Date(`${effectiveFrom}T00:00:00Z`);
+  if (Number.isNaN(base.getTime())) return effectiveFrom;
+  base.setUTCDate(base.getUTCDate() + ((day - base.getUTCDay() + 7) % 7));
+  return base.toISOString().slice(0, 10);
+}
 
 /**
  * Handle an ergani-* action. Returns a Response, or null if the action isn't ours.
@@ -168,11 +247,6 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
     }
 
     // ── Leave declaration mapped from an hr_absences row ──────────────────────
-    // The leave document's field schema is NOT in the API guide (it ships in Ergani's samples zip),
-    // so we do NOT hand-author it. Instead we fetch Ergani's OWN live template for the leave code
-    // (Documents/{code} GET) and substitute values only into fields whose key names are documented
-    // Ergani conventions (see fillErganiTemplate). A caller may pass a fully-built `document` to
-    // override. Any schema mismatch surfaces as an Ergani 400 stored verbatim in the audit.
     case 'ergani-submit-leave': {
       requireManage();
       const absenceId = String(body?.absence_id ?? '');
@@ -184,39 +258,191 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
       const leaveCode = String(body?.ergani_leave_code ?? abs.ergani_leave_code ?? '').trim();
       if (!leaveCode) return json({ error: 'ergani_leave_code is required (pick the Ergani leave type).' }, 400);
       const emp = await loadEmployee(ctx, abs.employee_id);
-      if (!emp.afm) return json({ error: 'Employee has no VAT number (set the contact VAT number first).' }, 400);
       const creds = await client(ctx);
-      if (!creds.employerAfm) return json({ error: 'employer_afm is not set in your Ergani credentials.' }, 400);
+      assertIdentity(creds, emp);
       const code = await resolveCode(creds, workspaceId, 'leave');
+      const note = abs.note ? String(abs.note) : '';
 
-      const [lastName, ...rest] = emp.name.split(' ');
-      let payload = body?.document;
-      if (payload === undefined || payload === null) {
-        // Fetch Ergani's own template and fill recognized fields by their real key names.
-        let template: any;
-        try { template = await getDocumentSchema(creds, workspaceId, code); }
-        catch (e) { throw toHttp(e); }
-        payload = fillErganiTemplate(template, {
-          employerAfm: creds.employerAfm, branchAa: creds.branchAa, comments: abs.note ? String(abs.note) : '',
-          afm: emp.afm, lastName: lastName || emp.name, firstName: rest.join(' '),
-          leaveCode, startDate: abs.start_date, endDate: abs.end_date,
-        });
+      const out = await fileDocument(ctx, creds, {
+        code, entityType: 'absence', entityId: absenceId, employeeId: abs.employee_id,
+        header: { employerAfm: creds.employerAfm, branchAa: creds.branchAa, comments: note },
+        rows: [{
+          ...personValues(emp), code: leaveCode, reason: note,
+          startDate: abs.start_date, endDate: abs.end_date, date: abs.start_date,
+        }],
+      });
+      if (out.kind === 'preview') return out.response;
+      await supabase.from('hr_absences').update({ ergani_leave_code: leaveCode })
+        .eq('id', absenceId).eq('workspace_id', workspaceId);
+      return json({ ok: true, result: out.result });
+    }
+
+    // ── Ε3 — hire announcement, prefilled from the employee record ────────────
+    // The Ergani-specific codes we cannot derive (ΣΤΕΠ specialty code, contract-type code,
+    // collective agreement…) come from hr_employees.ergani_e3, an exact template-key → value map
+    // the operator fills once per employee off the `unfilled` list of a preview.
+    case 'ergani-submit-hire': {
+      requireManage();
+      const employeeId = String(body?.employee_id ?? '');
+      if (!employeeId) return json({ error: 'employee_id is required' }, 400);
+      const emp = await loadEmployee(ctx, employeeId);
+      if (!emp.startDate) return json({ error: 'Set the employee’s start date before filing the Ε3 hire announcement.' }, 400);
+      const creds = await client(ctx);
+      assertIdentity(creds, emp);
+      const comments = String(body?.comments ?? '');
+
+      const out = await fileDocument(ctx, creds, {
+        code: 'E3', entityType: 'employee', entityId: employeeId, employeeId,
+        header: { employerAfm: creds.employerAfm, branchAa: creds.branchAa, comments },
+        rows: [{
+          ...personValues(emp), specialty: emp.specialty, contractType: emp.employmentType,
+          salary: emp.monthlySalary, weeklyHours: emp.weeklyHours,
+          startDate: emp.startDate, date: emp.startDate, comments,
+        }],
+      });
+      if (out.kind === 'preview') return out.response;
+      return json({ ok: true, result: out.result });
+    }
+
+    // ── Ε5 / Ε6 / Ε7 — voluntary departure / termination / fixed-term expiry ──
+    case 'ergani-submit-separation': {
+      requireManage();
+      const separationId = String(body?.separation_id ?? '');
+      if (!separationId) return json({ error: 'separation_id is required' }, 400);
+      const { data: sep } = await supabase
+        .from('hr_separations').select('*').eq('id', separationId).eq('workspace_id', workspaceId).maybeSingle();
+      if (!sep) return json({ error: 'separation not found in this workspace' }, 404);
+      if (sep.status === 'submitted') return json({ error: 'This separation has already been filed to Ergani.' }, 409);
+      const code = SEPARATION_CODES[String(sep.separation_type)];
+      if (!code) return json({ error: `Unknown separation type: ${sep.separation_type}` }, 400);
+
+      const emp = await loadEmployee(ctx, sep.employee_id);
+      const creds = await client(ctx);
+      assertIdentity(creds, emp);
+      const note = sep.note ? String(sep.note) : '';
+
+      const out = await fileDocument(ctx, creds, {
+        code, entityType: 'separation', entityId: separationId, employeeId: sep.employee_id,
+        header: { employerAfm: creds.employerAfm, branchAa: creds.branchAa, comments: note },
+        rows: [{
+          ...personValues(emp), specialty: emp.specialty, contractType: emp.employmentType,
+          reason: sep.reason ?? null, amount: sep.severance_amount ?? null,
+          // The employment window: it started at the hire date and ends on the separation date.
+          startDate: emp.startDate, endDate: sep.effective_date, date: sep.effective_date,
+          comments: note,
+        }],
+      });
+      if (out.kind === 'preview') return out.response;
+
+      await supabase.from('hr_separations')
+        .update({ status: 'submitted', ergani_protocol: out.result.protocol })
+        .eq('id', separationId).eq('workspace_id', workspaceId);
+      // The filing is the moment the departure becomes official — reflect it on the employee.
+      await supabase.from('hr_employees')
+        .update({ status: 'terminated', end_date: sep.effective_date })
+        .eq('id', sep.employee_id).eq('workspace_id', workspaceId);
+      return json({ ok: true, result: out.result });
+    }
+
+    // ── Ε8 — overtime. One filing may carry several entries (Ergani batches them). ──
+    case 'ergani-submit-overtime': {
+      requireManage();
+      const requested: string[] = Array.isArray(body?.overtime_ids)
+        ? body.overtime_ids.map((v: unknown) => String(v))
+        : body?.overtime_id ? [String(body.overtime_id)] : [];
+      const ids: string[] = [...new Set<string>(requested)];
+      if (!ids.length) return json({ error: 'overtime_id or overtime_ids is required' }, 400);
+      if (ids.length > 100) return json({ error: 'file at most 100 overtime entries at a time' }, 400);
+
+      const { data: entries } = await supabase
+        .from('hr_overtime').select('*').eq('workspace_id', workspaceId).in('id', ids);
+      if (!entries?.length) return json({ error: 'overtime entries not found in this workspace' }, 404);
+      if (entries.length !== ids.length) return json({ error: 'one or more overtime entries were not found in this workspace' }, 404);
+      const already = entries.find((e: any) => e.status === 'submitted');
+      if (already) return json({ error: 'One of the selected entries has already been filed to Ergani.' }, 409);
+
+      const creds = await client(ctx);
+      // Distinct employees only — load each once even when an employee has several blocks.
+      const employees = new Map<string, LoadedEmployee>();
+      for (const id of [...new Set<string>(entries.map((e: any) => String(e.employee_id)))]) {
+        const emp = await loadEmployee(ctx, id);
+        assertIdentity(creds, emp);
+        employees.set(id, emp);
       }
 
-      try {
-        const res = await submitDocument(creds, workspaceId, code, payload);
-        await supabase.from('hr_absences').update({ ergani_leave_code: leaveCode }).eq('id', absenceId).eq('workspace_id', workspaceId);
-        await audit(ctx, {
-          submission_type: code, entity_type: 'absence', entity_id: absenceId, employee_id: abs.employee_id,
-          environment: creds.environment, status: 'submitted', protocol: res.protocol, ergani_id: res.id,
-          submit_date: res.submitDate, request: payload, response: res,
-        });
-        return json({ ok: true, result: res });
-      } catch (e) {
-        const he = toHttp(e);
-        await audit(ctx, { submission_type: code, entity_type: 'absence', entity_id: absenceId, employee_id: abs.employee_id, environment: creds.environment, status: 'failed', request: payload, error: he.message });
-        throw he;
+      const rows: ErganiValues[] = entries.map((e: any) => {
+        const emp = employees.get(String(e.employee_id))!;
+        return {
+          ...personValues(emp), specialty: emp.specialty,
+          date: e.work_date, startDate: e.work_date,
+          startTime: toErganiTime(e.start_time), endTime: toErganiTime(e.end_time),
+          hours: e.hours, reason: e.reason, comments: e.note ?? '',
+        };
+      });
+
+      const out = await fileDocument(ctx, creds, {
+        code: 'E8', entityType: 'overtime',
+        entityId: entries.length === 1 ? String(entries[0].id) : null,
+        employeeId: employees.size === 1 ? String(entries[0].employee_id) : null,
+        header: { employerAfm: creds.employerAfm, branchAa: creds.branchAa, comments: String(body?.comments ?? '') },
+        rows,
+      });
+      if (out.kind === 'preview') return out.response;
+
+      await supabase.from('hr_overtime')
+        .update({ status: 'submitted', ergani_protocol: out.result.protocol })
+        .eq('workspace_id', workspaceId).in('id', ids);
+      return json({ ok: true, result: out.result, filed: ids.length });
+    }
+
+    // ── Ε4 — work-time schedule (WTOWeek / WTODaily), or a change (WKChgWK) ───
+    case 'ergani-submit-schedule': {
+      requireManage();
+      const scheduleId = String(body?.schedule_id ?? '');
+      if (!scheduleId) return json({ error: 'schedule_id is required' }, 400);
+      const { data: sched } = await supabase
+        .from('hr_work_schedules').select('*').eq('id', scheduleId).eq('workspace_id', workspaceId).maybeSingle();
+      if (!sched) return json({ error: 'schedule not found in this workspace' }, 404);
+      if (sched.status === 'submitted') return json({ error: 'This schedule has already been filed to Ergani.' }, 409);
+
+      // 'change' files the amendment document (WKChgWK) for a roster that already exists at Ergani.
+      const kind = String(body?.kind ?? (sched.schedule_type === 'daily' ? 'schedule_daily' : 'schedule_weekly'));
+      if (!['schedule_weekly', 'schedule_daily', 'change'].includes(kind)) {
+        return json({ error: "kind must be 'schedule_weekly', 'schedule_daily' or 'change'" }, 400);
       }
+      const emp = await loadEmployee(ctx, sched.employee_id);
+      const creds = await client(ctx);
+      assertIdentity(creds, emp);
+      const code = await resolveCode(creds, workspaceId, kind);
+
+      const shifts: any[] = Array.isArray(sched.details) ? sched.details : [];
+      const working = shifts.filter((s) => !s?.off);
+      if (!working.length) return json({ error: 'This schedule has no working shifts to file.' }, 400);
+
+      const rows: ErganiValues[] = working.map((s) => {
+        const date = s.date ?? shiftDate(String(sched.effective_from), Number(s.day));
+        return {
+          ...personValues(emp), specialty: emp.specialty,
+          date, startDate: date, endDate: date,
+          startTime: toErganiTime(s.start), endTime: toErganiTime(s.end),
+          comments: s.note ? String(s.note) : '',
+        };
+      });
+
+      const out = await fileDocument(ctx, creds, {
+        code, entityType: 'schedule', entityId: scheduleId, employeeId: sched.employee_id,
+        header: {
+          employerAfm: creds.employerAfm, branchAa: creds.branchAa,
+          comments: String(body?.comments ?? sched.name ?? ''),
+        },
+        rows,
+      });
+      if (out.kind === 'preview') return out.response;
+
+      await supabase.from('hr_work_schedules')
+        .update({ status: 'submitted', ergani_protocol: out.result.protocol })
+        .eq('id', scheduleId).eq('workspace_id', workspaceId);
+      return json({ ok: true, result: out.result });
     }
 
     // ── Generic submit for any code (E3, WTOWeek, WTODaily, WKChgWK) ───────────
@@ -233,7 +459,9 @@ export async function handleErgani(action: string, ctx: ErganiCtx): Promise<Resp
         const res = await submitDocument(creds, workspaceId, code, document);
         // If tied to a persisted schedule row, flip it to submitted.
         if (body?.schedule_id) {
-          await supabase.from('hr_work_schedules').update({ status: 'submitted' }).eq('id', String(body.schedule_id)).eq('workspace_id', workspaceId);
+          await supabase.from('hr_work_schedules')
+            .update({ status: 'submitted', ergani_protocol: res.protocol })
+            .eq('id', String(body.schedule_id)).eq('workspace_id', workspaceId);
         }
         await audit(ctx, {
           submission_type: code, entity_type: body?.entity_type ?? null, entity_id: body?.entity_id ?? null,

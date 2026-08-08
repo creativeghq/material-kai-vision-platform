@@ -288,6 +288,74 @@ export interface ErganiSubmission {
   protocol: string | null; ergani_id: string | null; submit_date: string | null; error: string | null; created_at: string;
 }
 
+/**
+ * A filing built from Ergani's live template but NOT yet submitted. `unfilled` lists the template
+ * keys we could not recognise — the operator completes those before submitting, which is why every
+ * Ε-document flow in the UI is preview-then-submit rather than one click.
+ */
+export interface ErganiPreview { preview: true; code: string; document: unknown; filled: string[]; unfilled: string[]; }
+export type ErganiFiled = { ok: true; result: ErganiSubmitResult; filed?: number };
+
+// ── Labour records behind the Ε-documents ──
+/** voluntary → Ε5, termination → Ε6, expiry → Ε7. The kind IS the Ergani document. */
+export type SeparationType = 'voluntary' | 'termination' | 'expiry';
+export type FilingStatus = 'draft' | 'submitted' | 'failed';
+export const SEPARATION_TYPE_LABELS: Record<SeparationType, string> = {
+  voluntary: 'Voluntary departure (Ε5)',
+  termination: 'Contract termination (Ε6)',
+  expiry: 'Fixed-term expiry (Ε7)',
+};
+export const SEPARATION_CODES: Record<SeparationType, string> = { voluntary: 'E5', termination: 'E6', expiry: 'E7' };
+
+export interface LabourEmployeeRef {
+  id: string;
+  contact: { id: string; name: string; vat_number: string | null } | null;
+}
+
+export interface Separation {
+  id: string; workspace_id: string; employee_id: string;
+  separation_type: SeparationType; effective_date: string; notice_date: string | null;
+  reason: string | null; severance_amount: number | null; note: string | null;
+  status: FilingStatus; ergani_protocol: string | null; created_at: string; updated_at: string;
+  employee?: LabourEmployeeRef | null;
+}
+export interface SeparationInput {
+  separation_type: SeparationType; effective_date: string; notice_date?: string | null;
+  reason?: string | null; severance_amount?: number | null; note?: string | null;
+}
+
+export interface Overtime {
+  id: string; workspace_id: string; employee_id: string;
+  work_date: string; start_time: string; end_time: string;
+  /** Generated in SQL from start/end — never sent by the client. */
+  hours: number;
+  reason: string; note: string | null;
+  status: FilingStatus; ergani_protocol: string | null; created_at: string; updated_at: string;
+  employee?: LabourEmployeeRef | null;
+}
+export interface OvertimeInput {
+  work_date: string; start_time: string; end_time: string; reason: string; note?: string | null;
+}
+
+export type ScheduleType = 'weekly' | 'daily';
+/** One roster row. `day` is 0=Sunday … 6=Saturday; `date` pins a specific day for daily schedules. */
+export interface ScheduleShift {
+  day: number; off?: boolean; start?: string; end?: string;
+  break_start?: string; break_end?: string; date?: string; note?: string;
+}
+export interface WorkSchedule {
+  id: string; workspace_id: string; employee_id: string;
+  name: string | null; schedule_type: ScheduleType;
+  effective_from: string; effective_to: string | null;
+  details: ScheduleShift[];
+  status: FilingStatus; ergani_protocol: string | null; created_at: string; updated_at: string;
+  employee?: LabourEmployeeRef | null;
+}
+export interface WorkScheduleInput {
+  name?: string | null; schedule_type: ScheduleType;
+  effective_from: string; effective_to?: string | null; details: ScheduleShift[];
+}
+
 async function call<T>(workspaceId: string, action: string, extra: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke('hr-api', {
     body: { action, workspace_id: workspaceId, ...extra },
@@ -538,6 +606,33 @@ class HrService {
   erganiDownloadPdf(ws: string, input: { code: string; protocol: string; submitted_date: string }): Promise<{ pdf_base64: string }> { return call(ws, 'ergani-download-pdf', input); }
   erganiSubmissionsLog(ws: string, filters: { employee_id?: string; submission_type?: string; limit?: number } = {}): Promise<{ submissions: ErganiSubmission[] }> { return call(ws, 'ergani-submissions-log', filters); }
   erganiRetry(ws: string, submission_id: string): Promise<{ ok: boolean; result: ErganiSubmitResult }> { return call(ws, 'ergani-retry', { submission_id }); }
+
+  // ── Ε3 / Ε4 / Ε5 / Ε6 / Ε7 / Ε8 filings ──
+  // Each is preview-then-submit: call with { preview: true } to get the document Ergani's own
+  // template produced plus the keys we could not fill, then submit — optionally with an edited
+  // `document`, which bypasses the builder entirely.
+  submitHire(ws: string, input: { employee_id: string; preview?: boolean; document?: unknown; comments?: string }): Promise<ErganiPreview | ErganiFiled> { return call(ws, 'ergani-submit-hire', input); }
+  submitSeparation(ws: string, input: { separation_id: string; preview?: boolean; document?: unknown }): Promise<ErganiPreview | ErganiFiled> { return call(ws, 'ergani-submit-separation', input); }
+  submitOvertime(ws: string, input: { overtime_ids: string[]; preview?: boolean; document?: unknown; comments?: string }): Promise<ErganiPreview | ErganiFiled> { return call(ws, 'ergani-submit-overtime', input); }
+  submitSchedule(ws: string, input: { schedule_id: string; kind?: 'schedule_weekly' | 'schedule_daily' | 'change'; preview?: boolean; document?: unknown; comments?: string }): Promise<ErganiPreview | ErganiFiled> { return call(ws, 'ergani-submit-schedule', input); }
+
+  // ── Separations (Ε5/Ε6/Ε7) ──
+  listSeparations(ws: string, filters: { employee_id?: string } = {}): Promise<{ separations: Separation[] }> { return call(ws, 'list-separations', filters); }
+  createSeparation(ws: string, input: SeparationInput & { employee_id: string }): Promise<{ separation: Separation }> { return call(ws, 'create-separation', input as unknown as Record<string, unknown>); }
+  updateSeparation(ws: string, input: Partial<SeparationInput> & { id: string }): Promise<{ separation: Separation }> { return call(ws, 'update-separation', input as unknown as Record<string, unknown>); }
+  deleteSeparation(ws: string, id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-separation', { id }); }
+
+  // ── Overtime (Ε8) ──
+  listOvertime(ws: string, filters: { employee_id?: string; from?: string; to?: string } = {}): Promise<{ overtime: Overtime[] }> { return call(ws, 'list-overtime', filters); }
+  createOvertime(ws: string, input: OvertimeInput & { employee_id: string }): Promise<{ overtime: Overtime }> { return call(ws, 'create-overtime', input as unknown as Record<string, unknown>); }
+  updateOvertime(ws: string, input: Partial<OvertimeInput> & { id: string }): Promise<{ overtime: Overtime }> { return call(ws, 'update-overtime', input as unknown as Record<string, unknown>); }
+  deleteOvertime(ws: string, id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-overtime', { id }); }
+
+  // ── Work schedules (Ε4) ──
+  listSchedules(ws: string, filters: { employee_id?: string } = {}): Promise<{ schedules: WorkSchedule[] }> { return call(ws, 'list-schedules', filters); }
+  createSchedule(ws: string, input: WorkScheduleInput & { employee_id: string }): Promise<{ schedule: WorkSchedule }> { return call(ws, 'create-schedule', input as unknown as Record<string, unknown>); }
+  updateSchedule(ws: string, input: Partial<WorkScheduleInput> & { id: string }): Promise<{ schedule: WorkSchedule }> { return call(ws, 'update-schedule', input as unknown as Record<string, unknown>); }
+  deleteSchedule(ws: string, id: string): Promise<{ ok: boolean }> { return call(ws, 'delete-schedule', { id }); }
 
   // ── Punch history + corrections + timesheet ──
   listPunches(ws: string, filters: { employee_id?: string; from?: string; to?: string } = {}): Promise<{ punches: Punch[] }> { return call(ws, 'list-punches', filters); }

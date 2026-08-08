@@ -3,6 +3,7 @@ import React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { SectionHeader as SharedSectionHeader } from '@/components/shared/SectionHeader';
 import { formatMoney } from '@/utils/decimal';
+import { statusTone } from '@/utils/statusTone';
 
 /**
  * Currency formatter for the HR sections — now a thin adapter over the canonical `formatMoney`
@@ -54,6 +55,17 @@ export function fileToBase64(file: File): Promise<string> {
     r.onerror = () => reject(new Error('Could not read file'));
     r.readAsDataURL(file);
   });
+}
+
+/**
+ * Ergani filing status as a plain colored word. `submitted` means "filed with the Ministry", which
+ * is the good outcome — but the platform-wide `statusTone` has no opinion on that word (it is
+ * "handed off, awaiting" nearly everywhere else), so the good tone is applied here rather than
+ * widening the shared helper for one module's vocabulary.
+ */
+export const FILING_STATUS_LABELS: Record<string, string> = { draft: 'Draft', submitted: 'Filed', failed: 'Failed' };
+export function filingTone(status: string): string {
+  return status === 'submitted' ? 'text-emerald-600 dark:text-emerald-400' : statusTone(status);
 }
 
 export function EmptyState({ icon: Icon, title, hint }: { icon?: LucideIcon; title: string; hint?: string }) {

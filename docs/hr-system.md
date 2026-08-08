@@ -13,13 +13,13 @@ HR is a self-contained tenant module. It is:
 
 **Module folder:** [`src/modules/hr/`](../src/modules/hr) — manifest, module definition, pages, section components, services.
 
-**Edge function:** [`supabase/functions/hr-api/`](../supabase/functions/hr-api) — a single router split across `index.ts` (employees + absences + gate chain), `expansion.ts` (org, recruitment, onboarding, documents, payroll, attendance, analytics, portal invite, self-service), `ergani.ts` (Ergani filings), `accounting.ts` (credit-metered OCR + reconciliation), `ai-meter.ts` (AI credit metering), `hr-util.ts` (shared helpers).
+**Edge function:** [`supabase/functions/hr-api/`](../supabase/functions/hr-api) — a single router split across `index.ts` (employees + absences + gate chain), `expansion.ts` (org, recruitment, onboarding, documents, payroll, attendance, analytics, portal invite, self-service), `labour.ts` (schedules, overtime, departures), `ergani.ts` (Ergani filings), `accounting.ts` (credit-metered OCR + reconciliation), `ai-meter.ts` (AI credit metering), `hr-util.ts` (shared helpers).
 
 **Routes**
 
 | Route | Page | Access |
 |---|---|---|
-| `/hr` | [HRPage.tsx](../src/modules/hr/pages/HRPage.tsx) | Entitlement-guarded; page-gated on `hr.view` |
+| `/hr` | [HRPage.tsx](../src/modules/hr/pages/HRPage.tsx) | Entitlement-guarded; page-gated on `hr.view`. Tabs: Overview, Employees, Departments, Time Off, Attendance, Schedules, Overtime · Recruiting · Records · Compliance (Departures, Ergani) |
 | `/my-hr` | [EmployeeSelfServicePage.tsx](../src/modules/hr/pages/EmployeeSelfServicePage.tsx) | Nav capability `hr.self` |
 | `/:slug/clockin` | [ClockInKioskPage.tsx](../src/modules/hr/pages/ClockInKioskPage.tsx) | **Public** (no login) |
 
@@ -98,6 +98,34 @@ Runs → items → Finance. `create-payroll-run` (`period` = `YYYY-MM`, unique p
 ### Accounting (credit-metered OCR + reconciliation)
 [accounting.ts](../supabase/functions/hr-api/accounting.ts) — the accounting team uploads the monthly statutory documents (EFKA/tax slips, APD, payslips, bonuses) that carry the real Payment IDs for a period. `list/upload/sign/delete-accounting-doc` manage them in `hr_accounting_documents`. **`analyze-accounting-doc`** runs Claude OCR (PDF or image) with a forced tool to identify the document (`kind_group` routing enum + a free-text `doc_kind`, so it recognises seasonal docs like Δώρο Χριστουγέννων/Πάσχα, Επίδομα Αδείας, επικουρικό/ΤΕΚΑ) and extract payment fields, amounts, and multi-obligation `entries[]`. **`prepare-accounting-period`** reconciles the analyzed docs against the payroll run's obligations, flags discrepancies, and best-effort stamps matched payment IDs onto the period's Finance `planned_payments`. Both are credit-metered (pre-check ceilings 25).
 
+### Work Schedules (Ε4)
+`list/create/update/delete-schedule` over `hr_work_schedules`. A roster is a 7-row weekly pattern
+stored in `details` jsonb — each shift is `{day, off, start, end, break_start?, break_end?, date?, note?}`
+with `day` in the **JS convention (0=Sunday … 6=Saturday)**; `hr_employees.work_days` is ISO
+(1=Mon … 7=Sun), so the builder converts rather than assuming. `details` is rebuilt field-by-field
+server-side (`normalizeShifts`) because it ends up inside a government filing. "Copy contract hours"
+prefills the pattern from the employee's `work_start_time`/`work_end_time`/`work_days`. Filed as
+`WTOWeek` (weekly) / `WTODaily` (daily), or `WKChgWK` for a change to a roster Ergani already holds.
+UI: [SchedulesSection.tsx](../src/modules/hr/components/SchedulesSection.tsx).
+
+### Overtime (Ε8)
+`list/create/update/delete-overtime` over `hr_overtime`. **`hours` is a generated column**
+(`round(extract(epoch from (end_time - start_time)) / 3600, 2)`), so the duration has exactly one
+derivation and a client can never disagree with it — it is never accepted from the body. A CHECK
+enforces `end_time > start_time` (Ergani declares overtime within one `work_date`), and `reason` is
+required because Ergani rejects a declaration without a justification. Entries are selected in the
+table and filed as **one batched Ε8**. UI: [OvertimeSection.tsx](../src/modules/hr/components/OvertimeSection.tsx).
+
+### Departures (Ε5 / Ε6 / Ε7)
+`list/create/update/delete-separation` over `hr_separations`. `separation_type` is 1:1 with the
+Ergani document — `voluntary` → **Ε5**, `termination` → **Ε6**, `expiry` → **Ε7** — so the code is
+derived, never picked by hand. Filing marks the employee `terminated` and stamps `end_date`; before
+that the employee stays active, because a recorded-but-unfiled departure is a plan, not a fact.
+UI: [SeparationsSection.tsx](../src/modules/hr/components/SeparationsSection.tsx).
+
+Records in all three tables become **read-only once `status='submitted'`** (409 on edit/delete) — the
+filed copy is the Ministry's, and letting ours drift from it would make the audit log a lie.
+
 ### Ergani (Compliance)
 See [Ergani integration](#ergani-integration).
 
@@ -124,7 +152,45 @@ Greek Ministry of Labour (ΠΣ Εργάνη / Ergani II) filings. Handled by [er
 - **Per-workspace credentials** live in `workspace_ergani_credentials` (`username`, `password`, `employer_afm`, `branch_aa` default `'0'`, `usertype` default `'02'`, `environment` ∈ `trial`/`production`, `enabled`). Configured at **Profile → Keys** via [ErganiCredentialsCard.tsx](../src/modules/hr/components/ErganiCredentialsCard.tsx); saved by `hrService.saveErganiCredentials` (direct upsert). Config status comes from the masked `get_ergani_creds_status` RPC — the password is never returned to the browser (`has_password` boolean only). Callers that need to submit get a clear `ergani_not_configured` error when absent.
 - **Per-employee identity** — `hr_employees.amka` (AMKA social-security number) and the contact `vat_number` (AFM) are required for filings.
 - **Trial vs production** — `environment` selects the Ergani endpoint; the value is stamped onto every audit row.
-- **Actions:** `ergani-submission-types` (live active types for the employer), `ergani-document-schema` (Ergani's own live JSON template for a code), `ergani-employer-info` (EX_BASE_01 registry), `ergani-submit-leave` (maps an `hr_absences` row onto the leave document — fetches Ergani's template and fills only fields whose key names match documented Ergani conventions, never fabricating structure; a fully-built `document` may be passed to override), `ergani-submit` (generic submit for E3 / WTOWeek / WTODaily / WKChgWK from an operator-reviewed payload), `ergani-download-pdf` (Base64 of the submitted document), `ergani-submissions-log` (audit), and `ergani-retry` (re-POST a failed submission's stored payload). The Digital **Work Card** (WRKCardSE) is filed from attendance punches via `_shared/ergani/workcard.ts`.
+- **Actions:** `ergani-submission-types` (live active types for the employer), `ergani-document-schema` (Ergani's own live JSON template for a code), `ergani-employer-info` (EX_BASE_01 registry), the six turnkey filings below, `ergani-submit` (generic submit for any code from an operator-reviewed payload), `ergani-download-pdf` (Base64 of the submitted document), `ergani-submissions-log` (audit), and `ergani-retry` (re-POST a failed submission's stored payload). The Digital **Work Card** (WRKCardSE) is filed from attendance punches via `_shared/ergani/workcard.ts`.
+
+| Filing | Action | Source record | Code |
+|---|---|---|---|
+| Hire announcement | `ergani-submit-hire` | `hr_employees` | Ε3 |
+| Work-time schedule | `ergani-submit-schedule` | `hr_work_schedules` | WTOWeek / WTODaily / WKChgWK |
+| Leave declaration | `ergani-submit-leave` | `hr_absences` | resolved from the live list |
+| Voluntary departure | `ergani-submit-separation` | `hr_separations` | Ε5 |
+| Contract termination | `ergani-submit-separation` | `hr_separations` | Ε6 |
+| Fixed-term expiry | `ergani-submit-separation` | `hr_separations` | Ε7 |
+| Overtime (batched) | `ergani-submit-overtime` | `hr_overtime` | Ε8 |
+| Digital work card | attendance punch | `hr_time_punches` | WRKCardSE |
+
+### How a document body is built — and why every filing is preview-then-submit
+
+The API guide documents the envelope and exactly **one** document schema in full (WRKCardSE, which
+`workcard.ts` therefore hand-authors). The field schemas for Ε3–Ε8 and leaves ship in Ergani's
+`HELP_FILES_SAMPLES.zip` and vary per employer, so **we never hand-author them**.
+[`_shared/ergani/document.ts`](../supabase/functions/_shared/ergani/document.ts) fetches the
+employer's own live template (`Documents/{code}` GET) and substitutes values only into fields whose
+key names match documented Ergani conventions (`f_afm_ergodoti`, `f_afm`, `f_eponymo`, `f_onoma`,
+`f_aitiologia`, plus the Greek-transliterated date/time/hours families). It never invents structure:
+repeated rows (one per employee, per shift, per overtime block) are produced by **cloning the
+template's own detail element**, located structurally — first array = the header collection, first
+array inside its element = the detail collection.
+
+Because that recognition is necessarily partial, every filing supports **`preview: true`**, which
+returns the built document plus `unfilled` — the template keys we could not recognise. The UI
+([ErganiFilingDialog.tsx](../src/modules/hr/components/ErganiFilingDialog.tsx)) shows those to the
+operator, who completes them before anything reaches the Ministry. Submitting a partially-recognised
+government document unseen is the failure mode this exists to prevent. A fully-built `document` may
+always be passed instead, bypassing the builder.
+
+Codes that repeat for one employee (ΣΤΕΠ specialty, contract type, collective agreement) are stored
+once on `hr_employees.ergani_e3` — an **exact template-key → value map**, normalised server-side to
+scalar strings — and applied before convention matching so they prefill on every later filing.
+
+**Outbound dates are ISO `YYYY-MM-DD`**, matching the production-verified work-card path. Ergani
+echoes `submitDate` back as `dd/mm/yyyy` in *responses*; that is not the request format.
 - **Audit** — every submission (success or failure) writes an `hr_ergani_submissions` row (type, entity, employee, environment, status, protocol, `ergani_id`, request/response, error). Auditing never masks the real result (never throws).
 - **Leave-type catalog** — the global `ergani_leave_types` table backs the leave-code picker (`listErganiLeaveTypes`).
 
@@ -151,7 +217,9 @@ All tables are workspace-scoped with RLS `is_workspace_admin(workspace_id) OR is
 | `hr_payroll_settings` | Per-workspace payroll rules (contribution rates, tax brackets, tax credits); Greek 2026 defaults when absent. |
 | `hr_settings` | Attendance/kiosk config: timezone, kiosk toggles, late-alert thresholds, notification recipients. |
 | `hr_time_punches` | Clock arrival/departure punches (source, `is_late`, status, `ergani_protocol`, `reference_date`). |
-| `hr_work_schedules` | Working-time schedules for Ergani WTOWeek/WTODaily submissions. |
+| `hr_work_schedules` | Working-time rosters (Ε4). `details` jsonb holds the shift rows; `name` + `ergani_protocol` on the row. |
+| `hr_separations` | Departures (Ε5/Ε6/Ε7): type, effective/notice dates, reason, severance, filing status + protocol. |
+| `hr_overtime` | Overtime blocks (Ε8): work date, start/end time, **generated** `hours`, required reason, filing status + protocol. |
 | `hr_accounting_documents` | Uploaded statutory docs + Claude-OCR extraction (`kind_group`, `doc_kind`, `extracted`, confidence, `credits_spent`). |
 | `hr_ergani_submissions` | Ergani submission audit log (request/response, protocol, status, environment). |
 | `hr_kiosk_attempts` | Public kiosk lookup/clock attempts. |
