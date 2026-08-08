@@ -170,16 +170,41 @@ Monthly statutory documents (EFKA/tax slips, APD, bonuses…) → Claude OCR →
 
 All `ergani-*` actions run under the workspace's own Ergani credentials (`workspace_ergani_credentials`); if none are configured they return `400` `ergani_not_configured`. Upstream Ergani errors map to `400` (business) / `502` (upstream).
 
+Every `ergani-submit-*` action accepts **`preview: true`**, which builds the body from Ergani's live template and returns `{ preview: true, code, document, filled, unfilled }` **without submitting** — `unfilled` lists the template keys the builder could not recognise, for the operator to complete. Passing an explicit `document` bypasses the builder entirely. Only a real submission writes an `hr_ergani_submissions` audit row.
+
 | Action | Params | Auth | Description |
 |---|---|---|---|
 | `ergani-submission-types` | — | view | Live list of active submission types for this employer. |
 | `ergani-document-schema` | **`code`** | view | Live JSON template for a submission code. |
 | `ergani-employer-info` | — | view | Employer registry info (EX_BASE_01). |
-| `ergani-submit-leave` | **`absence_id`**; `ergani_leave_code?`, `document?` | manage | Maps an `hr_absences` row onto Ergani's own leave template (or accepts a caller-built `document`) and submits; records an audit row. |
-| `ergani-submit` | **`code`**, **`document`**; `entity_type?`, `entity_id?`, `employee_id?`, `schedule_id?` | manage | Generic submit for any code (E3, WTOWeek, WTODaily, WKChgWK…); audited. |
+| `ergani-submit-leave` | **`absence_id`**; `ergani_leave_code?`, `preview?`, `document?` | manage | Maps an `hr_absences` row onto Ergani's own leave template and submits; audited. |
+| `ergani-submit-hire` | **`employee_id`**; `comments?`, `preview?`, `document?` | manage | **Ε3** hire announcement from the employee record. |
+| `ergani-submit-schedule` | **`schedule_id`**; `kind?` (`schedule_weekly`/`schedule_daily`/`change`), `comments?`, `preview?`, `document?` | manage | **Ε4** roster → `WTOWeek`/`WTODaily`/`WKChgWK`, one detail row per working shift. Flips the schedule to `submitted` + stores the protocol. `409` if already filed. |
+| `ergani-submit-separation` | **`separation_id`**; `preview?`, `document?` | manage | **Ε5**/**Ε6**/**Ε7**, code derived from `separation_type`. On success also marks the employee `terminated` + sets `end_date`. `409` if already filed. |
+| `ergani-submit-overtime` | **`overtime_ids`** (or `overtime_id`, ≤100); `comments?`, `preview?`, `document?` | manage | **Ε8** carrying every selected entry in one filing. `409` if any is already filed; `404` if any is outside the workspace. |
+| `ergani-submit` | **`code`**, **`document`**; `entity_type?`, `entity_id?`, `employee_id?`, `schedule_id?` | manage | Generic escape hatch for any code from a fully operator-built payload; audited. |
 | `ergani-download-pdf` | **`code`**, **`protocol`**, **`submitted_date`** (`yyyymmdd`) | view | Returns the submitted document PDF as base64. |
 | `ergani-retry` | **`submission_id`** | manage | Re-submits a `failed` audit row from its stored payload. |
 | `ergani-submissions-log` | `employee_id?`, `submission_type?`, `limit?` (≤500, default 100) | view | Submission audit log (newest first). |
+
+### Labour records — schedules, overtime, departures ([labour.ts](../../supabase/functions/hr-api/labour.ts))
+
+The records behind the Ε4/Ε5/Ε6/Ε7/Ε8 filings. Usable without Ergani configured — a workspace still gets an internal register. **Once a record is filed (`status='submitted'`) it is read-only: update/delete return `409`.**
+
+| Action | Params | Auth | Description |
+|---|---|---|---|
+| `list-schedules` | `employee_id?` | view | Rosters (newest `effective_from` first, ≤500) with employee. |
+| `create-schedule` | **`employee_id`**, **`schedule_type`** (`weekly`/`daily`), **`effective_from`**, **`details`**; `name?`, `effective_to?` | manage | `details` is an array of shifts `{ day: 0–6 (0=Sun), off, start, end, break_start?, break_end?, date?, note? }`, rebuilt field-by-field server-side (≤62). |
+| `update-schedule` | **`id`**; any of the above | manage | Patch. |
+| `delete-schedule` | **`id`** | manage | Delete. |
+| `list-overtime` | `employee_id?`, `from?`, `to?` | view | Overtime entries (newest `work_date` first, ≤500). |
+| `create-overtime` | **`employee_id`**, **`work_date`**, **`start_time`**, **`end_time`**, **`reason`**; `note?` | manage | `hours` is a generated column — never accepted from the body. `end_time` must be after `start_time` (same work date). |
+| `update-overtime` | **`id`**; any of the above | manage | Patch. |
+| `delete-overtime` | **`id`** | manage | Delete. |
+| `list-separations` | `employee_id?` | view | Departures (newest `effective_date` first, ≤500). |
+| `create-separation` | **`employee_id`**, **`separation_type`** (`voluntary`→Ε5 / `termination`→Ε6 / `expiry`→Ε7), **`effective_date`**; `notice_date?`, `reason?`, `severance_amount?`, `note?` | manage | The employee stays `active` until the departure is filed. |
+| `update-separation` | **`id`**; any of the above | manage | Patch. |
+| `delete-separation` | **`id`** | manage | Delete. |
 
 ### Self-service (linked employee only)
 
