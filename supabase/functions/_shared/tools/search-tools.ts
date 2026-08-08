@@ -411,6 +411,17 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
               categoryName: chunk.category_name,
               priceDocType: chunk.price_doc_type,
               relevanceScore: chunk.relevance_score || chunk.similarity_score || 0,
+              // Which corpus this hit is addressed in. `read_document_section` needs
+              // it: the two id spaces are disjoint, and a PDF document id sent to the
+              // kb reader 404s. PDF hits also carry productId, because chunkIndex
+              // restarts at 0 for each product inside a document.
+              source: chunk.source === 'pdf' ? 'pdf' : 'kb',
+              productId: chunk.product_id ?? null,
+              pageNumber: chunk.page_number ?? null,
+              // Set when structure expansion pulled neighbouring chunks in around the
+              // match, so the agent can tell the matched text from its context.
+              matchedContent: chunk.matched_content ?? null,
+              expandedChunkIndexes: chunk.metadata?.expanded_chunk_indexes ?? null,
             }));
           }
 
@@ -498,7 +509,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
     },
     {
       name: 'knowledge_base_search',
-      description: 'Search the Knowledge Base for articles, guides, installation instructions, and documentation. Use this FIRST when users ask how-to questions, troubleshooting, or general information queries. If articles are found, use them to provide accurate answers. If no articles are found, proceed to answer using your general knowledge. Optional category filters scope the search (e.g. categorySlug="pricing" to search only pricing docs). Each result is ONE SECTION of a document and carries docId + chunkIndex + heading. When a section is clearly the right place but its text is cut off mid-topic, continues into the next section, or refers to something stated just before it, call read_document_section with that docId and chunkIndex to read the surrounding sections IN ORDER — do not re-run this search with reworded keywords.',
+      description: 'Search the Knowledge Base for articles, guides, installation instructions, and documentation. Use this FIRST when users ask how-to questions, troubleshooting, or general information queries. If articles are found, use them to provide accurate answers. If no articles are found, proceed to answer using your general knowledge. Optional category filters scope the search (e.g. categorySlug="pricing" to search only pricing docs). Each result is ONE SECTION of a document and carries source + docId + chunkIndex + heading. PDF results (source="pdf") already arrive with the neighbouring sections merged in around the match, so a table or spec split across sections reads whole. When a section is still clearly the right place but its text is cut off mid-topic, continues into the next section, or refers to something stated just before it, call read_document_section with that docId, chunkIndex and source (and productId, if present) to read the surrounding sections IN ORDER — do not re-run this search with reworded keywords.',
       schema: z.object({
         query: z.string().describe('Search query - describe what information the user is looking for'),
         searchTypes: z.array(z.string()).default(['kb_docs', 'chunks', 'products']).describe('Types to search: kb_docs (authored Knowledge Base articles/docs), chunks (text extracted from ingested PDFs), products. Keep the default unless the user is clearly asking only about PDFs or products.'),
@@ -526,7 +537,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
  */
 export const createReadDocumentSectionTool = (workspaceId: string, isAdmin = false, agentId?: string) => {
   return tool(
-    async ({ docId, chunkIndex, before = 1, after = 2, query = '', maxTokens = 6000 }) => {
+    async ({ docId, chunkIndex, before = 1, after = 2, query = '', maxTokens = 6000, source = 'kb', productId }) => {
       try {
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
         const TIMEOUT_MS = 30000; // pure SQL — should answer in well under a second
@@ -538,8 +549,9 @@ export const createReadDocumentSectionTool = (workspaceId: string, isAdmin = fal
           const from = Math.max(0, chunkIndex - Math.max(0, before));
           const to = chunkIndex + Math.max(0, after);
 
+          const isPdf = source === 'pdf';
           const body: Record<string, any> = {
-            kb_doc_id: docId,
+            source: isPdf ? 'pdf' : 'kb',
             workspace_id: workspaceId,
             from_chunk_index: from,
             to_chunk_index: to,
@@ -550,6 +562,15 @@ export const createReadDocumentSectionTool = (workspaceId: string, isAdmin = fal
             caller: isAdmin ? 'admin' : 'agent',
             max_tokens: maxTokens,
           };
+          // Disjoint id spaces — the backend reads a different corpus per key.
+          if (isPdf) {
+            body.document_id = docId;
+            // chunk_index restarts at 0 per product inside a document, so without
+            // this the span resolves in the document-level namespace instead.
+            if (productId) body.product_id = productId;
+          } else {
+            body.kb_doc_id = docId;
+          }
           if (agentId && !isAdmin) body.agent_id = agentId;
 
           const response = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search/read-section`, {
@@ -579,11 +600,13 @@ export const createReadDocumentSectionTool = (workspaceId: string, isAdmin = fal
           return JSON.stringify({
             found: (data.chunks || []).length > 0,
             documentTitle: data.document_title,
-            docId: data.kb_doc_id,
+            source: data.source ?? 'kb',
+            docId: data.kb_doc_id ?? data.document_id,
             docSectionCount: data.doc_chunk_count,
             sections: (data.chunks || []).map((c: any) => ({
               chunkIndex: c.chunk_index,
               heading: c.heading,
+              pageNumber: c.page_number ?? null,
               content: c.content,
             })),
             // When the span exceeded the token budget the agent gets the outline of what
@@ -609,10 +632,12 @@ export const createReadDocumentSectionTool = (workspaceId: string, isAdmin = fal
     },
     {
       name: 'read_document_section',
-      description: 'Read a run of consecutive sections from ONE Knowledge Base document, in document order. Use this after knowledge_base_search when a result is clearly the right document but the section is incomplete — the text stops mid-topic, continues into the next heading, or depends on something explained just before it. Pass the docId and chunkIndex from that search result. This is the correct move instead of re-searching with different keywords, and it costs nothing. If the response says truncated, use the returned outline to request a narrower range.',
+      description: 'Read a run of consecutive sections from ONE document, in document order. Use this after knowledge_base_search when a result is clearly the right document but the section is incomplete — the text stops mid-topic, continues into the next heading, or depends on something explained just before it. Pass the docId, chunkIndex AND source from that search result (plus productId when the result carried one). This is the correct move instead of re-searching with different keywords, and it costs nothing. If the response says truncated, use the returned outline to request a narrower range.',
       schema: z.object({
         docId: z.string().describe('The docId from a knowledge_base_search result'),
         chunkIndex: z.number().describe('The chunkIndex of the section to read around, from the same search result'),
+        source: z.enum(['kb', 'pdf']).default('kb').describe("Copy the `source` field of the search result verbatim: 'kb' for authored Knowledge Base articles, 'pdf' for text extracted from ingested PDFs. The two use separate id spaces, so a wrong source finds nothing."),
+        productId: z.string().optional().describe("Only for source='pdf': copy the `productId` of the search result. Section numbering restarts per product inside a PDF, so omitting it reads a different part of the document."),
         before: z.number().default(1).describe('How many sections to include before it (default 1)'),
         after: z.number().default(2).describe('How many sections to include after it (default 2)'),
         query: z.string().default('').describe("The user's original question — pass it through so access rules match the search that found this document"),
