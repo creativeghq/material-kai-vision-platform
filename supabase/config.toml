@@ -132,6 +132,12 @@ verify_jwt = false
 [functions.finance-storefront]
 verify_jwt = false
 
+# #321 M1 / #258 — public product + 3D model read for the embed SDK. Anonymous by design: it runs
+# on the customer's own website, so there is no JWT to verify. Auth is a publishable embed key
+# (material_kai_keys) → workspace, plus that key's origin allowlist and per-minute quota.
+[functions.products-3d-api]
+verify_jwt = false
+
 # #252 — HR module API (employees as CRM contacts + absence tracking). Does its own auth
 # (authenticate + userCanAccessWorkspace + assertEntitled('hr') + hr.view/hr.manage RBAC).
 [functions.hr-api]
@@ -268,6 +274,13 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.taric-classify]
+verify_jwt = false
+
+# Outbound tenant webhooks (#330). The dispatcher is cron-only and gates itself on
+# x-cron-secret, so the platform JWT check has to be off for the cron to reach the handler.
+# The management API authenticates the caller itself (`authenticate({requireUser:true})`) and
+# reconciles every workspace_id against that JWT, so it does not rely on the platform gate.
+[functions.workspace-webhook-dispatcher]
 verify_jwt = false
 
 [auth]

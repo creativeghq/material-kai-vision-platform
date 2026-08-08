@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, CalendarDays, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe, Users } from 'lucide-react';
+import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, CalendarDays, Star, Share2, ReceiptText, KeyRound, Truck, LayoutGrid, Globe, Users, Webhook } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
@@ -13,6 +13,7 @@ import { InboxTab } from '@/components/core/Profile/InboxTab';
 import { SocialAccountsTab } from '@/modules/social-media/components/SocialAccountsTab';
 import { WebsitesTab } from '@/components/core/Profile/WebsitesTab';
 import { WorkspaceKeysTab } from '@/components/core/Profile/WorkspaceKeysTab';
+import { WebhooksTab } from '@/components/core/Profile/WebhooksTab';
 import { ModulesActivationTab } from '@/components/core/Profile/ModulesActivationTab';
 import { TeamPanel } from '@/components/core/Team/TeamPanel';
 import SupplierPortalPage from './SupplierPortalPage';
@@ -115,6 +116,10 @@ export const UserProfilePage: React.FC = () => {
             <KeyRound className="h-4 w-4" />
             Keys
           </TabsTrigger>
+          <TabsTrigger value="webhooks" className="flex items-center gap-2">
+            <Webhook className="h-4 w-4" />
+            Webhooks
+          </TabsTrigger>
           {showTeam && (
             <TabsTrigger value="team" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -182,6 +187,10 @@ export const UserProfilePage: React.FC = () => {
 
         <TabsContent value="keys" className="space-y-6">
           <WorkspaceKeysTab />
+        </TabsContent>
+
+        <TabsContent value="webhooks" className="space-y-6">
+          <WebhooksTab />
         </TabsContent>
 
         {showTeam && activeWorkspaceId && (

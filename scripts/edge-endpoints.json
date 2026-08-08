@@ -10679,5 +10679,74 @@
       }
     ],
     "response": "{ok: true} | {ok: true, ignored: true}"
+  },
+  {
+    "name": "workspace-webhooks-api",
+    "tag": "Webhooks",
+    "summary": "Manage a workspace's outbound webhook endpoints",
+    "description": "Tenant-facing CRUD for outbound webhook subscriptions (#330). Actions: list, create, update, rotate_secret, delete, deliveries. The HMAC signing secret is generated server-side and returned exactly once (on create and rotate_secret) - the column is revoked from the authenticated role and cannot be read back. Endpoint URLs are https-only and pass the shared SSRF guard before they are stored. Event types are validated against SUBSCRIBABLE_EVENT_TYPES. workspace_id is always reconciled against the caller's JWT; an endpoint belonging to another workspace returns 404, not 403.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": "docs/outbound-webhooks.md",
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "create",
+            "update",
+            "rotate_secret",
+            "delete",
+            "deliveries"
+          ]
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "event_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string"
+        },
+        "is_active": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "number"
+        }
+      }
+    },
+    "response": "{ok, webhooks[]|webhook|deliveries[]|secret, available_events[]}"
+  },
+  {
+    "name": "workspace-webhook-dispatcher",
+    "tag": "Webhooks",
+    "summary": "Deliver queued outbound webhook events to tenant endpoints",
+    "description": "Cron function that POSTs queued deliveries to tenant endpoints (#330). Signs each request HMAC-SHA256 over '{timestamp}.{body}' and sends it as X-MaterialKai-Signature, with the timestamp inside the signed string so a captured delivery cannot be replayed later. Re-runs the shared SSRF guard at delivery time (not just at registration - DNS behind a stored hostname can be re-pointed) and refuses to follow redirects. Retries with exponential backoff to a hard attempt cap; an SSRF rejection fails immediately rather than retrying. An endpoint that fails enough consecutive deliveries is auto-disabled.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": "docs/outbound-webhooks.md",
+    "methods": [
+      "POST"
+    ],
+    "request": [],
+    "response": "{ok, claimed, delivered, retrying, failed, dropped, endpoints_disabled}"
   }
 ]

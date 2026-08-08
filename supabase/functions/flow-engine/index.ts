@@ -1715,6 +1715,47 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'seo.ranking_movement', 'seo.backlink_movement', 'seo.site_health_changed',
 ]);
 
+/**
+ * Queue this event for every active tenant endpoint that opted into its type (#330).
+ *
+ * Queue, not deliver: a tenant's endpoint can be slow, down, or hostile, and none of that may
+ * be allowed to slow or fail the emit that triggered it. `workspace-webhook-dispatcher` does
+ * the actual POST, with the SSRF guard, the signature and the retry schedule.
+ *
+ * Subscriptions are matched by explicit opt-in (`event_types` contains this type). There is no
+ * "all events" option on purpose — an endpoint that silently starts receiving newly-added event
+ * types leaks data by default.
+ */
+async function enqueueTenantWebhooks(
+  supabase: DbClient,
+  workspaceId: string,
+  eventType: string,
+  data: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const { data: hooks, error } = await supabase
+      .from('workspace_webhooks')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('is_active', true)
+      .contains('event_types', [eventType]);
+    if (error || !hooks?.length) return;
+
+    await supabase.from('workspace_webhook_deliveries').insert(
+      hooks.map((h: { id: string }) => ({
+        webhook_id: h.id,
+        workspace_id: workspaceId,
+        event_type: eventType,
+        // A stable envelope, so a tenant parser does not break when we add fields to `data`.
+        payload: { type: eventType, workspace_id: workspaceId, data },
+      })),
+    );
+  } catch (err) {
+    // Never fail the emit over a webhook enqueue — the caller is mid-business-transaction.
+    console.error('[flow-engine] webhook enqueue failed', { workspaceId, eventType, err });
+  }
+}
+
 async function handleTriggerEvent(
   supabase: DbClient,
   body: { event_type: string; data: Record<string, unknown> },
@@ -1745,6 +1786,16 @@ async function handleTriggerEvent(
     } else if (auth.userId && await userCanAccessWorkspace(supabase, auth.userId, bodyWs)) {
       workspaceId = bodyWs;
     }
+  }
+
+  // ── Outbound tenant webhooks (#330) ────────────────────────────────────────────────────
+  // Deliberately BEFORE the flows lookup and its early return: most events match no flow, so
+  // enqueuing after that `return` would deliver nothing for exactly the events tenants most
+  // want (invoice issued, order created) while every call still returned 200 — the silent-zero
+  // shape. Requires a resolved workspace: an event we cannot attribute to one tenant must
+  // never be fanned out to a tenant's endpoint.
+  if (workspaceId) {
+    await enqueueTenantWebhooks(supabase, workspaceId, event_type, data);
   }
 
   // Match active flows on trigger_type, scoped: all is_global flows PLUS this workspace's
