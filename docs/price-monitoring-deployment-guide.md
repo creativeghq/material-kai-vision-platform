@@ -225,7 +225,10 @@ curl -X POST http://localhost:8000/api/v1/price-monitoring/products/<product_uui
   -d '{"url": "https://retailer.example.com/product/abc"}'
 ```
 
-Creates a sibling `tracked_queries` row with `mode='url-only'` and `pinned_url` set.
+Creates a sibling `tracked_queries` row with `mode='url-only'` and `pinned_url` set. Its
+refreshes take the Firecrawl-only path (`_refresh_url_only`) — one scrape of the pinned URL,
+no discovery and no classifier. Expect `source='firecrawl_url'`, `match_kind='exact'` and a
+single history row per refresh.
 
 ### 5. Verify database records
 

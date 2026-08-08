@@ -10,7 +10,15 @@ The exact same engine serves external API consumers via `POST /api/v1/prices/tra
 
 ## Pipeline
 
-Every refresh runs:
+Two refresh paths, chosen by `tracked_queries.mode`. `refresh()` branches **before** any paid
+call:
+
+- **`mode='url-only'`** (Custom Monitoring) → `_refresh_url_only()`: one Firecrawl scrape of
+  `pinned_url`, stamped `source='firecrawl_url'` / `match_kind='exact'`, then straight into
+  the shared persistence tail (steps 5, 7, 8, 9 below). No Perplexity, no DataForSEO, no
+  marketplaces, no Haiku classifier — the user picked the page, so there is nothing to
+  discover and no identity to adjudicate. ~1 Firecrawl credit per check.
+- **everything else** → the full discovery pass:
 
 1. **Discovery (parallel)** — Perplexity Sonar + DataForSEO Merchant + (when enabled) Greek marketplaces (Skroutz, Bestprice, Shopflix) + Idealo (DACH/IT/UK/ES/FR). Hits merged + deduped.
 2. **URL pre-filter** — drops homepages, SERPs, aggregator masquerades before Firecrawl spend.
@@ -108,7 +116,19 @@ Single chokepoint for both flows. Methods of interest:
 - `find_for_product(product_id)` — read internal row
 - `list_internal(...)` — admin dashboard product list
 - `add_url_only(...)` / `list_url_only_for_product(...)` — Custom Monitoring
-- `refresh(tracking_id, force=...)` — single shared refresh path; populates the denormalized cache via `_select_cheapest()`
+- `refresh(tracking_id, force=...)` — entry point for both paths; branches to `_refresh_url_only()` on `mode='url-only'` **before** the discovery call
+- `_refresh_url_only(...)` — Firecrawl scrape of `pinned_url`, nothing else
+- `_persist_refresh(...)` — the tail both paths share: exclusions → sanity band → history insert → alerts → `current_*` cache (`_select_cheapest()`) → cadence → brand index
+
+> **Fixed 2026-08-08 (issue #234).** Before this, `refresh()` had no `mode` branch and
+> `pinned_url` was read by no backend code at all: a pinned URL ran the full discovery pass
+> keyed on the product *name*, re-billed every 24h by the cron, while the page the user
+> actually pinned went unfetched. Guarded by
+> [tests/unit/test_url_only_is_firecrawl_only.py](../mivaa-pdf-extractor/tests/unit/test_url_only_is_firecrawl_only.py),
+> which asserts the branch sits before `search_prices()` — a branch placed after it reads as
+> correct and still pays for the pass. Same fix scoped `find_for_product()` to
+> `mode='discovery'`; without it that `LIMIT 1` could return a pinned-URL sibling as the
+> product's tracked query.
 - `latest_results_split(tracking_id)` → `{results, family_results}`
 - `history(tracking_id, limit)` — historical rows
 - `add_exclusion(...)` / `remove_exclusion(...)` / `list_exclusions(...)`
