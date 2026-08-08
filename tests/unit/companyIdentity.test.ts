@@ -18,9 +18,25 @@
  *      here is a FOURTH hand-rolled quick-create, which is exactly how we got three.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { globSync } from 'node:fs';
+
+/**
+ * Walk for `.ts`/`.tsx` under a root. NOT `fs.globSync` — that landed in Node 22, and CI runs
+ * Node 20, so it is `undefined` there: the guard threw in CI while passing on a dev machine.
+ * Every other source-scanning test in this directory walks with readdirSync for the same reason.
+ */
+function walk(dir: string, out: string[] = []): string[] {
+  let entries: string[];
+  try { entries = readdirSync(dir); } catch { return out; }
+  for (const e of entries) {
+    if (e === 'node_modules' || e === 'dist') continue;
+    const p = join(dir, e);
+    if (statSync(p).isDirectory()) walk(p, out);
+    else if (/\.tsx?$/.test(e)) out.push(p);
+  }
+  return out;
+}
 
 import {
   companyIdentityPayload,
@@ -203,7 +219,9 @@ describe('the shared control is the only way a business gets created', () => {
       'src/components/core/Profile/BusinessSection.tsx': 'own workspace business profile',
     };
 
-    const scanned = globSync('src/**/*.{ts,tsx}', { cwd: process.cwd() }).map((f) => f.replace(/\\/g, '/'));
+    const root = process.cwd();
+    const scanned = walk(join(root, 'src'))
+      .map((f) => f.slice(root.length + 1).replace(/\\/g, '/'));
     // A scan that finds no files passes every assertion below while checking nothing. This is
     // the platform's dominant failure shape (see ops.silent_zero) and a source-grep guard is a
     // prime host for it — so the scan proves it ran before its verdict counts.
