@@ -1034,12 +1034,16 @@ export interface ToolkitQuickStartRun {
   fixedArgs?: Record<string, unknown>;
   /**
    * Per-tool-arg value coercion (keyed by the RESOLVED tool-arg name):
-   *  - 'number' → Number(value)
-   *  - 'csv'    → split on commas → string[]
-   *  - 'lines'  → split on newlines/commas → string[]
+   *  - 'number'  → Number(value)
+   *  - 'boolean' → 'true'/'false' → true/false
+   *  - 'csv'     → split on commas → string[]
+   *  - 'lines'   → split on newlines/commas → string[]
    * Text fields without a coercion pass through as trimmed strings.
+   *
+   * `deriveCoercions` (toolAutoFields.ts) fills these in from the manifest for
+   * derived forms; anything declared here wins over the derived value.
    */
-  coerce?: Record<string, 'number' | 'csv' | 'lines'>;
+  coerce?: Record<string, 'number' | 'boolean' | 'csv' | 'lines'>;
 }
 
 /**
@@ -1084,6 +1088,18 @@ export interface ToolkitQuickStart {
    * firing `prompt` and having the agent ask follow-up questions in chat.
    */
   form?: ToolkitFormField[];
+  /**
+   * Derive the form from the target tool's schema instead of hand-writing it
+   * (see toolAutoFields.deriveAutoFields). Enum params become selects carrying
+   * EVERY option the z.enum declares, so adding an option to a tool surfaces it
+   * in the UI with no frontend edit — which is the point.
+   *
+   * Explicit opt-in, and only meaningful together with `run`. A `form` entry still
+   * overrides the derived field for the same param, so you can relabel one field
+   * without hand-writing the rest. Params pinned by `fixedArgs`, ids, and
+   * object/record-shaped params are never asked for.
+   */
+  autoFields?: boolean;
   /**
    * Template used with `form`. Placeholders `{{key}}` are substituted with the
    * collected values. Falls back to `prompt` when omitted.
@@ -1169,6 +1185,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Find me 5 cement-based grey tiles for a modern bathroom',
         promptTemplate: 'Find me {{count}} {{description}}.',
         run: { tool: 'material_search', argMap: { description: 'query', count: 'limit' }, coerce: { limit: 'number' } },
+        // autoFields keeps the two hand-written fields (they override `query` and
+        // `limit` by argMap) and ADDS the `aspect` select — colour / texture / style /
+        // material — which the schema has always had and the UI never showed.
+        autoFields: true,
         form: [
           { key: 'description', label: 'What are you looking for?', kind: 'text', required: true, placeholder: 'cement-based grey tiles for a modern bathroom' },
           { key: 'count', label: 'How many results?', kind: 'number', default: '5' },
@@ -1181,6 +1201,18 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'knowledge_base_search' },
         form: [
           { key: 'query', label: 'What do you want to look up?', kind: 'text', required: true, placeholder: 'How does the 7-vector fusion search work?' },
+        ],
+      },
+      {
+        // autoFields surfaces the tool's `focus` enum (all / floor / wall /
+        // countertop / ceiling / furniture), which existed in the schema from day
+        // one and had never been reachable from the UI.
+        label: 'Analyze inspiration', description: 'Pull design tokens from any page', icon: 'Link',
+        prompt: 'Analyze a design inspiration URL.',
+        run: { tool: 'analyze_inspiration_url' },
+        autoFields: true,
+        form: [
+          { key: 'url', label: 'Inspiration URL', kind: 'text', required: true, placeholder: 'https://www.pinterest.com/pin/12345/' },
         ],
       },
     ],
@@ -1232,9 +1264,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Generate the PDF for catalog "{{catalog}}" using the {{layout}} layout{{proforma}}.',
         form: [
           { key: 'catalog', label: 'Which catalog?', kind: 'text', required: true, placeholder: 'Spring 2026 — Porcelain Range' },
-          { key: 'layout', label: 'Layout', kind: 'select', default: 'table list', options: [
-            { value: 'table list', label: 'Table list (quote-style)' },
-            { value: 'image grid', label: 'Image grid (cards)' },
+          // Values are generate_catalog_pdf's `layout` z.enum. They used to be the
+          // prose 'table list' / 'image grid', which the enum rejects outright — the
+          // agent had to translate them back on every run.
+          { key: 'layout', label: 'Layout', kind: 'select', default: 'list', options: [
+            { value: 'list', label: 'Table list (quote-style)' },
+            { value: 'grid', label: 'Image grid (cards)' },
           ] },
           { key: 'proforma', label: 'Totals block?', kind: 'select', default: '', options: [
             { value: '', label: 'No — plain catalog' },
@@ -1257,9 +1292,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Re-price catalog "{{catalog}}" so the {{basis}} total becomes {{target}}. Scale every line proportionally, keep each line\'s discount %, then regenerate the PDF.',
         form: [
           { key: 'catalog', label: 'Which catalog / proforma?', kind: 'text', required: true, placeholder: 'Προσφορά ΠΡΦ-20-01645' },
-          { key: 'basis', label: 'Which total?', kind: 'select', default: 'payable (VAT included)', options: [
-            { value: 'payable (VAT included)', label: 'Payable — VAT included' },
-            { value: 'net (before VAT)', label: 'Net — before VAT' },
+          // Values are adjust_catalog_pricing's `basis` z.enum, not the parenthetical
+          // prose they used to be — the enum accepts only 'payable' | 'net'.
+          { key: 'basis', label: 'Which total?', kind: 'select', default: 'payable', options: [
+            { value: 'payable', label: 'Payable — VAT included' },
+            { value: 'net', label: 'Net — before VAT' },
           ] },
           { key: 'target', label: 'Target total or change', kind: 'text', required: true, placeholder: '€2,438  ·  +400  ·  +15%  ·  +25 per item' },
         ],
@@ -1587,7 +1624,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Record absence', description: 'Log a sick/vacation day (pending approval)', icon: 'CalendarPlus',
         prompt: 'Record an absence for an employee.',
         promptTemplate: 'Record a {{absence_type}} day for {{employee}} from {{start_date}} to {{end_date}}.',
-        run: { tool: 'manage_hr' },
+        run: {
+          tool: 'manage_hr',
+          fixedArgs: { action: 'record_absence' },
+          argMap: { employee: 'employee_name' },
+        },
         form: [
           { key: 'employee', label: 'Employee name', kind: 'text', required: true, placeholder: 'Maria' },
           { key: 'absence_type', label: 'Type', kind: 'select', default: 'sick', options: [
@@ -1625,7 +1666,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Check an item', description: 'On-hand & available for a product', icon: 'Search',
         prompt: 'Check stock for an item.',
         promptTemplate: 'How many "{{item}}" do we have in stock?',
-        run: { tool: 'manage_stock', fixedArgs: { action: 'check_stock' } },
+        run: { tool: 'manage_stock', fixedArgs: { action: 'check_stock' }, argMap: { item: 'item_query' } },
         form: [
           { key: 'item', label: 'Item name or SKU', kind: 'text', required: true, placeholder: 'Oak plank' },
         ],
@@ -1634,10 +1675,15 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Receive stock', description: 'Add received units to an item', icon: 'PackagePlus',
         prompt: 'Receive stock for an item.',
         promptTemplate: 'Receive {{quantity}} units of "{{item}}" into stock.',
-        run: { tool: 'manage_stock', fixedArgs: { action: 'adjust_stock', direction: 'in' } },
+        run: {
+          tool: 'manage_stock',
+          fixedArgs: { action: 'adjust_stock', direction: 'in' },
+          argMap: { item: 'item_query' },
+          coerce: { quantity: 'number' },
+        },
         form: [
           { key: 'item', label: 'Item name or SKU', kind: 'text', required: true, placeholder: 'White tile 60x60' },
-          { key: 'quantity', label: 'Quantity', kind: 'text', required: true, placeholder: '50' },
+          { key: 'quantity', label: 'Quantity', kind: 'number', required: true, placeholder: '50' },
         ],
       },
     ],
@@ -1661,7 +1707,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Product provenance', description: 'Where a product came from', icon: 'Network',
         prompt: 'Show the provenance of a product.',
         promptTemplate: 'Where did "{{product}}" come from? Show its provenance.',
-        run: { tool: 'product_provenance' },
+        run: { tool: 'product_provenance', argMap: { product: 'sku' } },
         form: [
           { key: 'product', label: 'Product name or SKU', kind: 'text', required: true, placeholder: 'White tile 60x60' },
         ],
@@ -1670,18 +1716,34 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Brand overview', description: 'Everything about one brand', icon: 'Building2',
         prompt: 'Give me an overview of a brand.',
         promptTemplate: 'Give me a brand overview for "{{brand}}".',
-        run: { tool: 'brand_overview' },
+        run: { tool: 'brand_overview', argMap: { brand: 'brand_name' } },
         form: [
           { key: 'brand', label: 'Brand', kind: 'text', required: true, placeholder: 'Marazzi' },
         ],
       },
       {
+        // NOT a `run:` quick-start. find_products_by_spec takes NUMERIC RANGES
+        // (ip_min, pei_min, thickness_min/max, wattage_min/max) — it has no free-text
+        // param at all, so the single "Specification" box this used to collect was
+        // dropped on the floor and the tool ran unfiltered. Prose goes to the agent,
+        // which translates "IP65, at least 10mm" into the ranges.
         label: 'Find by spec', description: 'Look products up by specification', icon: 'FileSearch',
         prompt: 'Find products by spec.',
         promptTemplate: 'Find products matching this spec: {{spec}}',
-        run: { tool: 'find_products_by_spec' },
         form: [
-          { key: 'spec', label: 'Specification', kind: 'text', required: true, placeholder: 'R11 slip resistance, frost resistant' },
+          { key: 'spec', label: 'Specification', kind: 'text', required: true, placeholder: 'IP65 or better, at least 10mm thick' },
+        ],
+      },
+      {
+        // autoFields surfaces the `match` enum (exact | prefix) — searching a ΚΑΔ
+        // sector ("46") versus an exact code ("46.73.10") is the whole point of that
+        // parameter, and it had no UI at all.
+        label: 'Search by ΚΑΔ', description: 'CRM companies with an activity code', icon: 'Search',
+        prompt: 'Which companies in our CRM have a given ΚΑΔ activity code?',
+        run: { tool: 'search_crm_by_kad' },
+        autoFields: true,
+        form: [
+          { key: 'kad', label: 'ΚΑΔ code', kind: 'text', required: true, placeholder: '46.73.10 or 46' },
         ],
       },
     ],
@@ -1701,21 +1763,30 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'manage_flows', fixedArgs: { action: 'list' } },
       },
       {
+        // Deliberately NOT a `run:` quick-start. `create` needs a structured
+        // `actions: [{action_type, config}]` array and a `trigger_type` drawn from the
+        // tenant-safe vocabulary — neither is expressible as free text. It WAS a run
+        // quick-start, and it was broken two ways: `trigger` is not a param at all, and
+        // the field literally keyed `action` overwrote the pinned `action: 'create'`
+        // router verb with the user's prose (buildToolInput applies form values AFTER
+        // fixedArgs). The agent translates the sentence into the structured call.
         label: 'Create a flow', description: 'Trigger → action automation', icon: 'Plus',
         prompt: 'Create a new flow.',
-        promptTemplate: 'Create a flow named "{{name}}" that runs when {{trigger}} and then {{action}}.',
-        run: { tool: 'manage_flows', fixedArgs: { action: 'create' } },
+        promptTemplate: 'Create a flow named "{{name}}" that runs when {{trigger}} and then {{what_it_does}}.',
         form: [
           { key: 'name', label: 'Flow name', kind: 'text', required: true, placeholder: 'Notify me on new quote' },
           { key: 'trigger', label: 'When should it run?', kind: 'text', required: true, placeholder: 'a quote is approved' },
-          { key: 'action', label: 'What should it do?', kind: 'text', required: true, placeholder: 'send me a notification' },
+          { key: 'what_it_does', label: 'What should it do?', kind: 'text', required: true, placeholder: 'send me a notification' },
         ],
       },
       {
+        // Also not a `run:`. toggle requires `flow_id` (a UUID) — the tool returns
+        // "flow_id is required to toggle a flow" for anything else, which is exactly
+        // what this quick-start used to send it, every time. Resolving a name to an id
+        // needs a list first, so it goes through the agent.
         label: 'Pause a flow', description: 'Turn an automation off', icon: 'CalendarOff',
         prompt: 'Pause one of my flows.',
         promptTemplate: 'Pause the flow "{{name}}".',
-        run: { tool: 'manage_flows', fixedArgs: { action: 'toggle' } },
         form: [
           { key: 'name', label: 'Flow name', kind: 'text', required: true, placeholder: 'Notify me on new quote' },
         ],
@@ -1775,23 +1846,38 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Browse the radar', description: 'Current tracked findings', icon: 'Radar',
         prompt: 'Show me the tech radar.',
         run: { tool: 'list_tech_radar' },
+        // Every field is optional, so this is still one click through — but the `ring`
+        // filter (adopt / trial / assess / hold) is now reachable instead of living
+        // only in the schema.
+        autoFields: true,
       },
       {
         label: 'Review a solution', description: 'Assess it against our stack', icon: 'BadgeCheck',
         prompt: 'Review a solution against our stack.',
         promptTemplate: 'Review "{{solution}}" against our current stack and tell me if we should adopt it.',
-        run: { tool: 'review_solution' },
+        run: { tool: 'review_solution', argMap: { solution: 'title' } },
         form: [
           { key: 'solution', label: 'Solution / Library', kind: 'text', required: true, placeholder: 'Drizzle ORM' },
+          { key: 'current_approach', label: 'How we do it today', kind: 'textarea', placeholder: 'Supabase JS client + hand-written SQL in edge functions' },
+          { key: 'constraints', label: 'Constraints to respect', kind: 'text', placeholder: 'Must run on Deno; no new paid services' },
         ],
       },
       {
         label: 'Track an entry', description: 'Add something to the radar', icon: 'Plus',
         prompt: 'Track something on the tech radar.',
         promptTemplate: 'Track "{{solution}}" on the tech radar.',
-        run: { tool: 'track_tech_radar' },
+        // `action` is REQUIRED on track_tech_radar — without the fixedArg this call
+        // failed zod validation every single time it was clicked.
+        run: {
+          tool: 'track_tech_radar',
+          fixedArgs: { action: 'create' },
+          argMap: { solution: 'title' },
+          coerce: { review_interval_hours: 'number' },
+        },
         form: [
           { key: 'solution', label: 'Solution / Library', kind: 'text', required: true, placeholder: 'Drizzle ORM' },
+          { key: 'component', label: 'Area it affects', kind: 'text', placeholder: 'ocr, image-embeddings' },
+          { key: 'review_interval_hours', label: 'Review cadence (hours)', kind: 'number', default: '168', help: '24 = daily, 168 = weekly, 720 = monthly' },
         ],
       },
     ],
@@ -1828,6 +1914,28 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'find_project' },
         form: [
           { key: 'query', label: 'Project name', kind: 'text', required: true, placeholder: 'Athens loft renovation' },
+        ],
+      },
+      {
+        // autoFields: the form is the tool's own schema, so `visibility`
+        // (internal | client_visible) shows up as a select without being mirrored
+        // here — and stays right if the enum ever gains a third value.
+        label: 'Add a task', description: 'Add a task to a project', icon: 'ListPlus',
+        prompt: 'Add a task to one of my projects.',
+        run: { tool: 'add_task' },
+        autoFields: true,
+        form: [
+          { key: 'project_name', label: 'Project', placeholder: 'Athens loft renovation', kind: 'text', required: true },
+          { key: 'title', label: 'Task', placeholder: 'Order the oak flooring', kind: 'text', required: true },
+        ],
+      },
+      {
+        label: 'Purchase sheet', description: 'PDF of the doors/windows spec', icon: 'FileText',
+        prompt: 'Generate the purchase sheet for one of my projects.',
+        run: { tool: 'generate_purchase_sheet' },
+        autoFields: true,
+        form: [
+          { key: 'project_name', label: 'Project', placeholder: 'Athens loft renovation', kind: 'text', required: true },
         ],
       },
     ],
@@ -1966,13 +2074,18 @@ export const TOOLKITS: ToolkitDefinition[] = [
         generation: { imageKeys: ['photo'] },
         form: [
           { key: 'photo', label: 'Room photo', kind: 'image', required: true },
-          { key: 'preset', label: 'Lighting mood', kind: 'select', default: 'Golden Hour', options: [
-            { value: 'Natural Daylight', label: 'Natural Daylight' },
-            { value: 'Golden Hour', label: 'Golden Hour' },
-            { value: 'Overcast', label: 'Overcast' },
-            { value: 'Showroom Spots', label: 'Showroom Spots' },
-            { value: 'Warm Evening', label: 'Warm Evening' },
-            { value: 'Night', label: 'Night' },
+          // Values are apply_lighting_preset's z.enum tokens, NOT prose. They used
+          // to be readable labels ("Natural Daylight", "Showroom Spots") that the
+          // agent had to map back through the tool description — an unchecked
+          // translation layer that would silently rot the day the enum changed.
+          // The options-drift guard now holds these to the schema.
+          { key: 'preset', label: 'Lighting mood', kind: 'select', default: 'golden_hour', options: [
+            { value: 'golden_hour', label: 'Golden hour' },
+            { value: 'bright_midday', label: 'Bright midday' },
+            { value: 'soft_overcast', label: 'Soft overcast' },
+            { value: 'warm_evening', label: 'Warm evening' },
+            { value: 'night', label: 'Night' },
+            { value: 'dramatic_spots', label: 'Dramatic spots' },
           ] },
         ],
       },
@@ -1995,15 +2108,48 @@ export const TOOLKITS: ToolkitDefinition[] = [
         icon: 'Globe',
         imageRequired: true,
         prompt: 'Build a VR world from this room image.',
-        promptTemplate: 'Turn this room image into an explorable VR world using the {{quality}} model.',
+        promptTemplate: 'Turn this room image into an explorable VR world using the {{model}} model.',
         // No forced mode — the interior agent routes to the VR tool.
         generation: { imageKeys: ['photo'] },
         form: [
           { key: 'photo', label: 'Room image', kind: 'image', required: true },
-          { key: 'quality', label: 'Quality', kind: 'select', default: 'draft', options: [
-            { value: 'draft', label: 'Draft — fast preview (18 credits)' },
-            { value: 'high-quality', label: 'High quality (190 credits)' },
+          // Values are generate_vr_world's `model` z.enum, not the invented
+          // 'draft' / 'high-quality' pair they used to be — those matched no enum
+          // member, so the agent had to guess the mapping on every single run.
+          { key: 'model', label: 'Quality', kind: 'select', default: 'marble-1.0-draft', options: [
+            { value: 'marble-1.0-draft', label: 'Draft — fast preview (18 credits)' },
+            { value: 'marble-1.1', label: 'High quality (190 credits)' },
           ] },
+        ],
+      },
+      {
+        // generate_video sat in this cluster's tool_ids with NO quick-start at all,
+        // so five video types and four models lived only in the schema. Same rail as
+        // the VR world flow: capture the photo, let the interior agent route to the
+        // tool with the pipeline's public image URL.
+        label: 'Make a video',
+        description: 'Animate a room image into a walkthrough, reel, or before/after',
+        icon: 'Video',
+        imageRequired: true,
+        prompt: 'Generate an interior video from this room image.',
+        promptTemplate: 'Generate a {{video_type}} video from this room image using the {{model}} model, {{aspect_ratio}}, {{duration_seconds}} seconds long. {{notes}}',
+        generation: { imageKeys: ['photo'] },
+        form: [
+          { key: 'photo', label: 'Room image', kind: 'image', required: true },
+          { key: 'video_type', label: 'Video type', kind: 'select', default: 'walkthrough', options: [
+            { value: 'walkthrough', label: 'Walkthrough — camera moves through the room' },
+            { value: 'product_spotlight', label: 'Product spotlight — focus on one material' },
+            { value: 'before_after', label: 'Before / after transition' },
+            { value: 'floorplan_flythrough', label: 'Floor-plan flythrough' },
+            { value: 'social_reel', label: 'Social reel — 9:16 short form' },
+          ] },
+          { key: 'aspect_ratio', label: 'Aspect ratio', kind: 'select', default: '16:9', options: [
+            { value: '16:9', label: '16:9 — standard' },
+            { value: '9:16', label: '9:16 — social reel' },
+            { value: '1:1', label: '1:1 — square' },
+          ] },
+          { key: 'duration_seconds', label: 'Duration (seconds)', kind: 'number', default: '8', help: '5–16 seconds' },
+          { key: 'notes', label: 'Anything to emphasize? (optional)', kind: 'textarea', placeholder: 'e.g. slow pan across the kitchen island' },
         ],
       },
     ],
@@ -2197,6 +2343,18 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
+        // autoFields surfaces the required `store` enum (google_play | app_store) —
+        // the tool was in this cluster with no quick-start, so picking a store was
+        // only possible by naming it in chat.
+        label: 'App-store keywords', description: 'Keywords a mobile app ranks for', icon: 'Layers',
+        prompt: 'Which keywords does a mobile app rank for?',
+        run: { tool: 'seo_app_keywords' },
+        autoFields: true,
+        form: [
+          { key: 'app_id', label: 'App ID', kind: 'text', required: true, placeholder: 'com.example.app  ·  id1234567890', help: 'Package name for Google Play, bundle ID for the App Store.' },
+        ],
+      },
+      {
         label: 'Reddit threads', description: 'Real user discussion + pain points', icon: 'Layers',
         prompt: 'Find Reddit threads discussing a topic.',
         promptTemplate: 'Find Reddit threads discussing "{{topic}}".',
@@ -2261,8 +2419,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Just research', description: 'Stop at research stage', icon: 'Search',
         prompt: 'Run only Stage 1 (keyword research).',
         promptTemplate: 'Run only Stage 1 (keyword research) for the seed keyword "{{keyword}}".',
-        run: { tool: 'seo_keyword_research', argMap: { keyword: 'topic' } },
+        // `topic` AND `target_keyword` are both required. Mapping the one seed field
+        // to `topic` left target_keyword unset, so the call never validated.
+        run: { tool: 'seo_keyword_research', argMap: { keyword: 'target_keyword' } },
         form: [
+          { key: 'topic', label: 'Topic / niche', kind: 'text', required: true, placeholder: 'sustainable building materials' },
           { key: 'keyword', label: 'Seed keyword', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
         ],
       },
@@ -2296,9 +2457,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'Enrich a company', description: 'Apollo data for a known domain', icon: 'Building2',
         prompt: 'Pull Apollo enrichment for a single company.',
         promptTemplate: 'Pull Apollo enrichment for {{domain}}.',
-        run: { tool: 'company_enrichment' },
+        // company_name is REQUIRED by the schema; collecting only the domain made
+        // every click fail validation before it reached Apollo.
+        run: { tool: 'company_enrichment', argMap: { company: 'company_name' } },
         form: [
-          { key: 'domain', label: 'Company domain', kind: 'text', required: true, placeholder: 'example.com' },
+          { key: 'company', label: 'Company name', kind: 'text', required: true, placeholder: 'Paradyż' },
+          { key: 'domain', label: 'Company domain', kind: 'text', placeholder: 'example.com' },
+          { key: 'country', label: 'Country', kind: 'country', placeholder: 'Any market' },
         ],
       },
       {
@@ -2461,6 +2626,8 @@ export function buildToolInput(
     if (coercion === 'number') {
       const n = Number(v);
       if (!Number.isNaN(n)) out[argName] = n;
+    } else if (coercion === 'boolean') {
+      out[argName] = v === 'true';
     } else if (coercion === 'csv') {
       out[argName] = v.split(',').map((s) => s.trim()).filter(Boolean);
     } else if (coercion === 'lines') {

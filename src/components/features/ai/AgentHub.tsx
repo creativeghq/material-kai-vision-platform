@@ -70,6 +70,9 @@ import { JobSitesFormModal, type JobSitesFormState } from './JobSitesFormModal';
 import { TechRadarFindingsCard, type TechRadarFindingsData } from './TechRadarFindingsCard';
 import { TechRadarReviewModal, type TechRadarFormState } from './TechRadarReviewModal';
 import { ToolkitFormModal, type ToolkitFormModalState } from './ToolkitFormModal';
+// A quick-start's fields may be DERIVED from its tool's schema (autoFields), so
+// "does this need the collect-first modal?" is no longer `qs.form?.length`.
+import { deriveAutoFields } from './toolAutoFields';
 // PromptLibrary merged into PromptBuilderModal — its 35 design templates,
 // 10 room-filter chips, image-aware mode, and virtual-staging wizard hook
 // now live inside the "Prompt Library" tab when the active agent is
@@ -982,7 +985,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // the toolkit into the next request) — closes the "tools not loaded" race.
     ensureAgentAndToolkit(tk);
 
-    if (qs.form?.length) {
+    if (deriveAutoFields(qs).length) {
       // Pre-fill the image field with a photo already in play (composer
       // attachment or the latest generated image) so launching from a chip
       // doesn't re-ask for the photo the user already provided.
@@ -4588,7 +4591,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const launchQuickStartFromOnboarding = (prompt: string, qs: ToolkitQuickStart, tk: ToolkitDefinition) => {
     setJustEnabledToolkitId(null);
     ensureAgentAndToolkit(tk);
-    if (qs.form?.length) {
+    if (deriveAutoFields(qs).length) {
       setToolkitFormState({ quickStart: qs, toolkit: tk });
       return;
     }
@@ -4839,7 +4842,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   // Form-bearing quick-starts collect their fields first, then
                   // auto-send one complete message (takes priority over the
                   // step-by-step workflow tracker).
-                  if (qs.form?.length) {
+                  if (deriveAutoFields(qs).length) {
                     setToolkitFormState({ quickStart: qs, toolkit: tkParam });
                     return;
                   }

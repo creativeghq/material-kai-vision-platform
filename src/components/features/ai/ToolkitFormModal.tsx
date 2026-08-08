@@ -26,6 +26,7 @@ import {
   renderPromptTemplate, buildToolInput,
   type ToolkitQuickStart, type ToolkitDefinition, type ToolkitFormField,
 } from './agentToolsCatalog';
+import { deriveAutoFields, deriveCoercions } from './toolAutoFields';
 
 export type ToolkitFormModalState = {
   quickStart: ToolkitQuickStart;
@@ -95,16 +96,19 @@ export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool, onGenera
   const open = !!state;
   const [values, setValues] = useState<Record<string, string>>({});
 
-  const fields = state?.quickStart.form ?? [];
+  // A quick-start with `autoFields` gets its fields from the target tool's own
+  // schema (see toolAutoFields), so a tool's z.enum options can never be invisible
+  // here. Everything else returns its hand-written `form` unchanged.
+  const fields = useMemo(() => (state ? deriveAutoFields(state.quickStart) : []), [state]);
   const imageFieldKeys = useMemo(() => fields.filter((f) => f.kind === 'image').map((f) => f.key), [fields]);
 
   // Reset to per-field defaults whenever a new quick-start opens.
   useEffect(() => {
     if (!state) return;
     const init: Record<string, string> = {};
-    for (const f of state.quickStart.form ?? []) init[f.key] = state.prefill?.[f.key] ?? f.default ?? '';
+    for (const f of fields) init[f.key] = state.prefill?.[f.key] ?? f.default ?? '';
     setValues(init);
-  }, [state]);
+  }, [state, fields]);
 
   const set = (k: string, v: string) => setValues((p) => ({ ...p, [k]: v }));
 
@@ -146,9 +150,13 @@ export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool, onGenera
     // direct tool invocation (no LLM). Falls back to prompt-injection if the
     // parent didn't provide onRunTool.
     if (state.quickStart.run && onRunTool) {
+      const run = state.quickStart.run;
       onRunTool({
-        toolName: state.quickStart.run.tool,
-        toolInput: buildToolInput(state.quickStart.run, values),
+        toolName: run.tool,
+        // Coercions derive from the schema (number / boolean / array) so a derived
+        // field never hands a z.number() the string "8". The quick-start's own
+        // `coerce` still wins per-arg.
+        toolInput: buildToolInput({ ...run, coerce: deriveCoercions(run) }, values),
         toolkit: state.toolkit,
         quickStart: state.quickStart,
       });
