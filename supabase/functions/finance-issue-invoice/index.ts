@@ -67,13 +67,20 @@ type Reservation =
  *  transmits free. */
 async function reserveTransmission(
   supabase: any, workspaceId: string, userId: string | undefined, description: string,
+  /** Which document this debit is for. Stamped onto the credit_transactions row so
+   *  finance-fiscal-offline-recovery can find and reverse it when a document that went
+   *  OFFLINE (credits kept) is later refused by AADE (#193). Without it the cron would have
+   *  to match on the description string. */
+  doc?: { table: 'invoices' | 'credit_notes' | 'delivery_notes'; id: string },
 ): Promise<Reservation> {
   const { data: ws } = await supabase.from('workspaces').select('is_root').eq('id', workspaceId).single();
   if (ws?.is_root || !userId) return { ok: true, refund: async () => {} }; // operator root transmits free
 
+  const meta = doc ? { einvoice_document_table: doc.table, einvoice_document_id: doc.id } : null;
   const { data, error } = await supabase.rpc('debit_credits', {
     p_user_id: userId, p_amount: TRANSMISSION_CREDITS,
     p_operation_type: 'einvoice_transmission', p_description: description,
+    p_metadata: meta,
     p_workspace_id: workspaceId ?? null,
   });
   const row = Array.isArray(data) ? data[0] : data;
@@ -92,6 +99,7 @@ async function reserveTransmission(
         p_user_id: userId, p_amount: TRANSMISSION_CREDITS,
         p_operation_type: 'einvoice_transmission_refund',
         p_description: `Refund — ${description} (transmission not completed)`,
+        p_metadata: meta,
         p_workspace_id: workspaceId ?? null,
       });
       // A failed refund credits the USER's favour, never the platform's — log loudly for
@@ -408,7 +416,11 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         return json({ ok: false, error: 'Connector does not support POS completion' }, 400);
       }
 
-      const reserve = await reserveTransmission(supabase, (sig as any).workspace_id, auth.userId, `myDATA POS completion for receipt ${(sig as any).invoice_id ?? (sig as any).id}`);
+      // CompletionPosInvoices transmits synchronously and returns the MARK, so this path never
+      // lands in the offline sweep — stamped anyway so every transmission debit is traceable to
+      // its document by the same key.
+      const reserve = await reserveTransmission(supabase, (sig as any).workspace_id, auth.userId, `myDATA POS completion for receipt ${(sig as any).invoice_id ?? (sig as any).id}`,
+        (sig as any).invoice_id ? { table: 'invoices', id: (sig as any).invoice_id } : undefined);
       if (!reserve.ok) return json({ ok: false, code: reserve.code, balance: reserve.balance, error: reserve.error }, 402);
 
       try {
@@ -484,7 +496,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       if (!resolved.ok) return json({ ok: false, code: resolved.code, error: resolved.error }, 400);
 
       // Reserve the transmission credits atomically before handing off to the connector.
-      const cnReserve = await reserveTransmission(supabase, cnRow.workspace_id, auth.userId, `myDATA credit note ${body.credit_note_id}`);
+      const cnReserve = await reserveTransmission(supabase, cnRow.workspace_id, auth.userId, `myDATA credit note ${body.credit_note_id}`,
+        { table: 'credit_notes', id: body.credit_note_id });
       if (!cnReserve.ok) return json({ ok: false, code: cnReserve.code, balance: cnReserve.balance, error: cnReserve.error }, 402);
 
       try {
@@ -568,7 +581,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       if (!resolved.ok) return json({ ok: false, code: resolved.code, error: resolved.error }, 400);
 
       // Reserve the transmission credits atomically before handing off to the connector.
-      const dnReserve = await reserveTransmission(supabase, dnRow.workspace_id, auth.userId, `myDATA delivery note ${body.delivery_note_id}`);
+      const dnReserve = await reserveTransmission(supabase, dnRow.workspace_id, auth.userId, `myDATA delivery note ${body.delivery_note_id}`,
+        { table: 'delivery_notes', id: body.delivery_note_id });
       if (!dnReserve.ok) return json({ ok: false, code: dnReserve.code, balance: dnReserve.balance, error: dnReserve.error }, 402);
 
       try {
@@ -711,7 +725,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         const resolved: any = await resolveWorkspaceConnector(supabase, invRow!.workspace_id, 'legal_invoice');
         // Reserve transmission credits atomically before the connector handoff (see reserveTransmission).
         const reserve = resolved.ok
-          ? await reserveTransmission(supabase, invRow!.workspace_id, auth.userId, `myDATA transmission for invoice ${invoiceId}`)
+          ? await reserveTransmission(supabase, invRow!.workspace_id, auth.userId, `myDATA transmission for invoice ${invoiceId}`,
+              { table: 'invoices', id: invoiceId })
           : null;
         if (!resolved.ok) {
           fiscalResult = { ok: false, code: resolved.code, error: resolved.error };

@@ -13,7 +13,10 @@
  *                                  at 'offline' forever, re-queried every 15 minutes, with the
  *                                  invoice page still promising the MARK would "appear shortly".
  *   3. It never resolves at all  → same invisibility, no verdict to act on.
- * (2) and (3) now both end in a human being told. A rejection is only made terminal after a
+ * (2) and (3) now both end in a human being told, and (2) also refunds the transmission credits
+ * — an immediate rejection is already free at issue time, so a late one must match or the price
+ * of one filed document depends on whether AADE happened to be up when the operator clicked.
+ * A rejection is only made terminal after a
  * grace period AND on a real provider error code, because a not-yet-transmitted document can
  * look like an error to `fetchTransmitted` — burning a live document on a transient blip would
  * be worse than waiting. Even then the flip is always accompanied by an alert, and the invoice
@@ -59,7 +62,7 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
     invoices_checked: 0, invoices_recovered: 0,
     credit_notes_checked: 0, credit_notes_recovered: 0,
     delivery_notes_checked: 0, delivery_notes_recovered: 0,
-    rejected_late: 0, stuck_alerted: 0,
+    rejected_late: 0, stuck_alerted: 0, credits_refunded: 0,
   };
   // Cache one connector per workspace across the batch.
   const connByWs = new Map<string, any>();
@@ -72,6 +75,94 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   };
 
   type DocTable = 'invoices' | 'credit_notes' | 'delivery_notes';
+
+  /**
+   * Give back the transmission credits for a document AADE refused on delayed transmission.
+   *
+   * At issue time the debit is kept for anything `accepted` OR `offline`, and refunded for
+   * everything else — so an IMMEDIATE rejection is free while a rejection that surfaced hours
+   * later cost the tenant 2 credits. Same outcome, same tenant behaviour, and the only
+   * discriminator is whether AADE happened to be down at the moment they clicked, which the
+   * tenant can neither see nor influence. Worse, they fix the cause and re-issue for another 2,
+   * so one filed document costs 4. The rule is "you pay when it lands on AADE", and this is the
+   * half of it that was missing.
+   *
+   * Finds the original debit by the document key stamped on its metadata by
+   * finance-issue-invoice. Idempotency is the `fiscal_credits_refunded_at` stamp on the document
+   * rather than a probe for an existing refund row, because the two wallets record refunds in
+   * two different tables with two different metadata shapes — a guard written against one would
+   * silently miss the other and pay out twice. Root workspaces transmit free and have no debit
+   * to find, which falls out of the lookup returning nothing.
+   */
+  const refundLateRejection = async (table: DocTable, r: any, docLabel: string) => {
+    if (r.fiscal_credits_refunded_at) return false; // a previous tick already did this
+    const docKeys = { einvoice_document_table: table, einvoice_document_id: r.id };
+
+    // The debit landed in ONE of two tables depending on which wallet paid, and the two store
+    // the operation type and the caller metadata differently. Check the pool first (that is what
+    // `debit_credits` tries first), then the personal wallet.
+    let userId: string | null = null;
+    let amount = 0;
+    let wallet: 'pool' | 'personal' = 'personal';
+    let workspaceId: string | null = null;
+
+    const { data: poolDebit } = await supabase
+      .from('workspace_credit_transactions')
+      .select('actor_user_id, amount, workspace_id')
+      .eq('transaction_type', 'debit')
+      .eq('operation_type', 'einvoice_transmission')
+      .contains('metadata', docKeys)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (poolDebit) {
+      userId = poolDebit.actor_user_id;
+      amount = Math.abs(Number(poolDebit.amount));
+      wallet = 'pool';
+      workspaceId = poolDebit.workspace_id;
+    } else {
+      const { data: personalDebit } = await supabase
+        .from('credit_transactions')
+        .select('user_id, amount')
+        .eq('transaction_type', 'debit')
+        // credit_transactions nests as {operation_type, metadata:{…caller metadata…}}
+        .contains('metadata', { operation_type: 'einvoice_transmission', metadata: docKeys })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (personalDebit) {
+        userId = personalDebit.user_id;
+        amount = Math.abs(Number(personalDebit.amount));
+      }
+    }
+
+    // No debit found: operator root transmits free, or the document pre-dates the metadata
+    // stamp. Nothing owed either way.
+    if (!userId || !(amount > 0)) return false;
+
+    const { error: rErr } = await supabase.rpc('refund_credits', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_operation_type: 'einvoice_transmission_refund',
+      p_description: `Refund — ${docLabel} (AADE refused it on delayed transmission)`,
+      p_metadata: { ...docKeys, reason: 'late_rejection' },
+      p_workspace_id: workspaceId,
+      // Return it to the wallet that actually paid rather than letting refund_credits
+      // re-derive: pool membership can have changed since the debit.
+      p_wallet: wallet,
+    });
+    if (rErr) {
+      // A failed refund is always in the PLATFORM's favour, never the tenant's — log loudly for
+      // manual reconciliation rather than failing the sweep and leaving the document unresolved.
+      console.error('[fiscal-offline-recovery] late-rejection refund FAILED — manual reconciliation needed', { table, docId: r.id, rErr });
+      return false;
+    }
+    await supabase.from(table)
+      .update({ fiscal_credits_refunded_at: new Date().toISOString() })
+      .eq('id', r.id);
+    return true;
+  };
 
   /** Tell the workspace's finance-capable members that a legal document needs a human.
    *  Stamped onto the row so the 15-minute cron doesn't re-send every tick. */
@@ -181,10 +272,15 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
             error_message: res.errorMessage ?? null,
           });
           results.rejected_late++;
+          // The document never landed, so the tenant should not have paid for it — an
+          // IMMEDIATE rejection is already refunded at issue time and a late one must match.
+          const refunded = await refundLateRejection(table, r, docLabel);
+          if (refunded) results.credits_refunded++;
           await alertDocument(
             table, r, docLabel,
             `myDATA rejected ${docLabel}`,
-            `AADE refused ${docLabel} on delayed transmission — ${detail}. The legal number is burned: void it and re-issue, or fix and re-transmit from the document page.`,
+            `AADE refused ${docLabel} on delayed transmission — ${detail}. The legal number is burned: void it and re-issue, or fix and re-transmit from the document page.`
+              + (refunded ? ' The transmission credits have been refunded.' : ''),
             'rejected', detail,
           );
           continue;
@@ -212,7 +308,7 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   };
 
   const { data: invs } = await supabase.from('invoices')
-    .select('id, workspace_id, fiscal_mark, legal_number, internal_number, fiscal_submitted_at, fiscal_alerted_at, updated_at')
+    .select('id, workspace_id, fiscal_mark, legal_number, internal_number, fiscal_submitted_at, fiscal_alerted_at, fiscal_credits_refunded_at, updated_at')
     .eq('fiscal_status', 'offline').limit(50);
   results.invoices_checked = (invs ?? []).length;
   await recover('invoices', invs ?? [],
@@ -220,7 +316,7 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
     (r) => `Invoice ${r.legal_number ?? r.internal_number ?? ''}`.trim());
 
   const { data: cns } = await supabase.from('credit_notes')
-    .select('id, workspace_id, fiscal_mark, credit_note_number, fiscal_submitted_at, fiscal_alerted_at, updated_at')
+    .select('id, workspace_id, fiscal_mark, credit_note_number, fiscal_submitted_at, fiscal_alerted_at, fiscal_credits_refunded_at, updated_at')
     .eq('fiscal_status', 'offline').limit(50);
   results.credit_notes_checked = (cns ?? []).length;
   await recover('credit_notes', cns ?? [],
@@ -230,7 +326,7 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
   // Delivery notes (myDATA 9.3) go offline exactly like invoices and were never swept here at
   // all — an offline movement document simply never got its MARK. Same treatment.
   const { data: dns } = await supabase.from('delivery_notes')
-    .select('id, workspace_id, fiscal_mark, delivery_note_number, fiscal_submitted_at, fiscal_alerted_at, updated_at')
+    .select('id, workspace_id, fiscal_mark, delivery_note_number, fiscal_submitted_at, fiscal_alerted_at, fiscal_credits_refunded_at, updated_at')
     .eq('fiscal_status', 'offline').limit(50);
   results.delivery_notes_checked = (dns ?? []).length;
   await recover('delivery_notes', dns ?? [],
