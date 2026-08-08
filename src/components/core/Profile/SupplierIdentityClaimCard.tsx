@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Factory, Loader2, ShieldCheck, Clock, XCircle, Send } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Factory, Loader2, ShieldCheck, Clock, XCircle, Send, Boxes } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -85,6 +86,15 @@ export const SupplierIdentityClaimCard: React.FC = () => {
                 ? 'You are the confirmed contact for this company, so you can publish its catalog data.'
                 : 'This company is confirmed, but publishing is limited to the person the operator confirmed. Ask the operator to confirm you as well.'}
             </p>
+            {/* Without this the publish surface has no entry point for a manufacturer —
+                they are not an admin, so the operator dashboard is not theirs to browse. */}
+            {status.is_confirmed_contact && (
+              <Button size="sm" variant="outline" className="rounded-full h-8" asChild>
+                <Link to="/admin/catalog-master">
+                  <Boxes className="h-3.5 w-3.5 mr-1" /> Manage your catalog
+                </Link>
+              </Button>
+            )}
           </div>
         ) : status.state === 'pending' ? (
           <div className="flex items-start gap-2 text-sm">

@@ -19,6 +19,7 @@ import {
   ChevronDown,
   FileJson,
   ShieldCheck,
+  Boxes,
 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
@@ -157,6 +158,14 @@ const adminSections = {
       description: 'Operator review of workspaces claiming a global supplier identity',
       icon: ShieldCheck,
       path: '/admin/supplier-claims',
+      status: 'active',
+      count: 'Operator',
+    },
+    {
+      title: 'Master Catalog',
+      description: 'Manufacturer-published product data, and factory price changes awaiting your review',
+      icon: Boxes,
+      path: '/admin/catalog-master',
       status: 'active',
       count: 'Operator',
     },

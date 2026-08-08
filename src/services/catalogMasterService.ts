@@ -25,11 +25,27 @@ export interface CatalogMasterProduct {
   field_authority: Record<string, FieldAuthority>;
   /** Values our ingestion had before a manufacturer superseded them — kept for audit. */
   superseded: Record<string, unknown>;
-  list_price: number | null;
-  list_price_currency: string | null;
-  list_price_updated_at: string | null;
   published_at: string | null;
   authority_revoked_at: string | null;
+  updated_at: string;
+  /**
+   * The factory's current ask, merged in from `catalog_master_price_offers`.
+   *
+   * It is NOT a column on the master row and must never become one: the master is
+   * world-readable by design (a shared catalog of what products ARE), so a price living
+   * there would hand every tenant the operator's buying prices. The offers table is
+   * readable only by the operator and by the manufacturer who published it.
+   */
+  list_price?: number | null;
+  list_price_currency?: string | null;
+  list_price_updated_at?: string | null;
+}
+
+/** The columns `withOffers` reads off `catalog_master_price_offers`. */
+interface MasterPriceOfferRow {
+  master_product_id: string;
+  list_price: number;
+  currency: string;
   updated_at: string;
 }
 
@@ -78,7 +94,11 @@ export const catalogMasterService = {
     };
   },
 
-  /** Master rows for a supplier identity (the supplier's own published catalog). */
+  /**
+   * Master rows for a supplier identity, with each row's own published ask merged in.
+   * The ask comes from a separate, access-controlled table, so RLS decides per row whether
+   * the caller sees a price at all — a tenant who may not simply gets `list_price` undefined.
+   */
   async listForSupplier(platformSupplierId: string): Promise<CatalogMasterProduct[]> {
     const { data, error } = await supabase
       .from('catalog_master_products')
@@ -86,14 +106,38 @@ export const catalogMasterService = {
       .eq('platform_supplier_id', platformSupplierId)
       .order('normalized_sku');
     if (error) throw error;
-    return (data ?? []) as unknown as CatalogMasterProduct[];
+    const rows = (data ?? []) as unknown as CatalogMasterProduct[];
+    return this.withOffers(rows);
   },
 
   async get(masterId: string): Promise<CatalogMasterProduct | null> {
     const { data, error } = await supabase
       .from('catalog_master_products').select('*').eq('id', masterId).maybeSingle();
     if (error) throw error;
-    return (data ?? null) as unknown as CatalogMasterProduct | null;
+    if (!data) return null;
+    return (await this.withOffers([data as unknown as CatalogMasterProduct]))[0] ?? null;
+  },
+
+  /** Merge the operator-scoped asks onto master rows. Rows with no visible offer stay priceless. */
+  async withOffers(rows: CatalogMasterProduct[]): Promise<CatalogMasterProduct[]> {
+    if (rows.length === 0) return rows;
+    const { data } = await supabase
+      .from('catalog_master_price_offers')
+      .select('master_product_id, list_price, currency, updated_at')
+      .in('master_product_id', rows.map((r) => r.id));
+    // Annotated because the shared client is created as `any` (see integrations/supabase/client.ts),
+    // so `data` arrives untyped. Feeding an untyped array to `new Map` leaves its generics
+    // uninferrable and they fall back to `unknown`, which is what makes the field reads below
+    // fail to compile. Naming the row shape once fixes it for the whole function — same reason
+    // the sibling queries in this file cast their results.
+    const offers = (data ?? []) as MasterPriceOfferRow[];
+    const byId = new Map(offers.map((o) => [o.master_product_id, o] as const));
+    return rows.map((r) => {
+      const o = byId.get(r.id);
+      return o
+        ? { ...r, list_price: o.list_price, list_price_currency: o.currency, list_price_updated_at: o.updated_at }
+        : r;
+    });
   },
 
   /**

@@ -2638,6 +2638,55 @@ export type Database = {
           },
         ]
       }
+      catalog_master_price_offers: {
+        Row: {
+          currency: string
+          list_price: number
+          master_product_id: string
+          published_by_user_id: string | null
+          published_by_workspace_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          currency?: string
+          list_price: number
+          master_product_id: string
+          published_by_user_id?: string | null
+          published_by_workspace_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          currency?: string
+          list_price?: number
+          master_product_id?: string
+          published_by_user_id?: string | null
+          published_by_workspace_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_master_price_offers_master_product_id_fkey"
+            columns: ["master_product_id"]
+            isOneToOne: true
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["master_product_id"]
+          },
+          {
+            foreignKeyName: "catalog_master_price_offers_master_product_id_fkey"
+            columns: ["master_product_id"]
+            isOneToOne: true
+            referencedRelation: "catalog_master_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_master_price_offers_published_by_workspace_id_fkey"
+            columns: ["published_by_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       catalog_master_products: {
         Row: {
           attributes: Json
@@ -2646,9 +2695,6 @@ export type Database = {
           created_at: string
           field_authority: Json
           id: string
-          list_price: number | null
-          list_price_currency: string | null
-          list_price_updated_at: string | null
           name: string | null
           normalized_sku: string
           platform_supplier_id: string
@@ -2666,9 +2712,6 @@ export type Database = {
           created_at?: string
           field_authority?: Json
           id?: string
-          list_price?: number | null
-          list_price_currency?: string | null
-          list_price_updated_at?: string | null
           name?: string | null
           normalized_sku: string
           platform_supplier_id: string
@@ -2686,9 +2729,6 @@ export type Database = {
           created_at?: string
           field_authority?: Json
           id?: string
-          list_price?: number | null
-          list_price_currency?: string | null
-          list_price_updated_at?: string | null
           name?: string | null
           normalized_sku?: string
           platform_supplier_id?: string
@@ -4183,6 +4223,7 @@ export type Database = {
           currency: string
           document_type: string | null
           fiscal_alerted_at: string | null
+          fiscal_credits_refunded_at: string | null
           fiscal_error: string | null
           fiscal_mark: string | null
           fiscal_qr_url: string | null
@@ -4217,6 +4258,7 @@ export type Database = {
           currency?: string
           document_type?: string | null
           fiscal_alerted_at?: string | null
+          fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
@@ -4251,6 +4293,7 @@ export type Database = {
           currency?: string
           document_type?: string | null
           fiscal_alerted_at?: string | null
+          fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
@@ -5914,6 +5957,7 @@ export type Database = {
           customer_contact_id: string | null
           delivery_note_number: string | null
           fiscal_alerted_at: string | null
+          fiscal_credits_refunded_at: string | null
           fiscal_error: string | null
           fiscal_mark: string | null
           fiscal_qr_url: string | null
@@ -5961,6 +6005,7 @@ export type Database = {
           customer_contact_id?: string | null
           delivery_note_number?: string | null
           fiscal_alerted_at?: string | null
+          fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
@@ -6008,6 +6053,7 @@ export type Database = {
           customer_contact_id?: string | null
           delivery_note_number?: string | null
           fiscal_alerted_at?: string | null
+          fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
@@ -6731,6 +6777,78 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_page_embeddings: {
+        Row: {
+          cache_status: string
+          created_at: string
+          document_id: string
+          embedding_model: string | null
+          error_message: string | null
+          id: string
+          image_height: number | null
+          image_pixels: number | null
+          image_width: number | null
+          page_number: number
+          schema_version: number | null
+          storage_bucket: string | null
+          storage_object_path: string | null
+          text_tokens: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          cache_status?: string
+          created_at?: string
+          document_id: string
+          embedding_model?: string | null
+          error_message?: string | null
+          id?: string
+          image_height?: number | null
+          image_pixels?: number | null
+          image_width?: number | null
+          page_number: number
+          schema_version?: number | null
+          storage_bucket?: string | null
+          storage_object_path?: string | null
+          text_tokens?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          cache_status?: string
+          created_at?: string
+          document_id?: string
+          embedding_model?: string | null
+          error_message?: string | null
+          id?: string
+          image_height?: number | null
+          image_pixels?: number | null
+          image_width?: number | null
+          page_number?: number
+          schema_version?: number | null
+          storage_bucket?: string | null
+          storage_object_path?: string | null
+          text_tokens?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_page_embeddings_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_page_embeddings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -12141,6 +12259,7 @@ export type Database = {
           exchange_rate: number | null
           fiscal_alerted_at: string | null
           fiscal_connector_slug: string | null
+          fiscal_credits_refunded_at: string | null
           fiscal_error: string | null
           fiscal_mark: string | null
           fiscal_qr_url: string | null
@@ -12230,6 +12349,7 @@ export type Database = {
           exchange_rate?: number | null
           fiscal_alerted_at?: string | null
           fiscal_connector_slug?: string | null
+          fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
@@ -12319,6 +12439,7 @@ export type Database = {
           exchange_rate?: number | null
           fiscal_alerted_at?: string | null
           fiscal_connector_slug?: string | null
+          fiscal_credits_refunded_at?: string | null
           fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
@@ -34134,7 +34255,25 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      dic_detect__catalog_authority_revoked_drift: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
       dic_detect__catalog_facet_canonicalization_degraded: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__catalog_publish_writes_cost: {
         Args: never
         Returns: {
           detail: Json
@@ -34341,6 +34480,15 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      dic_detect__ops_page_embeddings_never_written: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
       dic_detect__ops_payment_intents_stale: {
         Args: never
         Returns: {
@@ -34477,6 +34625,15 @@ export type Database = {
         }[]
       }
       dic_detect__stock_writers_outside_core: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__supplier_claim_without_contact: {
         Args: never
         Returns: {
           detail: Json
@@ -35407,6 +35564,7 @@ export type Database = {
         Args: { p_mine?: boolean; p_workspace_id: string }
         Returns: Json
       }
+      get_supplier_claim_queue: { Args: { p_status?: string }; Returns: Json }
       get_supplier_inbound_orders: {
         Args: { p_workspace_id: string }
         Returns: Json
@@ -36380,6 +36538,10 @@ export type Database = {
           company_ids: string[]
           contact_ids: string[]
         }[]
+      }
+      my_supplier_claim_status: {
+        Args: { p_workspace_id: string }
+        Returns: Json
       }
       next_credit_note_number: {
         Args: { p_workspace_id: string }
