@@ -99,23 +99,29 @@ function Widget({
         </Link>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-2 gap-2">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="flex items-center gap-2 animate-pulse">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 shrink-0" />
-              <div className="flex-1 min-w-0 space-y-1.5">
-                <div className="h-2.5 bg-primary/10 rounded w-4/5" />
-                <div className="h-2 bg-primary/10 rounded w-1/2" />
+      {/* min-h = the 3 rows the 6-item skeleton occupies (3 × 2rem + 2 × 0.5rem gap).
+          Without it a widget that resolves EMPTY collapsed from that skeleton to a
+          single "Nothing here yet." line, shrinking the whole row mid-load. All three
+          states now occupy the same box, so the grid never resizes as data lands. */}
+      <div className="flex-1 min-h-[7rem]">
+        {loading ? (
+          <div className="grid grid-cols-2 gap-2">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="flex items-center gap-2 animate-pulse">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 shrink-0" />
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="h-2.5 bg-primary/10 rounded w-4/5" />
+                  <div className="h-2 bg-primary/10 rounded w-1/2" />
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : empty ? (
-        <p className="text-xs text-muted-foreground py-4 text-center">Nothing here yet.</p>
-      ) : (
-        <div className="grid grid-cols-2 gap-2 flex-1">{children}</div>
-      )}
+            ))}
+          </div>
+        ) : empty ? (
+          <p className="text-xs text-muted-foreground py-4 text-center">Nothing here yet.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 h-full">{children}</div>
+        )}
+      </div>
     </div>
   );
 }

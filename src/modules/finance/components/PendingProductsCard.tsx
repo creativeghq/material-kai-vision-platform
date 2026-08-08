@@ -103,8 +103,6 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
     finally { setBusy(null); }
   };
 
-  if (loading) return null;
-
   const header = (
     <CardHeader className="border-b border-border/60 px-5 py-3 flex-row flex-wrap items-center gap-2 space-y-0">
       <PackagePlus className={`h-4 w-4 ${items.length > 0 ? 'text-amber-500' : 'text-muted-foreground'}`} />
@@ -123,6 +121,21 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
       </div>
     </CardHeader>
   );
+
+  // Both the empty and the populated state below render this card, so this component
+  // is never absent once loaded — returning null while it loads therefore popped the
+  // whole card into the page a beat late and shoved everything under it down. Hold the
+  // shell with a skeleton body instead, so the page is laid out the same before/after.
+  if (loading) {
+    return (
+      <Card>
+        {header}
+        <CardContent className="px-5 py-6">
+          <div className="h-4 w-2/3 rounded bg-muted animate-pulse" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   // An empty queue must explain itself. Rendering nothing at all is why this looked broken:
   // the operator sees no products, no queue, and no way to tell whether that means "all clear"

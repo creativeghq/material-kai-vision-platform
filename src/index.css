@@ -762,6 +762,13 @@ All colors MUST be HSL.
      shows through; the solid ground comes from the body background. */
   .page-wrapper {
     background: transparent;
+    /* Reserve the scrollbar gutter on the element that ACTUALLY scrolls. The app
+       shell (`Layout`) is `h-[100dvh] overflow-hidden`, so `html` never scrolls and
+       the `scrollbar-gutter: stable` set on it up in @layer base applies to nothing
+       once you are signed in — every authenticated page scrolls in this <main>.
+       Without it, the bar popping in as async content crosses the viewport height
+       narrows the content box, and every card in the page re-lays-out mid-load. */
+    scrollbar-gutter: stable;
   }
 
   /* Page container - ONLY left/right padding, NO top/bottom */

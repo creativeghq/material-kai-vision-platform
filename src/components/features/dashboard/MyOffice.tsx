@@ -89,7 +89,7 @@ function StatTile({
 
 // ── main panel ──────────────────────────────────────────────────────────────
 const MyOfficeImpl: React.FC = () => {
-  const { activeWorkspaceId } = useWorkspace();
+  const { activeWorkspaceId, loading: workspaceLoading } = useWorkspace();
   const { user } = useAuth();
   const [personName, setPersonName] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -157,7 +157,10 @@ const MyOfficeImpl: React.FC = () => {
   // ── stats ──
   useEffect(() => {
     if (!activeWorkspaceId) {
-      setStatsLoading(false);
+      // Only leave the loading state once we KNOW there is no workspace. While the
+      // workspace is still resolving, dropping out of it renders "—" / "0" in the
+      // tiles for a beat and then swaps in the real numbers.
+      if (!workspaceLoading) setStatsLoading(false);
       return;
     }
     let alive = true;
@@ -212,12 +215,14 @@ const MyOfficeImpl: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, workspaceLoading]);
 
   // ── insights ──
   const loadInsights = async (force = false) => {
     if (!activeWorkspaceId) {
-      setInsightsLoading(false);
+      // Same as the stats above — hold the skeleton until the workspace is settled,
+      // otherwise the "Pro tip" empty state flashes in before the real insights.
+      if (!workspaceLoading) setInsightsLoading(false);
       return;
     }
     if (force) setRefreshing(true);
@@ -236,9 +241,16 @@ const MyOfficeImpl: React.FC = () => {
   useEffect(() => {
     void loadInsights(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, workspaceLoading]);
 
-  if (!activeWorkspaceId) return null;
+  // A user with genuinely no workspace has no office to show — but `activeWorkspaceId`
+  // is ALSO null for the first beat of every load, while the workspace resolves.
+  // Returning null there rendered the dashboard's top row hero-only and then grew it
+  // by this panel's height a moment later, shoving the widgets below down the page:
+  // the "grid starts smaller and then expands" blink. Render the panel through the
+  // resolving phase — its stat/insight skeletons above already hold the full height —
+  // and only drop out once we actually know there is no workspace.
+  if (!activeWorkspaceId && !workspaceLoading) return null;
 
   return (
     <div
