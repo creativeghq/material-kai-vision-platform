@@ -1723,7 +1723,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         .map((it) => ({ itemId: it.id, quantityDelivered: Number(it.quantity) }));
       if (pending.length > 0) await ordersService.setDelivery(order.id, pending);
       await load(order.id); onChanged();
-      toast({ title: 'All lines marked delivered' });
+      // #320: say what did NOT happen. This action used to empty the warehouse for the whole
+      // order in one click, and a toast that only reports success reads as if it still does.
+      toast({
+        title: 'All lines marked picked',
+        description: 'Stock has not moved — issue the invoice or a Δελτίο Αποστολής to dispatch it.',
+      });
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
@@ -2295,12 +2300,19 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       <span className="text-muted-foreground text-xs">{unitLabel}</span>
                       {/* Delivered: inline-editable (reads like text, box on hover/focus) + quick menu.
                           Tone: green = fully delivered, amber = partial. Status auto-advances. */}
-                      {/* deliver_order_line writes quantity_delivered but skips ALL stock movement
-                          and status recomputation while the order is draft/cancelled — so the cell
-                          turned green "3 / 3" with no movement row, no stock change and no status
-                          change. Disabled there, with the reason on hover. */}
+                      {/* #320: this is a PICKING marker and nothing else. It writes
+                          quantity_delivered and drives recompute_order_fulfilment; it does not
+                          move warehouse stock, because goods may only leave against a fiscal
+                          accompanying document (τιμολόγιο / Δελτίο Αποστολής). Saying so on hover
+                          matters — this control used to move stock, and an operator who still
+                          believes it does will think the warehouse is wrong. */}
+                      {/* Still disabled on draft/cancelled: deliver_order_line skips status
+                          recomputation there, so the cell turned green "3 / 3" with no status
+                          change. Reason on hover. */}
                       <div className="flex items-center justify-end gap-0.5"
-                        title={deliveryLocked ? `Deliveries are recorded once the order leaves ${order.status}. Confirm it first.` : undefined}>
+                        title={deliveryLocked
+                          ? `Deliveries are recorded once the order leaves ${order.status}. Confirm it first.`
+                          : 'Picking progress only — this does not move warehouse stock. Stock moves when the goods get their document: issue the invoice, or a Δελτίο Αποστολής from the Dispatch board.'}>
                         <Input key={`${it.id}-${it.quantity_delivered}`}
                           className={`h-6 w-9 text-right text-xs px-0.5 tabular-nums border-0 shadow-none bg-transparent rounded hover:bg-muted/60 focus-visible:bg-muted focus-visible:ring-1 ${delTone} ${deliveryLocked ? 'opacity-50' : ''}`}
                           type="number" step="1" min="0" defaultValue={del} disabled={saving || deliveryLocked}
@@ -2310,9 +2322,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><button type="button" className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronDown className="h-3 w-3" /></button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, q)}>Mark fully delivered</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, Math.ceil(q / 2))}>Mark half delivered</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, 0)}>Mark not delivered</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, q)}>Mark fully picked</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, Math.ceil(q / 2))}>Mark half picked</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void setLineDelivered(it.id, 0)}>Mark not picked</DropdownMenuItem>
+                            {/* The menu says "picked", the column says "Delivered": the column name
+                                is the order's fulfilment vocabulary and drives its status, while
+                                the verbs are what the click actually does. Naming the action
+                                "delivered" is what made operators read it as a dispatch. */}
                           </DropdownMenuContent>
                         </DropdownMenu>
                         )}
@@ -2665,9 +2681,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             )}
 
             <p className="text-[11px] text-muted-foreground">
-              Payments / Expenses above are real cash on this order (money received from the customer / paid out). Marking a catalog
-              line delivered moves warehouse stock (sales out / purchase in) and auto-advances the status. The
-              receipt/invoice is the separate Create document action.
+              Payments / Expenses above are real cash on this order (money received from the customer / paid out). Marking a line
+              delivered records picking progress and auto-advances the status — it does <strong>not</strong> move warehouse stock.
+              Stock moves when the goods get their fiscal document: issue the invoice, or a Δελτίο Αποστολής from the Dispatch board.
             </p>
 
               </TabsContent>

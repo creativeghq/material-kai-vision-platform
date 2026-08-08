@@ -1409,9 +1409,14 @@ export const ordersService = {
    * two-call patterns that can crash mid-way".
    *
    * `deliver_order_lines` runs the same per-line function inside a single transaction, so an
-   * exception on any line rolls the whole delivery back. Stock movement is NOT the dispatch
-   * flow's job: `deliver_order_line` moves warehouse stock itself, by the delta
-   * (sales out / purchase in).
+   * exception on any line rolls the whole delivery back.
+   *
+   * #320: this writes a PICKING marker and nothing else — no warehouse stock moves from here.
+   * Goods may only leave against a fiscal accompanying document, so stock is moved by
+   * `issue_delivery_note` (Δελτίο Αποστολής, myDATA 9.3), by `mark_invoice_issued` on an
+   * order-linked invoice (τιμολόγιο–δελτίο αποστολής), or by `receive_order_into_warehouse` on
+   * the purchase side. All three go through `_deliver_order_line_core(..., true)`, which the
+   * public RPC cannot reach — the gate is the absence of a parameter, not a default.
    */
   async setDelivery(orderId: string, deliveries: Array<{ itemId: string; quantityDelivered: number }>): Promise<OrderStatus> {
     const { data, error } = await supabase.rpc('deliver_order_lines', {

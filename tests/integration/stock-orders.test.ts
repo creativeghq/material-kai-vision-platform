@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { hasCreds, serviceClient, createUser, createWorkspace, addMember, grantModule, teardown, runId, type TestUser } from './_harness';
+import { hasCreds, serviceClient, createUser, createWorkspace, addMember, grantModule, grantUnlimitedPlan, teardown, runId, type TestUser } from './_harness';
 
 // Stock ↔ Orders pure-SQL invariants. Like money-paths, these are SECURITY
 // DEFINER functions + triggers where being silently wrong loses stock/money: neither the route-load
@@ -76,6 +76,9 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     B = await createUser(svc, 'stockB', rid);
     ws = await createWorkspace(svc, 'wsStock', rid, A.id);
     await addMember(svc, ws, A.id, 'owner');
+    // This suite creates well over ten catalog products; without a plan the #214 material cap
+    // (free tier = 10) kills it partway through. Opt in explicitly — see grantUnlimitedPlan.
+    await grantUnlimitedPlan(svc, A.id);
     await grantModule(svc, ws, 'stock'); // record_stock_movement / import_opening_stock require the entitlement
     const { data: w } = await svc.from('warehouses').insert({ workspace_id: ws, name: 'Main', is_default: true }).select('id').single();
     whId = w!.id;

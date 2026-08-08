@@ -65,27 +65,30 @@ export async function createWorkspace(svc: SupabaseClient, label: string, rid: s
     .select('id')
     .single();
   if (error) throw new Error(`createWorkspace(${label}): ${error.message}`);
-  await grantUnlimitedPlan(svc, ownerId);
   return data.id;
 }
 
 /**
- * Put the fixture's owner on an unlimited plan.
+ * Put the fixture's owner on an unlimited plan. **Opt-in — call it only from a suite that needs
+ * more than ten catalog products.**
  *
  * #214 added `enforce_material_quota`, which caps a workspace at its plan's `max_materials`.
  * `workspace_quota` resolves that from the OWNER's active subscription and falls back to the
  * `free` plan — 10 materials — when there is none. A fixture owner has no subscription, so from
- * the moment that trigger shipped every suite that creates more than ten products died with
- * `quota_exceeded`, and since the whole deploy job runs these tests, NOTHING has deployed since.
- * That is how a correct feature took production offline: the cap was right, the fixtures were
- * invisible to it.
+ * the moment that trigger shipped every suite creating more than ten products died with
+ * `quota_exceeded`, and since the deploy job runs these tests, nothing deployed for hours. The cap
+ * was right; the fixtures were invisible to it.
  *
  * Deliberately done through the REAL mechanism — a real `user_subscriptions` row on the real
- * `enterprise` plan — rather than exempting fixtures inside the trigger. An `is_fixture` bypass
- * in `enforce_material_quota` would be a quota escape hatch living in production code, keyed on a
+ * `enterprise` plan — rather than exempting fixtures inside the trigger. An `is_fixture` bypass in
+ * `enforce_material_quota` would be a quota escape hatch living in production code, keyed on a
  * column, one RLS mistake away from being a free upgrade for anyone who can create a workspace.
- * A subscription row is what a paying tenant genuinely looks like, which is also what these tests
- * should be exercising.
+ *
+ * NOT called from createWorkspace, and that is the point. A plan raises the workspace's TIER, and
+ * tier covers modules: granting it to every fixture made `hr-job-postings-admin` — which asserts a
+ * 402 for a workspace not entitled to HR — get a 201 instead. A bare workspace with no plan is
+ * what most suites are actually testing against, so it stays the default and the quota is bought
+ * only where it is needed.
  */
 export async function grantUnlimitedPlan(svc: SupabaseClient, userId: string): Promise<void> {
   const { data: plan, error: planErr } = await svc
