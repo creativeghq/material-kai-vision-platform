@@ -48,6 +48,32 @@ export const supplierClaimsService = {
     return (data ?? []) as SupplierClaimRequest[];
   },
 
+  /**
+   * Operator queue, enriched. The operator is confirming that a specific HUMAN represents a
+   * specific factory (#324), so the row has to name that human — a workspace id cannot be
+   * vouched for. Operator-gated server-side.
+   */
+  async claimQueue(status: 'pending' | 'approved' | 'rejected' = 'pending'): Promise<SupplierClaimQueueRow[]> {
+    const { data, error } = await supabase.rpc('get_supplier_claim_queue', { p_status: status });
+    if (error) throw error;
+    return (data ?? []) as unknown as SupplierClaimQueueRow[];
+  },
+
+  /** Where this workspace's own claim stands — drives the self-serve card. */
+  async myClaimStatus(workspaceId: string): Promise<MySupplierClaimStatus> {
+    const { data, error } = await supabase.rpc('my_supplier_claim_status', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? { state: 'none' }) as unknown as MySupplierClaimStatus;
+  },
+
+  /** Operator-only: withdraw a claim. Published data survives; further publishing stops (D5). */
+  async revokeClaim(platformSupplierId: string, reason?: string): Promise<void> {
+    const { error } = await supabase.rpc('revoke_supplier_claim', {
+      p_platform_supplier_id: platformSupplierId, p_reason: reason ?? null,
+    });
+    if (error) throw error;
+  },
+
   /** Workspace names for the request rows (best-effort display). */
   async workspaceNames(ids: string[]): Promise<Record<string, string>> {
     if (ids.length === 0) return {};
@@ -72,6 +98,42 @@ export const supplierClaimsService = {
     if (error) throw error;
   },
 };
+
+/** A pending claim as the operator sees it — including WHO is asking (#324). */
+export interface SupplierClaimQueueRow {
+  id: string;
+  platform_supplier_id: string;
+  vat_number: string;
+  country_code: string;
+  risk_flag: 'low' | 'needs_review';
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  requesting_workspace_id: string;
+  requesting_workspace_name: string | null;
+  requesting_user_id: string | null;
+  requester_name: string | null;
+  requester_email: string | null;
+  supplier_legal_name: string | null;
+  supplier_vat_validated: boolean | null;
+  /** Set when the identity is already held by someone else — approving will fail. */
+  already_claimed_by: string | null;
+}
+
+export interface MySupplierClaimStatus {
+  state: 'none' | 'pending' | 'approved' | 'rejected' | 'claimed';
+  request_id?: string;
+  platform_supplier_id?: string;
+  legal_name?: string | null;
+  vat_number?: string | null;
+  country_code?: string | null;
+  created_at?: string;
+  approved_at?: string | null;
+  decision_reason?: string | null;
+  /** True only for the ONE user the operator confirmed — publishing rights follow this, not membership. */
+  is_confirmed_contact?: boolean;
+  own_vat: string | null;
+  own_country: string | null;
+}
 
 export interface SupplierInboundOrderLine { description: string; quantity: number; unit_price: number; line_total: number; }
 export interface SupplierInboundOrder {

@@ -96,6 +96,7 @@ const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
 const MonitoringPage = lazy(() => import('./pages/Admin/MonitoringPage'));
 const SupplierClaimsPage = lazy(() => import('./pages/Admin/SupplierClaimsPage'));
+const MasterCatalogPage = lazy(() => import('./pages/Admin/MasterCatalogPage'));
 const FreightQuoteRequestsPage = lazy(() => import('./pages/Admin/FreightQuoteRequestsPage'));
 const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
 // Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
@@ -777,6 +778,20 @@ const App = () => (
                           <SupplierClaimsPage />
                         </Layout>
                       </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* Master catalog (#324). Deliberately NOT behind AdminGuard: a confirmed
+                    manufacturer publishes their own products here. Both audiences are gated
+                    server-side — publishing by `supplier_publishing_allowed`, accepting a price
+                    by `is_platform_operator()` — so the page shows only what the caller may do. */}
+                <Route
+                  path="/admin/catalog-master"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <MasterCatalogPage />
+                      </Layout>
                     </AuthGuard>
                   }
                 />

@@ -286,6 +286,25 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'sales_order_id', label: 'Sales order ID', note: 'The draft sales order created in this (supplier) workspace.' },
     { key: 'purchase_order_id', label: 'Purchase order ID', note: 'The buyer-side purchase order paired to the sales order.' },
   ]),
+  // #324 — a verified manufacturer published to the shared master catalog.
+  catalog_master_updated: withStandard([
+    { key: 'admin_ids', label: 'Admin IDs', note: 'Operator (root workspace) admins to notify — iterate with a Loop ({{item}} = each admin id).' },
+    { key: 'supplier_name', label: 'Supplier name', note: 'The manufacturer that published.' },
+    { key: 'product_name', label: 'Product name', note: 'The product the manufacturer updated.' },
+    { key: 'sku', label: 'SKU', note: 'Normalized SKU of the master catalog row.' },
+    { key: 'master_product_id', label: 'Master product ID', note: 'The shared master catalog row.' },
+    { key: 'changed_fields', label: 'Changed fields', note: 'Object of the fields the manufacturer overwrote.' },
+  ]),
+  // #324 — published PRICE. An offer to the operator; nobody's cost moved yet.
+  supplier_price_changed: withStandard([
+    { key: 'admin_ids', label: 'Admin IDs', note: 'Operator (root workspace) admins to notify — iterate with a Loop ({{item}} = each admin id).' },
+    { key: 'supplier_name', label: 'Supplier name', note: 'The manufacturer that published the price.' },
+    { key: 'product_name', label: 'Product name', note: 'The product whose price changed.' },
+    { key: 'sku', label: 'SKU', note: 'Normalized SKU of the master catalog row.' },
+    { key: 'master_product_id', label: 'Master product ID', note: 'The shared master catalog row.' },
+    { key: 'list_price', label: 'New list price', note: 'What the factory now ASKS. Not a cost until the operator accepts it.' },
+    { key: 'currency', label: 'Currency', note: 'Currency of the published ask.', example: 'EUR' },
+  ]),
   'seo.ranking_movement': withStandard([
     { key: 'website_id', label: 'Website ID', note: 'The connected website whose rankings moved.' },
     { key: 'domain', label: 'Domain', note: 'The website domain.', example: 'flobali.gr' },

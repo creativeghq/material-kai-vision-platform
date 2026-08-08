@@ -27,10 +27,18 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 const ROOT = process.cwd();
 const SCAN_DIRS = ['src', 'supabase/functions', 'api'];
+
+/**
+ * The generated Supabase types are a machine projection of the schema: they DECLARE every RPC's
+ * signature, including the service-role-only ones, without calling anything. Scanning them finds
+ * `_deliver_order_line_core` as a type key the moment the types are regenerated, which is noise —
+ * a real call site can only ever appear in hand-written code, which is still fully in scope.
+ */
+const GENERATED = new Set(['src/integrations/supabase/types.ts'].map((p) => join(ROOT, p.replace(/\//g, sep))));
 
 function walk(dir: string, out: string[] = []): string[] {
   let entries: string[];
@@ -39,7 +47,7 @@ function walk(dir: string, out: string[] = []): string[] {
     if (e === 'node_modules' || e === 'dist') continue;
     const p = join(dir, e);
     if (statSync(p).isDirectory()) walk(p, out);
-    else if (/\.(tsx?|js)$/.test(e)) out.push(p);
+    else if (/\.(tsx?|js)$/.test(e) && !GENERATED.has(p)) out.push(p);
   }
   return out;
 }

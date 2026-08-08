@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { validateVatViaVies, type ViesValidationResult } from '@/services/viesService';
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 import { MarketplaceParticipationCard } from './MarketplaceParticipationCard';
+import { SupplierIdentityClaimCard } from './SupplierIdentityClaimCard';
 
 export type EntityType = 'solo' | 'business';
 
@@ -628,6 +629,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
       </CardContent>
     </Card>
     <MarketplaceParticipationCard />
+    <SupplierIdentityClaimCard />
     </div>
   );
 };

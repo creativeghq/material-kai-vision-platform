@@ -1281,8 +1281,22 @@ export type Database = {
             foreignKeyName: "ai_usage_logs_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "ai_usage_logs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_logs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "ai_usage_logs_workspace_id_fkey"
@@ -1407,7 +1421,6 @@ export type Database = {
       api_usage_logs: {
         Row: {
           created_at: string
-          endpoint_id: string | null
           id: string
           ip_address: unknown
           is_internal_request: boolean
@@ -1421,7 +1434,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          endpoint_id?: string | null
           id?: string
           ip_address: unknown
           is_internal_request?: boolean
@@ -1435,7 +1447,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          endpoint_id?: string | null
           id?: string
           ip_address?: unknown
           is_internal_request?: boolean
@@ -1447,15 +1458,7 @@ export type Database = {
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "api_usage_logs_endpoint_id_fkey"
-            columns: ["endpoint_id"]
-            isOneToOne: false
-            referencedRelation: "api_endpoints"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       appointment_availability: {
         Row: {
@@ -1976,8 +1979,29 @@ export type Database = {
             foreignKeyName: "blueprint_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "blueprint_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprint_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "blueprint_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
           },
           {
             foreignKeyName: "blueprint_items_service_id_fkey"
@@ -1985,6 +2009,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blueprint_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "blueprint_items_sub_blueprint_id_fkey"
@@ -2548,6 +2579,139 @@ export type Database = {
             columns: ["recipient_crm_contact_id"]
             isOneToOne: false
             referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_master_changelog: {
+        Row: {
+          actor_user_id: string | null
+          actor_workspace_id: string | null
+          change_kind: string
+          changed_fields: Json
+          created_at: string
+          id: string
+          master_product_id: string
+          previous_values: Json
+        }
+        Insert: {
+          actor_user_id?: string | null
+          actor_workspace_id?: string | null
+          change_kind: string
+          changed_fields?: Json
+          created_at?: string
+          id?: string
+          master_product_id: string
+          previous_values?: Json
+        }
+        Update: {
+          actor_user_id?: string | null
+          actor_workspace_id?: string | null
+          change_kind?: string
+          changed_fields?: Json
+          created_at?: string
+          id?: string
+          master_product_id?: string
+          previous_values?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_master_changelog_actor_workspace_id_fkey"
+            columns: ["actor_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_master_changelog_master_product_id_fkey"
+            columns: ["master_product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["master_product_id"]
+          },
+          {
+            foreignKeyName: "catalog_master_changelog_master_product_id_fkey"
+            columns: ["master_product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_master_products: {
+        Row: {
+          attributes: Json
+          authority_revoked_at: string | null
+          barcode: string | null
+          created_at: string
+          field_authority: Json
+          id: string
+          list_price: number | null
+          list_price_currency: string | null
+          list_price_updated_at: string | null
+          name: string | null
+          normalized_sku: string
+          platform_supplier_id: string
+          published_at: string | null
+          published_by_user_id: string | null
+          published_by_workspace_id: string | null
+          source_sku: string | null
+          superseded: Json
+          updated_at: string
+        }
+        Insert: {
+          attributes?: Json
+          authority_revoked_at?: string | null
+          barcode?: string | null
+          created_at?: string
+          field_authority?: Json
+          id?: string
+          list_price?: number | null
+          list_price_currency?: string | null
+          list_price_updated_at?: string | null
+          name?: string | null
+          normalized_sku: string
+          platform_supplier_id: string
+          published_at?: string | null
+          published_by_user_id?: string | null
+          published_by_workspace_id?: string | null
+          source_sku?: string | null
+          superseded?: Json
+          updated_at?: string
+        }
+        Update: {
+          attributes?: Json
+          authority_revoked_at?: string | null
+          barcode?: string | null
+          created_at?: string
+          field_authority?: Json
+          id?: string
+          list_price?: number | null
+          list_price_currency?: string | null
+          list_price_updated_at?: string | null
+          name?: string | null
+          normalized_sku?: string
+          platform_supplier_id?: string
+          published_at?: string | null
+          published_by_user_id?: string | null
+          published_by_workspace_id?: string | null
+          source_sku?: string | null
+          superseded?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_master_products_platform_supplier_id_fkey"
+            columns: ["platform_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "platform_suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_master_products_published_by_workspace_id_fkey"
+            columns: ["published_by_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -3229,8 +3393,22 @@ export type Database = {
             foreignKeyName: "chunk_product_relationships_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "chunk_product_relationships_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chunk_product_relationships_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -3588,6 +3766,8 @@ export type Database = {
           currency: string
           depreciation_method: string
           depreciation_start: string | null
+          disposal_proceeds: number | null
+          disposed_on: string | null
           finance_category_id: string | null
           id: string
           identifier: string | null
@@ -3595,6 +3775,7 @@ export type Database = {
           notes: string | null
           recurring_expense_id: string | null
           salvage_value: number
+          source_supplier_bill_id: string | null
           status: string
           supplier_company_id: string | null
           updated_at: string
@@ -3611,6 +3792,8 @@ export type Database = {
           currency?: string
           depreciation_method?: string
           depreciation_start?: string | null
+          disposal_proceeds?: number | null
+          disposed_on?: string | null
           finance_category_id?: string | null
           id?: string
           identifier?: string | null
@@ -3618,6 +3801,7 @@ export type Database = {
           notes?: string | null
           recurring_expense_id?: string | null
           salvage_value?: number
+          source_supplier_bill_id?: string | null
           status?: string
           supplier_company_id?: string | null
           updated_at?: string
@@ -3634,6 +3818,8 @@ export type Database = {
           currency?: string
           depreciation_method?: string
           depreciation_start?: string | null
+          disposal_proceeds?: number | null
+          disposed_on?: string | null
           finance_category_id?: string | null
           id?: string
           identifier?: string | null
@@ -3641,6 +3827,7 @@ export type Database = {
           notes?: string | null
           recurring_expense_id?: string | null
           salvage_value?: number
+          source_supplier_bill_id?: string | null
           status?: string
           supplier_company_id?: string | null
           updated_at?: string
@@ -3660,6 +3847,20 @@ export type Database = {
             columns: ["recurring_expense_id"]
             isOneToOne: false
             referencedRelation: "finance_recurring_expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_assets_source_supplier_bill_id_fkey"
+            columns: ["source_supplier_bill_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_assets_source_supplier_bill_id_fkey"
+            columns: ["source_supplier_bill_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ap_aging"
             referencedColumns: ["id"]
           },
           {
@@ -3708,8 +3909,22 @@ export type Database = {
             foreignKeyName: "competitor_source_promoted_urls_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "competitor_source_promoted_urls_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_source_promoted_urls_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -3967,9 +4182,12 @@ export type Database = {
           credit_note_number: string
           currency: string
           document_type: string | null
+          fiscal_alerted_at: string | null
+          fiscal_error: string | null
           fiscal_mark: string | null
           fiscal_qr_url: string | null
           fiscal_status: string | null
+          fiscal_submitted_at: string | null
           fiscal_uid: string | null
           fx_rate_to_base: number
           id: string
@@ -3998,9 +4216,12 @@ export type Database = {
           credit_note_number: string
           currency?: string
           document_type?: string | null
+          fiscal_alerted_at?: string | null
+          fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
+          fiscal_submitted_at?: string | null
           fiscal_uid?: string | null
           fx_rate_to_base?: number
           id?: string
@@ -4029,9 +4250,12 @@ export type Database = {
           credit_note_number?: string
           currency?: string
           document_type?: string | null
+          fiscal_alerted_at?: string | null
+          fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
+          fiscal_submitted_at?: string | null
           fiscal_uid?: string | null
           fx_rate_to_base?: number
           id?: string
@@ -5307,8 +5531,22 @@ export type Database = {
             foreignKeyName: "data_import_history_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "data_import_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "data_import_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -5675,9 +5913,12 @@ export type Database = {
           customer_company_id: string | null
           customer_contact_id: string | null
           delivery_note_number: string | null
+          fiscal_alerted_at: string | null
+          fiscal_error: string | null
           fiscal_mark: string | null
           fiscal_qr_url: string | null
           fiscal_status: string | null
+          fiscal_submitted_at: string | null
           fiscal_uid: string | null
           id: string
           invoice_id: string | null
@@ -5719,9 +5960,12 @@ export type Database = {
           customer_company_id?: string | null
           customer_contact_id?: string | null
           delivery_note_number?: string | null
+          fiscal_alerted_at?: string | null
+          fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
+          fiscal_submitted_at?: string | null
           fiscal_uid?: string | null
           id?: string
           invoice_id?: string | null
@@ -5763,9 +6007,12 @@ export type Database = {
           customer_company_id?: string | null
           customer_contact_id?: string | null
           delivery_note_number?: string | null
+          fiscal_alerted_at?: string | null
+          fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
+          fiscal_submitted_at?: string | null
           fiscal_uid?: string | null
           id?: string
           invoice_id?: string | null
@@ -6109,8 +6356,22 @@ export type Database = {
             foreignKeyName: "document_chunks_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "document_chunks_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_chunks_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -6119,15 +6380,19 @@ export type Database = {
           content: string | null
           created_at: string | null
           description: string | null
+          embedding_generated_at: string | null
+          embedding_model: string | null
           entity_type: string
           factory_group: string | null
           factory_name: string | null
+          has_text_embedding: boolean | null
           id: string
           manufacturer: string | null
           metadata: Json | null
           name: string
           page_range: number[] | null
           source_document_id: string | null
+          text_embedding: unknown
           updated_at: string | null
           workspace_id: string | null
         }
@@ -6135,15 +6400,19 @@ export type Database = {
           content?: string | null
           created_at?: string | null
           description?: string | null
+          embedding_generated_at?: string | null
+          embedding_model?: string | null
           entity_type: string
           factory_group?: string | null
           factory_name?: string | null
+          has_text_embedding?: boolean | null
           id?: string
           manufacturer?: string | null
           metadata?: Json | null
           name: string
           page_range?: number[] | null
           source_document_id?: string | null
+          text_embedding?: unknown
           updated_at?: string | null
           workspace_id?: string | null
         }
@@ -6151,15 +6420,19 @@ export type Database = {
           content?: string | null
           created_at?: string | null
           description?: string | null
+          embedding_generated_at?: string | null
+          embedding_model?: string | null
           entity_type?: string
           factory_group?: string | null
           factory_name?: string | null
+          has_text_embedding?: boolean | null
           id?: string
           manufacturer?: string | null
           metadata?: Json | null
           name?: string
           page_range?: number[] | null
           source_document_id?: string | null
+          text_embedding?: unknown
           updated_at?: string | null
           workspace_id?: string | null
         }
@@ -8004,7 +8277,9 @@ export type Database = {
           last_run_at: string | null
           next_run_at: string
           notes: string | null
+          order_id: string | null
           payment_method: string | null
+          project_id: string | null
           reference_prefix: string | null
           subtotal_net: number
           supplier_company_id: string | null
@@ -8029,7 +8304,9 @@ export type Database = {
           last_run_at?: string | null
           next_run_at: string
           notes?: string | null
+          order_id?: string | null
           payment_method?: string | null
+          project_id?: string | null
           reference_prefix?: string | null
           subtotal_net?: number
           supplier_company_id?: string | null
@@ -8054,7 +8331,9 @@ export type Database = {
           last_run_at?: string | null
           next_run_at?: string
           notes?: string | null
+          order_id?: string | null
           payment_method?: string | null
+          project_id?: string | null
           reference_prefix?: string | null
           subtotal_net?: number
           supplier_company_id?: string | null
@@ -8083,6 +8362,20 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "finance_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_recurring_expenses_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_recurring_expenses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
@@ -8567,6 +8860,7 @@ export type Database = {
           capability: string
           connector_slug: string
           created_at: string
+          credits_alerted_at: string | null
           error_code: string | null
           error_message: string | null
           fiscal_invoice_type: string | null
@@ -8592,6 +8886,7 @@ export type Database = {
           capability: string
           connector_slug: string
           created_at?: string
+          credits_alerted_at?: string | null
           error_code?: string | null
           error_message?: string | null
           fiscal_invoice_type?: string | null
@@ -8617,6 +8912,7 @@ export type Database = {
           capability?: string
           connector_slug?: string
           created_at?: string
+          credits_alerted_at?: string | null
           error_code?: string | null
           error_message?: string | null
           fiscal_invoice_type?: string | null
@@ -10304,6 +10600,79 @@ export type Database = {
           },
         ]
       }
+      hr_overtime: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          end_time: string
+          ergani_protocol: string | null
+          hours: number | null
+          id: string
+          note: string | null
+          reason: string
+          start_time: string
+          status: string
+          updated_at: string
+          work_date: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          end_time: string
+          ergani_protocol?: string | null
+          hours?: number | null
+          id?: string
+          note?: string | null
+          reason: string
+          start_time: string
+          status?: string
+          updated_at?: string
+          work_date: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          end_time?: string
+          ergani_protocol?: string | null
+          hours?: number | null
+          id?: string
+          note?: string | null
+          reason?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+          work_date?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_overtime_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_overtime_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "vw_hr_employee_absence_summary"
+            referencedColumns: ["employee_id"]
+          },
+          {
+            foreignKeyName: "hr_overtime_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_payroll_items: {
         Row: {
           basis: string | null
@@ -10508,6 +10877,79 @@ export type Database = {
           },
         ]
       }
+      hr_separations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_date: string
+          employee_id: string
+          ergani_protocol: string | null
+          id: string
+          note: string | null
+          notice_date: string | null
+          reason: string | null
+          separation_type: string
+          severance_amount: number | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_date: string
+          employee_id: string
+          ergani_protocol?: string | null
+          id?: string
+          note?: string | null
+          notice_date?: string | null
+          reason?: string | null
+          separation_type: string
+          severance_amount?: number | null
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          employee_id?: string
+          ergani_protocol?: string | null
+          id?: string
+          note?: string | null
+          notice_date?: string | null
+          reason?: string | null
+          separation_type?: string
+          severance_amount?: number | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_separations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_separations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "vw_hr_employee_absence_summary"
+            referencedColumns: ["employee_id"]
+          },
+          {
+            foreignKeyName: "hr_separations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_settings: {
         Row: {
           created_at: string
@@ -10639,7 +11081,9 @@ export type Database = {
           effective_from: string
           effective_to: string | null
           employee_id: string
+          ergani_protocol: string | null
           id: string
+          name: string | null
           schedule_type: string
           status: string
           updated_at: string
@@ -10652,7 +11096,9 @@ export type Database = {
           effective_from: string
           effective_to?: string | null
           employee_id: string
+          ergani_protocol?: string | null
           id?: string
+          name?: string | null
           schedule_type: string
           status?: string
           updated_at?: string
@@ -10665,7 +11111,9 @@ export type Database = {
           effective_from?: string
           effective_to?: string | null
           employee_id?: string
+          ergani_protocol?: string | null
           id?: string
+          name?: string | null
           schedule_type?: string
           status?: string
           updated_at?: string
@@ -10813,8 +11261,22 @@ export type Database = {
             foreignKeyName: "image_product_associations_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "image_product_associations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "image_product_associations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -11553,8 +12015,22 @@ export type Database = {
             foreignKeyName: "invoice_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "invoice_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "invoice_items_source_quote_item_id_fkey"
@@ -11663,7 +12139,9 @@ export type Database = {
           document_type: string | null
           due_at: string | null
           exchange_rate: number | null
+          fiscal_alerted_at: string | null
           fiscal_connector_slug: string | null
+          fiscal_error: string | null
           fiscal_mark: string | null
           fiscal_qr_url: string | null
           fiscal_status: string | null
@@ -11750,7 +12228,9 @@ export type Database = {
           document_type?: string | null
           due_at?: string | null
           exchange_rate?: number | null
+          fiscal_alerted_at?: string | null
           fiscal_connector_slug?: string | null
+          fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
@@ -11837,7 +12317,9 @@ export type Database = {
           document_type?: string | null
           due_at?: string | null
           exchange_rate?: number | null
+          fiscal_alerted_at?: string | null
           fiscal_connector_slug?: string | null
+          fiscal_error?: string | null
           fiscal_mark?: string | null
           fiscal_qr_url?: string | null
           fiscal_status?: string | null
@@ -12646,8 +13128,22 @@ export type Database = {
             foreignKeyName: "kb_doc_attachments_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "kb_doc_attachments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kb_doc_attachments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "kb_doc_attachments_workspace_id_fkey"
@@ -13343,8 +13839,22 @@ export type Database = {
             foreignKeyName: "marketplace_listings_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "marketplace_listings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_listings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "marketplace_listings_warehouse_item_id_fkey"
@@ -13398,8 +13908,22 @@ export type Database = {
             foreignKeyName: "marketplace_market_reference_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: true
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "marketplace_market_reference_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_market_reference_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -13552,8 +14076,22 @@ export type Database = {
             foreignKeyName: "master_request_lines_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "master_request_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_request_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "master_request_lines_quote_item_id_fkey"
@@ -13718,8 +14256,22 @@ export type Database = {
             foreignKeyName: "match_corrections_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "match_corrections_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_corrections_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "match_corrections_tracked_query_id_fkey"
@@ -13760,8 +14312,22 @@ export type Database = {
             foreignKeyName: "material_alerts_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "material_alerts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_alerts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "material_alerts_saved_search_id_fkey"
@@ -14211,8 +14777,22 @@ export type Database = {
             foreignKeyName: "material_reviews_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "material_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -14398,8 +14978,22 @@ export type Database = {
             foreignKeyName: "mention_alert_log_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "mention_alert_log_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mention_alert_log_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "mention_alert_log_tracked_mention_id_fkey"
@@ -15447,8 +16041,22 @@ export type Database = {
             foreignKeyName: "moodboard_items_material_id_fkey"
             columns: ["material_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "moodboard_items_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "moodboard_items_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "moodboard_items_moodboard_id_fkey"
@@ -15846,6 +16454,7 @@ export type Database = {
           product_id: string | null
           quantity: number
           quantity_delivered: number
+          quantity_shipped: number
           sort_order: number
           supplier_company_id: string | null
           taric_code: string | null
@@ -15872,6 +16481,7 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           quantity_delivered?: number
+          quantity_shipped?: number
           sort_order?: number
           supplier_company_id?: string | null
           taric_code?: string | null
@@ -15898,6 +16508,7 @@ export type Database = {
           product_id?: string | null
           quantity?: number
           quantity_delivered?: number
+          quantity_shipped?: number
           sort_order?: number
           supplier_company_id?: string | null
           taric_code?: string | null
@@ -16774,8 +17385,22 @@ export type Database = {
             foreignKeyName: "pipeline_strategy_metrics_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "pipeline_strategy_metrics_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_strategy_metrics_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -16993,6 +17618,11 @@ export type Database = {
       }
       platform_suppliers: {
         Row: {
+          claim_approved_at: string | null
+          claim_approved_by: string | null
+          claim_contact_id: string | null
+          claim_revoked_at: string | null
+          claim_revoked_by: string | null
           claimed_workspace_id: string | null
           country_code: string
           created_at: string
@@ -17008,6 +17638,11 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          claim_approved_at?: string | null
+          claim_approved_by?: string | null
+          claim_contact_id?: string | null
+          claim_revoked_at?: string | null
+          claim_revoked_by?: string | null
           claimed_workspace_id?: string | null
           country_code: string
           created_at?: string
@@ -17023,6 +17658,11 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          claim_approved_at?: string | null
+          claim_approved_by?: string | null
+          claim_contact_id?: string | null
+          claim_revoked_at?: string | null
+          claim_revoked_by?: string | null
           claimed_workspace_id?: string | null
           country_code?: string
           created_at?: string
@@ -17038,6 +17678,13 @@ export type Database = {
           website?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "platform_suppliers_claim_contact_id_fkey"
+            columns: ["claim_contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "platform_suppliers_claimed_workspace_id_fkey"
             columns: ["claimed_workspace_id"]
@@ -17445,8 +18092,22 @@ export type Database = {
             foreignKeyName: "price_alert_log_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "price_alert_log_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_alert_log_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "price_alert_log_tracked_query_id_fkey"
@@ -17508,8 +18169,22 @@ export type Database = {
             foreignKeyName: "price_discrepancies_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "price_discrepancies_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_discrepancies_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "price_discrepancies_tracked_query_id_fkey"
@@ -17648,8 +18323,22 @@ export type Database = {
             foreignKeyName: "price_monitoring_jobs_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "price_monitoring_jobs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_monitoring_jobs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -18148,8 +18837,22 @@ export type Database = {
             foreignKeyName: "product_3d_models_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_3d_models_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_3d_models_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_3d_models_workspace_id_fkey"
@@ -18200,8 +18903,22 @@ export type Database = {
             foreignKeyName: "product_document_relationships_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_document_relationships_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_document_relationships_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -18250,8 +18967,29 @@ export type Database = {
             foreignKeyName: "product_edges_dst_product_id_fkey"
             columns: ["dst_product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_edges_dst_product_id_fkey"
+            columns: ["dst_product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_edges_dst_product_id_fkey"
+            columns: ["dst_product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_edges_src_product_id_fkey"
+            columns: ["src_product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
           },
           {
             foreignKeyName: "product_edges_src_product_id_fkey"
@@ -18259,6 +18997,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_edges_src_product_id_fkey"
+            columns: ["src_product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_edges_workspace_id_fkey"
@@ -18410,8 +19155,22 @@ export type Database = {
             foreignKeyName: "product_layout_regions_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_layout_regions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_layout_regions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -18517,8 +19276,22 @@ export type Database = {
             foreignKeyName: "product_packaging_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: true
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_packaging_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_packaging_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_packaging_workspace_id_fkey"
@@ -18580,8 +19353,22 @@ export type Database = {
             foreignKeyName: "product_price_breaks_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_price_breaks_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_price_breaks_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_price_breaks_workspace_id_fkey"
@@ -18684,8 +19471,22 @@ export type Database = {
             foreignKeyName: "product_prices_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_prices_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_prices_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "product_prices_workspace_id_fkey"
@@ -18873,8 +19674,22 @@ export type Database = {
             foreignKeyName: "product_tables_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_tables_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_tables_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -18920,8 +19735,22 @@ export type Database = {
             foreignKeyName: "product_usage_stats_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: true
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_usage_stats_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_usage_stats_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -18950,6 +19779,7 @@ export type Database = {
           embedding_model: string | null
           enforce_moq: boolean
           external_sku: string | null
+          facet_canonicalization_version: number
           id: string
           import_batch_id: string | null
           item_type: string
@@ -18959,6 +19789,7 @@ export type Database = {
           layout_stats: Json | null
           long_description: string | null
           markup_percent: number | null
+          master_product_id: string | null
           measurement_unit_code: number | null
           metadata: Json | null
           mydata_income_classification_category: string | null
@@ -19030,6 +19861,7 @@ export type Database = {
           embedding_model?: string | null
           enforce_moq?: boolean
           external_sku?: string | null
+          facet_canonicalization_version?: number
           id?: string
           import_batch_id?: string | null
           item_type?: string
@@ -19039,6 +19871,7 @@ export type Database = {
           layout_stats?: Json | null
           long_description?: string | null
           markup_percent?: number | null
+          master_product_id?: string | null
           measurement_unit_code?: number | null
           metadata?: Json | null
           mydata_income_classification_category?: string | null
@@ -19110,6 +19943,7 @@ export type Database = {
           embedding_model?: string | null
           enforce_moq?: boolean
           external_sku?: string | null
+          facet_canonicalization_version?: number
           id?: string
           import_batch_id?: string | null
           item_type?: string
@@ -19119,6 +19953,7 @@ export type Database = {
           layout_stats?: Json | null
           long_description?: string | null
           markup_percent?: number | null
+          master_product_id?: string | null
           measurement_unit_code?: number | null
           metadata?: Json | null
           mydata_income_classification_category?: string | null
@@ -19172,6 +20007,20 @@ export type Database = {
             columns: ["brand_company_id"]
             isOneToOne: false
             referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_master_product_id_fkey"
+            columns: ["master_product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["master_product_id"]
+          },
+          {
+            foreignKeyName: "products_master_product_id_fkey"
+            columns: ["master_product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_products"
             referencedColumns: ["id"]
           },
           {
@@ -19448,6 +20297,91 @@ export type Database = {
           },
         ]
       }
+      project_document_revisions: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          is_current: boolean
+          notes: string | null
+          rev_label: string
+          storage_bucket: string
+          storage_object_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          is_current?: boolean
+          notes?: string | null
+          rev_label: string
+          storage_bucket?: string
+          storage_object_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          is_current?: boolean
+          notes?: string | null
+          rev_label?: string
+          storage_bucket?: string
+          storage_object_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_document_revisions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "project_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_documents: {
+        Row: {
+          client_visible: boolean
+          created_at: string
+          created_by: string | null
+          discipline: string | null
+          id: string
+          project_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          client_visible?: boolean
+          created_at?: string
+          created_by?: string | null
+          discipline?: string | null
+          id?: string
+          project_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          client_visible?: boolean
+          created_at?: string
+          created_by?: string | null
+          discipline?: string | null
+          id?: string
+          project_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_events: {
         Row: {
           actor_id: string | null
@@ -19587,8 +20521,29 @@ export type Database = {
             foreignKeyName: "project_plan_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "project_plan_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_plan_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "project_plan_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
           },
           {
             foreignKeyName: "project_plan_items_service_id_fkey"
@@ -19596,6 +20551,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_plan_items_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -19805,8 +20767,22 @@ export type Database = {
             foreignKeyName: "project_products_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "project_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "project_products_project_id_fkey"
@@ -19946,6 +20922,109 @@ export type Database = {
           },
         ]
       }
+      project_request_messages: {
+        Row: {
+          author_id: string | null
+          author_name: string | null
+          body: string
+          created_at: string
+          id: string
+          is_from_client: boolean
+          request_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_name?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          is_from_client?: boolean
+          request_id: string
+        }
+        Update: {
+          author_id?: string | null
+          author_name?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          is_from_client?: boolean
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_request_messages_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "project_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_requests: {
+        Row: {
+          approval_decision: string | null
+          assignee_id: string | null
+          body: string | null
+          client_visible: boolean
+          created_at: string
+          id: string
+          kind: string
+          project_id: string
+          raised_by: string | null
+          raised_by_name: string | null
+          resolved_at: string | null
+          status: string
+          target_id: string | null
+          target_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          approval_decision?: string | null
+          assignee_id?: string | null
+          body?: string | null
+          client_visible?: boolean
+          created_at?: string
+          id?: string
+          kind?: string
+          project_id: string
+          raised_by?: string | null
+          raised_by_name?: string | null
+          resolved_at?: string | null
+          status?: string
+          target_id?: string | null
+          target_type?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          approval_decision?: string | null
+          assignee_id?: string | null
+          body?: string | null
+          client_visible?: boolean
+          created_at?: string
+          id?: string
+          kind?: string
+          project_id?: string
+          raised_by?: string | null
+          raised_by_name?: string | null
+          resolved_at?: string | null
+          status?: string
+          target_id?: string | null
+          target_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_rooms: {
         Row: {
           budget_amount: number | null
@@ -20011,6 +21090,174 @@ export type Database = {
           },
         ]
       }
+      project_site_logs: {
+        Row: {
+          attendance: string | null
+          author_id: string | null
+          created_at: string
+          id: string
+          log_date: string
+          notes: string | null
+          photo_paths: string[]
+          project_id: string
+          updated_at: string
+          weather: string | null
+        }
+        Insert: {
+          attendance?: string | null
+          author_id?: string | null
+          created_at?: string
+          id?: string
+          log_date?: string
+          notes?: string | null
+          photo_paths?: string[]
+          project_id: string
+          updated_at?: string
+          weather?: string | null
+        }
+        Update: {
+          attendance?: string | null
+          author_id?: string | null
+          created_at?: string
+          id?: string
+          log_date?: string
+          notes?: string | null
+          photo_paths?: string[]
+          project_id?: string
+          updated_at?: string
+          weather?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_site_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_snags: {
+        Row: {
+          assignee_id: string | null
+          client_visible: boolean
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          photo_paths: string[]
+          project_id: string
+          resolved_at: string | null
+          room_id: string | null
+          severity: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          client_visible?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          photo_paths?: string[]
+          project_id: string
+          resolved_at?: string | null
+          room_id?: string | null
+          severity?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          client_visible?: boolean
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          photo_paths?: string[]
+          project_id?: string
+          resolved_at?: string | null
+          room_id?: string | null
+          severity?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_snags_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_snags_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "project_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_task_dependencies: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dep_type: string
+          id: string
+          predecessor_id: string
+          project_id: string
+          successor_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dep_type?: string
+          id?: string
+          predecessor_id: string
+          project_id: string
+          successor_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dep_type?: string
+          id?: string
+          predecessor_id?: string
+          project_id?: string
+          successor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_task_dependencies_predecessor_id_fkey"
+            columns: ["predecessor_id"]
+            isOneToOne: false
+            referencedRelation: "project_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_task_dependencies_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_task_dependencies_successor_id_fkey"
+            columns: ["successor_id"]
+            isOneToOne: false
+            referencedRelation: "project_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_tasks: {
         Row: {
           assignee_id: string | null
@@ -20019,11 +21266,15 @@ export type Database = {
           created_by: string | null
           description: string | null
           due_date: string | null
+          end_date: string | null
           id: string
+          is_milestone: boolean
           parent_task_id: string | null
+          progress_pct: number
           project_id: string
           room_id: string | null
           sort_order: number
+          start_date: string | null
           status: string
           title: string
           updated_at: string
@@ -20036,11 +21287,15 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           due_date?: string | null
+          end_date?: string | null
           id?: string
+          is_milestone?: boolean
           parent_task_id?: string | null
+          progress_pct?: number
           project_id: string
           room_id?: string | null
           sort_order?: number
+          start_date?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -20053,11 +21308,15 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           due_date?: string | null
+          end_date?: string | null
           id?: string
+          is_milestone?: boolean
           parent_task_id?: string | null
+          progress_pct?: number
           project_id?: string
           room_id?: string | null
           sort_order?: number
+          start_date?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -20353,7 +21612,6 @@ export type Database = {
           currency: string
           current_rent: number | null
           current_use: string | null
-          days_on_market: number | null
           deposit: number | null
           description_i18n: Json
           distance_to_sea: number | null
@@ -20381,6 +21639,7 @@ export type Database = {
           heating_type: string | null
           hide_exact_address: boolean
           house_rules: string | null
+          ical_token: string | null
           id: string
           in_discovery: boolean
           inside_city_plan: boolean | null
@@ -20391,6 +21650,7 @@ export type Database = {
           key_money: number | null
           kitchens: number | null
           land_use: string | null
+          last_vendor_report_at: string | null
           lat: number | null
           lease_expiry: string | null
           legal_clearances: string[] | null
@@ -20464,6 +21724,7 @@ export type Database = {
           updated_at: string
           utilities_available: string[] | null
           vendor_contact_id: string | null
+          vendor_reports_enabled: boolean
           video_url: string | null
           view_count: number
           view_types: string[] | null
@@ -20524,7 +21785,6 @@ export type Database = {
           currency?: string
           current_rent?: number | null
           current_use?: string | null
-          days_on_market?: number | null
           deposit?: number | null
           description_i18n?: Json
           distance_to_sea?: number | null
@@ -20552,6 +21812,7 @@ export type Database = {
           heating_type?: string | null
           hide_exact_address?: boolean
           house_rules?: string | null
+          ical_token?: string | null
           id?: string
           in_discovery?: boolean
           inside_city_plan?: boolean | null
@@ -20562,6 +21823,7 @@ export type Database = {
           key_money?: number | null
           kitchens?: number | null
           land_use?: string | null
+          last_vendor_report_at?: string | null
           lat?: number | null
           lease_expiry?: string | null
           legal_clearances?: string[] | null
@@ -20635,6 +21897,7 @@ export type Database = {
           updated_at?: string
           utilities_available?: string[] | null
           vendor_contact_id?: string | null
+          vendor_reports_enabled?: boolean
           video_url?: string | null
           view_count?: number
           view_types?: string[] | null
@@ -20695,7 +21958,6 @@ export type Database = {
           currency?: string
           current_rent?: number | null
           current_use?: string | null
-          days_on_market?: number | null
           deposit?: number | null
           description_i18n?: Json
           distance_to_sea?: number | null
@@ -20723,6 +21985,7 @@ export type Database = {
           heating_type?: string | null
           hide_exact_address?: boolean
           house_rules?: string | null
+          ical_token?: string | null
           id?: string
           in_discovery?: boolean
           inside_city_plan?: boolean | null
@@ -20733,6 +21996,7 @@ export type Database = {
           key_money?: number | null
           kitchens?: number | null
           land_use?: string | null
+          last_vendor_report_at?: string | null
           lat?: number | null
           lease_expiry?: string | null
           legal_clearances?: string[] | null
@@ -20806,6 +22070,7 @@ export type Database = {
           updated_at?: string
           utilities_available?: string[] | null
           vendor_contact_id?: string | null
+          vendor_reports_enabled?: boolean
           video_url?: string | null
           view_count?: number
           view_types?: string[] | null
@@ -20835,6 +22100,170 @@ export type Database = {
           },
           {
             foreignKeyName: "properties_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_booking_tasks: {
+        Row: {
+          assignee_name: string | null
+          assignee_user_id: string | null
+          booking_id: string | null
+          completed_at: string | null
+          cost: number | null
+          created_at: string
+          due_at: string
+          id: string
+          notes: string | null
+          property_id: string
+          status: string
+          task_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          assignee_name?: string | null
+          assignee_user_id?: string | null
+          booking_id?: string | null
+          completed_at?: string | null
+          cost?: number | null
+          created_at?: string
+          due_at: string
+          id?: string
+          notes?: string | null
+          property_id: string
+          status?: string
+          task_type?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          assignee_name?: string | null
+          assignee_user_id?: string | null
+          booking_id?: string | null
+          completed_at?: string | null
+          cost?: number | null
+          created_at?: string
+          due_at?: string
+          id?: string
+          notes?: string | null
+          property_id?: string
+          status?: string
+          task_type?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_booking_tasks_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "property_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_booking_tasks_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_booking_tasks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_bookings: {
+        Row: {
+          channel: string
+          check_in: string
+          check_out: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          external_ref: string | null
+          guest_contact_id: string | null
+          guest_email: string | null
+          guest_name: string | null
+          guest_phone: string | null
+          guests_count: number | null
+          id: string
+          nightly_rate: number | null
+          notes: string | null
+          property_id: string
+          status: string
+          total_amount: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          channel?: string
+          check_in: string
+          check_out: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          external_ref?: string | null
+          guest_contact_id?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
+          guests_count?: number | null
+          id?: string
+          nightly_rate?: number | null
+          notes?: string | null
+          property_id: string
+          status?: string
+          total_amount?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          channel?: string
+          check_in?: string
+          check_out?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          external_ref?: string | null
+          guest_contact_id?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
+          guests_count?: number | null
+          id?: string
+          nightly_rate?: number | null
+          notes?: string | null
+          property_id?: string
+          status?: string
+          total_amount?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_bookings_guest_contact_id_fkey"
+            columns: ["guest_contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_bookings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_bookings_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -20945,6 +22374,66 @@ export type Database = {
           },
         ]
       }
+      property_channel_links: {
+        Row: {
+          channel: string
+          created_at: string
+          ical_import_url: string | null
+          id: string
+          imported_count: number
+          is_active: boolean
+          last_sync_message: string | null
+          last_sync_status: string | null
+          last_synced_at: string | null
+          property_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          ical_import_url?: string | null
+          id?: string
+          imported_count?: number
+          is_active?: boolean
+          last_sync_message?: string | null
+          last_sync_status?: string | null
+          last_synced_at?: string | null
+          property_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          ical_import_url?: string | null
+          id?: string
+          imported_count?: number
+          is_active?: boolean
+          last_sync_message?: string | null
+          last_sync_status?: string | null
+          last_synced_at?: string | null
+          property_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_channel_links_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_channel_links_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_contacts_ext: {
         Row: {
           budget_max: number | null
@@ -21001,6 +22490,42 @@ export type Database = {
           },
           {
             foreignKeyName: "property_contacts_ext_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_daily_stats: {
+        Row: {
+          day: string
+          property_id: string
+          views: number
+          workspace_id: string
+        }
+        Insert: {
+          day: string
+          property_id: string
+          views?: number
+          workspace_id: string
+        }
+        Update: {
+          day?: string
+          property_id?: string
+          views?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_daily_stats_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_daily_stats_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -21182,11 +22707,17 @@ export type Database = {
       }
       property_inquiries: {
         Row: {
+          assigned_at: string | null
+          assigned_by_rule_id: string | null
+          assigned_user_id: string | null
           created_at: string
           crm_contact_id: string | null
           email: string | null
           gdpr_consent: boolean
           id: string
+          inbound_portal: string | null
+          inbound_raw: Json | null
+          marketing_consent: boolean
           message: string | null
           name: string | null
           phone: string | null
@@ -21196,11 +22727,17 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          assigned_at?: string | null
+          assigned_by_rule_id?: string | null
+          assigned_user_id?: string | null
           created_at?: string
           crm_contact_id?: string | null
           email?: string | null
           gdpr_consent?: boolean
           id?: string
+          inbound_portal?: string | null
+          inbound_raw?: Json | null
+          marketing_consent?: boolean
           message?: string | null
           name?: string | null
           phone?: string | null
@@ -21210,11 +22747,17 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          assigned_at?: string | null
+          assigned_by_rule_id?: string | null
+          assigned_user_id?: string | null
           created_at?: string
           crm_contact_id?: string | null
           email?: string | null
           gdpr_consent?: boolean
           id?: string
+          inbound_portal?: string | null
+          inbound_raw?: Json | null
+          marketing_consent?: boolean
           message?: string | null
           name?: string | null
           phone?: string | null
@@ -21373,6 +22916,79 @@ export type Database = {
           },
           {
             foreignKeyName: "property_investments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_kyc_checks: {
+        Row: {
+          check_type: string
+          contact_id: string
+          created_at: string
+          created_by: string | null
+          document_id: string | null
+          expires_at: string | null
+          id: string
+          notes: string | null
+          reference: string | null
+          status: string
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          check_type: string
+          contact_id: string
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          reference?: string | null
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          check_type?: string
+          contact_id?: string
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          reference?: string | null
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_kyc_checks_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_kyc_checks_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "property_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_kyc_checks_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -21762,6 +23378,82 @@ export type Database = {
           },
         ]
       }
+      property_sale_commission_splits: {
+        Row: {
+          basis: string
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          fixed_amount: number | null
+          id: string
+          label: string | null
+          notes: string | null
+          paid_at: string | null
+          party_type: string
+          pct: number | null
+          sale_id: string
+          updated_at: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          basis?: string
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          fixed_amount?: number | null
+          id?: string
+          label?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          party_type: string
+          pct?: number | null
+          sale_id: string
+          updated_at?: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          basis?: string
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          fixed_amount?: number | null
+          id?: string
+          label?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          party_type?: string
+          pct?: number | null
+          sale_id?: string
+          updated_at?: string
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_sale_commission_splits_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_sale_commission_splits_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "property_sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_sale_commission_splits_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_sales: {
         Row: {
           agent_id: string | null
@@ -21891,16 +23583,25 @@ export type Database = {
           created_by: string | null
           currency: string
           deposit: number | null
+          deposit_protected_at: string | null
+          deposit_reference: string | null
+          deposit_scheme: string | null
           end_date: string | null
           id: string
           landlord_contact_id: string | null
+          next_rent_review_date: string | null
           notes: string | null
+          notice_given_at: string | null
+          notice_given_by: string | null
+          notice_period_days: number | null
+          portal_token: string | null
           property_id: string
           rent_amount: number
           rent_frequency: string
           start_date: string
           status: string
           tenant_contact_id: string | null
+          termination_date: string | null
           updated_at: string
           workspace_id: string
         }
@@ -21910,16 +23611,25 @@ export type Database = {
           created_by?: string | null
           currency?: string
           deposit?: number | null
+          deposit_protected_at?: string | null
+          deposit_reference?: string | null
+          deposit_scheme?: string | null
           end_date?: string | null
           id?: string
           landlord_contact_id?: string | null
+          next_rent_review_date?: string | null
           notes?: string | null
+          notice_given_at?: string | null
+          notice_given_by?: string | null
+          notice_period_days?: number | null
+          portal_token?: string | null
           property_id: string
           rent_amount: number
           rent_frequency?: string
           start_date: string
           status?: string
           tenant_contact_id?: string | null
+          termination_date?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -21929,16 +23639,25 @@ export type Database = {
           created_by?: string | null
           currency?: string
           deposit?: number | null
+          deposit_protected_at?: string | null
+          deposit_reference?: string | null
+          deposit_scheme?: string | null
           end_date?: string | null
           id?: string
           landlord_contact_id?: string | null
+          next_rent_review_date?: string | null
           notes?: string | null
+          notice_given_at?: string | null
+          notice_given_by?: string | null
+          notice_period_days?: number | null
+          portal_token?: string | null
           property_id?: string
           rent_amount?: number
           rent_frequency?: string
           start_date?: string
           status?: string
           tenant_contact_id?: string | null
+          termination_date?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -21966,6 +23685,86 @@ export type Database = {
           },
           {
             foreignKeyName: "property_tenancies_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_tenancy_inspections: {
+        Row: {
+          completed_at: string | null
+          condition_rating: string | null
+          created_at: string
+          created_by: string | null
+          document_id: string | null
+          findings: string | null
+          id: string
+          inspection_type: string
+          inspector_user_id: string | null
+          property_id: string
+          scheduled_for: string | null
+          tenancy_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          condition_rating?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          findings?: string | null
+          id?: string
+          inspection_type?: string
+          inspector_user_id?: string | null
+          property_id: string
+          scheduled_for?: string | null
+          tenancy_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          condition_rating?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          findings?: string | null
+          id?: string
+          inspection_type?: string
+          inspector_user_id?: string | null
+          property_id?: string
+          scheduled_for?: string | null
+          tenancy_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_tenancy_inspections_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "property_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_tenancy_inspections_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_tenancy_inspections_tenancy_id_fkey"
+            columns: ["tenancy_id"]
+            isOneToOne: false
+            referencedRelation: "property_tenancies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_tenancy_inspections_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -22717,8 +24516,22 @@ export type Database = {
             foreignKeyName: "quote_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "quote_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "quote_items_quote_id_fkey"
@@ -23149,6 +24962,10 @@ export type Database = {
           feed_enabled: boolean
           feed_format: string
           feed_token: string
+          inbound_lead_token: string | null
+          inbound_leads_enabled: boolean
+          kyc_required_for_offers: boolean
+          kyc_required_types: string[]
           updated_at: string
           workspace_id: string
         }
@@ -23157,6 +24974,10 @@ export type Database = {
           feed_enabled?: boolean
           feed_format?: string
           feed_token?: string
+          inbound_lead_token?: string | null
+          inbound_leads_enabled?: boolean
+          kyc_required_for_offers?: boolean
+          kyc_required_types?: string[]
           updated_at?: string
           workspace_id: string
         }
@@ -23165,6 +24986,10 @@ export type Database = {
           feed_enabled?: boolean
           feed_format?: string
           feed_token?: string
+          inbound_lead_token?: string | null
+          inbound_leads_enabled?: boolean
+          kyc_required_for_offers?: boolean
+          kyc_required_types?: string[]
           updated_at?: string
           workspace_id?: string
         }
@@ -23173,6 +24998,118 @@ export type Database = {
             foreignKeyName: "real_estate_settings_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      realestate_calendar_connections: {
+        Row: {
+          access_token: string | null
+          calendar_id: string
+          created_at: string
+          google_email: string | null
+          id: string
+          is_active: boolean
+          last_sync_at: string | null
+          last_sync_error: string | null
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          calendar_id?: string
+          created_at?: string
+          google_email?: string | null
+          id?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          access_token?: string | null
+          calendar_id?: string
+          created_at?: string
+          google_email?: string | null
+          id?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "realestate_calendar_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      realestate_lead_routing_rules: {
+        Row: {
+          agent_user_ids: string[]
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          last_assigned_user_id: string | null
+          match_postcode_prefixes: string[]
+          match_regions: string[]
+          match_towns: string[]
+          name: string
+          priority: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          agent_user_ids?: string[]
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          last_assigned_user_id?: string | null
+          match_postcode_prefixes?: string[]
+          match_regions?: string[]
+          match_towns?: string[]
+          name: string
+          priority?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          agent_user_ids?: string[]
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          last_assigned_user_id?: string | null
+          match_postcode_prefixes?: string[]
+          match_regions?: string[]
+          match_towns?: string[]
+          name?: string
+          priority?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "realestate_lead_routing_rules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -25496,8 +27433,22 @@ export type Database = {
             foreignKeyName: "stock_allocations_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "stock_allocations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_allocations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "stock_allocations_supply_order_item_id_fkey"
@@ -26041,8 +27992,22 @@ export type Database = {
             foreignKeyName: "supplier_credit_note_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "supplier_credit_note_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_credit_note_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "supplier_credit_note_items_supplier_credit_note_id_fkey"
@@ -26229,8 +28194,22 @@ export type Database = {
             foreignKeyName: "supplier_products_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "supplier_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "supplier_products_supplier_company_id_fkey"
@@ -26681,6 +28660,8 @@ export type Database = {
           id: string
           is_billable: boolean
           minutes: number
+          project_id: string | null
+          task_id: string | null
           updated_at: string
           user_id: string | null
           work_date: string
@@ -26698,6 +28679,8 @@ export type Database = {
           id?: string
           is_billable?: boolean
           minutes: number
+          project_id?: string | null
+          task_id?: string | null
           updated_at?: string
           user_id?: string | null
           work_date?: string
@@ -26715,6 +28698,8 @@ export type Database = {
           id?: string
           is_billable?: boolean
           minutes?: number
+          project_id?: string | null
+          task_id?: string | null
           updated_at?: string
           user_id?: string | null
           work_date?: string
@@ -26747,6 +28732,20 @@ export type Database = {
             columns: ["customer_contact_id"]
             isOneToOne: false
             referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "project_tasks"
             referencedColumns: ["id"]
           },
           {
@@ -27151,8 +29150,22 @@ export type Database = {
             foreignKeyName: "tracked_mentions_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "tracked_mentions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracked_mentions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -27289,8 +29302,22 @@ export type Database = {
             foreignKeyName: "tracked_queries_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "tracked_queries_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracked_queries_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
         ]
       }
@@ -28082,8 +30109,22 @@ export type Database = {
             foreignKeyName: "user_material_interactions_material_id_fkey"
             columns: ["material_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "user_material_interactions_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_material_interactions_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "user_material_interactions_workspace_id_fkey"
@@ -28842,8 +30883,22 @@ export type Database = {
             foreignKeyName: "warehouse_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "warehouse_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "warehouse_items_warehouse_id_fkey"
@@ -28980,8 +31035,22 @@ export type Database = {
             foreignKeyName: "warehouse_pending_items_matched_product_id_fkey"
             columns: ["matched_product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "warehouse_pending_items_matched_product_id_fkey"
+            columns: ["matched_product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warehouse_pending_items_matched_product_id_fkey"
+            columns: ["matched_product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "warehouse_pending_items_matched_warehouse_item_id_fkey"
@@ -30594,6 +32663,31 @@ export type Database = {
       }
     }
     Views: {
+      catalog_master_price_drift: {
+        Row: {
+          list_price: number | null
+          list_price_currency: string | null
+          list_price_updated_at: string | null
+          master_product_id: string | null
+          name: string | null
+          needs_review: boolean | null
+          normalized_sku: string | null
+          operator_cost: number | null
+          operator_cost_currency: string | null
+          operator_product_id: string | null
+          platform_supplier_id: string | null
+          supplier_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_master_products_platform_supplier_id_fkey"
+            columns: ["platform_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "platform_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       catalog_operations_summary: {
         Row: {
           created_at: string | null
@@ -30736,8 +32830,22 @@ export type Database = {
             foreignKeyName: "marketplace_listings_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "marketplace_listings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_listings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "marketplace_listings_workspace_id_fkey"
@@ -30790,6 +32898,41 @@ export type Database = {
         }
         Relationships: []
       }
+      products_effective_facts: {
+        Row: {
+          attributes: Json | null
+          barcode: string | null
+          has_manufacturer_data: boolean | null
+          manufacturer_published_at: string | null
+          master_product_id: string | null
+          name: string | null
+          product_id: string | null
+          workspace_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_master_product_id_fkey"
+            columns: ["master_product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["master_product_id"]
+          },
+          {
+            foreignKeyName: "products_master_product_id_fkey"
+            columns: ["master_product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_items_with_room: {
         Row: {
           added_at: string | null
@@ -30834,8 +32977,22 @@ export type Database = {
             foreignKeyName: "quote_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "quote_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "quote_items_quote_id_fkey"
@@ -31242,6 +33399,22 @@ export type Database = {
         Returns: string
       }
       _auto_allocate_payment: { Args: { p_payment_id: string }; Returns: Json }
+      _deliver_order_line_core: {
+        Args: {
+          p_doc_id: string
+          p_doc_label: string
+          p_doc_type: string
+          p_item: string
+          p_move_stock: boolean
+          p_order: string
+          p_qty: number
+        }
+        Returns: string
+      }
+      _emit_catalog_flow_event: {
+        Args: { p_event_type: string; p_master_id: string; p_payload: Json }
+        Returns: undefined
+      }
       _extract_storage_bucket_from_url: {
         Args: { p_url: string }
         Returns: string
@@ -31316,6 +33489,7 @@ export type Database = {
         Args: { p_product_id: string }
         Returns: string
       }
+      accept_master_price: { Args: { p_master_id: string }; Returns: Json }
       accept_project_invitation: {
         Args: { p_share_token: string }
         Returns: {
@@ -31455,7 +33629,10 @@ export type Database = {
           ref: string
         }[]
       }
-      bump_template_usage: { Args: { p_template_id: string }; Returns: undefined }
+      bump_template_usage: {
+        Args: { p_template_id: string }
+        Returns: undefined
+      }
       calculate_generation_cost: { Args: { p_job_id: string }; Returns: number }
       calculate_layout_stats: { Args: { p_product_id: string }; Returns: Json }
       calculate_price_change: {
@@ -31957,6 +34134,15 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      dic_detect__catalog_facet_canonicalization_degraded: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
       dic_detect__credits_pool_ledger_drift: {
         Args: never
         Returns: {
@@ -32003,6 +34189,15 @@ export type Database = {
         }[]
       }
       dic_detect__finance_order_cross_currency_allocation: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__finance_order_delivered_without_document: {
         Args: never
         Returns: {
           detail: Json
@@ -32093,6 +34288,15 @@ export type Database = {
         }[]
       }
       dic_detect__finance_quote_totals_drift: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__finance_stock_bypasses_document_gate: {
         Args: never
         Returns: {
           detail: Json
@@ -32218,6 +34422,33 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      dic_detect__realestate_commission_over_allocated: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__realestate_rent_charge_status_drift: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__realestate_rent_never_invoiced: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
       dic_detect__security_invariants: {
         Args: never
         Returns: {
@@ -32318,6 +34549,10 @@ export type Database = {
         Returns: number
       }
       dic_heal__finance_order_total_mismatch: { Args: never; Returns: number }
+      dic_heal__realestate_rent_charge_status_drift: {
+        Args: never
+        Returns: number
+      }
       dic_heal__stock_reservation_missing: { Args: never; Returns: number }
       dic_heal__tenancy_order_item_workspace: { Args: never; Returns: number }
       dic_heal__tenancy_workspace_orphaned: { Args: never; Returns: number }
@@ -32331,6 +34566,22 @@ export type Database = {
       }
       ensure_own_workspace: { Args: never; Returns: Json }
       escalate_request: { Args: { p_request_id: string }; Returns: string }
+      expand_document_chunk_hits: {
+        Args: {
+          p_after?: number
+          p_before?: number
+          p_chunk_ids: string[]
+          p_workspace_id: string
+        }
+        Returns: {
+          chunk_id: string
+          chunk_index: number
+          content: string
+          neighbor_position: string
+          page_number: number
+          source_chunk_id: string
+        }[]
+      }
       expire_due_listings: { Args: never; Returns: number }
       expire_due_quotes: { Args: never; Returns: number }
       expire_stale_contracts: { Args: never; Returns: number }
@@ -32541,6 +34792,7 @@ export type Database = {
           embedding_model: string | null
           enforce_moq: boolean
           external_sku: string | null
+          facet_canonicalization_version: number
           id: string
           import_batch_id: string | null
           item_type: string
@@ -32550,6 +34802,7 @@ export type Database = {
           layout_stats: Json | null
           long_description: string | null
           markup_percent: number | null
+          master_product_id: string | null
           measurement_unit_code: number | null
           metadata: Json | null
           mydata_income_classification_category: string | null
@@ -32603,6 +34856,18 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_asset_book_values: {
+        Args: { p_asset_ids: string[] }
+        Returns: {
+          accumulated: number
+          asset_id: string
+          book_value: number
+          fully_depreciated: boolean
+          method: string
+          monthly_depreciation: number
+          months_elapsed: number
+        }[]
       }
       get_available_credits: {
         Args: { p_user_id: string; p_workspace_id?: string }
@@ -33009,9 +35274,31 @@ export type Database = {
           project_name: string
         }[]
       }
+      get_project_labor: { Args: { p_project_id: string }; Returns: Json }
+      get_project_pnl: { Args: { p_project_id: string }; Returns: Json }
       get_projects_using_product: {
         Args: { p_product_id: string; p_workspace_id: string }
         Returns: Json
+      }
+      get_property_performance: {
+        Args: { p_property_ids: string[] }
+        Returns: {
+          current_price: number
+          days_on_market: number
+          first_price: number
+          inquiries_30d: number
+          inquiries_total: number
+          lead_sources: Json
+          offers_total: number
+          price_change_pct: number
+          price_changes: number
+          property_id: string
+          viewings_completed: number
+          viewings_total: number
+          views_30d: number
+          views_7d: number
+          views_total: number
+        }[]
       }
       get_provider_health: {
         Args: { p_window_minutes?: number }
@@ -33051,6 +35338,35 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      get_rent_charge_settlements: {
+        Args: { p_charge_ids: string[] }
+        Returns: {
+          amount: number
+          charge_id: string
+          currency: string
+          outstanding: number
+          payment_status: string
+          settled: number
+          settlement_source: string
+        }[]
+      }
+      get_sale_commission_splits: {
+        Args: { p_sale_ids: string[] }
+        Returns: {
+          allocated: number
+          amount: number
+          commission_base: number
+          contact_id: string
+          currency: string
+          label: string
+          paid_at: string
+          party_type: string
+          sale_id: string
+          split_id: string
+          unallocated: number
+          user_id: string
+        }[]
       }
       get_search_performance_stats: {
         Args: { time_interval?: string }
@@ -33401,6 +35717,10 @@ export type Database = {
           success: boolean
           transaction_id: string
         }[]
+      }
+      greek_region_for_postal_code: {
+        Args: { p_postal: string }
+        Returns: string
       }
       handoff_purchase_order_to_supplier: {
         Args: { p_order: string }
@@ -34086,6 +36406,7 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string
       }
+      normalize_catalog_sku: { Args: { p_sku: string }; Returns: string }
       normalize_unit: { Args: { p_unit: string }; Returns: string }
       open_pos_session: {
         Args: {
@@ -34417,6 +36738,14 @@ export type Database = {
         Args: { p_product_id: string; p_quantity: number; p_unit?: string }
         Returns: number
       }
+      property_kyc_status: {
+        Args: { p_contact_id: string; p_workspace_id: string }
+        Returns: {
+          missing: string[]
+          required: boolean
+          satisfied: boolean
+        }[]
+      }
       propose_or_apply_customer_pricing: {
         Args: {
           p_discount_percent?: number
@@ -34437,6 +36766,14 @@ export type Database = {
           path: string
         }[]
       }
+      publish_master_product_facts: {
+        Args: { p_fields: Json; p_master_id: string }
+        Returns: Json
+      }
+      publish_master_product_price: {
+        Args: { p_currency?: string; p_master_id: string; p_price: number }
+        Returns: Json
+      }
       purge_archived_inbox_threads: {
         Args: { p_older_than?: string }
         Returns: number
@@ -34444,6 +36781,27 @@ export type Database = {
       raise_cover_purchase_orders: {
         Args: { p_order_id: string }
         Returns: Json
+      }
+      read_document_chunk_span: {
+        Args: {
+          match_workspace_id: string
+          p_document_id: string
+          p_from_chunk_index?: number
+          p_product_id?: string
+          p_to_chunk_index?: number
+        }
+        Returns: {
+          chunk_id: string
+          chunk_index: number
+          chunk_type: string
+          content: string
+          doc_chunk_count: number
+          document_id: string
+          document_title: string
+          page_number: number
+          product_id: string
+          product_name: string
+        }[]
       }
       rebuild_product_edges: {
         Args: { p_workspace_id: string }
@@ -34906,9 +37264,17 @@ export type Database = {
         Args: { p_decision: string; p_reason?: string; p_request_id: string }
         Returns: undefined
       }
+      revoke_supplier_claim: {
+        Args: { p_platform_supplier_id: string; p_reason?: string }
+        Returns: Json
+      }
       revoke_workspace_invite: {
         Args: { p_invite_id: string }
         Returns: boolean
+      }
+      route_property_lead: {
+        Args: { p_property_id: string; p_workspace_id: string }
+        Returns: string
       }
       run_data_integrity_checks: {
         Args: {
@@ -34958,6 +37324,28 @@ export type Database = {
           similarity_score: number
         }[]
       }
+      search_document_chunks_by_embedding: {
+        Args: {
+          p_categories?: string[]
+          p_limit?: number
+          p_similarity_threshold?: number
+          p_workspace_id: string
+          query_embedding: string
+        }
+        Returns: {
+          chunk_id: string
+          chunk_index: number
+          chunk_type: string
+          content: string
+          document_id: string
+          document_title: string
+          page_number: number
+          product_id: string
+          product_name: string
+          region_types: string[]
+          similarity_score: number
+        }[]
+      }
       search_document_chunks_fts: {
         Args: {
           result_limit?: number
@@ -34969,6 +37357,26 @@ export type Database = {
           id: string
           metadata: Json
           rank: number
+        }[]
+      }
+      search_document_entities_by_embedding: {
+        Args: {
+          p_entity_types?: string[]
+          p_limit?: number
+          p_similarity_threshold?: number
+          p_workspace_id: string
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          description: string
+          entity_id: string
+          entity_type: string
+          metadata: Json
+          name: string
+          page_range: number[]
+          similarity_score: number
+          source_document_id: string
         }[]
       }
       search_order_link_targets: {
@@ -35251,6 +37659,10 @@ export type Database = {
         Returns: Json
       }
       supplier_handoff_available: { Args: { p_order: string }; Returns: Json }
+      supplier_publishing_allowed: {
+        Args: { p_workspace_id: string }
+        Returns: Json
+      }
       supplier_update_inbound_order: {
         Args: {
           p_eta?: string
@@ -35536,6 +37948,17 @@ export type Database = {
           p_title: string
           p_visibility?: string
           p_workspace_id: string
+        }
+        Returns: string
+      }
+      upsert_master_from_extraction: {
+        Args: {
+          p_attributes?: Json
+          p_barcode?: string
+          p_name?: string
+          p_platform_supplier_id: string
+          p_product_id?: string
+          p_sku: string
         }
         Returns: string
       }

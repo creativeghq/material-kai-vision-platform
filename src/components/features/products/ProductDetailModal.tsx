@@ -43,6 +43,7 @@ import { ProductPricingCard } from '@/components/business/marketplace/ProductPri
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { DollarSign, Ship, Boxes } from 'lucide-react';
 import { ProductRecommendationsPanel } from './ProductRecommendationsPanel';
+import { SupplierPricingSection } from './SupplierPricingSection';
 import { supabase } from '@/integrations/supabase/client';
 import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
 import {
@@ -2780,6 +2781,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       {isAdmin && (
         <TabsContent value="pricing" className="mt-6">
           <div className="space-y-4">
+            {/* Multi-supplier price list (#324 phase 5). Own products only — a supplier row is
+                this workspace's negotiated deal, so there is nothing to show on someone
+                else's catalog product. */}
+            {isOwnProduct && activeWorkspaceId && (
+              <SupplierPricingSection productId={product.id} workspaceId={activeWorkspaceId} />
+            )}
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
