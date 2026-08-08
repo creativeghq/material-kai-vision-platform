@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, Boxes, RefreshCw, Send, Check, History, Info } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -26,6 +27,11 @@ import {
 export default function MasterCatalogPage() {
   const { activeWorkspaceId, isRootWorkspace } = useWorkspace();
   const { toast } = useToast();
+  // The price-change notification links here with ?product=<master id>. Landing on the page
+  // and leaving the operator to find the row by eye defeats the point of the link.
+  const [searchParams] = useSearchParams();
+  const focusId = searchParams.get('product');
+  const focusRef = useRef<HTMLTableRowElement | null>(null);
 
   const [gate, setGate] = useState<{ allowed: boolean; reason?: string; platformSupplierId?: string; legalName?: string } | null>(null);
   const [rows, setRows] = useState<CatalogMasterProduct[]>([]);
@@ -52,6 +58,13 @@ export default function MasterCatalogPage() {
   }, [activeWorkspaceId, isRootWorkspace, toast]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Once the rows are in, bring the linked one into view. Runs after both lists render, so it
+  // works whichever table the row landed in (operator drift, or the supplier's own products).
+  useEffect(() => {
+    if (!focusId || loading) return;
+    focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [focusId, loading, drift, rows]);
 
   const accept = async (d: MasterPriceDrift) => {
     setBusyId(d.master_product_id);
@@ -133,7 +146,11 @@ export default function MasterCatalogPage() {
                       {drift.map((d) => {
                         const up = d.operator_cost != null && d.list_price != null && d.list_price > d.operator_cost;
                         return (
-                          <tr key={d.master_product_id} className="border-b last:border-0">
+                          <tr
+                            key={d.master_product_id}
+                            ref={d.master_product_id === focusId ? focusRef : undefined}
+                            className={`border-b last:border-0 ${d.master_product_id === focusId ? 'bg-primary/5' : ''}`}
+                          >
                             <td className="px-4 py-2">
                               <div>{d.name || d.normalized_sku}</div>
                               <div className="font-mono text-[10px] text-muted-foreground">{d.normalized_sku}</div>
@@ -196,7 +213,11 @@ export default function MasterCatalogPage() {
                     {rows.map((r) => {
                       const mine = Object.values(r.field_authority ?? {}).some((a) => a === 'manufacturer');
                       return (
-                        <tr key={r.id} className="border-b last:border-0">
+                        <tr
+                          key={r.id}
+                          ref={r.id === focusId && !isRootWorkspace ? focusRef : undefined}
+                          className={`border-b last:border-0 ${r.id === focusId ? 'bg-primary/5' : ''}`}
+                        >
                           <td className="px-4 py-2 font-mono text-xs">{r.normalized_sku}</td>
                           <td className="px-4 py-2">{r.name || <span className="text-muted-foreground">—</span>}</td>
                           <td className="px-4 py-2 text-right tabular-nums">

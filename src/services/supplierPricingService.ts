@@ -83,6 +83,24 @@ export const supplierPricingService = {
     if (error) throw error;
   },
 
+  /**
+   * Whether sourcing must round an order up to the supplier's minimum order quantity.
+   * MOQ figures are inert without this switch: the resolver reads it before deciding whether
+   * a shortfall of 3 becomes an order for 3 or an order for the supplier's minimum of 50.
+   */
+  async getEnforceMoq(productId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('products').select('enforce_moq').eq('id', productId).maybeSingle();
+    if (error) throw error;
+    return !!data?.enforce_moq;
+  },
+
+  async setEnforceMoq(productId: string, enabled: boolean): Promise<void> {
+    const { error } = await supabase
+      .from('products').update({ enforce_moq: enabled }).eq('id', productId);
+    if (error) throw error;
+  },
+
   /** Exactly one preferred supplier per product — the sourcing resolver picks preferred first. */
   async setPreferred(productId: string, rowId: string): Promise<void> {
     const { error: clearErr } = await supabase

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
+import { Switch } from '@/components/core/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -21,13 +22,14 @@ import {
  * written by a manufacturer publishing a price. The sourcing resolver reads these rows
  * preferred-first, then cheapest, and MOQ/lead time feed the procurement flow.
  */
-interface Props { productId: string; workspaceId: string; enforceMoq?: boolean }
+interface Props { productId: string; workspaceId: string }
 
 export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<SupplierProductRow[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
   const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string }>>([]);
+  const [enforceMoq, setEnforceMoq] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<SupplierProductRow | 'new' | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -35,13 +37,27 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await supplierPricingService.listForProduct(productId);
+      const [list, moq] = await Promise.all([
+        supplierPricingService.listForProduct(productId),
+        supplierPricingService.getEnforceMoq(productId).catch(() => false),
+      ]);
       setRows(list);
+      setEnforceMoq(moq);
       setNames(await supplierPricingService.supplierNames(list.map((r) => r.supplier_company_id)));
     } catch (e: any) {
       toast({ title: 'Failed to load suppliers', description: e?.message, variant: 'destructive' });
     } finally { setLoading(false); }
   }, [productId, toast]);
+
+  const toggleEnforceMoq = async (next: boolean) => {
+    setEnforceMoq(next); // optimistic — a switch that lags feels broken
+    try {
+      await supplierPricingService.setEnforceMoq(productId, next);
+    } catch (e: any) {
+      setEnforceMoq(!next);
+      toast({ title: 'Failed', description: e?.message, variant: 'destructive' });
+    }
+  };
 
   useEffect(() => { void load(); }, [load]);
 
@@ -142,6 +158,20 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
               ))}
             </tbody>
           </table>
+        )}
+
+        {/* MOQ figures above are inert without this: it decides whether a shortfall of 3
+            orders 3, or the supplier's minimum of 50. */}
+        {rows.length > 0 && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
+            <div>
+              <Label htmlFor={`moq-${productId}`} className="text-sm">Respect minimum order quantities</Label>
+              <p className="text-xs text-muted-foreground">
+                When on, ordering this product rounds up to the chosen supplier's MOQ and shows their lead time.
+              </p>
+            </div>
+            <Switch id={`moq-${productId}`} checked={enforceMoq} onCheckedChange={toggleEnforceMoq} />
+          </div>
         )}
       </CardContent>
 
