@@ -1392,7 +1392,7 @@ Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_t
 - 🔮 Structural-pass performance monitoring & metrics (beyond the existing `paddleocr_metrics` table)
 - ✅ GPU acceleration — *realized* (PaddleOCR-VL on Modal GPU L4, scale-to-zero)
 - 🔮 Advanced chunking rules (lists, cross-references, formulas)
-- 🔮 Voyage `voyage-multimodal-3` page embedding → `vecs.page_embeddings` (8th fusion vector) for catalog-Q&A retrieval (known residual: `image`/`figure`/`chart` regions are crop sources but not OCR'd, so a product name baked inside a photo is still unread)
+- ✅ Voyage `voyage-multimodal` page embedding → `vecs.page_embeddings` (8th fusion vector) — *realized #239, 2026-08-08*. Runs as stage 4.7, after chunking, because the page text it embeds alongside the render comes from `document_chunks` (silver) rather than from the PDF. Per-page state in `document_page_embeddings.cache_status`; backfill via `POST /api/internal/backfill-page-embeddings`; breakage surfaces through `ops.page_embeddings_never_written`.
 
 ---
 

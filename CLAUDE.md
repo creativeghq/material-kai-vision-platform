@@ -177,7 +177,9 @@ lists of kind `role` / `employment` are DERIVED from those by `crm_resync_auto_c
 | `style_aspect_1024` | `image_style_embeddings` | 1024 |
 | `material_aspect_1024` | `image_material_embeddings` | 1024 |
 | `understanding_1024` | `image_understanding_embeddings` | 1024 (Voyage from Claude `vision_analysis`) |
+| `page_multimodal_1024` | `page_embeddings` | 1024 (`voyage-multimodal-3.5`, whole rendered page) |
 
+- **`page_embeddings` is keyed by PAGE, not image** — id is `"<document_id>:<page_number>"`, and `document_page_embeddings` is its serving row (`cache_status`, provenance, render path). It is the ONLY collection in a different latent space: **never query it with a voyage-4 text vector.** Both are 1024D, so the wrong vector is accepted and scores confident nonsense instead of raising — use `generate_page_query_embedding()`. Guarded by [tests/unit/test_page_embeddings.py](mivaa-pdf-extractor/tests/unit/test_page_embeddings.py).
 - **Never use `*_siglip_1152`, `*_clip_512`, or the legacy `*_slig_768` aspect keys** — removed; no consumer accepts them.
 - **Boolean presence flags on `document_images`** (`has_slig_embedding`, `has_understanding_embedding`, `has_*_slig`) are the canonical O(1) "does this image have embedding X?" check. Do not round-trip to VECS.
 - **Dropped columns — do NOT reference:** `document_images.{visual_clip_embedding_512, color_embedding_256, texture_embedding_256, application_embedding_512, multimodal_fusion_embedding_2688}`; `products.{embedding, *_clip_embedding_512, multimodal_fusion_embedding_2048}`; `document_vectors.visual_clip_embedding_512`.

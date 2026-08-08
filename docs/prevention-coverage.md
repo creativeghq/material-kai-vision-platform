@@ -66,6 +66,18 @@ from the day it shipped.
 - **Proven to fire:** 2026-08-01 — `no-swallowed-write` found 9 sites, 7 genuine: three lost `ai_usage_logs` billing rows, a lost ERGANI submission audit row, a lost `last_digest_at` double-notify guard, a lost `embedding_status='failed'` write, and a recovery cron incrementing its counter after an unchecked update.
 - **Note:** the **<5%** success-rate threshold matters. An exact-zero test reported this platform clean while two endpoints sat at 0.8% and 4.5%.
 - **Blind spot:** `ops.silent_zero` probes are hardcoded (deliberately — admin-editable SQL run by a SECURITY DEFINER function would be a privilege-escalation surface). A new metric gets no probe until someone writes a migration.
+- **Worked example of paying that cost, 2026-08-08 (#239):** the page-embedding channel shipped with `ops.page_embeddings_never_written` in the same change. Worth noting *why* it needed one at all: the fusion weights make its silent failure actively misleading rather than merely invisible. The `page` channel carries 8–15% of every weight profile, so with no vectors written, search reports eight healthy channels while ranking on seven — and because `multi_vector_search` normalizes by *active* weights, the scores stay plausibly scaled and nothing looks off. A feature whose absence degrades a number without changing its shape is exactly this defect class, and the probe is the only thing that can see it.
+
+### 4e. Wrong latent space — a vector that is the right SHAPE and the wrong MEANING
+Dimension is not identity. `voyage-4` and `voyage-multimodal-3.5` both return 1024D, so querying
+`vecs.page_embeddings` with an ordinary text embedding is accepted by Postgres, returns neighbours
+from the HNSW index, and produces confidently-scored nonsense. No typecheck, no dim check, and no
+integrity probe can see it — every artifact involved is individually valid.
+
+- **Guarded by:** [tests/unit/test_page_embeddings.py](../mivaa-pdf-extractor/tests/unit/test_page_embeddings.py) — pins that the page query goes to `/multimodalembeddings`, that the model comes from one setting so ingest and query cannot be pointed at different models independently, and that the path has no fallback provider.
+- **Proven to fire:** 2026-08-08, on introduction — mutation-tested by rewriting `generate_page_query_embedding` to call `_generate_text_embedding`, confirmed the guard catches it; likewise for the workspace stamp, the fail-closed read, the row-outruns-vector case, the silver-layer read and the page cap.
+- **Precedent it generalizes:** audit gap B, where the Voyage→OpenAI fallback was disabled on the understanding path for the same reason — a mixed-provider collection corrodes cosine similarity while every row in it remains individually well-formed.
+- **Blind spot:** the guard is source-level, so it protects the two call sites it names. Nothing stops a *new* consumer from querying `page_embeddings` with whatever 1024D vector it has to hand; the collection itself cannot reject a wrong-space query, because there is nothing about the vector to reject.
 
 ### 4c. Queue that never drains — items enqueued, nothing consuming them
 The `messaging-processor` cron sat `active:false` and nothing noticed. `email_logs` held 134
@@ -153,6 +165,9 @@ where the record was born.
 | `npm run lint:a11y` | CI | jsx-a11y, per-rule ratchet | partly — [tests/unit/a11yRatchet.test.ts](../tests/unit/a11yRatchet.test.ts) fails if a rule returns to `'off'` |
 | `npm run lint:tenancy` | CI | invariant 1, two-doors | **yes** — self-test runs before every scan |
 | `ops.silent_zero` | nightly | shape 4 | no |
+| `ops.page_embeddings_never_written` | nightly | shape 4, page channel (#239) | no — but it was run against the live DB on introduction and returned clean |
+| [tests/unit/test_page_embeddings.py](../mivaa-pdf-extractor/tests/unit/test_page_embeddings.py) | `pytest`, blocking | shape 4e + Phase-0 isolation on `page_embeddings` | **yes** — every assertion was mutation-tested against a deliberately broken copy of the code it guards |
+| [tests/unit/test_weight_profiles.py](../mivaa-pdf-extractor/tests/unit/test_weight_profiles.py) | `pytest`, blocking | a fusion vector scoring zero on a path someone missed | **yes** — the image-only weights are pinned to their pre-page values, so the #239 carve-out proved itself non-disruptive rather than being asserted to be |
 | `ops.storage_paths_unregistered` | nightly | shape 4d | **yes** — reads `build_storage_reference_set()`'s own body, so it cannot drift from what the cron actually honours |
 | `ops.money_without_currency` | nightly | shape 6 | no — but all three branches were watched to fire before shipping |
 | `ops.unsent_queue_backlog` | nightly | shape 4c | no — but it fired on real production data on introduction |
@@ -162,7 +177,7 @@ where the record was born.
 | [tests/unit/companyIdentity.test.ts](../tests/unit/companyIdentity.test.ts) | `npm test`, blocking | shape 8 — one identity lookup for every create-a-business surface, `crm_companies` direct-insert ratchet | **yes** — asserts its own scan matched >500 files before trusting the verdict, so an inert glob fails instead of reporting clean |
 
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
-what it found. Six of fourteen qualify. That is the gap.
+what it found. Eight of seventeen qualify. That is the gap.
 
 > **`db.plpgsql-lint` has one known false-positive shape: runtime-created temp tables.**
 > `plpgsql_check` analyses statically, so a `create temporary table X` inside a function makes it

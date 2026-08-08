@@ -101,7 +101,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 - **Per-call metrics**: `paddleocr_metrics` table
 - **Host — Modal only** (the in-process `paddleocr[doc-parser]` pipeline on `paddlepaddle-gpu`, NOT vLLM): `mivaa-pdf-extractor/modal_app/paddleocr_vl.py`; GPU L4, `min_containers=0` + `scaledown_window=120` (=$0 idle), `max_containers=4`, forces `device="gpu"`. Cold start ~90s (model load + JIT), paid once per job at warmup. Deployed at `https://basilakis--paddleocr-vl-paddleservice-web.modal.run`. Only required runtime var: **`PADDLEOCR_MODAL_API_KEY`** (URL baked as config default). Redeploy: `modal deploy modal_app/paddleocr_vl.py` (see `modal_app/README.md`).
 - **Replaced**: Surya-2 (2026-06-13); earlier YOLO + Chandra; earlier pytesseract + EasyOCR.
-- **Known residual**: `Image`/`Figure`/`chart` regions are crop sources but not OCR'd (text baked inside a photo is not read) — a `voyage-multimodal-3` page embedding is the planned follow-up.
+- **Known residual — mitigated, not removed**: `Image`/`Figure`/`chart` regions are crop sources and are still not OCR'd, so text baked inside a photo is not read *as text*. Since #239 the whole page is separately embedded by `voyage-multimodal-3.5` into `vecs.page_embeddings` (the 8th fusion vector), which makes that text **retrievable** without making it **extractable** — a page carrying a baked-in product name can now be found by a query for it, but the name still never lands in `document_chunks` or on a `products` row.
 
 ---
 

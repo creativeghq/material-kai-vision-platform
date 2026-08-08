@@ -367,9 +367,20 @@ No more dual-store. All vectors live in `vecs.image_*_embeddings` collections, a
 
 ## 🔮 Future Considerations
 
-1. **Voyage `voyage-multimodal-3.5`** — would replace the JSON-serialize-then-Voyage path with direct multimodal embedding. Watch for general availability.
+1. **Voyage `voyage-multimodal-3.5` for the UNDERSTANDING path** — would replace the JSON-serialize-then-Voyage path with direct multimodal embedding. The model is now GA (and is what the page channel uses), but swapping it into `image_understanding_embeddings` means re-embedding that whole collection: the two are different latent spaces, and a half-migrated collection is worse than either.
 2. **Schema versioning** — the `schema_version` field is in place; bumps will trigger backfill via `POST /admin/understanding-embeddings/backfill`.
-3. **Voyage `voyage-multimodal-3` page embedding** — a planned 8th fusion vector (`vecs.page_embeddings`) to read product names baked inside photos, which the PaddleOCR-VL structural pass does not OCR (Image/Figure/chart regions are crop sources only).
+
+### ✅ Realized: `voyage-multimodal` page embedding (#239, 2026-08-08)
+
+The 8th fusion vector. Each catalog page is rendered and embedded — picture and text
+together — into `vecs.page_embeddings` (halfvec(1024)), and scored as the `page`
+channel in fusion search. It exists for one specific gap: PaddleOCR-VL treats
+`Image`/`Figure`/`chart` regions as crop sources and never reads text inside them, so
+a product name printed across a photograph is invisible to every other channel.
+
+- **Model**: `settings.voyage_multimodal_model`, default `voyage-multimodal-3.5`. Do not change it on a populated collection — same latent-space reason as above.
+- **Billing is two-axis** ($0.12/1M text tokens **and** $0.60/1B pixels, clamped to 2M pixels per image). `AIPricingConfig.calculate_multimodal_embedding_cost()` is the only correct costing path; the token-only `calculate_cost()` under-reports a page ~20×. Render DPI defaults to 144 — an A4 page lands just under the pixel ceiling, above which you pay the capped price for pixels Voyage discards. ~$0.0012/page, so a 500-page catalog is ~$0.62.
+- **Query side**: `generate_page_query_embedding()`. It must NOT reuse the voyage-4 text vector — both are 1024D, so a wrong-space query is accepted and scores confident nonsense rather than erroring. Pinned by [tests/unit/test_page_embeddings.py](../mivaa-pdf-extractor/tests/unit/test_page_embeddings.py).
 
 ---
 
