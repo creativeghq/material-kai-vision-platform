@@ -27,6 +27,9 @@ export interface FiscalParty {
   taxOffice?: string;
   address?: FiscalAddress;
   phone?: string;
+  /** Emitted for the ISSUER only. The counterpart's address is deliberately withheld from the
+   *  provider so it cannot auto-email the customer a second copy of the invoice — we own that
+   *  channel. See the counterpart block in `novus.ts`. */
   email?: string;
   /** our internal counterpart code (#0001 etc.) */
   code?: string;
@@ -142,7 +145,9 @@ export interface FiscalInvoiceInput {
   };
   documentLabel?: string;
   documentComments?: string;
-  logoId?: string;
+  /** Presentation language of the PROVIDER's rendered PDF. Inert while we serve our own
+   *  document; defaults to English (never 'el') rather than being pinned in the connector. */
+  documentLanguageCode?: string;
 }
 
 export type FiscalSubmissionStatus = 'accepted' | 'offline' | 'rejected' | 'error' | 'awaiting_payment';

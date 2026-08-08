@@ -142,6 +142,13 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             }))
           : [{ type: 5, amount: summary.totalGrossValue }],
         invoiceDetails,
+        // ── Novus's PDF-RENDERING block — NOT tax data ────────────────────────────────
+        // Everything above (issuer/counterpart VAT, header, details, summary) is what AADE
+        // registers and what earns the MARK. This block only feeds the letterhead of the PDF
+        // *Novus* draws. We do not use that PDF: we render our own and stamp the returned MARK
+        // + QR onto it, and `invoiceUrl` (Novus's rendered copy) is deliberately never served.
+        // The issuer sub-block is mandatory per the Provider docs, so the envelope stays — but
+        // nothing render-only that has a side effect belongs in it.
         providerAdditionalInvoiceDetails: {
           issuer: {
             name: issuer.name ?? '',
@@ -149,6 +156,7 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             taxoffice: issuer.taxOffice ?? '',
             ...addr(issuer),
             phone: issuer.phone ?? '',
+            // The TENANT's own address — safe to send, and part of the mandatory issuer block.
             email: issuer.email ?? '',
           },
           counterpart: {
@@ -158,14 +166,24 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
             taxoffice: counterpart.taxOffice ?? '',
             ...addr(counterpart),
             phone: counterpart.phone ?? '',
-            email: counterpart.email ?? '',
+            // NO `email`. Deliberate: handing Novus the CUSTOMER's address inside the block
+            // whose job is producing and delivering Novus's document is what would let the
+            // provider auto-email them. We own the customer-facing channel (our PDF, our
+            // template, sent through Flows so admins can pause/edit/retarget it), so the
+            // customer must never receive a second invoice from a second sender. Omitting it
+            // costs a display field on a PDF nobody is served; sending it risks a duplicate.
           },
           additionalDetails: {
+            // Greek legal document-type names — correct for a Greek fiscal document, and
+            // overridable per call.
             documentLabel: input.documentLabel ?? 'Τιμολόγιο Πώλησης',
-            documentLanguageCode: 'EL',
+            // Was hardcoded 'EL'. Inert while we serve our own PDF, but a buried Greek
+            // language pin is exactly the thing that gets copied into somewhere that DOES
+            // render — so it is explicit now, and defaults to English per the platform rule
+            // that no language field defaults to 'el'.
+            documentLanguageCode: input.documentLanguageCode ?? 'EN',
             documentSizeCode: 0,
             documentComments: input.documentComments ?? '',
-            logoId: input.logoId ?? undefined,
           },
         },
         // B2G (public sector) — same envelope, extra block. Omitted entirely for
