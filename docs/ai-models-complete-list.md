@@ -57,7 +57,7 @@
 - **Dict key**: `text_1024`
 - **Cost**: $0.06 per 1M tokens
 - **Provenance**: `embedding_model` + `schema_version` persisted on every row for drift detection
-- **OpenAI fallback**: DISABLED for understanding path (would produce mixed-vector VECS collections)
+- **Fallback embedder**: NONE. Deleted 2026-08-08 — a same-dimension vector from another model is stored and ranked without error, so the only safe number of embedding providers is one.
 
 ---
 
@@ -297,7 +297,7 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV2 (RT-
 .py` deleted; all `Settings.
 - ✅ Vision moved to **Claude Opus 4.7 via Anthropic tool use** (`VisionAnalysis` Pydantic schema)
 .6**
-- ✅ Voyage drift detection: `embedding_model` + `schema_version` on every understanding-embedding row; OpenAI fallback disabled for understanding path
+- ✅ Voyage drift detection: `embedding_model` + `schema_version` on every understanding-embedding row; the OpenAI fallback is gone entirely (2026-08-08), so provenance now tracks MODEL changes rather than provider substitutions
 - ✅ `VisionProvider.
 
 **2026-06-13 — PaddleOCR-VL structural backbone** (replaced Surya-2, which had replaced YOLO + Chandra earlier the same day):

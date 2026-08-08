@@ -248,7 +248,7 @@ All tables use RLS policies that restrict access based on workspace membership. 
 **Voyage AI** (sole text embedder):
 - voyage-4 (1024D) — text chunks + product text + understanding embeddings (from Claude vision_analysis JSON via `serialize_vision_analysis_to_text`)
 - Provenance fields persisted (`embedding_model`, `schema_version`) for drift detection
-- OpenAI fallback DISABLED for understanding path (prevents VECS collection drift)
+- No fallback embedder anywhere (deleted 2026-08-08) — prevents VECS collection drift by construction
 
 **Modal** (visual embeddings):
 - **SLIG (SigLIP2)** — visual embeddings (768D, 5 specialized types: visual / color / texture / style / material). Model `basiliskan/slig` duplicates `google/siglip2-base-patch16-512` (native 768D, no projection head). Migrated off HuggingFace onto Modal 2026-06-14, so HuggingFace now hosts nothing.

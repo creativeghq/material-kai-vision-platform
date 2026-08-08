@@ -22,7 +22,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 | GPT-5 | OpenAI | Alternative discovery / agents (not vision) | Future | TBD |
 | **Text Embeddings** |
 | voyage-4 | Voyage AI | **PRIMARY, sole** text + understanding embedder | 1024D vectors | $0.06 input |
-| text-embedding-3-small | OpenAI | LEGACY (CI changelog only, retired 2026-04 from production); in-code fallback pinned to 1024D so legacy callers can't store wrong-dim text embeddings | 1536D historical | $0.02 input |
+| text-embedding-3-small | OpenAI | **NOT an embedder for this platform.** The in-code fallback was deleted 2026-08-08. Still priced because `SearchDeduplicationService` calls it to fingerprint queries against each other — that never touches a VECS collection, so it is not in a shared latent space | 1536D | $0.02 input |
 | **Visual Embeddings** |
 | SLIG (SigLIP2 base, 768D) Visual | Modal Endpoint | General visual embeddings | 768D | endpoint |
 | SLIG (SigLIP2 base, 768D) Color | Modal Endpoint | Color-guided embeddings | 768D | endpoint |
@@ -132,7 +132,7 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 
 **Provenance**: Every row persists `embedding_model` + `schema_version` (in VECS metadata + mirrored on `document_images.understanding_embedding_model` / `understanding_schema_version` and `products.text_embedding_1024_model` / `text_embedding_schema_version`). Enables drift detection and targeted backfill.
 
-**OpenAI fallback**: DISABLED for the understanding path so Voyage and OpenAI vectors never co-exist in the same VECS collection. The OpenAI legacy fallback (if ever invoked) is now pinned to 1024D.
+**Fallback embedder**: none — deleted 2026-08-08. Two models at the same dimension are the same shape and a different space, so a substituted vector is accepted, indexed and ranked with nothing raising. Voyage or nothing.
 
 **Performance**:
 - Dimension: 1024D (storage parity with every other embedding column in the platform)

@@ -191,8 +191,12 @@ There is no third-party vision model in this platform and none should be added c
 classification, `vision_analysis`, and material analysis all run on Claude. The ingestion path uses **real
 Anthropic tool_use** (`tools=[VISION_ANALYSIS_TOOL]` + forced `tool_choice`) — no regex repair, no JSON-parse
 fallback. `document_images.vision_provider` is CHECK-constrained to `claude` | `claude_fallback`;
-`SKIPPED`/`FAILED` are in-memory-only enum members and must never be persisted. The Voyage→OpenAI fallback is
-**disabled** for the understanding path so the two never co-exist in one VECS collection.
+`SKIPPED`/`FAILED` are in-memory-only enum members and must never be persisted. **There is no fallback embedder.** Voyage is the sole embedding provider; the
+Voyage→OpenAI fallback was deleted 2026-08-08. Reintroducing one is a bug, not a
+resilience win: two models at the same dimension are the same SHAPE and a different
+SPACE, so a substituted vector is stored, indexed and ranked without anything
+raising. `None` means NO VECTOR — never a vector from somewhere else. Guarded by
+[tests/unit/test_no_fallback_embedder.py](mivaa-pdf-extractor/tests/unit/test_no_fallback_embedder.py).
 
 ## Storage — routing rule
 6 buckets; routing is path-based and feature identity lives in the **top-level folder**, not the bucket name.

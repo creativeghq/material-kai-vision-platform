@@ -178,7 +178,7 @@ Understanding embeddings capture the structured knowledge from the vision_analys
 
 Every understanding-embedding row persists `embedding_model` + `schema_version` (in VECS metadata + mirrored on `document_images.understanding_embedding_model` / `understanding_schema_version`). Same on `products.text_embedding_1024_model` / `text_embedding_schema_version`.
 
-The **OpenAI fallback is disabled** for the understanding path so Voyage and OpenAI vectors never co-exist in the same VECS collection. Wrong-dim or missing embedding sets `embedding_failed=true` on the return; orchestrator marks for re-embedding rather than creating a row with NULL `text_embedding_1024` (fixed audit gap C).
+There is **no fallback embedder** (deleted 2026-08-08), so two providers' vectors cannot co-exist in a VECS collection at all. Wrong-dim or missing embedding sets `embedding_failed=true` on the return; orchestrator marks for re-embedding rather than creating a row with NULL `text_embedding_1024` (fixed audit gap C).
 
 ### Search Flow
 

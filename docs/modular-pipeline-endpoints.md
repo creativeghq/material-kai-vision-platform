@@ -280,7 +280,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
   - Dimension: 1024D
   - Input Type: `document`
   - One embedding per chunk
-  - Uses Voyage AI API (sole text embedder; OpenAI fallback retired 2026-04)
+  - Uses Voyage AI API (sole text embedder; the OpenAI fallback code was deleted 2026-08-08)
 
 - **Relationships**:
   - Creates chunk-to-product relationships

@@ -103,7 +103,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 │           serialize_vision_analysis_to_text() →                         │
 │           Voyage AI voyage-4 (input_type="document") → 1024D            │
 │ Provenance persisted: embedding_model, schema_version on every row      │
-│ OpenAI fallback: DISABLED for understanding path (drift prevention)     │
+│ No fallback embedder at all — Voyage or nothing (deleted 2026-08-08)   │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -207,12 +207,12 @@ Voyage `voyage-4` is the sole text embedder. It produces 1024D vectors stored as
 1. **Chunk + product text embeddings** (`text_embedding_1024`)
 2. **Understanding embeddings**: vision_analysis JSON → `serialize_vision_analysis_to_text()` → voyage-4 with `input_type="document"` → 1024D → `image_understanding_embeddings` collection
 
-**Provenance** persisted on every row (`embedding_model`, `schema_version`) so the admin UI / backfill cron can detect drift and stale-schema rows. The OpenAI fallback is **disabled** for the understanding path so Voyage and OpenAI vectors never co-exist in the same VECS collection.
+**Provenance** persisted on every row (`embedding_model`, `schema_version`) so the admin UI / backfill cron can detect drift and stale-schema rows. There is **no fallback embedder** — the Voyage→OpenAI fallback was deleted 2026-08-08, so a second provider's vectors cannot co-exist in a VECS collection by construction rather than by per-call discipline.
 
 **Hardening (2026-05-01)**:
 - 429 explicit handling with `Retry-After` honoring
 - `ai_usage_logs` mirror retries twice + ERRORs on persistent failure
-- OpenAI legacy fallback pinned to 1024D (was using caller-provided dimensions arg — legacy 1536D callers would silently store wrong-dim text embeddings)
+- OpenAI legacy fallback pinned to 1024D — since **deleted outright** (2026-08-08); pinning the dimension only made a wrong-space vector harder to notice, because dimension agreement is exactly what makes the substitution invisible
 
 **Cost**: $0.06 per 1M tokens
 **Speed**: 100-300ms
