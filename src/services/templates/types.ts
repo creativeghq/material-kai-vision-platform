@@ -103,7 +103,15 @@ export type TemplateApplyResult =
    * myDATA classification and notifications that the real form fires. An invoice conjured from a
    * template without the operator confirming the customer is a legal document nobody approved.
    */
-  | { kind: 'prefill'; route: string; message?: string };
+  | { kind: 'prefill'; route: string; message?: string }
+  /**
+   * An existing record was updated from the template — no new row.
+   *
+   * `crm_company` works this way: a CRM party must be found or created through the duplicate
+   * search, never conjured by a template, so what a company template usefully carries is the
+   * COMMERCIAL TERMS you apply to a company you already have.
+   */
+  | { kind: 'applied'; id: string; route: string; message?: string };
 
 export interface TemplateApplyContext {
   /** The template being applied — prefill routes need it to deep-link back to the payload. */

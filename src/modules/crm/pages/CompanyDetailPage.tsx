@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers } from 'lucide-react';
 import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
@@ -14,6 +14,8 @@ import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
+import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -173,6 +175,8 @@ export const CompanyDetailPage: React.FC = () => {
   // Imperative handle to open the shared Activity email composer from the sidebar /
   // Details quick-actions (works from any tab — the tab is force-mounted).
   const activityRef = useRef<CrmRecordActivityHandle>(null);
+  const [termsPickerOpen, setTermsPickerOpen] = useState(false);
+  const [saveTermsOpen, setSaveTermsOpen] = useState(false);
   const [company, setCompany] = useState<Company | null>(isNew ? {
     id: '',
     name: '',
@@ -878,7 +882,21 @@ export const CompanyDetailPage: React.FC = () => {
                     {showCommercial && (
                       <TabsContent value="commercial" className="mt-0 space-y-4">
                         <Card>
-                          <CardHeader><CardTitle className="flex items-center gap-2"><Percent className="h-4 w-4"/>Pricing</CardTitle></CardHeader>
+                          <CardHeader className="flex flex-row items-start justify-between gap-2">
+                            <CardTitle className="flex items-center gap-2"><Percent className="h-4 w-4"/>Pricing</CardTitle>
+                            {/* Commercial terms as a reusable preset (#322) — the template updates
+                                THIS company; a CRM party is never created from a template. */}
+                            {!isNew && id && (
+                              <div className="flex items-center gap-1">
+                                <Button variant="outline" size="sm" className="rounded-full" onClick={() => setTermsPickerOpen(true)}>
+                                  <Layers className="h-3.5 w-3.5 mr-1" /> Apply terms
+                                </Button>
+                                <Button variant="ghost" size="sm" className="rounded-full" onClick={() => setSaveTermsOpen(true)} title="Save these terms as a reusable preset">
+                                  Save as preset
+                                </Button>
+                              </div>
+                            )}
+                          </CardHeader>
                           <CardContent>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                               <InlineSelect alwaysEdit={isNew} label="Pricing level" value={company.user_level_key ?? undefined} unsetValue="__default__" placeholder="Standard" options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))} onSave={(v) => savePricing({ user_level_key: v })} hint="Tier this customer buys at — discount applies off retail on quotes." />
@@ -1295,6 +1313,26 @@ export const CompanyDetailPage: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Commercial-terms presets (#322). Applying one UPDATES this company — no CRM party is
+          ever created from a template. */}
+      {!isNew && id && (
+        <>
+          <TemplatePickerDialog
+            entityType="crm_company"
+            open={termsPickerOpen}
+            onOpenChange={(v) => { setTermsPickerOpen(v); if (!v) void loadCompany(); }}
+            customer={{ companyId: id }}
+          />
+          <SaveAsTemplateDialog
+            entityType="crm_company"
+            sourceId={id}
+            open={saveTermsOpen}
+            onOpenChange={setSaveTermsOpen}
+            defaultTitle={company?.name ? `${company.name} terms` : undefined}
+          />
+        </>
+      )}
     </div>
   );
 };

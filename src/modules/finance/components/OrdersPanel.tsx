@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
@@ -36,6 +36,9 @@ import { financeCategoriesService, type FinanceCategory } from '@/modules/financ
 import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { LinkExpenseToOrderDialog } from '@/modules/finance/components/LinkExpenseToOrderDialog';
+import { entityTemplatesService } from '@/services/entityTemplatesService';
+import { buildOrderPrefill, type OrderPrefill } from '@/services/templates/registry';
+import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { linkOrderToDocument } from '@/modules/finance/utils/inboundToOrder';
@@ -174,17 +177,45 @@ export const OrdersPanel: React.FC<{
 
   const openCreate = (orderType: OrderType, draft: boolean) => { setCreatePreset({ orderType, draft }); setCreateOpen(true); };
 
-  // App Launcher deep-link: /finance?tab=orders&new=order opens the New (sales) order flow.
+  /**
+   * Order template prefill (#322). Same reasoning as `reorderPrefill` right below: the template
+   * fills the ordinary New-order form rather than inserting a row, so numbering, stock reservation,
+   * three-way match and the order-created notification all still fire, and today's party and
+   * prices are a decision rather than a copy.
+   */
+  const [templatePrefill, setTemplatePrefill] = useState<OrderPrefill | null>(null);
+
+  // App Launcher deep-link: /finance?tab=orders&new=order opens the New (sales) order flow;
+  // `&template=<id>` seeds it from a saved order template.
   // Only in the standalone finance list — never when embedded in a project/party tab.
   useEffect(() => {
     if (embedded) return;
-    if (searchParams.get('new') === 'order') {
+    if (searchParams.get('new') !== 'order') return;
+    const templateId = searchParams.get('template');
+    const p = new URLSearchParams(searchParams);
+    p.delete('new');
+    p.delete('template');
+    setSearchParams(p, { replace: true });
+
+    if (!templateId) {
+      setTemplatePrefill(null);
       setCreatePreset({ orderType: 'sales', draft: false });
       setCreateOpen(true);
-      const p = new URLSearchParams(searchParams);
-      p.delete('new');
-      setSearchParams(p, { replace: true });
+      return;
     }
+    void (async () => {
+      let pre: OrderPrefill | null = null;
+      try {
+        const tpl = await entityTemplatesService.get(templateId);
+        pre = tpl ? await buildOrderPrefill(tpl.payload as never) : null;
+      } catch {
+        // A template that will not load must not block raising an order by hand.
+        pre = null;
+      }
+      setTemplatePrefill(pre);
+      setCreatePreset({ orderType: pre?.orderType ?? 'sales', draft: false });
+      setCreateOpen(true);
+    })();
   }, [embedded, searchParams, setSearchParams]);
 
   // Deep-link `?tab=doc_orders&order=<id>`: orders have their own page, so forward there instead
@@ -426,10 +457,17 @@ export const OrdersPanel: React.FC<{
         lockedCompanyId={companyId}
         lockedContactId={contactId}
         preset={createPreset}
+        // `vat_percent` → the form's `vat_code` happens here, where VAT_CATEGORIES lives; the
+        // template adapter deliberately does not carry a second copy of that vocabulary.
+        prefill={templatePrefill ? {
+          currency: templatePrefill.currency,
+          notes: templatePrefill.notes,
+          lines: templatePrefill.lines.map(({ vat_percent, ...rest }) => ({ ...rest, vat_code: vatCodeOf(vat_percent) })),
+        } : undefined}
         categories={categories}
         open={createOpen}
-        onOpenChange={setCreateOpen}
-        onCreated={() => { setCreateOpen(false); void load(); }}
+        onOpenChange={(v) => { setCreateOpen(v); if (!v) setTemplatePrefill(null); }}
+        onCreated={() => { setCreateOpen(false); setTemplatePrefill(null); void load(); }}
       />
       <OrderDetailDialog orderId={openId} categories={categories} open={openId !== null} onClose={() => setOpenId(null)} onChanged={() => void load()} onOpenOrder={(id) => setOpenId(id)} />
     </div>
@@ -1834,6 +1872,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    * other thing: an exact frozen-price copy for fixing paperwork.
    */
   const [reorder, setReorder] = useState<Awaited<ReturnType<typeof ordersService.reorderPrefill>> | null>(null);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const startReorder = async () => {
     if (!order) return;
     setSaving(true);
@@ -1891,7 +1930,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       await load(order.id); onChanged();
       toast({
         title: 'Sent in-app',
-        description: `A draft sales order is waiting in ${handoff?.supplierWorkspaceName ?? 'the supplier'}'s workspace. You'll see their acknowledgement here.`,
+        description: `A draft sales order is waiting in ${handoff?.supplierWorkspaceName ?? "the supplier"}'s workspace. You'll see their acknowledgement here.`,
       });
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setSaving(false); }
@@ -2156,6 +2195,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       <span className="flex flex-col">
                         <span>Order again</span>
                         <span className="text-[10px] text-muted-foreground">Same items and party — choose today’s prices or the original ones.</span>
+                      </span>
+                    </DropdownMenuItem>
+                    {/* The named, reusable version of the same idea (#322): the basket without the
+                        party, kept in the template library for any future order. */}
+                    <DropdownMenuItem className="items-start" onClick={() => setSaveTemplateOpen(true)}>
+                      <Layers className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
+                      <span className="flex flex-col">
+                        <span>Save as template</span>
+                        <span className="text-[10px] text-muted-foreground">Keeps the lines, not the party or the totals.</span>
                       </span>
                     </DropdownMenuItem>
                     {order.order_type === 'sales' && (
@@ -2799,6 +2847,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         />
       )}
     </Dialog>
+    {order && (
+      <SaveAsTemplateDialog
+        entityType="order"
+        sourceId={order.id}
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        defaultTitle={order.order_number ? `Order ${order.order_number}` : undefined}
+      />
+    )}
     {/* Re-order → the ordinary New order form, pre-filled and re-priced. Saving here runs the
         normal create path, which is what makes numbering, reservation, three-way match and the
         order-created notification fire — an insert behind the scenes fires none of them. */}

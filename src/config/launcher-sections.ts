@@ -145,6 +145,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Contracts', to: '/templates?type=contract', icon: FileText },
     { label: 'Onboarding', to: '/templates?type=hr_onboarding', icon: ClipboardList },
     { label: 'Listings', to: '/templates?type=property_listing', icon: Building2 },
+    { label: 'Customer terms', to: '/templates?type=crm_company', icon: Contact },
   ],
   // Sales/Inbox have no URL tabs → Open-only. My HR is Open-only too: EmployeeSelfServicePage uses
   // Tabs `defaultValue` and never reads ?tab=, so a tab deep-link would be inert.

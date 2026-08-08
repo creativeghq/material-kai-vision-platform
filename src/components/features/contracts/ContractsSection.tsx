@@ -311,6 +311,7 @@ export const ContractsSection: React.FC<{
                     <SelectItem value="finance">Finance</SelectItem>
                     <SelectItem value="hr">HR</SelectItem>
                     <SelectItem value="project">Projects</SelectItem>
+                    <SelectItem value="realestate">Real estate</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

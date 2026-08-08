@@ -23,22 +23,15 @@ export const TEMPLATE_ENTITY_TYPES = [
 /** Types with a shipped adapter. */
 export const LIVE_TEMPLATE_TYPES = [
   'invoice', 'quote', 'project', 'moodboard', 'order', 'contract', 'expense',
-  'hr_onboarding', 'property_listing',
+  'hr_onboarding', 'property_listing', 'crm_company',
 ] as const;
 export type LiveTemplateEntityType = (typeof LIVE_TEMPLATE_TYPES)[number];
 
 /**
  * Accepted by the DB, not yet offered in the UI. Declaring the gap keeps the guard test able to
- * tell "not built yet" apart from "forgotten".
- *
- * `crm_company` is intentionally still planned. A CRM party template would have to run through the
- * duplicate search before creating anything (a company created silently is the exact failure the
- * Greek-name lookup exists to prevent), and that create path is mid-rework — wiring a template
- * hook into it now would fight the change rather than ride it.
+ * tell "not built yet" apart from "forgotten". Empty today — every type has an adapter.
  */
-export const PLANNED_TEMPLATE_TYPES = [
-  'crm_company',
-] as const satisfies readonly TemplateEntityType[];
+export const PLANNED_TEMPLATE_TYPES = [] as const satisfies readonly TemplateEntityType[];
 
 export interface TemplateSchema {
   label: string;
@@ -274,6 +267,32 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
       { key: 'furnished', label: 'Furnished', kind: 'text', hint: 'Free text on the listing — yes / no / partial.' },
       { key: 'energy_class', label: 'Energy class', kind: 'text' },
       { key: 'country_code', label: 'Country code', kind: 'text' },
+    ],
+  },
+
+  crm_company: {
+    label: 'Customer terms',
+    plural: 'Customer terms',
+    description: 'A commercial-terms preset — pricing level, discount, credit and payment terms.',
+    sourceTable: 'crm_companies',
+    capability: 'crm.view',
+    moduleSlug: 'crm',
+    // TERMS ONLY. No name, VAT number, address, email, phone or billing block: those identify one
+    // company, and a CRM party is found or created through the duplicate search — never conjured
+    // from a template. That is why this type UPDATES a company you already have rather than
+    // creating one.
+    captureFields: [
+      'is_customer', 'is_supplier', 'user_level_key', 'discount_percent', 'discount_notes',
+      'credit_limit', 'payment_terms_days', 'min_order_value', 'prices_vat_inclusive',
+      'include_in_myf', 'contact_group', 'vat_exemption_reason',
+    ],
+    editableFields: [
+      { key: 'discount_percent', label: 'Discount %', kind: 'number' },
+      { key: 'payment_terms_days', label: 'Payment terms (days)', kind: 'number' },
+      { key: 'credit_limit', label: 'Credit limit', kind: 'number' },
+      { key: 'min_order_value', label: 'Minimum order value', kind: 'number' },
+      { key: 'discount_notes', label: 'Discount notes', kind: 'textarea' },
+      { key: 'prices_vat_inclusive', label: 'Show prices VAT-inclusive', kind: 'boolean' },
     ],
   },
 };

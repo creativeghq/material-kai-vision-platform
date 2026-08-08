@@ -1,5 +1,6 @@
 import {
-  ArrowUpCircle, Building2, ClipboardCheck, FileSignature, FileText, FolderKanban, Palette, Receipt, ShoppingCart,
+  ArrowUpCircle, Building2, ClipboardCheck, FileSignature, FileText, FolderKanban, Handshake, Palette, Receipt,
+  ShoppingCart,
 } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -459,13 +460,11 @@ export interface ContractTemplatePayload {
   currency?: string | null;
 }
 
-/**
- * `contracts_context_check` accepts only these three. `ContractContext` in contractsService also
- * lists 'realestate', but the constraint does not — a template must not carry a value the insert
- * will reject.
- */
-const contractContext = oneOf(['hr', 'finance', 'project'] as const);
-const CONTEXT_LABEL: Record<string, string> = { hr: 'HR', finance: 'Finance', project: 'Project' };
+/** `contracts_context_check`. */
+const contractContext = oneOf(['hr', 'finance', 'project', 'realestate'] as const);
+const CONTEXT_LABEL: Record<string, string> = {
+  hr: 'HR', finance: 'Finance', project: 'Project', realestate: 'Real estate',
+};
 
 export const contractAdapter: TemplateAdapter<ContractTemplatePayload> = {
   type: 'contract',
@@ -693,3 +692,90 @@ export const propertyListingAdapter: TemplateAdapter<PropertyListingTemplatePayl
   },
 };
 
+// ---------------------------------------------------------------------------
+// Customer terms — the one type that UPDATES rather than creates.
+//
+// A CRM party is found or created through the duplicate search (Greek script and
+// Latin stems both), never conjured by a template: a silently-created company is
+// precisely the failure that search exists to prevent. So what a company template
+// usefully carries is the COMMERCIAL TERMS — pricing level, discount, credit,
+// payment days — applied to a company you already have.
+// ---------------------------------------------------------------------------
+
+export interface CrmCompanyTemplatePayload {
+  is_customer?: boolean | null;
+  is_supplier?: boolean | null;
+  user_level_key?: string | null;
+  discount_percent?: number | null;
+  discount_notes?: string | null;
+  credit_limit?: number | null;
+  payment_terms_days?: number | null;
+  min_order_value?: number | null;
+  prices_vat_inclusive?: boolean | null;
+  include_in_myf?: boolean | null;
+  contact_group?: string | null;
+  vat_exemption_reason?: string | null;
+}
+
+/** `undefined` for an absent key, so a preset that says nothing about a field leaves it alone. */
+const numOrKeep = (v: unknown): number | null | undefined =>
+  (v === undefined ? undefined : v === null ? null : num(v));
+const boolOrKeep = (v: unknown): boolean | undefined =>
+  (v === undefined || v === null ? undefined : v === true);
+const strOrKeep = (v: unknown): string | null | undefined =>
+  (v === undefined ? undefined : str(v));
+
+export const crmCompanyAdapter: TemplateAdapter<CrmCompanyTemplatePayload> = {
+  type: 'crm_company',
+  icon: Handshake,
+  ...TEMPLATE_SCHEMAS.crm_company,
+  capture: (sourceId) => captureRecord<CrmCompanyTemplatePayload>(crmCompanyAdapter, sourceId),
+  async apply(payload, ctx): Promise<TemplateApplyResult> {
+    const companyId = ctx.customer?.companyId ?? null;
+    if (!companyId) {
+      return {
+        kind: 'prefill',
+        route: '/crm?tab=companies',
+        message: 'Open a company and apply these terms from its Commercial tab.',
+      };
+    }
+
+    // Explicit field by field, and only the keys the preset actually carries — a preset about
+    // discount must not blank someone's credit limit just by being silent on it.
+    const patch: Record<string, unknown> = {};
+    const set = (k: string, v: unknown) => { if (v !== undefined) patch[k] = v; };
+    set('is_customer', boolOrKeep(payload.is_customer));
+    set('is_supplier', boolOrKeep(payload.is_supplier));
+    set('user_level_key', strOrKeep(payload.user_level_key));
+    set('discount_percent', numOrKeep(payload.discount_percent));
+    set('discount_notes', strOrKeep(payload.discount_notes));
+    set('credit_limit', numOrKeep(payload.credit_limit));
+    set('payment_terms_days', numOrKeep(payload.payment_terms_days));
+    set('min_order_value', numOrKeep(payload.min_order_value));
+    set('prices_vat_inclusive', boolOrKeep(payload.prices_vat_inclusive));
+    set('include_in_myf', boolOrKeep(payload.include_in_myf));
+    set('contact_group', strOrKeep(payload.contact_group));
+    set('vat_exemption_reason', strOrKeep(payload.vat_exemption_reason));
+
+    if (Object.keys(patch).length) {
+      const { error } = await supabase.from('crm_companies').update(patch as never).eq('id', companyId);
+      if (error) throw error;
+    }
+
+    return {
+      kind: 'applied',
+      id: companyId,
+      route: `/admin/crm/companies/${companyId}`,
+      message: 'Terms applied to this company.',
+    };
+  },
+  summary(payload) {
+    const out: string[] = [];
+    if (payload.discount_percent != null) out.push(`${payload.discount_percent}% discount`);
+    if (payload.payment_terms_days != null) out.push(`${payload.payment_terms_days}d terms`);
+    if (payload.credit_limit != null) out.push(`credit ${payload.credit_limit}`);
+    if (payload.is_supplier && !payload.is_customer) out.push('Supplier');
+    else if (payload.is_customer && !payload.is_supplier) out.push('Customer');
+    return out.length ? out : ['No terms set'];
+  },
+};

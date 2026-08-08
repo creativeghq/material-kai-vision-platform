@@ -16,6 +16,7 @@ const TABS = [
   { value: 'finance', label: 'Finance' },
   { value: 'hr', label: 'HR' },
   { value: 'project', label: 'Projects' },
+  { value: 'realestate', label: 'Real estate' },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -46,7 +47,7 @@ export default function ContractsPage() {
   if (!ws) {
     return (
       <div className="min-h-screen">
-        <PageHeader icon={FileSignature} title="Contracts" subtitle="Signable agreements across HR, Finance and Projects" />
+        <PageHeader icon={FileSignature} title="Contracts" subtitle="Signable agreements across HR, Finance, Projects and Real estate" />
         <div className="p-6"><div className="dashboard-card p-8 text-center text-sm text-muted-foreground">No active workspace.</div></div>
       </div>
     );
@@ -54,7 +55,7 @@ export default function ContractsPage() {
 
   return (
     <div className="min-h-screen">
-      <PageHeader icon={FileSignature} title="Contracts" subtitle="Signable agreements across HR, Finance and Projects" />
+      <PageHeader icon={FileSignature} title="Contracts" subtitle="Signable agreements across HR, Finance, Projects and Real estate" />
       <div className="p-3 sm:p-6 max-w-4xl">
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
           <TabsList className="mb-4 gap-1.5">
