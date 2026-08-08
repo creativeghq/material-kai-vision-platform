@@ -722,7 +722,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     description: 'Search the Knowledge Base for articles, guides, installation instructions, and documentation.',
     params: [
       { name: 'query', type: 'string', optional: false, description: 'Search query - describe what information the user is looking for' },
-      { name: 'searchTypes', type: 'array', optional: true, description: 'Types to search: kb_docs (authored Knowledge Base articles/docs), chunks (text extracted from ingested PDFs), products. Keep the default unless the user is clearly asking only about PDFs or products.' },
+      { name: 'searchTypes', type: 'array', optional: true, description: 'Types to search: kb_docs (authored Knowledge Base articles/docs), chunks (text extracted from ingested PDFs), products, entities (certificates, logos and specification sheets pulled out of PDFs — add this when the user asks about a certification, standard, or compliance document). Keep the default unless the user is clearly asking only about PDFs, products, or certificates.' },
       { name: 'topK', type: 'number', optional: true, description: 'Maximum number of results to return' },
       { name: 'categorySlug', type: 'string', optional: true, description: 'Restrict search to a category by slug (e.g. "pricing")' },
       { name: 'categoryId', type: 'string', optional: true, description: 'Restrict search to a category by UUID' },
