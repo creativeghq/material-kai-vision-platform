@@ -44,6 +44,10 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
     lineCode: l.code ?? undefined,
     quantity: l.quantity,
     measurementUnitLabel: l.measurementUnitLabel ?? 'ΤΜΧ',
+    // 1.5 third-party-sales clearance: 1 = clearance line, 2 = commission-fee line.
+    // Emitted whenever it is set rather than silently dropped off-type — a line kind the
+    // operator recorded must either reach myDATA or be rejected loudly, never vanish.
+    ...(l.invoiceDetailType ? { invoiceDetailType: l.invoiceDetailType } : {}),
     lineUnitPrice: l.unitPrice,
     totalNetPriceBeforeDiscount: l.netValue + (l.discountValue ?? 0),
     totalDiscountValue: l.discountValue ?? 0,

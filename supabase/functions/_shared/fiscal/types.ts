@@ -80,6 +80,18 @@ export interface FiscalLine {
   otherTaxesCategory?: number;
   deductionsAmount?: number;
   lineComments?: string;
+  /**
+   * myDATA `invoiceDetailType` (Appendix Par.11 "Remarks") — which kind of line this is:
+   * 1 = third-party sales clearance, 2 = fee from third-party sales. A 1.5 document
+   * ("Clearance of Sales on Behalf of Third Parties – Fees from Sales on Behalf of Third
+   * Parties") carries both kinds at once, and this is what tells them apart.
+   *
+   * The Novus dev doc (p.9) glosses this as "self-billing remark" — a loose rendering of
+   * «Επισήμανση Αυτοτιμολόγησης» — but the two values above are its ONLY allowed values, so
+   * it belongs to the sale-on-behalf-of-third-parties family, NOT to self-billing
+   * (αυτοτιμολόγηση). Self-billing is the header flag `header.selfPricing`. See issue #278.
+   */
+  invoiceDetailType?: number;
 }
 
 export interface FiscalInvoiceInput {

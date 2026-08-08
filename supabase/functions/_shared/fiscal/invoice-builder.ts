@@ -299,6 +299,8 @@ export async function buildInvoiceInputFromDb(
       otherTaxesCategory: it.other_taxes_category ?? undefined,
       deductionsAmount: Number(it.deductions_amount ?? 0) || undefined,
       lineComments: it.line_comments ?? undefined,
+      // 1.5 clearance-of-third-party-sales line kind (1 = clearance, 2 = commission fee).
+      invoiceDetailType: Number(it.invoice_detail_type ?? 0) || undefined,
       incomeClassificationType: it.income_classification_type ?? productIncomeType(prod) ?? incType,
       incomeClassificationCategory: it.income_classification_category ?? productIncomeCategory(prod) ?? incCat,
     };

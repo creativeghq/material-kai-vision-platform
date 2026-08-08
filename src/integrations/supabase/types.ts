@@ -11422,6 +11422,7 @@ export type Database = {
           id: string
           income_classification_category: string | null
           income_classification_type: string | null
+          invoice_detail_type: number | null
           invoice_id: string
           line_comments: string | null
           line_cost: number | null
@@ -11462,6 +11463,7 @@ export type Database = {
           id?: string
           income_classification_category?: string | null
           income_classification_type?: string | null
+          invoice_detail_type?: number | null
           invoice_id: string
           line_comments?: string | null
           line_cost?: number | null
@@ -11502,6 +11504,7 @@ export type Database = {
           id?: string
           income_classification_category?: string | null
           income_classification_type?: string | null
+          invoice_detail_type?: number | null
           invoice_id?: string
           line_comments?: string | null
           line_cost?: number | null
