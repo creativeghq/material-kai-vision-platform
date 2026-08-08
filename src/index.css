@@ -1203,6 +1203,47 @@ All colors MUST be HSL.
     .skeleton::after { animation: none; }
     .skeleton { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
   }
+
+  /* Indeterminate progress bar — for work whose duration we cannot predict (a
+     search round-trip, a registry lookup). Unlike `.skeleton` it says "something
+     is in flight" rather than "content is coming here". Apply to the TRACK:
+     `<div className="progress-indeterminate" />` — the sweeping fill is ::after. */
+  .progress-indeterminate {
+    position: relative;
+    overflow: hidden;
+    height: 0.25rem;
+    border-radius: 9999px;
+    background-color: hsl(var(--foreground) / 0.08);
+  }
+
+  .progress-indeterminate::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: 40%;
+    border-radius: 9999px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--primary) / 0.9),
+      transparent
+    );
+    animation: progress-sweep 1.4s ease-in-out infinite;
+  }
+
+  @keyframes progress-sweep {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .progress-indeterminate::after {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      width: 100%;
+      transform: none;
+    }
+  }
 }
 
 /* ============================================================

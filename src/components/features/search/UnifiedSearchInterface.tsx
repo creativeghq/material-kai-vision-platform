@@ -74,6 +74,23 @@ interface EntityData {
 // Post-filter selections survive a reload.
 const FILTERS_STORAGE_KEY = 'materialSearchFilters';
 
+type SearchMode = 'text' | 'image' | 'hybrid' | 'color' | 'texture' | 'style' | 'material';
+
+/** Modes whose query is a picture, not words — they get "Searching by image", not "for “x.jpg”". */
+const IMAGE_MODES: SearchMode[] = ['image', 'color', 'texture', 'style', 'material'];
+
+// What the in-flight request is actually doing, per mode. Shown under the progress bar so the
+// wait is explained rather than just spun at.
+const SEARCH_PROGRESS_HINT: Record<SearchMode, string> = {
+  text: 'Understanding the query, then matching it across product text and document content…',
+  image: 'Analysing the image and comparing it against the visual index…',
+  hybrid: 'Combining the text query with the image for a fused match…',
+  color: 'Comparing colour palettes across the image index…',
+  texture: 'Comparing texture patterns across the image index…',
+  style: 'Comparing design styles across the image index…',
+  material: 'Comparing material types across the image index…',
+};
+
 interface UnifiedSearchInterfaceProps {
   onResultsFound?: (results: SearchResult[]) => void;
   onMaterialSelect?: (materialId: string) => void;
@@ -96,7 +113,16 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [searchType, setSearchType] = useState<'text' | 'image' | 'hybrid' | 'color' | 'texture' | 'style' | 'material'>('text');
+  // What the in-flight (or last completed) search was actually for, and whether one has ever run.
+  // Without these the page could not tell "you haven't searched yet" (say nothing) apart from
+  // "we searched and found nothing" (say so) — it rendered blank for both.
+  const [activeQuery, setActiveQuery] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
+  // The mode the in-flight search was STARTED in. The selector stays live during the request, so
+  // reading `searchType` for the progress copy would relabel a running image search as a colour
+  // one the moment the operator touched the dropdown.
+  const [activeMode, setActiveMode] = useState<SearchMode>('text');
+  const [searchType, setSearchType] = useState<SearchMode>('text');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -115,6 +141,17 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   useEffect(() => {
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(values));
   }, [values]);
+
+  // Elapsed seconds on the in-flight search. A multi-vector round-trip through MIVAA routinely
+  // takes several seconds; a spinner with no clock starts reading as "hung" long before it is.
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!isSearching) return;
+    setElapsed(0);
+    const started = Date.now();
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 500);
+    return () => clearInterval(t);
+  }, [isSearching]);
 
   // Seed + auto-run when opened with an initial query (Spotlight "Smart search", capability
   // deep-links). Runs once per distinct initialQuery so re-renders don't re-fire the search.
@@ -180,6 +217,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     }
 
     setIsSearching(true);
+    setActiveMode(searchType);
+    setActiveQuery(IMAGE_MODES.includes(searchType) ? (selectedImage?.name ?? '') : effectiveQuery.trim());
 
     try {
       // Prefer the active workspace (switcher-aware); fall back to a membership lookup.
@@ -253,12 +292,11 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       unifiedResults.sort((a, b) => b.similarity_score - a.similarity_score);
 
       setResults(unifiedResults);
+      setHasSearched(true);
       onResultsFound?.(unifiedResults);
-
-      toast({
-        title: 'Search Completed',
-        description: `Found ${unifiedResults.length} results using ${searchType} search`,
-      });
+      // No success toast. The results (or the empty state) below ARE the answer — a toast for
+      // them fired *after* the operator had already navigated away, which is how a search with
+      // no on-page loader ended up announcing itself from another screen.
     } catch (error) {
       console.error('Search error:', error);
       toast({
@@ -285,6 +323,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       if (!searchQuery.trim()) return;
 
       setIsSearching(true);
+      setActiveMode('text');   // the Quick button is always a plain text pass
+      setActiveQuery(searchQuery.trim());
       try {
         // Prefer the active workspace (switcher-aware); fall back to a membership lookup.
         let workspaceId = activeWorkspaceId;
@@ -328,6 +368,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         }));
 
         setResults(formatted);
+        setHasSearched(true);
         onResultsFound?.(formatted);
       } catch (error) {
         console.error('Quick search error:', error);
@@ -525,8 +566,65 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         </CardContent>
       </Card>
 
-      {/* Search Results */}
-      {results.length > 0 && (
+      {/* Results region — exactly one of: searching · searched-and-found-nothing · results.
+          The searching branch matters most on the deep-linked path (Spotlight → /discover?mode=
+          smart&q=…), where the search auto-fires on mount: with no branch here the page rendered
+          blank for the whole round-trip and the operator had no way to tell it was working. */}
+      {isSearching ? (
+        <Card aria-busy="true" aria-live="polite">
+          <CardHeader className="space-y-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+              <span className="truncate">
+                {IMAGE_MODES.includes(activeMode)
+                  ? <>Searching by {activeMode === 'image' ? 'image' : activeMode}{activeQuery ? ` — ${activeQuery}` : ''}…</>
+                  : activeQuery ? <>Searching for “{activeQuery}”…</> : 'Searching…'}
+              </span>
+              <span className="ml-auto shrink-0 text-xs font-normal tabular-nums text-muted-foreground">
+                {elapsed}s
+              </span>
+            </CardTitle>
+            <div className="progress-indeterminate" />
+            <p className="text-xs text-muted-foreground">{SEARCH_PROGRESS_HINT[activeMode]}</p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="space-y-2 rounded-lg border border-border border-l-4 border-l-primary/30 p-4"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="skeleton h-4 w-4 rounded" />
+                  <div className="skeleton h-3.5 w-52 rounded" />
+                  <div className="skeleton ml-auto h-3 w-10 rounded" />
+                </div>
+                <div className="skeleton h-2.5 w-full rounded" />
+                <div className="skeleton h-2.5 w-[85%] rounded" />
+                <div className="flex gap-2 pt-1">
+                  <div className="skeleton h-4 w-16 rounded-full" />
+                  <div className="skeleton h-4 w-20 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : hasSearched && results.length === 0 ? (
+        <Card>
+          <CardContent className="py-14 text-center">
+            <Search className="mx-auto mb-3 h-10 w-10 opacity-30" />
+            <p className="font-medium">
+              {IMAGE_MODES.includes(activeMode)
+                ? <>No {activeMode === 'image' ? 'visual' : activeMode} matches{activeQuery ? <> for “{activeQuery}”</> : null}</>
+                : activeQuery ? <>No matches for “{activeQuery}”</> : 'No matches'}
+            </p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+              {IMAGE_MODES.includes(activeMode)
+                ? 'Nothing in this workspace looked close enough. Try a clearer or tighter crop, or a different mode above.'
+                : 'Nothing in this workspace matched. Try fewer or different words, or switch the mode above to search by image, colour, texture or style.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : results.length > 0 && (
         <Card>
           <CardHeader className="space-y-3">
             <CardTitle>
@@ -549,6 +647,13 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
             />
           </CardHeader>
           <CardContent>
+            {/* Post-filters can hide every result. Say so — otherwise the card renders a header
+                claiming "0 of 15" above an empty box with no hint of what to undo. */}
+            {filteredResults.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                All {results.length} results are hidden by the filters above. Clear one to see them.
+              </p>
+            )}
             <div className="space-y-4">
               {filteredResults.map((result, index) => (
                 <Card
