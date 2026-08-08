@@ -173,9 +173,11 @@ const SnagsView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projectI
                     {s.description && <p className="mt-1 text-sm text-muted-foreground">{s.description}</p>}
                     {s.photo_paths.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {s.photo_paths.map((p) => (
+                        {s.photo_paths.map((p, i) => (
                           <a key={p} href={siteService.photoUrl(p)} target="_blank" rel="noreferrer">
-                            <img src={siteService.photoUrl(p)} alt="" loading="lazy"
+                            {/* The alt is the LINK's accessible name too — empty made this a
+                                nameless link, i.e. "link" is all a screen reader could announce. */}
+                            <img src={siteService.photoUrl(p)} alt={`Snag photo ${i + 1}: ${s.title}`} loading="lazy"
                               className="h-16 w-16 rounded-md object-cover border border-white/10" />
                           </a>
                         ))}
@@ -374,9 +376,9 @@ const SiteLogView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projec
                     {l.notes && <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{l.notes}</p>}
                     {l.photo_paths.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {l.photo_paths.map((p) => (
+                        {l.photo_paths.map((p, i) => (
                           <a key={p} href={siteService.photoUrl(p)} target="_blank" rel="noreferrer">
-                            <img src={siteService.photoUrl(p)} alt="" loading="lazy"
+                            <img src={siteService.photoUrl(p)} alt={`Site visit photo ${i + 1} — ${l.log_date}`} loading="lazy"
                               className="h-16 w-16 rounded-md object-cover border border-white/10" />
                           </a>
                         ))}

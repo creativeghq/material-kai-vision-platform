@@ -287,9 +287,11 @@ export default function PublicClientViewPage() {
                     </div>
                     {s.photo_urls.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {s.photo_urls.map((u) => (
+                        {s.photo_urls.map((u, i) => (
                           <a key={u} href={u} target="_blank" rel="noreferrer">
-                            <img src={u} alt="" loading="lazy" className="h-16 w-16 rounded-md border border-white/10 object-cover" />
+                            {/* Names the link as well as the image — an empty alt left the client
+                                view with a row of anonymous "link"s. */}
+                            <img src={u} alt={`Snag photo ${i + 1}: ${s.title}`} loading="lazy" className="h-16 w-16 rounded-md border border-white/10 object-cover" />
                           </a>
                         ))}
                       </div>

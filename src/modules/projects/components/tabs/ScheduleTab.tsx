@@ -21,7 +21,7 @@ import {
 } from '../../services/projectsService';
 import {
   criticalPathIds, rollupProgress, scheduleWindow, barGeometry, shiftTask,
-  parseDay, toDayString, type ScheduleTask,
+  parseDay, type ScheduleTask,
 } from '../../lib/schedule';
 
 const ROW_H = 36;
@@ -245,9 +245,18 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
 
                       if (st.is_milestone) {
                         return (
+                          // Dragging reschedules; Enter/Space opens the same edit dialog, so the
+                          // milestone is reachable without a mouse instead of being a diamond only
+                          // a pointer can operate.
                           <div
                             key={t.id}
+                            role="button"
+                            tabIndex={isOwner ? 0 : -1}
+                            aria-label={`Milestone: ${t.title}, ${t.start_date}`}
                             onMouseDown={(e) => isOwner && setDrag({ id: t.id, startX: e.clientX, deltaDays: 0 })}
+                            onKeyDown={(e) => {
+                              if (isOwner && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setEditing(t); }
+                            }}
                             className={`absolute ${isOwner ? 'cursor-grab' : ''}`}
                             style={{ left: left - 6, top: i * ROW_H + ROW_H / 2 - 6, width: 12, height: 12 }}
                             title={`${t.title} — ${t.start_date}`}
@@ -259,8 +268,14 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
                       return (
                         <div
                           key={t.id}
+                          role="button"
+                          tabIndex={isOwner ? 0 : -1}
+                          aria-label={`${t.title}: ${t.start_date} to ${t.end_date}, ${st.progress_pct}% complete`}
                           onMouseDown={(e) => isOwner && setDrag({ id: t.id, startX: e.clientX, deltaDays: 0 })}
                           onClick={() => !dragging && isOwner && setEditing(t)}
+                          onKeyDown={(e) => {
+                            if (isOwner && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setEditing(t); }
+                          }}
                           className={`absolute overflow-hidden rounded-md ${isOwner ? 'cursor-grab' : ''} ${
                             isCritical ? 'bg-primary/30 ring-1 ring-primary/60' : 'bg-white/10'
                           }`}

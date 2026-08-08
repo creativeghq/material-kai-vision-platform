@@ -1,5 +1,5 @@
 import {
-  BookOpen, FileSignature, FileSpreadsheet, LayoutTemplate, Mail, Megaphone, MessageCircle, SlidersHorizontal,
+  BookOpen, FileSignature, FileSpreadsheet, LayoutTemplate, Mail, Megaphone, MessageCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 

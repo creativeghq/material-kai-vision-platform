@@ -1891,7 +1891,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       await load(order.id); onChanged();
       toast({
         title: 'Sent in-app',
-        description: `A draft sales order is waiting in ${handoff?.supplierWorkspaceName ?? "the supplier"}'s workspace. You'll see their acknowledgement here.`,
+        description: `A draft sales order is waiting in ${handoff?.supplierWorkspaceName ?? 'the supplier'}'s workspace. You'll see their acknowledgement here.`,
       });
     } catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setSaving(false); }
