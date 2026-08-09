@@ -527,6 +527,16 @@ export class MaterialKaiProduct extends HTMLElement {
    */
   private emitAddToCart() {
     if (!this.product) return;
+    // The chosen options travel WITH the handoff. Without them a configured item reaches the
+    // merchant's cart indistinguishable from an unconfigured one, and the person picking the order
+    // has no idea which fabric was chosen. Both shapes are sent: readable labels for line-item
+    // properties (what a Shopify cart displays and a picker reads), and the ids for anything that
+    // needs to reconstruct the configuration exactly.
+    const options: Record<string, string> = {};
+    for (const g of this.product.options ?? []) {
+      const v = g.values.find((x) => x.id === this.selection[g.id]);
+      if (v) options[g.label] = v.label;
+    }
     const detail = {
       type: 'materialkai:add-to-cart',
       product_id: this.product.product_id,
@@ -534,6 +544,8 @@ export class MaterialKaiProduct extends HTMLElement {
       price: this.product.price,
       currency: this.product.currency,
       quantity: 1,
+      options,
+      option_value_ids: this.selectedValueIds(),
     };
     this.dispatchEvent(new CustomEvent('materialkai:add-to-cart', {
       detail, bubbles: true, composed: true,

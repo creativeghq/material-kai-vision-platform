@@ -1,0 +1,15 @@
+// #258 Phase 3 — Shopify theme app extension for the <materialkai-product> widget.
+//
+// A theme app extension is the difference between "paste this snippet into your theme's Liquid"
+// and "drag a block into your product page". Merchants on Shopify overwhelmingly will not edit
+// theme code, and asking them to is where an embed integration dies.
+//
+// DEPLOYING THIS NEEDS CREDENTIALS THIS REPO DOES NOT HAVE: a Shopify Partner account, an app
+// registered against it, and `shopify app deploy`. The source is complete; the account is an
+// operator decision. See README.md next to this file.
+api_version = "2025-07"
+
+[[extensions]]
+type = "theme"
+name = "MaterialKai 3D Product"
+handle = "materialkai-product"

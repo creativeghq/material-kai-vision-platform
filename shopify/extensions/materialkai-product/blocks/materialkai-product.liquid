@@ -1,0 +1,129 @@
+{% comment %}
+  MaterialKai 3D product block (#258 Phase 3).
+
+  Drops the <materialkai-product> widget onto a Shopify product page and bridges its add-to-cart
+  handoff into Shopify's own cart.
+
+  WHICH PRODUCT DOES IT SHOW? A Shopify product and a MaterialKai product are different rows in
+  different systems, so something has to map them. In order of preference:
+    1. a `materialkai.product_id` metafield on the Shopify product — set once, works for every
+       product, survives theme changes;
+    2. a product id typed into this block's settings — fine for a single hero product, and a
+       maintenance burden for a catalog.
+  With neither, the block renders nothing rather than an error: a merchant mid-setup should not
+  have a broken box on a live storefront.
+{% endcomment %}
+
+{%- assign mk_product_id = product.metafields.materialkai.product_id | default: block.settings.product_id -%}
+
+{%- if block.settings.api_key != blank and mk_product_id != blank -%}
+  <div class="materialkai-block" {{ block.shopify_attributes }}>
+    {%- if block.settings.heading != blank -%}
+      <h2 class="materialkai-block__heading">{{ block.settings.heading | escape }}</h2>
+    {%- endif -%}
+
+    <materialkai-product
+      id="materialkai-{{ block.id }}"
+      api-key="{{ block.settings.api_key | escape }}"
+      product-id="{{ mk_product_id | escape }}"
+      {% if block.settings.show_add_to_cart %}show-add-to-cart{% endif %}
+      {% unless block.settings.autorotate %}autorotate="false"{% endunless %}
+    ></materialkai-product>
+  </div>
+
+  <script src="{{ block.settings.script_url }}" defer></script>
+
+  <script>
+    (function () {
+      var el = document.getElementById('materialkai-{{ block.id }}');
+      if (!el) return;
+
+      el.addEventListener('materialkai:add-to-cart', function (event) {
+        var detail = event.detail || {};
+
+        // The CURRENT Shopify variant is what gets added — Shopify owns the price, the inventory
+        // and the tax treatment, and a configurator must not try to own any of those. The choices
+        // ride along as line-item properties, which is what the cart, the order and the person
+        // picking it actually read.
+        var variantId = {{ product.selected_or_first_available_variant.id | json }};
+        if (!variantId) return;
+
+        var properties = {};
+        Object.keys(detail.options || {}).forEach(function (key) {
+          properties[key] = detail.options[key];
+        });
+        // Hidden (underscore-prefixed) so it does not clutter the customer's cart, but present on
+        // the order so a configuration can be reconstructed exactly when someone asks "which one
+        // did they order?".
+        if (detail.option_value_ids && detail.option_value_ids.length) {
+          properties['_materialkai_options'] = detail.option_value_ids.join(',');
+        }
+        properties['_materialkai_product_id'] = detail.product_id;
+
+        fetch(window.Shopify.routes.root + 'cart/add.js', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: [{ id: variantId, quantity: detail.quantity || 1, properties: properties }]
+          })
+        })
+          .then(function (res) { return res.json(); })
+          .then(function () {
+            // Themes listen for this to refresh the cart drawer. Dispatching it is the difference
+            // between "it worked" and "nothing happened" from the shopper's point of view.
+            document.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
+            document.dispatchEvent(new CustomEvent('cart:build', { bubbles: true }));
+          })
+          .catch(function () {
+            // Never break the merchant's product page over our add-to-cart.
+          });
+      });
+    })();
+  </script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "MaterialKai 3D",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "api_key",
+      "label": "Embed key",
+      "info": "From Profile → Keys → Website Embed. This key is publishable — it is meant to appear in your page source. Add your shop's domain to its allowed websites."
+    },
+    {
+      "type": "text",
+      "id": "script_url",
+      "label": "Widget script URL",
+      "default": "https://app.materialshub.gr/embed/materialkai-product.js"
+    },
+    {
+      "type": "text",
+      "id": "product_id",
+      "label": "MaterialKai product ID (fallback)",
+      "info": "Leave empty when you use the materialkai.product_id metafield, which is the better option for more than one product."
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "See it in 3D"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_add_to_cart",
+      "label": "Show an Add to cart button",
+      "default": false,
+      "info": "Adds the currently selected Shopify variant, with the chosen finishes recorded on the line item."
+    },
+    {
+      "type": "checkbox",
+      "id": "autorotate",
+      "label": "Rotate the model automatically",
+      "default": true
+    }
+  ]
+}
+{% endschema %}
