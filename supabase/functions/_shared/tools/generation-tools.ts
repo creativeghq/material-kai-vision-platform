@@ -100,9 +100,19 @@ export const create3DGenerationTool = (
 
         let response;
         try {
+          // Authenticate as the Material Kai platform service. This call sent NO
+          // credential while POSTing a body `user_id` — but /api/interior declares
+          // Depends(get_current_user) (HTTPBearer, auto_error), so every request was
+          // rejected before reaching the handler. The route also overwrites body
+          // identity from the verified claims, which is why the key has to be one MIVAA
+          // can resolve to a workspace rather than any bearer that merely parses.
+          const mivaaApiKey = Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
           response = await fetch(interiorApiUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(mivaaApiKey ? { Authorization: `Bearer ${mivaaApiKey}` } : {}),
+            },
             body: JSON.stringify({
               prompt,
               room_type: roomType,

@@ -160,6 +160,9 @@ Deno.serve(withApiLogging('kb-generate-embedding', async (req: Request) => {
     // SECTION (not truncated to a head) and match per-section. Runs on MIVAA server-side;
     // fire-and-forget so doc save isn't blocked. Non-fatal — the backfill re-chunks on miss.
     try {
+      // The service-role key is REQUIRED here, not incidental: /api/rag/kb-docs/rechunk
+      // authenticates by comparing this header against SUPABASE_SERVICE_ROLE_KEY (or an
+      // x-cron-secret). Sending the MIVAA platform key instead would fail that check.
       const rechunk = fetch(`${MIVAA_URL}/api/rag/kb-docs/rechunk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
