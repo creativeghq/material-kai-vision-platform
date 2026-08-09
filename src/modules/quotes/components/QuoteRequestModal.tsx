@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, Upsell, QuoteUpsell } from '../services/QuotesService';
 import { ProjectTimelineModal } from './ProjectTimelineModal';
 import { humanizeLabel } from '@/utils/humanize';
+import { formatMoney } from '@/utils/decimal';
 
 interface QuoteRequestModalProps {
   quote: QuoteWithItems;
@@ -287,10 +288,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                               )}
                               <div className="flex items-center gap-1 text-green-600 font-semibold">
                                 <DollarSign className="h-4 w-4" />
-                                {new Intl.NumberFormat('en-US', {
-                                  style: 'currency',
-                                  currency: 'USD',
-                                }).format(upsell.price)}
+                                {formatMoney(upsell.price, 'USD')}
                               </div>
                             </div>
                             <div className="flex items-center gap-2 ml-4">
@@ -334,16 +332,14 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Accepted Extras Total:</span>
                         <span className="font-semibold text-green-600">
-                          {new Intl.NumberFormat('en-US', {
-                            style: 'currency',
-                            currency: 'USD',
-                          }).format(
+                          {formatMoney(
                             quoteUpsells
                               .filter(qu => qu.customer_accepted === true)
                               .reduce((sum, qu) => {
                                 const upsell = upsells.find(u => u.id === qu.upsell_id);
                                 return sum + (upsell?.price || 0);
                               }, 0),
+                            'USD',
                           )}
                         </span>
                       </div>

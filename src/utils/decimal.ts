@@ -109,8 +109,16 @@ export function round2(n: number): number {
  */
 export interface FormatMoneyOptions {
   /** Minimum fraction digits. 2 (accounting) by default; 0 for figures that read better whole,
-   *  like a property asking price or a payroll total. Maximum stays 2 either way. */
+   *  like a property asking price or a payroll total. */
   decimals?: number;
+  /**
+   * Maximum fraction digits, 2 by default. Set to 0 for figures that must render WHOLE — a
+   * property asking price or a CMA comparable, where "€450,000.00" is noise. Added because the
+   * call sites that needed it were each hand-rolling `Intl.NumberFormat` to get it, and every one
+   * of them picked a different locale on the way (`undefined`, `en-GB`), which is the drift this
+   * helper exists to prevent.
+   */
+  maxDecimals?: number;
   /** What `null`/`undefined` renders as. "—" by default; a listing might want "On request". */
   fallback?: string;
 }
@@ -122,12 +130,15 @@ export function formatMoney(
 ): string {
   if (value == null) return opts.fallback ?? '—';
   const min = opts.decimals ?? 2;
+  // Max never drops below min — Intl throws on that combination rather than clamping, and a
+  // caller asking for `decimals: 2, maxDecimals: 0` means "whole", not "crash".
+  const max = Math.max(opts.maxDecimals ?? 2, min);
   try {
     return new Intl.NumberFormat('en-IE', {
       style: 'currency',
       currency: currency || 'EUR',
       minimumFractionDigits: min,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: max,
     }).format(value);
   } catch {
     // Unknown/invalid currency code — Intl throws rather than degrading.

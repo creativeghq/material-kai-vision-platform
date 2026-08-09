@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
-import { parseDecimal } from '@/utils/decimal';
+import { parseDecimal, formatMoney } from '@/utils/decimal';
 import {
   assetsService, ASSET_CATEGORY_LABEL, ASSET_STATUS_LABEL, ACQUISITION_LABEL,
   type CompanyAsset, type AssetCategory, type AssetStatus, type AcquisitionType, type DepreciationMethod,
@@ -29,8 +29,7 @@ const ACQ_TYPES = Object.keys(ACQUISITION_LABEL) as AcquisitionType[];
 
 function money(n: number | null, currency: string): string {
   if (n == null) return '—';
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR' }).format(n); }
-  catch { return `${n} ${currency}`; }
+  return formatMoney(n, currency || 'EUR');
 }
 
 interface Props {

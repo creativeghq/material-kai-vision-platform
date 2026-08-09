@@ -130,7 +130,7 @@ const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
 // Self-contained printable HTML (inline styles — Tailwind classes don't cross the popup boundary).
 function buildCmaHtml(r: CmaReport): string {
   const ccy = r.subject.currency || 'EUR';
-  const m = (n: number | null | undefined) => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy, maximumFractionDigits: 0 }).format(n));
+  const m = (n: number | null | undefined) => formatMoney(n, ccy, { decimals: 0, maxDecimals: 0 });
   // CLAUDE.md invariant #11: use the CANONICAL escaper, never a local copy. The copy that was
   // here escaped only & < > " — four of the five — leaving the single quote unescaped, and this
   // output goes to `w.document.write(...)`, a genuine HTML sink. `real-estate-buyer-digests`

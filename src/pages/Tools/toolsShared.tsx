@@ -37,6 +37,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Skeleton } from '@/components/core/ui/skeleton';
+import { formatMoney } from '@/utils/decimal';
 import {
   fetchQuota,
   type PublicMentionResult,
@@ -694,7 +695,7 @@ export function formatPrice(value: number | null | undefined, currency: string |
   if (value == null) return '—';
   const cur = (currency || 'EUR').toUpperCase();
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(value);
+    return formatMoney(value, cur);
   } catch {
     return `${value.toFixed(2)} ${cur}`;
   }

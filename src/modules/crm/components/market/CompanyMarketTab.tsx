@@ -30,8 +30,7 @@ interface CompanyMarketTabProps {
   company: CompanyMarketSeed;
 }
 
-const eur = (n: number) =>
-  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n || 0);
+const eur = (n: number) => formatMoney(n || 0, 'EUR');
 
 const hostOf = (url?: string | null): string | null => {
   if (!url) return null;

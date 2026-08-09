@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { marketplacePricingService, type WorkspacePrice } from '@/services/marketplacePricingService';
-import { parseDecimal } from '@/utils/decimal';
+import { parseDecimal, formatMoney } from '@/utils/decimal';
 
 export const ProductPricePanel: React.FC<{ productId: string }> = ({ productId }) => {
   const { toast } = useToast();
@@ -67,7 +67,7 @@ export const ProductPricePanel: React.FC<{ productId: string }> = ({ productId }
   const retailNum = parseDecimal(retail);
   const margin = (retailNum != null && cost != null) ? Math.round((retailNum - cost) * 100) / 100 : null;
   const marginPct = (margin != null && cost) ? Math.round((margin / cost) * 1000) / 10 : null;
-  const fmt = (n: number | null | undefined) => n == null ? '—' : new Intl.NumberFormat('en-IE', { style: 'currency', currency: cur }).format(n);
+  const fmt = (n: number | null | undefined) => formatMoney(n, cur);
   const negative = margin != null && margin < 0;
 
   return (

@@ -12,6 +12,7 @@ import { Label } from '@/components/core/ui/label';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
+import { formatMoney } from '@/utils/decimal';
 import {
   financeService, PAYMENT_METHOD_LABEL, defaultMethodForAccountKind,
   ACCOUNT_KIND_LABEL, ACCOUNT_KIND_ORDER,
@@ -34,7 +35,7 @@ interface Props {
 
 const fmt = (n: number, currency: string) => {
   try {
-    return new Intl.NumberFormat('en-GB', { style: 'currency', currency: currency || 'EUR' }).format(n);
+    return formatMoney(n, currency || 'EUR');
   } catch { return `${n.toFixed(2)} ${currency || ''}`.trim(); }
 };
 

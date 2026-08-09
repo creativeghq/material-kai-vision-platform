@@ -13,6 +13,7 @@ import { Loader2, Store, Copy, ExternalLink, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { storefrontService, type StorefrontConfig, type PublishableProduct } from '@/modules/finance/services/storefrontService';
+import { formatMoney } from '@/utils/decimal';
 
 export const StorefrontCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   const { toast } = useToast();
@@ -117,7 +118,7 @@ export const StorefrontCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
                 <div key={p.product_id} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-1.5 text-sm">
                   <div className="min-w-0">
                     <div className="truncate">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">{p.price != null ? new Intl.NumberFormat(undefined, { style: 'currency', currency: p.currency }).format(p.price) : 'No price'}</div>
+                    <div className="text-xs text-muted-foreground">{p.price != null ? formatMoney(p.price, p.currency) : 'No price'}</div>
                   </div>
                   <Switch checked={p.storefront_published} onCheckedChange={() => togglePublished(p)} />
                 </div>

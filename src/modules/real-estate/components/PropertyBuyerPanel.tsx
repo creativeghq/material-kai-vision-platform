@@ -11,6 +11,7 @@ import { realEstateService, type BuyerRequirement, type ContactExt, type Propert
 import { PropertyFormDialog, type PropertyFormValues } from './PropertyFormDialog';
 import { scoreLead } from '@/modules/crm/services/leadScoring';
 import { statusTone } from '@/utils/statusTone';
+import { formatMoney } from '@/utils/decimal';
 
 // real-estate panel on the CRM contact page: the person's PROPERTIES (own as many as they
 // like — each a real listing record), their buyer profile (budget / pre-approval) and saved
@@ -61,7 +62,7 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
     finally { setSavingExt(false); }
   };
 
-  const money2 = (n: number | null, ccy: string) => (n == null ? '—' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n));
+  const money2 = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, maxDecimals: 0 });
 
   const openNew = (seed?: Partial<PropertyFormValues>) => { setEditId(null); setPrefill(seed); setPropOpen(true); };
   const openEdit = (id: string) => { setEditId(id); setPrefill(undefined); setPropOpen(true); };

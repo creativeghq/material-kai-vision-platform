@@ -13,6 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { billingService, CreditPackage, UserCredits } from '@/services/billing.service';
+import { formatMoney } from '@/utils/decimal';
 
 export const CreditPackagesPage: React.FC = () => {
   const { toast } = useToast();
@@ -73,10 +74,7 @@ export const CreditPackagesPage: React.FC = () => {
 
   const formatPrice = (priceInCents: number, currency: string) => {
     const price = priceInCents / 100;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency.toUpperCase(),
-    }).format(price);
+    return formatMoney(price, currency.toUpperCase());
   };
 
   const formatCredits = (credits: number) => {

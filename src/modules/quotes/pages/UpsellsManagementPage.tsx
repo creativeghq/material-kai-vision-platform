@@ -38,7 +38,7 @@ import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { parseDecimal } from '@/utils/decimal';
+import { parseDecimal, formatMoney } from '@/utils/decimal';
 import { quotesService, Upsell } from '../services/QuotesService';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
@@ -249,10 +249,7 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
+    return formatMoney(price, 'USD');
   };
 
   if (loading) {

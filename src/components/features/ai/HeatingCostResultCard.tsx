@@ -7,10 +7,11 @@
 import { Trophy } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
 import type { HeatingCostResult } from '@/lib/calculators/heatingCostComparison';
+import { formatMoney } from '@/utils/decimal';
 
 function eur(v: number): string {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
+    return formatMoney(v, 'EUR', { decimals: 0, maxDecimals: 0 });
   } catch {
     return `€${Math.round(v)}`;
   }

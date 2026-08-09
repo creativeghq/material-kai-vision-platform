@@ -29,6 +29,7 @@ import {
 } from '@/lib/calculators/heatingCostComparison';
 import { QuotaBadge, ToolsShell, useToolsQuota } from './toolsShared';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatMoney } from '@/utils/decimal';
 
 const METHOD_ICON: Record<HeatingMethodKey, typeof Flame> = {
   oil: Flame,
@@ -228,7 +229,7 @@ function PriceInput({ id, label, value, onChange }: { id: string; label: string;
 
 function eur(v: number): string {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
+    return formatMoney(v, 'EUR', { decimals: 0, maxDecimals: 0 });
   } catch {
     return `€${Math.round(v)}`;
   }

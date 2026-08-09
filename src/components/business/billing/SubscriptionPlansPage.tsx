@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { billingService, SubscriptionPlan, UserSubscription } from '@/services/billing.service';
 import { supabase } from '@/integrations/supabase/client';
 import { tierRank } from '@/services/planAdminService';
+import { formatMoney } from '@/utils/decimal';
 
 export const SubscriptionPlansPage: React.FC = () => {
   const { toast } = useToast();
@@ -84,10 +85,7 @@ export const SubscriptionPlansPage: React.FC = () => {
 
   const formatPrice = (priceInCents: number, currency: string) => {
     const price = priceInCents / 100;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency.toUpperCase(),
-    }).format(price);
+    return formatMoney(price, currency.toUpperCase());
   };
 
   const getPlanIcon = (index: number) => {

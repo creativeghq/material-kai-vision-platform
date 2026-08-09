@@ -38,6 +38,7 @@ import { ListingPerformancePanel } from '../components/ListingPerformancePanel';
 import { KycPanel } from '../components/KycPanel';
 import { ShortLetTab } from '../components/ShortLetTab';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
+import { formatMoney } from '@/utils/decimal';
 
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
 const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
@@ -829,7 +830,7 @@ export default function PropertyWorkbench() {
   );
 }
 
-const offerMoney = (n: number, ccy: string) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: ccy || 'EUR', maximumFractionDigits: 0 }).format(n);
+const offerMoney = (n: number, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, maxDecimals: 0 });
 
 // ── Lettings / property management ──
 const Stat: React.FC<{ label: string; value: string; accent?: boolean }> = ({ label, value, accent }) => (

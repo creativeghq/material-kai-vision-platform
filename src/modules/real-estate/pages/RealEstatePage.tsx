@@ -166,7 +166,7 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         {kpi('New leads', d.new_leads, 'text-primary')}
       </div>
       {d.commission && d.commission.sold_count > 0 && (() => {
-        const money = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: d.commission.currency || 'EUR', maximumFractionDigits: 0 }).format(n);
+        const money = (n: number) => formatMoney(n, d.commission.currency || 'EUR', { decimals: 0, maxDecimals: 0 });
         return (
           <Card><CardContent className="flex flex-wrap items-center gap-x-8 gap-y-2 p-4">
             <div className="text-sm font-semibold">Commissions <span className="text-xs font-normal text-muted-foreground">(year to date)</span></div>
