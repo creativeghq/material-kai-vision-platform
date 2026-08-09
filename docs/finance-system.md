@@ -204,6 +204,58 @@ Issued via `issue_supplier_credit_note(p_bill_id, p_reason, p_amount, p_lines)`.
 
 ---
 
+## 6a. A MARK makes the document immutable (#328)
+
+Once AADE returns a MARK, the document is a filed tax record. It **cannot be edited and cannot be
+deleted** — a correction is a credit note, never an `UPDATE`. Enforced in the database, not in the
+UI, because the UI is one of several writers:
+
+| Table | Trigger |
+|---|---|
+| `invoices`, `credit_notes`, `delivery_notes` | `_fiscal_document_immutability_guard()` (BEFORE UPDATE **OR DELETE**) |
+| `invoice_items` | `_invoice_items_immutability_guard()` |
+| `credit_note_items`, `delivery_note_items` | `_fiscal_line_item_mark_guard()` |
+
+**Two tiers.** Below a MARK, the old status-based rule is unchanged: an issued invoice freezes its
+eight financial fields. Once `fiscal_mark IS NOT NULL` it flips to an **allowlist** —
+everything is frozen except the operational fields in `fiscal_mutable_after_mark()`: settlement
+(`amount_paid`, `paid_at`, `status`…), rendering artefacts (`pdf_*`), payment links, and the #193
+post-transmission bookkeeping (`fiscal_error`, `fiscal_alerted_at`, `fiscal_credits_refunded_at`).
+
+The allowlist direction is the point. The previous guard was a **denylist of 8 columns**, and it
+had silently gone stale: `series` / `series_number` (the myDATA legal identity — `legal_number` was
+frozen, these were not), `issued_at`, all five tax-total columns transmitted in `invoiceSummary`,
+`document_type`, `branch_code`, the whole transport block that prints on a 9.3, and **`fiscal_mark`
+itself** were all editable. `credit_notes` and `delivery_notes` had no guard at all, and nothing
+blocked `DELETE`. With an allowlist, a column added tomorrow is frozen by default and whoever needs
+it mutable has to say so.
+
+Verified by probe against the live database rather than asserted — changing the total, the series
+number, the MARK, a tax total, the issue date or the frozen counterparty, adding a line item, and
+deleting the document are all rejected, while recording a payment, attaching the PDF and writing
+recovery bookkeeping still succeed.
+
+### The counterparty is frozen too
+
+`invoices.counterparty_snapshot` / `delivery_notes.counterparty_snapshot` record **who the document
+was issued to**, captured by `trg_*_freeze_counterparty` the moment the document stops being a
+draft. Before this, every document resolved its customer live from `crm_companies`, so renaming a
+customer silently rewrote who every past invoice was addressed to.
+
+- Captured by a **trigger, not by `mark_invoice_issued`** — the POS page inserts rows with
+  `status='issued'` directly and would never have been snapshotted.
+- Stores an **allowlisted** set of fields, not the row: an immutable legal record must not
+  accumulate PII (`lead_score`, `marketing_consent`) that nothing reads.
+- `capture_counterparty_snapshot` resolves an attached contact **up to its primary company**, the
+  same rule as `resolveContactBillingSource`, because that is the identity the document showed.
+- Credit notes deliberately have **no** snapshot of their own — they resolve from the invoice they
+  correct, snapshot included.
+- Readers go through `resolveCounterparty` in `_shared/fiscal/invoice-builder.ts`, which feeds the
+  snapshot to the same `partyFromCrm` used for live rows, so the billing-identity precedence rules
+  exist once and cannot drift between frozen and live documents.
+
+---
+
 ## 7. Key DB tables
 
 All workspace-scoped; RLS enforces `is_workspace_member` for read and `is_workspace_finance_manager` for write on document tables.
