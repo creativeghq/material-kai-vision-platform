@@ -1648,6 +1648,56 @@
           }
         ],
         "response": "{ok: true}. workspace_id is set from the key, never the body. Accepts a bodyless POST — the beacon sends everything in the query string."
+      },
+      {
+        "name": "resolve",
+        "summary": "Resolve a built specification to a real product, or report that nothing matches (#337)",
+        "params": [
+          {
+            "name": "spec",
+            "type": "object",
+            "required": true,
+            "desc": "The visitor’s specification as {facet_key: value}. Matched by jsonb containment against products.attributes — every specified facet must equal the product’s. Capped at 25 facets."
+          }
+        ],
+        "response": "{ok, match_kind: exact|near|none, product (ONLY when exact — its absence is the instruction to offer a quote), near_matches[] (no price, on purpose), spec_facets}. Only storefront-published products in the key’s scope are considered."
+      },
+      {
+        "name": "request_quote",
+        "summary": "Record a quote request for a specification nothing matched (#337)",
+        "params": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "desc": "Requester name."
+          },
+          {
+            "name": "email",
+            "type": "string",
+            "required": true,
+            "desc": "Requester email. Find-or-create a crm_contact in the key’s workspace, like guest checkout."
+          },
+          {
+            "name": "spec",
+            "type": "object",
+            "required": false,
+            "desc": "What they built. Stored on the request; NEVER creates a products row."
+          },
+          {
+            "name": "message",
+            "type": "string",
+            "required": false,
+            "desc": "Free text, truncated to 1000 chars."
+          },
+          {
+            "name": "turnstile_token",
+            "type": "string",
+            "required": false,
+            "desc": "Bot gate, verified BEFORE any row is created — this mints a CRM contact from an anonymous caller."
+          }
+        ],
+        "response": "{ok, quote_request_id}. No total_estimated is written: a request nobody has priced must not carry a number."
       }
     ]
   },

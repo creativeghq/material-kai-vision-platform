@@ -29,6 +29,7 @@ import {
 } from '../_shared/embed-key.ts';
 import { embedCorsHeaders } from '../_shared/cors.ts';
 import { imagesFromMetadata } from '../_shared/product-media.ts';
+import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
 import { grossFromNet } from '../_shared/money.ts';
 
 /** Page size ceiling — an embed grid is a shelf, not a catalog dump. */
@@ -50,6 +51,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** Ceiling on how many option ids one anonymous request may send. */
 const MAX_OPTION_IDS = 40;
+
+/** Ceiling on facets in a submitted spec — anonymous input that becomes a jsonb predicate. */
+const MAX_SPEC_FACETS = 25;
 
 /**
  * Configurator options for one product, shaped for the embed (#258 Phase 2).
@@ -462,6 +466,129 @@ Deno.serve(withApiLogging((req) => {
       // quote the merchant's customer ends up signing.
       violations: p?.violations ?? [],
       is_valid: p?.is_valid ?? true,
+    }, 200, cors);
+  }
+
+  // ── #337 "price it" ──────────────────────────────────────────────────────────────────────────
+  //
+  // The visitor built a spec across the wizard's stages and asked what it costs. Three answers:
+  //   exact → a real product, priced by the one derivation
+  //   near  → products that satisfy part of it, deliberately WITHOUT a price
+  //   none  → nothing matches; the caller should offer a quote request
+  //
+  // A price is only ever emitted for an exact match. Anything looser would put a number on a
+  // merchant's website that this tenant never agreed to.
+  if (action === 'resolve') {
+    let spec: Record<string, unknown>;
+    try {
+      spec = typeof params.spec === 'string' ? JSON.parse(params.spec) : (params.spec ?? {});
+    } catch {
+      return embedJson({ error: 'spec must be a JSON object' }, 400, cors);
+    }
+    if (!spec || typeof spec !== 'object' || Array.isArray(spec)) {
+      return embedJson({ error: 'spec must be a JSON object' }, 400, cors);
+    }
+    // Cap the spec: it is anonymous input that becomes a jsonb containment predicate.
+    const entries = Object.entries(spec).slice(0, MAX_SPEC_FACETS);
+    const safeSpec = Object.fromEntries(entries.map(([k, v]) => [String(k).slice(0, 80), v]));
+
+    const { data: resolved, error: rErr } = await supabase.rpc('resolve_product_spec', {
+      p_workspace_id: workspaceId,
+      p_spec: safeSpec,
+      p_limit: 5,
+    });
+    if (rErr) return embedJson({ error: 'Could not resolve this specification' }, 500, cors);
+
+    const res = resolved as Record<string, unknown>;
+    const matches = (res?.matches ?? []) as Array<{ product_id: string; name: string }>;
+
+    // Only an exact match gets priced, and the price comes from the same derivation the in-app
+    // configurator and the quote line use — not a second one that could disagree.
+    let priced: unknown = null;
+    if (res?.match_kind === 'exact' && matches[0]) {
+      // Scope still applies: an exact match the key may not serve is not a match for this caller.
+      if (await isProductInScope(supabase, auth.ctx, matches[0].product_id)) {
+        const { data: p } = await supabase.rpc('get_configured_product_price', {
+          p_workspace_id: workspaceId,
+          p_product_id: matches[0].product_id,
+          p_option_value_ids: [],
+          p_audience: 'buyer',
+        });
+        const net = (p as Record<string, unknown>)?.configured_price as number | null;
+        priced = {
+          product_id: matches[0].product_id,
+          name: matches[0].name,
+          price: net == null ? null : grossFromNet(net, vatRate),
+          currency: (p as Record<string, unknown>)?.currency ?? 'EUR',
+        };
+      }
+    }
+
+    return embedJson({
+      ok: true,
+      match_kind: priced ? 'exact' : (res?.match_kind === 'exact' ? 'none' : res?.match_kind ?? 'none'),
+      spec_facets: res?.spec_facets ?? 0,
+      // Present iff exact. Its absence IS the instruction to offer a quote.
+      product: priced,
+      near_matches: res?.near_matches ?? [],
+    }, 200, cors);
+  }
+
+  // ── #337 "request a quote" ───────────────────────────────────────────────────────────────────
+  //
+  // The only other write on this surface, and it creates a CRM contact, so it is gated harder than
+  // the analytics beacon: a bot gate BEFORE any row exists, and the workspace from the key.
+  if (action === 'request_quote') {
+    const name = String(params.name ?? '').trim();
+    const email = String(params.email ?? '').trim();
+    if (!name || !email) return embedJson({ error: 'name and email are required' }, 400, cors);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return embedJson({ error: 'that email address does not look right' }, 400, cors);
+    }
+
+    // Bot gate before ANY row is created — this endpoint mints a CRM contact and a request from an
+    // anonymous caller, which is exactly the shape finance-storefront had to protect.
+    const bot = await verifyTurnstile(supabase, params.turnstile_token, clientIp(req));
+    if (!bot.ok) return embedJson({ error: 'Bot check failed. Please try again.' }, 400, cors);
+
+    let spec: Record<string, unknown> = {};
+    try {
+      spec = typeof params.spec === 'string' ? JSON.parse(params.spec) : (params.spec ?? {});
+    } catch { /* a malformed spec must not lose the lead — record the request without it */ }
+
+    // Find-or-create the contact, the same way guest checkout does. The person asking is a CRM
+    // contact, not a platform user.
+    let contactId: string;
+    const { data: existing } = await supabase.from('crm_contacts')
+      .select('id').eq('workspace_id', workspaceId).ilike('email', email).limit(1);
+    if (existing && existing.length > 0) {
+      contactId = (existing[0] as { id: string }).id;
+    } else {
+      const { data: created, error: cErr } = await supabase.from('crm_contacts')
+        .insert({ workspace_id: workspaceId, name: name.slice(0, 200), email })
+        .select('id').single();
+      if (cErr || !created) return embedJson({ error: 'Could not record your request' }, 500, cors);
+      contactId = (created as { id: string }).id;
+    }
+
+    const { data: request, error: qErr } = await supabase.from('quote_requests').insert({
+      workspace_id: workspaceId,
+      user_id: null,
+      customer_contact_id: contactId,
+      source: 'embed',
+      status: 'pending',
+      items_count: 1,
+      // NO total_estimated. A request nobody has priced must not carry a number, or it anchors the
+      // negotiation on a figure that came from nowhere.
+      spec,
+      embed_key_id: auth.ctx.keyId,
+      notes: typeof params.message === 'string' ? params.message.slice(0, 1000) : null,
+    }).select('id').single();
+    if (qErr) return embedJson({ error: 'Could not record your request' }, 500, cors);
+
+    return embedJson({
+      ok: true,
+      quote_request_id: (request as { id: string }).id,
     }, 200, cors);
   }
 
