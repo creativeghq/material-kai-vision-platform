@@ -461,10 +461,13 @@ function createAgentGraph(
           // Collect products from search.
           //
           // visual_search joined this list once its non-aspect path moved to multi_vector,
-          // which returns the same product-shaped rows as material_search. Its ASPECT path
-          // does not — /api/search/by-<aspect> returns `{image_id, similarity_score}` with no
-          // product id or name — so the shape is checked rather than assumed. Mapping those
-          // would have produced a grid of "Unnamed Product" cards with undefined ids.
+          // which returns the same product-shaped rows as material_search.
+          //
+          // Shape-checked rather than name-checked, because the ASPECT path returns image
+          // rows: those now resolve to a product where an association exists, and carry only
+          // a caption and URL where none does. The check lets the former through as cards and
+          // leaves the latter for the agent to describe in prose — mapping them all would
+          // produce a grid of "Unnamed Product" tiles with undefined ids.
           const isProductShaped = Array.isArray(parsedResult.results)
             && parsedResult.results.some((r: any) => r?.id || r?.product_id || r?.product_name);
           if (['material_search', 'visual_search'].includes(toolCall.name) && isProductShaped) {
