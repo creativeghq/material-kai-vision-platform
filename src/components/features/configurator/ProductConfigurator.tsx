@@ -26,7 +26,7 @@ import { ProductModelStage } from '@/components/features/ar/ProductModelViewer';
 import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/CanvasChrome';
 import { product3dService, modelPublicUrl } from '@/services/product3dService';
 import {
-  productConfiguratorService, selectionToValueIds,
+  productConfiguratorService, selectionToValueIds, describeViolation,
   type OptionGroupWithValues, type ConfiguredPrice,
 } from '@/services/productConfiguratorService';
 
@@ -257,6 +257,18 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
           </div>
         ))}
 
+        {/* Rule violations (#260 Phase 2), as the SERVER evaluated them. There is no local rules
+            engine to disagree with it. */}
+        {price && price.violations?.length > 0 && (
+          <div className="space-y-1 rounded-md border border-destructive/40 bg-destructive/10 p-3">
+            {price.violations.map((v) => (
+              <p key={`${v.when_value_id}-${v.then_value_id}-${v.type}`} className="text-xs text-destructive">
+                {describeViolation(v)}
+              </p>
+            ))}
+          </div>
+        )}
+
         {/* An option whose target material is not in the model is an authoring mistake that
             otherwise looks like a working option that just does nothing. */}
         {unmatched.length > 0 && (
@@ -289,9 +301,15 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
           </div>
           <div className="flex items-center gap-2">
             {quotes.length > 0 && (
-              <Select value="" onValueChange={addToQuote} disabled={addingToQuote}>
+              // Disabled while a rule is violated. The database refuses the line anyway — the
+              // handoff re-checks violations from the same call that prices it — so this is the
+              // courtesy of not offering a button that cannot work, not the enforcement.
+              <Select value="" onValueChange={addToQuote} disabled={addingToQuote || price?.is_valid === false}>
                 <SelectTrigger className="w-[11rem] rounded-full">
-                  <SelectValue placeholder={addingToQuote ? 'Adding…' : 'Add to quote'} />
+                  <SelectValue placeholder={
+                    price?.is_valid === false ? 'Fix conflicts first'
+                      : addingToQuote ? 'Adding…' : 'Add to quote'
+                  } />
                 </SelectTrigger>
                 <SelectContent>
                   {quotes.map((q) => <SelectItem key={q.id} value={q.id}>{q.name}</SelectItem>)}

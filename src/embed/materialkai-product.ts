@@ -135,8 +135,11 @@ button:disabled { opacity:.5; cursor:default; }
 .swatch[aria-pressed="true"] { border-color:#1c1a1e; box-shadow:inset 0 0 0 1px #1c1a1e; }
 .dot { width:13px; height:13px; border-radius:50%; border:1px solid rgba(0,0,0,.18); }
 .delta { font-size:11px; color:#6b6560; }
+.violations { display:flex; flex-direction:column; gap:4px; padding-top:10px; }
+.violation { margin:0; font-size:12px; color:#a3341f; }
 @media (prefers-color-scheme: dark) {
   .optgroup > .optlabel, .delta { color:#a9a2ad; }
+  .violation { color:#f08a72; }
   .swatch { background:#2c2833; border-color:#3d3745; color:#f2eef2; }
   .swatch[aria-pressed="true"] { border-color:#f2eef2; box-shadow:inset 0 0 0 1px #f2eef2; }
 }
@@ -174,6 +177,15 @@ export class MaterialKaiProduct extends HTMLElement {
   private modelScene: import('three').Object3D | null = null;
   /** Rising counter so a slow price response cannot overwrite a newer one. */
   private priceRequest = 0;
+  /**
+   * Rule violations, as the SERVER evaluated them (#260 Phase 2).
+   *
+   * The widget has no rules engine. A local copy would eventually disagree with the one that
+   * prices the line, and the visitor would be told a combination is fine right up until the
+   * merchant's quote rejected it.
+   */
+  private violations: Array<{ type: string; when_label: string; then_label: string; note: string | null }> = [];
+  private violationsEl!: HTMLDivElement;
 
   constructor() {
     super();
@@ -224,7 +236,7 @@ export class MaterialKaiProduct extends HTMLElement {
     this.optionsEl.className = 'options';
     this.actionsEl = document.createElement('div');
     this.actionsEl.className = 'actions';
-    this.root.replaceChildren(style, this.frame, this.metaEl, this.optionsEl, this.actionsEl);
+    this.root.replaceChildren(style, this.frame, this.metaEl, this.optionsEl, this.violationsEl, this.actionsEl);
   }
 
   private fail(message: string) {
@@ -413,11 +425,34 @@ export class MaterialKaiProduct extends HTMLElement {
       if (res.ok && body?.configured_price != null) {
         this.product.price = body.configured_price;
       }
+      // Rule violations as the server evaluated them. No local rules engine exists to disagree.
+      this.violations = res.ok && Array.isArray(body?.violations) ? body.violations : [];
     } catch {
       // Leave the last known price rather than blanking it.
     } finally {
-      if (ticket === this.priceRequest) this.renderMeta();
+      if (ticket === this.priceRequest) {
+        this.renderMeta();
+        this.renderViolations();
+        this.renderActions();
+      }
     }
+  }
+
+  /** Show what the visitor has to change, in their words rather than the rules table's. */
+  private renderViolations() {
+    if (!this.violationsEl) return;
+    if (this.violations.length === 0) { this.violationsEl.replaceChildren(); return; }
+    const nodes = this.violations.map((v) => {
+      const p = document.createElement('p');
+      p.className = 'violation';
+      p.textContent = v.note
+        ? v.note
+        : v.type === 'excludes'
+          ? `${v.when_label} cannot be combined with ${v.then_label}`
+          : `${v.when_label} requires ${v.then_label}`;
+      return p;
+    });
+    this.violationsEl.replaceChildren(...nodes);
   }
 
   private showImageFallback() {
@@ -471,8 +506,12 @@ export class MaterialKaiProduct extends HTMLElement {
     if (this.hasAttribute('show-add-to-cart')) {
       const btn = document.createElement('button');
       btn.className = 'primary';
-      btn.textContent = 'Add to cart';
-      btn.addEventListener('click', () => this.emitAddToCart());
+      // A combination the merchant's own rules forbid must not be addable to a cart. The message
+      // above says what to change; a disabled button without it would just look broken.
+      const blocked = this.violations.length > 0;
+      btn.disabled = blocked;
+      btn.textContent = blocked ? 'Unavailable combination' : 'Add to cart';
+      if (!blocked) btn.addEventListener('click', () => this.emitAddToCart());
       nodes.push(btn);
     }
     this.actionsEl.replaceChildren(...nodes);

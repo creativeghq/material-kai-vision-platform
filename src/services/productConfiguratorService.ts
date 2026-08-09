@@ -48,6 +48,32 @@ export interface ConfiguredPrice {
    */
   options_requested: number;
   options_applied: number;
+  /**
+   * Rule violations for this selection (#260 Phase 2), evaluated in the SAME call that produced
+   * the price so the two can never be fetched out of step.
+   *
+   * There is no client-side rules engine on purpose: a second implementation would eventually
+   * disagree, and then the configurator shows a combination as valid that the quote rejects.
+   */
+  violations: OptionViolation[];
+  is_valid: boolean;
+}
+
+export interface OptionViolation {
+  type: 'excludes' | 'requires';
+  when_value_id: string;
+  when_label: string;
+  then_value_id: string;
+  then_label: string;
+  note: string | null;
+}
+
+/** One violation, phrased for a person rather than a rules table. */
+export function describeViolation(v: OptionViolation): string {
+  if (v.note) return v.note;
+  return v.type === 'excludes'
+    ? `${v.when_label} cannot be combined with ${v.then_label}`
+    : `${v.when_label} requires ${v.then_label}`;
 }
 
 /** The visual part of a choice, applied to a glTF material by name. */
@@ -59,6 +85,44 @@ export interface MaterialOverride {
 }
 
 export const productConfiguratorService = {
+  /** Compatibility rules for a product, with both sides' labels resolved for display. */
+  async listRules(productId: string): Promise<Array<{
+    id: string; rule_type: 'excludes' | 'requires';
+    when_value_id: string; then_value_id: string; note: string | null;
+  }>> {
+    const { data, error } = await supabase
+      .from('product_option_rules')
+      .select('id, rule_type, when_value_id, then_value_id, note')
+      .eq('product_id', productId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as never;
+  },
+
+  async addRule(
+    workspaceId: string,
+    productId: string,
+    ruleType: 'excludes' | 'requires',
+    whenValueId: string,
+    thenValueId: string,
+  ): Promise<void> {
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase.from('product_option_rules').insert({
+      workspace_id: workspaceId,
+      product_id: productId,
+      rule_type: ruleType,
+      when_value_id: whenValueId,
+      then_value_id: thenValueId,
+      created_by: auth.user?.id ?? null,
+    });
+    if (error) throw error;
+  },
+
+  async removeRule(id: string): Promise<void> {
+    const { error } = await supabase.from('product_option_rules').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   /** Option groups for a product, each with its values, in author-defined order. */
   async listOptions(productId: string): Promise<OptionGroupWithValues[]> {
     const { data: groups, error: gErr } = await supabase

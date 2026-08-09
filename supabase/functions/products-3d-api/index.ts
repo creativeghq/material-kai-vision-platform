@@ -457,6 +457,11 @@ Deno.serve(withApiLogging((req) => {
       currency: (p?.currency as string) ?? 'EUR',
       options_applied: p?.options_applied ?? 0,
       options_requested: p?.options_requested ?? 0,
+      // Rule violations (#260 Phase 2), evaluated by the same call that priced it. The widget has
+      // no rules engine of its own — a second implementation would eventually disagree with the
+      // quote the merchant's customer ends up signing.
+      violations: p?.violations ?? [],
+      is_valid: p?.is_valid ?? true,
     }, 200, cors);
   }
 

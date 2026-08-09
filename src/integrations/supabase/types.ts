@@ -19157,6 +19157,42 @@ export type Database = {
         }
         Relationships: []
       }
+      product_option_rules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          product_id: string
+          rule_type: string
+          then_value_id: string
+          when_value_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          product_id: string
+          rule_type: string
+          then_value_id: string
+          when_value_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          product_id?: string
+          rule_type?: string
+          then_value_id?: string
+          when_value_id?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       product_option_values: {
         Row: {
           base_color_hex: string | null

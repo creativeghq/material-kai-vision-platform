@@ -10,7 +10,7 @@
  * nothing, with no error anywhere. The runtime still warns after the fact (`unmatchedTargets`), but
  * preventing it at authoring time is better than reporting it afterwards.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Plus, Trash2, Loader2, Palette } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,12 +50,34 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
   const [busy, setBusy] = useState(false);
 
   const [newGroup, setNewGroup] = useState({ label: '', target: '' });
+  const [rules, setRules] = useState<Array<{
+    id: string; rule_type: 'excludes' | 'requires';
+    when_value_id: string; then_value_id: string; note: string | null;
+  }>>([]);
+  const [newRule, setNewRule] = useState<{ when: string; then: string; type: 'excludes' | 'requires' }>(
+    { when: '', then: '', type: 'excludes' },
+  );
+
+  /** Every choice across every group, which is the space a rule relates. */
+  const allValues = useMemo(
+    () => groups.flatMap((g) => g.values.map((v) => ({ id: v.id, label: `${g.label}: ${v.label}` }))),
+    [groups],
+  );
+  const labelFor = useCallback(
+    (valueId: string) => allValues.find((v) => v.id === valueId)?.label ?? 'a removed choice',
+    [allValues],
+  );
   const [newValue, setNewValue] = useState<Record<string, { label: string; color: string; delta: string }>>({});
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      setGroups(await productConfiguratorService.listOptions(productId));
+      const [g, r] = await Promise.all([
+        productConfiguratorService.listOptions(productId),
+        productConfiguratorService.listRules(productId),
+      ]);
+      setGroups(g);
+      setRules(r);
     } catch (err) {
       toast({
         title: 'Could not load options',
@@ -154,6 +176,41 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
     try {
       const { error } = await supabase.from('product_option_groups').delete().eq('id', id);
       if (error) throw error;
+      changed();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addRule = async () => {
+    if (!newRule.when || !newRule.then) return;
+    setBusy(true);
+    try {
+      await productConfiguratorService.addRule(
+        workspaceId, productId, newRule.type, newRule.when, newRule.then,
+      );
+      setNewRule({ when: '', then: '', type: 'excludes' });
+      changed();
+    } catch (err) {
+      toast({
+        title: 'Could not add the rule',
+        // The UNIQUE and self-reference constraints are the likely failures and read as gibberish.
+        description: /duplicate key/i.test(String(err))
+          ? 'That rule already exists.'
+          : /not_self/i.test(String(err))
+            ? 'A choice cannot rule out or require itself.'
+            : err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeRule = async (id: string) => {
+    setBusy(true);
+    try {
+      await productConfiguratorService.removeRule(id);
       changed();
     } finally {
       setBusy(false);
@@ -269,6 +326,75 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
               </div>
             </div>
           ))
+        )}
+
+        {/* Compatibility rules (#260 Phase 2). Only meaningful once there are at least two choices
+            to relate, so the whole section stays hidden until then rather than presenting empty
+            dropdowns. */}
+        {allValues.length >= 2 && (
+          <div className="space-y-3 border-t border-border/60 pt-4">
+            <div>
+              <p className="text-sm font-medium">Compatibility</p>
+              <p className="text-xs text-muted-foreground">
+                Combinations that are not available, and choices that depend on another. Checked
+                server-side — a blocked combination cannot reach a quote.
+              </p>
+            </div>
+
+            {rules.length > 0 && (
+              <ul className="space-y-1">
+                {rules.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
+                    <span>
+                      <strong>{labelFor(r.when_value_id)}</strong>
+                      {r.rule_type === 'excludes' ? ' cannot be combined with ' : ' requires '}
+                      <strong>{labelFor(r.then_value_id)}</strong>
+                    </span>
+                    <button type="button" onClick={() => removeRule(r.id)} disabled={busy}
+                      aria-label="Remove rule"
+                      className="shrink-0 text-muted-foreground hover:text-destructive">×</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[9rem] flex-1">
+                <Label className="text-xs">When</Label>
+                <Select value={newRule.when} onValueChange={(v) => setNewRule((r) => ({ ...r, when: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Choice" /></SelectTrigger>
+                  <SelectContent>
+                    {allValues.map((v) => <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-[10rem]">
+                <Label className="text-xs">Then</Label>
+                <Select value={newRule.type}
+                  onValueChange={(v) => setNewRule((r) => ({ ...r, type: v as 'excludes' | 'requires' }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="excludes">rules out</SelectItem>
+                    <SelectItem value="requires">requires</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="min-w-[9rem] flex-1">
+                <Label className="text-xs">&nbsp;</Label>
+                <Select value={newRule.then} onValueChange={(v) => setNewRule((r) => ({ ...r, then: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Choice" /></SelectTrigger>
+                  <SelectContent>
+                    {allValues.filter((v) => v.id !== newRule.when)
+                      .map((v) => <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button size="sm" variant="outline" className="rounded-full"
+                onClick={addRule} disabled={busy || !newRule.when || !newRule.then}>
+                <Plus className="mr-1 h-3.5 w-3.5" />Add rule
+              </Button>
+            </div>
+          </div>
         )}
 
         <div className="flex flex-wrap items-end gap-2 border-t border-border/60 pt-4">
