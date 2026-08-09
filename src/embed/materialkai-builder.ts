@@ -369,7 +369,13 @@ export class MaterialKaiBuilder extends HTMLElement {
       const res = await fetch(this.url('visualize'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spec: this.spec }),
+        body: JSON.stringify({
+          spec: this.spec,
+          // The NOUN. Without it the generator has only adjectives to work with and draws
+          // "something, in sunset" — which it did: a gold cylinder. A picture is only worth
+          // generating once the model knows what the thing is.
+          item_name: this.spec.product_type ?? 'product',
+        }),
       });
       const body = await res.json();
       if (body?.available && typeof body.image_url === 'string') {

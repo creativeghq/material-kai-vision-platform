@@ -156,6 +156,12 @@ describe('the embed builder always offers a way forward', () => {
     expect(see.indexOf("'resolve'")).toBeLessThan(see.indexOf('this.visualize()'));
   });
 
+  it('the generator is told WHAT the thing is, not only what colour it is', () => {
+    // With adjectives alone the model draws "something, in sunset" — it drew a gold cylinder. The
+    // noun comes from stage 1's `product_type`, which is why that stage exists.
+    expect(method('visualize')).toMatch(/item_name:\s*this\.spec\.product_type/);
+  });
+
   it('the viewport falls back to a generated image, clearly labelled as one', () => {
     // A spec the catalog cannot satisfy has no photograph, because the thing does not exist. An
     // unlabelled AI picture of it is a promise the merchant cannot keep.
