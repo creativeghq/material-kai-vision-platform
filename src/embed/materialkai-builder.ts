@@ -15,7 +15,6 @@
  * NOTHING IS PRICED LOCALLY. The widget sends the spec and renders whatever the server says. It
  * cannot compute a price even in principle: it has no catalog, and it must not appear to have one.
  */
-import { formatMoney } from '@/utils/decimal';
 
 interface SpecValue { value: string; in_catalog: boolean }
 interface SpecFacet { facet_key: string; label: string; in_catalog_count: number; values: SpecValue[] }
@@ -75,7 +74,11 @@ const STYLE = `
 .viewport { position:relative; width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden;
             background:#f4f2ef; margin-bottom:14px; }
 .viewport img { width:100%; height:100%; object-fit:contain; display:block; }
-.viewport materialkai-product { display:block; width:100%; height:100%; }
+/* A matched product is not a picture — it is the whole product widget, with its finishes and its
+   cart button. Squeezed into the square frame those sit below the clip and the visitor gets a
+   model they cannot configure or buy, which is the one thing an exact match is FOR. */
+.viewport[data-mode="product"] { aspect-ratio:auto; overflow:visible; background:transparent; }
+.viewport materialkai-product { display:block; width:100%; }
 .genTag { position:absolute; left:8px; bottom:8px; font-size:11px; padding:3px 8px; border-radius:999px;
           background:rgba(28,26,30,.72); color:#fff; }
 .vEmpty { position:absolute; inset:0; display:grid; place-items:center; font-size:13px; color:#8b857f; }
@@ -308,6 +311,7 @@ export class MaterialKaiBuilder extends HTMLElement {
     frame.className = 'viewport';
 
     if (this.matchedProductId) {
+      frame.dataset.mode = 'product';
       this.mountProduct(frame, this.matchedProductId);
       return frame;
     }
@@ -468,24 +472,17 @@ export class MaterialKaiBuilder extends HTMLElement {
     if (!r) return;
 
     if (r.match_kind === 'exact' && r.product) {
+      // The product widget in the viewport above IS the answer: it carries the name, the price, the
+      // finishes and the cart button. This branch adds only the sentence that explains why it is
+      // there.
+      //
+      // It deliberately prints NO price of its own. `resolve` returns the base price while the
+      // widget shows the CONFIGURED one, so rendering both would put two numbers from two
+      // derivations on screen at the same time, free to disagree the moment a finish is picked —
+      // the money rule (one derivation per quantity) arriving as a UI bug instead of a SQL one.
       const h = document.createElement('h3');
       h.textContent = 'We have exactly that';
-      host.appendChild(h);
-      const card = document.createElement('div');
-      card.className = 'card';
-      const nm = document.createElement('div');
-      nm.className = 'name';
-      nm.textContent = r.product.name;
-      const pr = document.createElement('div');
-      pr.className = 'price';
-      pr.textContent = r.product.price != null
-        ? formatMoney(r.product.price, r.product.currency)
-        : 'Price on request';
-      // The product itself is already at the top of the card, in the viewport — the name and price
-      // belong beside it, not next to a second copy of the same model further down.
-      card.append(nm, pr);
-      host.appendChild(card);
-      host.appendChild(this.backRow());
+      host.append(h, this.backRow());
       return;
     }
 

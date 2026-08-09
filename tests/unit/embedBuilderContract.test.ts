@@ -44,23 +44,15 @@ describe('the embed builder prices only exact matches', () => {
     expect(renderResult.length).toBeGreaterThan(400);
   });
 
-  it('every formatMoney call sits inside the exact-match branch', () => {
-    const exactStart = renderResult.indexOf("match_kind === 'exact'");
-    expect(exactStart, 'no exact-match branch').toBeGreaterThan(-1);
-    // The branch ends at its early return — everything after it is the near/none path.
-    const exactEnd = renderResult.indexOf('return;', exactStart);
-    expect(exactEnd, 'the exact branch does not return early').toBeGreaterThan(exactStart);
-
-    const calls = [...renderResult.matchAll(/formatMoney\s*\(/g)].map((m) => m.index!);
-    expect(calls.length, 'no price is rendered at all — did the exact branch lose its price?')
-      .toBeGreaterThan(0);
-
-    const outside = calls.filter((i) => i < exactStart || i > exactEnd);
-    expect(
-      outside.length,
-      'a price is formatted outside the exact-match branch. Near matches and no-match specs carry '
-      + 'no price from the server, so any number here was invented by the widget.',
-    ).toBe(0);
+  it('formats no money at all — the product widget is the only thing on screen that prices', () => {
+    // Stronger than "only price exact matches", and it replaced that rule for a concrete reason.
+    // `resolve` returns the BASE price while the mounted product widget shows the CONFIGURED one.
+    // Printing both put two numbers from two derivations on screen at once, free to disagree the
+    // instant a finish was picked — the money rule (one derivation per quantity) arriving as a UI
+    // bug rather than a SQL one. So the builder delegates the number entirely.
+    expect(SRC, 'the builder must not format money itself').not.toContain('formatMoney');
+    expect(renderResult, 'the exact branch must delegate the price to the product widget')
+      .not.toMatch(/\.price\s*=/);
   });
 
   it('the near-match list renders no price field', () => {
@@ -68,7 +60,15 @@ describe('the embed builder prices only exact matches', () => {
     expect(nearStart).toBeGreaterThan(-1);
     const near = renderResult.slice(nearStart);
     expect(near, 'near matches must not show a price').not.toMatch(/\.price\b/);
-    expect(near).not.toContain('formatMoney');
+  });
+
+  it('a matched product is given room for its finishes and its cart button', () => {
+    // The viewport is a square clipped frame, which is right for a picture and wrong for the
+    // product widget: its options and Add to cart sit below the clip, so the visitor gets a model
+    // they cannot configure or buy — the one thing an exact match exists to give them.
+    expect(method('renderViewport')).toMatch(/dataset\.mode = 'product'/);
+    expect(SRC).toMatch(/\.viewport\[data-mode="product"\][^}]*aspect-ratio:\s*auto/);
+    expect(SRC).toMatch(/\.viewport\[data-mode="product"\][^}]*overflow:\s*visible/);
   });
 
   it('does no arithmetic on money anywhere in the builder', () => {
