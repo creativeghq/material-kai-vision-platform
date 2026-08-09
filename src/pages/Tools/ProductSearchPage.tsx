@@ -17,6 +17,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { TurnstileWidget, type TurnstileHandle } from '@/components/features/turnstile/TurnstileWidget';
 import { PublicToolsApiError, productSearch, type PublicProductSearchResponse } from '@/services/publicToolsService';
+import { formatNumber } from '@/utils/decimal';
 import {
   ProductResultsCard,
   QuotaBadge,
@@ -181,7 +182,7 @@ export default function ProductSearchPage() {
             )}
             {quota && isAuthenticated && balance != null && (
               <p className="text-xs text-muted-foreground">
-                {balance.toLocaleString()} credits available · each search costs {creditsPerScan} credit{creditsPerScan === 1 ? '' : 's'}. Identical queries within 24 hours are served instantly and don't debit.
+                {formatNumber(balance)} credits available · each search costs {creditsPerScan} credit{creditsPerScan === 1 ? '' : 's'}. Identical queries within 24 hours are served instantly and don't debit.
               </p>
             )}
           </CardContent>

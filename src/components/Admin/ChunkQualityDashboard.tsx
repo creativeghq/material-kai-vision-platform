@@ -22,6 +22,7 @@ import {
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 interface ChunkQualityMetrics {
   total_chunks: number;
@@ -192,7 +193,7 @@ export const ChunkQualityDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {metrics?.total_chunks.toLocaleString() || 0}
+              {formatNumber(metrics?.total_chunks) || 0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Across {metrics?.total_documents || 0} documents
@@ -229,7 +230,7 @@ export const ChunkQualityDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {totalDuplicatesPrevented.toLocaleString()}
+              {formatNumber(totalDuplicatesPrevented)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Exact content match (MD5)

@@ -32,6 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { supabase } from '@/integrations/supabase/client';
 import { useModule } from '@/modules/_core';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#84cc16'];
 
@@ -1054,8 +1055,8 @@ export function PlatformOverviewTab() {
       {/* ─── 3. Credit Economy & AI Costs ───────────────────────── */}
       <SectionHeader title="Credit Economy & AI Costs" desc="Credit consumption patterns, AI model spend, operation breakdown, and user balance health" icon={DollarSign} />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Credits Consumed (12w)" value={creditStats.totalConsumed.toLocaleString()} icon={DollarSign} color="text-red-500" />
-        <KpiCard label="Credits Earned (12w)" value={creditStats.totalEarned.toLocaleString()} icon={TrendingUp} color="text-green-600" />
+        <KpiCard label="Credits Consumed (12w)" value={formatNumber(creditStats.totalConsumed)} icon={DollarSign} color="text-red-500" />
+        <KpiCard label="Credits Earned (12w)" value={formatNumber(creditStats.totalEarned)} icon={TrendingUp} color="text-green-600" />
         <KpiCard label="AI Cost (12w)" value={`$${creditKpis2.totalCostUsd.toFixed(2)}`} icon={Cpu} color="text-violet-600" />
         <KpiCard label="AI Active Users" value={creditKpis2.uniqueUsers} icon={Users} color="text-cyan-600" />
       </div>
@@ -1143,7 +1144,7 @@ export function PlatformOverviewTab() {
             {topCreditConsumers.length === 0 ? <EmptyState message="No usage data yet" /> : (
               <div className="overflow-auto max-h-[220px]">
                 <table className="w-full text-sm"><thead className="sticky top-0 bg-muted/50 border-b border-border/50"><tr className="border-b text-xs text-muted-foreground"><th className="text-left py-2 pr-4 font-medium">#</th><th className="text-left py-2 pr-4 font-medium">User ID</th><th className="text-right py-2 pr-4 font-medium">Credits</th><th className="text-right py-2 font-medium">Top Op</th></tr></thead>
-                  <tbody>{topCreditConsumers.map((row, i) => (<tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors"><td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td><td className="py-2 pr-4 font-mono text-xs">…{row.userId}</td><td className="py-2 pr-4 text-right tabular-nums text-primary font-semibold">{row.credits.toLocaleString()}</td><td className="py-2 text-right text-xs text-muted-foreground">{row.topOp}</td></tr>))}</tbody>
+                  <tbody>{topCreditConsumers.map((row, i) => (<tr key={i} className="border-b last:border-0 hover:bg-muted/40 transition-colors"><td className="py-2 pr-4 text-xs text-muted-foreground">{i + 1}</td><td className="py-2 pr-4 font-mono text-xs">…{row.userId}</td><td className="py-2 pr-4 text-right tabular-nums text-primary font-semibold">{formatNumber(row.credits)}</td><td className="py-2 text-right text-xs text-muted-foreground">{row.topOp}</td></tr>))}</tbody>
                 </table>
               </div>
             )}
@@ -1155,7 +1156,7 @@ export function PlatformOverviewTab() {
       <SectionHeader title="VR Worlds & 3D Generation" desc="WorldLabs VR world generation, Design Canvas 3D jobs, and segment analysis" icon={Layers} />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiCard label="VR Worlds (12w)" value={featureKpis.vrWorldsGenerated} icon={Eye} color="text-violet-600" />
-        <KpiCard label="VR Credits Used" value={vrTotalCredits.toLocaleString()} icon={DollarSign} color="text-amber-500" />
+        <KpiCard label="VR Credits Used" value={formatNumber(vrTotalCredits)} icon={DollarSign} color="text-amber-500" />
         <KpiCard label="3D Jobs (12w)" value={canvasKpis.gen3dJobs} icon={Layers} color="text-cyan-600" />
         <KpiCard label="Segments (12w)" value={canvasKpis.gen3dSegments} icon={Target} color="text-green-600" />
       </div>
@@ -1361,7 +1362,7 @@ export function PlatformOverviewTab() {
       {/* ─── 6. Community & Studio Workflow ────────────────────────── */}
       <SectionHeader title="Community & Studio Workflow" desc="Follow network growth, review sentiment, hire me conversions, moodboard activity, and project pipeline" icon={Users} />
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <KpiCard label="Total Follows" value={totalFollowers.toLocaleString()} icon={Users} color="text-violet-600" />
+        <KpiCard label="Total Follows" value={formatNumber(totalFollowers)} icon={Users} color="text-violet-600" />
         <KpiCard label="Reviews (12w)" value={reviewKpis.total} icon={Star} color="text-amber-500" sub={reviewKpis.avgRating !== '—' ? `avg ${reviewKpis.avgRating}★` : undefined} />
         <KpiCard label="Hire Me (12w)" value={kpis.hireTotal} icon={Award} color="text-cyan-600" />
         <KpiCard label="Moodboards (12w)" value={featureKpis.moodboardsCreated} icon={Package} color="text-green-600" />
@@ -1592,10 +1593,10 @@ export function PlatformOverviewTab() {
       {/* ─── 8. Content & Knowledge Base Health ─────────────────── */}
       <SectionHeader title="Content & Knowledge Base Health" desc="KB document status, embedding coverage, category distribution, and top viewed articles" icon={Database} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard label="Total KB Docs" value={kbKpis.totalDocs.toLocaleString()} icon={FileText} color="text-cyan-600" />
-        <KpiCard label="Published Docs" value={kbKpis.publishedDocs.toLocaleString()} icon={FileText} color="text-green-600" />
+        <KpiCard label="Total KB Docs" value={formatNumber(kbKpis.totalDocs)} icon={FileText} color="text-cyan-600" />
+        <KpiCard label="Published Docs" value={formatNumber(kbKpis.publishedDocs)} icon={FileText} color="text-green-600" />
         <KpiCard label="Embedding Success" value={kbKpis.embeddingSuccessRate} icon={Database} color="text-violet-600" sub="docs with embeddings" />
-        <KpiCard label="RAG Chunks (12w)" value={kbKpis.totalChunks.toLocaleString()} icon={Database} color="text-indigo-600" sub="new chunks indexed" />
+        <KpiCard label="RAG Chunks (12w)" value={formatNumber(kbKpis.totalChunks)} icon={Database} color="text-indigo-600" sub="new chunks indexed" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="rounded-2xl">
@@ -1718,10 +1719,10 @@ export function PlatformOverviewTab() {
             icon={ShoppingCart}
           />
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <KpiCard label="Price Refreshes (12w)" value={pricingKpis.refreshes12w.toLocaleString()} icon={TrendingUp} />
-            <KpiCard label="Marketplace Hits (12w)" value={pricingKpis.marketplaceHits12w.toLocaleString()} icon={ShoppingCart} color="text-emerald-600" />
+            <KpiCard label="Price Refreshes (12w)" value={formatNumber(pricingKpis.refreshes12w)} icon={TrendingUp} />
+            <KpiCard label="Marketplace Hits (12w)" value={formatNumber(pricingKpis.marketplaceHits12w)} icon={ShoppingCart} color="text-emerald-600" />
             <KpiCard label="Module Credits (12w)" value={pricingKpis.moduleCredits12w.toFixed(2)} icon={DollarSign} color="text-amber-500" />
-            <KpiCard label="Active Tracked Queries" value={pricingKpis.trackedQueries.toLocaleString()} icon={CheckCircle2} color="text-violet-600" />
+            <KpiCard label="Active Tracked Queries" value={formatNumber(pricingKpis.trackedQueries)} icon={CheckCircle2} color="text-violet-600" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
@@ -1797,11 +1798,11 @@ export function PlatformOverviewTab() {
       {/* ─── 11. Notifications & Messaging ──────────────────────── */}
       <SectionHeader title="Notifications & Messaging" desc="All-time sends across Email, SMS, Web Push, and In-App notification channels" icon={Bell} />
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <KpiCard label="Total Sent (12w)" value={notifKpis.totalSent.toLocaleString()} icon={Bell} />
-        <KpiCard label="Email" value={notifKpis.email.toLocaleString()} icon={Mail} color="text-blue-600" />
-        <KpiCard label="SMS / WhatsApp" value={notifKpis.sms.toLocaleString()} icon={MessageSquare} color="text-green-600" />
-        <KpiCard label="Web Push" value={notifKpis.webPush.toLocaleString()} icon={Monitor} color="text-violet-600" />
-        <KpiCard label="In-App" value={notifKpis.inApp.toLocaleString()} icon={Bell} color="text-amber-500" />
+        <KpiCard label="Total Sent (12w)" value={formatNumber(notifKpis.totalSent)} icon={Bell} />
+        <KpiCard label="Email" value={formatNumber(notifKpis.email)} icon={Mail} color="text-blue-600" />
+        <KpiCard label="SMS / WhatsApp" value={formatNumber(notifKpis.sms)} icon={MessageSquare} color="text-green-600" />
+        <KpiCard label="Web Push" value={formatNumber(notifKpis.webPush)} icon={Monitor} color="text-violet-600" />
+        <KpiCard label="In-App" value={formatNumber(notifKpis.inApp)} icon={Bell} color="text-amber-500" />
       </div>
       {notifTrend.some(w => w.email + w.sms + w.web + w.inapp > 0) ? (
         <Card className="rounded-2xl">

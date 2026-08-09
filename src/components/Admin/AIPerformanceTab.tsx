@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
 import type { AIUsageLog, InteriorDesignStats } from './OperationsDashboard/types';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatNumber } from '@/utils/decimal';
 
 interface ModelUsageRow {
   model_name: string;
@@ -201,7 +202,7 @@ export const AIPerformanceTab: React.FC = () => {
             <div>
               <div className="text-sm text-muted-foreground font-medium">Total Tokens</div>
               <div className="text-2xl font-bold text-foreground">
-                {aiUsageLogs.reduce((sum, log) => sum + (Number(log.input_tokens) || 0) + (Number(log.output_tokens) || 0), 0).toLocaleString()}
+                {formatNumber(aiUsageLogs.reduce((sum, log) => sum + (Number(log.input_tokens) || 0) + (Number(log.output_tokens) || 0), 0))}
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 Input + Output tokens
@@ -333,13 +334,13 @@ export const AIPerformanceTab: React.FC = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {model.call_count.toLocaleString()}
+                      {formatNumber(model.call_count)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm text-blue-600">
-                      {model.input_tokens ? model.input_tokens.toLocaleString() : '0'}
+                      {model.input_tokens ? formatNumber(model.input_tokens) : '0'}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm text-green-600">
-                      {model.output_tokens ? model.output_tokens.toLocaleString() : '0'}
+                      {model.output_tokens ? formatNumber(model.output_tokens) : '0'}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm font-semibold">
                       ${model.total_cost.toFixed(4)}

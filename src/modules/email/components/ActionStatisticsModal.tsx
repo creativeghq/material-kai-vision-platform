@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/c
 import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { formatNumber } from '@/utils/decimal';
 
 interface EmailAction {
   id: string;
@@ -135,7 +136,7 @@ export const ActionStatisticsModal: React.FC<ActionStatisticsModalProps> = ({
                   <Mail className="h-4 w-4 text-blue-500" />
                   <span className="text-sm font-medium">Total Sent</span>
                 </div>
-                <p className="text-2xl font-bold">{statistics.totalSent.toLocaleString()}</p>
+                <p className="text-2xl font-bold">{formatNumber(statistics.totalSent)}</p>
               </div>
 
               <div className="p-4 rounded-lg border bg-card">
@@ -143,7 +144,7 @@ export const ActionStatisticsModal: React.FC<ActionStatisticsModalProps> = ({
                   <CheckCircle className="h-4 w-4 text-green-500" />
                   <span className="text-sm font-medium">Delivered</span>
                 </div>
-                <p className="text-2xl font-bold">{statistics.totalDelivered.toLocaleString()}</p>
+                <p className="text-2xl font-bold">{formatNumber(statistics.totalDelivered)}</p>
                 <p className="text-xs text-muted-foreground">{statistics.deliveryRate.toFixed(1)}%</p>
               </div>
 
@@ -152,7 +153,7 @@ export const ActionStatisticsModal: React.FC<ActionStatisticsModalProps> = ({
                   <Eye className="h-4 w-4 text-purple-500" />
                   <span className="text-sm font-medium">Opened</span>
                 </div>
-                <p className="text-2xl font-bold">{statistics.totalOpened.toLocaleString()}</p>
+                <p className="text-2xl font-bold">{formatNumber(statistics.totalOpened)}</p>
                 <p className="text-xs text-muted-foreground">{statistics.openRate.toFixed(1)}%</p>
               </div>
 
@@ -161,7 +162,7 @@ export const ActionStatisticsModal: React.FC<ActionStatisticsModalProps> = ({
                   <XCircle className="h-4 w-4 text-red-500" />
                   <span className="text-sm font-medium">Bounced</span>
                 </div>
-                <p className="text-2xl font-bold">{statistics.totalBounced.toLocaleString()}</p>
+                <p className="text-2xl font-bold">{formatNumber(statistics.totalBounced)}</p>
                 <p className="text-xs text-muted-foreground">{statistics.bounceRate.toFixed(1)}%</p>
               </div>
 
@@ -170,7 +171,7 @@ export const ActionStatisticsModal: React.FC<ActionStatisticsModalProps> = ({
                   <AlertTriangle className="h-4 w-4 text-yellow-500" />
                   <span className="text-sm font-medium">Complaints</span>
                 </div>
-                <p className="text-2xl font-bold">{statistics.totalComplained.toLocaleString()}</p>
+                <p className="text-2xl font-bold">{formatNumber(statistics.totalComplained)}</p>
                 <p className="text-xs text-muted-foreground">{statistics.complaintRate.toFixed(1)}%</p>
               </div>
 
@@ -179,7 +180,7 @@ export const ActionStatisticsModal: React.FC<ActionStatisticsModalProps> = ({
                   <CheckCircle className="h-4 w-4 text-indigo-500" />
                   <span className="text-sm font-medium">Clicked</span>
                 </div>
-                <p className="text-2xl font-bold">{statistics.totalClicked.toLocaleString()}</p>
+                <p className="text-2xl font-bold">{formatNumber(statistics.totalClicked)}</p>
                 <p className="text-xs text-muted-foreground">{statistics.clickRate.toFixed(1)}%</p>
               </div>
             </div>

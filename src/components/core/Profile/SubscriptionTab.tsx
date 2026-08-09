@@ -15,6 +15,7 @@ import { ChangelogList } from './ChangelogList';
 import { ApplyForRoleCard } from './ApplyForRoleCard';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 const stripeService = new StripeService();
 
@@ -265,7 +266,7 @@ export const SubscriptionTab: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm font-semibold text-primary">{tier.monthlyCredits.toLocaleString()} credits/month</p>
+              <p className="text-sm font-semibold text-primary">{formatNumber(tier.monthlyCredits)} credits/month</p>
               <ul className="space-y-2">
                 {tier.features.map((feature, index) => (
                   <li key={index} className="flex items-start gap-2 text-sm">

@@ -5,6 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { stockService, type StockOverview, type StockValuation, type LowStockItem } from '../services/stockService';
+import { formatNumber } from '@/utils/decimal';
 
 const fmtMoney = (n: number, ccy?: string) => {
   const sym = ccy === 'USD' ? '$' : ccy === 'GBP' ? '£' : '€';
@@ -84,8 +85,8 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
         <KPI icon={Coins} label={`Stock value${ov.items_missing_cost > 0 ? ` · ${ov.items_missing_cost} missing cost` : ''}`} value={fmtMoney(ov.total_value, val?.currencies?.[0])} />
         <KPI icon={Package} label="Stock items" value={ov.items} />
         <KPI icon={WarehouseIcon} label="Warehouses" value={ov.warehouses} />
-        <KPI icon={PackageCheck} label="Units on hand" value={Number(ov.total_on_hand).toLocaleString()} />
-        <KPI icon={ArrowLeftRight} label="Units reserved" value={Number(ov.total_reserved).toLocaleString()} />
+        <KPI icon={PackageCheck} label="Units on hand" value={formatNumber(Number(ov.total_on_hand))} />
+        <KPI icon={ArrowLeftRight} label="Units reserved" value={formatNumber(Number(ov.total_reserved))} />
         <KPI icon={AlertTriangle} label="Low stock" value={ov.low_stock} tone={ov.low_stock > 0 ? 'amber' : 'default'} />
         <KPI icon={PackageX} label="Out of stock" value={ov.out_of_stock} tone={ov.out_of_stock > 0 ? 'red' : 'default'} />
         <KPI icon={Inbox} label="Pending intake" value={ov.pending_intake} tone={ov.pending_intake > 0 ? 'amber' : 'default'} />

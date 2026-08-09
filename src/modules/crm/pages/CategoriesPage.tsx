@@ -27,6 +27,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { CRM_CATEGORY_FILTERS } from './crmCategoryFilters';
+import { formatNumber } from '@/utils/decimal';
 
 const KIND_LABELS: Record<CrmCategoryKind, string> = {
   professional_type: 'Professional type',
@@ -413,7 +414,7 @@ const MiniStat: React.FC<{
   <Card className="dashboard-card">
     <CardContent className="p-3 flex flex-col gap-1">
       <div className="text-xs text-muted-foreground flex items-center gap-1"><Icon className="h-3 w-3" /> {label}</div>
-      <div className="text-2xl font-light">{value.toLocaleString()}</div>
+      <div className="text-2xl font-light">{formatNumber(value)}</div>
     </CardContent>
   </Card>
 );

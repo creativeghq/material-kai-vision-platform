@@ -19,6 +19,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 import {
   COLORS, KpiCard, SectionHeader, EmptyState, LifecycleBadge,
   getMomentum, prettifyKey, getLifecycle, formatProfType,
@@ -961,8 +962,8 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           </>
         ) : factoryKpis ? (
           <>
-            <KpiCard label="Your Moodboard Saves" value={factoryKpis.saves} sub={`Platform total: ${platformTotals.saves.toLocaleString()}`} icon={Star} color="text-violet-600" />
-            <KpiCard label="Your Quote Requests" value={factoryKpis.quotes} sub={`Platform total: ${platformTotals.quotes.toLocaleString()}`} icon={Target} color="text-cyan-600" />
+            <KpiCard label="Your Moodboard Saves" value={factoryKpis.saves} sub={`Platform total: ${formatNumber(platformTotals.saves)}`} icon={Star} color="text-violet-600" />
+            <KpiCard label="Your Quote Requests" value={factoryKpis.quotes} sub={`Platform total: ${formatNumber(platformTotals.quotes)}`} icon={Target} color="text-cyan-600" />
             <KpiCard label="Your Conv. Rate" value={factoryKpis.convRate} sub={`Platform avg: ${factoryKpis.platformConvRate}`} icon={TrendingUp} color="text-green-600" />
             <KpiCard label="Platform Top Category" value={kpis.topCategory} icon={Package} color="text-amber-500" />
             <KpiCard label="Platform #1 Buyer" value={kpis.topBuyerType} icon={Users} />
@@ -1001,7 +1002,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                           <div key={i} className="space-y-0.5">
                             <div className="flex justify-between text-[11px]">
                               <span className="text-muted-foreground truncate pr-1">{stage.stage}</span>
-                              <span className="font-semibold tabular-nums shrink-0">{stage.count.toLocaleString()}</span>
+                              <span className="font-semibold tabular-nums shrink-0">{formatNumber(stage.count)}</span>
                             </div>
                             <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
                               <div className={`h-1.5 rounded-full ${stage.color} opacity-80`} style={{ width: `${Math.round((stage.count / maxCount) * 100)}%` }} />
@@ -1020,7 +1021,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                           <div key={i} className="space-y-0.5">
                             <div className="flex justify-between text-[11px]">
                               <span className="text-muted-foreground truncate pr-1">{stage.stage}</span>
-                              <span className="tabular-nums shrink-0 text-muted-foreground">{stage.count.toLocaleString()}</span>
+                              <span className="tabular-nums shrink-0 text-muted-foreground">{formatNumber(stage.count)}</span>
                             </div>
                             <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
                               <div className={'h-1.5 rounded-full bg-muted-foreground/40'} style={{ width: `${Math.round((stage.count / maxCount) * 100)}%` }} />
@@ -1786,7 +1787,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-medium">{stage.stage}</span>
                         <div className="flex items-center gap-3">
-                          <span className="text-muted-foreground tabular-nums">{stage.count.toLocaleString()}</span>
+                          <span className="text-muted-foreground tabular-nums">{formatNumber(stage.count)}</span>
                           <span className={`font-semibold px-1.5 py-0.5 rounded text-white text-[11px] ${stage.color}`}>{stage.rate}</span>
                         </div>
                       </div>

@@ -31,6 +31,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { CronJobsPanel } from '@/components/Admin/CronJobsPanel';
 import { WebhooksPanel } from '@/components/Admin/WebhooksPanel';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 interface AIServiceHealth {
   status: 'healthy' | 'unhealthy';
@@ -501,7 +502,7 @@ export const SystemHealthMonitor: React.FC = () => {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total Queries</span>
-              <span className="text-sm font-medium">{health.query_metrics.total_queries.toLocaleString()}</span>
+              <span className="text-sm font-medium">{formatNumber(health.query_metrics.total_queries)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Avg Query Time</span>

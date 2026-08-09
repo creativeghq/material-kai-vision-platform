@@ -29,6 +29,7 @@ import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 import { AppearanceSection } from '@/components/core/Profile/AppearanceSection';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatNumber } from '@/utils/decimal';
 
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024;
 
@@ -1321,7 +1322,7 @@ export const ProfileTab: React.FC = () => {
             {featuredMoodboardId && isPublic && (
               <div className="flex items-center gap-1.5 pt-2 border-t border-border/40">
                 <Eye className="h-3 w-3 text-muted-foreground/50" />
-                <span className="text-xs font-semibold tabular-nums text-primary">{analytics.featuredMoodboardViews.toLocaleString()}</span>
+                <span className="text-xs font-semibold tabular-nums text-primary">{formatNumber(analytics.featuredMoodboardViews)}</span>
                 <span className="text-xs text-muted-foreground">visits</span>
               </div>
             )}
@@ -1351,7 +1352,7 @@ export const ProfileTab: React.FC = () => {
                     <div key={label} className="rounded-md bg-muted/40 p-1.5 text-center">
                       <div className="flex items-center justify-center gap-1 leading-none">
                         <Icon className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
-                        <span className="text-xs font-semibold tabular-nums">{value.toLocaleString()}</span>
+                        <span className="text-xs font-semibold tabular-nums">{formatNumber(value)}</span>
                       </div>
                       <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{label}</p>
                     </div>
@@ -1369,7 +1370,7 @@ export const ProfileTab: React.FC = () => {
                     <div key={label} className="rounded-md bg-muted/40 p-1.5 text-center">
                       <div className="flex items-center justify-center gap-1 leading-none">
                         <Icon className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
-                        <span className="text-xs font-semibold tabular-nums">{value.toLocaleString()}</span>
+                        <span className="text-xs font-semibold tabular-nums">{formatNumber(value)}</span>
                         {badge !== null && (
                           <span className={`text-[8px] font-medium rounded-full px-1 leading-[14px] ${badgeClass}`}>{badge}</span>
                         )}
@@ -1390,7 +1391,7 @@ export const ProfileTab: React.FC = () => {
                     <div key={label} className="rounded-md bg-muted/40 p-1.5 text-center">
                       <div className="flex items-center justify-center gap-1 leading-none">
                         <Icon className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
-                        <span className="text-xs font-semibold tabular-nums">{value.toLocaleString()}</span>
+                        <span className="text-xs font-semibold tabular-nums">{formatNumber(value)}</span>
                       </div>
                       <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{label}</p>
                     </div>

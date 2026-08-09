@@ -36,6 +36,7 @@ import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { roleLabel } from '@/modules/crm/crmConstants';
 import { crmCategoriesService } from '@/services/crmCategoriesService';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 interface UserProfile {
   id: string;
@@ -165,7 +166,7 @@ const AIUsageTab: React.FC<{ userId: string }> = ({ userId }) => {
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">
-              {((totals?.total_input_tokens || 0) + (totals?.total_output_tokens || 0)).toLocaleString()}
+              {formatNumber(((totals?.total_input_tokens || 0) + (totals?.total_output_tokens || 0)))}
             </div>
             <p className="text-xs text-muted-foreground">Total Tokens</p>
           </CardContent>

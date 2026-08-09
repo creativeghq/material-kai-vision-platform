@@ -29,6 +29,7 @@ import AIDataPage from '@/pages/Admin/AIDataPage';
 import { ApiGatewayAdmin } from '@/components/Admin/ApiGatewayAdmin';
 import { BackgroundAgentsPage } from '@/components/Admin/BackgroundAgents/BackgroundAgentsPage';
 import ModelDebuggingPanel from '@/components/Admin/ModelDebuggingPanel';
+import { formatNumber } from '@/utils/decimal';
 
 const TAB_VALUES = [
   'prompts', 'extraction', 'templates', 'sandbox', 'starters', 'pricing',
@@ -494,7 +495,7 @@ export const AgentConfigsPage: React.FC = () => {
                                 <TooltipTrigger asChild>
                                   <div className="flex items-center gap-1">
                                     <FileText className="h-3 w-3" />
-                                    <span>{getPromptLength(prompt).toLocaleString()} chars</span>
+                                    <span>{formatNumber(getPromptLength(prompt))} chars</span>
                                   </div>
                                 </TooltipTrigger>
                                 <TooltipContent>Prompt length</TooltipContent>
@@ -614,7 +615,7 @@ export const AgentConfigsPage: React.FC = () => {
                   className="min-h-[400px] font-mono text-sm mt-2"
                   placeholder="Enter prompt text..."
                 />
-                <p className="text-sm text-muted-foreground mt-2">{editedText.length.toLocaleString()} characters</p>
+                <p className="text-sm text-muted-foreground mt-2">{formatNumber(editedText.length)} characters</p>
               </div>
 
               {/* Change Reason */}

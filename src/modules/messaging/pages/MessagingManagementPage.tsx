@@ -19,6 +19,7 @@ import { MessagingOptoutsTab } from '../components/MessagingOptoutsTab';
 import { PushNotificationsTab } from '../components/PushNotificationsTab';
 import { messagingService } from '../services';
 import { useToast } from '@/hooks/use-toast';
+import { formatNumber } from '@/utils/decimal';
 
 export const MessagingManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState('channels');
@@ -129,7 +130,7 @@ export const MessagingManagement: React.FC = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">Total Sent</p>
-                <p className="text-lg font-bold">{analytics.totalSent.toLocaleString()}</p>
+                <p className="text-lg font-bold">{formatNumber(analytics.totalSent)}</p>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">All channels combined</p>
@@ -155,7 +156,7 @@ export const MessagingManagement: React.FC = () => {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {analytics.totalDelivered.toLocaleString()} delivered
+              {formatNumber(analytics.totalDelivered)} delivered
             </p>
           </div>
 
@@ -181,7 +182,7 @@ export const MessagingManagement: React.FC = () => {
                 WhatsApp
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground">{analytics.totalRead.toLocaleString()} read</p>
+            <p className="text-xs text-muted-foreground">{formatNumber(analytics.totalRead)} read</p>
           </div>
 
           {/* Channels Card */}

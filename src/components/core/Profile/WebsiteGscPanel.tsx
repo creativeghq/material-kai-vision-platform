@@ -7,12 +7,13 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
+import { formatNumber } from '@/utils/decimal';
 import {
   userWebsitesService, type UserWebsite, type GscStatus, type GscSummary,
 } from '@/services/userWebsitesService';
 
 
-const fmt = (n: number) => (n ?? 0).toLocaleString();
+const fmt = (n: number) => formatNumber((n ?? 0));
 
 /**
  * The "Search Performance" tab — Google Search Console for one connected website.

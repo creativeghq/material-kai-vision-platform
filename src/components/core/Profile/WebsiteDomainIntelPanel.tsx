@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { userWebsitesService, type UserWebsite, type DomainIntel } from '@/services/userWebsitesService';
+import { formatNumber } from '@/utils/decimal';
 
 function timeAgo(iso: string | null | undefined): string {
   if (!iso) return 'never';
@@ -14,7 +15,7 @@ function timeAgo(iso: string | null | undefined): string {
   if (d === 1) return 'yesterday';
   return `${d}d ago`;
 }
-const fmt = (n: number | null | undefined) => (n == null ? '—' : Math.round(n).toLocaleString());
+const fmt = (n: number | null | undefined) => (n == null ? '—' : formatNumber(Math.round(n)));
 
 function Metric({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
   return (
@@ -164,7 +165,7 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
                       <TableCell className="font-medium max-w-[240px] truncate">{k.keyword}</TableCell>
                       <TableCell className="text-right tabular-nums">{k.position ?? '—'}</TableCell>
                       <TableCell className="text-right tabular-nums">{fmt(k.search_volume)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{k.etv == null ? '—' : Math.round(k.etv).toLocaleString()}</TableCell>
+                      <TableCell className="text-right tabular-nums">{k.etv == null ? '—' : formatNumber(Math.round(k.etv))}</TableCell>
                       <TableCell className="max-w-[220px] truncate">
                         {k.url ? (
                           <a href={`${website.url.replace(/\/$/, '')}${k.url}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-primary text-xs">

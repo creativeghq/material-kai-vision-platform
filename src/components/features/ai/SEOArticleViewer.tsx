@@ -696,7 +696,7 @@ function ResearchTab({ data }: { data: ResearchTabData }) {
     if (!data.statistics) return [];
     const s = data.statistics;
     const entries: { label: string; value: string | number }[] = [];
-    if (s.avgWordCount > 0) entries.push({ label: 'Avg Word Count', value: s.avgWordCount.toLocaleString() });
+    if (s.avgWordCount > 0) entries.push({ label: 'Avg Word Count', value: formatNumber(s.avgWordCount) });
     if (s.avgContentScore > 0) entries.push({ label: 'Avg Content Score', value: s.avgContentScore });
     if (s.publicationDateRange?.earliest) entries.push({ label: 'Earliest Published', value: s.publicationDateRange.earliest });
     if (s.publicationDateRange?.latest) entries.push({ label: 'Latest Published', value: s.publicationDateRange.latest });
@@ -1146,7 +1146,7 @@ function InterlinkingTab({ data, markdown, onApplyLink }: { data: InterlinkingDa
                   </a>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground ml-4 flex-shrink-0">
-                  {comp.wordCount > 0 && <span>{comp.wordCount.toLocaleString()} words</span>}
+                  {comp.wordCount > 0 && <span>{formatNumber(comp.wordCount)} words</span>}
                   {comp.domainAuthority != null && comp.domainAuthority > 0 && (
                     <Badge variant="outline" className="text-xs">DA {comp.domainAuthority}</Badge>
                   )}
@@ -1448,6 +1448,7 @@ function parseArticle(markdown: string): ArticleBlock[] {
 // rhythm, and section dividers that feel intentional.
 
 import type { Components } from 'react-markdown';
+import { formatNumber } from '@/utils/decimal';
 
 /** Slugify heading text so each heading gets a stable anchor id. */
 function slugify(text: string): string {
@@ -1776,7 +1777,7 @@ function ArticleContent({ markdown, html, title, metaDescription, wordCount, rea
                   {wordCount && readingTimeMinutes ? <span className="text-muted-foreground/50">·</span> : null}
                   {wordCount ? (
                     <span className="font-sans uppercase tracking-wider">
-                      {wordCount.toLocaleString()} words
+                      {formatNumber(wordCount)} words
                     </span>
                   ) : null}
                 </div>
@@ -1934,7 +1935,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                     {article.overall_score != null && (
                       <span className={`font-medium ${scoreColor}`}>{article.overall_score}/100</span>
                     )}
-                    {article.word_count > 0 && <span>{article.word_count.toLocaleString()} words</span>}
+                    {article.word_count > 0 && <span>{formatNumber(article.word_count)} words</span>}
                     {article.reading_time_minutes > 0 && <span>{article.reading_time_minutes} min read</span>}
                   </>
                 )}

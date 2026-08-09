@@ -40,6 +40,7 @@ import { BookingWidget } from '@/components/features/profile/BookingWidget';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 
 import { onEnterOrSpace } from '@/utils/a11y';
+import { formatNumber } from '@/utils/decimal';
 
 interface PublicProfile {
   user_id: string;
@@ -457,11 +458,11 @@ export const PublicProfilePage: React.FC = () => {
           {/* Stats row */}
           <div className="flex items-center gap-8 pb-4 border-t border-border/30 pt-4">
             <div className="text-center cursor-default">
-              <p className="text-lg font-semibold tabular-nums">{followerCount.toLocaleString()}</p>
+              <p className="text-lg font-semibold tabular-nums">{formatNumber(followerCount)}</p>
               <p className="text-xs text-muted-foreground">Followers</p>
             </div>
             <div className="text-center cursor-default">
-              <p className="text-lg font-semibold tabular-nums">{followingCount.toLocaleString()}</p>
+              <p className="text-lg font-semibold tabular-nums">{formatNumber(followingCount)}</p>
               <p className="text-xs text-muted-foreground">Following</p>
             </div>
             {moodboards.length > 0 && (

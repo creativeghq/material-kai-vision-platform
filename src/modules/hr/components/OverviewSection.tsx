@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/core/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { hrService, type HrAnalytics, APP_STAGE_LABELS, ABSENCE_TYPE_LABELS } from '../services/hrService';
 import { HrStat, EmptyState } from './_shared';
+import { formatNumber } from '@/utils/decimal';
 
 export function OverviewSection({ workspaceId }: { workspaceId: string | null; canManage: boolean }) {
   const { toast } = useToast();
@@ -77,7 +78,7 @@ export function OverviewSection({ workspaceId }: { workspaceId: string | null; c
               <div className="mt-4 pt-3 border-t border-border/40 text-sm">
                 <span className="text-muted-foreground">Last payroll </span>
                 <span className="font-medium">{data.last_payroll.period}</span>
-                <span className="text-muted-foreground"> — {Number(data.last_payroll.total_net).toLocaleString()} {data.last_payroll.currency} net </span>
+                <span className="text-muted-foreground"> — {formatNumber(Number(data.last_payroll.total_net))} {data.last_payroll.currency} net </span>
                 <Badge variant="outline" className="ml-1">{data.last_payroll.status}</Badge>
               </div>
             )}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { formatMoney } from '@/utils/decimal';
+import { formatMoney, formatNumber } from '@/utils/decimal';
 import { Link } from 'react-router-dom';
 import {
   Users, Sparkles, Loader2, ExternalLink, Wallet, Inbox, ArrowRight, Building2, Search,
@@ -408,9 +408,9 @@ const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StatCell label="Products" value={String(data!.product_count)} />
-              <StatCell label="Views" value={views.toLocaleString()} />
-              <StatCell label="Saves" value={saves.toLocaleString()} />
-              <StatCell label="Quote adds" value={quotes.toLocaleString()} />
+              <StatCell label="Views" value={formatNumber(views)} />
+              <StatCell label="Saves" value={formatNumber(saves)} />
+              <StatCell label="Quote adds" value={formatNumber(quotes)} />
             </div>
 
             {data!.geo.length > 0 && (
@@ -420,7 +420,7 @@ const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
                   {data!.geo.map((g, i) => (
                     <div key={i} className="flex items-center justify-between px-3 py-1.5 text-sm">
                       <span>{[g.city, g.country].filter(Boolean).join(', ') || 'Unknown'}</span>
-                      <span className="text-muted-foreground">{g.count.toLocaleString()}</span>
+                      <span className="text-muted-foreground">{formatNumber(g.count)}</span>
                     </div>
                   ))}
                 </div>
@@ -434,7 +434,7 @@ const MarketPositionCard: React.FC<CompanyMarketTabProps> = ({ companyId }) => {
                   {data!.top_products.map((p) => (
                     <div key={p.product_id} className="flex items-center justify-between px-3 py-1.5 text-sm">
                       <span className="truncate">{p.name || p.product_id}</span>
-                      <span className="text-muted-foreground shrink-0">{p.count.toLocaleString()} saves/quotes</span>
+                      <span className="text-muted-foreground shrink-0">{formatNumber(p.count)} saves/quotes</span>
                     </div>
                   ))}
                 </div>

@@ -34,6 +34,7 @@ interface Counters {
 }
 
 import { timeAgo } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 export const SeoInterlinkingPanel: React.FC = () => {
   const { toast } = useToast();
@@ -127,7 +128,7 @@ export const SeoInterlinkingPanel: React.FC = () => {
           <Card className="dashboard-card">
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Indexed pages</p>
-              <p className="text-2xl font-semibold">{counters.total_pages.toLocaleString()}</p>
+              <p className="text-2xl font-semibold">{formatNumber(counters.total_pages)}</p>
             </CardContent>
           </Card>
           <Card className="dashboard-card">

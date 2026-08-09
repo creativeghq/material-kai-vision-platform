@@ -15,6 +15,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { TurnstileWidget, type TurnstileHandle } from '@/components/features/turnstile/TurnstileWidget';
 import { PublicToolsApiError, mentionScan, type PublicMentionScanResponse } from '@/services/publicToolsService';
+import { formatNumber } from '@/utils/decimal';
 import {
   MentionResultsCard,
   QuotaBadge,
@@ -192,7 +193,7 @@ export default function MentionScanPage() {
             )}
             {quota && isAuthenticated && balance != null && (
               <p className="text-xs text-muted-foreground">
-                {balance.toLocaleString()} credits available · each scan costs {creditsPerScan} credits. Identical queries within 24 hours are served instantly and don't debit.
+                {formatNumber(balance)} credits available · each scan costs {creditsPerScan} credits. Identical queries within 24 hours are served instantly and don't debit.
               </p>
             )}
           </CardContent>

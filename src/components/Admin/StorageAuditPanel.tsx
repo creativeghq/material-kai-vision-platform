@@ -5,6 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Loader2, RefreshCw, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatNumber } from '@/utils/decimal';
 
 type OrphanRow = {
   bucket: string;
@@ -183,10 +184,10 @@ export function StorageAuditPanel() {
                 return (
                   <tr key={r.bucket} className="border-b last:border-b-0">
                     <td className="px-4 py-2 font-medium">{r.bucket}</td>
-                    <td className="px-4 py-2 text-right">{Number(r.total_objects).toLocaleString()}</td>
+                    <td className="px-4 py-2 text-right">{formatNumber(Number(r.total_objects))}</td>
                     <td className="px-4 py-2 text-right">{fmtBytes(Number(r.total_bytes))}</td>
                     <td className="px-4 py-2 text-right">
-                      {Number(r.orphan_objects).toLocaleString()}
+                      {formatNumber(Number(r.orphan_objects))}
                       {orphanPct > 0 && (
                         <span className={`ml-2 text-xs ${orphanPct > 50 ? 'text-destructive' : 'text-muted-foreground'}`}>
                           {orphanPct}%
@@ -201,12 +202,12 @@ export function StorageAuditPanel() {
               <tr className="font-semibold">
                 <td className="px-4 py-3">Total</td>
                 <td className="px-4 py-3 text-right">
-                  {(rows.reduce((a, r) => a + Number(r.total_objects), 0)).toLocaleString()}
+                  {formatNumber((rows.reduce((a, r) => a + Number(r.total_objects), 0)))}
                 </td>
                 <td className="px-4 py-3 text-right">
                   {fmtBytes(rows.reduce((a, r) => a + Number(r.total_bytes), 0))}
                 </td>
-                <td className="px-4 py-3 text-right">{totalOrphans.toLocaleString()}</td>
+                <td className="px-4 py-3 text-right">{formatNumber(totalOrphans)}</td>
                 <td className="px-4 py-3 text-right">{fmtBytes(totalOrphanBytes)}</td>
                 <td className="px-4 py-3" />
               </tr>

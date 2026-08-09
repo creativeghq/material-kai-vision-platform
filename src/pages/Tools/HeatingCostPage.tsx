@@ -29,7 +29,7 @@ import {
 } from '@/lib/calculators/heatingCostComparison';
 import { QuotaBadge, ToolsShell, useToolsQuota } from './toolsShared';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatMoney } from '@/utils/decimal';
+import { formatMoney, formatNumber } from '@/utils/decimal';
 
 const METHOD_ICON: Record<HeatingMethodKey, typeof Flame> = {
   oil: Flame,
@@ -179,7 +179,7 @@ export default function HeatingCostPage() {
                               )}
                             </div>
                             <div className="text-[11px] text-muted-foreground tabular-nums">
-                              {m.unitsPerYear.toLocaleString()} {m.unitLabel}/yr
+                              {formatNumber(m.unitsPerYear)} {m.unitLabel}/yr
                             </div>
                           </div>
                           <div className="text-right shrink-0">
@@ -200,8 +200,8 @@ export default function HeatingCostPage() {
               </Card>
 
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Estimate based on {result.usefulDemandKwh.toLocaleString()} kWh/yr useful demand
-                ({result.deliveredEnergyKwh.toLocaleString()} kWh delivered after distribution losses). Running
+                Estimate based on {formatNumber(result.usefulDemandKwh)} kWh/yr useful demand
+                ({formatNumber(result.deliveredEnergyKwh)} kWh delivered after distribution losses). Running
                 cost only — excludes equipment purchase, installation and maintenance.
               </p>
             </>

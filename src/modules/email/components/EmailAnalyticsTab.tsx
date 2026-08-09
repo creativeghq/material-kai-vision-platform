@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, Mail, MailOpen, MousePointerClick, AlertTrian
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatNumber } from '@/utils/decimal';
 
 export const EmailAnalyticsTab: React.FC = () => {
   const [analytics, setAnalytics] = useState({
@@ -133,7 +134,7 @@ export const EmailAnalyticsTab: React.FC = () => {
             <p className="text-sm text-muted-foreground">Delivery Rate</p>
             <p className="text-2xl font-bold">{analytics.deliveryRate.toFixed(2)}%</p>
             <p className="text-xs text-muted-foreground">
-              {analytics.totalDelivered.toLocaleString()} of {analytics.totalSent.toLocaleString()} emails
+              {formatNumber(analytics.totalDelivered)} of {formatNumber(analytics.totalSent)} emails
             </p>
           </div>
         </div>
@@ -159,7 +160,7 @@ export const EmailAnalyticsTab: React.FC = () => {
             <p className="text-sm text-muted-foreground">Bounce Rate</p>
             <p className="text-2xl font-bold">{analytics.bounceRate.toFixed(2)}%</p>
             <p className="text-xs text-muted-foreground">
-              {analytics.totalBounced.toLocaleString()} bounced emails
+              {formatNumber(analytics.totalBounced)} bounced emails
             </p>
             {analytics.bounceRate > 5 && (
               <p className="text-xs text-red-500 mt-1">⚠️ High bounce rate</p>
@@ -188,7 +189,7 @@ export const EmailAnalyticsTab: React.FC = () => {
             <p className="text-sm text-muted-foreground">Complaint Rate</p>
             <p className="text-2xl font-bold">{analytics.complaintRate.toFixed(2)}%</p>
             <p className="text-xs text-muted-foreground">
-              {analytics.totalComplained.toLocaleString()} complaints
+              {formatNumber(analytics.totalComplained)} complaints
             </p>
             {analytics.complaintRate > 0.1 && (
               <p className="text-xs text-red-500 mt-1">⚠️ High complaint rate</p>
@@ -217,7 +218,7 @@ export const EmailAnalyticsTab: React.FC = () => {
             <p className="text-sm text-muted-foreground">Open Rate</p>
             <p className="text-2xl font-bold">{analytics.openRate.toFixed(2)}%</p>
             <p className="text-xs text-muted-foreground">
-              {analytics.totalOpened.toLocaleString()} of {analytics.totalDelivered.toLocaleString()} delivered
+              {formatNumber(analytics.totalOpened)} of {formatNumber(analytics.totalDelivered)} delivered
             </p>
           </div>
         </div>
@@ -243,7 +244,7 @@ export const EmailAnalyticsTab: React.FC = () => {
             <p className="text-sm text-muted-foreground">Click Rate</p>
             <p className="text-2xl font-bold">{analytics.clickRate.toFixed(2)}%</p>
             <p className="text-xs text-muted-foreground">
-              {analytics.totalClicked.toLocaleString()} of {analytics.totalDelivered.toLocaleString()} delivered
+              {formatNumber(analytics.totalClicked)} of {formatNumber(analytics.totalDelivered)} delivered
             </p>
           </div>
         </div>

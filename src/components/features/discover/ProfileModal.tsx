@@ -20,6 +20,7 @@ import { MoodboardComments } from '@/components/features/social/MoodboardComment
 import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
 import { BookingWidget } from '@/components/features/profile/BookingWidget';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
+import { formatNumber } from '@/utils/decimal';
 
 const CARD_COLORS = [
   'from-violet-950/60 to-indigo-950/40',
@@ -380,11 +381,11 @@ export function ProfileModal({ userId, onClose }: ProfileModalProps) {
                 {/* Stats row */}
                 <div className="flex items-center gap-4 sm:gap-8 py-4 border-t border-border/30 mt-4">
                   <div className="text-center cursor-default">
-                    <p className="text-lg font-semibold tabular-nums">{followerCount.toLocaleString()}</p>
+                    <p className="text-lg font-semibold tabular-nums">{formatNumber(followerCount)}</p>
                     <p className="text-xs text-muted-foreground">Followers</p>
                   </div>
                   <div className="text-center cursor-default">
-                    <p className="text-lg font-semibold tabular-nums">{followingCount.toLocaleString()}</p>
+                    <p className="text-lg font-semibold tabular-nums">{formatNumber(followingCount)}</p>
                     <p className="text-xs text-muted-foreground">Following</p>
                   </div>
                   {moodboards.length > 0 && (

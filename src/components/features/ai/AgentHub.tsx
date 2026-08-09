@@ -138,6 +138,7 @@ import { onEnterOrSpace } from '@/utils/a11y';
 
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 // Agent definitions with RBAC and default models
 interface AgentDefinition {
   id: string;
@@ -3996,9 +3997,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   {(l.salary_min || l.salary_max) && (
                     <span>
                       · {l.salary_currency || ''}
-                      {l.salary_min ? l.salary_min.toLocaleString() : ''}
+                      {l.salary_min ? formatNumber(l.salary_min) : ''}
                       {l.salary_min && l.salary_max ? '–' : ''}
-                      {l.salary_max ? l.salary_max.toLocaleString() : (l.salary_min ? '+' : '')}
+                      {l.salary_max ? formatNumber(l.salary_max) : (l.salary_min ? '+' : '')}
                     </span>
                   )}
                   {l.source && <span className="text-muted-foreground/70">· via {l.source.replace(/_/g, ' ')}</span>}

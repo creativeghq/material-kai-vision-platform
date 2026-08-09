@@ -31,6 +31,7 @@ import {
 } from '@/services/catalogsService';
 import { buildCatalogOperationsFilters } from './catalogOperationsFilters';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 /** Preserves the tab's previous default window now that the range Select is a dateRange field. */
 function defaultFilterValues(): FilterValues {
@@ -345,7 +346,7 @@ const Stat: React.FC<{
   <Card className="dashboard-card">
     <CardContent className="p-3 flex flex-col gap-1">
       <div className="text-xs text-muted-foreground flex items-center gap-1"><Icon className="h-3 w-3" /> {label}</div>
-      <div className={`text-2xl font-light ${variant === 'destructive' ? 'text-destructive' : 'text-foreground'}`}>{value.toLocaleString()}</div>
+      <div className={`text-2xl font-light ${variant === 'destructive' ? 'text-destructive' : 'text-foreground'}`}>{formatNumber(value)}</div>
       {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
     </CardContent>
   </Card>

@@ -18,6 +18,7 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Separator } from '@/components/core/ui/separator';
+import { formatNumber } from '@/utils/decimal';
 import {
   CheckCircle,
   AlertTriangle,
@@ -112,7 +113,7 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
             Product Preview
           </DialogTitle>
           <DialogDescription>
-            Review this sample product before importing {totalProducts.toLocaleString()} products
+            Review this sample product before importing {formatNumber(totalProducts)} products
           </DialogDescription>
         </DialogHeader>
 
@@ -306,7 +307,7 @@ export const XMLProductPreviewModal: React.FC<XMLProductPreviewModalProps> = ({
                 <p className="font-semibold">Ready to Import</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   This is a preview of 1 product. Clicking "Start Import" will process all{' '}
-                  <strong>{totalProducts.toLocaleString()}</strong> products with the same field mappings.
+                  <strong>{formatNumber(totalProducts)}</strong> products with the same field mappings.
                 </p>
               </div>
             </div>

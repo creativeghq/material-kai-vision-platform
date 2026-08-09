@@ -25,6 +25,7 @@ import {
 } from '@/services/jobResearchService';
 import { formatDistanceToNow } from 'date-fns';
 import { statusTone } from '@/utils/statusTone';
+import { formatNumber } from '@/utils/decimal';
 
 interface JobResearchSavedJobsPanelProps {
   /** The `tracked_job_id` carried in the background_agents.config blob. */
@@ -166,7 +167,7 @@ export function JobResearchSavedJobsPanel({ trackedJobId }: JobResearchSavedJobs
                     {l.location && <span>· {l.location}</span>}
                     {l.is_remote && <span className="text-emerald-500">· Remote</span>}
                     {l.salary_annual_min_usd && (
-                      <span>· ${l.salary_annual_min_usd.toLocaleString()}{l.salary_annual_max_usd ? `–$${l.salary_annual_max_usd.toLocaleString()}` : '+'} /yr</span>
+                      <span>· ${formatNumber(l.salary_annual_min_usd)}{l.salary_annual_max_usd ? `–$${formatNumber(l.salary_annual_max_usd)}` : '+'} /yr</span>
                     )}
                     {l.user_action_at && (
                       <span>· marked {formatDistanceToNow(new Date(l.user_action_at), { addSuffix: true })}</span>

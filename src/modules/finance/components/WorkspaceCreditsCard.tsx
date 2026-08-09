@@ -11,6 +11,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Coins, Loader2, ShoppingCart, Check, Infinity as InfinityIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { StripeService, calculateCreditsForAmount } from '@/services/stripe.service';
+import { formatNumber } from '@/utils/decimal';
 import {
   workspaceCreditsService,
   type WorkspaceCreditStatus,
@@ -128,7 +129,7 @@ export const WorkspaceCreditsCard: React.FC<{ workspaceId: string }> = ({ worksp
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
-                  You get <span className="font-semibold text-foreground">{quote.credits.toLocaleString()}</span> credits
+                  You get <span className="font-semibold text-foreground">{formatNumber(quote.credits)}</span> credits
                   {quote.discount > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">{quote.discount}% off</Badge>}
                 </span>
                 <Button size="sm" className="rounded-full" onClick={fund} disabled={funding}>

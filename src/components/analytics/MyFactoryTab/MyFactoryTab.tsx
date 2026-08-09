@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { buildWeeks, weeksAgo, weekLabel, convRate, CHART_MARGINS, GRID_PROPS } from '../shared/analyticsUtils';
 import { COLORS, KpiCard, SectionHeader, EmptyState, AnalyticsTable, AnalyticsCol, formatProfType } from '../shared/AnalyticsUIComponents';
 import { getManufacturer } from '@/utils/productMetadata';
+import { formatNumber } from '@/utils/decimal';
 
 // ─────────────────────────────────────────────────────────────
 // My Factory Tab — Enhanced
@@ -580,7 +581,7 @@ export const MyFactoryTab = function MyFactoryTab({ factoryName, userId, tier = 
                   <div key={row.label}>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-muted-foreground">{row.label}</span>
-                      <span className="font-semibold tabular-nums">{row.value.toLocaleString()} <span className="text-muted-foreground font-normal">({row.pct}%)</span></span>
+                      <span className="font-semibold tabular-nums">{formatNumber(row.value)} <span className="text-muted-foreground font-normal">({row.pct}%)</span></span>
                     </div>
                     <div className="h-2 rounded-full bg-muted overflow-hidden">
                       <div className={`h-full rounded-full ${row.color}`} style={{ width: `${row.pct}%` }} />

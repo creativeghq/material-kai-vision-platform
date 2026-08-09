@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatNumber } from '@/utils/decimal';
 import {
   Select,
   SelectContent,
@@ -337,7 +338,7 @@ export const SearchAnalyticsDashboard = () => {
               <Search className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               <p className="text-xs text-muted-foreground">Total Searches</p>
             </div>
-            <div className="text-2xl font-bold">{stats.totalSearches.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatNumber(stats.totalSearches)}</div>
             <p className="text-xs text-muted-foreground mt-1">
               {stats.avgSearchesPerUser == null
                 ? 'per-user rate needs identified searchers'
@@ -350,7 +351,7 @@ export const SearchAnalyticsDashboard = () => {
               <Users className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               <p className="text-xs text-muted-foreground">Unique Users</p>
             </div>
-            <div className="text-2xl font-bold">{stats.uniqueUsers.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatNumber(stats.uniqueUsers)}</div>
             <p className="text-xs text-muted-foreground mt-1">Active searchers</p>
           </div>
 
@@ -487,13 +488,13 @@ export const SearchAnalyticsDashboard = () => {
                     <div>
                       <div className="text-muted-foreground">Mentions</div>
                       <div className="font-semibold text-lg">
-                        {material.mention_count.toLocaleString()}
+                        {formatNumber(material.mention_count)}
                       </div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Unique Users</div>
                       <div className="font-semibold text-lg">
-                        {material.unique_users_requesting.toLocaleString()}
+                        {formatNumber(material.unique_users_requesting)}
                       </div>
                     </div>
                     <div>

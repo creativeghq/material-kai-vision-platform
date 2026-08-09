@@ -88,6 +88,7 @@ import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from './constants';
 import { estimateTokens, calculateCost } from './utils';
 import { StatCard } from './components/StatCard';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 // Shape of `admin_agent_chat_stats()` — one all-time aggregate row replacing what used to be a
 // 100-row client-side sample. Token counts are returned per model rather than pre-costed so the
@@ -965,7 +966,7 @@ const OperationsDashboardInner: React.FC = () => {
                         <TableRow key={tool.tool_name}>
                           <TableCell className="font-mono text-sm">{tool.tool_name}</TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {Number(tool.total_calls).toLocaleString()}
+                            {formatNumber(Number(tool.total_calls))}
                           </TableCell>
                           <TableCell className="text-right">
                             <Badge
@@ -1148,8 +1149,8 @@ const OperationsDashboardInner: React.FC = () => {
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm">
                             {svc.key === 'resend-email'
-                              ? (resendEmailStats ? resendEmailStats.total.toLocaleString() : <span className="text-muted-foreground">—</span>)
-                              : (allTime ? allTime.operations.toLocaleString() : <span className="text-muted-foreground">—</span>)
+                              ? (resendEmailStats ? formatNumber(resendEmailStats.total) : <span className="text-muted-foreground">—</span>)
+                              : (allTime ? formatNumber(allTime.operations) : <span className="text-muted-foreground">—</span>)
                             }
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm font-semibold">
@@ -1194,25 +1195,25 @@ const OperationsDashboardInner: React.FC = () => {
                       <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                         <Send className="h-3 w-3" /> Total Sent
                       </p>
-                      <p className="text-2xl font-bold">{resendEmailStats.total.toLocaleString()}</p>
+                      <p className="text-2xl font-bold">{formatNumber(resendEmailStats.total)}</p>
                       <p className="text-xs text-muted-foreground">emails in period</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground font-medium">Delivery Rate</p>
                       <p className="text-2xl font-bold text-green-600">{resendEmailStats.deliveryRate.toFixed(1)}%</p>
-                      <p className="text-xs text-muted-foreground">{resendEmailStats.delivered.toLocaleString()} delivered</p>
+                      <p className="text-xs text-muted-foreground">{formatNumber(resendEmailStats.delivered)} delivered</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground font-medium">Bounce Rate</p>
                       <p className={`text-2xl font-bold ${resendEmailStats.bounceRate > 5 ? 'text-red-600' : 'text-foreground'}`}>
                         {resendEmailStats.bounceRate.toFixed(1)}%
                       </p>
-                      <p className="text-xs text-muted-foreground">{resendEmailStats.bounced.toLocaleString()} bounced</p>
+                      <p className="text-xs text-muted-foreground">{formatNumber(resendEmailStats.bounced)} bounced</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground font-medium">Open Rate</p>
                       <p className="text-2xl font-bold">{resendEmailStats.openRate.toFixed(1)}%</p>
-                      <p className="text-xs text-muted-foreground">{resendEmailStats.opened.toLocaleString()} opens</p>
+                      <p className="text-xs text-muted-foreground">{formatNumber(resendEmailStats.opened)} opens</p>
                     </div>
                   </div>
                 ) : (
@@ -1247,7 +1248,7 @@ const OperationsDashboardInner: React.FC = () => {
                     {notifChannelStats.map((ch) => (
                       <div key={ch.channel} className="space-y-1 rounded-lg border border-border/50 p-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{ch.label}</p>
-                        <p className="text-2xl font-bold">{ch.total.toLocaleString()}</p>
+                        <p className="text-2xl font-bold">{formatNumber(ch.total)}</p>
                         <div className="flex gap-3 text-xs">
                           <span className="text-green-600">{ch.sent} sent</span>
                           {ch.failed > 0 && <span className="text-red-500">{ch.failed} failed</span>}
@@ -1270,7 +1271,7 @@ const OperationsDashboardInner: React.FC = () => {
                     {resendEmailStats && !notifChannelStats.find(c => c.channel === 'email') && (
                       <div className="space-y-1 rounded-lg border border-border/50 p-3">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Email (Resend)</p>
-                        <p className="text-2xl font-bold">{resendEmailStats.total.toLocaleString()}</p>
+                        <p className="text-2xl font-bold">{formatNumber(resendEmailStats.total)}</p>
                         <div className="flex gap-3 text-xs">
                           <span className="text-green-600">{resendEmailStats.delivered} delivered</span>
                           {resendEmailStats.bounced > 0 && <span className="text-red-500">{resendEmailStats.bounced} bounced</span>}
@@ -1359,7 +1360,7 @@ const OperationsDashboardInner: React.FC = () => {
                       <div>
                         <div className="text-sm text-muted-foreground font-medium">Total Operations</div>
                         <div className="text-2xl font-bold text-foreground">
-                          {extServiceData.summary.total_operations.toLocaleString()}
+                          {formatNumber(extServiceData.summary.total_operations)}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
                           Across {extServiceData.by_service.length} services
@@ -1500,7 +1501,7 @@ const OperationsDashboardInner: React.FC = () => {
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm">
-                              {svc.operations.toLocaleString()}
+                              {formatNumber(svc.operations)}
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm font-semibold">
                               ${svc.cost_usd.toFixed(5)}
@@ -1774,11 +1775,11 @@ const OperationsDashboardInner: React.FC = () => {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Total Products (XML)</span>
-                    <span className="font-semibold">{dataProcessingStats.xml.totalProducts.toLocaleString()}</span>
+                    <span className="font-semibold">{formatNumber(dataProcessingStats.xml.totalProducts)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Total Pages (Scraping)</span>
-                    <span className="font-semibold">{dataProcessingStats.scraping.totalPages.toLocaleString()}</span>
+                    <span className="font-semibold">{formatNumber(dataProcessingStats.scraping.totalPages)}</span>
                   </div>
                 </CardContent>
               </Card>

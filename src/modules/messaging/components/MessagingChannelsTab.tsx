@@ -15,6 +15,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingChannel } from '../services';
+import { formatNumber } from '@/utils/decimal';
 
 export const MessagingChannelsTab: React.FC = () => {
   const [channels, setChannels] = useState<MessagingChannel[]>([]);
@@ -172,7 +173,7 @@ export const MessagingChannelsTab: React.FC = () => {
                 )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Daily Quota</span>
-                  <span>{channel.daily_quota.toLocaleString()}</span>
+                  <span>{formatNumber(channel.daily_quota)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Rate Limit</span>

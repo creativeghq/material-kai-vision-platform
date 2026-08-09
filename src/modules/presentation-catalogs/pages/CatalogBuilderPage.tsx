@@ -42,6 +42,7 @@ import {
 import { SendToCustomersModal } from '@/components/business/catalogs/SendToCustomersModal';
 import { CatalogSourcesPanel } from '@/components/business/catalogs/CatalogSourcesPanel';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 const STATUS_VARIANT: Record<CatalogStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
   draft: 'secondary',
@@ -669,7 +670,7 @@ const MiniStat: React.FC<{
   <Card className="dashboard-card">
     <CardContent className="p-3 flex flex-col gap-1">
       <div className="text-xs text-muted-foreground flex items-center gap-1"><Icon className="h-3 w-3" /> {label}</div>
-      <div className={`text-2xl font-light ${variant === 'destructive' ? 'text-destructive' : 'text-foreground'}`}>{value.toLocaleString()}</div>
+      <div className={`text-2xl font-light ${variant === 'destructive' ? 'text-destructive' : 'text-foreground'}`}>{formatNumber(value)}</div>
     </CardContent>
   </Card>
 );

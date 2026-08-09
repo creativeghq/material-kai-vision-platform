@@ -41,6 +41,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { CompetitorSourceManager } from './CompetitorSourceManager';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { PriceAlertPreferences } from './PriceAlertPreferences';
+import { formatNumber } from '@/utils/decimal';
 import {
   refreshProduct,
   trackProduct,
@@ -1127,11 +1128,11 @@ const RetailerTable: React.FC<{
               {rating !== null && (
                 <span
                   className="text-[11px] text-muted-foreground flex items-center gap-0.5"
-                  title={ratingVotes ? `${rating.toFixed(1)} / 5 — ${ratingVotes.toLocaleString()} reviews` : `${rating.toFixed(1)} / 5`}
+                  title={ratingVotes ? `${rating.toFixed(1)} / 5 — ${formatNumber(ratingVotes)} reviews` : `${rating.toFixed(1)} / 5`}
                 >
                   ★ {rating.toFixed(1)}
                   {ratingVotes !== null && (
-                    <span className="ml-0.5">({ratingVotes.toLocaleString()})</span>
+                    <span className="ml-0.5">({formatNumber(ratingVotes)})</span>
                   )}
                 </span>
               )}

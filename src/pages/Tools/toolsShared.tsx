@@ -37,7 +37,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Skeleton } from '@/components/core/ui/skeleton';
-import { formatMoney } from '@/utils/decimal';
+import { formatMoney, formatNumber } from '@/utils/decimal';
 import {
   fetchQuota,
   type PublicMentionResult,
@@ -134,7 +134,7 @@ export function QuotaBadge({ quota, isAuthenticated }: { quota: PublicQuota | nu
     return (
       <Badge variant="outline" className="hidden sm:inline-flex gap-1.5">
         <Coins className="h-3.5 w-3.5 text-primary" />
-        <span className="tabular-nums">{quota.credits_balance.toLocaleString()}</span>
+        <span className="tabular-nums">{formatNumber(quota.credits_balance)}</span>
         <span className="text-muted-foreground">credits</span>
       </Badge>
     );
@@ -613,7 +613,7 @@ export function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isA
             <div>
               <CardTitle className="text-xl">Out of Credits</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                You have {(quota.credits_balance ?? 0).toLocaleString()} credits left — each scan costs {quota.credits_per_scan}. Top up to keep scanning.
+                You have {formatNumber((quota.credits_balance ?? 0))} credits left — each scan costs {quota.credits_per_scan}. Top up to keep scanning.
               </p>
             </div>
           </div>

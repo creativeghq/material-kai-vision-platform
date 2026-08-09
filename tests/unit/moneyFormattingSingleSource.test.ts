@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { formatMoney } from '@/utils/decimal';
+import { formatMoney, formatNumber } from '@/utils/decimal';
 
 /**
  * One money formatter, one locale (#329).
@@ -80,6 +80,21 @@ describe('money formatting has a single source (#329)', () => {
     // Intl throws when max < min rather than clamping; the helper must not pass that through.
     expect(() => formatMoney(1.239, 'EUR', { decimals: 2, maxDecimals: 0 })).not.toThrow();
     expect(formatMoney(1.239, 'EUR', { decimals: 2, maxDecimals: 0 })).toContain('1.24');
+  });
+
+  it('formatNumber groups consistently and is not locale-dependent', () => {
+    // The third pinned formatter (#329). 155 call sites were doing `n.toLocaleString()`, which
+    // groups by BROWSER locale — "1,234" for one user and "1.234" for another, and at a glance
+    // those are a thousand apart. Credit balances and KPI tiles were among them.
+    expect(formatNumber(1234567)).toBe('1,234,567');
+    expect(formatNumber(1234.5)).toBe('1,234.5');
+    // Whole by default (min 0), so a count does not grow ".00".
+    expect(formatNumber(42)).toBe('42');
+    expect(formatNumber(null)).toBe('—');
+    expect(formatNumber(undefined)).toBe('—');
+    // NaN is "we don't know", not "0" — a KPI tile showing 0 for a failed computation is a lie.
+    expect(formatNumber(Number.NaN)).toBe('—');
+    expect(formatNumber(0)).toBe('0');
   });
 
   it('null is a dash but zero is a real amount', () => {

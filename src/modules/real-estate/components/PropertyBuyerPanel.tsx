@@ -11,7 +11,7 @@ import { realEstateService, type BuyerRequirement, type ContactExt, type Propert
 import { PropertyFormDialog, type PropertyFormValues } from './PropertyFormDialog';
 import { scoreLead } from '@/modules/crm/services/leadScoring';
 import { statusTone } from '@/utils/statusTone';
-import { formatMoney } from '@/utils/decimal';
+import { formatMoney, formatNumber } from '@/utils/decimal';
 
 // real-estate panel on the CRM contact page: the person's PROPERTIES (own as many as they
 // like — each a real listing record), their buyer profile (budget / pre-approval) and saved
@@ -290,7 +290,7 @@ const SearchRow: React.FC<{ ws: string | null; req: BuyerRequirement; onDelete: 
             <div className="space-y-1">{matches.slice(0, 8).map((m) => (
               <Link key={m.id} to={`/properties/${m.id}`} className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/50">
                 <span className="min-w-0 flex-1 truncate">{m.title || 'Listing'} <span className="text-muted-foreground">{[m.town, m.region].filter(Boolean).join(', ')}</span></span>
-                <Badge className="rounded-full border-0 bg-muted text-[10px]">{m.price != null ? `${m.currency} ${m.price.toLocaleString()}` : '—'}</Badge>
+                <Badge className="rounded-full border-0 bg-muted text-[10px]">{m.price != null ? `${m.currency} ${formatNumber(m.price)}` : '—'}</Badge>
               </Link>
             ))}<div className="px-1.5 text-[11px] text-muted-foreground">{matches.length} match(es)</div></div>
           )}

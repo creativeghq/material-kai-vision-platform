@@ -44,6 +44,7 @@ import { HUBS } from '@/config/nav-items';
 import { Play } from 'lucide-react';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { formatNumber } from '@/utils/decimal';
 
 // Every `icon:` referenced by TOOLKITS (cluster + quick_start) must resolve here —
 // an unknown name silently degrades to a generic Wrench rather than failing, so
@@ -262,7 +263,7 @@ export const ToolkitPickerModal: React.FC<Props> = ({
         <div className="border-t border-border p-4 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 text-sm">
             <Badge variant="outline" className="text-xs gap-1">
-              <Coins className="h-3 w-3" /> ~{totalTokenEstimate.toLocaleString()} tokens / turn
+              <Coins className="h-3 w-3" /> ~{formatNumber(totalTokenEstimate)} tokens / turn
             </Badge>
             <span className="text-xs text-muted-foreground">
               {totalToolCount} tool{totalToolCount === 1 ? '' : 's'} loaded
@@ -368,7 +369,7 @@ const ToolkitCard: React.FC<{
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
           <span>{toolkit.tool_ids.length} tool{toolkit.tool_ids.length === 1 ? '' : 's'}</span>
           <span className="flex items-center gap-1">
-            <Coins className="h-2.5 w-2.5" /> ~{tokens.toLocaleString()} tok
+            <Coins className="h-2.5 w-2.5" /> ~{formatNumber(tokens)} tok
           </span>
         </div>
       </button>

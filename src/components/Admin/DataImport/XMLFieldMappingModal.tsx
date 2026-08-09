@@ -61,6 +61,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import { XMLProductPreviewModal } from './XMLProductPreviewModal';
+import { formatNumber } from '@/utils/decimal';
 
 interface DetectedField {
   xml_field: string;
@@ -629,7 +630,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
           </DialogTitle>
           <DialogDescription>
             Detected <strong>{detectedFields.length} XML fields</strong> across{' '}
-            <strong>{totalRows.toLocaleString()} product rows</strong>. Review and resolve any
+            <strong>{formatNumber(totalRows)} product rows</strong>. Review and resolve any
             gaps before import.
           </DialogDescription>
         </DialogHeader>
@@ -743,7 +744,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
         {/* Footer info + actions */}
         <div className="text-xs text-muted-foreground border-t pt-3">
           Auto-mapped: {autoMappedCount} · Routed to metadata: {metadataFields.length} · Total rows:{' '}
-          {totalRows.toLocaleString()}
+          {formatNumber(totalRows)}
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { taricService } from '@/services/taricService';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 /** Refuse to read a file the browser would choke on before the request is even built. */
 const MAX_FILE_BYTES = 40 * 1024 * 1024;
@@ -120,7 +121,7 @@ export const TaricReferencePanel: React.FC = () => {
               ? 'Checking…'
               : empty
                 ? 'Not imported yet — the code picker and the classifier have nothing to match against.'
-                : `${stats!.total.toLocaleString()} codes (${stats!.declarable.toLocaleString()} declarable) · last import ${formatDate(stats!.last_import!)}`}
+                : `${formatNumber(stats!.total)} codes (${formatNumber(stats!.declarable)} declarable) · last import ${formatDate(stats!.last_import!)}`}
           </CardDescription>
         </div>
         <div className="flex items-end gap-2 shrink-0">

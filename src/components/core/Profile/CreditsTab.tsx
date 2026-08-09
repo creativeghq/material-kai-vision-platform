@@ -11,6 +11,7 @@ import { StripeService, calculateCreditsForAmount } from '@/services/stripe.serv
 import { CreditUsageHistory } from './CreditUsageHistory';
 import { CronPausedBanner } from './CronPausedBanner';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatNumber } from '@/utils/decimal';
 
 const creditsService = new CreditsService();
 const stripeService = new StripeService();
@@ -123,7 +124,7 @@ export const CreditsTab: React.FC = () => {
                 >
                   <div className="text-lg font-bold">€{pa}</div>
                   <div className="text-sm text-primary font-semibold">
-                    {presetQuote.credits.toLocaleString()} credits
+                    {formatNumber(presetQuote.credits)} credits
                   </div>
                   {presetQuote.discount > 0 && (
                     <Badge variant="secondary" className="mt-1.5 text-[10px]">
@@ -160,7 +161,7 @@ export const CreditsTab: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">You get</span>
               <span className="text-2xl font-bold text-primary">
-                {quote.credits.toLocaleString()} credits
+                {formatNumber(quote.credits)} credits
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -183,7 +184,7 @@ export const CreditsTab: React.FC = () => {
             disabled={loading || amount < MIN_AMOUNT}
           >
             {loading ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : null}
-            Buy {quote.credits.toLocaleString()} Credits for €{amount}
+            Buy {formatNumber(quote.credits)} Credits for €{amount}
           </Button>
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground border-t border-border pt-3">

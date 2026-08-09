@@ -18,6 +18,7 @@ import { EmailActionsTab } from '../components/EmailActionsTab';
 import { CampaignsTab } from '../components/CampaignsTab';
 import { TestEmailDialog } from '../components/TestEmailDialog';
 import { EmailSettingsModal } from '../components/EmailSettingsModal';
+import { formatNumber } from '@/utils/decimal';
 
 export const EmailManagement: React.FC = () => {
   const [analytics, setAnalytics] = useState({
@@ -107,7 +108,7 @@ export const EmailManagement: React.FC = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">Total Sent</p>
-                <p className="text-lg font-bold">{analytics.totalSent.toLocaleString()}</p>
+                <p className="text-lg font-bold">{formatNumber(analytics.totalSent)}</p>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">Last 30 days</p>
@@ -133,7 +134,7 @@ export const EmailManagement: React.FC = () => {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {analytics.totalDelivered.toLocaleString()} delivered
+              {formatNumber(analytics.totalDelivered)} delivered
             </p>
           </div>
 
@@ -153,7 +154,7 @@ export const EmailManagement: React.FC = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">Bounce Rate</p>
-                <p className="text-lg font-bold">{analytics.totalBounced.toLocaleString()}</p>
+                <p className="text-lg font-bold">{formatNumber(analytics.totalBounced)}</p>
               </div>
               <Badge variant={analytics.bounceRate > 5 ? 'destructive' : 'secondary'} className="text-xs">
                 {analytics.bounceRate.toFixed(1)}%
@@ -182,7 +183,7 @@ export const EmailManagement: React.FC = () => {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              {analytics.totalOpened.toLocaleString()} opens
+              {formatNumber(analytics.totalOpened)} opens
             </p>
           </div>
         </div>

@@ -59,6 +59,7 @@ import { statusTone } from '@/utils/statusTone';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 interface ApiGatewayAdminProps {
   /** When embedded as a tab (e.g. in AI Configurations), hide the page header. */
@@ -395,7 +396,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                   <CardTitle className="font-medium">Total API Calls</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{analyticsData.totalRequests.toLocaleString()}</div>
+                  <div className="text-2xl font-bold">{formatNumber(analyticsData.totalRequests)}</div>
                   <p className="text-xs text-muted-foreground">{analyticsData.successfulRequests} successful</p>
                 </CardContent>
               </Card>
@@ -446,7 +447,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                       {analyticsData.topEndpoints.map((ep) => (
                         <TableRow key={ep.path}>
                           <TableCell className="font-mono text-sm">{ep.path}</TableCell>
-                          <TableCell className="text-right">{ep.count.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{formatNumber(ep.count)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

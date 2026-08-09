@@ -22,6 +22,7 @@ import {
 } from '@/services/userWebsitesService';
 import { Search, FileSearch, BarChart3, ChevronRight } from 'lucide-react';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatNumber } from '@/utils/decimal';
 
 
 function statusOf(w: UserWebsite): { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: React.ReactNode } {
@@ -456,7 +457,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="border rounded-lg p-3">
                   <p className="text-xs text-muted-foreground">Total URLs</p>
-                  <p className="text-xl font-semibold">{previewResult.result.pages_discovered.toLocaleString()}</p>
+                  <p className="text-xl font-semibold">{formatNumber(previewResult.result.pages_discovered)}</p>
                 </div>
                 <div className="border rounded-lg p-3">
                   <p className="text-xs text-muted-foreground">Will crawl up to</p>
@@ -480,7 +481,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20 text-xs">
                   <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 mt-0.5 flex-shrink-0" />
                   <p>
-                    Your sitemap has {previewResult.result.pages_discovered.toLocaleString()} URLs but the cap for this site is {previewResult.website.max_pages}.
+                    Your sitemap has {formatNumber(previewResult.result.pages_discovered)} URLs but the cap for this site is {previewResult.website.max_pages}.
                     The crawler picks the first {previewResult.website.max_pages} sitemap entries. Raise the cap (max 1000) or use a topic-scoped sitemap URL if needed.
                   </p>
                 </div>

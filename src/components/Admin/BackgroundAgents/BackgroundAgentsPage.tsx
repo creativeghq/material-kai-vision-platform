@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
   completed:  <CheckCircle className="h-4 w-4 text-green-500"                 />,
@@ -423,8 +424,8 @@ export function BackgroundAgentsPage() {
 
                     {/* Metadata grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-muted-foreground">
-                      <div><span className="font-semibold">In:</span> {run.input_tokens.toLocaleString()} tok</div>
-                      <div><span className="font-semibold">Out:</span> {run.output_tokens.toLocaleString()} tok</div>
+                      <div><span className="font-semibold">In:</span> {formatNumber(run.input_tokens)} tok</div>
+                      <div><span className="font-semibold">Out:</span> {formatNumber(run.output_tokens)} tok</div>
                       {run.credits_debited > 0 && (
                         <div><span className="font-semibold">Credits:</span> {run.credits_debited.toFixed(2)}</div>
                       )}

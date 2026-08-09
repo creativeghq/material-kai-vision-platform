@@ -107,6 +107,34 @@ export function round2(n: number): number {
  * still prints as a real amount (one of the replaced copies returned the dash for 0 as well,
  * because it tested falsiness).
  */
+/**
+ * Plain number for display — thousand separators, no currency.
+ *
+ * The third pinned formatter, for the same reason as the other two. `n.toLocaleString()` uses the
+ * BROWSER's locale, so "1,234" for one user and "1.234" for another — and at a glance those are a
+ * thousand apart. 164 call sites were doing exactly that: credit balances, row counts, KPI tiles.
+ *
+ * `en-US` matches `formatDate`'s pin. It makes no visible difference against `formatMoney`'s
+ * `en-IE` — both group as `1,234.56` — but it is pinned rather than left to agree by accident.
+ *
+ * `null`/`undefined` renders as an em dash: "we don't know" is not zero, and zero still prints as
+ * a real number.
+ */
+export function formatNumber(
+  value: number | null | undefined,
+  opts: { decimals?: number; maxDecimals?: number; fallback?: string } = {},
+): string {
+  if (value == null || (typeof value === 'number' && Number.isNaN(value))) {
+    return opts.fallback ?? '—';
+  }
+  const min = opts.decimals ?? 0;
+  const max = Math.max(opts.maxDecimals ?? Math.max(min, 2), min);
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: min,
+    maximumFractionDigits: max,
+  }).format(value);
+}
+
 export interface FormatMoneyOptions {
   /** Minimum fraction digits. 2 (accounting) by default; 0 for figures that read better whole,
    *  like a property asking price or a payroll total. */

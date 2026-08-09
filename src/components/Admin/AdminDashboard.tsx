@@ -37,6 +37,7 @@ import { ResetPlatformDialog } from './ResetPlatformDialog';
 import { AdminStatCard } from './AdminStatCard';
 import { useAdminDashboardCards } from '@/modules/_core';
 import { dataIntegrityService } from '@/services/dataIntegrityService';
+import { formatNumber } from '@/utils/decimal';
 
 // Types for our data structures
 type SystemMetrics = {
@@ -372,11 +373,11 @@ const AdminDashboard: React.FC = () => {
         <>
       <div className="px-3 sm:px-6 pt-4 sm:pt-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-          <AdminStatCard title="Processed Documents" value={systemMetrics.processedDocuments.toLocaleString()} icon={FileText} />
-          <AdminStatCard title="Knowledge Entries" value={systemMetrics.knowledgeEntries.toLocaleString()} icon={DatabaseIcon} />
-          <AdminStatCard title="Search Queries" value={systemMetrics.activeSessions.toLocaleString()} icon={BarChart3} />
-          <AdminStatCard title="Total Chats" value={systemMetrics.totalChats.toLocaleString()} icon={MessageSquare} />
-          <AdminStatCard title="Interior Chats" value={systemMetrics.interiorChats.toLocaleString()} icon={Home} />
+          <AdminStatCard title="Processed Documents" value={formatNumber(systemMetrics.processedDocuments)} icon={FileText} />
+          <AdminStatCard title="Knowledge Entries" value={formatNumber(systemMetrics.knowledgeEntries)} icon={DatabaseIcon} />
+          <AdminStatCard title="Search Queries" value={formatNumber(systemMetrics.activeSessions)} icon={BarChart3} />
+          <AdminStatCard title="Total Chats" value={formatNumber(systemMetrics.totalChats)} icon={MessageSquare} />
+          <AdminStatCard title="Interior Chats" value={formatNumber(systemMetrics.interiorChats)} icon={Home} />
         </div>
       </div>
 

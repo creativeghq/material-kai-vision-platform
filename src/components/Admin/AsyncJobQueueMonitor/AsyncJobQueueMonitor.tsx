@@ -67,6 +67,7 @@ import { MIVAA_API_URL } from '@/config/mivaa';
 import { statusTone } from '@/utils/statusTone';
 
 import { onEnterOrSpace } from '@/utils/a11y';
+import { formatNumber } from '@/utils/decimal';
 
 export const AsyncJobQueueMonitor: React.FC = () => {
   const navigate = useNavigate();
@@ -4305,7 +4306,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           Total: ${totalCost.toFixed(4)}
                         </Badge>
                         <Badge variant="outline" className="bg-blue-500/15 text-blue-400 border-blue-500/30">
-                          {totalGenerations.toLocaleString()} generations
+                          {formatNumber(totalGenerations)} generations
                         </Badge>
                       </div>
                     </div>
@@ -4336,7 +4337,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <Card className="bg-green-500/10 border-green-500/20">
                         <CardContent className="p-3">
                           <div className="text-[10px] font-bold text-green-400 uppercase tracking-wider">AI Generations</div>
-                          <div className="text-xl font-black text-green-300">{totalGenerations.toLocaleString()}</div>
+                          <div className="text-xl font-black text-green-300">{formatNumber(totalGenerations)}</div>
                           <div className="text-[9px] text-green-400/70">total operations</div>
                         </CardContent>
                       </Card>
@@ -4373,7 +4374,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           <div className="mt-2 pt-2 border-t border-white/10 grid grid-cols-4 gap-2 text-center">
                             <div>
                               <div className="text-[10px] text-muted-foreground uppercase">Generations</div>
-                              <div className="font-semibold text-xs text-foreground">{data.generations.toLocaleString()}</div>
+                              <div className="font-semibold text-xs text-foreground">{formatNumber(data.generations)}</div>
                             </div>
                             <div>
                               <div className="text-[10px] text-muted-foreground uppercase">Input Tokens</div>

@@ -12,6 +12,7 @@ import { AgentLogsViewer } from './AgentLogsViewer';
 import { JobResearchSavedJobsPanel } from './JobResearchSavedJobsPanel';
 import { TechRadarFindingsPanel } from './TechRadarFindingsPanel';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 interface AgentRunHistoryDrawerProps {
   agent:   BackgroundAgent | null;
@@ -122,8 +123,8 @@ export function AgentRunHistoryDrawer({ agent, open, onClose }: AgentRunHistoryD
                 <div className="px-3 pb-3 space-y-3 border-t">
                   {/* Tokens + credits + model + chain */}
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pt-2">
-                    <span>In: {run.input_tokens.toLocaleString()} tok</span>
-                    <span>Out: {run.output_tokens.toLocaleString()} tok</span>
+                    <span>In: {formatNumber(run.input_tokens)} tok</span>
+                    <span>Out: {formatNumber(run.output_tokens)} tok</span>
                     {run.credits_debited > 0 && (
                       <span>{run.credits_debited.toFixed(2)} credits</span>
                     )}

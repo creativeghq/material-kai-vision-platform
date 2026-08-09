@@ -24,6 +24,7 @@ import { netPositionTermCount, netPositionDirection } from '@/modules/finance/ut
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
@@ -606,10 +607,10 @@ export const CustomerTopItemsCard: React.FC<Target> = ({ contactId, companyId })
                     <div className="font-medium">{p.description || 'Product'}</div>
                     {p.sku && <div className="text-xs text-muted-foreground font-mono">{p.sku}</div>}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums">{Number(p.total_quantity).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{formatNumber(Number(p.total_quantity))}</td>
                   <td className="px-4 py-2 text-right">{formatMoney(p.revenue_net)}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{p.order_count}</td>
-                  <td className="px-4 py-2 text-right tabular-nums text-emerald-600">{Number(p.on_hand).toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right tabular-nums text-emerald-600">{formatNumber(Number(p.on_hand))}</td>
                   <td className="px-4 py-2 text-right text-muted-foreground">{p.last_ordered ? formatDate(p.last_ordered) : '—'}</td>
                 </tr>
               ))

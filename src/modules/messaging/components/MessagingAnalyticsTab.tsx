@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { messagingService, MessagingAnalyticsResponse } from '../services';
+import { formatNumber } from '@/utils/decimal';
 
 interface StatCardProps {
   title: string;
@@ -130,24 +131,24 @@ export const MessagingAnalyticsTab: React.FC = () => {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Total Sent"
-              value={(analytics.totalSent ?? 0).toLocaleString()}
+              value={formatNumber((analytics.totalSent ?? 0))}
               icon={<Send className="h-5 w-5 text-primary" />}
             />
             <StatCard
               title="Delivered"
-              value={(analytics.totalDelivered ?? 0).toLocaleString()}
+              value={formatNumber((analytics.totalDelivered ?? 0))}
               subtitle={`${analytics.deliveryRate ?? 0}% delivery rate`}
               icon={<CheckCircle className="h-5 w-5 text-green-500" />}
             />
             <StatCard
               title="Read"
-              value={(analytics.totalRead ?? 0).toLocaleString()}
+              value={formatNumber((analytics.totalRead ?? 0))}
               subtitle={`${analytics.readRate ?? 0}% read rate`}
               icon={<Eye className="h-5 w-5 text-blue-500" />}
             />
             <StatCard
               title="Failed"
-              value={(analytics.totalFailed ?? 0).toLocaleString()}
+              value={formatNumber((analytics.totalFailed ?? 0))}
               subtitle={`${analytics.failureRate ?? 0}% failure rate`}
               icon={<XCircle className="h-5 w-5 text-red-500" />}
             />
