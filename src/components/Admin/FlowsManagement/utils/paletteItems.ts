@@ -382,6 +382,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'seo.site_health_changed', group: 'Monitoring',
     label: 'SEO Site Health Changed', description: 'A connected website\'s on-page health score regressed (or recovered) week-over-week', icon: 'Search', color: 'blue',
     defaultData: { label: 'SEO Site Health Changed', category: 'trigger', triggerType: 'seo.site_health_changed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'page_watch_changed', group: 'Monitoring',
+    label: 'Watched Page Changed', description: 'A watched non-price page changed — supplier terms, a regulatory notice, partner API docs or a competitor page', icon: 'FileSearch', color: 'blue',
+    defaultData: { label: 'Watched Page Changed', category: 'trigger', triggerType: 'page_watch_changed', config: {} } as TriggerNodeData },
 
   // Upstream line-level RFQ between networked workspaces
   { type: 'triggerNode', category: 'trigger', subType: 'rfq_lines_requested', group: 'Quotes',

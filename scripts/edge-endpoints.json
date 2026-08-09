@@ -10748,5 +10748,171 @@
     ],
     "request": [],
     "response": "{ok, claimed, delivered, retrying, failed, dropped, endpoints_disabled}"
+  },
+  {
+    "name": "page-watch-webhook",
+    "tag": "Webhooks",
+    "summary": "Receives Firecrawl Monitoring callbacks for watched non-price pages and records the diff.",
+    "description": "Ingests `monitor.page` (one entry per page per check) and `monitor.check.completed` (reconciliation summary) from Firecrawl Monitoring. Firecrawl does NOT sign its webhooks, so authentication is a shared secret sent in the `x-firecrawl-webhook-secret` header, set on the monitor at creation time and compared in constant time. Fails closed with 503 when FIRECRAWL_WEBHOOK_SECRET is unset. The tenant is resolved from `page_watches` by `firecrawl_monitor_id` — never from the payload. Replays are absorbed by a unique index on (page_watch_id, firecrawl_check_id, url).",
+    "security": [
+      "sharedSecretHeader"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "monitor.page",
+            "monitor.check.completed"
+          ],
+          "description": "Firecrawl event type; anything else is acknowledged and ignored"
+        },
+        "data": {
+          "type": "array",
+          "description": "Per-page entries or the check summary, depending on `type`",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "changes_written": {
+          "type": "integer",
+          "description": "monitor.page only; excludes replayed duplicates"
+        },
+        "watches_updated": {
+          "type": "integer",
+          "description": "monitor.check.completed only"
+        },
+        "ignored": {
+          "type": "string",
+          "nullable": true,
+          "description": "Set when the event type is unrecognised"
+        }
+      }
+    },
+    "docs": "docs/page-monitoring.md"
+  },
+  {
+    "name": "page-watches",
+    "tag": "Monitoring Crons",
+    "summary": "CRUD for watched pages, mirrored to Firecrawl monitors.",
+    "description": "Action-dispatched endpoint backing the Page Monitoring UI. Creates, updates and deletes a Firecrawl monitor alongside each `page_watches` row so the two never drift — a row deleted without its monitor would keep billing on its schedule. Requires a user JWT; the supplied workspace_id is verified against the caller's membership before any read or write. `run` debits a Firecrawl credit before starting the check and refuses with 402 if the debit fails. Gated on the `page-monitoring` module.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "changes",
+            "create",
+            "update",
+            "remove",
+            "run",
+            "acknowledge"
+          ],
+          "description": "Operation to perform"
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Verified against the caller's memberships"
+        },
+        "id": {
+          "type": "string",
+          "nullable": true,
+          "description": "page_watches id; required by changes/update/remove/run"
+        },
+        "change_id": {
+          "type": "string",
+          "nullable": true,
+          "description": "page_watch_changes id; required by acknowledge"
+        },
+        "name": {
+          "type": "string",
+          "nullable": true
+        },
+        "url": {
+          "type": "string",
+          "nullable": true,
+          "description": "https only; validated through the shared SSRF guard"
+        },
+        "category": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "supplier_terms",
+            "regulatory",
+            "partner_docs",
+            "competitor",
+            "other"
+          ]
+        },
+        "goal": {
+          "type": "string",
+          "nullable": true,
+          "description": "Natural-language definition of a meaningful change; enables Firecrawl's judge"
+        },
+        "schedule_text": {
+          "type": "string",
+          "nullable": true,
+          "description": "Plain-English schedule, e.g. 'every day at 09:00'"
+        },
+        "timezone": {
+          "type": "string",
+          "nullable": true
+        },
+        "is_active": {
+          "type": "boolean",
+          "nullable": true,
+          "description": "update only; pauses the upstream monitor too"
+        },
+        "limit": {
+          "type": "integer",
+          "nullable": true,
+          "description": "changes only; capped at 200"
+        }
+      },
+      "required": [
+        "action",
+        "workspace_id"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "data": {
+          "type": "object",
+          "description": "Watch, list of watches, or list of changes depending on action"
+        },
+        "error": {
+          "type": "string",
+          "nullable": true
+        }
+      }
+    },
+    "docs": "docs/page-monitoring.md"
   }
 ]

@@ -213,6 +213,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'seo.ranking_movement': Search,
   'seo.backlink_movement': Search,
   'seo.site_health_changed': Search,
+  page_watch_changed: FileText,
 };
 
 const triggerLabels: Record<TriggerType, string> = {
@@ -332,6 +333,7 @@ const triggerLabels: Record<TriggerType, string> = {
   'seo.ranking_movement': 'SEO Rankings Moved',
   'seo.backlink_movement': 'SEO Backlinks Moved',
   'seo.site_health_changed': 'SEO Site Health Changed',
+  page_watch_changed: 'Watched Page Changed',
 };
 
 const statusColors: Record<FlowStatus, string> = {

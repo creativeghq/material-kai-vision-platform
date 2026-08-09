@@ -139,6 +139,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'seo.ranking_movement': Search,
   'seo.backlink_movement': Search,
   'seo.site_health_changed': Search,
+  page_watch_changed: FileText,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

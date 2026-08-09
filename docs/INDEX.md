@@ -576,6 +576,8 @@ Complete documentation for Material Kai Vision Platform.
 
 **[mention-monitoring-system.md](mention-monitoring-system.md)** - Mention monitoring ✨ NEW (2026-07) — news/blog/RSS/YouTube discovery + LLM visibility probes, classifier + cadence pipeline
 
+**[page-monitoring.md](page-monitoring.md)** - Page monitoring ✨ NEW (2026-08) — change detection on non-price pages (supplier terms, regulatory, partner docs) delegated to Firecrawl Monitoring; the unsigned-webhook boundary
+
 **[job-research-system.md](job-research-system.md)** - Job research ✨ NEW (2026-07) — job-discovery agent, consolidated digests, v0.1 → v0.3.5 history
 
 **[workspace-shared-credits.md](workspace-shared-credits.md)** - Workspace shared credits ✨ NEW (2026-07) — pooled credits (owner funds, members draw with optional per-member caps)

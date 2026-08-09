@@ -169,7 +169,10 @@ export type TriggerType =
   // crons and fanned out to the site's workspace members (payload-only, server-only events)
   | 'seo.ranking_movement'
   | 'seo.backlink_movement'
-  | 'seo.site_health_changed';
+  | 'seo.site_health_changed'
+  // A watched non-price page changed — supplier T&C, a regulatory notice, partner
+  // API docs, a competitor page (#331). Fired by the Firecrawl monitoring webhook.
+  | 'page_watch_changed';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
@@ -217,6 +220,7 @@ export interface UpstreamOrderCreatedTriggerConfig {}
 export interface SupplierPoReceivedTriggerConfig {}
 export interface CatalogMasterUpdatedTriggerConfig {}
 export interface SupplierPriceChangedTriggerConfig {}
+export interface PageWatchChangedTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface FreightQuoteRequestedTriggerConfig {}
 export interface OrderDispatchedTriggerConfig {}
@@ -464,6 +468,7 @@ export type TriggerConfigMap = {
   'seo.ranking_movement': SeoRankingMovementTriggerConfig;
   'seo.backlink_movement': SeoBacklinkMovementTriggerConfig;
   'seo.site_health_changed': SeoSiteHealthChangedTriggerConfig;
+  page_watch_changed: PageWatchChangedTriggerConfig;
 };
 
 // =====================================================

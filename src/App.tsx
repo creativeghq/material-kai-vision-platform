@@ -97,6 +97,7 @@ const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').
 const MonitoringPage = lazy(() => import('./pages/Admin/MonitoringPage'));
 const SupplierClaimsPage = lazy(() => import('./pages/Admin/SupplierClaimsPage'));
 const MasterCatalogPage = lazy(() => import('./pages/Admin/MasterCatalogPage'));
+const PageWatchesPage = lazy(() => import('./pages/PageWatchesPage'));
 const FreightQuoteRequestsPage = lazy(() => import('./pages/Admin/FreightQuoteRequestsPage'));
 const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
 // Social Media route (/admin/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
@@ -791,6 +792,19 @@ const App = () => (
                     <AuthGuard>
                       <Layout>
                         <MasterCatalogPage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+                {/* Page monitoring (#331). Workspace-scoped, not admin-only: watching a
+                    supplier's terms page is the job of whoever deals with that supplier.
+                    Every action is workspace-verified server-side in `page-watches`. */}
+                <Route
+                  path="/monitoring/pages"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <PageWatchesPage />
                       </Layout>
                     </AuthGuard>
                   }
