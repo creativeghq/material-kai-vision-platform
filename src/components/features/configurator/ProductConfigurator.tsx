@@ -18,6 +18,9 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/core/ui/select';
 import { formatMoney } from '@/utils/decimal';
 import { ProductModelStage } from '@/components/features/ar/ProductModelViewer';
 import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/CanvasChrome';
@@ -50,6 +53,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
   const [pricing, setPricing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [unmatched, setUnmatched] = useState<string[]>([]);
+  const [addingToQuote, setAddingToQuote] = useState(false);
+  const [quotes, setQuotes] = useState<Array<{ id: string; name: string }>>([]);
   const [resolvedModelUrl, setResolvedModelUrl] = useState<string | null>(modelUrlProp ?? null);
 
   // Resolve the model ourselves when the caller did not supply one. glb/gltf only — usdz is the
@@ -109,6 +114,16 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
   const handleUnmatched = useCallback((names: string[]) => setUnmatched(names), []);
 
+  // Open quotes to hand a configuration to. Loaded once; a stale list only costs a failed pick.
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    let cancelled = false;
+    productConfiguratorService.openQuotes(activeWorkspaceId)
+      .then((q) => { if (!cancelled) setQuotes(q); })
+      .catch(() => { if (!cancelled) setQuotes([]); });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
+
   const save = async () => {
     if (!activeWorkspaceId) return;
     setSaving(true);
@@ -123,6 +138,37 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  /**
+   * Save, then add to a quote (#260 Phase 3).
+   *
+   * The configuration is saved first because the quote line REFERENCES it — a line whose choices
+   * exist only in this component's state cannot be traced back to anything after the tab closes.
+   */
+  const addToQuote = async (quoteId: string) => {
+    if (!activeWorkspaceId) return;
+    setAddingToQuote(true);
+    try {
+      const config = await productConfiguratorService.saveConfiguration(
+        activeWorkspaceId, productId, valueIds,
+      );
+      const line = await productConfiguratorService.addToQuote(quoteId, config.id, 1);
+      toast({
+        title: line.pricing_status === 'priced' ? 'Added to quote' : 'Added — needs a price',
+        description: line.pricing_status === 'priced'
+          ? `${formatMoney(line.line_total, price?.currency ?? 'EUR')} · ${Object.entries(line.options).map(([k, v]) => `${k}: ${v}`).join(' · ')}`
+          : 'This product has no price, so the line is marked call-for-price.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Could not add to the quote',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setAddingToQuote(false);
     }
   };
 
@@ -241,10 +287,22 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
               </p>
             )}
           </div>
-          <Button className="rounded-full" onClick={save} disabled={saving}>
-            {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
-            Save configuration
-          </Button>
+          <div className="flex items-center gap-2">
+            {quotes.length > 0 && (
+              <Select value="" onValueChange={addToQuote} disabled={addingToQuote}>
+                <SelectTrigger className="w-[11rem] rounded-full">
+                  <SelectValue placeholder={addingToQuote ? 'Adding…' : 'Add to quote'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {quotes.map((q) => <SelectItem key={q.id} value={q.id}>{q.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            <Button variant="outline" className="rounded-full" onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+              Save
+            </Button>
+          </div>
         </div>
       </div>
     </div>

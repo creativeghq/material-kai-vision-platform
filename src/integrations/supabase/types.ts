@@ -19739,6 +19739,7 @@ export type Database = {
           moq: number | null
           notes: string | null
           price_lookup_call_id: string | null
+          product_configuration_id: string | null
           product_id: string
           source_kb_doc_ids: Json | null
           source_snippet: string | null
@@ -19763,6 +19764,7 @@ export type Database = {
           moq?: number | null
           notes?: string | null
           price_lookup_call_id?: string | null
+          product_configuration_id?: string | null
           product_id: string
           source_kb_doc_ids?: Json | null
           source_snippet?: string | null
@@ -19787,6 +19789,7 @@ export type Database = {
           moq?: number | null
           notes?: string | null
           price_lookup_call_id?: string | null
+          product_configuration_id?: string | null
           product_id?: string
           source_kb_doc_ids?: Json | null
           source_snippet?: string | null
@@ -24769,6 +24772,7 @@ export type Database = {
           line_total: number | null
           notes: string | null
           price_lookup_call_id: string | null
+          product_configuration_id: string | null
           price_source: string | null
           pricing_status: string
           product_id: string | null
@@ -24802,6 +24806,7 @@ export type Database = {
           line_total?: number | null
           notes?: string | null
           price_lookup_call_id?: string | null
+          product_configuration_id?: string | null
           price_source?: string | null
           pricing_status?: string
           product_id?: string | null
@@ -24835,6 +24840,7 @@ export type Database = {
           line_total?: number | null
           notes?: string | null
           price_lookup_call_id?: string | null
+          product_configuration_id?: string | null
           price_source?: string | null
           pricing_status?: string
           product_id?: string | null
@@ -33299,6 +33305,7 @@ export type Database = {
           line_total: number | null
           notes: string | null
           price_lookup_call_id: string | null
+          product_configuration_id: string | null
           price_source: string | null
           product_id: string | null
           quantity: number | null
@@ -35600,6 +35607,10 @@ export type Database = {
       }
       get_embed_analytics_summary: {
         Args: { p_days?: number; p_workspace_id: string }
+        Returns: Json
+      }
+      add_configuration_to_quote: {
+        Args: { p_configuration_id: string; p_quantity?: number; p_quote_id: string }
         Returns: Json
       }
       get_configured_product_price: {

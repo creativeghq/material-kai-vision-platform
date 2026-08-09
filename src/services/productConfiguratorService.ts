@@ -166,6 +166,47 @@ export const productConfiguratorService = {
     return data;
   },
 
+  /**
+   * Turn a saved configuration into a quote line (#260 Phase 3).
+   *
+   * Everything happens in one SQL statement: the price is read from the derivation and FROZEN onto
+   * the line in the same breath. Quotes freeze their own numbers — which is exactly why a
+   * configuration stores none — and doing the read here then writing it back would open a window
+   * between the two, plus an obvious place for someone to "adjust" the figure on the way past.
+   *
+   * The function also refuses to pair a quote and a configuration from different workspaces. Both
+   * being individually visible is not the same as belonging together: a user in two workspaces can
+   * legitimately read one of each.
+   */
+  async addToQuote(quoteId: string, configurationId: string, quantity = 1): Promise<{
+    quote_item_id: string;
+    unit_price: number | null;
+    line_total: number | null;
+    pricing_status: string;
+    options: Record<string, string>;
+  }> {
+    const { data, error } = await supabase.rpc('add_configuration_to_quote', {
+      p_quote_id: quoteId,
+      p_configuration_id: configurationId,
+      p_quantity: quantity,
+    });
+    if (error) throw error;
+    return data as never;
+  },
+
+  /** Quotes this configuration could be added to — the workspace's open ones. */
+  async openQuotes(workspaceId: string): Promise<Array<{ id: string; name: string }>> {
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('id, name, status')
+      .eq('workspace_id', workspaceId)
+      .in('status', ['draft', 'pending', 'sent'])
+      .order('updated_at', { ascending: false })
+      .limit(25);
+    if (error) throw error;
+    return (data ?? []).map((q) => ({ id: q.id, name: q.name ?? 'Untitled quote' }));
+  },
+
   async listConfigurations(productId: string): Promise<ProductConfiguration[]> {
     const { data, error } = await supabase
       .from('product_configurations')
