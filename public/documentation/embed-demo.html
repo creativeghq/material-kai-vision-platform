@@ -49,36 +49,34 @@
 <div class="page">
 
   <p class="banner">
-    <b>Demo page.</b> Seeded product, seeded embed key, <code>noindex</code>. Safe to delete —
-    it is a single file at <code>public/documentation/embed-demo.html</code>.
+    <b>A test harness, not a fixture.</b> It seeds nothing. Point it at one of your OWN products
+    with <code>?key=…&amp;product=…</code> — an earlier version shipped with a fabricated product
+    sitting in the catalog, which is exactly where a demo does not belong.
   </p>
 
   <h1>What the embed looks like on someone else's website</h1>
   <p class="lede">
     Everything in the card on the left is the widget: two lines of HTML on a page that knows nothing
     about the platform. The model, the finishes, the prices and the compatibility rule all come from
-    the live API.
+    the live API — from whichever product you point it at.
   </p>
 
   <div class="split">
     <div class="shop">
-      <h2>Lounge Armchair</h2>
-      <p class="where">Pied-à-terre · Living</p>
+      <h2 id="shopTitle">Your product</h2>
+      <p class="where">A merchant's own product page</p>
 
-      <materialkai-product id="w"
-        api-key="mk_embed_demo_4e1ee22a876c4b91a8054a682b4c2082"
-        product-id="b8043c04-86bb-4f72-a6af-e4ebca336608"
-        autorotate="false"
-        show-add-to-cart></materialkai-product>
+      <div id="mount"></div>
+      <div id="setup" class="cart" hidden></div>
     </div>
 
     <div>
       <h3>Things worth trying</h3>
       <ol>
-        <li><b>Drag the model.</b> It is a real 428 KB glTF, uploaded through the platform and served from storage — not a photo.</li>
-        <li><b>Switch the fabric.</b> The legs stay walnut, because a choice targets one glTF <em>material</em>, not the whole model.</li>
-        <li><b>Watch the price.</b> Every change re-asks the server. The widget never adds the numbers up itself, so it cannot disagree with a quote.</li>
-        <li><b>Pick Emerald Velvet <em>and</em> Blackened Oak.</b> A rule the tenant authored fires, and the cart button refuses — the same check blocks it from reaching a quote.</li>
+        <li><b>Drag the model.</b> It is the glTF uploaded against that product, served from storage — not a photo. Without a model you get the product's photo instead.</li>
+        <li><b>Switch a finish.</b> Only the parts using that glTF <em>material</em> change; a choice targets a material, not the whole model, so picking a fabric leaves the legs alone.</li>
+        <li><b>Watch the price.</b> Every change re-asks the server. The widget never adds the numbers up itself, so it cannot disagree with the quote that follows.</li>
+        <li><b>Break a rule</b>, if the product has any. The reason appears under the swatches and the cart button refuses — the same check stops it reaching a quote.</li>
         <li><b>Add to cart</b> on a valid combination. The payload appears below; on a real shop that is what your cart receives.</li>
       </ol>
 
@@ -104,6 +102,38 @@
 </div>
 
 <script>
+  // The widget is mounted from URL parameters rather than hardcoded. A demo page that carries its
+  // own product has to CREATE one, and a fabricated row in `products` is a catalog entry: it flows
+  // into search, facet canonicalisation, embeddings, analytics counts and the storefront. So this
+  // page owns no data at all.
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var key = q.get('key');
+    var product = q.get('product') || q.get('product_id');
+
+    if (!key || !product) {
+      var setup = document.getElementById('setup');
+      setup.hidden = false;
+      setup.textContent =
+        'Add your own key and product to the URL:\n\n'
+        + '  ?key=mk_embed_…&product=<product-id>\n\n'
+        + 'Where to get them:\n'
+        + '  key      Profile → Keys → Website Embed (allow this domain)\n'
+        + '  product  any product published to your online store\n\n'
+        + 'A 3D model on that product gives you the viewer; without one\n'
+        + 'the widget falls back to the product photo.';
+      return;
+    }
+
+    var el = document.createElement('materialkai-product');
+    el.id = 'w';
+    el.setAttribute('api-key', key);
+    el.setAttribute('product-id', product);
+    el.setAttribute('autorotate', 'false');
+    if (q.get('cart') !== 'off') el.setAttribute('show-add-to-cart', '');
+    document.getElementById('mount').appendChild(el);
+  })();
+
   document.addEventListener('materialkai:add-to-cart', function (e) {
     document.getElementById('cart').textContent = JSON.stringify(e.detail, null, 2);
   });
