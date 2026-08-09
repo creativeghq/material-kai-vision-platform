@@ -74,7 +74,11 @@ describe('the embed builder prices only exact matches', () => {
   it('does no arithmetic on money anywhere in the builder', () => {
     // The server returns a gross price ready to display. Any operator applied to it here is a
     // second derivation — VAT re-added, a discount re-applied, a delta summed.
-    const bad = [...SRC.matchAll(/\bprice\s*[*/+-]|[*/+-]\s*\bprice\b/g)].map((m) => m[0]);
+    //
+    // Comments are stripped first. The rule is about CODE, and prose trips it constantly: a line
+    // ending in the word "price" followed by the next line's `//` reads as `price /` to the regex.
+    const code = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
+    const bad = [...code.matchAll(/\bprice\s*[*/+-]|[*/+-]\s*\bprice\b/g)].map((m) => m[0]);
     expect(bad, 'money arithmetic in the widget: ' + bad.join(', ')).toEqual([]);
   });
 });
@@ -97,11 +101,31 @@ describe('the embed builder always offers a way forward', () => {
     expect(form).toMatch(/email\.value\.trim\(\)/);
   });
 
-  it('an exact match hands the visitor the real product widget', () => {
+  it('an exact match hands the visitor the real product widget, in the viewport', () => {
     // Otherwise the builder would have to re-implement the model viewer, AR and the cart — three
-    // things that already exist one element away.
-    expect(method('renderResult')).toContain('mountProduct');
+    // things that already exist one element away. It mounts from the VIEWPORT at the top of the
+    // card, not from the result block: the visitor is configuring one thing, and showing the model
+    // again beside the price would be a second copy of the same object on screen.
+    expect(method('renderViewport')).toContain('mountProduct');
     expect(method('mountProduct')).toContain("createElement('materialkai-product')");
+    expect(method('renderResult'), 'the result block must not mount a second copy of the model')
+      .not.toContain('mountProduct');
+  });
+
+  it('the viewport falls back to a generated image, clearly labelled as one', () => {
+    // A spec the catalog cannot satisfy has no photograph, because the thing does not exist. An
+    // unlabelled AI picture of it is a promise the merchant cannot keep.
+    const vp = method('renderViewport');
+    expect(vp).toContain('this.generatedUrl');
+    expect(vp).toMatch(/AI impression/);
+  });
+
+  it('a changed spec clears the viewport', () => {
+    // Otherwise the previous answer sits there looking like the answer to the new selection.
+    for (const m of ['choose', 'backRow']) {
+      expect(method(m), `${m} leaves a stale result in the viewport`)
+        .toContain('this.generatedUrl = null');
+    }
   });
 });
 

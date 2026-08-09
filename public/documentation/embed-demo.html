@@ -57,75 +57,47 @@
   <h1>What the embed looks like on someone else's website</h1>
   <p class="lede">
     Everything in the card on the left is the widget: two lines of HTML on a page that knows nothing
-    about the platform. The model, the finishes, the prices and the compatibility rule all come from
-    the live API — from whichever product you point it at.
+    about the platform. Pick a specification, see it, and price it — and if the catalogue cannot
+    satisfy it, you get a quote instead of a price. The model, the imagery, the prices and the
+    compatibility rules all come from the live API.
   </p>
 
   <div class="split">
     <div class="shop">
-      <h2 id="shopTitle">Your product</h2>
-      <p class="where">A merchant's own product page</p>
+      <h2 id="shopTitle">Build what you want</h2>
+      <p class="where">A merchant's own page — one element</p>
 
-      <div id="mount"></div>
-      <div id="setup" class="cart" hidden></div>
-    </div>
-
-    <div>
-      <h3>Things worth trying</h3>
-      <ol>
-        <li><b>Drag the model.</b> It is the glTF uploaded against that product, served from storage — not a photo. Without a model you get the product's photo instead.</li>
-        <li><b>Switch a finish.</b> Only the parts using that glTF <em>material</em> change; a choice targets a material, not the whole model, so picking a fabric leaves the legs alone.</li>
-        <li><b>Watch the price.</b> Every change re-asks the server. The widget never adds the numbers up itself, so it cannot disagree with the quote that follows.</li>
-        <li><b>Break a rule</b>, if the product has any. The reason appears under the swatches and the cart button refuses — the same check stops it reaching a quote.</li>
-        <li><b>Add to cart</b> on a valid combination. The payload appears below; on a real shop that is what your cart receives.</li>
-      </ol>
-
-      <h3>The whole integration</h3>
-      <div class="snippet">&lt;script src="/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
-
-&lt;materialkai-product
-  api-key="mk_embed_…"
-  product-id="…"
-  show-add-to-cart&gt;
-&lt;/materialkai-product&gt;</div>
-
-      <h3>What your cart would receive</h3>
-      <div class="cart" id="cart">// nothing yet — add to cart on a valid combination</div>
-    </div>
-  </div>
-
-  <hr style="border:0;border-top:1px solid var(--line);margin:3rem 0 2rem">
-
-  <h1>Starting from a spec instead of a product</h1>
-  <p class="lede">
-    The widget above answers "show me <em>this</em>". This one answers "I want something like this —
-    what does it cost?", which ends in one of two places. If a published product satisfies every
-    choice, you get its price and the product itself. If nothing does, you get a quote request —
-    and that is the normal outcome, not the error case: a configurator bound to one product can only
-    ever sell what someone already modelled and priced.
-  </p>
-
-  <div class="split">
-    <div class="shop">
-      <h2>Build a spec</h2>
-      <p class="where">Only needs a key — no product id</p>
       <div id="mountBuilder"></div>
       <div id="builderSetup" class="cart" hidden></div>
     </div>
 
     <div>
-      <h3>Things worth trying</h3>
+      <h3>The stages, in one widget</h3>
       <ol>
-        <li><b>Pick nothing and press Price it.</b> An empty spec matches everything, so you get the first published product. Containment with no constraints is not an error.</li>
-        <li><b>Pick only values marked ●.</b> Those are values a published product actually carries; the rest is the shared taxonomy. A spec built entirely from ● can still miss — the marks are per value, not per combination.</li>
-        <li><b>Mix one ● with one unmarked value.</b> Nothing matches exactly, so you land on the quote form with the close ones listed above it — deliberately without prices, because a near match is a suggestion and not an offer.</li>
-        <li><b>Send the quote request.</b> It creates a CRM contact and a <code>quote_requests</code> row carrying your exact spec. No total: nobody has priced it yet, and a number there would anchor the negotiation on a figure that came from nowhere.</li>
+        <li><b>Pick anything that matters.</b> Values marked ● are ones a published product actually carries; the rest is the shared taxonomy. Offering only stocked values would make this a product picker with extra steps.</li>
+        <li><b>See it.</b> The frame at the top is the same frame throughout. A match puts the real product in it — glTF model, finishes, AR. No match draws your specification instead, labelled as an AI impression, because there is no photograph of a thing that does not exist yet.</li>
+        <li><b>Price it.</b> A match gives you its price and the product itself. Nothing matching gives you a quote request — and that is the normal ending, not the error case: a configurator bound to one product can only ever sell what someone already modelled and priced.</li>
+        <li><b>Near matches carry no price</b>, deliberately. A near match is a suggestion, not an offer.</li>
+        <li><b>The quote request</b> creates a CRM contact and a <code>quote_requests</code> row carrying your exact spec, and lands in Admin → Quote Requests. No total: nobody has priced it, and a number would anchor the negotiation on a figure that came from nowhere.</li>
       </ol>
 
       <h3>The whole integration</h3>
       <div class="snippet">&lt;script src="/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
 
 &lt;materialkai-builder api-key="mk_embed_…"&gt;&lt;/materialkai-builder&gt;</div>
+
+      <h3>Bound to one product instead</h3>
+      <p style="font-size:.9rem;line-height:1.55;color:var(--soft);margin:0 0 1rem">
+        The same bundle also ships <code>&lt;materialkai-product&gt;</code> for a normal product page,
+        where the item is already known. The builder mounts it internally on a match, so the model,
+        the finishes and the cart are the same code either way.
+      </p>
+      <div class="snippet">&lt;materialkai-product api-key="mk_embed_…" product-id="…" show-add-to-cart&gt;&lt;/materialkai-product&gt;</div>
+      <div id="mount"></div>
+      <div id="setup" class="cart" hidden></div>
+
+      <h3>What your cart would receive</h3>
+      <div class="cart" id="cart">// nothing yet — add to cart on a valid combination</div>
     </div>
   </div>
 

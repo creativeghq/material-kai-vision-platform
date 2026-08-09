@@ -72,6 +72,13 @@ function loadTurnstile(): Promise<TurnstileApi> {
 
 const STYLE = `
 :host { display:block; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; color:#1c1a1e; }
+.viewport { position:relative; width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden;
+            background:#f4f2ef; margin-bottom:14px; }
+.viewport img { width:100%; height:100%; object-fit:contain; display:block; }
+.viewport materialkai-product { display:block; width:100%; height:100%; }
+.genTag { position:absolute; left:8px; bottom:8px; font-size:11px; padding:3px 8px; border-radius:999px;
+          background:rgba(28,26,30,.72); color:#fff; }
+.vEmpty { position:absolute; inset:0; display:grid; place-items:center; font-size:13px; color:#8b857f; }
 .step { display:flex; align-items:center; gap:8px; padding-bottom:14px; }
 .dot { width:22px; height:22px; border-radius:50%; display:grid; place-items:center;
        font-size:11px; font-weight:700; background:#eae4d8; color:#6b6560; }
@@ -109,6 +116,7 @@ textarea { min-height:70px; resize:vertical; }
 @media (prefers-color-scheme: dark) {
   :host { color:#f2eef2; }
   .dot { background:#2c2833; color:#a9a2ad; } .dot[data-on="1"] { background:#f2eef2; color:#221f26; }
+  .viewport { background:#252030; } .vEmpty { color:#8b8394; }
   .rule, .card, .near .n { border-color:#3d3745; } .card, .opt, input, textarea, button.ghost { background:#2c2833; }
   .opt, button.ghost, input, textarea { border-color:#3d3745; color:#f2eef2; }
   .opt[aria-pressed="true"] { border-color:#f2eef2; box-shadow:inset 0 0 0 1px #f2eef2; }
@@ -132,6 +140,10 @@ export class MaterialKaiBuilder extends HTMLElement {
   /** Light-DOM host for the bot challenge, projected into the form through a named slot. */
   private challengeHost: HTMLDivElement | null = null;
   private widgetId: string | undefined;
+  /** What the viewport at the top is currently showing. */
+  private matchedProductId: string | null = null;
+  private generatedUrl: string | null = null;
+  private generating = false;
 
   constructor() {
     super();
@@ -175,6 +187,9 @@ export class MaterialKaiBuilder extends HTMLElement {
     // visitor cares about, not a form they must complete.
     if (this.spec[key] === value) delete this.spec[key];
     else this.spec[key] = value;
+    // Any change invalidates what the viewport is showing — it answers the spec as it was.
+    this.matchedProductId = null;
+    this.generatedUrl = null;
     this.render();
   }
 
@@ -190,6 +205,18 @@ export class MaterialKaiBuilder extends HTMLElement {
       if (!res.ok) throw new Error(body?.error ?? 'failed');
       this.result = body as ResolveResult;
       this.stage = 2;
+
+      // Stage 3 decided by the result: a real product goes in the viewport as itself; a spec
+      // nothing satisfies gets drawn, because that is precisely when there is no photo to show.
+      this.matchedProductId = this.result.match_kind === 'exact' && this.result.product
+        ? this.result.product.product_id
+        : null;
+      if (!this.matchedProductId && Object.keys(this.spec).length > 0) {
+        // Deliberately not awaited. The price and the quote form are the answer the visitor asked
+        // for and must not wait behind an image generation that may take many seconds or be
+        // switched off entirely.
+        void this.visualize();
+      }
     } catch {
       this.failure = 'Could not price that just now. Please try again.';
     } finally {
@@ -265,6 +292,76 @@ export class MaterialKaiBuilder extends HTMLElement {
       });
   }
 
+  /**
+   * The viewport — stage 3, "see it", living at the top of the card across every stage.
+   *
+   * Three states, in the order they are worth showing:
+   *   matched   → the real product widget, so the 3D model, the finishes and AR come for free
+   *   generated → an AI image of the spec, for the case the catalog cannot satisfy
+   *   neither   → a prompt to build a spec, not an empty grey box
+   *
+   * The generated image carries a visible label. A picture of something we do not stock, shown
+   * without one, is a promise the merchant cannot keep.
+   */
+  private renderViewport(): HTMLElement {
+    const frame = document.createElement('div');
+    frame.className = 'viewport';
+
+    if (this.matchedProductId) {
+      this.mountProduct(frame, this.matchedProductId);
+      return frame;
+    }
+
+    if (this.generatedUrl) {
+      const img = document.createElement('img');
+      img.src = this.generatedUrl;
+      img.alt = 'Generated impression of your specification';
+      frame.appendChild(img);
+      const tag = document.createElement('span');
+      tag.className = 'genTag';
+      tag.textContent = 'AI impression — not a catalogue photo';
+      frame.appendChild(tag);
+      return frame;
+    }
+
+    const empty = document.createElement('div');
+    empty.className = 'vEmpty';
+    empty.textContent = this.generating
+      ? 'Drawing your specification…'
+      : 'Your selection appears here';
+    frame.appendChild(empty);
+    return frame;
+  }
+
+  /**
+   * Ask the server to draw a spec the catalog cannot satisfy.
+   *
+   * Silent on refusal, by design. The server answers 200 with `available:false` when the merchant
+   * has not enabled generation, is at their daily cap, or the provider failed — none of which is
+   * the visitor's business, and all of which should leave the flow working rather than showing
+   * them an error about someone else's billing.
+   */
+  private async visualize() {
+    if (this.generating || this.generatedUrl) return;
+    this.generating = true;
+    this.render();
+    try {
+      const res = await fetch(this.url('visualize'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spec: this.spec }),
+      });
+      const body = await res.json();
+      if (body?.available && typeof body.image_url === 'string') {
+        this.generatedUrl = body.image_url;
+      }
+    } catch { /* leave the frame in its empty state */ }
+    finally {
+      this.generating = false;
+      this.render();
+    }
+  }
+
   /** Hand a matched product to the product widget, so the model and AR come for free. */
   private mountProduct(host: HTMLElement, productId: string) {
     const el = document.createElement('materialkai-product');
@@ -289,7 +386,12 @@ export class MaterialKaiBuilder extends HTMLElement {
       if (i < 2) { const r = document.createElement('span'); r.className = 'rule'; steps.appendChild(r); }
     });
 
+    // The picture sits at the TOP, above everything, and stays there across stages. It is the same
+    // frame whether it holds the matched product's 3D model or a generated image of something we
+    // do not stock — the visitor is looking at one thing they are configuring, not at a form with
+    // a result panel somewhere further down.
     const body = document.createElement('div');
+    body.appendChild(this.renderViewport());
     if (this.stage === 1) this.renderBuild(body);
     else if (this.stage === 2) this.renderResult(body);
     else this.renderSent(body);
@@ -379,9 +481,9 @@ export class MaterialKaiBuilder extends HTMLElement {
       pr.textContent = r.product.price != null
         ? formatMoney(r.product.price, r.product.currency)
         : 'Price on request';
+      // The product itself is already at the top of the card, in the viewport — the name and price
+      // belong beside it, not next to a second copy of the same model further down.
       card.append(nm, pr);
-      // The matched product, with its model and AR, rendered by the widget that already does that.
-      this.mountProduct(card, r.product.product_id);
       host.appendChild(card);
       host.appendChild(this.backRow());
       return;
@@ -505,7 +607,15 @@ export class MaterialKaiBuilder extends HTMLElement {
     const back = document.createElement('button');
     back.className = 'ghost';
     back.textContent = 'Change my choices';
-    back.addEventListener('click', () => { this.stage = 1; this.result = null; this.render(); });
+    back.addEventListener('click', () => {
+      this.stage = 1;
+      this.result = null;
+      // The viewport is showing the answer to the OLD spec. Left up, it would sit there looking
+      // like the answer to whatever the visitor picks next.
+      this.matchedProductId = null;
+      this.generatedUrl = null;
+      this.render();
+    });
     row.appendChild(back);
     return row;
   }

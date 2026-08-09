@@ -510,6 +510,109 @@ Deno.serve(withApiLogging((req) => {
     return embedJson({ ok: true, facets: data ?? [], turnstile_site_key: siteKey }, 200, cors);
   }
 
+  // ── #337 stage 3: "see it" when there is nothing to see ──────────────────────────────────────
+  //
+  // A spec the catalog cannot satisfy has no model and no photograph, because the thing does not
+  // exist yet. That is exactly when a visitor most needs to see something — and it is the one stage
+  // that costs real money, charged to the merchant, triggered by an anonymous stranger on their own
+  // website. So it is gated harder than every other action here:
+  //
+  //   • opt-in per key (`allow_generation`, default false) — a merchant who never asked cannot be
+  //     billed, and a leaked key cannot be turned into a spending endpoint
+  //   • a per-key DAILY cap, consumed atomically, separate from the per-minute read quota
+  //   • credits debited BEFORE the upstream call (invariant 10), never after
+  //
+  // Every refusal returns 200 with `available:false`. A visitor is not owed an explanation of the
+  // merchant's billing, and the widget simply does not offer the picture.
+  if (action === 'visualize') {
+    const { data: keyRow } = await supabase
+      .from('material_kai_keys')
+      .select('allow_generation, generation_daily_cap')
+      .eq('id', auth.ctx.keyId)
+      .maybeSingle();
+
+    if (!keyRow?.allow_generation) {
+      return embedJson({ ok: true, available: false, reason: 'not_enabled' }, 200, cors);
+    }
+
+    const { data: slot, error: slotErr } = await supabase.rpc('consume_embed_generation_quota', {
+      p_key_id: auth.ctx.keyId,
+      p_cap: (keyRow.generation_daily_cap as number | null) ?? 20,
+    });
+    // Fail CLOSED, same reasoning as the read quota: an errored check is not evidence of headroom,
+    // and here the thing on the other side of it costs money.
+    if (slotErr || slot === false) {
+      return embedJson({ ok: true, available: false, reason: 'daily_cap' }, 200, cors);
+    }
+
+    let spec: Record<string, unknown> = {};
+    try {
+      spec = typeof params.spec === 'string' ? JSON.parse(params.spec) : (params.spec ?? {});
+    } catch { /* an unusable spec still gets a generic product shot */ }
+    const safeSpec = Object.fromEntries(
+      Object.entries(spec).slice(0, MAX_SPEC_FACETS).map(([k, v]) => [String(k).slice(0, 80), v]),
+    );
+
+    // Credits belong to the WORKSPACE that owns the key, attributed to its owner — the merchant is
+    // the one whose website this is and whose pool pays. Never the visitor: there isn't one.
+    const { data: owner } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', workspaceId)
+      .eq('role', 'owner')
+      .eq('status', 'active')
+      .limit(1)
+      .maybeSingle();
+    if (!owner?.user_id) {
+      return embedJson({ ok: true, available: false, reason: 'no_billable_owner' }, 200, cors);
+    }
+
+    // Server-to-server into the existing generator rather than a fourth copy of the Gemini call.
+    // It owns the credit preflight, the debit, the provider routing and the usage logging; passing
+    // `user_id` with the service-role token is the path it already exposes for exactly this.
+    //
+    // `mode: 'product-shot'` takes the SPEC and builds the prompt itself. Building it here instead
+    // would be a second copy of that derivation, free to drift from the one the rest of the
+    // platform uses — the same mistake as re-deriving a money quantity.
+    let imageUrl: string | null = null;
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/generate-interior-gemini`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({
+          mode: 'product-shot',
+          item_type: 'product',
+          item_name: typeof params.item_name === 'string' ? params.item_name.slice(0, 120) : 'product',
+          spec: safeSpec,
+          user_id: owner.user_id,
+          workspace_id: workspaceId,
+          aspect_ratio: '1:1',
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      // The generator answers 200 with `success:false` for some failures, so status alone is not
+      // the verdict — trusting it would hand the widget a null image and call it a success.
+      if (!res.ok || body?.success === false) {
+        // Insufficient credits is the merchant's business, not the visitor's — same shape as the
+        // other refusals so the widget has one thing to handle.
+        console.error('[products-3d-api] visualize failed', res.status, JSON.stringify(body).slice(0, 200));
+        return embedJson({ ok: true, available: false, reason: 'generation_failed' }, 200, cors);
+      }
+      imageUrl = body?.image_url ?? body?.images?.[0]?.url ?? body?.url ?? null;
+    } catch (e) {
+      console.error('[products-3d-api] visualize threw', e instanceof Error ? e.message : e);
+      return embedJson({ ok: true, available: false, reason: 'generation_failed' }, 200, cors);
+    }
+
+    if (!imageUrl) {
+      return embedJson({ ok: true, available: false, reason: 'generation_failed' }, 200, cors);
+    }
+    return embedJson({ ok: true, available: true, image_url: imageUrl }, 200, cors);
+  }
+
   // ── #337 "price it" ──────────────────────────────────────────────────────────────────────────
   //
   // The visitor built a spec across the wizard's stages and asked what it costs. Three answers:
