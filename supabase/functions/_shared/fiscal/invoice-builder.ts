@@ -138,6 +138,45 @@ function partyFromCrm(c: any): FiscalParty {
 }
 
 /**
+ * Resolve the counterparty for a fiscal document (#328).
+ *
+ * Prefers the snapshot frozen onto the document at issue over the live CRM row. An issued
+ * invoice must keep saying who it was addressed to: without this, renaming a customer silently
+ * rewrites every past document, and a reprint shows today's identity rather than the one the
+ * document was issued under. It is also what lets a disabled workspace's retained documents keep
+ * rendering after their customers are re-homed to the operator — the CRM row is then in another
+ * workspace and RLS would hand back nothing.
+ *
+ * Note it re-uses `partyFromCrm` rather than reading the snapshot with its own field logic. The
+ * snapshot deliberately stores the same raw field names, so the billing-identity precedence
+ * rules exist in exactly one place and cannot drift between "live" and "frozen" documents.
+ *
+ * Falls back to the live row when there is no snapshot: drafts have not been issued yet, and
+ * documents that predate this column never got one.
+ */
+async function resolveCounterparty(
+  supabase: any,
+  doc: { counterparty_snapshot?: { row?: unknown } | null; customer_company_id?: string | null; customer_contact_id?: string | null },
+): Promise<FiscalParty> {
+  // The snapshot already holds the RESOLVED billing source — `capture_counterparty_snapshot`
+  // walks an attached contact up to its primary company exactly as resolveContactBillingSource
+  // does — so it goes straight into partyFromCrm with no second resolution step.
+  const snapshot = doc.counterparty_snapshot?.row;
+  if (snapshot) return partyFromCrm(snapshot);
+
+  if (doc.customer_company_id) {
+    const { data: c } = await supabase.from('crm_companies').select('*').eq('id', doc.customer_company_id).single();
+    if (c) return partyFromCrm(c);
+  } else if (doc.customer_contact_id) {
+    const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', doc.customer_contact_id).single();
+    // A contact attached to a company is invoiced under the company's billing/VAT identity —
+    // a person who belongs to a business has no separate commercial identity.
+    if (c) return partyFromCrm(await resolveContactBillingSource(supabase, c));
+  }
+  return { vatNumber: '', country: 'GR', branch: 0 };
+}
+
+/**
  * If a sub-unit (branch / establishment) address was chosen on the document, re-address the
  * counterpart to that unit instead of the party's main address, carrying its ΑΑΔΕ branch
  * number. No-op when unitId is null/empty. Returns the (possibly) updated party.
@@ -205,16 +244,7 @@ export async function buildInvoiceInputFromDb(
     email: fs?.business_email ?? undefined,
   };
 
-  let counterpart: FiscalParty = { vatNumber: '', country: 'GR', branch: 0 };
-  if (inv.customer_company_id) {
-    const { data: c } = await supabase.from('crm_companies').select('*').eq('id', inv.customer_company_id).single();
-    if (c) counterpart = partyFromCrm(c);
-  } else if (inv.customer_contact_id) {
-    const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', inv.customer_contact_id).single();
-    // Items 6/7/8 — a contact attached to a company is invoiced under the company's
-    // billing/VAT identity unless it explicitly overrides (resolveContactBillingSource).
-    if (c) counterpart = partyFromCrm(await resolveContactBillingSource(supabase, c));
-  }
+  let counterpart: FiscalParty = await resolveCounterparty(supabase, inv);
   counterpart = await applyCounterpartAddressUnit(supabase, counterpart, inv.customer_address_unit_id);
 
   const rate = Number(inv.vat_rate ?? fs?.default_vat_rate ?? 24);
@@ -443,14 +473,10 @@ export async function buildCreditNoteInputFromDb(
     email: fs?.business_email ?? undefined,
   };
 
-  let counterpart: FiscalParty = { vatNumber: '', country: 'GR', branch: 0 };
-  if (inv.customer_company_id) {
-    const { data: c } = await supabase.from('crm_companies').select('*').eq('id', inv.customer_company_id).single();
-    if (c) counterpart = partyFromCrm(c);
-  } else if (inv.customer_contact_id) {
-    const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', inv.customer_contact_id).single();
-    if (c) counterpart = partyFromCrm(await resolveContactBillingSource(supabase, c));
-  }
+  // From the CORRECTED INVOICE, snapshot included: a credit note must name the same party the
+  // document it corrects named. Reading the credit note's own customer refs (or today's CRM)
+  // could address the correction to someone the original invoice never mentioned.
+  let counterpart: FiscalParty = await resolveCounterparty(supabase, inv);
   // Credit note inherits the corrected invoice's chosen sub-unit address.
   counterpart = await applyCounterpartAddressUnit(supabase, counterpart, inv.customer_address_unit_id);
 
@@ -554,14 +580,9 @@ export async function buildDeliveryNoteInputFromDb(
     email: fs?.business_email ?? undefined,
   };
 
-  let counterpart: FiscalParty = { vatNumber: '', country: 'GR', branch: 0 };
-  if (dn.customer_company_id) {
-    const { data: c } = await supabase.from('crm_companies').select('*').eq('id', dn.customer_company_id).single();
-    if (c) counterpart = partyFromCrm(c);
-  } else if (dn.customer_contact_id) {
-    const { data: c } = await supabase.from('crm_contacts').select('*').eq('id', dn.customer_contact_id).single();
-    if (c) counterpart = partyFromCrm(await resolveContactBillingSource(supabase, c));
-  }
+  // A delivery note carries its OWN customer refs (it can precede any invoice), so it gets its
+  // own snapshot rather than inheriting one.
+  const counterpart: FiscalParty = await resolveCounterparty(supabase, dn);
 
   const lines: FiscalLine[] = (items ?? []).map((it: any, i: number) => ({
     lineNumber: i + 1,
