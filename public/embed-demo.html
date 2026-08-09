@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Embed demo — MaterialKai 3D</title>
+<style>
+  :root {
+    --bg: #f7f4ee; --card: #fff; --line: #e3ddd2; --ink: #221e26; --soft: #6b6560; --accent: #6e6b36;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f0d13; --card: #191521; --line: #2c2436; --ink: #ede7f0; --soft: #a99fb4; --accent: #e14c93; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .page { max-width: 62rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+  .banner { border: 1px dashed var(--line); border-radius: 6px; padding: .7rem .9rem;
+            font-size: .82rem; color: var(--soft); margin-bottom: 2rem; }
+  .banner b { color: var(--ink); }
+  h1 { font-size: 1.5rem; letter-spacing: -.02em; margin: 0 0 .3rem; }
+  .lede { color: var(--soft); margin: 0 0 2rem; max-width: 46rem; line-height: 1.55; }
+  .split { display: grid; gap: 2rem; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); align-items: start; }
+  @media (max-width: 46rem) { .split { grid-template-columns: 1fr; } }
+  .shop { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1.1rem; }
+  .shop h2 { font-size: 1rem; margin: 0 0 .15rem; }
+  .shop .where { font-size: .78rem; color: var(--soft); margin: 0 0 1rem; }
+  h3 { font-size: .82rem; text-transform: uppercase; letter-spacing: .1em; color: var(--soft);
+       margin: 0 0 .6rem; font-weight: 600; }
+  ol { margin: 0 0 1.6rem; padding-left: 1.1rem; display: flex; flex-direction: column; gap: .55rem; }
+  li { line-height: 1.5; font-size: .92rem; }
+  li b { font-weight: 650; }
+  code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .85em;
+         background: color-mix(in oklab, var(--ink) 8%, transparent); padding: .1em .35em; border-radius: 3px; }
+  .cart { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: .8rem .95rem;
+          font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .76rem;
+          line-height: 1.5; white-space: pre-wrap; word-break: break-word; color: var(--soft);
+          max-height: 22rem; overflow: auto; }
+  .snippet { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+             padding: .8rem .95rem; font-family: ui-monospace, Menlo, Consolas, monospace;
+             font-size: .76rem; line-height: 1.6; overflow-x: auto; margin-bottom: 1.6rem; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--line);
+           font-size: .78rem; color: var(--soft); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <p class="banner">
+    <b>Demo page.</b> Seeded product, seeded embed key, <code>noindex</code>. Safe to delete —
+    it is a single file at <code>public/embed-demo.html</code>.
+  </p>
+
+  <h1>What the embed looks like on someone else's website</h1>
+  <p class="lede">
+    Everything in the card on the left is the widget: two lines of HTML on a page that knows nothing
+    about the platform. The model, the finishes, the prices and the compatibility rule all come from
+    the live API.
+  </p>
+
+  <div class="split">
+    <div class="shop">
+      <h2>Lounge Armchair</h2>
+      <p class="where">Pied-à-terre · Living</p>
+
+      <materialkai-product id="w"
+        api-key="mk_embed_demo_4e1ee22a876c4b91a8054a682b4c2082"
+        product-id="b8043c04-86bb-4f72-a6af-e4ebca336608"
+        autorotate="false"
+        show-add-to-cart></materialkai-product>
+    </div>
+
+    <div>
+      <h3>Things worth trying</h3>
+      <ol>
+        <li><b>Drag the model.</b> It is a real 428 KB glTF, uploaded through the platform and served from storage — not a photo.</li>
+        <li><b>Switch the fabric.</b> The legs stay walnut, because a choice targets one glTF <em>material</em>, not the whole model.</li>
+        <li><b>Watch the price.</b> Every change re-asks the server. The widget never adds the numbers up itself, so it cannot disagree with a quote.</li>
+        <li><b>Pick Emerald Velvet <em>and</em> Blackened Oak.</b> A rule the tenant authored fires, and the cart button refuses — the same check blocks it from reaching a quote.</li>
+        <li><b>Add to cart</b> on a valid combination. The payload appears below; on a real shop that is what your cart receives.</li>
+      </ol>
+
+      <h3>The whole integration</h3>
+      <div class="snippet">&lt;script src="/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
+
+&lt;materialkai-product
+  api-key="mk_embed_…"
+  product-id="…"
+  show-add-to-cart&gt;
+&lt;/materialkai-product&gt;</div>
+
+      <h3>What your cart would receive</h3>
+      <div class="cart" id="cart">// nothing yet — add to cart on a valid combination</div>
+    </div>
+  </div>
+
+  <footer>
+    Program <a href="https://github.com/creativeghq/material-kai-vision-platform/issues/321">#321</a> ·
+    embed SDK <a href="https://github.com/creativeghq/material-kai-vision-platform/issues/258">#258</a> ·
+    <a href="/documentation/api-embed.html">Website Embed docs</a>
+  </footer>
+</div>
+
+<script>
+  document.addEventListener('materialkai:add-to-cart', function (e) {
+    document.getElementById('cart').textContent = JSON.stringify(e.detail, null, 2);
+  });
+</script>
+<script src="/embed/materialkai-product.js" defer></script>
+</body>
+</html>
