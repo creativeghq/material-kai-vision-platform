@@ -138,7 +138,22 @@ function serializeModels(supabaseUrl: string, rows: ModelRow[]) {
   }));
 }
 
-Deno.serve(withApiLogging('products-3d-api', async (req) => {
+/**
+ * Logged per ACTION, not as one flat name.
+ *
+ * This endpoint is a dispatcher, and `ops.silent_zero` flags an endpoint whose success rate is
+ * under 5%. Logged flat, an action failing on 100% of its calls hides behind the two that work:
+ * the `event` ingest 400'd on every request and the function's overall rate stayed healthy. That
+ * is the dilution `monitoring-cron` demonstrated — 261 real 5xx sitting at ~74% of calls while a
+ * feature was dead for three months.
+ */
+Deno.serve(withApiLogging((req) => {
+  try {
+    return `products-3d-api?action=${new URL(req.url).searchParams.get('action') ?? 'list'}`;
+  } catch {
+    return 'products-3d-api';
+  }
+}, async (req) => {
   // Both read the environment INSIDE the handler — the secrets bootstrap populates Deno.env at
   // handler entry, so a module-load capture would read undefined (CLAUDE.md secrets rule).
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -192,11 +207,20 @@ Deno.serve(withApiLogging('products-3d-api', async (req) => {
   const url = new URL(req.url);
   let params: Record<string, any> = Object.fromEntries(url.searchParams.entries());
   if (req.method === 'POST') {
-    try {
-      const body = await req.json();
-      if (body && typeof body === 'object') params = { ...params, ...body };
-    } catch {
-      return embedJson({ error: 'Invalid JSON body' }, 400, cors);
+    // A BODYLESS POST is legitimate and must not be an error: the analytics beacon sends
+    // `fetch(url, {method:'POST', keepalive:true})` with everything in the query string, and
+    // `req.json()` throws on an empty body. Treating that as malformed 400'd every single event
+    // — and the beacon swallows its own errors by design, so the metric would have sat at zero
+    // forever with nothing anywhere complaining. Only a body that is PRESENT and unparseable is
+    // a client error.
+    const raw = await req.text();
+    if (raw.trim()) {
+      try {
+        const body = JSON.parse(raw);
+        if (body && typeof body === 'object') params = { ...params, ...body };
+      } catch {
+        return embedJson({ error: 'Invalid JSON body' }, 400, cors);
+      }
     }
   }
 
