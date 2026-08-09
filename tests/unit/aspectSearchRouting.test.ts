@@ -71,23 +71,31 @@ describe('visual_search routes an aspect to an endpoint that honors it', () => {
     ).not.toMatch(/\baspect\s*\?\s*\{\s*aspect\s*\}/);
   });
 
-  it('only reaches for strategy=image when there is no aspect', () => {
+  it('never falls back to strategy=image, which returns unusable rows', () => {
+    // strategy=image ranks on the SLIG vector alone and returns bare
+    // `{image_id, similarity_score}`. The route's enrichment keys on a product id those rows
+    // do not carry, so the agent received UUIDs it could not turn into an answer. The
+    // non-aspect path uses multi_vector, which returns named products with related images.
+    expect(visualSearch).not.toMatch(/'strategy',\s*'image'/);
     expect(
       visualSearch,
-      "setting strategy='image' must be guarded by `if (!aspect)`",
-    ).toMatch(/!aspect[\s\S]{0,120}'strategy',\s*'image'/);
+      'the non-aspect path must ask for multi_vector',
+    ).toMatch(/!aspect[\s\S]{0,120}'strategy',\s*'multi_vector'/);
   });
 
-  it('gates the aspect path on credits before the vision spend', () => {
-    // The aspect path makes MIVAA run a Claude vision analysis of the image. Invariant 10:
-    // the check happens BEFORE the upstream call, never after. The plain path compares
-    // stored vectors only and is deliberately left ungated.
-    const gate = visualSearch.match(/if \(aspect\)[\s\S]{0,400}?reserveCredits\([\s\S]{0,200}?\}/);
-    expect(gate, 'the aspect branch must call reserveCredits before fetching').not.toBeNull();
+  it('gates every path that spends a vision call, before it spends it', () => {
+    // MIVAA runs Claude vision in two cases: an aspect search, and an image search with no
+    // text (the text channels stand down, so the image must supply the query vectors).
+    // Invariant 10 — the check happens BEFORE the upstream call, never after. An image WITH
+    // words reuses stored vectors and is deliberately left ungated.
+    expect(
+      visualSearch,
+      'the gate must cover both the aspect case and the no-text case',
+    ).toMatch(/willRunVision\s*=\s*Boolean\(aspect\)\s*\|\|\s*!\(query \|\| ''\)\.trim\(\)/);
 
     const gateAt = visualSearch.indexOf('reserveCredits');
     const fetchAt = visualSearch.indexOf('await fetch(');
-    expect(gateAt).toBeGreaterThan(-1);
+    expect(gateAt, 'reserveCredits must be called').toBeGreaterThan(-1);
     expect(gateAt, 'the credit gate must run before the upstream call, not after').toBeLessThan(fetchAt);
   });
 

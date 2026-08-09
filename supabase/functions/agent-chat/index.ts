@@ -458,8 +458,16 @@ function createAgentGraph(
             args: toolCall.args,
           });
 
-          // Collect products from search
-          if (toolCall.name === 'material_search' && parsedResult.results) {
+          // Collect products from search.
+          //
+          // visual_search joined this list once its non-aspect path moved to multi_vector,
+          // which returns the same product-shaped rows as material_search. Its ASPECT path
+          // does not — /api/search/by-<aspect> returns `{image_id, similarity_score}` with no
+          // product id or name — so the shape is checked rather than assumed. Mapping those
+          // would have produced a grid of "Unnamed Product" cards with undefined ids.
+          const isProductShaped = Array.isArray(parsedResult.results)
+            && parsedResult.results.some((r: any) => r?.id || r?.product_id || r?.product_name);
+          if (['material_search', 'visual_search'].includes(toolCall.name) && isProductShaped) {
             const products = parsedResult.results.map((r: any) => {
               // MIVAA returns "product_name" not "name", and images in "related_images"
               const productName = r.product_name || r.name || r.title || 'Unnamed Product';

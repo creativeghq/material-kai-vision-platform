@@ -268,12 +268,14 @@ export const createVisualSearchTool = (workspaceId: string, images: string[], us
           return JSON.stringify({ error: 'Invalid image data format' });
         }
 
-        // Gate BEFORE the upstream spend (invariant 10). The aspect path makes MIVAA run a
-        // Claude vision analysis of this image — plain visual similarity only compares
-        // stored vectors and stays free, so only this branch is gated. Reserve-then-refund
-        // mirrors analyze_inspiration_url: it turns away a 0-credit caller without
-        // double-charging, since /api/search/by-<aspect> meters the analysis itself.
-        if (aspect) {
+        // Gate BEFORE the upstream spend (invariant 10). MIVAA runs a Claude vision analysis
+        // of this image in exactly two cases: an aspect search, and an image search with no
+        // text for the text channels to stand on. Both are gated; an image PLUS words reuses
+        // stored vectors and stays free. Reserve-then-refund mirrors analyze_inspiration_url:
+        // it turns away a 0-credit caller without double-charging, since MIVAA meters the
+        // analysis itself.
+        const willRunVision = Boolean(aspect) || !(query || '').trim();
+        if (willRunVision) {
           const gate = await reserveCredits(supabase, userId, workspaceId, 1, 'visual_aspect_search');
           if (!gate.ok) {
             return JSON.stringify({ error: gate.message, insufficient_credits: true });
@@ -300,7 +302,13 @@ export const createVisualSearchTool = (workspaceId: string, images: string[], us
             ? `${MIVAA_GATEWAY_URL}/api/search/by-${aspect}`
             : `${MIVAA_GATEWAY_URL}/api/rag/search`,
         );
-        if (!aspect) url.searchParams.set('strategy', 'image');
+        // Without an aspect this used `strategy=image`, which ranks on the SLIG vector alone
+        // and returns bare `{image_id, similarity_score}` — UUIDs the agent cannot turn into
+        // an answer, since the route's enrichment keys on a product id these rows do not
+        // carry. multi_vector returns named products with related images, and now that an
+        // empty query is valid it answers an image-only search FROM the image: SLIG visual
+        // plus the four aspect vectors and understanding, all derived from one vision call.
+        if (!aspect) url.searchParams.set('strategy', 'multi_vector');
 
         const startTime = Date.now();
 
@@ -326,6 +334,10 @@ export const createVisualSearchTool = (workspaceId: string, images: string[], us
                     min_similarity: 0.3,
                   }
                 : {
+                    // Empty is meaningful and now valid: "match this picture, I have no
+                    // words." MIVAA stands the text-only channels down rather than embedding
+                    // the empty string, instead of us inventing a query to satisfy a
+                    // min_length that no longer exists.
                     query: query || '',
                     workspace_id: workspaceId,
                     image_base64: base64Data,
