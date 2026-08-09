@@ -234,6 +234,8 @@ export class MaterialKaiProduct extends HTMLElement {
     this.metaEl.className = 'meta';
     this.optionsEl = document.createElement('div');
     this.optionsEl.className = 'options';
+    this.violationsEl = document.createElement('div');
+    this.violationsEl.className = 'violations';
     this.actionsEl = document.createElement('div');
     this.actionsEl.className = 'actions';
     this.root.replaceChildren(style, this.frame, this.metaEl, this.optionsEl, this.violationsEl, this.actionsEl);
