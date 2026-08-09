@@ -2760,6 +2760,8 @@ export type Database = {
         Row: {
           created_at: string
           file_size_bytes: number | null
+          material_names: string[] | null
+          mesh_count: number | null
           id: string
           manufacturer_name: string | null
           manufacturer_url: string | null
@@ -2777,6 +2779,8 @@ export type Database = {
         Insert: {
           created_at?: string
           file_size_bytes?: number | null
+          material_names?: string[] | null
+          mesh_count?: number | null
           id?: string
           manufacturer_name?: string | null
           manufacturer_url?: string | null
@@ -2794,6 +2798,8 @@ export type Database = {
         Update: {
           created_at?: string
           file_size_bytes?: number | null
+          material_names?: string[] | null
+          mesh_count?: number | null
           id?: string
           manufacturer_name?: string | null
           manufacturer_url?: string | null
@@ -18862,6 +18868,8 @@ export type Database = {
           extracted_content: string | null
           extraction_type: string
           file_size_bytes: number | null
+          material_names: string[] | null
+          mesh_count: number | null
           id: string
           metadata: Json | null
           page_count: number | null
@@ -18882,6 +18890,8 @@ export type Database = {
           extracted_content?: string | null
           extraction_type: string
           file_size_bytes?: number | null
+          material_names?: string[] | null
+          mesh_count?: number | null
           id?: string
           metadata?: Json | null
           page_count?: number | null
@@ -18902,6 +18912,8 @@ export type Database = {
           extracted_content?: string | null
           extraction_type?: string
           file_size_bytes?: number | null
+          material_names?: string[] | null
+          mesh_count?: number | null
           id?: string
           metadata?: Json | null
           page_count?: number | null
@@ -18930,6 +18942,8 @@ export type Database = {
           created_by: string | null
           depth_m: number | null
           file_size_bytes: number | null
+          material_names: string[] | null
+          mesh_count: number | null
           format: string
           height_m: number | null
           id: string
@@ -18947,6 +18961,8 @@ export type Database = {
           created_by?: string | null
           depth_m?: number | null
           file_size_bytes?: number | null
+          material_names?: string[] | null
+          mesh_count?: number | null
           format: string
           height_m?: number | null
           id?: string
@@ -18964,6 +18980,8 @@ export type Database = {
           created_by?: string | null
           depth_m?: number | null
           file_size_bytes?: number | null
+          material_names?: string[] | null
+          mesh_count?: number | null
           format?: string
           height_m?: number | null
           id?: string

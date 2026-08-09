@@ -91,8 +91,9 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
 
   useEffect(() => { void reload(); }, [reload]);
 
-  // Parse the product's GLB for its material names. Best-effort: no model, or a model we cannot
-  // read, simply leaves the picker empty and the field falls back to free text.
+  // Material names for the target picker. Read from the ROW first — they are recorded at upload
+  // now, so the common case costs nothing. Downloading and parsing the whole GLB just to list three
+  // strings is the fallback for models uploaded before that existed.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -100,6 +101,10 @@ export const ProductOptionsEditor: React.FC<ProductOptionsEditorProps> = ({
         const models = await product3dService.listModels(productId);
         const renderable = models.find((m) => m.format === 'glb' || m.format === 'gltf');
         if (!renderable) return;
+        if (renderable.material_names?.length) {
+          if (!cancelled) setMaterialNames(renderable.material_names);
+          return;
+        }
         const gltf = await new GLTFLoader().loadAsync(modelPublicUrl(renderable));
         if (!cancelled) setMaterialNames(listMaterialNames(gltf.scene));
       } catch {
