@@ -134,6 +134,25 @@ describe('the embed builder can actually pass the bot gate', () => {
       .not.toContain('cf-turnstile');
   });
 
+  it('the challenge lives in the light DOM, projected through a slot', () => {
+    // Whether Cloudflare's explicit render works reliably INSIDE a shadow root is an assumption
+    // that would be invisible until the quote path was dead in production. A slot removes the
+    // question: the element it renders into is an ordinary document child of the host.
+    const mount = method('mountChallenge');
+    expect(mount).toMatch(/holder\.slot = 'turnstile'/);
+    expect(mount, 'the holder must be a LIGHT-DOM child of the host, not of this.root')
+      .toContain('this.appendChild(holder)');
+    expect(mount).not.toContain('this.root');
+    expect(method('quoteForm'), 'nothing projects the holder into the form')
+      .toMatch(/slot\.name = 'turnstile'/);
+  });
+
+  it('mounts the challenge at most once per element', () => {
+    // A second widget would leave the first registered, so a visitor who solved the old one sends
+    // a token belonging to a widget nothing is watching.
+    expect(method('mountChallenge')).toMatch(/if \(!this\.siteKey \|\| this\.challengeHost\) return/);
+  });
+
   it('a failed submit does not re-render the form away', () => {
     // render() rebuilds the whole shadow tree — it would discard the visitor's typed name and
     // email AND a solved challenge, so a transient error would cost them the entire form.

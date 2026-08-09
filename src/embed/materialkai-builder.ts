@@ -129,6 +129,9 @@ export class MaterialKaiBuilder extends HTMLElement {
   private failure = '';
   private siteKey: string | null = null;
   private turnstileToken = '';
+  /** Light-DOM host for the bot challenge, projected into the form through a named slot. */
+  private challengeHost: HTMLDivElement | null = null;
+  private widgetId: string | undefined;
 
   constructor() {
     super();
@@ -225,6 +228,41 @@ export class MaterialKaiBuilder extends HTMLElement {
         ? e.message
         : 'Could not send that. Please try again.';
     }
+  }
+
+  /**
+   * Create the light-DOM challenge host and render into it, at most once per element.
+   *
+   * Once, because Turnstile's own widget is stateful: rendering a second one into a fresh holder
+   * would leave the first still registered, and a visitor who solved the old one would be sending
+   * a token that belongs to a widget nothing is watching.
+   */
+  private mountChallenge() {
+    if (!this.siteKey || this.challengeHost) return;
+
+    const holder = document.createElement('div');
+    holder.slot = 'turnstile';
+    holder.style.paddingBottom = '10px';
+    this.appendChild(holder);
+    this.challengeHost = holder;
+
+    loadTurnstile()
+      .then((api) => {
+        this.widgetId = api.render(holder, {
+          sitekey: this.siteKey,
+          action: 'embed_quote_request',
+          callback: (token: string) => { this.turnstileToken = token; },
+          // An expired token must be cleared, not left to be sent and rejected as stale.
+          'expired-callback': () => { this.turnstileToken = ''; },
+          'error-callback': () => { this.turnstileToken = ''; },
+        });
+      })
+      .catch(() => {
+        // Blocked or unreachable CDN. Submit without a token and let the server rule on it —
+        // holding the form hostage to a third-party script would lose the lead outright.
+        holder.remove();
+        this.challengeHost = null;
+      });
   }
 
   /** Hand a matched product to the product widget, so the model and AR come for free. */
@@ -404,31 +442,23 @@ export class MaterialKaiBuilder extends HTMLElement {
 
     card.append(mk('Your name', name), mk('Email', email), mk('Message (optional)', msg));
 
-    // The bot challenge, when the platform has one configured. It is rendered EXPLICITLY with an
-    // element reference rather than by Cloudflare's automatic class-based scan: that scan is a
-    // `document.querySelectorAll`, which does not descend into a shadow root, so the automatic
-    // mode finds nothing inside a web component and the challenge never appears.
-    let widgetId: string | undefined;
+    // The bot challenge lives in the LIGHT DOM and is projected in here through a slot.
+    //
+    // Not a style preference — it removes a question I could not otherwise answer. Cloudflare's
+    // automatic mode is a `document.querySelectorAll`, which cannot descend into a shadow root, and
+    // whether the explicit API renders reliably into one is exactly the kind of assumption that is
+    // invisible until it is dead in production. A slot sidesteps it: the element Cloudflare renders
+    // into is an ordinary document child of the host, styled and scripted like any other, and the
+    // shadow tree merely projects it into place.
+    //
+    // It also survives re-renders. The holder is not part of the shadow tree, so rebuilding the
+    // shadow DOM cannot destroy a solved challenge; when no slot is on screen it is simply not
+    // projected, and it comes back intact if the visitor returns to the form.
     if (this.siteKey) {
-      const holder = document.createElement('div');
-      holder.style.paddingBottom = '10px';
-      card.appendChild(holder);
-      loadTurnstile()
-        .then((api) => {
-          widgetId = api.render(holder, {
-            sitekey: this.siteKey,
-            action: 'embed_quote_request',
-            callback: (token: string) => { this.turnstileToken = token; },
-            // An expired token must be cleared, not left to be sent and rejected as stale.
-            'expired-callback': () => { this.turnstileToken = ''; },
-            'error-callback': () => { this.turnstileToken = ''; },
-          });
-        })
-        .catch(() => {
-          // Blocked or unreachable CDN. Submit without a token and let the server rule on it —
-          // holding the form hostage to a third-party script would lose the lead outright.
-          holder.remove();
-        });
+      const slot = document.createElement('slot');
+      slot.name = 'turnstile';
+      card.appendChild(slot);
+      this.mountChallenge();
     }
 
     // The form's own error line. Local rather than the element-wide `failure`, because showing that
@@ -451,7 +481,7 @@ export class MaterialKaiBuilder extends HTMLElement {
       // a retry without a reset is guaranteed to fail a second time for a different reason.
       this.turnstileToken = '';
       const api = (window as unknown as { turnstile?: TurnstileApi }).turnstile;
-      if (api && widgetId !== undefined) api.reset(widgetId);
+      if (api && this.widgetId !== undefined) api.reset(this.widgetId);
     };
 
     go.addEventListener('click', () => {
