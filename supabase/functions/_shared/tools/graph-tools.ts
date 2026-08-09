@@ -476,6 +476,30 @@ export const createPriceMySpecTool = (
       }
 
       const verdict = priced ? 'exact' : (res.match_kind === 'exact' ? 'none' : res.match_kind ?? 'none');
+
+      // ON A MISS, HAND BACK THE REAL VOCABULARY.
+      //
+      // The agent does not know this workspace's facet KEYS. Asked "how much for a navy armchair"
+      // it will reasonably send {"color": "navy"} when the key is `available_colors`, get nothing,
+      // and tell the customer we do not stock it — a confident wrong answer, which is worse than
+      // an error. It cannot guess its way out either: the keys are whatever this tenant's catalog
+      // happens to use.
+      //
+      // So a miss returns what could have been asked, and the guidance tells the agent to retry
+      // before concluding anything. Only on the SECOND miss is "we don't have it" trustworthy.
+      let vocabulary: unknown = undefined;
+      if (!priced) {
+        const { data: vocab } = await sb.rpc('get_embed_spec_options', {
+          p_workspace_id: workspaceId,
+          p_product_ids: null,
+          p_max_facets: 12,
+          p_max_values: 30,
+        });
+        vocabulary = (Array.isArray(vocab) ? vocab : []).map((f: any) => ({
+          key: f.facet_key,
+          values: (f.values ?? []).filter((v: any) => v.in_catalog).map((v: any) => v.value),
+        })).filter((f: any) => f.values.length > 0);
+      }
       onChunk?.({
         type: 'spec_pricing_result',
         workspace_id: workspaceId,
@@ -495,9 +519,14 @@ export const createPriceMySpecTool = (
         spec: fullSpec,
         product: priced,
         near_matches: res.near_matches ?? [],
+        available_vocabulary: vocabulary,
         guidance: priced
           ? 'An exact match exists. Quote this price.'
-          : 'Nothing in the catalogue satisfies this specification. Do NOT estimate a price — offer to raise a quote request instead. Near matches are suggestions and carry no price on purpose.',
+          : 'No match for the keys you used. FIRST check `available_vocabulary` above — it lists the '
+            + 'facet keys and in-stock values this catalogue actually uses, and your key names may '
+            + 'simply differ (e.g. "color" vs "available_colors"). Retry once with the real keys. '
+            + 'If it still misses, the catalogue genuinely does not have it: do NOT estimate a price '
+            + '— offer to raise a quote request. Near matches are suggestions and carry no price on purpose.',
       });
     },
     {
