@@ -19,6 +19,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { isOriginAllowed, embedCorsHeaders } from '../../supabase/functions/_shared/cors';
+import { intersectIdFilters } from '../../supabase/functions/_shared/embed-key';
 import { normalizeOriginList, isWildcardOriginList } from '@/utils/embedOrigins';
 
 const req = (origin?: string | null) =>
@@ -107,6 +108,42 @@ describe('embedCorsHeaders', () => {
   it('advertises the embed key header, or the browser strips it from the real request', () => {
     const headers = embedCorsHeaders(req('https://shop.acme.com'), ['https://shop.acme.com']);
     expect(headers?.['Access-Control-Allow-Headers']).toContain('x-embed-key');
+  });
+});
+
+/**
+ * `null` = "this filter did not restrict anything"; `[]` = "this filter matched nothing".
+ *
+ * Both read as empty-ish and they are one keystroke apart, and swapping them fails in opposite,
+ * silent directions: `[]` treated as unrestricted serves the WHOLE catalog through a key scoped to
+ * one collection, and `null` treated as empty serves an empty shelf through a working key. A
+ * catalog is a valid response either way, so nothing downstream can notice.
+ */
+describe('intersectIdFilters — null is not the same as empty', () => {
+  it('returns null only when nothing restricted', () => {
+    expect(intersectIdFilters(null, null)).toBeNull();
+    expect(intersectIdFilters()).toBeNull();
+  });
+
+  it('a single restriction passes through', () => {
+    expect(intersectIdFilters(['a', 'b'], null)).toEqual(['a', 'b']);
+    expect(intersectIdFilters(null, ['a', 'b'])).toEqual(['a', 'b']);
+  });
+
+  it('an empty restriction wins — it means nothing matches, not "no filter"', () => {
+    expect(intersectIdFilters([], null)).toEqual([]);
+    expect(intersectIdFilters(['a', 'b'], [])).toEqual([]);
+    expect(intersectIdFilters([], ['a'])).toEqual([]);
+  });
+
+  it('intersects rather than unions, so a caller cannot widen past the key scope', () => {
+    // Key scoped to a+b; caller asks for only_3d which matches b+c. Only b is legitimately visible.
+    expect(intersectIdFilters(['a', 'b'], ['b', 'c'])).toEqual(['b']);
+    expect(intersectIdFilters(['a'], ['b'])).toEqual([]);
+  });
+
+  it('handles three restrictions', () => {
+    expect(intersectIdFilters(['a', 'b', 'c'], ['b', 'c'], ['c'])).toEqual(['c']);
   });
 });
 

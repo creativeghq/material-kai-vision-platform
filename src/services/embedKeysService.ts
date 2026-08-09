@@ -22,12 +22,61 @@ export { normalizeOriginList, isWildcardOriginList } from '@/utils/embedOrigins'
 
 export type EmbedKey = Tables<'material_kai_keys'>;
 
+/**
+ * Which slice of the published catalog a key may read.
+ *
+ * Mirrors the `material_kai_keys_scope_type_check` CHECK — a value this union allows but the
+ * constraint rejects fails at insert time, so the two must stay in step.
+ */
+export type EmbedScopeType = 'all' | 'categories' | 'products';
+
 export interface EmbedKeyInput {
   key_name: string;
   description?: string | null;
   /** Browser origins allowed to use the key. `['*']` = any site. Empty = no browser may use it. */
   allowed_origins: string[];
   rate_limit_per_minute: number;
+  scope_type: EmbedScopeType;
+  /** Category ids or product ids per `scope_type`. Must be empty iff scope_type is 'all'. */
+  scope_values: string[];
+}
+
+export interface EmbedScopeOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * The catalog scope a key can be limited to.
+ *
+ * Categories come from `material_categories`, a GLOBAL taxonomy with no workspace column — so the
+ * list is the same for every tenant, and the scope only ever means "this category *within my
+ * workspace*". The server applies the workspace filter independently, so picking a category can
+ * never widen a key past its own tenant.
+ */
+export async function listScopeCategories(): Promise<EmbedScopeOption[]> {
+  const { data, error } = await supabase
+    .from('material_categories')
+    .select('id, name, display_name')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((c) => ({ id: c.id, label: c.display_name || c.name }));
+}
+
+/** Type-ahead over the workspace's own products, for an explicit product allowlist. */
+export async function searchScopeProducts(workspaceId: string, term: string): Promise<EmbedScopeOption[]> {
+  const q = term.trim();
+  let query = supabase
+    .from('products')
+    .select('id, name')
+    .eq('workspace_id', workspaceId)
+    .order('name', { ascending: true })
+    .limit(20);
+  if (q) query = query.ilike('name', `%${q}%`);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map((p) => ({ id: p.id, label: p.name ?? '(unnamed)' }));
 }
 
 /** Sensible ceiling for a per-key quota — high enough for a busy shop, low enough to be a cap. */
@@ -69,6 +118,11 @@ export const embedKeysService = {
         description: input.description?.trim() || null,
         allowed_origins: input.allowed_origins,
         rate_limit_per_minute: clampRate(input.rate_limit_per_minute),
+        // Normalized together: the CHECK requires values to be empty for 'all' and non-empty
+        // otherwise, so sending a stale list alongside 'all' is a constraint violation rather than
+        // a harmless extra field.
+        scope_type: input.scope_type,
+        scope_values: input.scope_type === 'all' ? [] : input.scope_values,
         is_active: true,
         created_by: auth.user?.id ?? null,
       })
@@ -87,6 +141,14 @@ export const embedKeysService = {
         ...(patch.allowed_origins !== undefined ? { allowed_origins: patch.allowed_origins } : {}),
         ...(patch.rate_limit_per_minute !== undefined
           ? { rate_limit_per_minute: clampRate(patch.rate_limit_per_minute) }
+          : {}),
+        // Scope moves as a PAIR or not at all — updating one half would leave the row in a state
+        // the CHECK rejects (e.g. type 'all' still carrying its old values).
+        ...(patch.scope_type !== undefined
+          ? {
+            scope_type: patch.scope_type,
+            scope_values: patch.scope_type === 'all' ? [] : (patch.scope_values ?? []),
+          }
           : {}),
         ...(patch.is_active !== undefined ? { is_active: patch.is_active } : {}),
         updated_at: new Date().toISOString(),

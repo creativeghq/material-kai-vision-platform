@@ -24,7 +24,9 @@
  */
 import { serviceClient } from '../_shared/supabase-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { authenticateEmbedKey, embedJson } from '../_shared/embed-key.ts';
+import {
+  authenticateEmbedKey, embedJson, intersectIdFilters, type EmbedKeyContext,
+} from '../_shared/embed-key.ts';
 import { embedCorsHeaders } from '../_shared/cors.ts';
 import { imagesFromMetadata } from '../_shared/product-media.ts';
 import { grossFromNet } from '../_shared/money.ts';
@@ -34,6 +36,63 @@ const MAX_LIMIT = 60;
 
 /** Ceiling on the id list used to pre-filter `only_3d` requests. See the comment at its use. */
 const MAX_MODEL_ID_FILTER = 2000;
+
+/** Ceiling on the id list resolved from a category scope. Same reasoning as above. */
+const MAX_SCOPE_ID_FILTER = 5000;
+
+/**
+ * The product ids this KEY may read, or null when the key is unrestricted.
+ *
+ * Server-side and non-negotiable: the scope lives on the key row, never in a request parameter,
+ * because the key is publishable and anything the request can assert an attacker can assert too.
+ */
+async function scopeRestriction(
+  supabase: ReturnType<typeof serviceClient>,
+  ctx: EmbedKeyContext,
+): Promise<string[] | null> {
+  if (ctx.scopeType === 'all') return null;
+  if (ctx.scopeValues.length === 0) return [];       // scoped to nothing — serve nothing
+  if (ctx.scopeType === 'products') return ctx.scopeValues;
+
+  // categories → resolve to product ids. The workspace filter is applied here as well as on the
+  // main query: `material_categories` is a GLOBAL taxonomy, so a category id alone says nothing
+  // about tenancy and must never be the only thing narrowing the rows.
+  const { data } = await supabase
+    .from('products')
+    .select('id')
+    .eq('workspace_id', ctx.workspaceId)
+    .in('category_id', ctx.scopeValues)
+    .limit(MAX_SCOPE_ID_FILTER);
+  return (data ?? []).map((p: any) => p.id as string);
+}
+
+/**
+ * Is ONE product inside the key's scope? Asked exactly, not against the capped list above.
+ *
+ * The list path can tolerate `MAX_SCOPE_ID_FILTER` truncating a very large category scope — it
+ * costs a few rows off the end of a shelf. The single-product path cannot: a truncated list would
+ * 404 a product the key is genuinely entitled to, and that is what a deep link from the partner's
+ * site hits. So the category case re-asks the question about this one id, which is an indexed
+ * lookup with no ceiling.
+ */
+async function isProductInScope(
+  supabase: ReturnType<typeof serviceClient>,
+  ctx: EmbedKeyContext,
+  productId: string,
+): Promise<boolean> {
+  if (ctx.scopeType === 'all') return true;
+  if (ctx.scopeValues.length === 0) return false;
+  if (ctx.scopeType === 'products') return ctx.scopeValues.includes(productId);
+
+  const { data } = await supabase
+    .from('products')
+    .select('id')
+    .eq('workspace_id', ctx.workspaceId)
+    .eq('id', productId)
+    .in('category_id', ctx.scopeValues)
+    .maybeSingle();
+  return !!data;
+}
 
 interface ModelRow {
   format: string;
@@ -174,11 +233,18 @@ Deno.serve(withApiLogging('products-3d-api', async (req) => {
         .eq('status', 'ready')
         .limit(MAX_MODEL_ID_FILTER);
       modelledIds = [...new Set((modelled ?? []).map((m: any) => m.product_id as string))];
-      if (modelledIds.length === 0) return embedJson({ ok: true, products: [] }, 200, cors);
+    }
+
+    // The key's scope and the caller's only_3d are both id restrictions; `null` from either means
+    // "did not restrict". Intersecting them keeps the scope authoritative — a caller cannot widen
+    // past it, only narrow further.
+    const restrictIds = intersectIdFilters(await scopeRestriction(supabase, auth.ctx), modelledIds);
+    if (restrictIds !== null && restrictIds.length === 0) {
+      return embedJson({ ok: true, products: [] }, 200, cors);
     }
 
     let query = publishedQuery();
-    if (modelledIds) query = query.in('product_id', modelledIds);
+    if (restrictIds) query = query.in('product_id', restrictIds);
     // Stable order, or `range()` paginates over an undefined sequence and pages can repeat or drop
     // rows between calls.
     const { data: rows, error } = await query
@@ -225,6 +291,14 @@ Deno.serve(withApiLogging('products-3d-api', async (req) => {
   if (action === 'product') {
     const productId = String(params.product_id ?? '').trim();
     if (!productId) return embedJson({ error: 'product_id is required' }, 400, cors);
+
+    // Scope is enforced HERE too, not only on `list`. Checking it only on the listing would make
+    // it decorative: a scoped key could still read any published product by naming its id, which
+    // is the whole thing the scope exists to prevent. Same 404 as another tenant's product, so an
+    // out-of-scope id and a non-existent one stay indistinguishable.
+    if (!(await isProductInScope(supabase, auth.ctx, productId))) {
+      return embedJson({ error: 'Product not found' }, 404, cors);
+    }
 
     const { data: row } = await publishedQuery().eq('product_id', productId).maybeSingle();
     // 404 rather than 403 when the product belongs to another tenant or is unpublished — the two

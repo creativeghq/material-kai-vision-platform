@@ -17,12 +17,43 @@
 import type { DbClient } from './supabase-client.ts';
 import { embedCorsHeaders } from './cors.ts';
 
+export type EmbedScopeType = 'all' | 'categories' | 'products';
+
 export interface EmbedKeyContext {
   keyId: string;
   /** Derived from the key row. The ONLY source of tenancy on an embed request. */
   workspaceId: string;
+  /**
+   * Which slice of the published catalog this key may read.
+   *
+   * Enforced server-side on every action. It cannot be a request parameter: the key is public, so
+   * anything the request can say, an attacker can say too.
+   */
+  scopeType: EmbedScopeType;
+  scopeValues: string[];
   /** CORS headers every response on this request must carry. */
   cors: Record<string, string>;
+}
+
+/**
+ * Combine id restrictions, where `null` means "no restriction" and `[]` means "nothing matches".
+ *
+ * That distinction is the whole reason this is a named, tested function rather than an inline
+ * `&&`. The two values are both falsy-ish to a reader, they are one keystroke apart, and getting
+ * them backwards fails in opposite and equally silent directions: treating `[]` as "unrestricted"
+ * serves the ENTIRE catalog through a scoped key, and treating `null` as "nothing" serves an empty
+ * shelf through a working one. Neither raises.
+ *
+ * Intersection, not union — every restriction present must hold (a key scoped to a category, asked
+ * for only_3d, gets the products that are both).
+ */
+export function intersectIdFilters(...filters: (string[] | null)[]): string[] | null {
+  const present = filters.filter((f): f is string[] => f !== null);
+  if (present.length === 0) return null;
+  return present.reduce((acc, next) => {
+    const nextSet = new Set(next);
+    return acc.filter((id) => nextSet.has(id));
+  });
 }
 
 export type EmbedAuthResult =
@@ -80,7 +111,7 @@ export async function authenticateEmbedKey(
 
   const { data: row, error } = await supabase
     .from('material_kai_keys')
-    .select('id, workspace_id, is_active, expires_at, allowed_origins, rate_limit_per_minute')
+    .select('id, workspace_id, is_active, expires_at, allowed_origins, rate_limit_per_minute, scope_type, scope_values')
     .eq('api_key', key)
     .maybeSingle();
 
@@ -120,6 +151,16 @@ export async function authenticateEmbedKey(
 
   return {
     ok: true,
-    ctx: { keyId: row.id as string, workspaceId: row.workspace_id as string, cors },
+    ctx: {
+      keyId: row.id as string,
+      workspaceId: row.workspace_id as string,
+      // Default to the most restrictive reading of a missing value. A row that somehow carries no
+      // scope_type is a bug, and an unrecognised one must not fall through to "serve everything".
+      scopeType: (['all', 'categories', 'products'] as const).includes(row.scope_type as EmbedScopeType)
+        ? (row.scope_type as EmbedScopeType)
+        : 'products',
+      scopeValues: (row.scope_values as string[] | null) ?? [],
+      cors,
+    },
   };
 }

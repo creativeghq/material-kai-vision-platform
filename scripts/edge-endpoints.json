@@ -1551,7 +1551,7 @@
     "name": "products-3d-api",
     "tag": "Products",
     "summary": "Public product + 3D model read for the website embed SDK",
-    "description": "Anonymous read API for the <materialkai-product> embed (#321 M1 / #258). Authenticated by a publishable embed key (material_kai_keys) sent as the x-embed-key header or ?key= query param; the key resolves the workspace, so no caller-supplied workspace id is ever trusted. The key's allowed_origins drives per-request CORS (browser-enforced) and its rate_limit_per_minute is consumed atomically per call. Serves only products with a storefront-published price row — the same publication gate as the online storefront.",
+    "description": "Anonymous read API for the <materialkai-product> embed (#321 M1 / #258). Authenticated by a publishable embed key (material_kai_keys) sent as the x-embed-key header or ?key= query param; the key resolves the workspace, so no caller-supplied workspace id is ever trusted. The key's allowed_origins drives per-request CORS (browser-enforced) and its rate_limit_per_minute is consumed atomically per call. Serves only products with a storefront-published price row — the same publication gate as the online storefront. Each key additionally carries a catalog scope (all | categories | products) enforced server-side on BOTH actions: a scoped key naming an out-of-scope product_id gets the same 404 as another tenant's id, and request params can only narrow the scope, never widen it.",
     "security": [
       "public"
     ],

@@ -14686,6 +14686,8 @@ export type Database = {
           rate_limit_per_minute: number | null
           rate_window_count: number
           rate_window_started_at: string
+          scope_type: string
+          scope_values: string[]
           updated_at: string | null
           usage_count: number | null
           workspace_id: string
@@ -14705,6 +14707,8 @@ export type Database = {
           rate_limit_per_minute?: number | null
           rate_window_count?: number
           rate_window_started_at?: string
+          scope_type?: string
+          scope_values?: string[]
           updated_at?: string | null
           usage_count?: number | null
           workspace_id: string
@@ -14724,6 +14728,8 @@ export type Database = {
           rate_limit_per_minute?: number | null
           rate_window_count?: number
           rate_window_started_at?: string
+          scope_type?: string
+          scope_values?: string[]
           updated_at?: string | null
           usage_count?: number | null
           workspace_id?: string

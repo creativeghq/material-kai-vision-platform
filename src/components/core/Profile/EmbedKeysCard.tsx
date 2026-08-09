@@ -24,13 +24,24 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/core/ui/alert-dialog';
+import { Checkbox } from '@/components/core/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 import {
   embedKeysService, normalizeOriginList, isWildcardOriginList,
-  MAX_RATE_LIMIT_PER_MINUTE, type EmbedKey,
+  listScopeCategories, searchScopeProducts,
+  MAX_RATE_LIMIT_PER_MINUTE, type EmbedKey, type EmbedScopeType, type EmbedScopeOption,
 } from '@/services/embedKeysService';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
 
 const DEFAULT_RATE = 60;
+
+/** What a key is limited to, in the row summary. Counts, not ids — ids mean nothing at a glance. */
+function scopeLabel(key: EmbedKey): string {
+  const n = key.scope_values?.length ?? 0;
+  if (key.scope_type === 'categories') return `${n} ${n === 1 ? 'category' : 'categories'}`;
+  if (key.scope_type === 'products') return `${n} ${n === 1 ? 'product' : 'products'}`;
+  return 'Everything published';
+}
 
 /**
  * The snippet a tenant copies.
@@ -57,7 +68,44 @@ export const EmbedKeysCard: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<EmbedKey | null>(null);
 
-  const [form, setForm] = useState({ name: '', origins: '', rate: DEFAULT_RATE, allowAny: false });
+  const [form, setForm] = useState({
+    name: '', origins: '', rate: DEFAULT_RATE, allowAny: false,
+    scopeType: 'all' as EmbedScopeType, scopeValues: [] as string[],
+  });
+
+  // Scope pickers. Categories are a short fixed list (a global taxonomy, ~a dozen entries), so they
+  // load once as checkboxes; products are unbounded per workspace, so they type-ahead.
+  const [categories, setCategories] = useState<EmbedScopeOption[]>([]);
+  const [productTerm, setProductTerm] = useState('');
+  const [productHits, setProductHits] = useState<EmbedScopeOption[]>([]);
+  // Labels for already-chosen products, so a selection stays readable after the search box clears.
+  const [chosenProducts, setChosenProducts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!creating || form.scopeType !== 'categories' || categories.length) return;
+    listScopeCategories().then(setCategories).catch(() => setCategories([]));
+  }, [creating, form.scopeType, categories.length]);
+
+  useEffect(() => {
+    if (!creating || form.scopeType !== 'products' || !activeWorkspaceId) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      searchScopeProducts(activeWorkspaceId, productTerm)
+        .then((hits) => { if (!cancelled) setProductHits(hits); })
+        .catch(() => { if (!cancelled) setProductHits([]); });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [creating, form.scopeType, productTerm, activeWorkspaceId]);
+
+  const toggleScopeValue = (option: EmbedScopeOption) => {
+    setForm((f) => ({
+      ...f,
+      scopeValues: f.scopeValues.includes(option.id)
+        ? f.scopeValues.filter((v) => v !== option.id)
+        : [...f.scopeValues, option.id],
+    }));
+    setChosenProducts((prev) => ({ ...prev, [option.id]: option.label }));
+  };
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) return;
@@ -77,7 +125,12 @@ export const EmbedKeysCard: React.FC = () => {
 
   useEffect(() => { void load(); }, [load]);
 
-  const resetForm = () => setForm({ name: '', origins: '', rate: DEFAULT_RATE, allowAny: false });
+  const resetForm = () => {
+    setForm({ name: '', origins: '', rate: DEFAULT_RATE, allowAny: false, scopeType: 'all', scopeValues: [] });
+    setProductTerm('');
+    setProductHits([]);
+    setChosenProducts({});
+  };
 
   const handleCreate = async () => {
     if (!activeWorkspaceId) return;
@@ -94,12 +147,25 @@ export const EmbedKeysCard: React.FC = () => {
       });
       return;
     }
+    // The CHECK rejects a scoped key with an empty list, and a key that serves nothing is a
+    // support ticket rather than a configuration — catch it here with a sentence instead of a
+    // constraint error.
+    if (form.scopeType !== 'all' && form.scopeValues.length === 0) {
+      toast({
+        title: form.scopeType === 'categories' ? 'Pick at least one category' : 'Pick at least one product',
+        description: 'A limited key with nothing selected would return an empty catalog.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSaving(true);
     try {
       await embedKeysService.create(activeWorkspaceId, {
         key_name: form.name,
         allowed_origins: origins,
         rate_limit_per_minute: form.rate,
+        scope_type: form.scopeType,
+        scope_values: form.scopeValues,
       });
       toast({ title: 'Embed key created' });
       setCreating(false);
@@ -200,7 +266,8 @@ export const EmbedKeysCard: React.FC = () => {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {key.rate_limit_per_minute ?? DEFAULT_RATE} requests/min
+                        {scopeLabel(key)}
+                        {' · '}{key.rate_limit_per_minute ?? DEFAULT_RATE} requests/min
                         {/* Counts every call the key made, including ones the quota refused —
                             "served" would overstate it. */}
                         {key.usage_count ? ` · ${key.usage_count} requests` : ' · never used'}
@@ -313,6 +380,81 @@ export const EmbedKeysCard: React.FC = () => {
                   become readable from any site on the internet.
                 </p>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>What this key can show</Label>
+              <RadioGroup
+                className="space-y-1.5"
+                value={form.scopeType}
+                onValueChange={(v) => setForm((f) => ({ ...f, scopeType: v as EmbedScopeType, scopeValues: [] }))}
+              >
+                {([
+                  ['all', 'Everything published', 'All products you have published to your online store.'],
+                  ['categories', 'Only certain categories', 'Good for a partner who should see one range.'],
+                  ['products', 'Only specific products', 'The tightest option — an exact list.'],
+                ] as [EmbedScopeType, string, string][]).map(([value, label, hint]) => (
+                  <label
+                    key={value}
+                    htmlFor={`embed-scope-${value}`}
+                    className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${
+                      form.scopeType === value ? 'border-primary' : 'border-border/60'
+                    }`}
+                  >
+                    <RadioGroupItem value={value} id={`embed-scope-${value}`} className="mt-1" />
+                    <span className="space-y-0.5">
+                      <span className="block text-sm">{label}</span>
+                      <span className="block text-xs text-muted-foreground">{hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </RadioGroup>
+
+              {form.scopeType === 'categories' && (
+                <div className="max-h-44 space-y-1.5 overflow-y-auto rounded-md border border-border/60 p-3">
+                  {categories.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Loading categories…</p>
+                  ) : categories.map((c) => (
+                    <label key={c.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={form.scopeValues.includes(c.id)}
+                        onCheckedChange={() => toggleScopeValue(c)}
+                      />
+                      <span>{c.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {form.scopeType === 'products' && (
+                <div className="space-y-2 rounded-md border border-border/60 p-3">
+                  <Input
+                    placeholder="Search your products…"
+                    value={productTerm}
+                    onChange={(e) => setProductTerm(e.target.value)}
+                  />
+                  <div className="max-h-36 space-y-1.5 overflow-y-auto">
+                    {productHits.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        {productTerm ? 'No products match.' : 'No products in this workspace yet.'}
+                      </p>
+                    ) : productHits.map((p) => (
+                      <label key={p.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={form.scopeValues.includes(p.id)}
+                          onCheckedChange={() => toggleScopeValue(p)}
+                        />
+                        <span className="truncate">{p.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {form.scopeValues.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Selected: {form.scopeValues.map((id) => chosenProducts[id] ?? id).join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5">
