@@ -39,7 +39,7 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildQuoteRequestFilters } from '../components/quoteFilters';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems, StatusTag } from '../services/QuotesService';
+import { quotesService, QuoteWithItems, StatusTag, UnquotedRequest } from '../services/QuotesService';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -67,6 +67,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [statusTags, setStatusTags] = useState<StatusTag[]>([]);
   const [page, setPage] = useState(1);
+  const [inbox, setInbox] = useState<UnquotedRequest[]>([]);
 
   // Slide-out panels state
   const [showTimelinePanel, setShowTimelinePanel] = useState(false);
@@ -85,6 +86,15 @@ export const QuoteRequestsAdmin: React.FC = () => {
     loadUsers();
     loadStatusTags();
   }, []);
+
+  // Keyed on the workspace: the inbox is workspace-scoped, and on first paint activeWorkspaceId is
+  // still resolving, so loading it alongside the rest would query with undefined and show nothing.
+  useEffect(() => {
+    if (!activeWorkspaceId) { setInbox([]); return; }
+    quotesService.listUnquotedRequests(activeWorkspaceId)
+      .then(setInbox)
+      .catch((e) => console.error('Error loading incoming requests:', e));
+  }, [activeWorkspaceId]);
 
   const loadQuoteRequests = async () => {
     try {
@@ -332,6 +342,73 @@ export const QuoteRequestsAdmin: React.FC = () => {
             <div className="text-2xl font-bold">{quoteRequests.filter(q => q.status === 'draft').length}</div>
           </div>
         </div>
+
+        {/*
+          Incoming requests with no quote yet (#337).
+
+          The table below reads `quotes`, so it can only show work that already exists. A request
+          from the website embed has no quote — that is the point of it — so these were arriving in
+          `quote_requests` and being read by nobody. Rendered only when there are some: an empty
+          section every day teaches people to skip past it, and then it is invisible again on the
+          day it is not empty.
+        */}
+        {inbox.length > 0 && (
+          <>
+            <SectionHeader
+              title="Incoming requests"
+              subtitle="Specifications sent from your website. Nothing here has been priced yet."
+            />
+            <div className="dashboard-card overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>From</TableHead>
+                    <TableHead>What they asked for</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Received</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inbox.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell>
+                        <div className="font-medium">{r.contact_name ?? 'Unknown'}</div>
+                        {r.contact_email && (
+                          <div className="text-xs text-muted-foreground">{r.contact_email}</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-md">
+                        {Object.keys(r.spec).length > 0 ? (
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                            {Object.entries(r.spec).map(([k, v]) => (
+                              <span key={k}>
+                                <span className="text-muted-foreground">
+                                  {k.replace(/_/g, ' ')}:
+                                </span>{' '}
+                                {Array.isArray(v) ? v.join(', ') : String(v)}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">No specification given</span>
+                        )}
+                        {r.notes && (
+                          <div className="text-xs text-muted-foreground mt-1">{r.notes}</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {r.from_embed ? 'Website embed' : r.source}
+                      </TableCell>
+                      <TableCell className={`text-sm ${statusTone(r.status)}`}>{r.status}</TableCell>
+                      <TableCell className="text-sm">{formatDate(r.created_at)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        )}
 
         {/* Actions */}
         <SectionHeader

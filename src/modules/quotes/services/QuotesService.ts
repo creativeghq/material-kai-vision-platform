@@ -121,6 +121,24 @@ export interface QuoteItemWithProduct extends QuoteItem {
   product?: Product;
 }
 
+/**
+ * A request nobody has quoted yet — an inbox row, not a quote.
+ *
+ * Carries no total, deliberately. Nothing has been priced, and a number here would anchor the
+ * negotiation on a figure that came from nowhere.
+ */
+export interface UnquotedRequest {
+  id: string;
+  created_at: string;
+  status: string;
+  source: string;
+  notes: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  spec: Record<string, unknown>;
+  from_embed: boolean;
+}
+
 // =====================================================
 // STATUS TAGS
 // =====================================================
@@ -986,6 +1004,59 @@ export class QuotesService {
       console.error('Error deleting quote:', quoteError);
       throw new Error(`Failed to delete quote: ${quoteError.message}`);
     }
+  }
+
+  /**
+   * Incoming requests that nobody has turned into a quote yet (#337).
+   *
+   * `getQuoteRequests()` above reads the `quotes` table, so despite its name it can only ever show
+   * work that already exists. A request from the website embed has no quote — that is the entire
+   * point of it — so it was landing in `quote_requests` and being seen by nobody: leads accumulating
+   * in a table with no reader, which is the business-level version of the silent zero.
+   *
+   * `quote_id is null` is the definition of "not yet handled". The contact is resolved separately
+   * rather than through a nested select because `crm_contacts` and `quote_requests` have no
+   * PostgREST relationship declared, and a nested select that cannot resolve fails the whole query.
+   */
+  async listUnquotedRequests(workspaceId: string): Promise<UnquotedRequest[]> {
+    const { data, error } = await supabase
+      .from('quote_requests')
+      .select('id, created_at, status, source, spec, notes, customer_contact_id, embed_key_id')
+      .eq('workspace_id', workspaceId)
+      .is('quote_id', null)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+    const rows = data ?? [];
+    if (rows.length === 0) return [];
+
+    const contactIds = [...new Set(rows.map((r) => r.customer_contact_id).filter(Boolean))] as string[];
+    const contacts = new Map<string, { name: string | null; email: string | null }>();
+    if (contactIds.length > 0) {
+      const { data: cs } = await supabase
+        .from('crm_contacts')
+        .select('id, name, email')
+        .in('id', contactIds);
+      for (const c of cs ?? []) contacts.set(c.id, { name: c.name, email: c.email });
+    }
+
+    return rows.map((r) => {
+      const contact = r.customer_contact_id ? contacts.get(r.customer_contact_id) : undefined;
+      return {
+        id: r.id,
+        created_at: r.created_at,
+        status: r.status ?? 'pending',
+        source: r.source,
+        notes: r.notes,
+        contact_name: contact?.name ?? null,
+        contact_email: contact?.email ?? null,
+        // The spec is the whole value of an embed lead: it says what the visitor actually wanted,
+        // including the parts the catalog could not satisfy.
+        spec: (r.spec ?? {}) as Record<string, unknown>,
+        from_embed: r.embed_key_id != null,
+      };
+    });
   }
 
   // =====================================================
