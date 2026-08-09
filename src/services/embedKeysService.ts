@@ -96,7 +96,37 @@ export function generateEmbedKey(): string {
   return `mk_embed_${body}`;
 }
 
+/**
+ * Embed telemetry for one workspace, already aggregated.
+ *
+ * Counts come from the SQL summary rather than by pulling rows and tallying them here — the same
+ * reason prices are derived in SQL. `by_event` is keyed by the event types the widget emits
+ * (`embed_view`, `embed_model_load`, `embed_ar_launch`, `embed_add_to_cart`); a type with no
+ * events is simply absent, not zero.
+ */
+export interface EmbedAnalyticsSummary {
+  days: number;
+  total: number;
+  by_event: Record<string, number>;
+  by_key: Array<{ embed_key_id: string; events: number }>;
+  top_pages: Array<{ page: string; events: number }>;
+  daily: Array<{ day: string; events: number }>;
+}
+
 export const embedKeysService = {
+  /**
+   * Usage for the workspace's embeds. Runs SECURITY INVOKER, so a caller only ever sees their own
+   * workspace's rows — the RLS policy is the access control, not a filter this code remembers.
+   */
+  async analytics(workspaceId: string, days = 30): Promise<EmbedAnalyticsSummary> {
+    const { data, error } = await supabase.rpc('get_embed_analytics_summary', {
+      p_workspace_id: workspaceId,
+      p_days: days,
+    });
+    if (error) throw error;
+    return data as unknown as EmbedAnalyticsSummary;
+  },
+
   async list(workspaceId: string): Promise<EmbedKey[]> {
     const { data, error } = await supabase
       .from('material_kai_keys')

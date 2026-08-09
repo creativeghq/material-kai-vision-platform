@@ -35598,6 +35598,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_embed_analytics_summary: {
+        Args: { p_days?: number; p_workspace_id: string }
+        Returns: Json
+      }
       get_configured_product_price: {
         Args: {
           p_audience?: string

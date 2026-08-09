@@ -30,7 +30,16 @@ import {
   embedKeysService, normalizeOriginList, isWildcardOriginList,
   listScopeCategories, searchScopeProducts,
   MAX_RATE_LIMIT_PER_MINUTE, type EmbedKey, type EmbedScopeType, type EmbedScopeOption,
+  type EmbedAnalyticsSummary,
 } from '@/services/embedKeysService';
+
+/** What the widget emits, in the order a visit produces them. */
+const EMBED_EVENT_LABELS: Array<[string, string]> = [
+  ['embed_view', 'Views'],
+  ['embed_model_load', '3D loads'],
+  ['embed_ar_launch', 'AR launches'],
+  ['embed_add_to_cart', 'Add to cart'],
+];
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
 
 const DEFAULT_RATE = 60;
@@ -76,6 +85,7 @@ export const EmbedKeysCard: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<EmbedKey | null>(null);
+  const [analytics, setAnalytics] = useState<EmbedAnalyticsSummary | null>(null);
 
   const [form, setForm] = useState({
     name: '', origins: '', rate: DEFAULT_RATE, allowAny: false,
@@ -121,6 +131,11 @@ export const EmbedKeysCard: React.FC = () => {
     setLoading(true);
     try {
       setKeys(await embedKeysService.list(activeWorkspaceId));
+      // Telemetry is best-effort: a key list that renders without its usage numbers is still
+      // useful, and a failure here must not hide the keys themselves.
+      embedKeysService.analytics(activeWorkspaceId, 30)
+        .then(setAnalytics)
+        .catch(() => setAnalytics(null));
     } catch (err) {
       toast({
         title: 'Could not load embed keys',
@@ -253,6 +268,39 @@ export const EmbedKeysCard: React.FC = () => {
         </CardHeader>
 
         <CardContent className="space-y-3">
+          {/* Usage, next to the keys that produce it — "is my embed actually live?" is the first
+              question after pasting the snippet, and until now nothing in the platform answered it
+              even though the events were being recorded. */}
+          {analytics && analytics.total > 0 && (
+            <div className="rounded-md border border-border/60 p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-sm font-medium">Last {analytics.days} days</span>
+                <span className="text-xs text-muted-foreground">{analytics.total} events</span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {EMBED_EVENT_LABELS.map(([key, label]) => (
+                  <div key={key}>
+                    <p className="text-lg font-semibold tabular-nums">{analytics.by_event[key] ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                  </div>
+                ))}
+              </div>
+              {analytics.top_pages.length > 0 && (
+                <div className="mt-3 border-t border-border/60 pt-3">
+                  <p className="text-xs text-muted-foreground">Where it is running</p>
+                  <ul className="mt-1 space-y-0.5">
+                    {analytics.top_pages.map((p) => (
+                      <li key={p.page} className="flex justify-between gap-3 text-xs">
+                        <span className="truncate text-muted-foreground">{p.page}</span>
+                        <span className="shrink-0 tabular-nums">{p.events}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           {loading ? (
             <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />Loading keys…
