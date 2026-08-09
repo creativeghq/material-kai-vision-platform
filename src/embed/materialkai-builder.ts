@@ -29,6 +29,47 @@ interface ResolveResult {
 
 const DEFAULT_API_BASE = 'https://bgbavxtjlbvgplozizxu.supabase.co';
 
+const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+
+interface TurnstileApi {
+  render(el: HTMLElement, opts: Record<string, unknown>): string;
+  reset(id?: string): void;
+}
+
+/**
+ * Load Cloudflare's script once per page and resolve when its API is ready.
+ *
+ * Once PER PAGE, not per element: a merchant may place several widgets, and Cloudflare's script
+ * defines a global. Loading it twice is at best wasted bytes and at worst a re-registration.
+ *
+ * Rejects rather than hanging if the script cannot load — the caller then submits without a token
+ * and the server decides, which is the correct place for that decision. A blocked CDN must not
+ * leave the visitor staring at a form that never enables.
+ */
+let turnstileLoad: Promise<TurnstileApi> | null = null;
+function loadTurnstile(): Promise<TurnstileApi> {
+  const existing = (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+  if (existing) return Promise.resolve(existing);
+  if (turnstileLoad) return turnstileLoad;
+
+  turnstileLoad = new Promise<TurnstileApi>((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = TURNSTILE_SRC;
+    s.async = true;
+    s.defer = true;
+    s.onload = () => {
+      const api = (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+      if (api) resolve(api);
+      else reject(new Error('turnstile script loaded without an api'));
+    };
+    s.onerror = () => reject(new Error('turnstile script failed to load'));
+    document.head.appendChild(s);
+  });
+  // A failed load must not be cached as a permanent verdict — the next form gets a fresh attempt.
+  turnstileLoad.catch(() => { turnstileLoad = null; });
+  return turnstileLoad;
+}
+
 const STYLE = `
 :host { display:block; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; color:#1c1a1e; }
 .step { display:flex; align-items:center; gap:8px; padding-bottom:14px; }
@@ -86,6 +127,8 @@ export class MaterialKaiBuilder extends HTMLElement {
   private busy = false;
   private sent = false;
   private failure = '';
+  private siteKey: string | null = null;
+  private turnstileToken = '';
 
   constructor() {
     super();
@@ -115,6 +158,9 @@ export class MaterialKaiBuilder extends HTMLElement {
       const res = await fetch(this.url('spec_options'));
       const body = await res.json();
       this.facets = Array.isArray(body?.facets) ? body.facets : [];
+      // Null when the platform has no Turnstile configured, in which case no challenge renders and
+      // the server accepts the request — the same fail-open every public form here follows.
+      this.siteKey = typeof body?.turnstile_site_key === 'string' ? body.turnstile_site_key : null;
     } catch {
       this.facets = [];
     }
@@ -149,25 +195,35 @@ export class MaterialKaiBuilder extends HTMLElement {
     }
   }
 
-  private async submitQuote(name: string, email: string, message: string) {
-    this.busy = true; this.failure = ''; this.render();
+  /**
+   * Send the request. Returns an error string, or null on success.
+   *
+   * DELIBERATELY DOES NOT RE-RENDER on the failure path. `render()` rebuilds the whole shadow tree,
+   * which would wipe the name and email the visitor just typed and — worse, once a challenge is in
+   * the form — throw away a solved Turnstile widget and make them do it again. Someone who has
+   * filled in a form and hit a transient error must not be punished for retrying. Only success
+   * re-renders, because that replaces the form with the confirmation.
+   */
+  private async submitQuote(name: string, email: string, message: string): Promise<string | null> {
     try {
       const res = await fetch(this.url('request_quote'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, message, spec: this.spec }),
+        body: JSON.stringify({
+          name, email, message, spec: this.spec,
+          turnstile_token: this.turnstileToken || undefined,
+        }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error ?? 'failed');
       this.sent = true;
       this.stage = 3;
+      this.render();
+      return null;
     } catch (e) {
-      this.failure = e instanceof Error && e.message !== 'failed'
+      return e instanceof Error && e.message !== 'failed'
         ? e.message
         : 'Could not send that. Please try again.';
-    } finally {
-      this.busy = false;
-      this.render();
     }
   }
 
@@ -348,17 +404,66 @@ export class MaterialKaiBuilder extends HTMLElement {
 
     card.append(mk('Your name', name), mk('Email', email), mk('Message (optional)', msg));
 
+    // The bot challenge, when the platform has one configured. It is rendered EXPLICITLY with an
+    // element reference rather than by Cloudflare's automatic class-based scan: that scan is a
+    // `document.querySelectorAll`, which does not descend into a shadow root, so the automatic
+    // mode finds nothing inside a web component and the challenge never appears.
+    let widgetId: string | undefined;
+    if (this.siteKey) {
+      const holder = document.createElement('div');
+      holder.style.paddingBottom = '10px';
+      card.appendChild(holder);
+      loadTurnstile()
+        .then((api) => {
+          widgetId = api.render(holder, {
+            sitekey: this.siteKey,
+            action: 'embed_quote_request',
+            callback: (token: string) => { this.turnstileToken = token; },
+            // An expired token must be cleared, not left to be sent and rejected as stale.
+            'expired-callback': () => { this.turnstileToken = ''; },
+            'error-callback': () => { this.turnstileToken = ''; },
+          });
+        })
+        .catch(() => {
+          // Blocked or unreachable CDN. Submit without a token and let the server rule on it —
+          // holding the form hostage to a third-party script would lose the lead outright.
+          holder.remove();
+        });
+    }
+
+    // The form's own error line. Local rather than the element-wide `failure`, because showing that
+    // one means a full re-render, and a re-render at this point costs the visitor everything they
+    // have typed plus a solved challenge.
+    const err = document.createElement('p');
+    err.className = 'err';
+    err.hidden = true;
+    card.appendChild(err);
+
     const go = document.createElement('button');
     go.className = 'go';
-    go.textContent = this.busy ? 'Sending…' : 'Request a quote';
-    go.disabled = this.busy;
+    go.textContent = 'Request a quote';
+    const fail = (message: string) => {
+      err.textContent = message;
+      err.hidden = false;
+      go.disabled = false;
+      go.textContent = 'Request a quote';
+      // A Turnstile token is single-use: once spent on a rejected request it can never succeed, so
+      // a retry without a reset is guaranteed to fail a second time for a different reason.
+      this.turnstileToken = '';
+      const api = (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+      if (api && widgetId !== undefined) api.reset(widgetId);
+    };
+
     go.addEventListener('click', () => {
       if (!name.value.trim() || !email.value.trim()) {
-        this.failure = 'Please add your name and email so we can reply.';
-        this.render();
+        fail('Please add your name and email so we can reply.');
         return;
       }
-      void this.submitQuote(name.value, email.value, msg.value);
+      err.hidden = true;
+      go.disabled = true;
+      go.textContent = 'Sending…';
+      void this.submitQuote(name.value, email.value, msg.value)
+        .then((message) => { if (message) fail(message); });
     });
     card.appendChild(go);
     return card;

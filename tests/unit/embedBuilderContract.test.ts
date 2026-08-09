@@ -27,7 +27,9 @@ const SRC = readFileSync(join(process.cwd(), 'src/embed/materialkai-builder.ts')
 
 /** Slice one method body out by name, terminating at the first 2-space-indented brace. */
 function method(name: string): string {
-  const start = SRC.indexOf(`private ${name}(`);
+  // `private async foo(` as well as `private foo(` — matching only the latter silently returned
+  // -1 for every async method and made four assertions look like real failures.
+  const start = SRC.search(new RegExp(`private (?:async )?${name}\\(`));
   expect(start, `${name} not found — was it renamed?`).toBeGreaterThan(-1);
   const end = SRC.indexOf('\n  }', start);
   expect(end, `${name} has no terminator`).toBeGreaterThan(start);
@@ -100,6 +102,54 @@ describe('the embed builder always offers a way forward', () => {
     // things that already exist one element away.
     expect(method('renderResult')).toContain('mountProduct');
     expect(method('mountProduct')).toContain("createElement('materialkai-product')");
+  });
+});
+
+/**
+ * These four exist because the quote path shipped dead and the live probe is what found it.
+ *
+ * `verifyTurnstile` fails CLOSED when a secret is configured, and it IS configured here — so a
+ * builder that rendered no challenge had every single quote request answered "Bot check failed".
+ * The priced half looked perfectly healthy the whole time, which is the silent-zero shape exactly:
+ * the lead-capture half of the feature returning zero forever with nothing complaining.
+ */
+describe('the embed builder can actually pass the bot gate', () => {
+  it('reads the site key the server sends with the vocabulary', () => {
+    expect(method('loadFacets')).toContain('turnstile_site_key');
+  });
+
+  it('sends the token with the quote request', () => {
+    expect(
+      method('submitQuote'),
+      'without this every quote request is rejected wherever Turnstile is configured',
+    ).toContain('turnstile_token');
+  });
+
+  it('renders the challenge explicitly, never by Cloudflare class auto-scan', () => {
+    // The auto-scan is a `document.querySelectorAll`, which does not descend into a shadow root:
+    // the automatic mode finds nothing inside a web component and no challenge ever appears.
+    expect(SRC).toContain('render=explicit');
+    expect(SRC).toMatch(/api\.render\(\s*holder/);
+    expect(SRC, 'cf-turnstile is the auto-scan class and cannot work in shadow DOM')
+      .not.toContain('cf-turnstile');
+  });
+
+  it('a failed submit does not re-render the form away', () => {
+    // render() rebuilds the whole shadow tree — it would discard the visitor's typed name and
+    // email AND a solved challenge, so a transient error would cost them the entire form.
+    const submit = method('submitQuote');
+    const catchAt = submit.indexOf('} catch');
+    expect(catchAt, 'submitQuote no longer has a catch').toBeGreaterThan(-1);
+    expect(
+      submit.slice(catchAt),
+      'the failure path re-renders, which wipes the form the visitor just filled in',
+    ).not.toContain('this.render(');
+  });
+
+  it('a failed submit resets the challenge, because a token is single-use', () => {
+    const form = method('quoteForm');
+    expect(form).toMatch(/api\.reset\(/);
+    expect(form).toMatch(/this\.turnstileToken = ''/);
   });
 });
 

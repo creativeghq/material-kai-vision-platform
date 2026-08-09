@@ -31,6 +31,7 @@ import { embedCorsHeaders } from '../_shared/cors.ts';
 import { imagesFromMetadata } from '../_shared/product-media.ts';
 import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
 import { grossFromNet } from '../_shared/money.ts';
+import { resolveSecret } from '../_shared/secrets.ts';
 
 /** Page size ceiling — an embed grid is a shelf, not a catalog dump. */
 const MAX_LIMIT = 60;
@@ -494,7 +495,19 @@ Deno.serve(withApiLogging((req) => {
       p_max_values: MAX_SPEC_VALUES,
     });
     if (error) return embedJson({ error: 'Could not load specification options' }, 500, cors);
-    return embedJson({ ok: true, facets: data ?? [] }, 200, cors);
+
+    // The SITE key is public by design — it is rendered into the widget in the page source. It ships
+    // with the vocabulary because the builder needs to know whether to render a challenge BEFORE the
+    // visitor reaches the quote form, and `request_quote` is the only write here.
+    //
+    // Without this the fallback path was dead. `verifyTurnstile` fails CLOSED when a secret is
+    // configured, and it is configured on this platform, so a builder that rendered no challenge
+    // had every quote request rejected — the exact silent-zero shape: the lead-capture half of the
+    // feature returning "Bot check failed" forever while the priced half looked perfectly healthy.
+    const siteKey = (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY')
+      .catch(() => ({ value: null })))?.value ?? null;
+
+    return embedJson({ ok: true, facets: data ?? [], turnstile_site_key: siteKey }, 200, cors);
   }
 
   // ── #337 "price it" ──────────────────────────────────────────────────────────────────────────
