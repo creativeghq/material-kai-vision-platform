@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Website Embed API | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="api.html">API</a> / Website Embed</div>
+  <h1>Website Embed</h1>
+  <div class="routes"><span class="badge route">/functions/v1/products-3d-api</span></div>
+  <p class="lead">Show your products — in <strong>3D</strong>, in <strong>AR</strong>, with <strong>configurable finishes</strong> — on your own website. Two lines of HTML, or the JSON API underneath if you'd rather build your own.</p>
+
+  <div class="callout"><p><strong>Where:</strong> create a key at <strong>Profile → Keys → Website Embed</strong>. Keys are per workspace, so any admin can manage them and they outlive whoever created one.</p></div>
+
+  <h2>The two-line version</h2>
+  <pre><code>&lt;script src="https://app.materialshub.gr/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
+
+&lt;materialkai-product
+  api-key="mk_embed_…"
+  product-id="YOUR-PRODUCT-ID"&gt;
+&lt;/materialkai-product&gt;</code></pre>
+
+  <p>That renders the product in 3D with orbit controls, an <strong>AR button</strong> on phones that support it, its price, and — if the product has configurable options — swatches that repaint the model and update the price as they're picked.</p>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Attribute</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>api-key</code></td><td><strong>Required.</strong> Your embed key.</td></tr>
+      <tr><td><code>product-id</code></td><td><strong>Required.</strong> The product to show.</td></tr>
+      <tr><td><code>show-add-to-cart</code></td><td>Adds a cart button. It doesn't take payment — it hands your page the chosen configuration (see below).</td></tr>
+      <tr><td><code>autorotate="false"</code></td><td>Stops the model turning on its own.</td></tr>
+      <tr><td><code>api-base</code></td><td>Point at a different environment. Rarely needed.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Your key is meant to be public</h2>
+  <p>The embed key ships in your page's source. That's what it's for — like a Stripe publishable key or a Google Maps key. It is <strong>not</strong> a secret, and it is not what protects your catalog. Three things do:</p>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Control</th><th>What it stops</th><th>What it can't</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Allowed websites</strong></td><td>Another site mounting your widget with your key.</td><td>It's enforced by the browser, so it can't bind a script that isn't one. That's true of every publishable key.</td></tr>
+      <tr><td><strong>Requests per minute</strong></td><td>Anyone burning through your quota — browser or not.</td><td>—</td></tr>
+      <tr><td><strong>What the key may serve</strong></td><td>A key seeing more of your catalog than you chose.</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout warn"><p><strong>Add your domain before you go live.</strong> Include any staging or <code>*.myshopify.com</code> preview domain you test on. Miss it and the widget says <em>“This website is not allowed to use this embed key”</em> — which is the message doing its job, and a one-line fix in Profile → Keys.</p></div>
+
+  <h3>Limiting what a key can show</h3>
+  <p>When you create a key you choose its reach: <strong>everything published</strong>, <strong>only certain categories</strong>, or <strong>only specific products</strong>. Because the key is public, this is the only control that genuinely constrains what an embed can pull — anything the request could ask for, anyone reading your page source could ask for too. Hand a partner a key scoped to one range and that's all it will ever return.</p>
+
+  <p>Only products you've <strong>published to your online store</strong> are served at all. Unpublish one and it disappears from every embed immediately.</p>
+
+  <h2>The add-to-cart handoff</h2>
+  <p>We never take payment. When a visitor clicks the cart button your page gets an event with the configuration, and your own cart does the rest.</p>
+
+  <pre><code>document.addEventListener('materialkai:add-to-cart', (event) =&gt; {
+  const { product_id, name, price, currency, quantity, options } = event.detail;
+  // options → { "Fabric": "Velvet Emerald", "Legs": "Walnut" }
+  myCart.add({ product_id, quantity, properties: options });
+});</code></pre>
+
+  <p>If the widget sits inside an iframe the same payload is also sent via <code>postMessage</code> to the parent window, so you can listen either way.</p>
+
+  <div class="callout"><p><strong>On Shopify</strong> there's a theme block that does this wiring for you — it adds the selected variant and records the chosen finishes on the line item, so the person picking the order can see them. Ask us about it.</p></div>
+
+  <h2>The JSON API</h2>
+  <p>If you'd rather render it yourself. Send the key as <code>?key=</code> or in an <code>x-embed-key</code> header — the query string avoids a CORS preflight, so it's one request instead of two.</p>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Action</th><th>What you get</th></tr></thead>
+    <tbody>
+      <tr><td><code>?action=list</code></td><td>Your published products. <code>&amp;only_3d=true</code> for just the ones with a model; <code>limit</code> and <code>offset</code> to page.</td></tr>
+      <tr><td><code>?action=product&amp;product_id=…</code></td><td>One product: images, price, its glb/gltf/usdz models with real-world dimensions, and its configurable options.</td></tr>
+      <tr><td><code>?action=configure&amp;product_id=…&amp;option_value_ids=a,b</code></td><td>What that combination costs — and whether it's allowed.</td></tr>
+      <tr><td><code>?action=event</code></td><td>Records a view, an AR launch or a cart handoff. The widget does this for you.</td></tr>
+    </tbody>
+  </table></div>
+
+  <pre><code>fetch("https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/products-3d-api"
+      + "?action=list&amp;only_3d=true&amp;key=mk_embed_…")
+  .then((r) =&gt; r.json())
+  .then(({ products }) =&gt; console.log(products));</code></pre>
+
+  <p>Prices come back <strong>VAT-inclusive</strong>, matching what your online store shows. Option price differences are included in the same figure — the total is always calculated on our side, so it can't drift from what a quote would say.</p>
+
+  <h3>Unavailable combinations</h3>
+  <p>If you've set up compatibility rules — <em>“velvet isn't available on oak legs”</em>, <em>“walnut legs require velvet”</em> — <code>configure</code> returns them as <code>violations</code> and the widget shows the reason and disables its cart button. The same check runs when a configuration becomes a quote, so a blocked combination can't reach a document a customer signs.</p>
+
+  <h3>When something's refused</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Status</th><th>Meaning</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td><code>401</code></td><td>The key is wrong, disabled or expired.</td><td>Check it in Profile → Keys.</td></tr>
+      <tr><td><code>403</code></td><td>This website isn't on the key's list.</td><td>Add the domain.</td></tr>
+      <tr><td><code>404</code></td><td>The product isn't published, or is outside this key's reach.</td><td>Publish it, or widen the key.</td></tr>
+      <tr><td><code>429</code></td><td>Over the key's per-minute limit.</td><td>Raise the limit, or slow down.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Seeing whether it's working</h2>
+  <p><strong>Profile → Keys → Website Embed</strong> shows the last 30 days: views, 3D loads, AR launches, cart handoffs — and <strong>which pages</strong> the widget is running on. If you've just installed it and the page list is empty, the script isn't loading or the domain isn't allowed.</p>
+
+  <h2>What you need first</h2>
+  <ul class="feat">
+    <li>A product <strong>published to your online store</strong> — that's the same switch the storefront uses.</li>
+    <li>A <strong>3D model</strong> uploaded to that product, if you want 3D rather than a photo. We read its real-world size straight from the file.</li>
+    <li>A <strong>USDZ</strong> as well, for AR on iPhones and iPads. Android AR works from the same glb.</li>
+    <li><strong>Options</strong> on the product, if you want configurable finishes.</li>
+  </ul>
+  <p>Without a model the widget falls back to the product's photo, so it's still worth embedding before your 3D work is finished.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

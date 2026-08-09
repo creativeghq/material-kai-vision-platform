@@ -149,6 +149,7 @@
         { file: "api-mivaa.html", title: "MIVAA API" },
         { file: "api-supabase.html", title: "Supabase API" },
         { file: "api-jobs.html", title: "Public Jobs API" },
+        { file: "api-embed.html", title: "Website Embed" },
       ]},
     ]},
     { title: "Account", items: [
