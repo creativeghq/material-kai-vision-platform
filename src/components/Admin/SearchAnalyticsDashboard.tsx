@@ -611,7 +611,7 @@ export const SearchAnalyticsDashboard = () => {
                 </div>
                 <div className="text-2xl font-bold">{perfStats.cache_hit_rate?.toFixed(1) || 0}%</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {perfStats.cache_hits?.toLocaleString()} of {perfStats.total_searches?.toLocaleString()}
+                  {formatNumber(perfStats.cache_hits)} of {formatNumber(perfStats.total_searches)}
                 </p>
               </div>
 
@@ -622,7 +622,7 @@ export const SearchAnalyticsDashboard = () => {
                 </div>
                 <div className="text-2xl font-bold">{perfStats.zero_result_rate?.toFixed(1) || 0}%</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {perfStats.zero_result_count?.toLocaleString()} empty
+                  {formatNumber(perfStats.zero_result_count)} empty
                 </p>
               </div>
 
@@ -632,7 +632,7 @@ export const SearchAnalyticsDashboard = () => {
                   <p className="text-xs text-muted-foreground">Product-Name Searches</p>
                 </div>
                 <div className="text-2xl font-bold">
-                  {perfStats.product_name_searches?.toLocaleString() || 0}
+                  {formatNumber(perfStats.product_name_searches ?? 0)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {perfStats.total_searches > 0
@@ -787,7 +787,7 @@ export const SearchAnalyticsDashboard = () => {
                 <p className="text-xs text-muted-foreground">Cached Queries</p>
               </div>
               <div className="text-2xl font-bold">
-                {cacheStats.total_cached_queries?.toLocaleString() || 0}
+                {formatNumber(cacheStats.total_cached_queries ?? 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">unique entries</p>
             </div>
@@ -798,7 +798,7 @@ export const SearchAnalyticsDashboard = () => {
                 <p className="text-xs text-muted-foreground">Total Cache Hits</p>
               </div>
               <div className="text-2xl font-bold">
-                {cacheStats.total_cache_hits?.toLocaleString() || 0}
+                {formatNumber(cacheStats.total_cache_hits ?? 0)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 {cacheStats.avg_hits_per_entry?.toFixed(1) || 0} avg per entry

@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { hrService, type Punch, type TimesheetRow } from '../services/hrService';
 import { EmptyState } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { formatTime } from '@/utils/datetime';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const daysAgoISO = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
@@ -123,7 +124,7 @@ export function TimesheetDialog({ workspaceId }: { workspaceId: string }) {
   const exportCsv = () => {
     const lines = [['Employee', 'Date', 'Hours', 'First in', 'Last out'].join(',')];
     for (const r of rows) for (const d of r.days) {
-      lines.push([csvCell(r.name), d.date, String(d.hours), d.first_in ? new Date(d.first_in).toLocaleTimeString() : '', d.last_out ? new Date(d.last_out).toLocaleTimeString() : ''].join(','));
+      lines.push([csvCell(r.name), d.date, String(d.hours), d.first_in ? formatTime(d.first_in) : '', d.last_out ? formatTime(d.last_out) : ''].join(','));
     }
     const url = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
     const a = document.createElement('a'); a.href = url; a.download = `timesheet_${from}_${to}.csv`; a.click();

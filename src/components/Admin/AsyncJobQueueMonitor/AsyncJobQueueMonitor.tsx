@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { formatDate as formatDateValue } from '@/utils/datetime';
+import { formatDate as formatDateValue, formatTime as formatTimeOfDay } from '@/utils/datetime';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -3496,7 +3496,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                           <div>
                                             <span className="text-muted-foreground font-medium">Started:</span>
                                             <span className="ml-2 text-foreground">
-                                              {new Date(product.started_at).toLocaleTimeString()}
+                                              {formatTimeOfDay(product.started_at)}
                                             </span>
                                           </div>
                                         )}
@@ -3504,7 +3504,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                           <div>
                                             <span className="text-muted-foreground font-medium">Completed:</span>
                                             <span className="ml-2 text-foreground">
-                                              {new Date(product.completed_at).toLocaleTimeString()}
+                                              {formatTimeOfDay(product.completed_at)}
                                             </span>
                                           </div>
                                         )}

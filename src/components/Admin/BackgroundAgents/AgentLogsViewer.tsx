@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Terminal } from 'lucide-react';
 import { listLogs, subscribeToLogs, logLevelColor } from '@/services/backgroundAgents';
 import type { AgentRunLog } from '@/services/backgroundAgents';
+import { formatTime } from '@/utils/datetime';
 
 interface AgentLogsViewerProps {
   runId: string;
@@ -53,7 +54,7 @@ export function AgentLogsViewer({ runId, live = false }: AgentLogsViewerProps) {
       {logs.map((log) => (
         <div key={log.id} className="flex gap-2">
           <span className="text-zinc-500 shrink-0 select-none">
-            {new Date(log.created_at).toLocaleTimeString()}
+            {formatTime(log.created_at)}
           </span>
           <span className={`uppercase font-bold shrink-0 w-10 ${logLevelColor(log.level)}`}>
             {log.level}

@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { SectionHeader } from '@/components/shared/SectionHeader';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, formatTime } from '@/utils/datetime';
 import {
   healthCheck,
   readinessCheck,
@@ -112,7 +112,7 @@ const HealthPage: React.FC = () => {
           <>
             {lastChecked && (
               <span className="text-sm text-muted-foreground">
-                Last checked: {lastChecked.toLocaleTimeString()}
+                Last checked: {formatTime(lastChecked)}
               </span>
             )}
             <Button

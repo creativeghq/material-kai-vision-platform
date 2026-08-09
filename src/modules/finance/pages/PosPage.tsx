@@ -31,7 +31,7 @@ import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingS
 import { parseDecimal } from '@/utils/decimal';
 import { edgeError } from '@/utils/edgeError';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, formatTime } from '@/utils/datetime';
 
 interface SellItem {
   id: string;
@@ -628,7 +628,7 @@ const PosPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                 <span className="font-medium">Shift open</span>
-                <span className="text-xs text-muted-foreground">since {new Date(session.opened_at).toLocaleTimeString()} · float {formatMoney(session.opening_float, currency)}</span>
+                <span className="text-xs text-muted-foreground">since {formatTime(session.opened_at)} · float {formatMoney(session.opening_float, currency)}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Button size="sm" variant="ghost" onClick={() => cashMove('in')}>Cash in</Button>

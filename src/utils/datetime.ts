@@ -58,6 +58,34 @@ export function formatDate(
   });
 }
 
+/**
+ * Time of day only — for logs, attendance rows and session timestamps where the date is already
+ * obvious from context.
+ *
+ * Added because 7 call sites were doing `new Date(x).toLocaleTimeString()`, which is the same
+ * browser-locale problem `formatDate` exists to solve, and there was nowhere to send them: the
+ * date formatter has no time-only mode. Same pinned locale, so a time and a date rendered next to
+ * each other agree.
+ *
+ * 24-hour by default. These are operational readouts — a log line at "14:05" is unambiguous, and
+ * "2:05 PM" is longer for no gain in a dense table.
+ */
+export function formatTime(
+  value: string | Date | null | undefined,
+  opts: { fallback?: string; seconds?: boolean; hour12?: boolean } = {},
+): string {
+  const fallback = opts.fallback ?? '—';
+  if (!value) return fallback;
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return fallback;
+  return d.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(opts.seconds ? { second: '2-digit' as const } : {}),
+    hour12: opts.hour12 ?? false,
+  });
+}
+
 export interface TimeAgoOptions {
   /** Rendered when the timestamp is null/undefined/unparseable. */
   never?: string;

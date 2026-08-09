@@ -837,7 +837,7 @@ function ResearchTab({ data }: { data: ResearchTabData }) {
                 </a>
               </div>
               <div className="flex items-center gap-4 text-xs text-muted-foreground ml-4">
-                <span>{comp.wordCount?.toLocaleString()} words</span>
+                <span>{formatNumber(comp.wordCount)} words</span>
                 {comp.contentScore != null && comp.contentScore > 0 && (
                   <Badge variant="secondary">{comp.contentScore}</Badge>
                 )}
@@ -2010,7 +2010,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                     Score: <span className={`font-semibold ${scoreColor}`}>{article.overall_score}/100</span>
                   </span>
                 )}
-                <span>{article.word_count?.toLocaleString()} words</span>
+                <span>{formatNumber(article.word_count)} words</span>
                 {article.reading_time_minutes > 0 && <span>{article.reading_time_minutes} min read</span>}
                 {article.credits_used > 0 && <span>{article.credits_used} credits</span>}
                 {article.processing_time_ms > 0 && <span>{(article.processing_time_ms / 1000).toFixed(1)}s</span>}

@@ -23,6 +23,7 @@ import {
   type SeoTrackedDomainRow,
 } from '@/services/userWebsitesService';
 import SEOArticleViewer from '@/components/features/ai/SEOArticleViewer';
+import { formatNumber } from '@/utils/decimal';
 
 
 const STATUS_COLOR: Record<string, string> = {
@@ -196,7 +197,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                         </TableCell>
                         <TableCell className="text-muted-foreground max-w-[180px] truncate">{a.target_keyword}</TableCell>
                         <TableCell className="text-right">{a.seo_score ?? '—'}</TableCell>
-                        <TableCell className="text-right">{a.word_count?.toLocaleString() ?? '—'}</TableCell>
+                        <TableCell className="text-right">{formatNumber(a.word_count)}</TableCell>
                         <TableCell className={STATUS_COLOR[a.status] || 'text-muted-foreground'}>{a.status}</TableCell>
                         <TableCell className="text-muted-foreground">{timeAgo(a.created_at)}</TableCell>
                       </TableRow>
@@ -236,8 +237,8 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                       <TableRow key={r.id}>
                         <TableCell className="font-medium max-w-[220px] truncate">{r.target_keyword}</TableCell>
                         <TableCell className="text-muted-foreground max-w-[220px] truncate">{r.topic}</TableCell>
-                        <TableCell className="text-right">{r.total_keywords_found?.toLocaleString() ?? '—'}</TableCell>
-                        <TableCell className="text-right">{r.total_addressable_volume?.toLocaleString() ?? '—'}</TableCell>
+                        <TableCell className="text-right">{formatNumber(r.total_keywords_found)}</TableCell>
+                        <TableCell className="text-right">{formatNumber(r.total_addressable_volume)}</TableCell>
                         <TableCell className="text-muted-foreground">{timeAgo(r.created_at)}</TableCell>
                       </TableRow>
                     ))}
@@ -318,7 +319,7 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite; onBack: () =>
                       <TableRow key={d.id}>
                         <TableCell className="font-medium">{d.display_label || d.domain}</TableCell>
                         <TableCell className="text-right">{d.current_domain_rank ?? '—'}</TableCell>
-                        <TableCell className="text-right">{d.current_organic_traffic?.toLocaleString() ?? '—'}</TableCell>
+                        <TableCell className="text-right">{formatNumber(d.current_organic_traffic)}</TableCell>
                         <TableCell className={d.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}>
                           {d.is_active ? 'active' : 'paused'}
                         </TableCell>

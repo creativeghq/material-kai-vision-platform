@@ -137,7 +137,7 @@ import { AgentAvatar } from './AgentAvatar';
 import { onEnterOrSpace } from '@/utils/a11y';
 
 import { useEscapeKey } from '@/hooks/useEscapeKey';
-import { formatDate } from '@/utils/datetime';
+import { formatDate, formatTime } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 // Agent definitions with RBAC and default models
 interface AgentDefinition {
@@ -5482,7 +5482,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     )}
                     <div className="flex items-center justify-between mt-2">
                       <p className="text-xs text-white/60">
-                        {message.timestamp.toLocaleTimeString()}
+                        {formatTime(message.timestamp)}
                       </p>
                       {/* Rating buttons for assistant messages */}
                       {message.role === 'assistant' && (

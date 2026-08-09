@@ -1086,7 +1086,7 @@ export function PlatformOverviewTab() {
                 <BarChart data={aiModelCosts} layout="vertical" margin={{ top: 5, right: 20, left: 90, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis type="number" tick={{ fontSize: 11 }} /><YAxis type="category" dataKey="model" tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(v: any, n: string) => [n === 'credits' ? v.toLocaleString() : `$${v}`, n]} />
+                  <Tooltip formatter={(v: any, n: string) => [n === 'credits' ? formatNumber(Number(v)) : `$${v}`, n]} />
                   <Bar dataKey="credits" name="credits" radius={[0, 4, 4, 0]}>{aiModelCosts.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Bar>
                 </BarChart>
               </ResponsiveContainer>
