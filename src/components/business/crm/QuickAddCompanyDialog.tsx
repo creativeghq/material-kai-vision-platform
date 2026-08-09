@@ -105,7 +105,9 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
   // Adopting the existing row still has to apply the role. A company only ever flagged as a
   // customer that now pays us bills IS a supplier — leave the flag off and it stays invisible to
   // every supplier-scoped picker and report.
-  const useExisting = async () => {
+  // Named `adopt`, not `use`: a plain async handler that starts with `use` reads as a hook to
+  // both eslint (rules-of-hooks fails on it inside the onClick below) and to the next reader.
+  const adoptExisting = async () => {
     if (!duplicate) return;
     const flags: Record<string, boolean> = {};
     if (role === 'supplier' || role === 'both') flags.is_supplier = true;
@@ -173,7 +175,7 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
                 <span className="font-medium text-foreground">{duplicate.name}</span>
                 <span className="text-muted-foreground"> is already in CRM.</span>
               </span>
-              <Button type="button" size="sm" variant="outline" onClick={() => void useExisting()}>Use it</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => void adoptExisting()}>Use it</Button>
             </div>
           )}
         </CompanyIdentityLookup>

@@ -38,6 +38,7 @@
     "src/types/modules.d.ts",
     "src/types/jsx.d.ts",
     "vite.config.ts",
+    "vite.embed.config.ts",
     "tailwind.config.ts",
     "vitest.config.ts",
     "playwright.config.ts"

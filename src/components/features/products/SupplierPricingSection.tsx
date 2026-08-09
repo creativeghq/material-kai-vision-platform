@@ -125,7 +125,7 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
                 <th className="text-right font-medium px-4 py-2">Your cost</th>
                 <th className="text-right font-medium px-4 py-2">MOQ</th>
                 <th className="text-right font-medium px-4 py-2">Lead time</th>
-                <th className="px-4 py-2" />
+                <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>

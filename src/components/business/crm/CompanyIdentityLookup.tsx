@@ -33,8 +33,6 @@ export {
 } from './companyIdentity';
 export type { CompanyIdentityDraft, CompanyIdentityVerification } from './companyIdentity';
 
-const isEu = (code: string) => VAT_COUNTRY_OPTIONS.find((o) => o.code === code)?.eu === true;
-
 interface Props {
   value: CompanyIdentityDraft;
   onChange: (next: CompanyIdentityDraft) => void;

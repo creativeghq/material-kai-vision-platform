@@ -189,8 +189,9 @@ describe('the shared control is the only way a business gets created', () => {
     const body = src(QUICK_ADD);
     expect(body).toContain('vatDedupeForms');
     // The duplicate must be offerable, not merely warned about — a warning you cannot act on
-    // gets clicked past.
-    expect(body).toMatch(/useExisting/);
+    // gets clicked past. (`adopt`, not `use`: a plain handler named use* reads as a React hook
+    // and fails rules-of-hooks at the call site.)
+    expect(body).toMatch(/adoptExisting/);
   });
 
   it('every create-a-business surface routes through it', () => {

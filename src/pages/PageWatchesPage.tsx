@@ -198,7 +198,7 @@ export default function PageWatchesPage() {
                   <th className="text-left font-medium px-4 py-2">Kind</th>
                   <th className="text-left font-medium px-4 py-2">Last checked</th>
                   <th className="text-left font-medium px-4 py-2">State</th>
-                  <th className="px-4 py-2" />
+                  <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

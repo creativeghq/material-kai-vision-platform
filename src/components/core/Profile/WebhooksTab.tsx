@@ -182,7 +182,7 @@ export const WebhooksTab: React.FC = () => {
                   <th className="px-4 py-2 font-medium">Events</th>
                   <th className="px-4 py-2 font-medium">Last delivery</th>
                   <th className="px-4 py-2 font-medium">Active</th>
-                  <th className="px-4 py-2" />
+                  <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>

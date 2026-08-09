@@ -480,7 +480,7 @@ export class MaterialKaiProduct extends HTMLElement {
       const fallback = encodeURIComponent(location.href);
       return {
         href: `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(glb.url)}&mode=ar_preferred`
-          + `#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;`
+          + '#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;'
           + `S.browser_fallback_url=${fallback};end;`,
         ios: false,
       };

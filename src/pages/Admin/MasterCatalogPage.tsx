@@ -140,7 +140,7 @@ export default function MasterCatalogPage() {
                         <th className="text-left font-medium px-4 py-2">Supplier</th>
                         <th className="text-right font-medium px-4 py-2">You pay</th>
                         <th className="text-right font-medium px-4 py-2">They ask</th>
-                        <th className="px-4 py-2" />
+                        <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -207,7 +207,7 @@ export default function MasterCatalogPage() {
                       <th className="text-left font-medium px-4 py-2">Name</th>
                       <th className="text-right font-medium px-4 py-2">Your price</th>
                       <th className="text-left font-medium px-4 py-2">Source</th>
-                      <th className="px-4 py-2" />
+                      <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
                   <tbody>
