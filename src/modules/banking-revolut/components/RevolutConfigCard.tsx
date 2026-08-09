@@ -22,6 +22,7 @@ import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/datetime';
 import {
   callRevolutApi,
   getRevolutStatus,
@@ -300,7 +301,7 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
             <p className="text-xs text-destructive">Last sync error: {status.last_sync_error}</p>
           )}
           {status.last_sync_at && !status.last_sync_error && (
-            <p className="text-xs text-muted-foreground">Last synced {new Date(status.last_sync_at).toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">Last synced {formatDate(status.last_sync_at, { withTime: true })}</p>
           )}
         </div>
 

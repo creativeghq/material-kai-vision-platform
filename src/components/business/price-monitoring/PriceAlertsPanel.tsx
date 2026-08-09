@@ -19,6 +19,7 @@ import { FilterBar, useFilters } from '@/components/core/filters';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { listPriceAlerts, type PriceAlertLogRow } from './priceAlertsService';
 import { buildPriceAlertFilters, alertTypeLabel } from './priceAlertFilters';
+import { formatDate } from '@/utils/datetime';
 
 const TYPE_TONE: Record<string, string> = {
   price_drop: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30',
@@ -111,7 +112,7 @@ export const PriceAlertsPanel: React.FC<PriceAlertsPanelProps> = ({ onRefresh })
               <tbody>
                 {paginate(filtered, page).map((a) => (
                   <tr key={a.id} className="border-b border-border/30 hover:bg-muted/30">
-                    <td className="px-3 py-2 whitespace-nowrap">{new Date(a.created_at).toLocaleString()}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">{formatDate(a.created_at, { withTime: true })}</td>
                     <td className="px-3 py-2">
                       <Badge variant="outline" className={`text-[10px] ${TYPE_TONE[a.alert_type] ?? ''}`}>
                         {alertTypeLabel(a.alert_type)}

@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/datetime';
 import {
   projectsService,
   type ProjectTaskWithSubtasks,
@@ -330,7 +331,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
               )}
               {task.due_date && (
                 <span className={days !== null && days < 0 ? 'text-destructive' : days !== null && days <= 3 ? 'text-amber-300' : ''}>
-                  {days === null ? new Date(task.due_date).toLocaleDateString() :
+                  {days === null ? formatDate(task.due_date) :
                     days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? 'Today' : `${days}d left`}
                 </span>
               )}

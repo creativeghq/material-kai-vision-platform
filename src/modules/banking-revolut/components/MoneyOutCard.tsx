@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { callRevolutApi, getRevolutStatus, type RevolutAccountInfo } from '../services/revolutConfigService';
+import { formatDate } from '@/utils/datetime';
 
 interface PayoutRow {
   id: string;
@@ -144,7 +145,7 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
             <div className="divide-y divide-border/60">
               {history.map((h) => (
                 <div key={h.id} className="flex items-center gap-3 py-2 text-sm">
-                  <span className="w-24 shrink-0 text-xs text-muted-foreground">{new Date(h.created_at).toLocaleDateString()}</span>
+                  <span className="w-24 shrink-0 text-xs text-muted-foreground">{formatDate(h.created_at)}</span>
                   <span className="w-24 shrink-0 text-xs text-muted-foreground">{h.kind.replace('_', ' ')}</span>
                   <span className="min-w-0 flex-1 truncate">{h.counterparty_name || h.reference || '—'}</span>
                   {stateWord(h.state)}

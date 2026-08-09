@@ -91,6 +91,7 @@ import { entityTemplatesService } from '@/services/entityTemplatesService';
 import { buildExpensePrefill, buildInvoicePrefill, type ExpensePrefill, type InvoicePrefill } from '@/services/templates/registry';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
+import { formatDate } from '@/utils/datetime';
 
 const DOC_TABS: { value: string; type: any; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'doc_orders', type: 'orders', label: 'Orders', icon: ShoppingCart },
@@ -729,7 +730,7 @@ const FinancePage: React.FC = () => {
                             {d.party_name ?? 'Unattributed'}
                             {d.order_number && <span className="text-xs text-muted-foreground"> · Order {d.order_number}</span>}
                           </div>
-                          <div className="text-[11px] text-muted-foreground">{new Date(d.paid_at).toLocaleDateString()}{d.reference ? ` · ${d.reference}` : ''}</div>
+                          <div className="text-[11px] text-muted-foreground">{formatDate(d.paid_at)}{d.reference ? ` · ${d.reference}` : ''}</div>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-medium tabular-nums">{formatMoney(d.unallocated, d.currency)}</span>
@@ -778,7 +779,7 @@ const FinancePage: React.FC = () => {
                           <div className="text-right">
                             <div className="text-sm font-medium">{formatMoney(r.grand_total ?? 0, r.currency ?? 'EUR')}</div>
                             {r.next_scheduled_follow_up && (
-                              <div className="text-[10px] text-muted-foreground">Scheduled {new Date(r.next_scheduled_follow_up).toLocaleDateString()}</div>
+                              <div className="text-[10px] text-muted-foreground">Scheduled {formatDate(r.next_scheduled_follow_up)}</div>
                             )}
                           </div>
                         </li>
@@ -807,7 +808,7 @@ const FinancePage: React.FC = () => {
                               {i.internal_number}
                             </Link>
                             <div className="text-xs text-muted-foreground">
-                              {i.issued_at ? `Issued ${new Date(i.issued_at).toLocaleDateString()}` : 'Draft'}
+                              {i.issued_at ? `Issued ${formatDate(i.issued_at)}` : 'Draft'}
                               {i.due_at && ` · Due ${i.due_at}`}
                             </div>
                           </div>
@@ -1346,7 +1347,7 @@ const FinancePage: React.FC = () => {
                           <td className="px-4 py-2"><span className={`text-xs ${statusTone(r.status)}`}>{r.status}</span></td>
                           <td className="px-4 py-2 text-right">{formatMoney(r.grand_total ?? 0, r.currency ?? 'EUR')}</td>
                           <td className="px-4 py-2 text-right">{r.days_since_activity ?? '—'}d</td>
-                          <td className="px-4 py-2 text-right">{r.next_scheduled_follow_up ? new Date(r.next_scheduled_follow_up).toLocaleDateString() : '—'}</td>
+                          <td className="px-4 py-2 text-right">{r.next_scheduled_follow_up ? formatDate(r.next_scheduled_follow_up) : '—'}</td>
                           <td className="px-4 py-2 text-right"><Link to={`/quotes/${r.id}`}><Button size="sm" variant="outline">Open</Button></Link></td>
                         </tr>
                       ))}
@@ -1926,7 +1927,7 @@ const RecentOrdersCard: React.FC<{ rows: OrderListRow[]; onViewAll?: () => void 
             <div className="min-w-0">
               <div className="text-sm font-medium truncate">{o.party_name ?? 'Walk-in'}</div>
               <div className="text-xs text-muted-foreground">
-                <span className="font-mono">{o.order_number ?? o.id.slice(0, 8)}</span> · {new Date(o.created_at).toLocaleDateString()}
+                <span className="font-mono">{o.order_number ?? o.id.slice(0, 8)}</span> · {formatDate(o.created_at)}
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">

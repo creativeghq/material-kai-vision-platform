@@ -18,6 +18,7 @@ import {
 } from '../services/hrService';
 import { HrStat, EmptyState } from '../components/_shared';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 
 export default function EmployeeSelfServicePage() {
   const { activeWorkspaceId, activeWorkspace, loading: wsLoading } = useWorkspace();
@@ -120,7 +121,7 @@ export default function EmployeeSelfServicePage() {
                         <div className="flex items-center gap-2">
                           {p.punch_type === 'arrival' ? <LogIn className="h-4 w-4 text-emerald-500" /> : <LogOut className="h-4 w-4 text-muted-foreground" />}
                           <span className="font-medium capitalize">{p.punch_type === 'arrival' ? 'In' : 'Out'}</span>
-                          <span className="text-muted-foreground">{new Date(p.punched_at).toLocaleString()}</span>
+                          <span className="text-muted-foreground">{formatDate(p.punched_at, { withTime: true })}</span>
                         </div>
                         <span className={`text-sm ${p.status === 'submitted' ? 'text-emerald-600 dark:text-emerald-400' : p.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'}`} title={p.ergani_protocol ?? ''}>
                           {p.status === 'submitted' ? `Ergani · ${p.ergani_protocol ?? 'filed'}` : p.status === 'failed' ? 'Ergani failed' : 'Recorded'}

@@ -35,6 +35,7 @@ import { AdminRoleUpgradeRequestsPanel } from '@/modules/crm/components/AdminRol
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { roleLabel } from '@/modules/crm/crmConstants';
 import { crmCategoriesService } from '@/services/crmCategoriesService';
+import { formatDate } from '@/utils/datetime';
 
 interface UserProfile {
   id: string;
@@ -222,7 +223,7 @@ const AIUsageTab: React.FC<{ userId: string }> = ({ userId }) => {
                       ${(log.billed_cost_usd || 0).toFixed(6)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(log.created_at).toLocaleString()}
+                      {formatDate(log.created_at, { withTime: true })}
                     </p>
                   </div>
                 </div>
@@ -607,7 +608,7 @@ export const UserDetailPage: React.FC = () => {
                     <Label>Created</Label>
                     <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                       <Calendar className="h-4 w-4" />
-                      {new Date(user.created_at).toLocaleString()}
+                      {formatDate(user.created_at, { withTime: true })}
                     </div>
                   </div>
 

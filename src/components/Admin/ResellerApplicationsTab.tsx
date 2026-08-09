@@ -6,6 +6,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/datetime';
 import {
   resellerApplicationsService,
   type ResellerApplication,
@@ -160,8 +161,8 @@ export const ResellerApplicationsTab: React.FC = () => {
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      Applied {new Date(app.created_at).toLocaleDateString()}
-                      {app.aade_checked_at && ` · ΑΑΔΕ checked ${new Date(app.aade_checked_at).toLocaleDateString()}`}
+                      Applied {formatDate(app.created_at)}
+                      {app.aade_checked_at && ` · ΑΑΔΕ checked ${formatDate(app.aade_checked_at)}`}
                     </p>
                     {app.status === 'aade_failed' && (app.aade_snapshot as any)?.error && (
                       <p className="text-xs text-orange-600 mt-1">{(app.aade_snapshot as any).error}</p>

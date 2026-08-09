@@ -19,6 +19,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { parseDecimal } from '@/utils/decimal';
 import { masterRequestsService } from '@/services/masterRequestsService';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/datetime';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
 const extractSizeFromNotes = (notes?: string | null): string | null => {
@@ -703,7 +704,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                   ) : (
                                     <p className="text-xs text-foreground flex items-center gap-1">
                                       <Truck className="h-3 w-3 text-muted-foreground" />
-                                      {new Date(item.delivery_date!).toLocaleDateString()}
+                                      {formatDate(item.delivery_date!)}
                                     </p>
                                   )}
                                 </div>

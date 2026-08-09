@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteTimeline, TimelineStep } from '../services/QuotesService';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { formatDate } from '@/utils/datetime';
 
 interface ProjectTimelineModalProps {
   quoteId: string;
@@ -271,7 +272,7 @@ export const ProjectTimelineModal: React.FC<ProjectTimelineModalProps> = ({
                                 )}
                                 {timelineEntry.completed_at && (
                                   <p className="text-xs text-gray-500 mt-2">
-                                    Completed: {new Date(timelineEntry.completed_at).toLocaleDateString()}
+                                    Completed: {formatDate(timelineEntry.completed_at)}
                                   </p>
                                 )}
                                 {isAdmin && (

@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildMentionFeedFilters } from './mentionFilters';
+import { formatDate } from '@/utils/datetime';
 import {
   TrackedMention, MentionRow, LlmVisibilitySnapshot, MentionExclusion,
   trackProduct, untrackProduct, getProductMonitoring, refreshProduct,
@@ -409,7 +410,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
                                 </span>
                                 {row.published_at && (
                                   <span className="text-xs text-muted-foreground">
-                                    · {new Date(row.published_at).toLocaleDateString()}
+                                    · {formatDate(row.published_at)}
                                   </span>
                                 )}
                               </div>
@@ -510,7 +511,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
                                 <div className="text-[10px] text-muted-foreground italic mt-0.5">{ex.reason}</div>
                               )}
                               <div className="text-[10px] text-muted-foreground mt-0.5">
-                                Excluded {new Date(ex.excluded_at).toLocaleDateString()}
+                                Excluded {formatDate(ex.excluded_at)}
                               </div>
                             </div>
                             <Button
@@ -629,7 +630,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ productId, productName }) =
           {/* Footer */}
           <div className="text-xs text-muted-foreground flex items-center gap-2">
             Cadence: every {tracked.refresh_interval_hours || 24}h ·
-            {tracked.last_refreshed_at ? ` last refreshed ${new Date(tracked.last_refreshed_at).toLocaleString()}` : ' never refreshed'}
+            {tracked.last_refreshed_at ? ` last refreshed ${formatDate(tracked.last_refreshed_at, { withTime: true })}` : ' never refreshed'}
           </div>
         </>
       )}

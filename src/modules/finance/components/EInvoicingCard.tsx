@@ -25,6 +25,7 @@ import { Loader2, Save, FileSignature, CheckCircle2, XCircle, AlertTriangle, Ext
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
+import { formatDate } from '@/utils/datetime';
 
 // Mandatory Novus issuer fields (providerAdditionalInvoiceDetails.issuer — all YES in the
 // Provider docs). branch comes from the invoice's establishment, not finance_settings.
@@ -254,7 +255,7 @@ export const EInvoicingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity })
             </Button>
           </div>
           {fs.einvoicing_authorization_updated_at && (
-            <p className="text-[11px] text-muted-foreground">Last updated: {new Date(fs.einvoicing_authorization_updated_at).toLocaleString()}</p>
+            <p className="text-[11px] text-muted-foreground">Last updated: {formatDate(fs.einvoicing_authorization_updated_at, { withTime: true })}</p>
           )}
         </div>
       </CardContent>

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { marketplaceService, type MarketplaceApplication } from '@/services/marketplaceService';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * Operator surface for the surplus marketplace. Workspaces opt in (owner enables) → an
@@ -79,7 +80,7 @@ export const MarketplaceApprovalsTab: React.FC = () => {
                   <div className="text-xs text-muted-foreground">
                     {statusWord(r.status)}
                     {r.enabled ? ' · enabled' : ' · disabled by owner'}
-                    {r.applied_at ? ` · applied ${new Date(r.applied_at).toLocaleDateString()}` : ''}
+                    {r.applied_at ? ` · applied ${formatDate(r.applied_at)}` : ''}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

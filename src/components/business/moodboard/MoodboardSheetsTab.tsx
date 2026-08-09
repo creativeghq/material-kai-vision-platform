@@ -24,6 +24,7 @@ import { SheetTypePreviewModal } from '@/components/features/sheets/SheetTypePre
 import { SheetWizardModal, type SheetWizardResult } from '@/components/features/sheets/SheetWizardModal';
 import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 
 interface MoodboardSheetsTabProps {
   moodboardId: string;
@@ -350,7 +351,7 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
                 )}
                 {sheet.credits_used > 0 && <span>· {sheet.credits_used} cr</span>}
                 <span className="ml-auto">
-                  {new Date(sheet.updated_at).toLocaleDateString()}
+                  {formatDate(sheet.updated_at)}
                 </span>
               </div>
 

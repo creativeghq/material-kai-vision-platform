@@ -5,6 +5,7 @@ import { Button } from '@/components/core/ui/button';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { useToast } from '@/hooks/use-toast';
 import { supplierClaimsService, type SupplierClaimQueueRow } from '@/services/supplierClaimsService';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * Operator review queue for supplier identity claims (#324).
@@ -85,7 +86,7 @@ export default function SupplierClaimsPage() {
                     {c.requester_name || 'Unnamed user'}
                     {c.requester_email ? ` · ${c.requester_email}` : ''}
                     {' · from '}{c.requesting_workspace_name || c.requesting_workspace_id}
-                    {' · '}{new Date(c.created_at).toLocaleDateString()}
+                    {' · '}{formatDate(c.created_at)}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0 text-[10px]">

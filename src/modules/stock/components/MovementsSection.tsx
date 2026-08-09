@@ -5,6 +5,7 @@ import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { stockService, type StockMovement } from '../services/stockService';
+import { formatDate } from '@/utils/datetime';
 
 const DIR_META: Record<string, { icon: React.ElementType; label: string; cls: string }> = {
   in: { icon: PackagePlus, label: 'Received', cls: 'text-emerald-600 dark:text-emerald-400' },
@@ -13,7 +14,7 @@ const DIR_META: Record<string, { icon: React.ElementType; label: string; cls: st
 };
 
 const fmtWhen = (iso: string) => {
-  try { return new Date(iso).toLocaleString(); } catch { return iso; }
+  try { return formatDate(iso, { withTime: true }); } catch { return iso; }
 };
 
 export const MovementsSection: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {

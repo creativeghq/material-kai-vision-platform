@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ShieldCheck, Mail, Globe, Clock, Hash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * Operator-side e-sign audit trail for a quote.
@@ -54,7 +55,7 @@ export function QuoteApprovalsCard({ quoteId }: { quoteId: string }) {
               <div className="font-medium text-sm">{a.signer_name}</div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                {new Date(a.signed_at).toLocaleString()}
+                {formatDate(a.signed_at, { withTime: true })}
               </div>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">

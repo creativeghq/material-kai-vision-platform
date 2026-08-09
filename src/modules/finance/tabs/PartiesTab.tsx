@@ -18,6 +18,7 @@ import { humanizeLabel } from '@/utils/humanize';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { FilterBar, NONE_VALUE, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { RefreshResearchButton } from '@/modules/crm/components/RefreshResearchButton';
+import { formatDate } from '@/utils/datetime';
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
@@ -396,7 +397,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
     const sideLabel = ledgerSide === 'customer' ? 'Πελάτης / Customer' : 'Προμηθευτής / Supplier';
     const rowsHtml = ledgerWithBalance.map((r) => `
       <tr>
-        <td>${r.entry_date ? new Date(r.entry_date).toLocaleDateString() : ''}</td>
+        <td>${r.entry_date ? formatDate(r.entry_date) : ''}</td>
         <td>${esc(LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind)}</td>
         <td>${esc(r.doc_number)}</td>
         <td class="r">${Number(r.debit) ? m(Number(r.debit)) : ''}</td>
@@ -418,8 +419,8 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
       tfoot td{font-weight:bold;border-top:2px solid #333;background:#fafafa}
       .open td{font-weight:600;color:#555;background:#fafafa}.close{margin-top:10px;font-size:13px;text-align:right}</style></head>
       <body><h1>Καρτέλα ${ledgerSide === 'customer' ? 'Πελάτη' : 'Προμηθευτή'}</h1>
-      <div class="sub">Από ${new Date(fromDate).toLocaleDateString()} Έως ${new Date(toDate).toLocaleDateString()} · ${sideLabel}</div>
-      <div class="id">${esc(party.display_name)}${party.email ? ' · ' + esc(party.email) : ''} · printed ${new Date().toLocaleDateString()}</div>
+      <div class="sub">Από ${formatDate(fromDate)} Έως ${formatDate(toDate)} · ${sideLabel}</div>
+      <div class="id">${esc(party.display_name)}${party.email ? ' · ' + esc(party.email) : ''} · printed ${formatDate(new Date())}</div>
       <table>
       <thead><tr><th>Ημ/νία</th><th>Τύπος</th><th>Παραστατικό</th><th class="r">Χρέωση</th><th class="r">Πίστωση</th><th class="r">Προοδ. Χρέωση</th><th class="r">Προοδ. Πίστωση</th><th class="r">Υπόλοιπο</th></tr></thead>
       <tbody>
@@ -562,7 +563,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                     <ul className="divide-y divide-border/40">
                       {paginate(payments, payPage).map((p) => (
                         <li key={p.id} className="flex justify-between gap-2 px-3 py-2 text-sm">
-                          <div>{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'In' : 'Out'} · {p.method ?? '—'}</div>
+                          <div>{formatDate(p.paid_at)} · {p.direction === 'in' ? 'In' : 'Out'} · {p.method ?? '—'}</div>
                           <div className={`text-right tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</div>
                         </li>
                       ))}
@@ -628,7 +629,7 @@ const PartyDetailDialog: React.FC<DetailProps> = ({ party, aging, open, onClose,
                             // Key on the ABSOLUTE row index — a per-page index collides across
                             // pages and lets React reuse the previous page's rows.
                             <tr key={(ledgerPage - 1) * TABLE_PAGE_SIZE + idx} className="border-b border-border/30">
-                              <td className="px-3 py-1.5">{r.entry_date ? new Date(r.entry_date).toLocaleDateString() : '—'}</td>
+                              <td className="px-3 py-1.5">{r.entry_date ? formatDate(r.entry_date) : '—'}</td>
                               <td className="px-3 py-1.5">{LEDGER_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
                               <td className="px-3 py-1.5 font-mono">{r.doc_number ?? '—'}</td>
                               <td className="px-3 py-1.5 text-right tabular-nums">{Number(r.debit) ? m(Number(r.debit)) : ''}</td>

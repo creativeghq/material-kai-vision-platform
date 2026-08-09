@@ -6,6 +6,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Skeleton } from '@/components/core/ui/skeleton';
 import type { JobFailureSummary, PipelineError } from '../types';
+import { formatDate } from '@/utils/datetime';
 
 interface Props {
   jobId: string;
@@ -191,7 +192,7 @@ export function PipelineErrorsPanel({ jobId, failureSummary }: Props) {
                     )}
                     {err.occurred_at && (
                       <span className="ml-auto text-[10px] text-muted-foreground">
-                        {new Date(err.occurred_at).toLocaleString()}
+                        {formatDate(err.occurred_at, { withTime: true })}
                       </span>
                     )}
                   </div>

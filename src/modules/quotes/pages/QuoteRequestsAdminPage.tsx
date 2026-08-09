@@ -47,6 +47,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TimelineStepsManagement } from './TimelineStepsManagementPage';
 import { UpsellsManagement } from './UpsellsManagementPage';
 import { QuoteSettingsPage } from './QuoteSettingsPage';
+import { formatDate } from '@/utils/datetime';
 
 interface UserProfile {
   id: string;
@@ -430,10 +431,10 @@ export const QuoteRequestsAdmin: React.FC = () => {
                     </TableCell>
                     <TableCell>{quote.total_items}</TableCell>
                     <TableCell className="text-sm">
-                      {new Date(quote.created_at).toLocaleDateString()}
+                      {formatDate(quote.created_at)}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {new Date(quote.expires_at).toLocaleDateString()}
+                      {formatDate(quote.expires_at)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">

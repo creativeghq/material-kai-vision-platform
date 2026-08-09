@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, type PayableExpense } from '@/modules/finance/services/financeService';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 
 interface Props {
   workspaceId: string;
@@ -161,7 +162,7 @@ export const LinkExpenseToOrderDialog: React.FC<Props> = ({
                   )}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
-                  {e.issued_at ? new Date(e.issued_at).toLocaleDateString() : 'no date'}
+                  {e.issued_at ? formatDate(e.issued_at) : 'no date'}
                   {' · '}<span className={statusTone(e.status)}>{humanizeLabel(e.status)}</span>
                   {e.notes ? ` · ${e.notes}` : ''}
                 </span>

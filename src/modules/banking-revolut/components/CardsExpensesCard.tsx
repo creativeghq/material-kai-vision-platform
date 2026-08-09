@@ -17,6 +17,7 @@ import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { callRevolutApi, getRevolutStatus } from '../services/revolutConfigService';
+import { formatDate } from '@/utils/datetime';
 
 interface Member { id: string; email?: string; first_name?: string; last_name?: string }
 interface CardRow { id: string; label?: string; state?: string; virtual?: boolean; holder_id?: string; last_digits?: string }
@@ -229,7 +230,7 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
                 {expenses.map((e) => (
                   <div key={e.id} className="flex items-center gap-3 py-2 text-sm">
                     <span className="w-24 shrink-0 text-xs text-muted-foreground">
-                      {e.spent_at ? new Date(e.spent_at).toLocaleDateString() : '—'}
+                      {e.spent_at ? formatDate(e.spent_at) : '—'}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{e.merchant?.name || 'Expense'}</span>
                     <span className="shrink-0 font-medium">{Number(e.amount ?? 0).toFixed(2)} {e.currency ?? ''}</span>

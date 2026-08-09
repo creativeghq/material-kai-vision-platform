@@ -16,6 +16,7 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import { realEstateService, type PropertyDeal, type DealStage, type DealTask, type PropertyListItem } from '../services/realEstateService';
+import { formatDate } from '@/utils/datetime';
 
 const STAGES: { key: DealStage; label: string }[] = [
   { key: 'lead', label: 'Lead' }, { key: 'viewing', label: 'Viewing' }, { key: 'offer', label: 'Offer' },
@@ -137,7 +138,7 @@ const DealCard: React.FC<{ ws: string; deal: PropertyDeal; canManage: boolean; o
           <PopoverContent align="end" className="w-64 p-3"><DealTasks ws={ws} dealId={deal.id} canManage={canManage} onChanged={onChanged} /></PopoverContent>
         </Popover>
       </div>
-      {deal.expected_close_date && <div className="mt-1.5 text-[10px] text-muted-foreground">Close ~ {new Date(deal.expected_close_date).toLocaleDateString()}</div>}
+      {deal.expected_close_date && <div className="mt-1.5 text-[10px] text-muted-foreground">Close ~ {formatDate(deal.expected_close_date)}</div>}
       {editing && <DealDialog ws={ws} deal={deal} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />}
     </div>
   );

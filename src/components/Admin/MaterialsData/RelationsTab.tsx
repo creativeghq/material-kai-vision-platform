@@ -4,6 +4,7 @@ import { Loader2, Link2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SmartPagination } from '@/components/core/ui/smart-pagination';
+import { formatDate } from '@/utils/datetime';
 import {
   Table,
   TableBody,
@@ -171,7 +172,7 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(relation.created_at).toLocaleString()}
+                      {formatDate(relation.created_at, { withTime: true })}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {relation.id}

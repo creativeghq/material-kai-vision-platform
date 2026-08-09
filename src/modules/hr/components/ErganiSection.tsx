@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { hrService, type ErganiCredsStatus, type ErganiSubmission, type ErganiSubmissionType } from '../services/hrService';
 import { SectionHeader, EmptyState } from './_shared';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { formatDate } from '@/utils/datetime';
 
 const statusBadge = (s: string) =>
   s === 'submitted' ? <span className="text-sm text-emerald-600 dark:text-emerald-400">Submitted</span>
@@ -147,7 +148,7 @@ export function ErganiSection({ workspaceId, canManage }: { workspaceId: string 
                     <TableCell className="text-sm text-muted-foreground">{s.entity_type ?? '—'}</TableCell>
                     <TableCell>{statusBadge(s.status)}{s.status === 'failed' && s.error && <span className="block text-xs text-destructive mt-1 max-w-[240px] truncate" title={s.error}>{s.error}</span>}</TableCell>
                     <TableCell className="font-mono text-xs">{s.protocol ?? '—'}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{s.submit_date ?? new Date(s.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{s.submit_date ?? formatDate(s.created_at)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {s.status === 'submitted' && s.protocol && (

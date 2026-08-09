@@ -11,6 +11,7 @@ import { statusTone } from '@/utils/statusTone';
 import { AgentLogsViewer } from './AgentLogsViewer';
 import { JobResearchSavedJobsPanel } from './JobResearchSavedJobsPanel';
 import { TechRadarFindingsPanel } from './TechRadarFindingsPanel';
+import { formatDate } from '@/utils/datetime';
 
 interface AgentRunHistoryDrawerProps {
   agent:   BackgroundAgent | null;
@@ -100,7 +101,7 @@ export function AgentRunHistoryDrawer({ agent, open, onClose }: AgentRunHistoryD
                 </span>
 
                 <span className="text-xs text-muted-foreground">
-                  {new Date(run.created_at).toLocaleString()}
+                  {formatDate(run.created_at, { withTime: true })}
                 </span>
 
                 {(run.status === 'pending' || run.status === 'processing') && (

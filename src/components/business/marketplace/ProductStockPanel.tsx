@@ -29,6 +29,7 @@ import {
 import { marketplaceService, type ActiveListingSummary } from '@/services/marketplaceService';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { unitSuffix } from '@/lib/units';
+import { formatDate } from '@/utils/datetime';
 
 interface Props {
   productId: string;
@@ -255,7 +256,7 @@ export const ProductStockPanel: React.FC<Props> = ({
                 {movements.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell className="text-muted-foreground">
-                      {new Date(m.occurred_at).toLocaleDateString()}
+                      {formatDate(m.occurred_at)}
                     </TableCell>
                     <TableCell className={m.direction === 'in' ? 'text-emerald-500' : m.direction === 'out' ? 'text-amber-500' : 'text-muted-foreground'}>
                       <span className="flex items-center gap-1">

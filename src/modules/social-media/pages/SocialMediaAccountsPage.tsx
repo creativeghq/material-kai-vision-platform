@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { formatDate } from '@/utils/datetime';
 
 interface SocialAccount {
   id: string;
@@ -206,7 +207,7 @@ export const SocialMediaAccountsPage: React.FC = () => {
                         {timeAgo(account.last_synced_at)}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {new Date(account.connected_at).toLocaleDateString()}
+                        {formatDate(account.connected_at)}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -12,6 +12,7 @@ import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { entityTemplatesService, type EntityTemplate } from '@/services/entityTemplatesService';
+import { formatDate } from '@/utils/datetime';
 import {
   EXTERNAL_TEMPLATE_SOURCES, LIVE_TEMPLATE_TYPES, TEMPLATE_ADAPTERS, getAdapter,
   type LiveTemplateEntityType,
@@ -149,7 +150,7 @@ export const TemplateLibraryPage: React.FC = () => {
           {tpl.usage_count > 0 && (
             <div className="text-[11px] text-muted-foreground">
               Used {tpl.usage_count} time{tpl.usage_count === 1 ? '' : 's'}
-              {tpl.last_used_at && ` · last ${new Date(tpl.last_used_at).toLocaleDateString()}`}
+              {tpl.last_used_at && ` · last ${formatDate(tpl.last_used_at)}`}
             </div>
           )}
 

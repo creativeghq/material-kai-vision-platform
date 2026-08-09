@@ -154,6 +154,7 @@ const hrefFor = (kind: string | null | undefined, id: string | null | undefined,
 };
 
 import { formatMoney as money } from '@/utils/decimal';
+import { formatDate } from '@/utils/datetime';
 
 // Composer entry types. `note` persists to crm_notes; the rest log a typed row to
 // crm_activities (activity_type / title) — all merge back into the timeline below.
@@ -173,7 +174,7 @@ const relativeTime = (iso: string): string => {
   const m = Math.round(s / 60); if (m < 60) return `${m}m ago`;
   const h = Math.round(m / 60); if (h < 24) return `${h}h ago`;
   const d = Math.round(h / 24); if (d < 30) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(iso);
 };
 
 export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, onComposeEmail, canEmail, people, onMeetingLogged }) => {

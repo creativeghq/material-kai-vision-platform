@@ -10,6 +10,7 @@ import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { catalogsService, type CatalogSourcePdf } from '@/services/catalogsService';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 
 export const CatalogSourcesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -150,7 +151,7 @@ export const CatalogSourcesPage: React.FC = () => {
                   <div className="flex gap-3 text-xs text-muted-foreground mt-1">
                     {s.page_count && <span>{s.page_count} pages</span>}
                     {s.file_size_bytes && <span>{(s.file_size_bytes / 1024 / 1024).toFixed(1)} MB</span>}
-                    <span>uploaded {new Date(s.created_at).toLocaleDateString()}</span>
+                    <span>uploaded {formatDate(s.created_at)}</span>
                     {s.notes && <span title={s.notes}>📝</span>}
                   </div>
                 </div>

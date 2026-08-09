@@ -19,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { parseDecimalOr } from '@/utils/decimal';
+import { formatDate } from '@/utils/datetime';
 
 interface Edit { name: string; sku: string; unit: string; quantity: string; unit_cost: string; sales_price: string; category_id: string; warehouse_id: string; add_to_catalog: boolean; }
 
@@ -177,7 +178,7 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
                     </span>
                   )}
                   {it.inbound_document?.issue_date && (
-                    <span className="text-muted-foreground">{new Date(it.inbound_document.issue_date).toLocaleDateString()}</span>
+                    <span className="text-muted-foreground">{formatDate(it.inbound_document.issue_date)}</span>
                   )}
                   {/* What approving will actually DO — top up existing stock, or create a product. */}
                   {it.match_score != null && (

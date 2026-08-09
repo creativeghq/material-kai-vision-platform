@@ -8,6 +8,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/core/ui/dialog';
 import { inboxApi, signInboxAttachment, type InboxMessage } from '@/services/inboxApi';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * Public customer thread (`/i/:token`). Minimal chrome: one thread, reply box,
@@ -175,7 +176,7 @@ const PublicBubble: React.FC<{ m: InboxMessage }> = ({ m }) => {
           </a>
         );
       })}
-      <div className="text-[10px] text-muted-foreground mt-1">{new Date(m.created_at).toLocaleString()}</div>
+      <div className="text-[10px] text-muted-foreground mt-1">{formatDate(m.created_at, { withTime: true })}</div>
     </div>
   );
 };

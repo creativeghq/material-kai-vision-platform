@@ -10,6 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { financeService } from '@/modules/finance/services/financeService';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { formatDate } from '@/utils/datetime';
 
 interface Req {
   id: string; target_id: string; before: any; after: any; requested_by: string | null; created_at: string;
@@ -83,7 +84,7 @@ export const PendingDiscountApprovalsCard: React.FC<{ workspaceId: string }> = (
               <div key={r.id} className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 text-sm">
                 <div className="min-w-0">
                   <div className="truncate capitalize">{fmtChange(r.before, r.after)}</div>
-                  <div className="text-[11px] text-muted-foreground">{new Date(r.created_at).toLocaleString()}</div>
+                  <div className="text-[11px] text-muted-foreground">{formatDate(r.created_at, { withTime: true })}</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <Button size="sm" variant="outline" className="h-7 gap-1" disabled={busyId === r.id} onClick={() => decide(r, true)}>

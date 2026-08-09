@@ -64,6 +64,7 @@ import {
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { MYDATA_EXEMPTION_CATEGORIES } from '@/lib/mydataExemptionCategories';
 import { InlineText, InlineSelect } from '@/components/business/crm/inline/InlineFields';
+import { formatDate } from '@/utils/datetime';
 
 interface Company {
   id: string;
@@ -746,7 +747,7 @@ export const CompanyDetailPage: React.FC = () => {
             </CollapsibleCard>
 
             <div className="px-1 text-xs text-muted-foreground">
-              Created {new Date(company.created_at).toLocaleDateString()}{company.updated_at ? ` · Updated ${new Date(company.updated_at).toLocaleDateString()}` : ''}
+              Created {formatDate(company.created_at)}{company.updated_at ? ` · Updated ${formatDate(company.updated_at)}` : ''}
             </div>
           </aside>
 
@@ -851,7 +852,7 @@ export const CompanyDetailPage: React.FC = () => {
                               Validate (VIES)
                             </Button>
                             {company.vat_validated === true && (
-                              <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">{company.vat_validation_source === 'aade' ? 'AADE Active' : 'VAT verified'}{company.vat_validated_at ? ` · ${new Date(company.vat_validated_at).toLocaleDateString()}` : ''}</Badge>
+                              <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">{company.vat_validation_source === 'aade' ? 'AADE Active' : 'VAT verified'}{company.vat_validated_at ? ` · ${formatDate(company.vat_validated_at)}` : ''}</Badge>
                             )}
                             {company.vat_validated === false && (
                               <Badge variant="destructive">{company.vat_validation_source === 'aade' ? 'AADE: business inactive' : 'VAT not recognised by VIES'}</Badge>

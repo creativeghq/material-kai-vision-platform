@@ -16,6 +16,7 @@ import {
   type RoleUpgradeRequest,
 } from '@/services/roleUpgradeRequestService';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 
 interface Props {
   userId: string;
@@ -191,7 +192,7 @@ const RequestRow: React.FC<RequestRowProps> = ({ request, onApprove, onReject })
           {statusBadge()}
         </div>
         <span className="text-xs text-muted-foreground">
-          {new Date(request.created_at).toLocaleString()}
+          {formatDate(request.created_at, { withTime: true })}
         </span>
       </div>
       <VatStatusLine request={request} />

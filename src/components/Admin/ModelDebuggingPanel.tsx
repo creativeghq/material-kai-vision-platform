@@ -36,6 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 // Relocated here from its orphaned /admin/3d-suggestions route.
 import { MaterialSuggestionsPanel } from './MaterialSuggestionsPanel';
+import { formatDate } from '@/utils/datetime';
 
 interface ModelLog {
   id: string;
@@ -571,7 +572,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
                                     Last Tested:
                                   </span>
                                   <span className="text-xs">
-                                    {new Date(model.lastTested).toLocaleString()}
+                                    {formatDate(model.lastTested, { withTime: true })}
                                   </span>
                                 </div>
                               )}
@@ -645,7 +646,7 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
                                       {log.status}
                                     </Badge>
                                     <span className="text-muted-foreground text-xs">
-                                      {new Date(log.timestamp).toLocaleString()}
+                                      {formatDate(log.timestamp, { withTime: true })}
                                     </span>
                                   </div>
                                   {log.duration && (

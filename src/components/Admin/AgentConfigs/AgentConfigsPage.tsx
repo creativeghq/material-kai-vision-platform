@@ -504,7 +504,7 @@ export const AgentConfigsPage: React.FC = () => {
                                 <TooltipTrigger asChild>
                                   <div className="flex items-center gap-1">
                                     <Clock className="h-3 w-3" />
-                                    <span>{new Date(prompt.updated_at).toLocaleDateString()}</span>
+                                    <span>{formatDate(prompt.updated_at)}</span>
                                   </div>
                                 </TooltipTrigger>
                                 <TooltipContent>Last updated</TooltipContent>

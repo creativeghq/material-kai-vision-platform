@@ -27,6 +27,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/core/ui/collapsible';
 import { type FunctionalMetadata } from '@/types/materials';
+import { formatDate } from '@/utils/datetime';
 
 interface EnhancedFunctionalMetadataCardProps {
   /** Functional metadata object containing all 9 categories */
@@ -515,9 +516,7 @@ export const EnhancedFunctionalMetadataCard: React.FC<
       {functionalMetadata.functionalMetadataUpdatedAt && (
         <div className="text-xs text-muted-foreground text-right mt-2">
           Last updated:{' '}
-          {new Date(
-            functionalMetadata.functionalMetadataUpdatedAt,
-          ).toLocaleString()}
+          {formatDate(functionalMetadata.functionalMetadataUpdatedAt, { withTime: true })}
         </div>
       )}
     </div>

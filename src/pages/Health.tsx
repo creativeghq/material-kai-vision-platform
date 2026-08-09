@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 import {
   healthCheck,
   readinessCheck,
@@ -179,7 +180,7 @@ const HealthPage: React.FC = () => {
                   <div>Uptime: {Math.floor(healthStatus.uptime)}s</div>
                   <div>
                     Timestamp:{' '}
-                    {new Date(healthStatus.timestamp).toLocaleString()}
+                    {formatDate(healthStatus.timestamp, { withTime: true })}
                   </div>
                 </div>
 
@@ -267,7 +268,7 @@ const HealthPage: React.FC = () => {
                 <div className="pt-4 border-t space-y-1 text-sm text-muted-foreground">
                   <div>
                     Timestamp:{' '}
-                    {new Date(readinessStatus.timestamp).toLocaleString()}
+                    {formatDate(readinessStatus.timestamp, { withTime: true })}
                   </div>
                 </div>
 

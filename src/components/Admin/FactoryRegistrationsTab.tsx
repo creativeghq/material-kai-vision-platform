@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/datetime';
 
 interface RegistrationRequest {
   id: string;
@@ -156,7 +157,7 @@ export const FactoryRegistrationsTab: React.FC = () => {
                       Claims: <span className="font-medium text-foreground">{req.factory_claimed_name}</span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      By: {req.user_profiles?.full_name || req.user_id.slice(0, 8)} · {new Date(req.created_at).toLocaleDateString()}
+                      By: {req.user_profiles?.full_name || req.user_id.slice(0, 8)} · {formatDate(req.created_at)}
                     </p>
                   </div>
 

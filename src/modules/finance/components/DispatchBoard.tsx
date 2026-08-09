@@ -16,6 +16,7 @@ import { formatMoney } from '@/modules/finance/services/financeService';
 import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { deliveryNotesService, type DispatchQueueOrder } from '@/modules/finance/services/deliveryNotesService';
+import { formatDate } from '@/utils/datetime';
 
 type BucketKey = 'overdue' | 'today' | 'next7' | 'later' | 'undated';
 const BUCKET_LABEL: Record<BucketKey, string> = {
@@ -283,7 +284,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
 /** Open a printable run sheet (one picking block per order) in a new window. Pure client render. */
 function printRunSheet(orders: DispatchQueueOrder[]) {
   const esc = escapeHtml; // was a local `& < >`-only escaper (left " ' unescaped — attribute-unsafe)
-  const today = new Date().toLocaleDateString();
+  const today = formatDate(new Date());
   const blocks = orders.map((o) => `
     <div class="order">
       <div class="ohead">

@@ -18,6 +18,7 @@ import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { projectsService } from '../../services/projectsService';
+import { formatDate } from '@/utils/datetime';
 
 const money = (n: number | null, c: string | null) => formatMoney(n, c ?? 'EUR');
 
@@ -103,7 +104,7 @@ export const BillingTab: React.FC<{ projectId: string }> = ({ projectId }) => {
                   <p className="font-medium truncate">{inv.internal_number}</p>
                   <span className="text-[10px] text-muted-foreground capitalize">{inv.invoice_kind}{inv.progress_pct ? ` ${inv.progress_pct}%` : ''}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">{inv.issued_at ? new Date(inv.issued_at).toLocaleDateString() : 'Draft'}</p>
+                <p className="text-xs text-muted-foreground">{inv.issued_at ? formatDate(inv.issued_at) : 'Draft'}</p>
               </div>
               <div className="text-right shrink-0">
                 <p className="font-medium">{money(inv.total, inv.currency)}</p>

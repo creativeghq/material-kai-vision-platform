@@ -32,6 +32,7 @@ import type { ChatConversation } from '@/services/agents/agentChatHistoryService
 import { TOOLKITS, ALWAYS_ON_TOOLKIT_IDS } from './agentToolsCatalog';
 
 import { onEnterOrSpace } from '@/utils/a11y';
+import { formatDate } from '@/utils/datetime';
 
 interface ConversationManagerModalProps {
   open: boolean;
@@ -248,7 +249,7 @@ export const ConversationManagerModal: React.FC<ConversationManagerModalProps> =
                         )}
                         <div className="truncate text-xs text-muted-foreground">
                           {c.messageCount} {c.messageCount === 1 ? 'message' : 'messages'} ·{' '}
-                          {new Date(c.lastMessageAt).toLocaleDateString()}
+                          {formatDate(c.lastMessageAt)}
                         </div>
                         <ConversationTags toolkits={c.toolkits} />
                       </div>

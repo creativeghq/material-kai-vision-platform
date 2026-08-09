@@ -23,6 +23,7 @@ import { ReleaseCreditDialog } from '@/modules/finance/components/ReleaseCreditD
 import { netPositionTermCount, netPositionDirection } from '@/modules/finance/utils/netPosition';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 
 // `customerName` is optional metadata used only to label the customer inside the
 // create dialogs; the ids are what actually scope the created records.
@@ -397,7 +398,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         profitability={profitability}
         meta={[
           { label: 'Open orders', value: openOrders },
-          { label: 'Last payment', value: lastPayment ? new Date(lastPayment.paid_at).toLocaleDateString() : '—' },
+          { label: 'Last payment', value: lastPayment ? formatDate(lastPayment.paid_at) : '—' },
         ]}
       />
 
@@ -503,7 +504,7 @@ export const PartyPaymentsCard: React.FC<Target & { roles?: { customer?: boolean
                 const isIn = p.direction === 'in';
                 return (
                   <tr key={p.id} className="border-b border-border/30 hover:bg-muted/30">
-                    <td className="px-4 py-2 whitespace-nowrap">{new Date(p.paid_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">{formatDate(p.paid_at)}</td>
                     <td className="px-4 py-2">
                       <span className={`text-xs ${isIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
                         {isIn ? 'Received' : 'Paid'}
@@ -609,7 +610,7 @@ export const CustomerTopItemsCard: React.FC<Target> = ({ contactId, companyId })
                   <td className="px-4 py-2 text-right">{formatMoney(p.revenue_net)}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{p.order_count}</td>
                   <td className="px-4 py-2 text-right tabular-nums text-emerald-600">{Number(p.on_hand).toLocaleString()}</td>
-                  <td className="px-4 py-2 text-right text-muted-foreground">{p.last_ordered ? new Date(p.last_ordered).toLocaleDateString() : '—'}</td>
+                  <td className="px-4 py-2 text-right text-muted-foreground">{p.last_ordered ? formatDate(p.last_ordered) : '—'}</td>
                 </tr>
               ))
             )}

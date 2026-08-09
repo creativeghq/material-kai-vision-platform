@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, formatPct } from '@/modules/finance/services/financeService';
 import { AccountingExportCard } from '@/modules/finance/components/AccountingExportCard';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { formatDate } from '@/utils/datetime';
 
 type ReportKind =
   | 'cashflow_per_day' | 'pnl_per_category'
@@ -608,7 +609,7 @@ function renderReport(
         headers={['Quote', 'Kind', 'Scheduled for', 'In', 'Note']}
         totals={totals}
         rows={paginate(rows, page).map((r: any) => [
-          r.quote_label, r.kind, r.scheduled_for ? new Date(r.scheduled_for).toLocaleString() : '—', `${r.days_until}d`, r.body ?? '—',
+          r.quote_label, r.kind, r.scheduled_for ? formatDate(r.scheduled_for, { withTime: true }) : '—', `${r.days_until}d`, r.body ?? '—',
         ])}
         footer={<TablePagination page={page} total={rows.length} onPageChange={onPageChange} label="tasks" />}
       />
@@ -706,7 +707,7 @@ const MyDataReconTable: React.FC<{
               <tr key={`${r.doc_kind}-${r.doc_id}`} className="border-b border-border/30">
                 <td className="px-4 py-2 font-mono text-xs">{r.doc_number ?? r.doc_id?.slice(0, 8)}</td>
                 <td className="px-4 py-2">{DOC_KIND_LABEL[r.doc_kind] ?? r.doc_kind}</td>
-                <td className="px-4 py-2">{r.issued_at ? new Date(r.issued_at).toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-2">{r.issued_at ? formatDate(r.issued_at) : '—'}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{r.total != null ? formatMoney(Number(r.total), r.currency ?? undefined) : '—'}</td>
                 <td className="px-4 py-2 font-mono text-[11px] break-all">{r.fiscal_mark ?? '—'}</td>
                 <td className="px-4 py-2"><span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] ${meta.cls}`}>{meta.label}</span></td>

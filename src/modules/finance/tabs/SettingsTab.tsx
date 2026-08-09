@@ -36,6 +36,7 @@ import { WorkspaceCreditsCard } from '@/modules/finance/components/WorkspaceCred
 import { EInvoicingCard } from '@/modules/finance/components/EInvoicingCard';
 import { BankAccountsCard } from '@/modules/finance/components/BankAccountsCard';
 import { MoneyOutCard } from '@/modules/banking-revolut/components/MoneyOutCard';
+import { formatDate } from '@/utils/datetime';
 
 interface Props { workspaceId: string; onSettingsChanged: (s: FinanceSettings) => void }
 
@@ -515,7 +516,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   Statements cover the current calendar year. Runs hourly; each workspace fires once when its scheduled hour + day match.
-                  {settings.auto_statement_last_run_at && ` Last run: ${new Date(settings.auto_statement_last_run_at).toLocaleString()}.`}
+                  {settings.auto_statement_last_run_at && ` Last run: ${formatDate(settings.auto_statement_last_run_at, { withTime: true })}.`}
                 </p>
               </>
             )}
@@ -784,7 +785,7 @@ const DigestPanel: React.FC<DigestPanelProps> = ({ settings, onPatch, onSave, sa
 
       {settings.digest_last_sent_at && (
         <p className="text-[11px] text-muted-foreground">
-          Last sent: {new Date(settings.digest_last_sent_at).toLocaleString()}
+          Last sent: {formatDate(settings.digest_last_sent_at, { withTime: true })}
         </p>
       )}
     </>

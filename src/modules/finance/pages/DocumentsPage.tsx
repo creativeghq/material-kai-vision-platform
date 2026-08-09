@@ -47,6 +47,7 @@ import { statusTone } from '@/utils/statusTone';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildDocumentFilters, type DocFilterType } from '@/modules/finance/components/documentFilters';
+import { formatDate } from '@/utils/datetime';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'dispatch' | 'delivery_notes' | 'cheques' | 'expenses';
 
@@ -477,7 +478,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                           <td className="px-4 py-2 font-mono text-xs">
                             <button type="button" onClick={(e) => { e.stopPropagation(); navigate(`${financeBase}/invoices/${i.id}`); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{i.internal_number}</button>
                           </td>
-                          <td className="px-4 py-2">{i.issued_at ? new Date(i.issued_at).toLocaleDateString() : <span className="text-muted-foreground">Draft</span>}</td>
+                          <td className="px-4 py-2">{i.issued_at ? formatDate(i.issued_at) : <span className="text-muted-foreground">Draft</span>}</td>
                           <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                             {isAccountant ? (
                               <span className="text-xs text-muted-foreground">{categoryName((i as any).category_id)}</span>
@@ -641,7 +642,7 @@ const RecurringExpensesCard: React.FC<{ rows: RecurringExpense[]; categoryName: 
                 <td className="px-4 py-2 text-xs text-muted-foreground">{categoryName(r.category_id)}</td>
                 <td className="px-4 py-2 text-xs">{r.interval_count > 1 ? `${r.interval_count}× ` : ''}{CADENCE_LABEL[r.cadence]}</td>
                 <td className="px-4 py-2 text-right">{formatMoney(Number(r.subtotal_net) + Number(r.vat_amount), r.currency)}</td>
-                <td className="px-4 py-2">{r.is_active ? new Date(r.next_run_at).toLocaleDateString() : '—'}</td>
+                <td className="px-4 py-2">{r.is_active ? formatDate(r.next_run_at) : '—'}</td>
                 <td className="px-4 py-2 text-center">{r.auto_pay ? <span className="text-emerald-500">✓</span> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(r.is_active ? 'active' : 'paused')}`}>{r.is_active ? 'Active' : 'Paused'}</span></td>
                 {!readOnly && (
@@ -763,7 +764,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
           <tr key={d.id} className="border-b border-border/30">
             <td className="px-4 py-2 font-mono text-xs">{d.delivery_note_number ?? <span className="text-muted-foreground">draft</span>}</td>
             <td className="px-4 py-2"><span className="text-[10px] text-muted-foreground">{d.kind === 'receipt' ? 'Receipt' : 'Dispatch'}</span></td>
-            <td className="px-4 py-2">{d.issued_at ? new Date(d.issued_at).toLocaleDateString() : new Date(d.created_at).toLocaleDateString()}</td>
+            <td className="px-4 py-2">{d.issued_at ? formatDate(d.issued_at) : formatDate(d.created_at)}</td>
             <td className="px-4 py-2 text-center">
               <div className="flex items-center justify-center gap-2">
                 <span className={`text-[10px] ${statusTone(d.status)}`}>{humanizeLabel(d.status)}</span>
@@ -849,7 +850,7 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
       {rows.map((cn: any) => (
         <tr key={cn.id} className="border-b border-border/30">
           <td className="px-4 py-2 font-mono text-xs">{cn.credit_note_number}</td>
-          <td className="px-4 py-2">{cn.issued_at ? new Date(cn.issued_at).toLocaleDateString() : '—'}</td>
+          <td className="px-4 py-2">{cn.issued_at ? formatDate(cn.issued_at) : '—'}</td>
           <td className="px-4 py-2"><span className="text-xs text-muted-foreground">{cn.document_type ?? '—'}</span></td>
           <td className="px-4 py-2 text-muted-foreground truncate max-w-[220px]">{cn.reason ?? '—'}</td>
           <td className="px-4 py-2 text-right font-medium">{formatMoney(cn.total ?? cn.amount, cn.currency)}</td>
@@ -900,7 +901,7 @@ const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[] }> = ({ row
       {rows.map((cn) => (
         <tr key={cn.id} className="border-b border-border/30">
           <td className="px-4 py-2 font-mono text-xs">{cn.supplier_credit_note_number}</td>
-          <td className="px-4 py-2">{cn.issued_at ? new Date(cn.issued_at).toLocaleDateString() : '—'}</td>
+          <td className="px-4 py-2">{cn.issued_at ? formatDate(cn.issued_at) : '—'}</td>
           <td className="px-4 py-2 text-muted-foreground truncate max-w-[220px]">{cn.reason ?? '—'}</td>
           <td className={`px-4 py-2 ${cn.status === 'void' ? 'text-muted-foreground' : 'text-emerald-600 dark:text-emerald-400'}`}>{cn.status}</td>
           <td className="px-4 py-2 text-right">{formatMoney(cn.subtotal_net, cn.currency)}</td>
@@ -942,7 +943,7 @@ const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id
         const allocated = Math.round((Number(p.amount ?? 0) - (Number(p.unallocated) || 0)) * 100) / 100;
         return (
           <tr key={p.id} className="border-b border-border/30">
-            <td className="px-4 py-2">{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}</td>
+            <td className="px-4 py-2">{p.paid_at ? formatDate(p.paid_at) : '—'}</td>
             <td className="px-4 py-2">
               <span className={p.direction === 'in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
                 {/* A refund is money OUT that settles a credit note. `credit_number` is a
@@ -1131,7 +1132,7 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
           const outcomes = inboundOutcomes(d, { ordered: ordered.has(d.id) });
           return (
           <tr key={d.id} className={`border-b border-border/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}>
-            <td className="px-4 py-2">{d.issue_date ? new Date(d.issue_date).toLocaleDateString() : '—'}</td>
+            <td className="px-4 py-2">{d.issue_date ? formatDate(d.issue_date) : '—'}</td>
             <td className="px-4 py-2">
               <div className="text-xs font-medium">{d.series ?? '—'}{d.aa ? ` ${d.aa}` : ''}</div>
               <div className="text-[10px] text-muted-foreground font-mono" title={`MARK ${d.mark}`}>{d.mark}</div>

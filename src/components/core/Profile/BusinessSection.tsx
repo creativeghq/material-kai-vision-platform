@@ -14,6 +14,7 @@ import { validateVatViaVies, type ViesValidationResult } from '@/services/viesSe
 import { aadeService, type AadeLookupResult } from '@/modules/myaade';
 import { MarketplaceParticipationCard } from './MarketplaceParticipationCard';
 import { SupplierIdentityClaimCard } from './SupplierIdentityClaimCard';
+import { formatDate } from '@/utils/datetime';
 
 export type EntityType = 'solo' | 'business';
 
@@ -723,7 +724,7 @@ const ViesStatusInline: React.FC<ViesStatusInlineProps> = ({ cache, lastResult, 
       <p className="text-xs text-green-700 dark:text-green-400 flex items-start gap-1.5 mt-1.5">
         <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5" />
         <span>
-          Verified via VIES on {new Date(cache.validated_at).toLocaleDateString()}{cache.name ? <> — registered as <strong>{cache.name}</strong></> : ''}
+          Verified via VIES on {formatDate(cache.validated_at)}{cache.name ? <> — registered as <strong>{cache.name}</strong></> : ''}
           {cache.name_latin ? <> (<span className="text-muted-foreground">{cache.name_latin}</span>)</> : ''}.
         </span>
       </p>
@@ -733,7 +734,7 @@ const ViesStatusInline: React.FC<ViesStatusInlineProps> = ({ cache, lastResult, 
     return (
       <p className="text-xs text-destructive flex items-start gap-1.5 mt-1.5">
         <ShieldAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-        <span>Last VIES check on {new Date(cache.validated_at).toLocaleDateString()} returned invalid.</span>
+        <span>Last VIES check on {formatDate(cache.validated_at)} returned invalid.</span>
       </p>
     );
   }

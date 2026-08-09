@@ -8,6 +8,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/utils/datetime';
 
 interface SearchInterfaceProps {
   /** Open a document in the editor (from a search result click). */
@@ -215,7 +216,7 @@ export const SearchInterface: React.FC<SearchInterfaceProps> = ({ onOpen }) => {
                   )}
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <span>Views: {doc.view_count}</span>
-                    <span>Created: {new Date(doc.created_at).toLocaleDateString()}</span>
+                    <span>Created: {formatDate(doc.created_at)}</span>
                     {doc.embedding_status === 'success' && (
                       <Badge variant="outline" className="text-green-600">
                         <Sparkles className="h-3 w-3 mr-1" />

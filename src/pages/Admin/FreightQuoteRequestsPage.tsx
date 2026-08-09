@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { stockService, type PendingQuoteRequest, type FreightOffer } from '@/modules/stock/services/stockService';
+import { formatDate } from '@/utils/datetime';
 
 type OfferRow = { carrier: string; amount: string; currency: string; transit: string };
 const emptyRow = (): OfferRow => ({ carrier: '', amount: '', currency: 'USD', transit: '' });
@@ -75,7 +76,7 @@ export default function FreightQuoteRequestsPage() {
                       <td className="px-4 py-2 font-medium">{q.workspace_name}</td>
                       <td className="px-4 py-2">{q.origin} → {q.destination}{q.container_type ? <span className="ml-2 text-xs text-muted-foreground">{q.container_type}</span> : null}</td>
                       <td className="px-4 py-2 uppercase text-xs text-muted-foreground">{q.mode}</td>
-                      <td className="px-4 py-2 text-xs text-muted-foreground">{new Date(q.created_at).toLocaleString()}</td>
+                      <td className="px-4 py-2 text-xs text-muted-foreground">{formatDate(q.created_at, { withTime: true })}</td>
                       <td className="px-4 py-2 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button size="sm" className="rounded-full h-7 text-xs" onClick={() => setAnswer(q)}><Send className="h-3.5 w-3.5 mr-1" /> Answer</Button>

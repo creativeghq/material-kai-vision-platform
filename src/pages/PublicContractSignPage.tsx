@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { contractsService } from '@/services/contractsService';
+import { formatDate } from '@/utils/datetime';
 
 type Resolved =
   | { kind: 'loading' }
@@ -91,9 +92,9 @@ export default function PublicContractSignPage() {
       </div>
       {(state.effective || state.expiry) && (
         <p className="text-xs text-muted-foreground mb-4">
-          {state.effective && <>Effective {new Date(state.effective).toLocaleDateString()}</>}
+          {state.effective && <>Effective {formatDate(state.effective)}</>}
           {state.effective && state.expiry && ' · '}
-          {state.expiry && <>Expires {new Date(state.expiry).toLocaleDateString()}</>}
+          {state.expiry && <>Expires {formatDate(state.expiry)}</>}
         </p>
       )}
 

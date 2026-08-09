@@ -27,6 +27,7 @@ import type { AgentRun, BackgroundAgent } from '@/services/backgroundAgents';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
   completed:  <CheckCircle className="h-4 w-4 text-green-500"                 />,
@@ -382,7 +383,7 @@ export function BackgroundAgentsPage() {
                     </span>
 
                     <span className="text-xs text-muted-foreground">
-                      {new Date(run.created_at).toLocaleString()}
+                      {formatDate(run.created_at, { withTime: true })}
                     </span>
 
                     {(run.status === 'pending' || run.status === 'processing') && (

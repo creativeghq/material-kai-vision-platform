@@ -44,6 +44,7 @@ import { Progress } from '@/components/core/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { applyFiltersToQuery } from '@/components/core/filters';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/utils/datetime';
 
 type RelevancyTab = 'chunk-product' | 'product-image' | 'chunk-image';
 
@@ -673,7 +674,7 @@ export const RelevancyManagement: React.FC = () => {
                 <div>
                   <Label>Created</Label>
                   <div className="mt-2 text-sm text-gray-600">
-                    {new Date(selectedRel.created_at).toLocaleDateString()}
+                    {formatDate(selectedRel.created_at)}
                   </div>
                 </div>
               </div>

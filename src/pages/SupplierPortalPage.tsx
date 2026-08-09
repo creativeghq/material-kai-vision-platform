@@ -10,6 +10,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supplierClaimsService, type SupplierInboundOrder } from '@/services/supplierClaimsService';
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * Supplier portal. A claimed supplier sees the purchase
@@ -151,7 +152,7 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
                   </Link>
                 </Button>
               )}
-              {o.supplier_eta && <span className="text-xs text-muted-foreground ml-auto">ETA {new Date(o.supplier_eta).toLocaleDateString()}</span>}
+              {o.supplier_eta && <span className="text-xs text-muted-foreground ml-auto">ETA {formatDate(o.supplier_eta)}</span>}
             </div>
           </CardContent>
         </Card>

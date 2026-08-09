@@ -53,6 +53,7 @@ import { FilterBar, type FilterGroupDef, type FilterValues } from '@/components/
 import { UNITS } from '@/lib/units';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { PaymentRowActions } from '@/modules/finance/components/PaymentRowActions';
+import { formatDate } from '@/utils/datetime';
 import {
   ordersService, ORDER_STATUS_LABEL, ORDER_PAYMENT_LABEL,
   type OrderType, type OrderStatus, type OrderPaymentStatus, type OrderListRow, type OrderItem, type Order,
@@ -441,7 +442,7 @@ export const OrdersPanel: React.FC<{
                         return <span className={r.order_type === 'sales' ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-red-400 font-medium'}>{formatMoney(o, r.currency)}</span>;
                       })()}
                     </td>
-                    <td className="px-4 py-2 text-right text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-2 text-right text-xs text-muted-foreground">{formatDate(r.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -2790,7 +2791,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         Applied from account credit
                         {c.counterparty_name && <span className="text-muted-foreground">{c.direction === 'in' ? ' · from ' : ' · to '}<span className="text-foreground/80">{c.counterparty_name}</span></span>}
                       </span>
-                      <span className="text-[11px] text-muted-foreground">{new Date(c.paid_at).toLocaleDateString()} · {c.direction === 'in' ? 'Payment' : 'Expense'} · account credit</span>
+                      <span className="text-[11px] text-muted-foreground">{formatDate(c.paid_at)} · {c.direction === 'in' ? 'Payment' : 'Expense'} · account credit</span>
                     </span>
                     <span className={`tabular-nums shrink-0 ${c.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(c.amount, c.currency)}</span>
                   </div>
@@ -2810,7 +2811,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       </span>
                       {/* Account only — the method is derived from it, so printing both said
                           "Postbank BG · Bank Payment" and taught the reader nothing twice. */}
-                      <span className="text-[11px] text-muted-foreground">{new Date(p.paid_at).toLocaleDateString()} · {p.direction === 'in' ? 'Payment' : 'Expense'}{acctName ? ` · ${acctName}` : ''}</span>
+                      <span className="text-[11px] text-muted-foreground">{formatDate(p.paid_at)} · {p.direction === 'in' ? 'Payment' : 'Expense'}{acctName ? ` · ${acctName}` : ''}</span>
                     </span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span className={`tabular-nums ${p.direction === 'in' ? 'text-emerald-500' : 'text-red-400'}`}>{formatMoney(Number(p.amount), p.currency)}</span>
@@ -2853,7 +2854,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       {a.action === 'update' && newAmt != null && oldAmt !== newAmt
                         ? <>{formatMoney(oldAmt, order.currency)} → {formatMoney(newAmt, order.currency)}</>
                         : formatMoney(oldAmt, order.currency)}
-                      {' '}· {new Date(a.changed_at).toLocaleString()}
+                      {' '}· {formatDate(a.changed_at, { withTime: true })}
                     </div>
                   );
                 })}

@@ -27,6 +27,7 @@ import {
 } from '@/components/core/ui/alert-dialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { parseDecimal } from '@/utils/decimal';
+import { formatDate } from '@/utils/datetime';
 
 export const ExpensePaymentsDialog: React.FC<{
   workspaceId: string;
@@ -149,7 +150,7 @@ export const ExpensePaymentsDialog: React.FC<{
                     <div className="font-medium">From the Inbox — {expense.inbox.issuer_name ?? expense.inbox.issuer_vat ?? 'received document'}</div>
                     <div className="text-muted-foreground">
                       {expense.inbox.series ?? ''}{expense.inbox.aa ? ` ${expense.inbox.aa}` : ''}
-                      {expense.inbox.issue_date ? ` · ${new Date(expense.inbox.issue_date).toLocaleDateString()}` : ''}
+                      {expense.inbox.issue_date ? ` · ${formatDate(expense.inbox.issue_date)}` : ''}
                       <span className="ml-1 font-mono">MARK {expense.inbox.mark}</span>
                     </div>
                   </div>
@@ -179,7 +180,7 @@ export const ExpensePaymentsDialog: React.FC<{
                     <tbody>
                       {settlements.map((s) => (
                         <tr key={s.allocation_id} className="border-b border-border/30 last:border-0">
-                          <td className="px-3 py-1.5">{s.occurred_at ? new Date(s.occurred_at).toLocaleDateString() : '—'}</td>
+                          <td className="px-3 py-1.5">{s.occurred_at ? formatDate(s.occurred_at) : '—'}</td>
                           <td className="px-3 py-1.5 text-xs text-muted-foreground">
                             {/* The account the money left from — not the method, which is only
                                 a restatement of the account's kind. */}
@@ -230,7 +231,7 @@ export const ExpensePaymentsDialog: React.FC<{
                             <SelectContent>
                               {attachable.map((p) => (
                                 <SelectItem key={p.id} value={p.id}>
-                                  {new Date(p.paid_at).toLocaleDateString()}
+                                  {formatDate(p.paid_at)}
                                   {p.party_name ? ` · ${p.party_name}` : ''}
                                   {p.reference ? ` · ${p.reference}` : ''}
                                   {` — ${formatMoney(p.unallocated, p.currency)} free`}

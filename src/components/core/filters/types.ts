@@ -7,6 +7,7 @@
  * to know what a row is. That is what lets one modal serve payments, products, jobs and CRM.
  */
 import type { LucideIcon } from 'lucide-react';
+import { formatDate } from '@/utils/datetime';
 
 export interface FilterOption {
   value: string;
@@ -135,7 +136,7 @@ export function describeValue(field: FilterField, value: FilterValue): string {
     }
     case 'dateRange': {
       const d = value as DateRangeValue;
-      const fmt = (s?: string) => (s ? new Date(s).toLocaleDateString() : '');
+      const fmt = (s?: string) => (s ? formatDate(s) : '');
       if (d.from && d.to) return `${fmt(d.from)} – ${fmt(d.to)}`;
       if (d.from) return `${field.label} from ${fmt(d.from)}`;
       return `${field.label} to ${fmt(d.to)}`;

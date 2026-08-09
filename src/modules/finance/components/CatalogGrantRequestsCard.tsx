@@ -15,6 +15,7 @@ import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { catalogGrantsService } from '@/services/catalogGrantsService';
+import { formatDate } from '@/utils/datetime';
 
 interface RequestRow {
   id: string;
@@ -105,7 +106,7 @@ export const CatalogGrantRequestsCard: React.FC<{ workspaceIds: string[] }> = ({
                     {r.factoryName ?? <span className="text-muted-foreground">All factories</span>}
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">
-                    {new Date(r.requestedAt).toLocaleDateString()}
+                    {formatDate(r.requestedAt)}
                   </td>
                   <td className="px-4 py-2 text-center">
                     <span className={`text-[10px] ${r.status === 'active' ? 'text-emerald-500' : 'text-amber-500'}`}>

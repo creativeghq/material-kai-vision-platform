@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
 import { projectsService, type ProjectRoom } from '../../services/projectsService';
+import { formatDate } from '@/utils/datetime';
 import {
   siteService, SNAG_STATUSES, SNAG_SEVERITIES, SNAG_CLOSED_STATUSES,
   type ProjectSnag, type ProjectSiteLog, type SnagStatus, type SnagSeverity,
@@ -369,7 +370,7 @@ const SiteLogView: React.FC<{ projectId: string; isOwner: boolean }> = ({ projec
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{new Date(`${l.log_date}T00:00:00Z`).toLocaleDateString()}</p>
+                      <p className="font-medium">{formatDate(`${l.log_date}T00:00:00Z`)}</p>
                       {l.weather && <span className="text-[11px] text-muted-foreground">· {l.weather}</span>}
                       {l.attendance && <span className="text-[11px] text-muted-foreground">· {l.attendance}</span>}
                     </div>

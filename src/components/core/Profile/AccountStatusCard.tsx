@@ -20,6 +20,7 @@ import { PowerOff, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { workspaceLifecycleService } from '@/services/workspaceLifecycleService';
+import { formatDate } from '@/utils/datetime';
 
 export const AccountStatusCard: React.FC = () => {
   const { activeWorkspaceId, activeWorkspace } = useWorkspace();
@@ -80,7 +81,7 @@ export const AccountStatusCard: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-2 p-5 text-sm">
           <p className="text-muted-foreground">
-            Disabled{disabledAt ? ` on ${new Date(disabledAt).toLocaleDateString()}` : ''}. Your customers were
+            Disabled{disabledAt ? ` on ${formatDate(disabledAt)}` : ''}. Your customers were
             moved to the operator. No new invoices, quotes or orders can be created.
           </p>
           <p className="flex items-start gap-1.5 text-xs text-emerald-500">

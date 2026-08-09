@@ -7,6 +7,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { quotesService } from '../services/QuotesService';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * QuoteAnalyticsPanel — admin-only view/download analytics for a single quote,
@@ -213,7 +214,7 @@ export const QuoteAnalyticsPanel: React.FC<Props> = ({
                     </span>
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap ml-3">
-                    {new Date(e.created_at).toLocaleString()}
+                    {formatDate(e.created_at, { withTime: true })}
                   </span>
                 </div>
               ))}

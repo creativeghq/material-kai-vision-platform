@@ -25,6 +25,7 @@ import {
   TableRow,
 } from '@/components/core/ui/table';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { formatDate } from '@/utils/datetime';
 import {
   Dialog,
   DialogContent,
@@ -454,7 +455,7 @@ export const PushNotificationsTab: React.FC = () => {
                       </span>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(sub.created_at).toLocaleDateString()}
+                      {formatDate(sub.created_at)}
                     </TableCell>
                     <TableCell className="text-right">
                       {sub.is_active && (

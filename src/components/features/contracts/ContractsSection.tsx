@@ -15,6 +15,7 @@ import { entityTemplatesService } from '@/services/entityTemplatesService';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
 import { contractsService, type Contract, type ContractContext, type ContractStatus } from '@/services/contractsService';
+import { formatDate } from '@/utils/datetime';
 
 const STATUS_TONE: Record<ContractStatus, string> = {
   draft: 'text-muted-foreground border-border',
@@ -268,8 +269,8 @@ export const ContractsSection: React.FC<{
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {c.counterparty_name && <>For {c.counterparty_name} · </>}
                   {c.status === 'signed' && c.signed_at
-                    ? <span className="text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Signed {new Date(c.signed_at).toLocaleDateString()}</span>
-                    : c.expiry_date ? <>Expires {new Date(c.expiry_date).toLocaleDateString()}</> : <>Created {new Date(c.created_at).toLocaleDateString()}</>}
+                    ? <span className="text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Signed {formatDate(c.signed_at)}</span>
+                    : c.expiry_date ? <>Expires {formatDate(c.expiry_date)}</> : <>Created {formatDate(c.created_at)}</>}
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">

@@ -87,6 +87,7 @@ import type {
 import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from './constants';
 import { estimateTokens, calculateCost } from './utils';
 import { StatCard } from './components/StatCard';
+import { formatDate } from '@/utils/datetime';
 
 // Shape of `admin_agent_chat_stats()` — one all-time aggregate row replacing what used to be a
 // 100-row client-side sample. Token counts are returned per model rather than pre-costed so the
@@ -914,7 +915,7 @@ const OperationsDashboardInner: React.FC = () => {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm text-gray-500">
-                            {new Date(chat.created_at).toLocaleString()}
+                            {formatDate(chat.created_at, { withTime: true })}
                           </TableCell>
                         </TableRow>
                       );
@@ -1056,7 +1057,7 @@ const OperationsDashboardInner: React.FC = () => {
                           </TableCell>
                           <TableCell>
                             {log.created_at
-                              ? new Date(log.created_at).toLocaleString()
+                              ? formatDate(log.created_at, { withTime: true })
                               : 'N/A'}
                           </TableCell>
                         </TableRow>

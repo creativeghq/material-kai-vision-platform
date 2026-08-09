@@ -26,6 +26,7 @@ import { SEOResearchCard } from '@/components/features/ai/SEOResearchCard';
 import { SEOGenericCard } from '@/components/features/ai/SEOGenericCard';
 import { listResearchRuns, persistResearchRun, type SeoResearchRun } from '@/services/seoToolkitApi';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 
 interface Props {
   productId: string;
@@ -240,7 +241,7 @@ const ProductSEOTab: React.FC<Props> = ({ productId, productName, manufacturer, 
         <Card className="dashboard-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-muted-foreground">
-              Last refreshed {new Date(research.created_at).toLocaleString()} · ${research.cost_usd.toFixed(4)}
+              Last refreshed {formatDate(research.created_at, { withTime: true })} · ${research.cost_usd.toFixed(4)}
             </CardTitle>
           </CardHeader>
           <CardContent>

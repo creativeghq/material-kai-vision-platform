@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 import { useShowPrices } from '@/hooks/useShowPrices';
+import { formatDate } from '@/utils/datetime';
 
 interface PublicMeta {
   title: string;
@@ -234,7 +235,7 @@ const CatalogReader: React.FC<{
   const dateStr = useMemo(() => {
     const raw = catalog.cover_data?.date;
     if (!raw) return null;
-    try { return new Date(raw).toLocaleDateString(); } catch { return null; }
+    try { return formatDate(raw); } catch { return null; }
   }, [catalog.cover_data?.date]);
   const coverImage = catalog.cover_data?.cover_image_url || null;
 

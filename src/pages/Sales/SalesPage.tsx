@@ -21,6 +21,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { quotesService, type QuoteWithItems } from '@/modules/quotes/services/QuotesService';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
+import { formatDate } from '@/utils/datetime';
 
 interface CustomerOption { type: 'contact' | 'company'; id: string; label: string; sub?: string; }
 
@@ -216,7 +217,7 @@ export const SalesPage: React.FC = () => {
                         )}
                         <td className="px-3 py-2.5"><QuoteStatusWord status={q.status} /></td>
                         <td className="px-3 py-2.5 tabular-nums">{q.total_items || q.items?.length || 0}</td>
-                        <td className="px-3 py-2.5 text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</td>
+                        <td className="px-3 py-2.5 text-muted-foreground">{formatDate(q.created_at)}</td>
                         <td className="px-6 py-2.5 text-right">
                           <div className="flex items-center justify-end gap-1" role="presentation" onClick={(e) => e.stopPropagation()}>
                             {partyId && (

@@ -137,6 +137,7 @@ import { AgentAvatar } from './AgentAvatar';
 import { onEnterOrSpace } from '@/utils/a11y';
 
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { formatDate } from '@/utils/datetime';
 // Agent definitions with RBAC and default models
 interface AgentDefinition {
   id: string;
@@ -4002,7 +4003,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   )}
                   {l.source && <span className="text-muted-foreground/70">· via {l.source.replace(/_/g, ' ')}</span>}
                   {l.employment_type && <span className="bg-muted border border-border rounded-full px-2 py-0.5 text-[10px]">{l.employment_type.replace(/_/g, ' ')}</span>}
-                  {l.posted_at && <span>· {new Date(l.posted_at).toLocaleDateString()}</span>}
+                  {l.posted_at && <span>· {formatDate(l.posted_at)}</span>}
                 </div>
                 {(l.seniority || l.description_excerpt || l.match_note) && (
                   <details className="group mt-1.5">
@@ -4090,7 +4091,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <span>{p.order_number || (p.order_id ? `PO #${String(p.order_id).slice(0, 8)}` : 'PO')}</span>
                     <span className="text-muted-foreground text-right">
                       {p.uncommitted_qty != null ? `${p.uncommitted_qty} inbound` : ''}
-                      {p.expected_at ? ` · ETA ${new Date(p.expected_at).toLocaleDateString()}` : ''}
+                      {p.expected_at ? ` · ETA ${formatDate(p.expected_at)}` : ''}
                     </span>
                   </div>
                 ))}
@@ -4108,7 +4109,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     {s.lead_time_days != null ? ` · ${s.lead_time_days}d lead` : ''}
                     {s.moq != null ? ` · MOQ ${s.moq}${s.meets_moq === false ? ' (short)' : ''}` : ''}
                     {s.availability ? ` · ${s.availability}` : ''}
-                    {s.valid_until ? ` · until ${new Date(s.valid_until).toLocaleDateString()}` : ''}
+                    {s.valid_until ? ` · until ${formatDate(s.valid_until)}` : ''}
                   </span>
                 </div>
               ))}
@@ -4158,7 +4159,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             Mention summary · last {message.mentionSummaryData.days} days
           </div>
           {message.mentionSummaryData.summary?.latest_at && (
-            <div className="text-[11px] text-muted-foreground mb-0.5">last mentioned {new Date(message.mentionSummaryData.summary.latest_at).toLocaleDateString()}</div>
+            <div className="text-[11px] text-muted-foreground mb-0.5">last mentioned {formatDate(message.mentionSummaryData.summary.latest_at)}</div>
           )}
           <p className="text-[11px] text-muted-foreground mb-2">How often this subject was written about lately, and how the coverage felt.</p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -4312,7 +4313,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       <div className="text-xs text-muted-foreground">
                         {r.outlet_name || r.outlet_domain}
                         {r.sentiment ? ` · ${r.sentiment}` : ''}
-                        {r.published_at ? ` · ${new Date(r.published_at).toLocaleDateString()}` : ''}
+                        {r.published_at ? ` · ${formatDate(r.published_at)}` : ''}
                       </div>
                     </summary>
                     <div className="pt-1 space-y-1 text-xs">

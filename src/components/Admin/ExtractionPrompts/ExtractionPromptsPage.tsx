@@ -46,6 +46,7 @@ import {
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { formatDate } from '@/utils/datetime';
 
 interface ExtractionPrompt {
   id: string;
@@ -384,7 +385,7 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {new Date(prompt.updated_at).toLocaleDateString()}
+                      {formatDate(prompt.updated_at)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -509,7 +510,7 @@ export const ExtractionPromptsPage: React.FC<{ embedded?: boolean }> = ({ embedd
                           Version {history.version}
                         </CardTitle>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(history.created_at).toLocaleString()}
+                          {formatDate(history.created_at, { withTime: true })}
                         </span>
                       </div>
                       {history.change_reason && (

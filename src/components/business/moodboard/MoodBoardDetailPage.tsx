@@ -39,6 +39,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getProductName, getManufacturer } from '@/utils/productMetadata';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { MoodboardSheetsTab } from './MoodboardSheetsTab';
+import { formatDate } from '@/utils/datetime';
 
 // ─── Helper: pick the most visually interesting hero image ────────────────────
 // Priority: generated images > 3D/VR/video renders > products with rich metadata > first available
@@ -352,7 +353,7 @@ export const MoodBoardDetailPage: React.FC = () => {
         <div className="mt-4 mx-2 sm:mx-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm">
             <span className="font-medium text-amber-600">Scheduled for deletion</span>{' '}
-            <span className="text-muted-foreground">— this board has been idle and will be removed on {new Date(moodboard.deletionScheduledAt).toLocaleDateString()}.</span>
+            <span className="text-muted-foreground">— this board has been idle and will be removed on {formatDate(moodboard.deletionScheduledAt)}.</span>
           </div>
           <Button size="sm" variant="outline" onClick={handleKeepActive}>Keep active</Button>
         </div>

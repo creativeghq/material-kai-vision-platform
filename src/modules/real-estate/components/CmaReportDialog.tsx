@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { realEstateService, type CmaReport } from '../services/realEstateService';
 import { escapeHtml } from '@/utils/escapeHtml';
+import { formatDate } from '@/utils/datetime';
 
 const PROPERTY_TYPES = ['residential', 'commercial', 'land', 'other'];
 const money = (n: number | null | undefined, ccy = 'EUR') => formatMoney(n, ccy || 'EUR', { decimals: 0 });
@@ -162,7 +163,7 @@ function buildCmaHtml(r: CmaReport): string {
     @media print{body{padding:0}}
   </style></head><body>
     <h1>Comparative Market Analysis</h1>
-    <div class="meta">${subjectTitle}${r.subject.area ? ` · ${r.subject.area} m²` : ''} · generated ${new Date(r.generated_at).toLocaleDateString()}</div>
+    <div class="meta">${subjectTitle}${r.subject.area ? ` · ${r.subject.area} m²` : ''} · generated ${formatDate(r.generated_at)}</div>
     ${suggestion}
     <div class="stats">
       <div class="stat"><div class="k">Comparables</div><div class="v">${r.stats.count}${r.stats.sold_count ? ` (${r.stats.sold_count} sold)` : ''}</div></div>

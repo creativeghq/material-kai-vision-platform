@@ -40,6 +40,7 @@ import {
 } from '@/services/seoToolkitApi';
 import { SeoInterlinkingPanel } from '@/modules/seo-interlinking/pages/SeoInterlinkingModulePage';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 
 const fmtNum = (n: any): string => {
   const v = Number(n);
@@ -259,7 +260,7 @@ const KeywordResearchTab: React.FC = () => {
                       <span className="font-medium text-sm truncate">{r.label || r.subject}</span>
                     </div>
                     <div className="text-xs text-muted-foreground space-x-4">
-                      <span>{new Date(r.created_at).toLocaleString()}</span>
+                      <span>{formatDate(r.created_at, { withTime: true })}</span>
                       <span>cost: ${r.cost_usd.toFixed(4)}</span>
                       {r.latency_ms != null && <span>{r.latency_ms}ms</span>}
                     </div>
@@ -387,7 +388,7 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
                         <span>traffic: <strong>{fmtNum(d.current_organic_traffic)}</strong></span>
                         <span>refs: <strong>{fmtNum(d.current_referring_domains)}</strong></span>
                         <span>links: <strong>{fmtNum(d.current_backlinks)}</strong></span>
-                        <span>last: {d.last_audited_at ? new Date(d.last_audited_at).toLocaleDateString() : 'never'}</span>
+                        <span>last: {d.last_audited_at ? formatDate(d.last_audited_at) : 'never'}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
@@ -435,7 +436,7 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
                 <div key={s.id} className="bg-white/5 rounded p-3 border border-white/10">
                   <div className="flex items-center justify-between">
                     <div className="text-xs text-muted-foreground">
-                      {new Date(s.audited_at).toLocaleString()} · {s.source}
+                      {formatDate(s.audited_at, { withTime: true })} · {s.source}
                     </div>
                     <div className="text-xs text-muted-foreground">${s.cost_usd.toFixed(4)}</div>
                   </div>
@@ -585,7 +586,7 @@ const BacklinksTab: React.FC = () => {
                 <div className="col-span-2 text-right">{fmtNum(d.current_referring_domains)}</div>
                 <div className="col-span-2 text-right">{fmtNum(d.current_backlinks)}</div>
                 <div className="col-span-2 text-right text-muted-foreground">
-                  {d.last_audited_at ? new Date(d.last_audited_at).toLocaleDateString() : 'never'}
+                  {d.last_audited_at ? formatDate(d.last_audited_at) : 'never'}
                 </div>
                 <div className="col-span-2 text-right">
                   <a

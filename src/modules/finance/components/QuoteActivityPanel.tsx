@@ -22,6 +22,7 @@ import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 import {
   financeService,
   type QuoteActivity,
@@ -179,12 +180,12 @@ export const QuoteActivityPanel: React.FC<Props> = ({ quoteId }) => {
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span className="font-medium text-foreground">{KIND_LABEL[a.kind]}</span>
-                        <span>· {new Date(a.created_at).toLocaleString()}</span>
+                        <span>· {formatDate(a.created_at, { withTime: true })}</span>
                         {a.scheduled_for && (
                           <span className={`text-[10px] ${statusTone(a.completed_at ? 'completed' : overdue ? 'overdue' : 'scheduled')}`}>
                             {a.completed_at ? 'completed' : overdue ? 'overdue' : 'scheduled'}
                             {' · '}
-                            {new Date(a.scheduled_for).toLocaleString()}
+                            {formatDate(a.scheduled_for, { withTime: true })}
                           </span>
                         )}
                       </div>

@@ -18,6 +18,7 @@ import {
 } from '@/services/entityTemplatesService';
 import { getAdapter, isLiveTemplateType, SYNTHETIC_PAYLOAD_FIELDS } from '@/services/templates/registry';
 import type { TemplateChildSpec, TemplateEditableField } from '@/services/templates/types';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * Template editor (issue #322).
@@ -324,7 +325,7 @@ export const TemplateEditorPage: React.FC = () => {
                       <div className="text-sm">
                         Version {v.version}
                         <span className="text-xs text-muted-foreground ml-2">
-                          {new Date(v.created_at).toLocaleString()}
+                          {formatDate(v.created_at, { withTime: true })}
                         </span>
                       </div>
                       <Button variant="outline" size="sm" className="rounded-full" onClick={() => restore(v.version)}>

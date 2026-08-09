@@ -11,6 +11,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { realEstatePublic, type TenantPortal } from '@/modules/real-estate/services/realEstateService';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 
 const money = (n: number | null | undefined, ccy: string) => formatMoney(n ?? 0, ccy || 'EUR', { decimals: 2 });
 
@@ -76,7 +77,7 @@ export default function TenantPortalPage() {
           </div>
           <div className="rounded-xl border bg-card px-3 py-2.5">
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Term ends</div>
-            <div className="mt-0.5 text-lg font-semibold">{data.tenancy.end_date ? new Date(data.tenancy.end_date).toLocaleDateString() : '—'}</div>
+            <div className="mt-0.5 text-lg font-semibold">{data.tenancy.end_date ? formatDate(data.tenancy.end_date) : '—'}</div>
           </div>
         </div>
 
@@ -85,7 +86,7 @@ export default function TenantPortalPage() {
           {data.charges.length === 0 && <div className="p-6 text-center text-sm text-muted-foreground">No rent charges yet.</div>}
           {data.charges.map((c) => (
             <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-              <span className="w-24 shrink-0 text-muted-foreground">{new Date(c.due_date).toLocaleDateString()}</span>
+              <span className="w-24 shrink-0 text-muted-foreground">{formatDate(c.due_date)}</span>
               <span className="font-medium tabular-nums">{money(c.amount, c.currency)}</span>
               {/* The DERIVED status — the same number the agent sees. A tenant told they still owe
                   rent they have already paid is the worst thing this page could do. */}
@@ -101,7 +102,7 @@ export default function TenantPortalPage() {
             <div key={m.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
               <Wrench className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span>{m.title}</span>
-              <span className="ml-auto text-xs text-muted-foreground">{new Date(m.reported_at).toLocaleDateString()}</span>
+              <span className="ml-auto text-xs text-muted-foreground">{formatDate(m.reported_at)}</span>
               <span className={`text-xs capitalize ${statusTone(m.status)}`}>{m.status.replace('_', ' ')}</span>
             </div>
           ))}

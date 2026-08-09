@@ -14,6 +14,7 @@ import { DollarSign, FileText, Loader2, TrendingUp, XCircle } from 'lucide-react
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/utils/datetime';
 
 interface PriceLookupRow {
   id: string;
@@ -145,7 +146,7 @@ export const PriceLookupsCard: React.FC = () => {
                           </span>
                         )}
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {new Date(r.created_at).toLocaleString()}
+                          {formatDate(r.created_at, { withTime: true })}
                         </span>
                       </div>
                     </div>

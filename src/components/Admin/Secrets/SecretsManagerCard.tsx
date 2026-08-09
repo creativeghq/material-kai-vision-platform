@@ -7,6 +7,7 @@ import { Label } from '@/components/core/ui/label';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { platformSecretsService, type PlatformSecretView } from '@/services/platformSecretsService';
+import { formatDate } from '@/utils/datetime';
 
 export type SecretScope = { mode: 'platform' } | { mode: 'module'; moduleSlug: string } | { mode: 'all' };
 
@@ -165,7 +166,7 @@ export const SecretsManagerCard: React.FC<Props> = ({ scope, title, description,
                   {secret.last_verified_status === 'ok'
                     ? <CheckCircle2 className="h-3 w-3 text-emerald-500" />
                     : <AlertCircle className="h-3 w-3 text-amber-500" />}
-                  Last verified {new Date(secret.last_verified_at).toLocaleString()}
+                  Last verified {formatDate(secret.last_verified_at, { withTime: true })}
                   {secret.last_verified_error && <span className="text-amber-500 truncate"> — {secret.last_verified_error}</span>}
                 </div>
               )}

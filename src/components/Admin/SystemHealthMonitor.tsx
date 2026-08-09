@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CronJobsPanel } from '@/components/Admin/CronJobsPanel';
 import { WebhooksPanel } from '@/components/Admin/WebhooksPanel';
+import { formatDate } from '@/utils/datetime';
 
 interface AIServiceHealth {
   status: 'healthy' | 'unhealthy';
@@ -879,7 +880,7 @@ export const SystemHealthMonitor: React.FC = () => {
       <WebhooksPanel />
 
       <p className="text-xs text-muted-foreground text-center">
-        Last updated: {new Date(health.timestamp).toLocaleString()} • Auto-refreshes every 30s
+        Last updated: {formatDate(health.timestamp, { withTime: true })} • Auto-refreshes every 30s
       </p>
     </div>
   );

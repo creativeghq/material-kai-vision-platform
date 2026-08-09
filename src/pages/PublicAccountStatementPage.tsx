@@ -6,6 +6,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { financeService, formatMoney } from '@/modules/finance/services/financeService';
+import { formatDate } from '@/utils/datetime';
 
 // Public, no-auth account-statement page reached via a shared /statement/:token link.
 // The recipient unlocks it with their VAT + email (verified server-side against the CRM
@@ -223,7 +224,7 @@ const PublicAccountStatementPage: React.FC = () => {
                       <tr><td colSpan={6} className="px-3 py-4 text-center text-xs text-muted-foreground">No activity in this period.</td></tr>
                     ) : (data.rows ?? []).map((r, idx) => (
                       <tr key={idx} className="border-b border-border/30">
-                        <td className="px-3 py-1.5">{r.date ? new Date(r.date).toLocaleDateString() : '—'}</td>
+                        <td className="px-3 py-1.5">{r.date ? formatDate(r.date) : '—'}</td>
                         <td className="px-3 py-1.5">{KIND_LABEL[r.kind] ?? r.kind}</td>
                         <td className="px-3 py-1.5 font-mono">{r.doc ?? '—'}</td>
                         <td className="px-3 py-1.5 text-right tabular-nums">{r.debit ? m(r.debit) : ''}</td>

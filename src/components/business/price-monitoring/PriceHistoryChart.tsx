@@ -10,6 +10,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { isDemoProduct, getDemoPriceHistory } from '@/data/demo/price-monitoring-demo';
+import { formatDate } from '@/utils/datetime';
 
 interface PriceHistoryChartProps {
   productId?: string;
@@ -141,7 +142,7 @@ export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
       const chartData: PriceDataPoint[] = (data || [])
         .filter((item) => item.price !== null && (item.match_kind ?? '').toLowerCase() !== 'family')
         .map((item) => ({
-          date: new Date(item.scraped_at).toLocaleDateString(),
+          date: formatDate(item.scraped_at),
           price: item.price as number,
           source: item.retailer_name || '',
           availability: item.availability || '',

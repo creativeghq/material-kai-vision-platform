@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDate } from '@/utils/datetime';
 import {
   COLORS, KpiCard, SectionHeader, EmptyState, LifecycleBadge,
   getMomentum, prettifyKey, getLifecycle, formatProfType,
@@ -498,7 +499,7 @@ export const MarketTrendsTab: React.FC<{ factoryName?: string; isFactory?: boole
           setZeroResultDemands((unmatchedData ?? []).map((d: any) => ({
             term: String(d.term ?? '').slice(0, 50),
             count: d.frequency_count ?? 0,
-            lastSeen: d.last_seen_at ? new Date(d.last_seen_at).toLocaleDateString() : '—',
+            lastSeen: d.last_seen_at ? formatDate(d.last_seen_at) : '—',
           })));
         } catch (e) { console.error('Zero-result data load failed:', e); }
 

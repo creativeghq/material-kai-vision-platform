@@ -6,6 +6,7 @@ import { Button } from '@/components/core/ui/button';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { supplierClaimsService, type MySupplierClaimStatus } from '@/services/supplierClaimsService';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * The front door for a manufacturer (#324 phase 0).
@@ -101,7 +102,7 @@ export const SupplierIdentityClaimCard: React.FC = () => {
             <Clock className="h-4 w-4 mt-0.5 text-amber-600 dark:text-amber-400 shrink-0" />
             <div>
               <p>Waiting for the operator to confirm <span className="font-medium">{status.vat_number}</span>.</p>
-              <p className="text-xs text-muted-foreground">Submitted {status.created_at ? new Date(status.created_at).toLocaleDateString() : ''}.</p>
+              <p className="text-xs text-muted-foreground">Submitted {status.created_at ? formatDate(status.created_at) : ''}.</p>
             </div>
           </div>
         ) : (

@@ -7,6 +7,7 @@ import { Label } from '@/components/core/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { realEstateService, type CommissionSplit, type CommissionTotals } from '../services/realEstateService';
+import { formatDate } from '@/utils/datetime';
 
 const money = (n: number | null | undefined, ccy: string) => formatMoney(n ?? 0, ccy || 'EUR', { decimals: 2 });
 
@@ -99,7 +100,7 @@ export const CommissionSplitsCard: React.FC<{ ws: string | null; saleId: string;
             {s.label && <span className="text-xs text-muted-foreground">{s.label}</span>}
             <span className="ml-auto font-medium tabular-nums">{money(s.amount, s.currency)}</span>
             {s.paid_at
-              ? <span className="text-xs text-emerald-600 dark:text-emerald-400">paid {new Date(s.paid_at).toLocaleDateString()}</span>
+              ? <span className="text-xs text-emerald-600 dark:text-emerald-400">paid {formatDate(s.paid_at)}</span>
               : <span className="text-xs text-amber-600 dark:text-amber-400">unpaid</span>}
             {canManage && (
               <div className="flex items-center gap-1">

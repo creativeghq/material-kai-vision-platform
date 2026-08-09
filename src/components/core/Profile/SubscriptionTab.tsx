@@ -14,6 +14,7 @@ import { apiGatewayService, type ApiKey } from '@/services/apiGateway/apiGateway
 import { ChangelogList } from './ChangelogList';
 import { ApplyForRoleCard } from './ApplyForRoleCard';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 
 const stripeService = new StripeService();
 
@@ -225,7 +226,7 @@ export const SubscriptionTab: React.FC = () => {
                 </span>
                 {periodEnd && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Renews on: {new Date(periodEnd).toLocaleDateString()}
+                    Renews on: {formatDate(periodEnd)}
                   </p>
                 )}
               </div>
@@ -394,9 +395,9 @@ export const SubscriptionTab: React.FC = () => {
                               : '— revoked —'}
                           </p>
                           <p className="text-[10px] text-muted-foreground mt-0.5">
-                            Created {new Date(key.created_at).toLocaleDateString()}
-                            {key.last_used_at && ` · Last used ${new Date(key.last_used_at).toLocaleDateString()}`}
-                            {key.expires_at && ` · Expires ${new Date(key.expires_at).toLocaleDateString()}`}
+                            Created {formatDate(key.created_at)}
+                            {key.last_used_at && ` · Last used ${formatDate(key.last_used_at)}`}
+                            {key.expires_at && ` · Expires ${formatDate(key.expires_at)}`}
                           </p>
                         </div>
                       </div>

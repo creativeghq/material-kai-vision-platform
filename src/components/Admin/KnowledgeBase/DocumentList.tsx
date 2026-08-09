@@ -49,6 +49,7 @@ import { edgeError, edgeErrorMessage } from '@/utils/edgeError';
 import { FilterBar, applyFiltersToQuery, countActive, type FilterValues } from '@/components/core/filters';
 import { statusTone } from '@/utils/statusTone';
 import { buildKbDocFilters, type KbFilterCategory } from './kbDocFilters';
+import { formatDate } from '@/utils/datetime';
 
 interface DocumentListProps {
   onEdit: (docId: string) => void;
@@ -669,7 +670,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                   </TableCell>
                   <TableCell>{doc.view_count}</TableCell>
                   <TableCell>
-                    {new Date(doc.created_at).toLocaleDateString()}
+                    {formatDate(doc.created_at)}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">

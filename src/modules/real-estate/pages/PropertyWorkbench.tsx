@@ -39,6 +39,7 @@ import { KycPanel } from '../components/KycPanel';
 import { ShortLetTab } from '../components/ShortLetTab';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { formatMoney } from '@/utils/decimal';
+import { formatDate } from '@/utils/datetime';
 
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
 const RE_TAB = 'flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground';
@@ -100,7 +101,7 @@ const DocumentsTab: React.FC<{ ws: string | null; propertyId: string; canManage:
               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="font-medium">{d.title || 'Document'}</span>
               <span className="text-xs text-muted-foreground">{DOC_TYPE_LABELS[d.doc_type] ?? d.doc_type}</span>
-              <span className="ml-auto text-xs text-muted-foreground">{new Date(d.created_at).toLocaleDateString()}</span>
+              <span className="ml-auto text-xs text-muted-foreground">{formatDate(d.created_at)}</span>
               {d.url && <a href={d.url} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-primary"><ExternalLink className="mr-1 h-3 w-3" /> Open</Button></a>}
               {canManage && <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-destructive" onClick={() => remove(d.id)}><Trash2 className="h-3 w-3" /></Button>}
             </div>
@@ -682,7 +683,7 @@ export default function PropertyWorkbench() {
                     <div className="min-w-0 flex-1">
                       <div className="font-medium">{q.name || 'Anonymous'} <span className="text-xs text-muted-foreground">{q.email}</span></div>
                       {q.message && <div className="mt-0.5 text-sm text-muted-foreground line-clamp-2">{q.message}</div>}
-                      <div className="mt-0.5 text-[11px] text-muted-foreground">{new Date(q.created_at).toLocaleString()}</div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(q.created_at, { withTime: true })}</div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {!q.crm_contact_id && editable && (
@@ -746,7 +747,7 @@ export default function PropertyWorkbench() {
               <Card><CardContent className="p-0"><div className="divide-y divide-border">
                 {viewings.map((v) => (
                   <div key={v.id} className="flex items-center gap-4 px-4 py-3 text-sm">
-                    <div className="flex-1">{new Date(v.scheduled_at).toLocaleString()} · <span className="capitalize text-muted-foreground">{v.type.replace('_', ' ')}</span></div>
+                    <div className="flex-1">{formatDate(v.scheduled_at, { withTime: true })} · <span className="capitalize text-muted-foreground">{v.type.replace('_', ' ')}</span></div>
                     {editable && (
                       <select className="rounded-md border bg-background px-2 py-1 text-xs" value={v.status}
                         onChange={async (e) => {
@@ -787,7 +788,7 @@ export default function PropertyWorkbench() {
                 <Card><CardContent className="p-0"><div className="divide-y divide-border">
                   {openHouses.map((o) => (
                     <div key={o.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                      <span>{new Date(o.starts_at).toLocaleString()}</span>
+                      <span>{formatDate(o.starts_at, { withTime: true })}</span>
                       {o.note && <span className="text-xs text-muted-foreground">{o.note}</span>}
                       {editable && (
                         <Button size="sm" variant="ghost" className="ml-auto h-7 rounded-full px-2 text-xs text-destructive" onClick={async () => {
@@ -961,11 +962,11 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
         <Card><CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 p-4">
           <div>
             <div className="text-lg font-semibold">{offerMoney(tenancy.rent_amount, ccy)}<span className="text-xs font-normal text-muted-foreground"> / {tenancy.rent_frequency}</span></div>
-            <div className="text-xs text-muted-foreground">{tenancy.tenant?.name || 'No tenant set'} · from {new Date(tenancy.start_date).toLocaleDateString()}</div>
+            <div className="text-xs text-muted-foreground">{tenancy.tenant?.name || 'No tenant set'} · from {formatDate(tenancy.start_date)}</div>
           </div>
           <Badge className="rounded-full border-0 bg-primary/15 text-[11px] capitalize">{tenancy.status}</Badge>
           {tenancy.deposit != null && <div className="text-xs text-muted-foreground">Deposit {offerMoney(tenancy.deposit, ccy)}</div>}
-          {tenancy.end_date && <div className="text-xs text-muted-foreground">Ends {new Date(tenancy.end_date).toLocaleDateString()}</div>}
+          {tenancy.end_date && <div className="text-xs text-muted-foreground">Ends {formatDate(tenancy.end_date)}</div>}
           {canManage && (
             <div className="ml-auto flex gap-1.5">
               <Button size="sm" variant="ghost" className="rounded-full" onClick={renew}><RotateCw className="mr-1 h-3.5 w-3.5" /> Renew</Button>
@@ -1006,8 +1007,8 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
               <Label className="text-xs">Notice</Label>
               {tenancy.notice_given_at ? (
                 <div className="flex h-9 items-center gap-2 text-sm">
-                  <span className="capitalize">{tenancy.notice_given_by} gave notice {new Date(tenancy.notice_given_at).toLocaleDateString()}</span>
-                  {tenancy.termination_date && <span className="text-muted-foreground">· ends {new Date(tenancy.termination_date).toLocaleDateString()}</span>}
+                  <span className="capitalize">{tenancy.notice_given_by} gave notice {formatDate(tenancy.notice_given_at)}</span>
+                  {tenancy.termination_date && <span className="text-muted-foreground">· ends {formatDate(tenancy.termination_date)}</span>}
                   <Button size="sm" variant="ghost" className="ml-auto h-7 rounded-full px-2 text-xs" onClick={() => void saveLifecycle({ notice_given_by: null })}>Withdraw</Button>
                 </div>
               ) : (
@@ -1053,7 +1054,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
             <Card><CardContent className="p-0"><div className="divide-y divide-border">
               {charges.map((c) => (
                 <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                  <span className="w-24 shrink-0 text-muted-foreground">{new Date(c.due_date).toLocaleDateString()}</span>
+                  <span className="w-24 shrink-0 text-muted-foreground">{formatDate(c.due_date)}</span>
                   <span className="font-medium">{offerMoney(c.amount, c.currency)}</span>
                   {/* The DERIVED status, not the stored flag: an invoiced charge settles in Finance and
                       `status` on this row never moves when the tenant pays. */}
@@ -1072,7 +1073,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
                         <Button size="sm" variant="ghost" className="h-7 rounded-full px-2 text-xs text-muted-foreground" onClick={() => markPaid(c.id, 'waived')}>Waive</Button>
                       </>
                     )}
-                    {c.payment_status === 'paid' && c.paid_at && <span className="text-xs text-muted-foreground">Paid {new Date(c.paid_at).toLocaleDateString()}</span>}
+                    {c.payment_status === 'paid' && c.paid_at && <span className="text-xs text-muted-foreground">Paid {formatDate(c.paid_at)}</span>}
                   </div>
                 </div>
               ))}
@@ -1103,7 +1104,7 @@ const LettingsTab: React.FC<{ ws: string | null; propertyId: string; canManage: 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2"><span className="font-medium">{w.title}</span><span className={`text-[10px] capitalize ${statusTone(w.status)}`}>{w.status.replace('_', ' ')}</span>{w.priority !== 'normal' && <span className="text-[10px] capitalize text-muted-foreground">{w.priority}</span>}</div>
                   {w.description && <div className="mt-0.5 text-xs text-muted-foreground">{w.description}</div>}
-                  <div className="mt-0.5 text-xs text-muted-foreground">{[w.contractor_name, w.cost != null ? offerMoney(w.cost, ccy) : null, new Date(w.reported_at).toLocaleDateString()].filter(Boolean).join(' · ')}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{[w.contractor_name, w.cost != null ? offerMoney(w.cost, ccy) : null, formatDate(w.reported_at)].filter(Boolean).join(' · ')}</div>
                 </div>
                 {canManage && w.status !== 'completed' && w.status !== 'cancelled' && (
                   <div className="flex shrink-0 gap-1.5">
@@ -1283,7 +1284,7 @@ const CommissionPanel: React.FC<{ ws: string | null; propertyId: string; propert
           <div className="text-xs text-muted-foreground">Commission {sale.commission_pct ? `(${sale.commission_pct}%${sale.commission_fixed ? ` + ${offerMoney(sale.commission_fixed, ccy)}` : ''})` : ''}</div>
           <div className="text-lg font-semibold text-emerald-500">{offerMoney(sale.commission_base, ccy)}<span className="text-xs font-normal text-muted-foreground"> + VAT</span></div>
         </div>
-        <Badge className="rounded-full border-0 bg-emerald-500/15 text-[11px] text-emerald-500">Sold {new Date(sale.completed_at).toLocaleDateString()}</Badge>
+        <Badge className="rounded-full border-0 bg-emerald-500/15 text-[11px] text-emerald-500">Sold {formatDate(sale.completed_at)}</Badge>
       </div>
       {canManage && (
         <div className="flex items-center gap-3">
@@ -1363,7 +1364,7 @@ const OffersTab: React.FC<{ ws: string | null; propertyId: string; canManage: bo
             <div key={o.id} className="flex items-start gap-4 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2"><span className="font-semibold">{offerMoney(o.amount, o.currency)}</span><span className={`text-[11px] capitalize ${statusTone(o.status)}`}>{o.status.replace('_', ' ')}</span></div>
-                <div className="mt-0.5 text-xs text-muted-foreground">{o.buyer?.name || o.buyer_name || 'Buyer'} · {new Date(o.created_at).toLocaleDateString()}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{o.buyer?.name || o.buyer_name || 'Buyer'} · {formatDate(o.created_at)}</div>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {o.proof_of_funds && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">Proof of funds</span>}
                   {o.mortgage_in_principle && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-500">MIP</span>}

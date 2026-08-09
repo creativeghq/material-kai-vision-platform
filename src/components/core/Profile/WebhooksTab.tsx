@@ -23,13 +23,14 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { formatDate } from '@/utils/datetime';
 import {
   workspaceWebhooksService,
   type WorkspaceWebhook,
   type WebhookDelivery,
 } from '@/services/workspaceWebhooksService';
 
-const relative = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '—');
+const relative = (iso: string | null) => (iso ? formatDate(iso, { withTime: true }) : '—');
 
 /** Turn `purchase_order.sent` into `Purchase order sent` for the checkbox list. */
 const humanize = (t: string) =>

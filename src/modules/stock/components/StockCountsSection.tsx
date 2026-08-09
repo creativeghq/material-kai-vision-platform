@@ -15,6 +15,7 @@ import { warehouseService, type Warehouse } from '@/services/warehouseService';
 import { stockService, type StockCount, type StockCountLine } from '../services/stockService';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildStockCountFilters } from './stockCountFilters';
+import { formatDate } from '@/utils/datetime';
 
 const STATUS_META: Record<string, { cls: string; label: string }> = {
   draft: { cls: 'text-amber-600 dark:text-amber-400', label: 'Draft' },
@@ -100,7 +101,7 @@ export const StockCountsSection: React.FC<{ workspaceId: string }> = ({ workspac
                 const meta = STATUS_META[c.status] ?? STATUS_META.draft;
                 return (
                   <tr key={c.id} className="border-b border-border/30">
-                    <td className="px-4 py-2 whitespace-nowrap text-xs text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-xs text-muted-foreground">{formatDate(c.created_at)}</td>
                     <td className="px-4 py-2">{c.warehouse?.name ?? '—'}</td>
                     <td className="px-4 py-2"><span className={`text-sm ${meta.cls}`}>{meta.label}</span></td>
                     <td className="px-4 py-2 text-muted-foreground truncate max-w-[16rem]">{c.note ?? '—'}</td>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { LineChart, MessageSquare } from 'lucide-react';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * Surface monitoring intel where a product is quoted/viewed.
@@ -47,7 +48,7 @@ export const MarketIntelCard: React.FC<{ productId: string; className?: string }
           <span>
             Market price: <strong>{price!.current_price} {price!.current_currency || ''}</strong>
             {price!.current_price_updated_at && (
-              <span className="text-muted-foreground"> · {new Date(price!.current_price_updated_at).toLocaleDateString()}</span>
+              <span className="text-muted-foreground"> · {formatDate(price!.current_price_updated_at)}</span>
             )}
           </span>
         )}

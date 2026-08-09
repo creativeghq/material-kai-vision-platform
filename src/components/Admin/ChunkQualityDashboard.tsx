@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 
 interface ChunkQualityMetrics {
   total_chunks: number;
@@ -547,7 +548,7 @@ export const ChunkQualityDashboard: React.FC = () => {
                     {chunk.reviewed && (
                       <div className="text-sm text-muted-foreground">
                         Reviewed: {chunk.review_action} on{' '}
-                        {new Date(chunk.reviewed_at!).toLocaleDateString()}
+                        {formatDate(chunk.reviewed_at!)}
                       </div>
                     )}
                   </CardContent>

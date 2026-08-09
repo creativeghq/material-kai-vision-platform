@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { masterRequestsService, type MasterRequest, type MasterRequestLine } from '@/services/masterRequestsService';
+import { formatDate } from '@/utils/datetime';
 
 const money = (n: number | null, c: string | null) => formatMoney(n, c ?? 'EUR');
 
@@ -176,7 +177,7 @@ export const RequestsInboxPanel: React.FC = () => {
                           <span className="text-xs text-muted-foreground">{r.quote?.quote_number || r.quote?.name || `Quote ${r.quote_id.slice(0, 8)}`}</span>
                           <span className={`text-[10px] capitalize ${TONE[r.status] || 'text-muted-foreground'}`}>{r.status.replace('_', ' ')}</span>
                         </div>
-                        <div className="text-xs text-muted-foreground">{money(r.amount, r.currency)} · {new Date(r.created_at).toLocaleDateString()}</div>
+                        <div className="text-xs text-muted-foreground">{money(r.amount, r.currency)} · {formatDate(r.created_at)}</div>
                       </div>
                       <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/quotes/${r.quote_id}`)} title="Open quote"><ArrowRight className="h-4 w-4" /></Button>
                       {(r.status === 'new' || r.status === 'in_review') && (
@@ -267,7 +268,7 @@ export const RequestsInboxPanel: React.FC = () => {
                       </Button>
                       <div className="flex-1 min-w-0">
                         <span className="font-medium">{r.quote?.quote_number || r.quote?.name || `Quote ${r.quote_id.slice(0, 8)}`}</span>
-                        <div className="text-xs text-muted-foreground">{money(r.amount, r.currency)} · {new Date(r.created_at).toLocaleDateString()}</div>
+                        <div className="text-xs text-muted-foreground">{money(r.amount, r.currency)} · {formatDate(r.created_at)}</div>
                       </div>
                       {(r.status === 'priced' || (linesById[r.id]?.some((l) => l.status === 'priced'))) && (
                         <>

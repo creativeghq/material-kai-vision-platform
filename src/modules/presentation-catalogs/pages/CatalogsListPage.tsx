@@ -9,6 +9,7 @@ import { catalogsService, type PresentationCatalog } from '@/services/catalogsSe
 import { CreateCatalogModal } from '../../../components/business/catalogs/CreateCatalogModal';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 
 export const CatalogsListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -104,7 +105,7 @@ export const CatalogsListPage: React.FC = () => {
                       <span>{sectionsCount} sections</span>
                       <span>{materialsCount} materials</span>
                       <span>{c.view_count} views</span>
-                      <span>updated {new Date(c.updated_at).toLocaleDateString()}</span>
+                      <span>updated {formatDate(c.updated_at)}</span>
                     </div>
                   </div>
                   <div className="flex gap-2 shrink-0">

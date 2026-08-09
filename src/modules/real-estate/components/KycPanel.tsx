@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { useToast } from '@/hooks/use-toast';
 import { realEstateService, KYC_TYPE_LABELS, type KycStatus, type KycCheck } from '../services/realEstateService';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * The AML/KYC verdicts held against one buyer, and what is still missing before their offer can be
@@ -73,7 +74,7 @@ export const KycPanel: React.FC<{ ws: string | null; contactId: string | null; c
               <span className={`text-xs capitalize ${statusTone(expired ? 'expired' : (c?.status ?? 'pending'))}`}>
                 {expired ? 'expired' : (c?.status ?? 'not recorded')}
               </span>
-              {c?.expires_at && <span className="text-xs text-muted-foreground">expires {new Date(c.expires_at).toLocaleDateString()}</span>}
+              {c?.expires_at && <span className="text-xs text-muted-foreground">expires {formatDate(c.expires_at)}</span>}
               {canManage && contactId && (
                 <div className="ml-auto flex items-center gap-1">
                   {busy === t

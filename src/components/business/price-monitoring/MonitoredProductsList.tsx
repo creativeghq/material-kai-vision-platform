@@ -27,6 +27,7 @@ import { refreshProduct, untrackProduct, trackProduct } from '@/services/priceMo
 import type { TrackedQuery } from '@/services/priceMonitoringApi';
 import { statusTone } from '@/utils/statusTone';
 import { buildMonitoredProductFilters } from './monitoredProductFilters';
+import { formatDate } from '@/utils/datetime';
 
 interface MonitoredProductsListProps {
   products: TrackedQuery[];
@@ -199,12 +200,12 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                       {tq.last_refreshed_at
-                        ? new Date(tq.last_refreshed_at).toLocaleString()
+                        ? formatDate(tq.last_refreshed_at, { withTime: true })
                         : 'Never'}
                     </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
                       {tq.next_check_at
-                        ? new Date(tq.next_check_at).toLocaleString()
+                        ? formatDate(tq.next_check_at, { withTime: true })
                         : '—'}
                     </TableCell>
                     <TableCell className="text-right">

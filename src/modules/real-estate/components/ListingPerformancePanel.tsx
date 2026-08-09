@@ -4,6 +4,7 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { realEstateService, type ListingPerformance, type ListingViewPoint, type VendorReport } from '../services/realEstateService';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * Listing performance (#281 gap 8). Everything here is READ from
@@ -64,7 +65,7 @@ const Sparkline: React.FC<{ points: { day: string; views: number }[] }> = ({ poi
       </svg>
       {hp && (
         <div className="pointer-events-none absolute -top-1 left-0 rounded-md border bg-popover px-2 py-1 text-[11px] shadow-sm">
-          <span className="font-medium tabular-nums">{hp.views}</span> view{hp.views === 1 ? '' : 's'} · {new Date(hp.day).toLocaleDateString()}
+          <span className="font-medium tabular-nums">{hp.views}</span> view{hp.views === 1 ? '' : 's'} · {formatDate(hp.day)}
         </div>
       )}
     </div>

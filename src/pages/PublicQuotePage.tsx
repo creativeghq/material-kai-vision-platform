@@ -71,6 +71,7 @@ interface IssuedDocument {
 }
 
 import { formatMoney as money } from '@/utils/decimal';
+import { formatDate } from '@/utils/datetime';
 
 export default function PublicQuotePage() {
   const { token } = useParams<{ token: string }>();
@@ -221,8 +222,8 @@ export default function PublicQuotePage() {
         {(quote.client_name || quote.created_at) && (
           <div className="text-xs text-muted-foreground flex items-center gap-4 flex-wrap">
             {quote.client_name && <span>Prepared for {quote.client_name}</span>}
-            {quote.created_at && <span>Created {new Date(quote.created_at).toLocaleDateString()}</span>}
-            {quote.expires_at && <span>Valid until {new Date(quote.expires_at).toLocaleDateString()}</span>}
+            {quote.created_at && <span>Created {formatDate(quote.created_at)}</span>}
+            {quote.expires_at && <span>Valid until {formatDate(quote.expires_at)}</span>}
           </div>
         )}
 
@@ -238,7 +239,7 @@ export default function PublicQuotePage() {
                 <span className="text-muted-foreground"> · {money(issuedDoc.total, issuedDoc.currency)}</span>
               )}
               {issuedDoc.issued_at && (
-                <span className="text-muted-foreground"> · {new Date(issuedDoc.issued_at).toLocaleDateString()}</span>
+                <span className="text-muted-foreground"> · {formatDate(issuedDoc.issued_at)}</span>
               )}
             </div>
             {issuedDoc.pdf_url && (
@@ -316,7 +317,7 @@ export default function PublicQuotePage() {
               <div className="text-sm">
                 <span className="font-medium">Accepted</span>
                 {quote.signed_by && <span className="text-muted-foreground"> · signed by {quote.signed_by}</span>}
-                {quote.signed_at && <span className="text-muted-foreground"> · {new Date(quote.signed_at).toLocaleDateString()}</span>}
+                {quote.signed_at && <span className="text-muted-foreground"> · {formatDate(quote.signed_at)}</span>}
               </div>
             </div>
 

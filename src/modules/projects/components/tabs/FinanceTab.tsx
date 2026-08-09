@@ -27,6 +27,7 @@ import {
 } from '../../services/projectsService';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 
 const money = (n: number | null | undefined, c: string | null | undefined) => formatMoney(n, c ?? 'EUR');
 
@@ -104,7 +105,7 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
                     <p className="font-medium truncate">{r.label || r.id.slice(0, 8)}</p>
                     <span className="text-[10px] text-muted-foreground capitalize">{KIND_LABEL[r.kind] || r.kind}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{r.issued_at ? new Date(r.issued_at).toLocaleDateString() : 'Draft'}</p>
+                  <p className="text-xs text-muted-foreground">{r.issued_at ? formatDate(r.issued_at) : 'Draft'}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-medium">{money(r.total, r.currency)}</p>

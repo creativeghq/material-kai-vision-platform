@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getErrorMessage } from '@/core/errors/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useModule } from '@/modules/_core';
+import { formatDate } from '@/utils/datetime';
 import {
   workspaceManagementService, type WorkspaceInvite,
 } from '@/services/workspaceManagementService';
@@ -270,7 +271,7 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
                       {inv.email || inv.invitee_name || 'Open link (anyone with it)'}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {workspaceRoleLabel(inv.role)} · expires {new Date(inv.expires_at).toLocaleDateString()}
+                      {workspaceRoleLabel(inv.role)} · expires {formatDate(inv.expires_at)}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">

@@ -26,6 +26,7 @@ import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { Calendar, Loader2, AlertTriangle, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/datetime';
 
 interface ImportJob {
   id: string;
@@ -263,7 +264,7 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
             <div className="p-3 bg-purple-900/20 border border-purple-700 rounded text-sm">
               <strong>Current Schedule:</strong> {job.cron_schedule}
               <br />
-              <strong>Next Run:</strong> {new Date(job.next_run_at).toLocaleString()}
+              <strong>Next Run:</strong> {formatDate(job.next_run_at, { withTime: true })}
             </div>
           )}
         </div>

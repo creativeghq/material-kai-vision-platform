@@ -22,6 +22,7 @@ import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 
 interface Props {
   workspaceId: string;
@@ -371,7 +372,7 @@ const TripCardDetail: React.FC<{
           </div>
         )}
         {report.reimbursed_at && (
-          <div className="text-[11px] text-emerald-500">Reimbursed on {new Date(report.reimbursed_at).toLocaleDateString()}.</div>
+          <div className="text-[11px] text-emerald-500">Reimbursed on {formatDate(report.reimbursed_at)}.</div>
         )}
       </CardHeader>
 

@@ -30,6 +30,7 @@ import { Label } from '@/components/core/ui/label';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildInboxFilters } from './inboxFilters';
+import { formatDate } from '@/utils/datetime';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/core/ui/dialog';
@@ -56,7 +57,7 @@ function timeAgo(iso: string): string {
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
   if (s < 604800) return `${Math.floor(s / 86400)}d`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(iso);
 }
 
 function initials(name: string | null | undefined): string {
@@ -1031,7 +1032,7 @@ const MessageBubble: React.FC<{
             );
           })}
         </div>
-        <div className="text-[10px] mt-1 px-1 text-muted-foreground">{new Date(m.created_at).toLocaleString()}</div>
+        <div className="text-[10px] mt-1 px-1 text-muted-foreground">{formatDate(m.created_at, { withTime: true })}</div>
       </div>
     </div>
   );
@@ -1163,7 +1164,7 @@ const DetailsRail: React.FC<{
                 <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="truncate">{inv.number || 'Invoice'}</div>
-                  {inv.due_at && <div className="text-[11px] text-muted-foreground">Due {new Date(inv.due_at).toLocaleDateString()}</div>}
+                  {inv.due_at && <div className="text-[11px] text-muted-foreground">Due {formatDate(inv.due_at)}</div>}
                 </div>
                 <span className="text-xs shrink-0 text-warning" style={{ fontWeight: 600 }}>{money(inv.amount_due, inv.currency)}</span>
               </div>
@@ -1271,7 +1272,7 @@ const DetailsRail: React.FC<{
         <SectionTitle icon={<MessageSquare className="h-4 w-4" />}>Conversation</SectionTitle>
         <Row icon={<MessagesSquare className="w-3.5 h-3.5" />}><span className="capitalize">{thread.channel} · {thread.thread_type}</span></Row>
         <Row icon={<Hash className="w-3.5 h-3.5" />}><span className="capitalize">{thread.status}</span></Row>
-        <div className="text-[11px] text-muted-foreground pt-0.5">Started {new Date(thread.created_at).toLocaleString()}</div>
+        <div className="text-[11px] text-muted-foreground pt-0.5">Started {formatDate(thread.created_at, { withTime: true })}</div>
       </div>
     </div>
   );

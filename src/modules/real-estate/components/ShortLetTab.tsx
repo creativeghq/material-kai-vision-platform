@@ -7,6 +7,7 @@ import { Label } from '@/components/core/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 import {
   realEstateService, icalFeedUrl, CHANNEL_LABELS,
   type Booking, type BookingTask, type ChannelLink,
@@ -93,7 +94,7 @@ export const ShortLetTab: React.FC<{ ws: string | null; propertyId: string; ical
           {bookings.length === 0 && !draft && <p className="py-2 text-sm text-muted-foreground">No bookings yet. Link a channel below, or add one directly.</p>}
           {bookings.map((b) => (
             <div key={b.id} className="flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-sm">
-              <span className="font-medium">{new Date(b.check_in).toLocaleDateString()} → {new Date(b.check_out).toLocaleDateString()}</span>
+              <span className="font-medium">{formatDate(b.check_in)} → {formatDate(b.check_out)}</span>
               <span className="text-xs text-muted-foreground">{nights(b)} night{nights(b) === 1 ? '' : 's'}</span>
               <span className="text-xs text-muted-foreground">{CHANNEL_LABELS[b.channel] ?? b.channel}</span>
               {b.guest_name && <span className="text-xs">{b.guest_name}</span>}
@@ -142,7 +143,7 @@ export const ShortLetTab: React.FC<{ ws: string | null; propertyId: string; ical
           {openTasks.map((t) => (
             <div key={t.id} className="flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-sm">
               <span className="font-medium capitalize">{t.task_type.replace('_', ' ')}</span>
-              <span className="text-xs text-muted-foreground">due {new Date(t.due_at).toLocaleDateString()}</span>
+              <span className="text-xs text-muted-foreground">due {formatDate(t.due_at)}</span>
               {t.assignee_name && <span className="text-xs">{t.assignee_name}</span>}
               <span className={`ml-auto text-xs capitalize ${statusTone(t.status)}`}>{t.status.replace('_', ' ')}</span>
               {canManage && (

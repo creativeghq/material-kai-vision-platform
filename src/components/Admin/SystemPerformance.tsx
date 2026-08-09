@@ -32,6 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { formatDate } from '@/utils/datetime';
 
 // Rows still fetched for the AI-provider panel — analytics_events carries no per-provider
 // aggregate, so those two figures remain a recent-window read and say so on screen.
@@ -973,7 +974,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                         </TableCell>
                         <TableCell>{formatJobDuration(job)}</TableCell>
                         <TableCell>
-                          {new Date(job.created_at).toLocaleString()}
+                          {formatDate(job.created_at, { withTime: true })}
                         </TableCell>
                         <TableCell className="max-w-xs">
                           {job.error_message || job.error ? (

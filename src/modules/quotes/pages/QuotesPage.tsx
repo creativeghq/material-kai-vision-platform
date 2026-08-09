@@ -26,6 +26,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { CreateQuoteModal } from '../components/CreateQuoteModal';
 import { RequestsInboxPanel } from '../components/RequestsInboxPanel';
 import { quotesService, QuoteWithItems } from '../services/QuotesService';
+import { formatDate } from '@/utils/datetime';
 
 type QuotesTab = 'quotes' | 'requests' | 'settings';
 
@@ -291,8 +292,8 @@ export const QuotesPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2.5"><QuoteStatusWord status={quote.status} /></td>
                       <td className="px-3 py-2.5 tabular-nums">{quote.total_items || quote.items?.length || 0}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{new Date(quote.created_at).toLocaleDateString()}</td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{new Date(quote.expires_at).toLocaleDateString()}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{formatDate(quote.created_at)}</td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{formatDate(quote.expires_at)}</td>
                       <td className="px-6 py-2.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button

@@ -31,6 +31,7 @@ import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingS
 import { parseDecimal } from '@/utils/decimal';
 import { edgeError } from '@/utils/edgeError';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
+import { formatDate } from '@/utils/datetime';
 
 interface SellItem {
   id: string;
@@ -538,7 +539,7 @@ const PosPage: React.FC = () => {
       stockMoved = false;
       console.error('[pos] generate_order_from_invoice failed — stock not moved', e);
     }
-    setResult({ ...snapshot, invoiceId, mark: finalMark, uid, qrUrl, method: paidMethod, issuedAt: new Date().toLocaleString() });
+    setResult({ ...snapshot, invoiceId, mark: finalMark, uid, qrUrl, method: paidMethod, issuedAt: formatDate(new Date(), { withTime: true }) });
     resetSale();
 
     // The receipt is legally issued either way — never pretend otherwise — but say plainly

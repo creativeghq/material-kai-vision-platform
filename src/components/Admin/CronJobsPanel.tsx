@@ -20,6 +20,7 @@ import {
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
+import { formatDate } from '@/utils/datetime';
 import {
   Dialog,
   DialogContent,
@@ -307,7 +308,7 @@ export const CronJobsPanel: React.FC = () => {
                   {paginate(history, historyPage).map((r) => (
                     <tr key={r.runid} className="border-b border-border/40 align-top">
                       <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
-                        {new Date(r.start_time).toLocaleString()}
+                        {formatDate(r.start_time, { withTime: true })}
                       </td>
                       <td className="py-2 pr-3">
                         <StatusBadge status={r.status} />

@@ -36,6 +36,7 @@ import { TablePagination, paginate } from '@/components/core/ui/table-pagination
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { DocumentFactoriesCrmLinker } from '@/components/Admin/DocumentFactoriesCrmLinker';
+import { formatDate } from '@/utils/datetime';
 
 interface DocumentDetails {
   id: string;
@@ -256,7 +257,7 @@ export const PDFDocumentDetails: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold">{document.filename}</h1>
             <p className="text-sm text-muted-foreground">
-              Uploaded {new Date(document.created_at).toLocaleString()}
+              Uploaded {formatDate(document.created_at, { withTime: true })}
             </p>
           </div>
         </div>
@@ -708,7 +709,7 @@ export const PDFDocumentDetails: React.FC = () => {
                       Created At
                     </p>
                     <p className="text-sm">
-                      {new Date(document.created_at).toLocaleString()}
+                      {formatDate(document.created_at, { withTime: true })}
                     </p>
                   </div>
                 </div>

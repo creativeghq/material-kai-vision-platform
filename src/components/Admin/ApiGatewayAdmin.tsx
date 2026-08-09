@@ -58,6 +58,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { statusTone } from '@/utils/statusTone';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { formatDate } from '@/utils/datetime';
 
 interface ApiGatewayAdminProps {
   /** When embedded as a tab (e.g. in AI Configurations), hide the page header. */
@@ -320,9 +321,9 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                               : '— revoked —'}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Created {new Date(key.created_at).toLocaleDateString()}
-                            {key.last_used_at && ` · Last used ${new Date(key.last_used_at).toLocaleDateString()}`}
-                            {key.expires_at && ` · Expires ${new Date(key.expires_at).toLocaleDateString()}`}
+                            Created {formatDate(key.created_at)}
+                            {key.last_used_at && ` · Last used ${formatDate(key.last_used_at)}`}
+                            {key.expires_at && ` · Expires ${formatDate(key.expires_at)}`}
                             {key.user_id && ` · User: ${key.user_id.slice(0, 8)}…`}
                           </p>
                         </div>
@@ -489,7 +490,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{log.response_time_ms != null ? `${log.response_time_ms}ms` : '—'}</TableCell>
                           <TableCell className="text-xs text-muted-foreground font-mono">{log.ip_address || '—'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{log.created_at ? new Date(log.created_at).toLocaleString() : '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{log.created_at ? formatDate(log.created_at, { withTime: true }) : '—'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

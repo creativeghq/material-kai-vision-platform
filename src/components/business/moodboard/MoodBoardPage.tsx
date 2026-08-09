@@ -33,6 +33,7 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardCard } from '@/components/core/DesignSystem/DashboardCard';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
+import { formatDate } from '@/utils/datetime';
 
 export const MoodBoardPage = () => {
   const [moodboards, setMoodboards] = useState<MoodBoard[]>([]);
@@ -279,7 +280,7 @@ export const MoodBoardPage = () => {
               {/* Action Bar */}
               <div className="flex items-center justify-between px-4 py-2 border-t border-border">
                 <span className="text-xs text-muted-foreground">
-                  {new Date(board.createdAt).toLocaleDateString()}
+                  {formatDate(board.createdAt)}
                 </span>
                 <TooltipProvider>
                   <div className="flex gap-1">

@@ -26,6 +26,7 @@ import { realEstateService, feedUrl, inboundLeadUrl, type PropertyListItem, type
 import { statusTone } from '@/utils/statusTone';
 import { Rss, Copy, RefreshCw } from 'lucide-react';
 import { TemplatePickerDialog } from '@/components/features/templates/TemplatePickerDialog';
+import { formatDate } from '@/utils/datetime';
 
 const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0 });
 // Canonical tab trigger styling (design-system.md → Tabs): flat primary active state, icon+label gap.
@@ -184,7 +185,7 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
             <div className="divide-y divide-border">{d.upcoming_viewings.map((v) => (
               <button key={v.id} onClick={() => navigate(`/properties/${v.property_id}`)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-muted/40">
                 <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="flex-1"><div className="font-medium">{new Date(v.scheduled_at).toLocaleString()}</div><div className="text-xs text-muted-foreground">{v.property?.title || 'Listing'}</div></div>
+                <div className="flex-1"><div className="font-medium">{formatDate(v.scheduled_at, { withTime: true })}</div><div className="text-xs text-muted-foreground">{v.property?.title || 'Listing'}</div></div>
                 <span className={`text-[11px] capitalize ${statusTone(v.status)}`}>{v.status.replace('_', ' ')}</span>
               </button>
             ))}</div>
@@ -632,7 +633,7 @@ const LeadRow: React.FC<{ ws: string; q: PropertyInquiry; onChanged: () => void 
         <div className="font-medium">{q.name || 'Anonymous'} <span className="text-xs text-muted-foreground">{q.email}</span></div>
         {q.property?.title && <button onClick={() => navigate(`/properties/${q.property_id}`)} className="text-xs text-primary hover:underline">{q.property.title}</button>}
         {q.message && <div className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{q.message}</div>}
-        <div className="mt-0.5 text-[11px] text-muted-foreground">{new Date(q.created_at).toLocaleString()}</div>
+        <div className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(q.created_at, { withTime: true })}</div>
       </div>
       <select className="h-7 shrink-0 rounded-md border bg-background px-1.5 text-xs capitalize" value={q.status} onChange={(e) => setStatus(e.target.value)} title="Status">
         {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
@@ -719,7 +720,7 @@ const ViewingsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         <div key={v.id} className="flex items-center hover:bg-muted/40">
           <button onClick={() => navigate(`/properties/${v.property_id}`)} className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left text-sm">
             <CalendarClock className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1"><div className="font-medium">{new Date(v.scheduled_at).toLocaleString()}</div><div className="text-xs text-muted-foreground">{v.property?.title || 'Listing'} · <span className="capitalize">{v.type.replace('_', ' ')}</span></div></div>
+            <div className="min-w-0 flex-1"><div className="font-medium">{formatDate(v.scheduled_at, { withTime: true })}</div><div className="text-xs text-muted-foreground">{v.property?.title || 'Listing'} · <span className="capitalize">{v.type.replace('_', ' ')}</span></div></div>
             <span className={`text-[11px] capitalize ${statusTone(v.status)}`}>{v.status.replace('_', ' ')}</span>
           </button>
           <div className="pr-3"><DeleteIconButton title="Delete viewing" confirmText="Delete this viewing from the calendar?" onDelete={() => realEstateService.deleteViewing(ws as string, v.id).then(load)} /></div>
@@ -800,7 +801,7 @@ const LettingsPortfolioPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
                 <button onClick={() => navigate(`/properties/${t.property_id}`)} className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3 text-left">
                   <div className="min-w-0 flex-1">
                     <div className="font-medium">{t.property?.title || 'Rental'} <span className="text-xs text-muted-foreground">· {t.tenant?.name || 'no tenant'}</span></div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{money(t.rent_amount, t.currency)}{freq(t)} · from {new Date(t.start_date).toLocaleDateString()}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{money(t.rent_amount, t.currency)}{freq(t)} · from {formatDate(t.start_date)}</div>
                   </div>
                   <span className={`text-[11px] capitalize ${statusTone(t.status)}`}>{t.status}</span>
                 </button>
@@ -860,7 +861,7 @@ const SalesPanel: React.FC<{ ws: string | null; canManage: boolean }> = ({ ws, c
               <Handshake className="h-4 w-4 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{s.property?.title || 'Property'} <span className="text-xs text-muted-foreground">· sold {money(s.sale_price, s.currency)}</span></div>
-                <div className="mt-0.5 text-xs text-muted-foreground">{s.seller?.name ? `${s.seller.name} · ` : ''}{new Date(s.completed_at).toLocaleDateString()}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{s.seller?.name ? `${s.seller.name} · ` : ''}{formatDate(s.completed_at)}</div>
               </div>
               <div className="text-right">
                 <div className="text-sm font-semibold text-emerald-500">{money(s.commission_base, s.currency)}</div>

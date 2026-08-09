@@ -23,6 +23,7 @@ import { QuoteEmailButton } from '../components/QuoteEmailButton';
 import { useQuoteDocument } from '../hooks/useQuoteDocument';
 import { trackQuoteView } from '@/services/quoteAnalyticsService';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * Customer-facing Quote Detail Page
@@ -256,7 +257,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
       <PageHeader
         icon={ShoppingCart}
         title={quote.name || 'Untitled Quote'}
-        subtitle={`Created ${new Date(quote.created_at).toLocaleDateString()} · Expires ${new Date(quote.expires_at).toLocaleDateString()}`}
+        subtitle={`Created ${formatDate(quote.created_at)} · Expires ${formatDate(quote.expires_at)}`}
         actions={
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <QuoteStatusBadge status={quote.status} />

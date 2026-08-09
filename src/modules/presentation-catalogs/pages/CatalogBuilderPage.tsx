@@ -41,6 +41,7 @@ import {
 } from '@/services/catalogsService';
 import { SendToCustomersModal } from '@/components/business/catalogs/SendToCustomersModal';
 import { CatalogSourcesPanel } from '@/components/business/catalogs/CatalogSourcesPanel';
+import { formatDate } from '@/utils/datetime';
 
 const STATUS_VARIANT: Record<CatalogStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
   draft: 'secondary',
@@ -437,7 +438,7 @@ export const CatalogBuilderPage: React.FC = () => {
                     <span className="font-medium">{g.email}</span>
                     {g.note && <span className="text-muted-foreground text-xs">— {g.note}</span>}
                     {g.revoked_at && <Badge variant="outline">revoked</Badge>}
-                    <span className="ml-auto text-xs text-muted-foreground">{new Date(g.created_at).toLocaleDateString()}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{formatDate(g.created_at)}</span>
                     {!g.revoked_at && (
                       <Button size="sm" variant="ghost" onClick={() => handleRevokeGrant(g.id)}>Revoke</Button>
                     )}
@@ -478,7 +479,7 @@ export const CatalogBuilderPage: React.FC = () => {
                   <tbody>
                     {viewEvents.map((e) => (
                       <tr key={e.id} className="border-t">
-                        <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</td>
+                        <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(e.created_at, { withTime: true })}</td>
                         <td className="px-3 py-2">
                           <span className="text-[10px] text-muted-foreground capitalize inline-flex items-center">
                             {e.event_type === 'pdf_download' ? <FileDown className="h-3 w-3 mr-1 inline" /> : <Eye className="h-3 w-3 mr-1 inline" />}
@@ -515,7 +516,7 @@ export const CatalogBuilderPage: React.FC = () => {
                   <tbody>
                     {accessLog.map((row) => (
                       <tr key={row.id} className="border-t">
-                        <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</td>
+                        <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(row.created_at, { withTime: true })}</td>
                         <td className="px-3 py-2 font-medium text-sm">{row.email}</td>
                         <td className="px-3 py-2">
                           <span className={`text-[10px] ${row.granted_access ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
@@ -573,7 +574,7 @@ export const CatalogBuilderPage: React.FC = () => {
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium truncate">{batch.subject || '(no subject)'}</div>
                             <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
-                              {batch.last_sent_at && <span>{new Date(batch.last_sent_at).toLocaleString()}</span>}
+                              {batch.last_sent_at && <span>{formatDate(batch.last_sent_at, { withTime: true })}</span>}
                               {batch.source_category_slugs.length > 0 && (
                                 <span>to: {batch.source_category_slugs.join(', ')}</span>
                               )}
@@ -603,8 +604,8 @@ export const CatalogBuilderPage: React.FC = () => {
                                     </span>
                                     <span className="font-mono">{r.recipient_email}</span>
                                     {r.recipient_member_kind && <span className="text-[10px] text-muted-foreground capitalize">{r.recipient_member_kind}</span>}
-                                    {r.first_opened_at && <span title={new Date(r.first_opened_at).toLocaleString()}><Eye className="h-3 w-3 inline" /></span>}
-                                    {r.first_downloaded_at && <span title={new Date(r.first_downloaded_at).toLocaleString()}><FileDown className="h-3 w-3 inline" /></span>}
+                                    {r.first_opened_at && <span title={formatDate(r.first_opened_at, { withTime: true })}><Eye className="h-3 w-3 inline" /></span>}
+                                    {r.first_downloaded_at && <span title={formatDate(r.first_downloaded_at, { withTime: true })}><FileDown className="h-3 w-3 inline" /></span>}
                                     {r.status_message && <span className="text-muted-foreground italic">{r.status_message}</span>}
                                   </div>
                                 ))}
@@ -627,7 +628,7 @@ export const CatalogBuilderPage: React.FC = () => {
               {(pdfSignedUrl ?? catalog.pdf_url) ? (
                 <>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">{catalog.page_count} pages • generated {catalog.pdf_generated_at && new Date(catalog.pdf_generated_at).toLocaleString()}</span>
+                    <span className="text-sm">{catalog.page_count} pages • generated {catalog.pdf_generated_at && formatDate(catalog.pdf_generated_at, { withTime: true })}</span>
                     <Button size="sm" variant="outline" onClick={() => window.open((pdfSignedUrl ?? catalog.pdf_url)!, '_blank')}>
                       <ExternalLink className="mr-2 h-4 w-4" /> Open
                     </Button>

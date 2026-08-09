@@ -39,6 +39,7 @@ import { IssueInvoiceButton } from '@/modules/finance/components/IssueInvoiceBut
 import { formatMoney, financeService } from '@/modules/finance/services/financeService';
 import { Switch } from '@/components/core/ui/switch';
 import { previewTotalsBreakdown } from '@/modules/quotes/utils/quoteTotals';
+import { formatDate } from '@/utils/datetime';
 
 const sendQuoteNotification = (userId: string, title: string, quoteId: string) => {
   supabase.from('user_notifications').insert({
@@ -549,11 +550,11 @@ export const QuoteDetailPage: React.FC = () => {
           <span className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5" />
-              Created {new Date(quote.created_at).toLocaleDateString()}
+              Created {formatDate(quote.created_at)}
             </span>
             <span className="flex items-center gap-1.5">
               <Timer className="h-3.5 w-3.5" />
-              Expires {new Date(quote.expires_at).toLocaleDateString()}
+              Expires {formatDate(quote.expires_at)}
             </span>
           </span>
         }
@@ -1311,7 +1312,7 @@ export const QuoteDetailPage: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-sm">{new Date(item.delivery_date).toLocaleDateString()}</span>
+                          <span className="text-sm">{formatDate(item.delivery_date)}</span>
                         </div>
                       </div>
                     );
@@ -1492,7 +1493,7 @@ export const QuoteDetailPage: React.FC = () => {
                             )}
                             {item.completed_at && (
                               <p className="text-xs text-muted-foreground mb-2">
-                                Completed: {new Date(item.completed_at).toLocaleDateString()}
+                                Completed: {formatDate(item.completed_at)}
                               </p>
                             )}
 

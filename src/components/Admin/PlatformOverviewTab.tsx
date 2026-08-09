@@ -31,6 +31,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useModule } from '@/modules/_core';
+import { formatDate } from '@/utils/datetime';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#84cc16'];
 
@@ -794,7 +795,7 @@ export function PlatformOverviewTab() {
         const statusCount = new Map<string, number>();
         (regs ?? []).forEach((r: any) => statusCount.set(r.status, (statusCount.get(r.status) ?? 0) + 1));
         setFactoryPipeline(Array.from(statusCount.entries()).map(([status, count]) => ({ status, count })));
-        setRecentRequests((regs ?? []).slice(0, 8).map((r: any) => ({ name: r.company_name ?? 'Unknown', type: r.type ?? '—', status: r.status ?? '—', date: new Date(r.created_at).toLocaleDateString() })));
+        setRecentRequests((regs ?? []).slice(0, 8).map((r: any) => ({ name: r.company_name ?? 'Unknown', type: r.type ?? '—', status: r.status ?? '—', date: formatDate(r.created_at) })));
       }
 
       // ── Notifications & Messaging ──────────────────────────────

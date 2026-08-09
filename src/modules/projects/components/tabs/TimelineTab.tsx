@@ -74,14 +74,10 @@ const describe = (e: ProjectEvent): string => {
 };
 
 import { formatMoney as formatMoneyValue } from '@/utils/decimal';
+import { formatDate } from '@/utils/datetime';
 
 /** Timeline payloads are untyped JSON, so coerce before handing to the canonical formatter. */
 const formatMoney = (v: any, currency: any) => formatMoneyValue(v == null ? null : Number(v), currency || 'EUR');
-
-const formatDate = (v: any) => {
-  if (!v) return '—';
-  return new Date(v).toLocaleDateString();
-};
 
 const formatTime = (iso: string) => {
   const d = new Date(iso);

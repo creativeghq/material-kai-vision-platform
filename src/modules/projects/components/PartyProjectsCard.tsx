@@ -8,6 +8,7 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { statusTone } from '@/utils/statusTone';
 import { projectsService, type ProjectWithClient } from '../services/projectsService';
 import { CreateProjectModal } from './CreateProjectModal';
+import { formatDate } from '@/utils/datetime';
 
 /**
  * ONE projects element shared by the CRM contact record AND the company record — the same pattern
@@ -96,10 +97,10 @@ export const PartyProjectsCard: React.FC<{
                       {p.client_company?.name ?? p.client_contact?.name ?? '—'}
                     </td>
                     <td className={`px-4 py-2 capitalize ${statusTone(p.status)}`}>{p.status.replace(/_/g, ' ')}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{p.deadline ? new Date(p.deadline).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{p.deadline ? formatDate(p.deadline) : '—'}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{money(p.budget_amount, p.budget_currency)}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{money(p.actual_amount, p.budget_currency)}</td>
-                    <td className="px-4 py-2 text-right text-muted-foreground">{new Date(p.last_activity_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-2 text-right text-muted-foreground">{formatDate(p.last_activity_at)}</td>
                     <td className="px-4 py-2 text-right">
                       <Link to={`/projects/${p.id}`} title="Open project">
                         <Button size="icon" variant="ghost" className="h-8 w-8"><ExternalLink className="h-3.5 w-3.5" /></Button>

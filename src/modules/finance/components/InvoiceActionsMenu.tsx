@@ -30,6 +30,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
+import { formatDate } from '@/utils/datetime';
 
 interface Props {
   invoiceId: string;
@@ -306,7 +307,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
               <dt className="text-muted-foreground">Legal number</dt>
               <dd className="col-span-2 font-mono text-xs">{(detail as any).legal_number ?? '—'}</dd>
               <dt className="text-muted-foreground">Submitted</dt>
-              <dd className="col-span-2">{(detail as any).fiscal_submitted_at ? new Date((detail as any).fiscal_submitted_at).toLocaleString() : '—'}</dd>
+              <dd className="col-span-2">{(detail as any).fiscal_submitted_at ? formatDate((detail as any).fiscal_submitted_at, { withTime: true }) : '—'}</dd>
               <dt className="text-muted-foreground">Connector</dt>
               <dd className="col-span-2">{(detail as any).fiscal_connector_slug ?? '—'}</dd>
             </dl>
@@ -351,7 +352,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
                 <span className="absolute -left-[5px] mt-1.5 h-2 w-2 rounded-full bg-primary" />
                 <div className="flex items-center justify-between gap-2">
                   <span>{e.label}</span>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">{e.when ? new Date(e.when).toLocaleString() : ''}</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{e.when ? formatDate(e.when, { withTime: true }) : ''}</span>
                 </div>
               </li>
             ))}

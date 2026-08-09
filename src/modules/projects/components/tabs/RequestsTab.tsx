@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/c
 import { useToast } from '@/hooks/use-toast';
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
+import { formatDate } from '@/utils/datetime';
 import {
   projectRequestsService, REQUEST_KINDS, REQUEST_STATUSES, REQUEST_CLOSED_STATUSES,
   type ProjectRequestWithMessages, type RequestKind, type RequestStatus,
@@ -122,7 +123,7 @@ export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
                         {!r.client_visible && <span className="text-[11px] text-muted-foreground">· internal</span>}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {r.raised_by_name || 'Someone'} · {new Date(r.created_at).toLocaleDateString()}
+                        {r.raised_by_name || 'Someone'} · {formatDate(r.created_at)}
                         {r.messages.length > 0 && ` · ${r.messages.length} repl${r.messages.length === 1 ? 'y' : 'ies'}`}
                       </p>
                     </button>
@@ -154,7 +155,7 @@ export const RequestsTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
                           {r.messages.map((m) => (
                             <div key={m.id} className={`rounded-md border border-white/10 p-3 ${m.is_from_client ? '' : 'bg-white/5'}`}>
                               <p className="text-[11px] text-muted-foreground">
-                                {m.author_name || (m.is_from_client ? 'Client' : 'Team')} · {new Date(m.created_at).toLocaleString()}
+                                {m.author_name || (m.is_from_client ? 'Client' : 'Team')} · {formatDate(m.created_at, { withTime: true })}
                               </p>
                               <p className="mt-1 whitespace-pre-wrap text-sm">{m.body}</p>
                             </div>

@@ -16,6 +16,7 @@ import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SmartPagination } from '@/components/core/ui/smart-pagination';
+import { formatDate } from '@/utils/datetime';
 import {
   Dialog,
   DialogContent,
@@ -211,7 +212,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
                       <Badge variant="outline">{emb.embedding_dimension || 0}</Badge>
                     </TableCell>
                     <TableCell>
-                      {new Date(emb.created_at).toLocaleDateString()}
+                      {formatDate(emb.created_at)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

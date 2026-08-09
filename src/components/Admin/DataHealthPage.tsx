@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { TaricReferencePanel } from './TaricReferencePanel';
 import { TaricRulesPanel } from './TaricRulesPanel';
+import { formatDate } from '@/utils/datetime';
 import {
   dataIntegrityService as svc,
   type IntegrityCheck, type IntegrityFinding, type IntegrityRun, type IntegritySeverity,
@@ -110,7 +111,7 @@ export default function DataHealthPage() {
               </CardTitle>
               <CardDescription>
                 {lastRun
-                  ? `Last run ${new Date(lastRun.started_at).toLocaleString()} · ${lastRun.checks_run} checks · ${lastRun.findings_healed} healed`
+                  ? `Last run ${formatDate(lastRun.started_at, { withTime: true })} · ${lastRun.checks_run} checks · ${lastRun.findings_healed} healed`
                   : 'No runs yet.'}
               </CardDescription>
             </div>
@@ -237,7 +238,7 @@ export default function DataHealthPage() {
                   <TableBody>
                     {paginate(runs, runsPage).map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell className="text-xs">{new Date(r.started_at).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs">{formatDate(r.started_at, { withTime: true })}</TableCell>
                         <TableCell className="text-xs">{r.triggered_by === 'cron' ? 'cron' : r.autoheal ? 'admin · heal' : 'admin'}</TableCell>
                         <TableCell className="text-center tabular-nums">{r.checks_run}</TableCell>
                         <TableCell className="text-center tabular-nums">{r.findings_open}</TableCell>

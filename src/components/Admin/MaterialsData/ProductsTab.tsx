@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ProductDetailModal } from './ProductDetailModal';
 import { SmartPagination } from '@/components/core/ui/smart-pagination';
 import { MIVAA_API_URL } from '@/config/mivaa';
+import { formatDate } from '@/utils/datetime';
 import {
   getManufacturer,
   getMaterialCategory,
@@ -317,7 +318,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                       )}
                     </TableCell>
                     <TableCell>
-                      {new Date(product.created_at).toLocaleDateString()}
+                      {formatDate(product.created_at)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">

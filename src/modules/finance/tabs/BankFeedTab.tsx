@@ -24,6 +24,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
+import { formatDate } from '@/utils/datetime';
 
 interface FeedRow {
   id: string;
@@ -296,7 +297,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                       {matched && <span className="text-xs text-muted-foreground">→ {matched.internal_number}</span>}
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {r.booked_at ? new Date(r.booked_at).toLocaleDateString() : '—'}{r.reference ? ` · ${r.reference}` : ''}
+                      {r.booked_at ? formatDate(r.booked_at) : '—'}{r.reference ? ` · ${r.reference}` : ''}
                     </div>
                   </div>
                   {suggestions.slice(0, 1).map((inv) => (

@@ -14,6 +14,7 @@ import {
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { useToast } from '@/hooks/use-toast';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 
 interface SubscriberRow {
   workspace_id: string;
@@ -77,10 +78,10 @@ const SubscriberTable: React.FC<{ module: ModuleOverviewRow }> = ({ module: m })
                 </span>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {s.current_period_end ? new Date(s.current_period_end).toLocaleDateString() : '—'}
+                {s.current_period_end ? formatDate(s.current_period_end) : '—'}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {new Date(s.created_at).toLocaleDateString()}
+                {formatDate(s.created_at)}
               </TableCell>
             </TableRow>
           ))}

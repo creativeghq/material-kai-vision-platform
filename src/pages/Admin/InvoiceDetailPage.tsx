@@ -27,6 +27,7 @@ import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreview
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
+import { formatDate } from '@/utils/datetime';
 
 const MOVE_PURPOSE_LABELS: Record<string, string> = {
   '1': 'Sale',
@@ -212,7 +213,7 @@ const InvoiceDetailPage: React.FC = () => {
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {invoice.issued_at
-                ? `Issued ${new Date(invoice.issued_at).toLocaleDateString()}`
+                ? `Issued ${formatDate(invoice.issued_at)}`
                 : 'Not issued yet'}
               {invoice.due_at && ` · Due ${invoice.due_at}`}
               {Number((invoice as any).branch_code ?? 0) > 0 && ` · Establishment #${(invoice as any).branch_code}`}
@@ -461,7 +462,7 @@ const InvoiceDetailPage: React.FC = () => {
                   .reduce((acc, a) => acc + Number(a.amount ?? 0), 0);
                 return (
                   <tr key={p.id} className="border-b border-border/30">
-                    <td className="px-4 py-2">{new Date(p.paid_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-2">{formatDate(p.paid_at)}</td>
                     {/* Account, not method — the method is derived from the account. */}
                     <td className="px-4 py-2">{p.bank_account_name ?? '—'}</td>
                     <td className="px-4 py-2">{p.reference ?? '—'}</td>
@@ -499,7 +500,7 @@ const InvoiceDetailPage: React.FC = () => {
                 {(invoice.credit_notes ?? []).map((cn: any) => (
                   <tr key={cn.id} className="border-b border-border/30">
                     <td className="px-4 py-2 font-mono text-xs">{cn.credit_note_number}</td>
-                    <td className="px-4 py-2">{cn.issued_at ? new Date(cn.issued_at).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-2">{cn.issued_at ? formatDate(cn.issued_at) : '—'}</td>
                     <td className="px-4 py-2">
                       <Badge variant="outline" className="mr-1">{cn.document_type ?? '—'}</Badge>
                       {cn.fiscal_mark
@@ -551,7 +552,7 @@ const InvoiceDetailPage: React.FC = () => {
               {f.fiscal_submitted_at && (
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Submitted</span>
-                  <span className="text-xs">{new Date(f.fiscal_submitted_at).toLocaleString()}</span>
+                  <span className="text-xs">{formatDate(f.fiscal_submitted_at, { withTime: true })}</span>
                 </div>
               )}
               {f.fiscal_qr_url && (

@@ -10,6 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { factoryAccessService, type FactoryAccessRequest } from '@/services/factoryAccessService';
+import { formatDate } from '@/utils/datetime';
 
 export const FactoryAccessRequestsTab: React.FC = () => {
   const { toast } = useToast();
@@ -73,7 +74,7 @@ export const FactoryAccessRequestsTab: React.FC = () => {
                     <p className="text-sm">{req.factory_name || req.factory_user_id.slice(0, 8)}</p>
                     <span className={`text-xs font-medium capitalize ${statusColor(req.status)}`}>{req.status}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Requested {new Date(req.created_at).toLocaleDateString()}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Requested {formatDate(req.created_at)}</p>
                   {req.message && <p className="text-sm text-muted-foreground mt-2 italic">“{req.message}”</p>}
                   {req.status === 'rejected' && req.rejection_reason && <p className="text-xs text-muted-foreground mt-1">Reason: {req.rejection_reason}</p>}
                 </div>

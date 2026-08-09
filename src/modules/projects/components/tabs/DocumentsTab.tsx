@@ -13,6 +13,7 @@ import { Label } from '@/components/core/ui/label';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/datetime';
 import {
   projectDocumentsService,
   type ProjectDocumentWithRevisions, type ProjectDocumentRevision,
@@ -120,7 +121,7 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
                           <div key={r.id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
                             <span className="w-14 shrink-0 text-xs text-muted-foreground">Rev {r.rev_label}</span>
                             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                              {new Date(r.created_at).toLocaleDateString()}{r.notes ? ` · ${r.notes}` : ''}
+                              {formatDate(r.created_at)}{r.notes ? ` · ${r.notes}` : ''}
                             </span>
                             <button type="button" className="text-muted-foreground hover:text-foreground" title="Open" onClick={() => open(r)}>
                               <Download className="h-3.5 w-3.5" />

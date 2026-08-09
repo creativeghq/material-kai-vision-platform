@@ -13,6 +13,7 @@ import { formatMoney } from '@/modules/finance/services/financeService';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { inboundService, type InboundAddress, type InboundDocument, type IssuerProfile } from '@/modules/finance/services/inboundService';
 import { unitSuffix, unitFromMydataCode } from '@/lib/units';
+import { formatDate } from '@/utils/datetime';
 
 /** AADE VAT-category code → rate. Codes 1-8 per the myDATA reference table. */
 const VAT_RATE: Record<number, string> = {
@@ -148,7 +149,7 @@ export const InboundDocPreviewDialog: React.FC<{
             <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
               <Truck className="h-3.5 w-3.5" /> Dispatch
             </span>
-            <Fact label="Date" value={doc.dispatch_date ? new Date(doc.dispatch_date).toLocaleDateString() : null} />
+            <Fact label="Date" value={doc.dispatch_date ? formatDate(doc.dispatch_date) : null} />
             <Fact label="Vehicle" value={doc.vehicle_number ? <span className="font-mono">{doc.vehicle_number}</span> : null} />
             <Fact label="From" value={fmtAddress(loading)} />
           </div>
@@ -160,7 +161,7 @@ export const InboundDocPreviewDialog: React.FC<{
             <Row label="Type"><MydataTypeLabel code={doc.doc_type} className="text-xs font-medium" /></Row>
             <Row label="Currency">{doc.currency}</Row>
             <Row label="Also a delivery note">{doc.is_delivery_note ? 'Yes' : 'No'}</Row>
-            <Row label="Date">{doc.issue_date ? new Date(doc.issue_date).toLocaleDateString() : '—'}</Row>
+            <Row label="Date">{doc.issue_date ? formatDate(doc.issue_date) : '—'}</Row>
             <Row label="MARK"><span className="font-mono text-[11px]">{doc.mark}</span></Row>
           </div>
           <div>

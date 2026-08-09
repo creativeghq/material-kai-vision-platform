@@ -26,6 +26,7 @@ import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
 import { orderLinesFromDoc, docsWithOrders } from '@/modules/finance/utils/inboundToOrder';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
+import { formatDate } from '@/utils/datetime';
 
 export const PartyInboundDocsCard: React.FC<{
   workspaceId: string;
@@ -123,7 +124,7 @@ export const PartyInboundDocsCard: React.FC<{
                     const outcomes = inboundOutcomes(d, { ordered: ordered.has(d.id) });
                     return (
                       <tr key={d.id} className={`border-b border-border/30 ${d.status === 'dismissed' ? 'opacity-60' : ''}`}>
-                        <td className="px-4 py-2">{d.issue_date ? new Date(d.issue_date).toLocaleDateString() : '—'}</td>
+                        <td className="px-4 py-2">{d.issue_date ? formatDate(d.issue_date) : '—'}</td>
                         <td className="px-4 py-2">
                           <div className="text-xs font-medium">{d.series ?? '—'}{d.aa ? ` ${d.aa}` : ''}</div>
                           <div className="text-[10px] font-mono text-muted-foreground" title={`MARK ${d.mark}`}>{d.mark}</div>

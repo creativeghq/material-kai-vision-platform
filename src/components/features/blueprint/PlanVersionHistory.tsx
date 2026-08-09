@@ -6,6 +6,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { projectPlansService, type ProjectPlanVersion } from '@/services/projectPlansService';
+import { formatDate } from '@/utils/datetime';
 
 interface PlanVersionHistoryProps {
   open: boolean;
@@ -61,7 +62,7 @@ export function PlanVersionHistory({ open, onOpenChange, planId, onRestored }: P
                 <div className="min-w-0">
                   <div className="text-sm font-medium">Version {v.version}</div>
                   <div className="text-xs text-muted-foreground truncate">
-                    {new Date(v.created_at).toLocaleString()}{v.note ? ` · ${v.note}` : ''}
+                    {formatDate(v.created_at, { withTime: true })}{v.note ? ` · ${v.note}` : ''}
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="rounded-full" disabled={restoring !== null} onClick={() => restore(v.version)}>

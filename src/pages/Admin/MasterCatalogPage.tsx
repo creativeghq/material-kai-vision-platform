@@ -11,6 +11,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/datetime';
 import {
   catalogMasterService, type CatalogMasterProduct, type MasterPriceDrift, type MasterChangelogEntry,
 } from '@/services/catalogMasterService';
@@ -368,7 +369,7 @@ const HistoryDialog: React.FC<{ data: { row: CatalogMasterProduct; entries: Mast
           <div key={e.id} className="text-xs border-b last:border-0 pb-2">
             <div className="flex items-center justify-between">
               <span className="font-medium capitalize">{e.change_kind}</span>
-              <span className="text-muted-foreground">{new Date(e.created_at).toLocaleString()}</span>
+              <span className="text-muted-foreground">{formatDate(e.created_at, { withTime: true })}</span>
             </div>
             <div className="text-muted-foreground break-all">{Object.keys(e.changed_fields ?? {}).join(', ')}</div>
           </div>

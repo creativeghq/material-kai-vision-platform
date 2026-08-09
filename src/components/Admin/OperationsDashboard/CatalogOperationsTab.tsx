@@ -30,6 +30,7 @@ import {
   type CatalogAccessLogRow,
 } from '@/services/catalogsService';
 import { buildCatalogOperationsFilters } from './catalogOperationsFilters';
+import { formatDate } from '@/utils/datetime';
 
 /** Preserves the tab's previous default window now that the range Select is a dateRange field. */
 function defaultFilterValues(): FilterValues {
@@ -207,7 +208,7 @@ export const CatalogOperationsTab: React.FC = () => {
                         <td className="px-3 py-2 text-right">{s.pdf_downloads}</td>
                         <td className="px-3 py-2 text-right">{s.gate_grants} / <span className={s.gate_denials > 0 ? 'text-destructive' : ''}>{s.gate_denials}</span></td>
                         <td className="px-3 py-2 text-right">{s.unique_email_count}</td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{s.last_event_at ? new Date(s.last_event_at).toLocaleString() : '—'}</td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{s.last_event_at ? formatDate(s.last_event_at, { withTime: true }) : '—'}</td>
                         <td className="px-3 py-2 flex justify-end gap-1">
                           <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/catalogs/${s.id}`)}>Open</Button>
                           {s.slug && (
@@ -246,7 +247,7 @@ export const CatalogOperationsTab: React.FC = () => {
                   <tbody>
                     {visibleEvents.map((e) => (
                       <tr key={e.id} className="border-t hover:bg-muted/20">
-                        <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(e.created_at).toLocaleString()}</td>
+                        <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(e.created_at, { withTime: true })}</td>
                         <td className="px-3 py-2">
                           <span className="inline-flex items-center text-xs text-muted-foreground capitalize">
                             {e.event_type === 'pdf_download' ? <FileDown className="h-3 w-3 mr-1 inline" /> : <Eye className="h-3 w-3 mr-1 inline" />}
@@ -299,7 +300,7 @@ export const CatalogOperationsTab: React.FC = () => {
                   <tbody>
                     {visibleGateLog.map((row) => (
                       <tr key={row.id} className="border-t hover:bg-muted/20">
-                        <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</td>
+                        <td className="px-3 py-2 text-xs whitespace-nowrap">{formatDate(row.created_at, { withTime: true })}</td>
                         <td className="px-3 py-2 font-medium">{row.email}</td>
                         <td className="px-3 py-2">
                           <span className={`text-xs font-medium ${row.granted_access ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>

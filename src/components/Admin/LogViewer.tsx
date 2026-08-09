@@ -25,6 +25,7 @@ import {
   type DateRangeValue,
 } from '@/components/core/filters';
 import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
+import { formatDate } from '@/utils/datetime';
 
 type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
 
@@ -461,7 +462,7 @@ export function LogViewer() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="block text-sm font-medium text-muted-foreground">Timestamp</span>
-                  <p className="text-sm font-mono">{new Date(selectedLog.timestamp).toLocaleString()}</p>
+                  <p className="text-sm font-mono">{formatDate(selectedLog.timestamp, { withTime: true })}</p>
                 </div>
                 <div>
                   <span className="block text-sm font-medium text-muted-foreground">Level</span>

@@ -22,6 +22,7 @@ import {
 } from '@/services/clientViewsService';
 import { SHEET_TYPE_LABELS, type SheetType } from '@/services/moodboardSheetsService';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { formatDate } from '@/utils/datetime';
 
 interface ClientViewTabProps {
   projectId: string;
@@ -532,7 +533,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                             : <MessageSquare className="h-4 w-4 text-muted-foreground mt-0.5" />}
                           <div>
                             <span className="font-medium">{f.author_name || 'Client'}</span>
-                            <span className="text-muted-foreground"> · {f.status || f.kind} · {new Date(f.created_at).toLocaleDateString()}</span>
+                            <span className="text-muted-foreground"> · {f.status || f.kind} · {formatDate(f.created_at)}</span>
                             {f.body && <p className="text-muted-foreground">{f.body}</p>}
                           </div>
                         </div>

@@ -54,6 +54,7 @@ import { scoreLead, leadScoreTint } from '@/modules/crm/services/leadScoring';
 import { financeService } from '@/modules/finance/services/financeService';
 import { researchCompany, summarizeResearch, greekAfm } from '@/modules/crm/services/companyResearch';
 import { flowEventService } from '@/services/flows/flowEventService';
+import { formatDate } from '@/utils/datetime';
 
 interface Contact {
   id: string;
@@ -767,7 +768,7 @@ export const ContactDetailPage: React.FC = () => {
             </CollapsibleCard>
 
             <div className="px-1 text-xs text-muted-foreground">
-              Created {new Date(contact.created_at).toLocaleDateString()}{contact.updated_at ? ` · Updated ${new Date(contact.updated_at).toLocaleDateString()}` : ''}
+              Created {formatDate(contact.created_at)}{contact.updated_at ? ` · Updated ${formatDate(contact.updated_at)}` : ''}
             </div>
           </aside>
 

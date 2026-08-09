@@ -28,6 +28,7 @@ import {
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
+import { formatDate } from '@/utils/datetime';
 import {
   Dialog,
   DialogContent,
@@ -394,7 +395,7 @@ export const WebhooksPanel: React.FC = () => {
                   {paginate(history, historyPage).map((r) => (
                     <tr key={r.run_id} className="border-b border-border/40 align-top">
                       <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
-                        {new Date(r.started_at).toLocaleString()}
+                        {formatDate(r.started_at, { withTime: true })}
                       </td>
                       <td className="py-2 pr-3"><StatusBadge status={r.status} /></td>
                       <td className="py-2 pr-3 text-muted-foreground whitespace-nowrap">
