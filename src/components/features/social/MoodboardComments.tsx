@@ -89,7 +89,7 @@ export const MoodboardComments: React.FC<MoodboardCommentsProps> = ({
   };
 
   const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 
   return (
     <div className="space-y-4">

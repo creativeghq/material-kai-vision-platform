@@ -15,7 +15,7 @@ import { crmMeetingsService, type CrmMeeting } from '@/services/crmMeetingsServi
 import { getErrorMessage } from '@/core/errors/utils';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 
-const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' });
+const fmt = (iso: string) => new Date(iso).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
 
 export const ProfileMeetingsTab: React.FC = () => {
   const navigate = useNavigate();

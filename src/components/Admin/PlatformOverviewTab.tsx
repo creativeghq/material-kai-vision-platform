@@ -1372,7 +1372,7 @@ export function PlatformOverviewTab() {
         <KpiCard label="Projects (all-time)" value={projectKpis.total} icon={Package} color="text-primary" />
         <KpiCard label="Active Projects" value={projectKpis.active} icon={Package} color="text-green-600" sub={projectKpis.total > 0 ? `${Math.round((projectKpis.active / projectKpis.total) * 100)}% of total` : undefined} />
         <KpiCard label="With Deadline" value={projectKpis.withDeadline} icon={Award} color="text-amber-500" />
-        <KpiCard label="Budget Allocated (USD)" value={`$${projectKpis.budgetSumUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} icon={Award} color="text-cyan-600" sub="USD-quoted projects only" />
+        <KpiCard label="Budget Allocated (USD)" value={`$${projectKpis.budgetSumUsd.toLocaleString('en-US', { maximumFractionDigits: 0 })}`} icon={Award} color="text-cyan-600" sub="USD-quoted projects only" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">

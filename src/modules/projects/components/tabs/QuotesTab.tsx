@@ -140,7 +140,7 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {q.total_items} {q.total_items === 1 ? 'item' : 'items'} ·
-                        Updated {new Date(q.updated_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                        Updated {new Date(q.updated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
                       </p>
                     </div>
                     <div className="text-right shrink-0">

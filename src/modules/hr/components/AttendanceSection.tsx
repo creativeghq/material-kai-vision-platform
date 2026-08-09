@@ -113,7 +113,7 @@ export function AttendanceSection({ workspaceId, canManage }: { workspaceId: str
                           : <span className="text-sm text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {r.last_at ? new Date(r.last_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                      {r.last_at ? new Date(r.last_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '—'}
                       {r.last_status === 'submitted' && <span className="ml-1 text-emerald-500" title="Filed to Ergani">✓</span>}
                     </TableCell>
                     {canManage && (

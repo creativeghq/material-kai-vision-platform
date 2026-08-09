@@ -3995,7 +3995,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               <div className="flex flex-col items-center gap-1">
                                 <span className="text-2xl">{style.icon}</span>
                                 <span className="text-[10px] font-mono text-muted-foreground">
-                                  {new Date(cp.created_at).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                  {new Date(cp.created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                 </span>
                               </div>
 

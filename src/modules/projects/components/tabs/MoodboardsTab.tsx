@@ -105,7 +105,7 @@ export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId }) => {
               <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{mb.description}</p>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              Updated {new Date(mb.updated_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+              Updated {new Date(mb.updated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
             </p>
           </CardContent>
         </Card>

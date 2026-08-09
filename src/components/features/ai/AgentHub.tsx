@@ -4132,7 +4132,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               {message.purchaseOrderCreatedData.orders.map((o, i) => (
                 <div key={o.order_id || i} className="flex justify-between gap-2 text-xs bg-muted/40 border border-border rounded-md px-2.5 py-1.5">
                   <span className="text-muted-foreground">Draft PO {o.order_id ? `#${String(o.order_id).slice(0, 8)}` : `#${i + 1}`}</span>
-                  <span className="text-foreground">{o.subtotal_net != null ? o.subtotal_net.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</span>
+                  <span className="text-foreground">{o.subtotal_net != null ? o.subtotal_net.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</span>
                 </div>
               ))}
             </div>

@@ -288,7 +288,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                               )}
                               <div className="flex items-center gap-1 text-green-600 font-semibold">
                                 <DollarSign className="h-4 w-4" />
-                                {formatMoney(upsell.price, 'USD')}
+                                {formatMoney(upsell.price, 'EUR')}
                               </div>
                             </div>
                             <div className="flex items-center gap-2 ml-4">
@@ -339,7 +339,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                                 const upsell = upsells.find(u => u.id === qu.upsell_id);
                                 return sum + (upsell?.price || 0);
                               }, 0),
-                            'USD',
+                            'EUR',
                           )}
                         </span>
                       </div>

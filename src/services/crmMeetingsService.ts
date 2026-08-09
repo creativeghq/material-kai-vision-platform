@@ -122,7 +122,7 @@ class CrmMeetingsService {
             description: input.notes?.trim() || null, location: input.location?.trim() || null,
             organizerEmail: user.email ?? null, attendeeEmails: emails,
           });
-          const when = start.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' });
+          const when = start.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
           const html = `<div style="font-family:'Open Sans',Arial,sans-serif;font-size:14px;line-height:1.6;color:#222">
             <p>You're invited to <strong>${escapeHtml(subject)}</strong>.</p>
             <p><strong>When:</strong> ${escapeHtml(when)}</p>

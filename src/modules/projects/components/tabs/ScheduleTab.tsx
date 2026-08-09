@@ -111,7 +111,7 @@ export const ScheduleTab: React.FC<{ projectId: string; isOwner: boolean }> = ({
     while (d.getTime() < win.start + win.days * DAY_MS) {
       ticks.push({
         left: ((d.getTime() - win.start) / DAY_MS) * PX_PER_DAY,
-        label: d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' }),
+        label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
       });
       d.setUTCMonth(d.getUTCMonth() + 1);
     }

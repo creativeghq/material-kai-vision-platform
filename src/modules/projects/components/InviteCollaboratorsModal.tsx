@@ -185,8 +185,8 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
                         {statusBadge(c)}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Invited {new Date(c.invited_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-                        {c.accepted_at && ` · Accepted ${new Date(c.accepted_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`}
+                        Invited {new Date(c.invited_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                        {c.accepted_at && ` · Accepted ${new Date(c.accepted_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">

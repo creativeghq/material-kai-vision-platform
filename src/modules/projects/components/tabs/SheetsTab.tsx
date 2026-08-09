@@ -104,7 +104,7 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId, isOwner = true 
         </p>
         <p className="text-xs text-muted-foreground">
           {SHEET_TYPE_LABEL[s.sheet_type] || s.sheet_type} ·
-          Created {new Date(s.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+          Created {new Date(s.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
         </p>
       </div>
       <span className={`text-xs capitalize ${statusTone(s.status)}`}>{humanizeLabel(s.status)}</span>

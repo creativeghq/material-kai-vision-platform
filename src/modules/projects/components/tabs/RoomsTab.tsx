@@ -179,7 +179,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
                     <span>{formatMoney(Number(r.budget_amount), budgetCurrency)}</span>
                   )}
                   {r.deadline && (
-                    <span>Due {new Date(r.deadline).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
+                    <span>Due {new Date(r.deadline).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</span>
                   )}
                 </div>
                 {(() => {

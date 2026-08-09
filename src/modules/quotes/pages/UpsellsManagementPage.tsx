@@ -249,7 +249,7 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
   };
 
   const formatPrice = (price: number) => {
-    return formatMoney(price, 'USD');
+    return formatMoney(price, 'EUR');
   };
 
   if (loading) {

@@ -92,10 +92,10 @@ export function groupByMonth(entries: ChangelogEntry[]): ChangelogMonth[] {
   }
   return Object.entries(byMonth).map(([key, items]) => {
     const [y, m] = key.split('-').map(Number);
-    const label = new Date(y, m - 1, 1).toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
+    const label = new Date(y, m - 1, 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
     return { key, label, items };
   });
 }
 
 export const formatChangelogDate = (iso: string): string =>
-  new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });

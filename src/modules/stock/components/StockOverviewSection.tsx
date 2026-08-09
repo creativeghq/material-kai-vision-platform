@@ -9,7 +9,7 @@ import { formatNumber } from '@/utils/decimal';
 
 const fmtMoney = (n: number, ccy?: string) => {
   const sym = ccy === 'USD' ? '$' : ccy === 'GBP' ? '£' : '€';
-  return `${sym}${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  return `${sym}${Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 };
 
 const KPI: React.FC<{ icon: React.ElementType; label: string; value: React.ReactNode; tone?: 'default' | 'amber' | 'red' }> = ({ icon: Icon, label, value, tone = 'default' }) => (

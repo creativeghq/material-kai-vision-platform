@@ -101,7 +101,7 @@ export function OnboardingSection({ workspaceId, canManage }: { workspaceId: str
                             className={`text-[10px] shrink-0 ${t.status !== 'done' && new Date(t.due_date) < new Date(new Date().toDateString()) ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
                             title={t.status !== 'done' && new Date(t.due_date) < new Date(new Date().toDateString()) ? 'Overdue' : 'Due date'}
                           >
-                            due {new Date(t.due_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                            due {new Date(t.due_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
                           </span>
                         )}
                         {canManage && <button onClick={() => del(t.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>}

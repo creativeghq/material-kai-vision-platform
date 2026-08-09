@@ -1711,7 +1711,7 @@ const PnlCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => (
           )}
           {rows.map((r) => (
             <tr key={r.period_month} className="border-b border-border/30">
-              <td className="px-4 py-2">{new Date(r.period_month).toLocaleDateString(undefined, { year: 'numeric', month: 'short' })}</td>
+              <td className="px-4 py-2">{new Date(r.period_month).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}</td>
               <td className="px-4 py-2 text-right">{formatMoney(r.revenue_net)}</td>
               <td className="px-4 py-2 text-right">{formatMoney(r.cogs)}</td>
               <td className="px-4 py-2 text-right font-medium">{formatMoney(r.gross_margin)}</td>
@@ -1821,7 +1821,7 @@ const RevenueTrendCard: React.FC<{ rows: PnlRow[] }> = ({ rows }) => {
             {months.map((m, i) => {
               const rev = Number(m.revenue_net ?? 0);
               const isLast = i === months.length - 1;
-              const label = new Date(m.period_month).toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+              const label = new Date(m.period_month).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
               return (
                 <div key={m.period_month} className="group relative flex flex-1 flex-col items-center justify-end gap-1">
                   <div

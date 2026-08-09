@@ -149,7 +149,7 @@ export const MaterialReviews: React.FC<MaterialReviewsProps> = ({ productId, cur
     (name || '?').split(' ').filter(Boolean).slice(0, 2).map((s) => s[0].toUpperCase()).join('');
 
   const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
     <div className="space-y-4">

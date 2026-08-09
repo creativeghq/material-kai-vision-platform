@@ -54,9 +54,12 @@ function offenders(): string[] {
     const src = readFileSync(file, 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^[ \t]*\/\/.*$/gm, '');
-    // `new Date(…).toLocaleDateString()` / `.toLocaleString()` with NO arguments — the
-    // browser-locale form. An options object means the caller wanted a specific shape.
-    if (/new Date\([^;]*?\)\.toLocale(Date)?String\(\s*\)/.test(src)) found.push(rel);
+    // (a) `new Date(…).toLocale*String()` with NO arguments — the plain browser-locale form.
+    if (/new Date\([^;]*?\)\.toLocale(Date)?String\(\s*\)/.test(src)) { found.push(rel); continue; }
+    // (b) An explicit options object but `undefined` / `[]` as the LOCALE. The shape is
+    // deliberate; the locale is still the browser's, which is the same bug wearing a disguise.
+    // 25 call sites looked intentional purely because they passed options.
+    if (/\.toLocale(Date|Time)?String\(\s*(undefined|\[\])\s*,/.test(src)) found.push(rel);
   }
   return [...new Set(found)];
 }

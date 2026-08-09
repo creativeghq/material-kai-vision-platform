@@ -132,7 +132,7 @@ export default function PublicJobPage() {
             {job.level && <p className="text-xs text-muted-foreground leading-relaxed">This position is leveled as {job.level}.</p>}
             {job.closes_at && (
               <p className="text-xs text-muted-foreground">
-                Applications close {new Date(job.closes_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}.
+                Applications close {new Date(job.closes_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}.
               </p>
             )}
           </aside>

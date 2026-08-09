@@ -69,7 +69,7 @@ export const InboxTab: React.FC = () => {
   };
 
   const fmt = (iso: string) =>
-    new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 
   if (loading) {
     return (
