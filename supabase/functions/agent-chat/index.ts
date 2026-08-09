@@ -2233,7 +2233,7 @@ async function executeAgent(
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached
   if (config.tools.includes('visual_search') && images.length > 0) {
-    tools.push(createVisualSearchTool(workspaceId, images));
+    tools.push(createVisualSearchTool(workspaceId, images, userId));
   }
 
   // --- Interior Designer tools ---

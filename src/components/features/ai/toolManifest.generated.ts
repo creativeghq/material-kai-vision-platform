@@ -2111,8 +2111,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createVisualSearchTool',
     description: 'Search for visually similar materials using the user\'s uploaded image.',
     params: [
-      { name: 'query', type: 'string', optional: true, description: 'Optional text description to refine visual search results' },
-      { name: 'aspect', type: 'enum', enum: ['color', 'texture', 'style', 'material'], optional: true, description: 'Bias toward one aspect of the image — e.g. match its COLOR, TEXTURE, STYLE, or MATERIAL specifically. Omit for overall visual similarity.' },
+      { name: 'query', type: 'string', optional: true, description: 'Optional text description to refine visual search results. Ignored when `aspect` is set — an aspect search is grounded in the image itself.' },
+      { name: 'aspect', type: 'enum', enum: ['color', 'texture', 'style', 'material'], optional: true, description: 'Match ONE aspect of the image instead of its overall look — set this when the user asks for a similar COLOR, TEXTURE, STYLE, or MATERIAL specifically. Costs a vision analysis of the image, so omit it for a general "find similar" request.' },
     ],
   },
 ];

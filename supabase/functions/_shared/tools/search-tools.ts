@@ -247,8 +247,12 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
  * LangChain Tool: Visual Search using MIVAA API
  * Sends user-attached images to MIVAA's image similarity endpoint (CLIP/SigLIP embeddings)
  * Only created when images are actually attached to the request
+ *
+ * `userId` is appended rather than moved to the front to match the `(userId, workspaceId)`
+ * convention used elsewhere: both are strings, so a reordered call site would type-check
+ * perfectly while metering the wrong subject and scoping results to a user id.
  */
-export const createVisualSearchTool = (workspaceId: string, images: string[]) => {
+export const createVisualSearchTool = (workspaceId: string, images: string[], userId?: string) => {
   return tool(
     async ({ query, aspect }) => {
       try {
@@ -264,9 +268,39 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
           return JSON.stringify({ error: 'Invalid image data format' });
         }
 
+        // Gate BEFORE the upstream spend (invariant 10). The aspect path makes MIVAA run a
+        // Claude vision analysis of this image — plain visual similarity only compares
+        // stored vectors and stays free, so only this branch is gated. Reserve-then-refund
+        // mirrors analyze_inspiration_url: it turns away a 0-credit caller without
+        // double-charging, since /api/search/by-<aspect> meters the analysis itself.
+        if (aspect) {
+          const gate = await reserveCredits(supabase, userId, workspaceId, 1, 'visual_aspect_search');
+          if (!gate.ok) {
+            return JSON.stringify({ error: gate.message, insufficient_credits: true });
+          }
+          await refundCredits(supabase, userId, workspaceId, 1, 'visual_aspect_search');
+        }
+
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-        const url = new URL(`${MIVAA_GATEWAY_URL}/api/rag/search`);
-        url.searchParams.set('strategy', 'image');
+
+        // Two different endpoints, on purpose.
+        //
+        // `/api/rag/search?strategy=image` ranks on the SLIG visual vector alone and
+        // never reads `aspect` — the request model accepted the field, the image branch
+        // dropped it, and every "match this photo's TEXTURE" call quietly returned plain
+        // visual similarity while looking like it had worked.
+        //
+        // It cannot be fixed by passing the flag harder: the per-aspect collections hold
+        // no image vectors at all. They hold Voyage embeddings of vision-analysis TEXT,
+        // so an image reaches them only by running the same analyze → serialize → embed
+        // pipeline ingestion ran. `/api/search/by-<aspect>` is the endpoint that does
+        // exactly that, which is why the aspect path goes there instead.
+        const url = new URL(
+          aspect
+            ? `${MIVAA_GATEWAY_URL}/api/search/by-${aspect}`
+            : `${MIVAA_GATEWAY_URL}/api/rag/search`,
+        );
+        if (!aspect) url.searchParams.set('strategy', 'image');
 
         const startTime = Date.now();
 
@@ -278,14 +312,26 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
           const response = await fetch(url.toString(), {
             method: 'POST',
             headers: mivaaAuthHeaders(),
-            body: JSON.stringify({
-              query: query || '',
-              workspace_id: workspaceId,
-              image_base64: base64Data,
-              top_k: 10,
-              // Aspect bias — e.g. "find the same COLOUR as this photo".
-              ...(aspect ? { aspect } : {}),
-            }),
+            body: JSON.stringify(
+              aspect
+                ? {
+                    query_image: base64Data,
+                    workspace_id: workspaceId,
+                    limit: 10,
+                    // The endpoint's own default is 0.5. Aspect strings are short
+                    // descriptors ("matte honed, fine grain"), so their cosine scores sit
+                    // lower than full-text chunks'; 0.3 is the floor the rest of the
+                    // platform's vector search uses. Inheriting the stricter default here
+                    // would return an empty list far more often than a bad match.
+                    min_similarity: 0.3,
+                  }
+                : {
+                    query: query || '',
+                    workspace_id: workspaceId,
+                    image_base64: base64Data,
+                    top_k: 10,
+                  },
+            ),
             signal: controller.signal,
           });
 
@@ -296,10 +342,27 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
           if (!response.ok) {
             const errorText = await response.text();
             console.error(`❌ Visual search API error: ${response.status} - ${errorText}`);
+            // A 400 from /api/search/by-<aspect> is a semantic refusal the agent can act on
+            // ("the image carried no texture content"), not an outage. Passing the detail
+            // back lets it retry without the aspect instead of reporting search as down.
+            if (aspect && response.status === 400) {
+              return JSON.stringify({
+                error: `Could not run ${aspect} search on this image: ${errorText}`,
+                aspect_unavailable: true,
+              });
+            }
             throw new Error(`Visual search API error: ${response.status} ${response.statusText}`);
           }
 
           const data = await response.json();
+          if (aspect) {
+            // Deliberately not reranked. This ordering IS what was asked for — a ranking by
+            // one aspect — and re-sorting it by text relevance to a phrase like "similar
+            // texture" would discard the bias a vision call was just spent computing.
+            // `query_summary` carries the exact text the server embedded, so the agent can
+            // tell the user what it actually matched on.
+            return JSON.stringify(data);
+          }
           // The text query is optional here, so this reranks only when the user gave one to
           // rank against; pure image-similarity results keep MIVAA's visual ordering, which is
           // the right answer when there is no stated intent to weigh them against.
@@ -322,9 +385,9 @@ export const createVisualSearchTool = (workspaceId: string, images: string[]) =>
       name: 'visual_search',
       description: 'Search for visually similar materials using the user\'s uploaded image. Uses CLIP/SigLIP embeddings to find products matching the visual appearance, color, texture, and style of the image. Use this when the user attaches an image and wants to find similar materials, match colors, or identify products.',
       schema: z.object({
-        query: z.string().default('').describe('Optional text description to refine visual search results'),
+        query: z.string().default('').describe('Optional text description to refine visual search results. Ignored when `aspect` is set — an aspect search is grounded in the image itself.'),
         aspect: z.enum(['color', 'texture', 'style', 'material']).optional()
-          .describe('Bias toward one aspect of the image — e.g. match its COLOR, TEXTURE, STYLE, or MATERIAL specifically. Omit for overall visual similarity.'),
+          .describe('Match ONE aspect of the image instead of its overall look — set this when the user asks for a similar COLOR, TEXTURE, STYLE, or MATERIAL specifically. Costs a vision analysis of the image, so omit it for a general "find similar" request.'),
       }),
     }
   );
