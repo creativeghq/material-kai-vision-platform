@@ -38,6 +38,8 @@ import { ProductStockPanel } from '@/components/business/marketplace/ProductStoc
 import { ProductCostCard } from '@/components/business/marketplace/ProductCostCard';
 import { ProductPackagingCard } from '@/components/business/marketplace/ProductPackagingCard';
 import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
+import { ProductConfigurator } from '@/components/features/configurator/ProductConfigurator';
+import { ProductOptionsEditor } from '@/components/features/configurator/ProductOptionsEditor';
 import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -220,6 +222,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const { activeWorkspaceId } = useWorkspace();
   const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  // Bumped whenever the option editor changes something, to remount the configurator preview
+  // beneath it — see the comment at its mount point.
+  const [configuratorNonce, setConfiguratorNonce] = useState(0);
   const [images, setImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
   const [chunks, setChunks] = useState<any[]>([]);
@@ -2583,6 +2588,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {isOwnProduct && activeWorkspaceId && (
             <div className="mt-6">
               <Product3DModelCard productId={product.id} workspaceId={activeWorkspaceId} />
+            </div>
+          )}
+
+          {/* Configurator (#321 M2 / #260 Phase 1). Authoring is owner-only for the same reason the
+              upload card is; the preview sits under it so a change can be seen immediately. The
+              `configuratorNonce` remount is deliberate — the preview holds selection state derived
+              from the option list, and editing that list underneath it would leave a selection
+              pointing at a value that no longer exists. */}
+          {isOwnProduct && activeWorkspaceId && (
+            <div className="mt-6 space-y-4">
+              <ProductOptionsEditor
+                productId={product.id}
+                workspaceId={activeWorkspaceId}
+                onChanged={() => setConfiguratorNonce((n) => n + 1)}
+              />
+              <ProductConfigurator key={configuratorNonce} productId={product.id} />
             </div>
           )}
 

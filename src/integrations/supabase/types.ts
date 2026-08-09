@@ -19007,6 +19007,128 @@ export type Database = {
           },
         ]
       }
+      product_configurations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string | null
+          product_id: string
+          selections: string[]
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string | null
+          product_id: string
+          selections?: string[]
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string | null
+          product_id?: string
+          selections?: string[]
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      product_option_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_required: boolean
+          key: string
+          label: string
+          product_id: string
+          sort_order: number
+          target_material_name: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_required?: boolean
+          key: string
+          label: string
+          product_id: string
+          sort_order?: number
+          target_material_name?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_required?: boolean
+          key?: string
+          label?: string
+          product_id?: string
+          sort_order?: number
+          target_material_name?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      product_option_values: {
+        Row: {
+          base_color_hex: string | null
+          created_at: string
+          group_id: string
+          id: string
+          is_default: boolean
+          label: string
+          metalness: number | null
+          price_delta: number
+          roughness: number | null
+          sort_order: number
+          workspace_id: string
+        }
+        Insert: {
+          base_color_hex?: string | null
+          created_at?: string
+          group_id: string
+          id?: string
+          is_default?: boolean
+          label: string
+          metalness?: number | null
+          price_delta?: number
+          roughness?: number | null
+          sort_order?: number
+          workspace_id: string
+        }
+        Update: {
+          base_color_hex?: string | null
+          created_at?: string
+          group_id?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          metalness?: number | null
+          price_delta?: number
+          roughness?: number | null
+          sort_order?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_option_values_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "product_option_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_document_relationships: {
         Row: {
           created_at: string | null
@@ -35394,6 +35516,17 @@ export type Database = {
           p_product_id: string
           p_quantity: number
           p_unit?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      get_configured_product_price: {
+        Args: {
+          p_audience?: string
+          p_company_id?: string
+          p_contact_id?: string
+          p_option_value_ids?: string[]
+          p_product_id: string
           p_workspace_id: string
         }
         Returns: Json

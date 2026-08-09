@@ -26,6 +26,9 @@ import {
 } from '@/components/core/ui/dialog';
 import { useARSupport } from './useARSupport';
 import { ProductModelStage } from './ProductModelViewer';
+// Loader + error boundary moved to CanvasChrome when the #260 configurator became a second
+// canvas surface — a copied error boundary drifts and nobody notices.
+import { CanvasLoader, ThreeErrorBoundary } from './CanvasChrome';
 import { product3dService, modelPublicUrl, type Product3DModel } from '@/services/product3dService';
 
 // ---------------------------------------------------------------------------
@@ -157,58 +160,6 @@ const Scene: React.FC<SceneProps> = (props) => {
 };
 
 // ---------------------------------------------------------------------------
-// Loading fallback
-// ---------------------------------------------------------------------------
-
-const CanvasLoader: React.FC = () => (
-  <div className="flex h-full w-full items-center justify-center">
-    <div className="flex flex-col items-center gap-3">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      <p className="text-sm text-muted-foreground">Loading 3D preview...</p>
-    </div>
-  </div>
-);
-
-// ---------------------------------------------------------------------------
-// Error boundary for Three.js
-// ---------------------------------------------------------------------------
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error?: Error;
-}
-
-class ThreeErrorBoundary extends React.Component<
-  { children: React.ReactNode; fallback?: React.ReactNode },
-  ErrorBoundaryState
-> {
-  state: ErrorBoundaryState = { hasError: false };
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        this.props.fallback ?? (
-          <div className="flex h-full w-full items-center justify-center bg-muted/30 p-8">
-            <div className="text-center">
-              <p className="text-sm font-medium text-destructive">
-                Failed to load 3D preview
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {this.state.error?.message || 'An unexpected error occurred'}
-              </p>
-            </div>
-          </div>
-        )
-      );
-    }
-    return this.props.children;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // ARPreviewModal (exported)
 // ---------------------------------------------------------------------------
