@@ -48,6 +48,56 @@ const EMBED_EVENT_TYPES = ['embed_view', 'embed_model_load', 'embed_ar_launch', 
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Ceiling on how many option ids one anonymous request may send. */
+const MAX_OPTION_IDS = 40;
+
+/**
+ * Configurator options for one product, shaped for the embed (#258 Phase 2).
+ *
+ * `price_delta` is returned GROSS, like every other price on this surface. Returning the stored net
+ * delta next to a VAT-inclusive price would make "+€40" and the total disagree, and the visitor
+ * would be right.
+ */
+async function loadOptions(
+  supabase: ReturnType<typeof serviceClient>,
+  workspaceId: string,
+  productId: string,
+  vatRate: number,
+) {
+  const { data: groups } = await supabase
+    .from('product_option_groups')
+    .select('id, key, label, target_material_name, sort_order, is_required')
+    .eq('workspace_id', workspaceId)
+    .eq('product_id', productId)
+    .order('sort_order', { ascending: true });
+  if (!groups || groups.length === 0) return [];
+
+  const { data: values } = await supabase
+    .from('product_option_values')
+    .select('id, group_id, label, price_delta, base_color_hex, roughness, metalness, sort_order, is_default')
+    .in('group_id', groups.map((g: any) => g.id))
+    .order('sort_order', { ascending: true });
+
+  return groups.map((g: any) => ({
+    id: g.id,
+    key: g.key,
+    label: g.label,
+    target_material_name: g.target_material_name,
+    is_required: g.is_required,
+    values: (values ?? [])
+      .filter((v: any) => v.group_id === g.id)
+      .map((v: any) => ({
+        id: v.id,
+        label: v.label,
+        price_delta: grossFromNet(v.price_delta, vatRate),
+        base_color_hex: v.base_color_hex,
+        roughness: v.roughness,
+        metalness: v.metalness,
+        is_default: v.is_default,
+      })),
+  }));
+}
+
 /**
  * The product ids this KEY may read, or null when the key is unrestricted.
  *
@@ -344,6 +394,11 @@ Deno.serve(withApiLogging((req) => {
       .eq('product_id', productId)
       .eq('status', 'ready');
 
+    // Configurator options (#258 Phase 2). Sent with the product so the widget can render the
+    // picker on first paint rather than after a second round trip — the swatches ARE the product
+    // on a configurable item, and revealing them late reads as a broken page.
+    const options = await loadOptions(supabase, workspaceId, productId, vatRate);
+
     const product = (row as any).product;
     return embedJson({
       ok: true,
@@ -357,7 +412,51 @@ Deno.serve(withApiLogging((req) => {
         currency: (row as any).currency ?? 'EUR',
         images: imagesFromMetadata(product.metadata),
         models: serializeModels(supabaseUrl, (models ?? []) as ModelRow[]),
+        options,
       },
+    }, 200, cors);
+  }
+
+  if (action === 'configure') {
+    // Price a set of choices for an anonymous visitor.
+    //
+    // The derivation is SECURITY DEFINER and NOT granted to `anon` — the embed reaches it through
+    // this function's service-role client, after the key has been checked. That is the whole shape
+    // of the embed surface: anonymous callers never touch a privileged routine directly.
+    const productId = String(params.product_id ?? '').trim();
+    if (!productId) return embedJson({ error: 'product_id is required' }, 400, cors);
+    if (!(await isProductInScope(supabase, auth.ctx, productId))) {
+      return embedJson({ error: 'Product not found' }, 404, cors);
+    }
+    const { data: published } = await publishedQuery().eq('product_id', productId).maybeSingle();
+    if (!published) return embedJson({ error: 'Product not found' }, 404, cors);
+
+    const raw = params.option_value_ids;
+    const optionIds = (Array.isArray(raw) ? raw : String(raw ?? '').split(','))
+      .map((v: unknown) => String(v).trim())
+      .filter((v: string) => UUID_RE.test(v))
+      .slice(0, MAX_OPTION_IDS);
+
+    const { data: priced, error: priceErr } = await supabase.rpc('get_configured_product_price', {
+      p_workspace_id: workspaceId,
+      p_product_id: productId,
+      p_option_value_ids: optionIds,
+      // No company/contact and the BUYER audience: an anonymous visitor gets the public price, never
+      // a negotiated one. Passing the seller audience here would leak cost and margin.
+      p_audience: 'buyer',
+    });
+    if (priceErr) return embedJson({ error: 'Could not price this configuration' }, 500, cors);
+
+    const p = priced as Record<string, unknown>;
+    const net = p?.configured_price as number | null;
+    return embedJson({
+      ok: true,
+      // Gross, matching the `price` every other action returns — a configurator that quotes ex-VAT
+      // next to a VAT-inclusive list price is a support ticket.
+      configured_price: net == null ? null : grossFromNet(net, vatRate),
+      currency: (p?.currency as string) ?? 'EUR',
+      options_applied: p?.options_applied ?? 0,
+      options_requested: p?.options_requested ?? 0,
     }, 200, cors);
   }
 

@@ -30,6 +30,12 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { TARGET_SIZE, normalizeModelTransform } from '@/components/features/ar/modelTransform';
+// The SAME swap functions the in-app configurator uses. Both are React-free for exactly this
+// reason: a second implementation of "recolour material X" would drift, and the cache-isolation
+// bug it guards against (three shares materials across clone()) would come back here first.
+import {
+  applyMaterialOverrides, cloneSceneWithOwnMaterials, type MaterialOverride,
+} from '@/components/features/ar/materialOverrides';
 import { formatMoney } from '@/utils/decimal';
 
 interface EmbedModel {
@@ -40,6 +46,25 @@ interface EmbedModel {
   depth_m: number | null;
 }
 
+interface EmbedOptionValue {
+  id: string;
+  label: string;
+  price_delta: number;
+  base_color_hex: string | null;
+  roughness: number | null;
+  metalness: number | null;
+  is_default: boolean;
+}
+
+interface EmbedOptionGroup {
+  id: string;
+  key: string;
+  label: string;
+  target_material_name: string | null;
+  is_required: boolean;
+  values: EmbedOptionValue[];
+}
+
 interface EmbedProduct {
   product_id: string;
   name: string;
@@ -48,6 +73,7 @@ interface EmbedProduct {
   currency: string;
   images: string[];
   models: EmbedModel[];
+  options?: EmbedOptionGroup[];
 }
 
 /** Where the API lives. Overridable per-element so a staging page can point elsewhere. */
@@ -98,6 +124,22 @@ button:disabled { opacity:.5; cursor:default; }
   padding:16px; text-align:center; font-size:14px; color:#6b6560; background:#f4f2ef;
 }
 .fallback { width:100%; height:100%; object-fit:contain; }
+.options { display:flex; flex-direction:column; gap:10px; padding-top:12px; }
+.optgroup > .optlabel { font-size:12px; color:#6b6560; padding-bottom:5px; }
+.swatches { display:flex; flex-wrap:wrap; gap:6px; }
+.swatch {
+  font:inherit; font-size:13px; padding:5px 11px; border-radius:999px;
+  border:1px solid #d9d4cd; background:#fff; color:inherit; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.swatch[aria-pressed="true"] { border-color:#1c1a1e; box-shadow:inset 0 0 0 1px #1c1a1e; }
+.dot { width:13px; height:13px; border-radius:50%; border:1px solid rgba(0,0,0,.18); }
+.delta { font-size:11px; color:#6b6560; }
+@media (prefers-color-scheme: dark) {
+  .optgroup > .optlabel, .delta { color:#a9a2ad; }
+  .swatch { background:#2c2833; border-color:#3d3745; color:#f2eef2; }
+  .swatch[aria-pressed="true"] { border-color:#f2eef2; box-shadow:inset 0 0 0 1px #f2eef2; }
+}
 @media (prefers-color-scheme: dark) {
   :host { color:#f2eef2; }
   .frame, .overlay { background:#221f26; color:#a9a2ad; }
@@ -123,6 +165,15 @@ export class MaterialKaiProduct extends HTMLElement {
   private observer: IntersectionObserver | null = null;
   private started = false;
   private disposed = false;
+
+  // Configurator state (#258 Phase 2).
+  private optionsEl!: HTMLDivElement;
+  /** group id → chosen value id. */
+  private selection: Record<string, string> = {};
+  /** The loaded scene, kept so a later choice can repaint it without reloading the GLB. */
+  private modelScene: import('three').Object3D | null = null;
+  /** Rising counter so a slow price response cannot overwrite a newer one. */
+  private priceRequest = 0;
 
   constructor() {
     super();
@@ -169,9 +220,11 @@ export class MaterialKaiProduct extends HTMLElement {
     this.frame.appendChild(this.overlay);
     this.metaEl = document.createElement('div');
     this.metaEl.className = 'meta';
+    this.optionsEl = document.createElement('div');
+    this.optionsEl.className = 'options';
     this.actionsEl = document.createElement('div');
     this.actionsEl.className = 'actions';
-    this.root.replaceChildren(style, this.frame, this.metaEl, this.actionsEl);
+    this.root.replaceChildren(style, this.frame, this.metaEl, this.optionsEl, this.actionsEl);
   }
 
   private fail(message: string) {
@@ -218,7 +271,14 @@ export class MaterialKaiProduct extends HTMLElement {
     if (this.disposed) return;
 
     this.product = product;
+    // Default selection before first paint, so the model renders in the finish the visitor sees
+    // selected rather than flashing the authored colours and correcting itself.
+    for (const g of product.options ?? []) {
+      const pick = g.values.find((v) => v.is_default) ?? g.values[0];
+      if (pick) this.selection[g.id] = pick.id;
+    }
     this.renderMeta();
+    this.renderOptions();
     this.track('embed_view');
 
     const glb = product.models.find((m) => m.format === 'glb' || m.format === 'gltf');
@@ -241,6 +301,123 @@ export class MaterialKaiProduct extends HTMLElement {
     price.className = 'price';
     price.textContent = formatMoney(this.product.price, this.product.currency);
     this.metaEl.replaceChildren(name, price);
+  }
+
+  /** The chosen value ids, in group order. */
+  private selectedValueIds(): string[] {
+    return (this.product?.options ?? [])
+      .map((g) => this.selection[g.id])
+      .filter(Boolean);
+  }
+
+  /** Visual overrides for the current selection, in the shape the shared swap function takes. */
+  private currentOverrides(): MaterialOverride[] {
+    const out: MaterialOverride[] = [];
+    for (const g of this.product?.options ?? []) {
+      // A group with no target material is a priced choice with no visual effect — an extended
+      // warranty, an assembly service. It counts toward the price and paints nothing.
+      if (!g.target_material_name) continue;
+      const v = g.values.find((x) => x.id === this.selection[g.id]);
+      if (!v) continue;
+      out.push({
+        targetMaterialName: g.target_material_name,
+        baseColorHex: v.base_color_hex,
+        roughness: v.roughness,
+        metalness: v.metalness,
+      });
+    }
+    return out;
+  }
+
+  private renderOptions() {
+    const groups = this.product?.options ?? [];
+    if (groups.length === 0) { this.optionsEl.replaceChildren(); return; }
+
+    const nodes = groups.map((g) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'optgroup';
+      const label = document.createElement('div');
+      label.className = 'optlabel';
+      label.textContent = g.label;
+      const row = document.createElement('div');
+      row.className = 'swatches';
+
+      for (const v of g.values) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'swatch';
+        b.setAttribute('aria-pressed', String(this.selection[g.id] === v.id));
+        if (v.base_color_hex) {
+          const dot = document.createElement('span');
+          dot.className = 'dot';
+          dot.style.backgroundColor = v.base_color_hex;
+          b.appendChild(dot);
+        }
+        b.appendChild(document.createTextNode(v.label));
+        if (Number(v.price_delta) !== 0) {
+          const d = document.createElement('span');
+          d.className = 'delta';
+          // ONE option's authored delta, already gross from the API. The TOTAL is never assembled
+          // here — it is re-asked of the server on every change.
+          d.textContent = `${Number(v.price_delta) > 0 ? '+' : ''}${formatMoney(Number(v.price_delta), this.product?.currency ?? 'EUR')}`;
+          b.appendChild(d);
+        }
+        b.addEventListener('click', () => this.choose(g.id, v.id));
+        row.appendChild(b);
+      }
+
+      wrap.append(label, row);
+      return wrap;
+    });
+    this.optionsEl.replaceChildren(...nodes);
+  }
+
+  private choose(groupId: string, valueId: string) {
+    if (this.selection[groupId] === valueId) return;
+    this.selection[groupId] = valueId;
+    this.renderOptions();
+    this.applySelectionToModel();
+    void this.reprice();
+  }
+
+  /** Repaint the already-loaded scene. No reload — the geometry did not change. */
+  private applySelectionToModel() {
+    if (!this.modelScene) return;
+    applyMaterialOverrides(this.modelScene, this.currentOverrides());
+  }
+
+  /**
+   * Ask the server what this configuration costs.
+   *
+   * Never computed here. The widget knows each option's delta only to LABEL it; the total is a
+   * money quantity with exactly one derivation, and it lives in SQL. A visitor being shown a total
+   * the server would disagree with is worse than a moment of "…".
+   */
+  private async reprice() {
+    const productId = this.getAttribute('product-id');
+    const apiKey = this.getAttribute('api-key');
+    if (!productId || !apiKey || !this.product) return;
+
+    const ticket = ++this.priceRequest;
+    const priceEl = this.metaEl.querySelector('.price');
+    if (priceEl) priceEl.textContent = '…';
+
+    try {
+      const url = `${this.apiBase}/functions/v1/products-3d-api`
+        + `?action=configure&product_id=${encodeURIComponent(productId)}&key=${encodeURIComponent(apiKey)}`
+        + `&option_value_ids=${encodeURIComponent(this.selectedValueIds().join(','))}`;
+      const res = await fetch(url);
+      const body = await res.json();
+      // A stale response from a slower earlier click must not overwrite a newer price.
+      if (ticket !== this.priceRequest || this.disposed) return;
+      if (res.ok && body?.configured_price != null) {
+        this.product.price = body.configured_price;
+      }
+    } catch {
+      // Leave the last known price rather than blanking it.
+    } finally {
+      if (ticket === this.priceRequest) this.renderMeta();
+    }
   }
 
   private showImageFallback() {
@@ -392,13 +569,21 @@ export class MaterialKaiProduct extends HTMLElement {
     try {
       const gltf = await new GLTFLoader().loadAsync(url);
       if (this.disposed) return;
+      // Private copies of the node tree AND materials before anything is recoloured. GLTFLoader
+      // has no cache here, but two widgets on one page can load the same URL, and a configurator
+      // that repaints a shared material would repaint the other widget too.
+      const model = cloneSceneWithOwnMaterials(gltf.scene);
       // The SAME normalization the in-app viewer uses, imported rather than reimplemented — which
       // is what makes its guard test (an empty-bounding-box GLB placing at -Infinity) protect this
       // bundle too.
-      const { scale, offset } = normalizeModelTransform(gltf.scene);
-      gltf.scene.scale.setScalar(scale);
-      gltf.scene.position.copy(offset);
-      scene.add(gltf.scene);
+      const { scale, offset } = normalizeModelTransform(model);
+      model.scale.setScalar(scale);
+      model.position.copy(offset);
+      // Paint the default selection BEFORE the first frame, so the visitor never sees the authored
+      // colours flash and correct themselves.
+      this.modelScene = model;
+      this.applySelectionToModel();
+      scene.add(model);
       this.overlay.style.display = 'none';
       this.track('embed_model_load');
     } catch {

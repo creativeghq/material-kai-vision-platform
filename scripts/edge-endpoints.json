@@ -1600,6 +1600,25 @@
         "response": "{ok, product: {product_id, name, description, unit, item_type, price, currency, images[], models: [{format, url, file_size_bytes, width_m, height_m, depth_m}]}}"
       },
       {
+        "name": "configure",
+        "summary": "Price a set of configurator choices for an anonymous visitor (#258 Phase 2)",
+        "params": [
+          {
+            "name": "product_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "Must be published AND in the key's scope, else 404."
+          },
+          {
+            "name": "option_value_ids",
+            "type": "uuid[] or comma-separated string",
+            "required": false,
+            "desc": "Chosen product_option_values. Non-uuids are dropped and the list is capped at 40; ids belonging to another product contribute nothing and are reported via options_applied."
+          }
+        ],
+        "response": "{ok, configured_price (GROSS, like every other price here), currency, options_applied, options_requested}. Priced with the BUYER audience and no company/contact — an anonymous visitor never receives a negotiated price, cost or margin. The derivation is SECURITY DEFINER and NOT granted to anon; the embed reaches it through this function's service-role client after the key is checked."
+      },
+      {
         "name": "event",
         "summary": "Record an embed analytics event (the only write on this anonymous surface)",
         "params": [
