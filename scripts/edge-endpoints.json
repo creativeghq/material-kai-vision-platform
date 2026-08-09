@@ -1598,6 +1598,37 @@
           }
         ],
         "response": "{ok, product: {product_id, name, description, unit, item_type, price, currency, images[], models: [{format, url, file_size_bytes, width_m, height_m, depth_m}]}}"
+      },
+      {
+        "name": "event",
+        "summary": "Record an embed analytics event (the only write on this anonymous surface)",
+        "params": [
+          {
+            "name": "event_type",
+            "type": "string",
+            "required": true,
+            "desc": "One of embed_view, embed_model_load, embed_ar_launch, embed_add_to_cart. An allowlist, not free text."
+          },
+          {
+            "name": "product_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "Must be published AND within the key's scope, else 404 — otherwise any key holder could write events against arbitrary products and pollute another tenant's dashboard."
+          },
+          {
+            "name": "session_id",
+            "type": "uuid",
+            "required": false,
+            "desc": "Per-visit id from the widget. Replaced server-side when absent or not a uuid; an analytics event never fails the visitor's page."
+          },
+          {
+            "name": "source_page",
+            "type": "string",
+            "required": false,
+            "desc": "Page the widget is embedded on. Truncated to 500 chars (attacker-controlled free text)."
+          }
+        ],
+        "response": "{ok: true}. workspace_id is set from the key, never the body. Accepts a bodyless POST — the beacon sends everything in the query string."
       }
     ]
   },
