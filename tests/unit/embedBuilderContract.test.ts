@@ -129,6 +129,33 @@ describe('the embed builder always offers a way forward', () => {
     expect(headingAt).toBeLessThan(viewportAt);
   });
 
+  it('"see it" is a visible step, not a side effect of pricing', () => {
+    // It shipped as a silent consequence of pressing "Price it", on the branch where nothing
+    // matched. No button, no mention, ~20s of nothing — so nobody could find it, and the stage
+    // may as well not have existed. #337 also puts "see it" BEFORE "price it" for a reason: you
+    // should be able to look at your specification without asking what it costs.
+    const build = method('renderBuild');
+    expect(build, 'no See it control in the build stage').toContain('See it');
+    expect(build).toContain('this.seeIt()');
+  });
+
+  it('"see it" is offered only when the key can actually generate', () => {
+    // A button that quietly does nothing because of someone else's billing setting is worse than
+    // no button at all.
+    expect(method('renderBuild')).toContain('this.generationEnabled');
+    expect(method('loadFacets'), 'the flag is never read from the server')
+      .toContain('generation_enabled');
+  });
+
+  it('"see it" prefers a real product over inventing one', () => {
+    // Generating an impression of something already in the catalogue spends the merchant's credits
+    // to invent a thing they own a model of.
+    const see = method('seeIt');
+    expect(see).toContain("'resolve'");
+    expect(see).toMatch(/match_kind === 'exact'/);
+    expect(see.indexOf("'resolve'")).toBeLessThan(see.indexOf('this.visualize()'));
+  });
+
   it('the viewport falls back to a generated image, clearly labelled as one', () => {
     // A spec the catalog cannot satisfy has no photograph, because the thing does not exist. An
     // unlabelled AI picture of it is a promise the merchant cannot keep.

@@ -486,6 +486,14 @@ Deno.serve(withApiLogging((req) => {
   // steps, and the specs nobody stocks yet are exactly the leads this feature exists to capture.
   if (action === 'spec_options') {
     const scoped = await scopeRestriction(supabase, auth.ctx);
+    // Told UP FRONT whether this key may generate, so the widget can decide whether to OFFER the
+    // "see it" step at all. Discovering it only by pressing the button and getting nothing back is
+    // how the stage ended up invisible in the first place.
+    const { data: genKey } = await supabase
+      .from('material_kai_keys')
+      .select('allow_generation')
+      .eq('id', auth.ctx.keyId)
+      .maybeSingle();
     const { data, error } = await supabase.rpc('get_embed_spec_options', {
       p_workspace_id: workspaceId,
       // The key's scope, not a request parameter. A scoped key must not learn the attribute values
@@ -507,7 +515,12 @@ Deno.serve(withApiLogging((req) => {
     const siteKey = (await resolveSecret(supabase, 'TURNSTILE_SITE_KEY')
       .catch(() => ({ value: null })))?.value ?? null;
 
-    return embedJson({ ok: true, facets: data ?? [], turnstile_site_key: siteKey }, 200, cors);
+    return embedJson({
+      ok: true,
+      facets: data ?? [],
+      turnstile_site_key: siteKey,
+      generation_enabled: !!genKey?.allow_generation,
+    }, 200, cors);
   }
 
   // ── #337 stage 3: "see it" when there is nothing to see ──────────────────────────────────────

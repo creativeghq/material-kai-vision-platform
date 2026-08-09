@@ -147,6 +147,8 @@ export class MaterialKaiBuilder extends HTMLElement {
   private matchedProductId: string | null = null;
   private generatedUrl: string | null = null;
   private generating = false;
+  /** Whether this key may generate at all — decides if the "See it" step is offered. */
+  private generationEnabled = false;
 
   constructor() {
     super();
@@ -179,6 +181,7 @@ export class MaterialKaiBuilder extends HTMLElement {
       // Null when the platform has no Turnstile configured, in which case no challenge renders and
       // the server accepts the request — the same fail-open every public form here follows.
       this.siteKey = typeof body?.turnstile_site_key === 'string' ? body.turnstile_site_key : null;
+      this.generationEnabled = body?.generation_enabled === true;
     } catch {
       this.facets = [];
     }
@@ -342,7 +345,10 @@ export class MaterialKaiBuilder extends HTMLElement {
     empty.className = 'vEmpty';
     empty.textContent = this.generating
       ? 'Drawing your specification…'
-      : 'Your selection appears here';
+      : this.generationEnabled
+        // Name the button. An empty frame saying nothing is how the whole stage stayed hidden.
+        ? 'Pick a few things, then press “See it”'
+        : 'Your selection appears here';
     frame.appendChild(empty);
     return frame;
   }
@@ -479,12 +485,60 @@ export class MaterialKaiBuilder extends HTMLElement {
     go.addEventListener('click', () => this.priceIt());
     row.appendChild(go);
 
+    const n = Object.keys(this.spec).length;
+
+    // Stage 3, "see it", as its own visible step BEFORE pricing — which is both the order #337
+    // specifies and the only way anyone finds it. Run as a side effect of "Price it" it was
+    // invisible: no button, no mention, and it only fired on the branch where nothing matched.
+    //
+    // Offered only when the key may actually generate. A button that quietly does nothing because
+    // of someone else's billing setting is worse than no button.
+    if (this.generationEnabled) {
+      const see = document.createElement('button');
+      see.className = 'ghost';
+      see.textContent = this.generating ? 'Drawing…' : 'See it';
+      // Nothing to draw without a spec — an empty one would render a generic chair and charge the
+      // merchant for it.
+      see.disabled = this.generating || n === 0;
+      see.title = n === 0 ? 'Pick something first' : 'Show this specification';
+      see.addEventListener('click', () => this.seeIt());
+      row.appendChild(see);
+    }
+
     const count = document.createElement('span');
     count.className = 'muted';
-    const n = Object.keys(this.spec).length;
     count.textContent = n ? `${n} choice${n === 1 ? '' : 's'}` : 'no choices yet';
     row.appendChild(count);
     host.appendChild(row);
+  }
+
+  /**
+   * "See it" — show the spec, without pricing it.
+   *
+   * Resolves FIRST rather than generating straight away: if a real product satisfies the spec, the
+   * honest picture of it is the product's own model, and drawing an impression instead would spend
+   * the merchant's credits to invent something they already have.
+   */
+  private async seeIt() {
+    if (this.generating) return;
+    this.generating = true;
+    this.render();
+    try {
+      const res = await fetch(this.url('resolve'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spec: this.spec }),
+      });
+      const body = await res.json();
+      if (res.ok && body?.match_kind === 'exact' && body.product) {
+        this.matchedProductId = body.product.product_id;
+        this.generating = false;
+        this.render();
+        return;
+      }
+    } catch { /* fall through and draw it */ }
+    this.generating = false;
+    await this.visualize();
   }
 
   private renderResult(host: HTMLElement) {
