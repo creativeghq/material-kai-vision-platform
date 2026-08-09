@@ -56,6 +56,14 @@ const MAX_OPTION_IDS = 40;
 const MAX_SPEC_FACETS = 25;
 
 /**
+ * Ceiling on values offered per facet by `spec_options`.
+ *
+ * This renders as buttons inside someone else's page. A workspace whose colour taxonomy has grown
+ * to 300 entries would otherwise push 300 chips into a partner's layout.
+ */
+const MAX_SPEC_VALUES = 30;
+
+/**
  * Configurator options for one product, shaped for the embed (#258 Phase 2).
  *
  * `price_delta` is returned GROSS, like every other price on this surface. Returning the stored net
@@ -469,6 +477,26 @@ Deno.serve(withApiLogging((req) => {
     }, 200, cors);
   }
 
+  // ── #337 the wizard's vocabulary ─────────────────────────────────────────────────────────────
+  //
+  // What the builder can OFFER, which is deliberately wider than what the catalog HOLDS. Values a
+  // published product carries come back flagged `in_catalog`; the rest is the golden canonical
+  // taxonomy. Offering only stocked values would make the builder a product picker with extra
+  // steps, and the specs nobody stocks yet are exactly the leads this feature exists to capture.
+  if (action === 'spec_options') {
+    const scoped = await scopeRestriction(supabase, auth.ctx);
+    const { data, error } = await supabase.rpc('get_embed_spec_options', {
+      p_workspace_id: workspaceId,
+      // The key's scope, not a request parameter. A scoped key must not learn the attribute values
+      // of products it cannot serve.
+      p_product_ids: scoped,
+      p_max_facets: MAX_SPEC_FACETS,
+      p_max_values: MAX_SPEC_VALUES,
+    });
+    if (error) return embedJson({ error: 'Could not load specification options' }, 500, cors);
+    return embedJson({ ok: true, facets: data ?? [] }, 200, cors);
+  }
+
   // ── #337 "price it" ──────────────────────────────────────────────────────────────────────────
   //
   // The visitor built a spec across the wizard's stages and asked what it costs. Three answers:
@@ -496,6 +524,10 @@ Deno.serve(withApiLogging((req) => {
       p_workspace_id: workspaceId,
       p_spec: safeSpec,
       p_limit: 5,
+      // Scope goes INTO the query. The exact match is re-checked below anyway, but near matches
+      // were not checked at all — a category-scoped key was being handed the names of every other
+      // category's products as suggestions.
+      p_product_ids: await scopeRestriction(supabase, auth.ctx),
     });
     if (rErr) return embedJson({ error: 'Could not resolve this specification' }, 500, cors);
 

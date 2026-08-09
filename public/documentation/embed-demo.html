@@ -94,8 +94,44 @@
     </div>
   </div>
 
+  <hr style="border:0;border-top:1px solid var(--line);margin:3rem 0 2rem">
+
+  <h1>Starting from a spec instead of a product</h1>
+  <p class="lede">
+    The widget above answers "show me <em>this</em>". This one answers "I want something like this —
+    what does it cost?", which ends in one of two places. If a published product satisfies every
+    choice, you get its price and the product itself. If nothing does, you get a quote request —
+    and that is the normal outcome, not the error case: a configurator bound to one product can only
+    ever sell what someone already modelled and priced.
+  </p>
+
+  <div class="split">
+    <div class="shop">
+      <h2>Build a spec</h2>
+      <p class="where">Only needs a key — no product id</p>
+      <div id="mountBuilder"></div>
+      <div id="builderSetup" class="cart" hidden></div>
+    </div>
+
+    <div>
+      <h3>Things worth trying</h3>
+      <ol>
+        <li><b>Pick nothing and press Price it.</b> An empty spec matches everything, so you get the first published product. Containment with no constraints is not an error.</li>
+        <li><b>Pick only values marked ●.</b> Those are values a published product actually carries; the rest is the shared taxonomy. A spec built entirely from ● can still miss — the marks are per value, not per combination.</li>
+        <li><b>Mix one ● with one unmarked value.</b> Nothing matches exactly, so you land on the quote form with the close ones listed above it — deliberately without prices, because a near match is a suggestion and not an offer.</li>
+        <li><b>Send the quote request.</b> It creates a CRM contact and a <code>quote_requests</code> row carrying your exact spec. No total: nobody has priced it yet, and a number there would anchor the negotiation on a figure that came from nowhere.</li>
+      </ol>
+
+      <h3>The whole integration</h3>
+      <div class="snippet">&lt;script src="/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
+
+&lt;materialkai-builder api-key="mk_embed_…"&gt;&lt;/materialkai-builder&gt;</div>
+    </div>
+  </div>
+
   <footer>
     Program <a href="https://github.com/creativeghq/material-kai-vision-platform/issues/321">#321</a> ·
+    spec builder <a href="https://github.com/creativeghq/material-kai-vision-platform/issues/337">#337</a> ·
     embed SDK <a href="https://github.com/creativeghq/material-kai-vision-platform/issues/258">#258</a> ·
     <a href="api-embed.html">Website Embed docs</a>
   </footer>
@@ -110,6 +146,19 @@
     var q = new URLSearchParams(location.search);
     var key = q.get('key');
     var product = q.get('product') || q.get('product_id');
+
+    // The builder needs only a key — it has no product until the server finds one — so it mounts
+    // independently of the product widget above.
+    if (key) {
+      var b = document.createElement('materialkai-builder');
+      b.setAttribute('api-key', key);
+      document.getElementById('mountBuilder').appendChild(b);
+    } else {
+      var bs = document.getElementById('builderSetup');
+      bs.hidden = false;
+      bs.textContent = 'Add a key to the URL:\n\n  ?key=mk_embed_…\n\n'
+        + 'Profile → Keys → Website Embed (allow this domain).';
+    }
 
     if (!key || !product) {
       var setup = document.getElementById('setup');

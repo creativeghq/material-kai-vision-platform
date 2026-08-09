@@ -37,6 +37,10 @@ import {
   applyMaterialOverrides, cloneSceneWithOwnMaterials, type MaterialOverride,
 } from '@/components/features/ar/materialOverrides';
 import { formatMoney } from '@/utils/decimal';
+// Registers `<materialkai-builder>` in the same bundle. They ship together because the builder's
+// success case IS the product widget — an exact match mounts one — and because splitting them
+// would give a merchant two script tags to get right for one feature.
+import './materialkai-builder';
 
 interface EmbedModel {
   format: string;
