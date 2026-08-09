@@ -807,14 +807,17 @@ export class MivaaApiClient {
     workspace_id: string;
     top_k?: number;
   }): Promise<MivaaApiResponse> {
-    return this.request('/api/rag/search', {
+    // `strategy` is a QUERY parameter on this route, not a body field. It used to be sent in
+    // the body, where SearchRequest has no such field and Pydantic dropped it — the call
+    // worked only because the query-param default is also 'multi_vector'. Changing that
+    // default would have silently rerouted this caller with nothing to notice it.
+    return this.request('/api/rag/search?strategy=multi_vector', {
       method: 'POST',
       body: JSON.stringify({
         image_base64: payload.image_base64,
         query: payload.query,
         workspace_id: payload.workspace_id,
         top_k: payload.top_k ?? 8,
-        strategy: 'multi_vector',
         // Segmentation flow renders only the direct match cards — skip the
         // expensive per-result related_products enrichment that fans out
         // ~24 sequential Supabase queries per call (workspace-wide product
