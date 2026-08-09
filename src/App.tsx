@@ -32,6 +32,7 @@ import HealthPage from './pages/Health';
 
 // Core user pages
 const Index = lazy(() => import('./pages/Index'));
+const RoomPlannerPage = lazy(() => import('./pages/RoomPlannerPage').then(m => ({ default: m.RoomPlannerPage })));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
@@ -411,6 +412,18 @@ const App = () => (
                           <OrderDetailPage />
                         </Layout>
                       </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                {/* #321 M3 / #259 Phase 1 — 2D room planner. Its own route because a plan is
+                    referenced from quotes, client views and moodboards alike. */}
+                <Route
+                  path="/room-planner"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <RoomPlannerPage />
+                      </Layout>
                     </AuthGuard>
                   }
                 />

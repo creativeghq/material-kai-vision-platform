@@ -19007,6 +19007,84 @@ export type Database = {
           },
         ]
       }
+      room_layout_items: {
+        Row: {
+          created_at: string
+          footprint_depth_m: number | null
+          footprint_width_m: number | null
+          id: string
+          layout_id: string
+          product_id: string
+          rotation_deg: number
+          sort_order: number
+          workspace_id: string
+          x_m: number
+          y_m: number
+        }
+        Insert: {
+          created_at?: string
+          footprint_depth_m?: number | null
+          footprint_width_m?: number | null
+          id?: string
+          layout_id: string
+          product_id: string
+          rotation_deg?: number
+          sort_order?: number
+          workspace_id: string
+          x_m?: number
+          y_m?: number
+        }
+        Update: {
+          created_at?: string
+          footprint_depth_m?: number | null
+          footprint_width_m?: number | null
+          id?: string
+          layout_id?: string
+          product_id?: string
+          rotation_deg?: number
+          sort_order?: number
+          workspace_id?: string
+          x_m?: number
+          y_m?: number
+        }
+        Relationships: []
+      }
+      room_layouts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          room_depth_m: number
+          room_width_m: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          room_depth_m?: number
+          room_width_m?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          room_depth_m?: number
+          room_width_m?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       product_configurations: {
         Row: {
           created_at: string
