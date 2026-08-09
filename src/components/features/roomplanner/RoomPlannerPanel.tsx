@@ -7,8 +7,9 @@
  * nobody reads a default 60 × 60 cm placeholder as a real dimension. That distinction is the
  * difference between a plan you can order from and a picture.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Ruler } from 'lucide-react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { Loader2, Plus, Ruler, Box, Map as MapIcon } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +21,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/core/ui/select';
 import { RoomPlannerCanvas } from './RoomPlannerCanvas';
+import { RoomScene3D, type SceneItem } from './RoomScene3D';
+import { roomCameraPosition } from './roomScene';
+import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/CanvasChrome';
 import { occupiedAreaM2 } from './roomGeometry';
 import { roomPlannerService, type RoomLayout, type ResolvedLayoutItem } from '@/services/roomPlannerService';
 
@@ -33,6 +37,8 @@ export const RoomPlannerPanel: React.FC = () => {
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'2d' | '3d'>('2d');
+  const [modelUrls, setModelUrls] = useState<Map<string, string>>(new Map());
 
   const layout = useMemo(() => layouts.find((l) => l.id === layoutId) ?? null, [layouts, layoutId]);
 
@@ -153,7 +159,23 @@ export const RoomPlannerPanel: React.FC = () => {
     } catch { void loadLayouts(); }
   };
 
+  // Model URLs, fetched once per set of products in the layout — not per item, and not per frame.
+  useEffect(() => {
+    if (!activeWorkspaceId || items.length === 0) { setModelUrls(new Map()); return; }
+    let cancelled = false;
+    roomPlannerService.modelUrlsForProducts(activeWorkspaceId, items.map((i) => i.product_id))
+      .then((m) => { if (!cancelled) setModelUrls(m); })
+      .catch(() => { if (!cancelled) setModelUrls(new Map()); });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId, items]);
+
+  const sceneItems: SceneItem[] = useMemo(
+    () => items.map((i) => ({ ...i, modelUrl: modelUrls.get(i.product_id) ?? null })),
+    [items, modelUrls],
+  );
+
   const assumedCount = items.filter((i) => i.footprint_source === 'default').length;
+  const missingModels = sceneItems.filter((i) => !i.modelUrl).length;
   const areaUsed = occupiedAreaM2(items.map((i) => ({
     xM: Number(i.x_m), yM: Number(i.y_m), rotationDeg: Number(i.rotation_deg),
     widthM: Number(i.effective_width_m), depthM: Number(i.effective_depth_m),
@@ -191,6 +213,17 @@ export const RoomPlannerPanel: React.FC = () => {
           <Button size="sm" variant="outline" className="rounded-full" onClick={createLayout}>
             <Plus className="mr-1 h-3.5 w-3.5" />New plan
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-full"
+            onClick={() => setView((v) => (v === '2d' ? '3d' : '2d'))}
+            aria-pressed={view === '3d'}
+          >
+            {view === '2d'
+              ? <><Box className="mr-1 h-3.5 w-3.5" />3D view</>
+              : <><MapIcon className="mr-1 h-3.5 w-3.5" />Floor plan</>}
+          </Button>
 
           {layout && (
             <>
@@ -216,15 +249,44 @@ export const RoomPlannerPanel: React.FC = () => {
           <p className="py-8 text-sm text-muted-foreground">Create a plan to start arranging.</p>
         ) : (
           <>
-            <RoomPlannerCanvas
-              room={{ widthM: Number(layout.room_width_m), depthM: Number(layout.room_depth_m) }}
-              items={items}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onMoveCommit={commitMove}
-              onRotate={rotate}
-              onRemove={remove}
-            />
+            {view === '2d' ? (
+              <RoomPlannerCanvas
+                room={{ widthM: Number(layout.room_width_m), depthM: Number(layout.room_depth_m) }}
+                items={items}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onMoveCommit={commitMove}
+                onRotate={rotate}
+                onRemove={remove}
+              />
+            ) : (
+              // Same rows, second renderer. Arranging stays in 2D — dragging in perspective is a
+              // worse tool for placing furniture than a plan view, which is why floor plans exist.
+              <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg border border-border/60 bg-muted/20">
+                <ThreeErrorBoundary>
+                  <Suspense fallback={<CanvasLoader label="Building the room…" />}>
+                    <Canvas
+                      camera={{
+                        position: roomCameraPosition({
+                          widthM: Number(layout.room_width_m),
+                          depthM: Number(layout.room_depth_m),
+                        }),
+                        fov: 50,
+                      }}
+                      gl={{ antialias: true, alpha: true }}
+                      onPointerMissed={() => setSelectedId(null)}
+                    >
+                      <RoomScene3D
+                        room={{ widthM: Number(layout.room_width_m), depthM: Number(layout.room_depth_m) }}
+                        items={sceneItems}
+                        selectedId={selectedId}
+                        onSelect={setSelectedId}
+                      />
+                    </Canvas>
+                  </Suspense>
+                </ThreeErrorBoundary>
+              </div>
+            )}
 
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-[14rem] flex-1">
@@ -243,6 +305,12 @@ export const RoomPlannerPanel: React.FC = () => {
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
               <span>{items.length} item{items.length === 1 ? '' : 's'}</span>
               <span>{areaUsed} m² of {Math.round(roomArea * 100) / 100} m² floor</span>
+              {view === '3d' && missingModels > 0 && (
+                <span className="text-muted-foreground">
+                  {missingModels} shown as {missingModels === 1 ? 'a placeholder box' : 'placeholder boxes'} —
+                  no 3D model uploaded
+                </span>
+              )}
               {assumedCount > 0 && (
                 <span className="text-warning">
                   {assumedCount} item{assumedCount === 1 ? ' uses a' : 's use'} placeholder size — upload a

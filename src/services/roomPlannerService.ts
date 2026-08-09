@@ -12,6 +12,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { modelPublicUrl } from '@/services/product3dService';
 
 export type RoomLayout = Tables<'room_layouts'>;
 
@@ -78,6 +79,33 @@ export const roomPlannerService = {
       .order('sort_order', { ascending: true });
     if (error) throw error;
     return (data ?? []) as unknown as ResolvedLayoutItem[];
+  },
+
+  /**
+   * Model URLs for the products in a layout, keyed by product_id (#259 Phase 2).
+   *
+   * One query for the whole room rather than one per item — a 20-piece layout would otherwise open
+   * 20 round trips before the first frame. Only glb/gltf: usdz is the iOS AR format and cannot be
+   * rendered in a WebGL canvas.
+   */
+  async modelUrlsForProducts(workspaceId: string, productIds: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    if (productIds.length === 0) return out;
+    const { data, error } = await supabase
+      .from('product_3d_models')
+      .select('product_id, format, storage_bucket, storage_path, updated_at')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'ready')
+      .in('format', ['glb', 'gltf'])
+      .in('product_id', [...new Set(productIds)]);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      // Prefer glb when a product has both — it is the format the rest of the platform renders,
+      // so its measurements are the ones a user has actually seen.
+      if (out.has(row.product_id) && row.format !== 'glb') continue;
+      out.set(row.product_id, modelPublicUrl(row));
+    }
+    return out;
   },
 
   async addItem(
