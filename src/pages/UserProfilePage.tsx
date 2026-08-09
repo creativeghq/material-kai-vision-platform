@@ -14,6 +14,7 @@ import { SocialAccountsTab } from '@/modules/social-media/components/SocialAccou
 import { WebsitesTab } from '@/components/core/Profile/WebsitesTab';
 import { WorkspaceKeysTab } from '@/components/core/Profile/WorkspaceKeysTab';
 import { WebhooksTab } from '@/components/core/Profile/WebhooksTab';
+import { AccountStatusCard } from '@/components/core/Profile/AccountStatusCard';
 import { ModulesActivationTab } from '@/components/core/Profile/ModulesActivationTab';
 import { TeamPanel } from '@/components/core/Team/TeamPanel';
 import SupplierPortalPage from './SupplierPortalPage';
@@ -142,6 +143,8 @@ export const UserProfilePage: React.FC = () => {
 
         <TabsContent value="profile" className="space-y-6">
           <ProfileTab />
+          {/* Renders nothing unless the user has a workspace; shows a status card once disabled. */}
+          <AccountStatusCard />
         </TabsContent>
 
         <TabsContent value="inbox" className="space-y-6">
