@@ -58,16 +58,35 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     return { picked: Number(data!.quantity_delivered), shipped: Number(data!.quantity_shipped) };
   }
   /**
-   * Cut and issue a Δελτίο Αποστολής for an order — since #320 this (or issuing the invoice) is
-   * the ONLY thing that moves stock. Owner JWT: issue_delivery_note gates on
-   * is_workspace_finance_manager, which reads auth.uid().
+   * Cut a draft Δελτίο Αποστολής carrying one line. Both inserts are error-checked on purpose: an
+   * unchecked fixture insert downgrades a hard DB error into "the stock simply did not move",
+   * which is exactly how a trigger that rejected EVERY delivery_note_items write reached main
+   * looking like an arithmetic bug in the delivery RPC.
+   */
+  async function draftNote(oId: string, productId: string, wiId: string, qty: number): Promise<string> {
+    const { data: dn, error: dnErr } = await svc.from('delivery_notes')
+      .insert({ workspace_id: ws, kind: 'dispatch', order_id: oId, status: 'draft', branch_code: 0 }).select('id').single();
+    if (dnErr) throw new Error(`draftNote(delivery_notes): ${dnErr.message}`);
+    const { error: liErr } = await svc.from('delivery_note_items')
+      .insert({ delivery_note_id: dn!.id, product_id: productId, warehouse_item_id: wiId, description: 'line', quantity: qty });
+    if (liErr) throw new Error(`draftNote(delivery_note_items): ${liErr.message}`);
+    return dn!.id;
+  }
+  /**
+   * Cut and issue one — since #320 this (or issuing the invoice) is the ONLY thing that moves
+   * stock. Owner JWT: issue_delivery_note gates on is_workspace_finance_manager, which reads
+   * auth.uid().
    */
   async function shipViaNote(oId: string, productId: string, wiId: string, qty: number): Promise<void> {
-    const { data: dn } = await svc.from('delivery_notes')
-      .insert({ workspace_id: ws, kind: 'dispatch', order_id: oId, status: 'draft', branch_code: 0 }).select('id').single();
-    await svc.from('delivery_note_items').insert({ delivery_note_id: dn!.id, product_id: productId, warehouse_item_id: wiId, description: 'line', quantity: qty });
-    const { error } = await A.client.rpc('issue_delivery_note', { p_id: dn!.id });
+    const dnId = await draftNote(oId, productId, wiId, qty);
+    const { data, error } = await A.client.rpc('issue_delivery_note', { p_id: dnId });
     if (error) throw new Error(`shipViaNote: ${error.message}`);
+    // A note that issues cleanly while moving nothing is the silent zero this suite exists to
+    // catch. Fail where it happens, not three assertions later as a figure that never changed.
+    const res = data as { moved: number; skipped: number; skipped_lines: string[] } | null;
+    if (!res || Number(res.moved) < 1) {
+      throw new Error(`shipViaNote: note issued but moved nothing — ${JSON.stringify(data)}`);
+    }
   }
 
   beforeAll(async () => {
@@ -162,10 +181,8 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     expect((await qtys(wi)).on_hand).toBe(50);
 
     // now cut + issue a dispatch note linked to the SAME order
-    const { data: dn } = await svc.from('delivery_notes')
-      .insert({ workspace_id: ws, kind: 'dispatch', order_id: oId, status: 'draft', branch_code: 0 }).select('id').single();
-    await svc.from('delivery_note_items').insert({ delivery_note_id: dn!.id, product_id: p, warehouse_item_id: wi, description: 'line', quantity: 10 });
-    const { error } = await A.client.rpc('issue_delivery_note', { p_id: dn!.id });
+    const dnId = await draftNote(oId, p, wi, 10);
+    const { error } = await A.client.rpc('issue_delivery_note', { p_id: dnId });
     expect(error).toBeNull();
 
     expect((await qtys(wi)).on_hand).toBe(40);   // the document moved it — once
@@ -173,14 +190,12 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
 
     // and a SECOND document over the same goods moves nothing: quantity_shipped is the single
     // ledger both paths advance, so ship-then-invoice cannot decrement twice (#236's open question).
-    const { data: dn2 } = await svc.from('delivery_notes')
-      .insert({ workspace_id: ws, kind: 'dispatch', order_id: oId, status: 'draft', branch_code: 0 }).select('id').single();
-    await svc.from('delivery_note_items').insert({ delivery_note_id: dn2!.id, product_id: p, warehouse_item_id: wi, description: 'line', quantity: 10 });
-    await A.client.rpc('issue_delivery_note', { p_id: dn2!.id });
+    const dn2Id = await draftNote(oId, p, wi, 10);
+    await A.client.rpc('issue_delivery_note', { p_id: dn2Id });
     expect((await qtys(wi)).on_hand).toBe(40);
     expect(await outMoves(wi)).toBe(10);
 
-    const { data: issued } = await svc.from('delivery_notes').select('status').eq('id', dn!.id).single();
+    const { data: issued } = await svc.from('delivery_notes').select('status').eq('id', dnId).single();
     expect(issued!.status).toBe('issued');
   });
 
@@ -189,10 +204,7 @@ suite('stock ↔ orders · reservation + unified delivery', () => {
     const wi = await makeStock(p, 50);
     const { oId, oiId } = await makeConfirmedOrder(p, 10);
 
-    const { data: dn } = await svc.from('delivery_notes')
-      .insert({ workspace_id: ws, kind: 'dispatch', order_id: oId, status: 'draft', branch_code: 0 }).select('id').single();
-    await svc.from('delivery_note_items').insert({ delivery_note_id: dn!.id, product_id: p, warehouse_item_id: wi, description: 'line', quantity: 10 });
-    await A.client.rpc('issue_delivery_note', { p_id: dn!.id });
+    await shipViaNote(oId, p, wi, 10);
 
     let q = await qtys(wi);
     expect(q.on_hand).toBe(40);
