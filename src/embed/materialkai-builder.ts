@@ -306,6 +306,16 @@ export class MaterialKaiBuilder extends HTMLElement {
    * The generated image carries a visible label. A picture of something we do not stock, shown
    * without one, is a promise the merchant cannot keep.
    */
+  /** The one-line verdict that sits above the viewport, or null on the stages that have none. */
+  private stageHeading(): HTMLElement | null {
+    if (this.stage !== 2 || !this.result) return null;
+    const h = document.createElement('h3');
+    h.textContent = this.result.match_kind === 'exact' && this.result.product
+      ? 'We have exactly that'
+      : 'We will quote you for it';
+    return h;
+  }
+
   private renderViewport(): HTMLElement {
     const frame = document.createElement('div');
     frame.className = 'viewport';
@@ -372,6 +382,11 @@ export class MaterialKaiBuilder extends HTMLElement {
     el.setAttribute('api-key', this.apiKey);
     el.setAttribute('product-id', productId);
     if (this.getAttribute('api-base')) el.setAttribute('api-base', this.getAttribute('api-base')!);
+    // A match is BUYABLE — that is the whole distinction this widget draws. "Matched → price and
+    // add to cart, no match → request a quote" is the rule, so mounting the product without its
+    // cart button leaves the matched half of it unfinished: a price you cannot act on. Opt out with
+    // `no-cart` for a merchant who only wants enquiries.
+    if (!this.hasAttribute('no-cart')) el.setAttribute('show-add-to-cart', '');
     host.appendChild(el);
   }
 
@@ -395,6 +410,11 @@ export class MaterialKaiBuilder extends HTMLElement {
     // do not stock — the visitor is looking at one thing they are configuring, not at a form with
     // a result panel somewhere further down.
     const body = document.createElement('div');
+    // The verdict goes ABOVE the picture, because it is what the picture is an answer to. Rendered
+    // after it, "We have exactly that" ends up orphaned underneath the product's own cart button,
+    // reading as a caption for whatever happens to be last on screen.
+    const verdict = this.stageHeading();
+    if (verdict) body.appendChild(verdict);
     body.appendChild(this.renderViewport());
     if (this.stage === 1) this.renderBuild(body);
     else if (this.stage === 2) this.renderResult(body);
@@ -480,14 +500,10 @@ export class MaterialKaiBuilder extends HTMLElement {
       // widget shows the CONFIGURED one, so rendering both would put two numbers from two
       // derivations on screen at the same time, free to disagree the moment a finish is picked —
       // the money rule (one derivation per quantity) arriving as a UI bug instead of a SQL one.
-      const h = document.createElement('h3');
-      h.textContent = 'We have exactly that';
-      host.append(h, this.backRow());
+      host.appendChild(this.backRow());
       return;
     }
 
-    const h = document.createElement('h3');
-    h.textContent = 'We will quote you for it';
     const p = document.createElement('p');
     p.className = 'hint';
     // Said plainly. Nothing matched is a normal outcome, not an error, and pretending otherwise
@@ -495,7 +511,7 @@ export class MaterialKaiBuilder extends HTMLElement {
     p.textContent = r.match_kind === 'near'
       ? 'Nothing matches that exactly, so we will price it for you. A few close ones are below.'
       : 'Nothing in the catalogue matches that, so we will price it for you.';
-    host.append(h, p);
+    host.appendChild(p);
 
     if (r.near_matches?.length) {
       const near = document.createElement('div');

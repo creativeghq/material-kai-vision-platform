@@ -112,6 +112,23 @@ describe('the embed builder always offers a way forward', () => {
       .not.toContain('mountProduct');
   });
 
+  it('a matched product is buyable, not just displayed', () => {
+    // "Matched → price and add to cart, no match → request a quote" is the rule the whole widget
+    // draws. Mounting the product without its cart button leaves the matched half unfinished: a
+    // price the visitor cannot act on, which is the same dead end the quote form exists to avoid.
+    expect(method('mountProduct')).toContain("setAttribute('show-add-to-cart'");
+  });
+
+  it('the verdict is rendered above the viewport, not stranded below the product', () => {
+    // Rendered after it, "We have exactly that" lands underneath the product's own cart button and
+    // reads as a caption for whatever happens to be last on screen.
+    const render = method('render');
+    const headingAt = render.indexOf('stageHeading()');
+    const viewportAt = render.indexOf('renderViewport()');
+    expect(headingAt, 'the verdict heading is not rendered at all').toBeGreaterThan(-1);
+    expect(headingAt).toBeLessThan(viewportAt);
+  });
+
   it('the viewport falls back to a generated image, clearly labelled as one', () => {
     // A spec the catalog cannot satisfy has no photograph, because the thing does not exist. An
     // unlabelled AI picture of it is a promise the merchant cannot keep.
