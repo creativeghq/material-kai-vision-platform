@@ -1150,6 +1150,17 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'price_my_spec',
+    file: 'supabase/functions/_shared/tools/graph-tools.ts',
+    factory: 'createPriceMySpecTool',
+    description: 'Price a described specification against the published catalogue — "a lounge armchair in linen, sunset", "velvet dining chair".',
+    params: [
+      { name: 'product_type', type: 'string', optional: true, description: 'What the thing IS, e.g. "lounge armchair", "floor tile"' },
+      { name: 'spec', type: 'object', optional: true, description: 'Attributes as key/value, e.g. {"fabric":"linen","available_colors":"sunset"}' },
+      { name: 'limit', type: 'number', optional: true, description: 'Max matches and near matches (default 5)' },
+    ],
+  },
+  {
     name: 'product_analysis',
     file: 'supabase/functions/_shared/tools/sub-agent-tools.ts',
     factory: 'createProductAnalysisTool',

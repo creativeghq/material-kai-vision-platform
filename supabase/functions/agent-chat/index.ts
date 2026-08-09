@@ -1268,6 +1268,7 @@ async function executeAgent(
         'product_provenance', 'product_price_history', 'projects_using_product',
         'products_in_project', 'customer_overview', 'supplier_overview',
         'products_by_brand', 'brand_overview', 'related_products', 'find_products_by_spec',
+        'price_my_spec',
         'search_crm_by_kad',
       ],
     },
@@ -2176,6 +2177,7 @@ async function executeAgent(
       if (config.tools.includes('brand_overview')) tools.push(graphMod.createBrandOverviewTool(workspaceId, onChunk));
       if (config.tools.includes('related_products')) tools.push(graphMod.createRelatedProductsTool(workspaceId, onChunk));
       if (config.tools.includes('find_products_by_spec')) tools.push(graphMod.createFindProductsBySpecTool(workspaceId, onChunk));
+      if (config.tools.includes('price_my_spec')) tools.push(graphMod.createPriceMySpecTool(workspaceId, onChunk));
     } catch (graphErr) {
       console.warn('⚠️ Could not register knowledge-graph tools:', graphErr);
     }

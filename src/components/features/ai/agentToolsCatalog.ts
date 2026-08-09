@@ -1700,6 +1700,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'product_provenance', 'product_price_history', 'projects_using_product',
       'products_in_project', 'customer_overview', 'supplier_overview',
       'products_by_brand', 'brand_overview', 'related_products', 'find_products_by_spec',
+      'price_my_spec',
       'search_crm_by_kad',
     ],
     quick_starts: [
@@ -1732,6 +1733,18 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Find products matching this spec: {{spec}}',
         form: [
           { key: 'spec', label: 'Specification', kind: 'text', required: true, placeholder: 'IP65 or better, at least 10mm thick' },
+        ],
+      },
+      {
+        // Prose, not a `run:` quick-start, for the same reason as "Find by spec" above but more so:
+        // `spec` is a free-form key/value record, and a single text box cannot fill it. The agent
+        // turns "a lounge armchair in linen, sunset" into product_type + spec, which is the one
+        // translation step a form genuinely cannot do.
+        label: 'Price a spec', description: 'What would this cost?', icon: 'Tag',
+        prompt: 'Price a specification against our catalogue.',
+        promptTemplate: 'What would this cost: {{spec}}? If we do not have it, say so rather than estimating.',
+        form: [
+          { key: 'spec', label: 'What are you after', kind: 'text', required: true, placeholder: 'a lounge armchair in linen, sunset' },
         ],
       },
       {

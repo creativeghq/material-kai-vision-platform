@@ -370,6 +370,9 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   brand_overview_result: 'Brand overview',
   related_products_result: 'Related products',
   find_products_by_spec_result: 'Products by spec',
+  // #337. Registered here or the payload is dropped and the user sees "Done — ran price_my_spec"
+  // with no verdict — which on this tool means they cannot tell a real price from "we don't have it".
+  spec_pricing_result: 'What that would cost',
   // Purchase sheet
   purchase_sheet_ready: 'Purchase sheet ready',
   // Trip / expense cards

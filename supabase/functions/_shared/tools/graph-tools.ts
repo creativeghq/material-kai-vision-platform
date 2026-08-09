@@ -402,3 +402,119 @@ export const createFindProductsBySpecTool = (
     },
   );
 };
+
+// ── 11) price_my_spec (#337 — the embed's "price it", in chat) ──────────────
+
+/**
+ * Answer "I want X like this — what does it cost?" the same way the website embed does.
+ *
+ * SIBLING OF `find_products_by_spec`, NOT A DUPLICATE. That one filters NUMERIC ranges (IP rating,
+ * PEI class, thickness, wattage) and returns a list. This one takes a CATEGORICAL specification —
+ * the nouns and adjectives a customer actually says, "a lounge armchair in linen, sunset" — and
+ * returns a VERDICT: exact, near, or nothing, which is what decides between quoting a price and
+ * opening a quote request.
+ *
+ * IT CALLS THE SAME RPC THE EMBED CALLS. `resolve_product_spec` is the one derivation of that
+ * verdict; a second implementation here would be free to disagree with the widget on a customer's
+ * own website, which is the failure mode this codebase keeps paying for. The tool is a thin
+ * wrapper — the matching rule, the tenancy scope and the "near matches carry no price" decision all
+ * stay in SQL.
+ *
+ * NO PRICE ON A NEAR MATCH, and none invented here. A near match is a suggestion; putting a number
+ * on it would have the agent quote a figure nobody approved.
+ */
+export const createPriceMySpecTool = (
+  workspaceId: string,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async ({ product_type, spec, limit }: {
+      product_type?: string;
+      spec?: Record<string, string>;
+      limit?: number;
+    }) => {
+      const sb = svcClient();
+
+      // The noun travels INSIDE the spec, because that is the shape the RPC understands: it strips
+      // `product_type` out of the jsonb containment predicate and applies it as its own filter.
+      const fullSpec: Record<string, string> = { ...(spec ?? {}) };
+      if (product_type) fullSpec.product_type = product_type;
+      if (Object.keys(fullSpec).length === 0) {
+        return JSON.stringify({
+          success: false,
+          error: 'Describe what you are after — at minimum a product type, e.g. product_type: "lounge armchair".',
+        });
+      }
+
+      const { data, error } = await sb.rpc('resolve_product_spec', {
+        p_workspace_id: workspaceId,
+        p_spec: fullSpec,
+        p_limit: limit ?? 5,
+      });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+
+      const res = (data ?? {}) as Record<string, any>;
+      const matches: Array<{ product_id: string; name: string }> = res.matches ?? [];
+
+      // Only an exact match is priced, and the price comes from `get_configured_product_price` —
+      // the same single derivation the widget, the configurator and the quote line all read.
+      let priced: Record<string, unknown> | null = null;
+      if (res.match_kind === 'exact' && matches[0]) {
+        const { data: p } = await sb.rpc('get_configured_product_price', {
+          p_workspace_id: workspaceId,
+          p_product_id: matches[0].product_id,
+          p_option_value_ids: [],
+          p_audience: 'buyer',
+        });
+        const row = (p ?? {}) as Record<string, unknown>;
+        priced = {
+          product_id: matches[0].product_id,
+          name: matches[0].name,
+          net_price: row.configured_price ?? null,
+          currency: row.currency ?? 'EUR',
+        };
+      }
+
+      const verdict = priced ? 'exact' : (res.match_kind === 'exact' ? 'none' : res.match_kind ?? 'none');
+      onChunk?.({
+        type: 'spec_pricing_result',
+        workspace_id: workspaceId,
+        spec: fullSpec,
+        match_kind: verdict,
+        product: priced,
+        near_matches: res.near_matches ?? [],
+        // What the agent should do next, stated rather than inferred: this is the whole point of
+        // the tool, and leaving it implicit is how "quote it" turns into "invent a price".
+        next_step: priced ? 'quote_the_price' : 'offer_a_quote_request',
+        timestamp: Date.now(),
+      });
+
+      return JSON.stringify({
+        success: true,
+        match_kind: verdict,
+        spec: fullSpec,
+        product: priced,
+        near_matches: res.near_matches ?? [],
+        guidance: priced
+          ? 'An exact match exists. Quote this price.'
+          : 'Nothing in the catalogue satisfies this specification. Do NOT estimate a price — offer to raise a quote request instead. Near matches are suggestions and carry no price on purpose.',
+      });
+    },
+    {
+      name: 'price_my_spec',
+      description:
+        'Price a described specification against the published catalogue — "a lounge armchair in linen, sunset", '
+        + '"velvet dining chair". Returns exact / near / none: an exact match comes back PRICED, anything else '
+        + 'comes back deliberately WITHOUT a price so you offer a quote request instead of estimating. '
+        + 'Use for "how much would X cost", "do we have X", "can we do X in Y". For NUMERIC ranges '
+        + '(IP rating, PEI, thickness, wattage) use find_products_by_spec instead.',
+      schema: z.object({
+        product_type: z.string().optional().describe('What the thing IS, e.g. "lounge armchair", "floor tile"'),
+        spec: z.record(z.string()).optional().describe(
+          'Attributes as key/value, e.g. {"fabric":"linen","available_colors":"sunset"}',
+        ),
+        limit: z.number().optional().describe('Max matches and near matches (default 5)'),
+      }),
+    },
+  );
+};
