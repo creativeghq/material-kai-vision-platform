@@ -20,7 +20,7 @@ import { VatCountryCombobox } from '@/components/core/VatCountryCombobox';
 import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { validateVatViaVies } from '@/services/viesService';
+import { lookupBusinessIdentity, providerFor } from '@/services/identity/registry';
 import { researchCompany, summarizeResearch } from '@/modules/crm/services/companyResearch';
 import type { CompanyIdentityDraft } from './companyIdentity';
 
@@ -110,91 +110,65 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
     }
     setBusyBoth(true);
     try {
-      const afm = vat.replace(/[^0-9]/g, '');
-      // Greek ΑΦΜ → the ONE shared research chain (ΑΑΔΕ → ΓΕΜΗ → business research), the same
-      // routine the company/contact records and the Expenses-inbox "Add issuer to CRM" run.
-      // No companyId: the row may not exist yet, so everything comes back as a field patch.
-      if (cc === 'EL' && afm.length === 9) {
-        const res = await researchCompany({
-          vatNumber: vat,
-          countryCode: cc,
-          name: value.name.trim() || undefined,
-          workspaceId: activeWorkspaceId ?? undefined,
-          reason: 'crm_enrichment',
-          existing: value.fields,
-          onProgress: setStatusLine,
-        });
-        if (!res.ok) {
-          toast({ title: 'Lookup found nothing', description: summarizeResearch(res.steps), variant: 'destructive' });
-          return;
-        }
-        const fields: Record<string, any> = { ...value.fields, ...res.fields, vat_number: vat, country_code: 'EL' };
-        onChange({
-          ...value,
-          fields,
-          name: res.resolvedName || value.name,
-          verified: {
-            name: (fields.vat_validated_name as string) ?? res.resolvedName,
-            address: (fields.vat_validated_address as string) ?? null,
-            source: 'aade',
-            gemiNumber: (fields.gemi_number as string) ?? null,
-          },
-        });
+      // Which authority answers for this country is the registry's decision, not this
+      // component's (#329). The old code hardcoded EL→ΑΑΔΕ / EU→VIES / else→shrug here, which
+      // meant adding a country's registry required editing every call site that verifies a VAT.
+      const provider = providerFor(cc);
+      const res = await lookupBusinessIdentity({
+        countryCode: cc,
+        vatNumber: vat,
+        name: value.name.trim() || undefined,
+        workspaceId: activeWorkspaceId ?? undefined,
+        onProgress: setStatusLine,
+      });
+
+      if (res.skippedReason === 'unsupported_country' || res.skippedReason === 'bad_input') {
+        // A real answer, not a fallthrough: this country has no registry we can ask.
+        toast({ title: 'No registry lookup', description: res.message });
+        return;
+      }
+      if (res.valid === null) {
         toast({
-          title: res.resolvedName ? `Imported ${res.resolvedName}` : 'Business details imported',
-          description: summarizeResearch(res.steps),
+          title: `${provider?.label ?? 'Registry'} unavailable`,
+          description: res.message || 'Could not reach the registry. Try again or fill manually.',
+          variant: 'destructive',
         });
         return;
       }
-      // EU (non-Greek) → VIES. Non-EU countries are skipped (no registry to hit).
-      if (!isEu(cc)) {
-        toast({ title: 'No registry lookup', description: `${cc} is outside VIES/ΑΑΔΕ — fill the details manually.` });
+      if (res.valid === false) {
+        toast({
+          title: 'VAT not recognised',
+          description: res.message || `${provider?.label ?? 'The registry'} does not recognise this number.`,
+          variant: 'destructive',
+        });
         return;
       }
-      const res = await validateVatViaVies({ countryCode: cc, vatNumber: vat });
-      if (res.valid === true) {
-        const adr = res.address_parsed;
-        const legal = res.legal_name ?? res.name ?? null;
+
+      const fields: Record<string, any> = { ...value.fields, ...(res.fields ?? {}) };
+      const next: CompanyIdentityDraft = {
+        ...value,
+        fields,
+        name: res.legalName || value.name,
+        verified: {
+          name: (fields.vat_validated_name as string) ?? res.legalName ?? null,
+          address: (fields.vat_validated_address as string) ?? res.address ?? null,
+          source: res.provider,
+          gemiNumber: (fields.gemi_number as string) ?? null,
+        },
+      };
+      onChange(next);
+      toast({
+        title: res.legalName ? `Verified as ${res.legalName}` : 'VAT verified',
+        // Registries answering in Cyrillic/Greek get the Latin rendering alongside, so the toast
+        // is readable to a Latin-script user without displacing the authoritative name.
+        description: res.legalNameLatin ? `(${res.legalNameLatin})` : res.message,
+      });
+
+      // Only when the provider has not already done it — ΑΑΔΕ's lookup IS the enrichment chain,
+      // and running it twice would repeat the TAXISnet audit entry it writes to the business.
+      if (!provider?.enrichesAutomatically) {
         const countryName = VAT_COUNTRY_OPTIONS.find((o) => o.code === cc)?.name ?? null;
-        const next: CompanyIdentityDraft = {
-          ...value,
-          name: legal || value.name,
-          fields: {
-            ...value.fields,
-            name: legal ?? value.fields.name ?? '',
-            vat_number: vat,
-            country_code: cc,
-            country: countryName ?? value.fields.country ?? null,
-            state: adr?.state ?? value.fields.state ?? null,
-            address: res.address ?? null,
-            street: adr?.street ?? null,
-            street_number: adr?.street_number ?? null,
-            postal_code: adr?.postal_code ?? null,
-            city: adr?.city ?? null,
-            vat_validated: true,
-            vat_validated_at: res.checked_at,
-            vat_validated_name: legal,
-            vat_validated_address: res.address ?? null,
-            vat_validated_name_latin: res.legal_name_latin ?? null,
-            vat_validated_address_latin: res.address_latin ?? null,
-            vat_validation_source: 'vies',
-          },
-          verified: { name: legal, address: res.address ?? null, source: 'vies' },
-        };
-        onChange(next);
-        toast({
-          title: 'VAT verified',
-          // Registers answering in Cyrillic/Greek get the Latin rendering alongside, so the toast
-          // is readable to a Latin-script user without displacing the authoritative name.
-          description: legal
-            ? `Registered as ${legal}${res.legal_name_latin ? ` (${res.legal_name_latin})` : ''}`
-            : 'Number is valid.',
-        });
-        await runEnrichment(next, legal || next.name, countryName, vat);
-      } else if (res.valid === false) {
-        toast({ title: 'VAT not recognised', description: 'VIES does not recognise this number for the given country.', variant: 'destructive' });
-      } else {
-        toast({ title: 'VIES unavailable', description: res.message || 'Could not reach VIES. Try again or fill manually.', variant: 'destructive' });
+        await runEnrichment(next, res.legalName || next.name, countryName, vat);
       }
     } finally {
       setBusyBoth(false);

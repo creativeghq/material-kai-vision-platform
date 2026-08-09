@@ -432,6 +432,11 @@ export async function buildInvoiceInputFromDb(
     } as any,
     documentLabel: overrides.documentLabel,
     documentComments: inv.notes ?? undefined,
+    // The operator already chose this per invoice (invoices.doc_language, defaulted from
+    // finance_settings.default_doc_language) and our own PDF honours it. Feed the same choice to
+    // the provider instead of a constant, so the two can never disagree about what language the
+    // document is in.
+    documentLanguageCode: String(inv.doc_language ?? 'en').toUpperCase(),
   };
 }
 
@@ -534,6 +539,8 @@ export async function buildCreditNoteInputFromDb(
     },
     documentLabel: overrides.documentLabel ?? 'Πιστωτικό Τιμολόγιο',
     documentComments: cn.reason ?? undefined,
+    // Follows the invoice it corrects — the two are read side by side.
+    documentLanguageCode: String(inv.doc_language ?? 'en').toUpperCase(),
   };
 }
 
@@ -640,5 +647,7 @@ export async function buildDeliveryNoteInputFromDb(
     summary: { totalNetValue: 0, totalVatAmount: 0, totalGrossValue: 0 },
     documentLabel: overrides.documentLabel ?? 'Δελτίο Αποστολής',
     documentComments: dn.notes ?? undefined,
+    // Delivery notes carry no per-document language, so they follow the workspace default.
+    documentLanguageCode: String(fs?.default_doc_language ?? 'en').toUpperCase(),
   };
 }
