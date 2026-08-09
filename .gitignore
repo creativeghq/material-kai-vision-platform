@@ -66,3 +66,7 @@ mkai-auth.json
 supabase/functions/deno.lock
 supabase/functions/*/deno.lock
 !supabase/functions/agent-chat/deno.lock
+
+# #321 embed bundle — built by `npm run build:embed`, never committed (a checked-in build
+# artifact drifts from its source the first time someone forgets to rebuild).
+public/embed/

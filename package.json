@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:embed && vite build",
     "start": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -21,7 +21,8 @@
     "db:migrate": "node scripts/database/apply-migrations.js",
     "db:migrate:dry-run": "node scripts/database/apply-migrations.js --dry-run",
     "openapi:edge": "node scripts/build-openapi-edge.mjs",
-    "tools:manifest": "node scripts/gen-tool-manifest.mjs"
+    "tools:manifest": "node scripts/gen-tool-manifest.mjs",
+    "build:embed": "vite build --config vite.embed.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",

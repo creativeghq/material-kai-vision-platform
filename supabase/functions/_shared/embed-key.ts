@@ -8,11 +8,14 @@
  *
  * Three gates, cheapest first:
  *   1. the key resolves to an active, unexpired row        → else 401
- *   2. the browser's Origin is in that key's allowlist      → else 403, WITHOUT permissive CORS
+ *   2. the browser's Origin is in that key's allowlist      → else 403
  *   3. the key is under its per-minute quota                → else 429
  *
  * Gate 2 binds browsers only and gate 3 binds everyone; see the note in `_shared/cors.ts` on why
  * that is the honest reading of a publishable key rather than a gap.
+ *
+ * All three refusals are CORS-READABLE by design — see `readableRefusal`. Only responses that
+ * carry product data use the strict per-key headers.
  */
 import type { DbClient } from './supabase-client.ts';
 import { embedCorsHeaders } from './cors.ts';
@@ -74,16 +77,29 @@ export function readEmbedKey(req: Request): string | null {
 }
 
 /**
- * A refusal that deliberately carries NO `Access-Control-Allow-Origin`.
+ * A refusal the CALLING PAGE CAN READ.
  *
- * Used when we cannot vouch for the origin — an unknown key (we have no allowlist to check it
- * against) or an origin the key does not permit. Answering these with permissive CORS would let
- * the calling page read the refusal and, more importantly, would make the allowlist advisory.
+ * This deliberately carries permissive CORS, which is the opposite of what it did first — and the
+ * first version was wrong in a way only running it revealed. A browser cannot read the status of a
+ * CORS-blocked response: `fetch` rejects with a bare `TypeError: Failed to fetch`. So refusing
+ * opaquely collapsed "your key is invalid", "this site is not on the allowlist" and "the network
+ * is down" into one indistinguishable failure, and the widget's message for the most likely
+ * integration mistake was literally unreachable code.
+ *
+ * Answering readably is safe, and does NOT make the allowlist advisory. The allowlist protects
+ * PRODUCT DATA, and every response that carries product data still uses the strict per-key headers
+ * from `embedCorsHeaders`. A refusal carries no tenant data at all — only the fact of the refusal,
+ * which the caller already knows because their request failed. It grants no capability a plain
+ * `curl` did not already have, since CORS binds browsers and nothing else.
  */
-function opaqueRefusal(message: string, status: number): Response {
+function readableRefusal(req: Request, message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { 'Content-Type': 'application/json', 'Vary': 'Origin' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': req.headers.get('Origin') ?? '*',
+      'Vary': 'Origin',
+    },
   });
 }
 
@@ -107,7 +123,7 @@ export async function authenticateEmbedKey(
   req: Request,
 ): Promise<EmbedAuthResult> {
   const key = readEmbedKey(req);
-  if (!key) return { ok: false, response: opaqueRefusal('Missing embed key', 401) };
+  if (!key) return { ok: false, response: readableRefusal(req, 'Missing embed key', 401) };
 
   const { data: row, error } = await supabase
     .from('material_kai_keys')
@@ -118,17 +134,17 @@ export async function authenticateEmbedKey(
   // One indistinguishable answer for unknown / disabled / expired, so the endpoint cannot be used
   // to test which keys exist.
   if (error || !row || !row.is_active) {
-    return { ok: false, response: opaqueRefusal('Invalid embed key', 401) };
+    return { ok: false, response: readableRefusal(req, 'Invalid embed key', 401) };
   }
   if (row.expires_at && new Date(row.expires_at as string) < new Date()) {
-    return { ok: false, response: opaqueRefusal('Invalid embed key', 401) };
+    return { ok: false, response: readableRefusal(req, 'Invalid embed key', 401) };
   }
 
   const cors = embedCorsHeaders(req, row.allowed_origins as string[] | null);
   if (!cors) {
     return {
       ok: false,
-      response: opaqueRefusal('This origin is not allowed to use this embed key', 403),
+      response: readableRefusal(req, 'This origin is not allowed to use this embed key', 403),
     };
   }
 

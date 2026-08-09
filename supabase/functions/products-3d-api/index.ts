@@ -41,6 +41,14 @@ const MAX_MODEL_ID_FILTER = 2000;
 const MAX_SCOPE_ID_FILTER = 5000;
 
 /**
+ * Embed events the ingest accepts. An allowlist, not free text: `event_type` is written by an
+ * anonymous caller, and an open column becomes a place to store whatever anyone likes.
+ */
+const EMBED_EVENT_TYPES = ['embed_view', 'embed_model_load', 'embed_ar_launch', 'embed_add_to_cart'];
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
  * The product ids this KEY may read, or null when the key is unrestricted.
  *
  * Server-side and non-negotiable: the scope lives on the key row, never in a request parameter,
@@ -327,6 +335,53 @@ Deno.serve(withApiLogging('products-3d-api', async (req) => {
         models: serializeModels(supabaseUrl, (models ?? []) as ModelRow[]),
       },
     }, 200, cors);
+  }
+
+  if (action === 'event') {
+    // The ONLY write this anonymous surface has. Three things make that safe, and all three are
+    // server-side because the caller is untrusted by construction:
+    //   • workspace_id comes from the key, never the body (invariant 1)
+    //   • the product must be published AND in this key's scope — otherwise anyone holding a key
+    //     could write events against arbitrary product ids and pollute another tenant's dashboard
+    //   • event_type is an allowlist, and metadata is size-capped
+    // The per-key quota was already consumed by authenticateEmbedKey, so event spam costs the
+    // spammer their own rate limit.
+    const productId = String(params.product_id ?? '').trim();
+    const eventType = String(params.event_type ?? '').trim();
+    if (!productId || !eventType) {
+      return embedJson({ error: 'product_id and event_type are required' }, 400, cors);
+    }
+    if (!EMBED_EVENT_TYPES.includes(eventType)) {
+      return embedJson({ error: `Unsupported event_type: ${eventType}` }, 400, cors);
+    }
+    if (!(await isProductInScope(supabase, auth.ctx, productId))) {
+      return embedJson({ error: 'Product not found' }, 404, cors);
+    }
+    const { data: published } = await publishedQuery().eq('product_id', productId).maybeSingle();
+    if (!published) return embedJson({ error: 'Product not found' }, 404, cors);
+
+    // session_id is NOT NULL and a uuid. A caller-supplied value that isn't one would fail the
+    // insert, so anything unparseable is replaced rather than rejected — an analytics event is
+    // never worth failing the visitor's page over.
+    const sessionId = UUID_RE.test(String(params.session_id ?? ''))
+      ? String(params.session_id)
+      : crypto.randomUUID();
+
+    const { error: insErr } = await supabase.from('manufacturer_analytics_events').insert({
+      event_type: eventType,
+      product_id: productId,
+      workspace_id: workspaceId,
+      session_id: sessionId,
+      // Where the widget is embedded. Truncated — it is attacker-controlled free text.
+      source_page: typeof params.source_page === 'string' ? params.source_page.slice(0, 500) : null,
+      metadata: {
+        embed_key_id: auth.ctx.keyId,
+        origin: req.headers.get('Origin') ?? null,
+      },
+    });
+    // Report the failure but never 500 the widget over telemetry.
+    if (insErr) console.error('[products-3d-api] event insert failed', insErr.message);
+    return embedJson({ ok: true }, 200, cors);
   }
 
   return embedJson({ error: `Unknown action: ${action}` }, 400, cors);

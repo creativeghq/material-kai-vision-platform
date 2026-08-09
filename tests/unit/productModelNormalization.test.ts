@@ -19,7 +19,9 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { Box3, Vector3, type Group } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { normalizeModelTransform, TARGET_SIZE } from '@/components/features/ar/ProductModelViewer';
+// The React-free source module, not the viewer that re-exports it — the guard should drive the
+// function the embed bundle and the in-app viewer both import, without booting React to do it.
+import { normalizeModelTransform, TARGET_SIZE } from '@/components/features/ar/modelTransform';
 
 const FIXTURE = path.resolve(__dirname, '../fixtures/armchair.glb');
 

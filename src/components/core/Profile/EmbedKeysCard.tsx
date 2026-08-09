@@ -44,17 +44,26 @@ function scopeLabel(key: EmbedKey): string {
 }
 
 /**
- * The snippet a tenant copies.
+ * The snippet a tenant copies into their own site.
  *
- * Deliberately the raw `fetch` against `products-3d-api` rather than a `<materialkai-product>`
- * tag: the web component is the next slice of #258 and does not exist yet. A snippet promising a
- * tag that resolves to nothing would be a worse first impression than an honest one.
+ * `PRODUCT_ID` is left as a literal placeholder rather than pre-filled with a real id: a key is
+ * not tied to one product, and quietly baking in whichever product happened to be first would be
+ * a worse guess than an obvious blank.
  */
 function usageSnippet(apiKey: string): string {
+  const base = window.location.origin;
+  return `<script src="${base}/embed/materialkai-product.js" defer></script>
+
+<materialkai-product
+  api-key="${apiKey}"
+  product-id="PRODUCT_ID">
+</materialkai-product>`;
+}
+
+/** For anyone wiring their own storefront instead of using the tag. */
+function apiSnippet(apiKey: string): string {
   const base = supabaseConfig.projectUrl.replace(/\/$/, '');
-  return `fetch("${base}/functions/v1/products-3d-api?action=list&only_3d=true", {
-  headers: { "x-embed-key": "${apiKey}" }
-})
+  return `fetch("${base}/functions/v1/products-3d-api?action=list&only_3d=true&key=${apiKey}")
   .then((r) => r.json())
   .then(({ products }) => console.log(products));`;
 }
@@ -300,8 +309,12 @@ export const EmbedKeysCard: React.FC = () => {
                       <Copy className="h-3.5 w-3.5 mr-1" />Copy
                     </Button>
                     <Button size="sm" variant="outline" className="rounded-full shrink-0"
-                      onClick={() => copy(usageSnippet(key.api_key), 'Snippet')}>
-                      Snippet
+                      onClick={() => copy(usageSnippet(key.api_key), 'Embed snippet')}>
+                      Embed code
+                    </Button>
+                    <Button size="sm" variant="ghost" className="rounded-full shrink-0"
+                      onClick={() => copy(apiSnippet(key.api_key), 'API snippet')}>
+                      API
                     </Button>
                   </div>
 
