@@ -14675,6 +14675,7 @@ export type Database = {
           allowed_origins: string[] | null
           api_key: string
           created_at: string | null
+          created_by: string | null
           description: string | null
           expires_at: string | null
           id: string
@@ -14683,6 +14684,8 @@ export type Database = {
           last_used_at: string | null
           metadata: Json | null
           rate_limit_per_minute: number | null
+          rate_window_count: number
+          rate_window_started_at: string
           updated_at: string | null
           usage_count: number | null
           workspace_id: string
@@ -14691,6 +14694,7 @@ export type Database = {
           allowed_origins?: string[] | null
           api_key: string
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           expires_at?: string | null
           id?: string
@@ -14699,6 +14703,8 @@ export type Database = {
           last_used_at?: string | null
           metadata?: Json | null
           rate_limit_per_minute?: number | null
+          rate_window_count?: number
+          rate_window_started_at?: string
           updated_at?: string | null
           usage_count?: number | null
           workspace_id: string
@@ -14707,6 +14713,7 @@ export type Database = {
           allowed_origins?: string[] | null
           api_key?: string
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           expires_at?: string | null
           id?: string
@@ -14715,11 +14722,21 @@ export type Database = {
           last_used_at?: string | null
           metadata?: Json | null
           rate_limit_per_minute?: number | null
+          rate_window_count?: number
+          rate_window_started_at?: string
           updated_at?: string | null
           usage_count?: number | null
           workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "material_kai_keys_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       material_metadata_fields: {
         Row: {

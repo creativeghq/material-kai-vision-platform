@@ -18,23 +18,14 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 
 
 const publicAppUrl = () => Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr';
-import { round2 } from '../_shared/money.ts';
+import { grossFromNet, round2 } from '../_shared/money.ts';
 import { verifyTurnstile, clientIp } from '../_shared/turnstile.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 
-/** Pull a usable image URL out of the product's metadata jsonb (best-effort, schema-loose). */
-function imageFromMetadata(meta: any): string | null {
-  if (!meta || typeof meta !== 'object') return null;
-  const direct = meta.image_url || meta.thumbnail_url || meta.primary_image || meta.image || meta.cover_image;
-  if (typeof direct === 'string' && direct.startsWith('http')) return direct;
-  const arr = meta.images || meta.gallery;
-  if (Array.isArray(arr) && arr.length) {
-    const first = arr[0];
-    if (typeof first === 'string' && first.startsWith('http')) return first;
-    if (first && typeof first.url === 'string') return first.url;
-  }
-  return null;
-}
+// Image extraction and the net→gross conversion moved to _shared once the #321 embed API became a
+// second public surface publishing the same products at the same prices. Two copies of a price
+// derivation is the failure CLAUDE.md's "one derivation per money quantity" rule is about.
+import { imageFromMetadata } from '../_shared/product-media.ts';
 
 Deno.serve(withApiLogging('finance-storefront', async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders });
@@ -91,7 +82,7 @@ Deno.serve(withApiLogging('finance-storefront', async (req) => {
           description: r.product.description ?? null,
           unit: r.unit ?? null,
           item_type: r.product.item_type ?? 'good',
-          price: round2(Number(r.list_price) * (1 + vatP / 100)),
+          price: grossFromNet(r.list_price, vatP),
           currency: r.currency ?? 'EUR',
           image_url: imageFromMetadata(r.product.metadata),
         }));

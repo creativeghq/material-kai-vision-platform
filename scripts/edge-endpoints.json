@@ -1548,6 +1548,60 @@
     ]
   },
   {
+    "name": "products-3d-api",
+    "tag": "Products",
+    "summary": "Public product + 3D model read for the website embed SDK",
+    "description": "Anonymous read API for the <materialkai-product> embed (#321 M1 / #258). Authenticated by a publishable embed key (material_kai_keys) sent as the x-embed-key header or ?key= query param; the key resolves the workspace, so no caller-supplied workspace id is ever trusted. The key's allowed_origins drives per-request CORS (browser-enforced) and its rate_limit_per_minute is consumed atomically per call. Serves only products with a storefront-published price row — the same publication gate as the online storefront.",
+    "security": [
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "list",
+        "summary": "List published products with the 3D formats each one has",
+        "params": [
+          {
+            "name": "limit",
+            "type": "number",
+            "required": false,
+            "desc": "Page size, 1-60 (default 24)."
+          },
+          {
+            "name": "offset",
+            "type": "number",
+            "required": false,
+            "desc": "Pagination offset (default 0)."
+          },
+          {
+            "name": "only_3d",
+            "type": "boolean",
+            "required": false,
+            "desc": "When 'true', return only products that have a ready 3D model."
+          }
+        ],
+        "response": "{ok, products: [{product_id, name, description, unit, item_type, price, currency, images[], model_formats[]}]}"
+      },
+      {
+        "name": "product",
+        "summary": "One published product with its media, gross price and 3D models",
+        "params": [
+          {
+            "name": "product_id",
+            "type": "uuid",
+            "required": true,
+            "desc": "Product id. Returns 404 when unpublished or owned by another workspace — the two are deliberately indistinguishable."
+          }
+        ],
+        "response": "{ok, product: {product_id, name, description, unit, item_type, price, currency, images[], models: [{format, url, file_size_bytes, width_m, height_m, depth_m}]}}"
+      }
+    ]
+  },
+  {
     "name": "flow-engine",
     "tag": "Flows",
     "summary": "Execute, test, or event-trigger workflow automations by walking the xyflow graph.",

@@ -23,6 +23,21 @@ export function round2(n: number): number {
   return Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
 }
 
+/**
+ * VAT-inclusive price from a net one.
+ *
+ * `product_prices.list_price` is NET everywhere in this platform, and every consumer-facing
+ * surface shows gross — so this conversion is a money derivation with more than one caller
+ * (the online storefront and the #321 embed API both publish the same product at the same
+ * price). It lives here for the reason the file header describes: the moment it is written out
+ * twice, the two copies are free to round differently, and a wrong price is a valid `number`
+ * that nothing downstream can flag.
+ */
+export function grossFromNet(net: number | null | undefined, vatRatePct: number | null | undefined): number {
+  const rate = Number(vatRatePct);
+  return round2(Number(net ?? 0) * (1 + (Number.isFinite(rate) ? rate : 0) / 100));
+}
+
 export interface FormatMoneyOptions {
   /** Minimum fraction digits — 2 (accounting) by default, 0 for figures that read better whole. */
   decimals?: number;
