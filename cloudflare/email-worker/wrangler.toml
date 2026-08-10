@@ -2,7 +2,9 @@ name = "inbound-email-worker"
 main = "src/index.ts"
 compatibility_date = "2026-08-01"
 
-# Workers Paid ($5/mo). The Free plan can fail handlers that stream a 20 MiB body.
+# Workers Free is enough: the free tier's 10 ms limit is CPU time, not wall-clock, and this
+# handler awaits I/O rather than computing. Breaching it means parsing crept in that belongs in
+# email-webhooks.
 
 [vars]
 # The receiving subdomain. Its MX points at Cloudflare Email Routing with a single catch-all
