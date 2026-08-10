@@ -27,6 +27,13 @@ export default [
       '.env*',
       '*.tsbuildinfo',
       'supabase/**',
+      // Cloudflare Worker (#342 inbound email). A different runtime with its own ambient types,
+      // deliberately outside tsconfig.json and dependency-free — wrangler bundles it with esbuild
+      // and does not typecheck it. Typed linting therefore cannot resolve it ("was not found by
+      // the project service") and failed the whole pipeline, lint included, on every push.
+      // It is not unguarded: tests/security/inbound-email-isolation.test.ts greps this source and
+      // fails the build if tenancy resolution ever appears in it.
+      'cloudflare/**',
       '.ruru/**',
       'scripts/**',
       'tests/**',

@@ -1111,7 +1111,6 @@ const OrderIntakePanel: React.FC<{
 
   if (loading || !intake) return null;
 
-  const pending = intake.status === 'pending_review';
   const needsCustomer = !intake.customer_contact_id && !intake.customer_company_id;
   const reviewCount = intake.items.filter((i) => i.needs_review).length;
 
