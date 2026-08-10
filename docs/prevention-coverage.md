@@ -61,6 +61,21 @@ action checked ownership.
 - **Current state:** 0 findings, baseline 0.
 - **Blind spot:** resolved per file+table, so a file that checks ownership on one path to a table and forgets it on a second path is not reported. Also: a site that fetches `workspace_id` and never compares it reads as fetch-then-verify.
 
+**The same shape on the METER instead of the guard (2026-08-10):** `svc.refresh()` in job-research
+spends real money — DataForSEO SERP, Perplexity Sonar, Firecrawl scrapes, Haiku classification —
+and had three doors. The partner API-key route debited 5 credits up front; `/cron-refresh` charged
+per subject via `charge_cron`; `POST /track/{id}/refresh`, **the one the app's Refresh button
+calls**, debited nothing. The cheapest way to spend the operator's upstream budget was to press the
+button instead of calling the API that charges for it. Neither the tenancy-parity script (it looks
+for ownership checks, not meters) nor `ops.silent_zero` could see it — its `ai_spend_never_debited`
+probe reads `ai_usage_logs.credits_debited`, and job-research charges through
+`credit_transactions`, so a module that meters perfectly and one that does not meter at all are
+indistinguishable from there.
+
+- **Guarded by:** [test_paid_route_metering.py](../mivaa-pdf-extractor/tests/unit/test_paid_route_metering.py) — every door onto `svc.refresh()` must call its metering function, and must call it BEFORE the refresh (invariant 10). It also pins that the debit is not wrapped in `if user_id and not debit(...)`, the partner route's form, which reads as metering and behaves as a free pass whenever the identity is missing.
+- **Proven to fire:** 2026-08-10 — the debit was deleted from the session door and 1 of 6 assertions failed; the file was restored byte-identical.
+- **Blind spot:** source-level, so it pins the shape of the three doors it knows about. A *fourth* caller of `svc.refresh()` is only caught because the test enumerates doors by decorator — add one and you must add it to `PAID_REFRESH_DOORS`, which nothing forces.
+
 ### 3. Dead input — a control that changes nothing
 Lists and toggles that never reach the engine; a tool registered on an agent but absent from every
 toolkit cluster is stripped and unreachable.
@@ -107,6 +122,19 @@ Same shape as `_deliver_order_line_core`.
 - **Proven to fire:** 2026-08-10 — found live. The owner-path test passed; the sales-path run raised `P0002 order not found` from inside `recompute_order_totals`, which is what surfaced the bug. Re-run after the split: draft sales order, total 37.20, and the public wrapper still refuses a non-finance-manager.
 - **Current state:** fixed; the core is REVOKEd from `anon` and `authenticated` (verified via `has_function_privilege`).
 - **Blind spot:** the integration tier self-skips without `SUPABASE_SERVICE_ROLE_KEY`, so this only actually runs in CI. A local `npm test` reports it as skipped, not passed.
+
+- **A third worked example, 2026-08-10 — the janitor that aborted on its own first branch.** `run_storage_retention_sweep` set `quotes.pdf_generation_status = 'expired'` when purging a stale PDF; the CHECK constraint allowed only `pending|generating|completed|failed`. So the UPDATE threw, and because the sweep is one plpgsql function in one transaction, the exception rolled back **every** branch — agent conversation media, moodboard sheet PDFs, client-view PDFs and catalog PDFs had never been purged either. `QuotePDFService.refreshPDFUrl`'s "if it expired, rebuild it on open" branch was correspondingly dead code, because no quote could ever reach that status. The cron had failed 100% of its runs since it shipped. Fixed by widening the constraint to the vocabulary the code already used — narrowing the code instead would have left old quotes permanently without a PDF.
+  - **What caught it, and what nearly didn't:** only the generic `<5%` cron-success probe, and only because pg_cron recorded a *hard error*. Had the sweep instead purged nothing quietly — a narrowed window, a wrong `WHERE` — it would have reported success forever. That is the janitor rule in CLAUDE.md: watch the OUTPUT, not the exit code.
+  - **Guarded by:** `ops.silent_zero` probe `storage_retention_never_purges` — files past their retention window versus anything the sweep actually purged in the last 7 days.
+  - **Proven to fire:** 2026-08-10 — returned `activity 6 / signal 0` on introduction. The constraint fix itself was verified by running the real (non-dry) sweep inside a deliberately-aborted transaction, since `p_dry_run` only *counts* and never exercises the UPDATE that was throwing.
+
+- **A shape mismatch reads exactly like an absence, 2026-08-10.** Auditing which metered crons had ever charged returned "none, ever, for all fourteen keys" — via `credit_transactions.metadata->>'cron_key'`. That was wrong: `seo-website-crawl` had charged 29 times. Two sibling debit functions wrote the same logical field at two different JSON depths — `debit_credits` (workspace router) flat, `debit_user_credits` (personal wallet) nested one level under `'metadata'`. Every personal-wallet charge was therefore invisible to the obvious query, and nothing errored; the number was simply zero. Flattened to match, with the existing rows backfilled.
+  - **Worth stating as its own hazard:** the first version of this section asserted "the entire cron-billing system has never charged anything" on the strength of that query. It survived one round of review because a zero from a wrong path and a zero from a real absence are the same character on screen. When a probe reports total absence across *every* member of a set, suspect the query before the system.
+  - **Guarded by:** the flattening itself (one shape, so the divergence cannot recur silently) + the `cron_metering:*` probe below, which reads the flat shape.
+
+- **And the probe that could not see the ledger it was judging, 2026-08-10.** `ai_spend_never_debited` reads `ai_usage_logs.credits_debited`. Cron-metered modules charge through `credit_transactions` and never touch that column, so for them the probe was structurally blind in one direction and a false positive in the other — it flagged `job-research` while `seo-website-crawl`, which *was* charging, would have been flagged identically had its volume crossed the threshold. Replaced for those modules by `cron_metering:*`, which joins `cron_billing_registry.expected_module_slug` (new) to the module's real spend and asks the ledger cron billing actually writes to.
+  - **Proven to fire:** 2026-08-10 — surfaced `job-research-refresh` ($4.00/30d), plus `mention-monitoring` and `llm-mention-probe` ($0.41) that the old probe never reached. Mutation-tested in the other direction too: inserting one charge for `job-research-refresh` made its finding disappear, so the probe goes quiet when the defect is fixed rather than latching.
+  - **The finding it produced was NOT the bug it looked like.** The job-research metering existed in the MIVAA repo from 2026-07-25 but only reached the server on 2026-08-08 (`stat` on the deployed file), and all of the unbilled spend ran between 2026-07-25 and 2026-08-06. The charge path was correct and simply had not shipped. Confirming that took reading deploy-file mtimes and systemd restart times — worth doing before "fixing" a working system, and a reminder that for the separate MIVAA repo *committed is not deployed*.
 
 ### 4e. Wrong latent space — a vector that is the right SHAPE and the wrong MEANING
 Dimension is not identity. `voyage-4` and `voyage-multimodal-3.5` both return 1024D, so querying

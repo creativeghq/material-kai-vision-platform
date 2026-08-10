@@ -32,7 +32,10 @@ export interface Quote {
   quote_number?: string;
   pdf_storage_path?: string;
   pdf_generated_at?: string;
-  pdf_generation_status?: 'pending' | 'generating' | 'completed' | 'failed' | null;
+  // 'expired' = the storage-retention sweep purged the stored PDF; QuotePDFService.refreshPDFUrl
+  // rebuilds it on open (regeneration is credit-free). It was missing from this union while the
+  // DB CHECK also rejected it, so the sweep threw on every run and the rebuild branch was dead.
+  pdf_generation_status?: 'pending' | 'generating' | 'completed' | 'failed' | 'expired' | null;
   subtotal?: number;
   vat_rate?: number;
   vat_amount?: number;
