@@ -5,6 +5,7 @@ import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows, rowInScope, isUuid, type CrmScope } from './_scope.ts';
 import { pickContactFields, escapeLike, parseIdsParam } from './contacts-api-handler.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
+import { foldForSearch } from '../../_shared/searchFold.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -237,10 +238,13 @@ export async function handleCompanies(req: Request): Promise<Response> {
       // Every filter below is ANDed ON TOP of the workspace clause above. None of them
       // may relax or replace it — a request param must never influence tenant scope.
 
-      // Add search filter if provided — escape % and _ to prevent wildcard injection
+      // Match the FOLDED haystack with a FOLDED term — `ilike` is case-insensitive but not
+      // accent-insensitive, so "Καρέλης" never found "ΚΑΡΕΛΗΣ". `search_fold` is a generated
+      // column (name + email + website) written by public.crm_fold(); foldForSearch() is its
+      // twin. One column replaces the three-way `.or()`, so the term no longer touches
+      // PostgREST's comma-delimited filter grammar at all.
       if (search) {
-        const safeSearch = escapeLike(search);
-        query = query.or(`name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%,website.ilike.%${safeSearch}%`);
+        query = query.ilike('search_fold', `%${escapeLike(foldForSearch(search))}%`);
       }
       if (ids) query = query.in('id', ids);
       if (profession) query = query.eq('profession', profession);

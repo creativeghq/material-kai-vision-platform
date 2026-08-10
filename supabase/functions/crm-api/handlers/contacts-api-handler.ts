@@ -4,6 +4,7 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows, rowInScope, type CrmScope } from './_scope.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
+import { foldForSearch } from '../../_shared/searchFold.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -20,6 +21,21 @@ export const MAX_FILTER_IDS = 1000;
 /** Escape PostgREST ilike wildcards so a user typing `%` or `_` can't broaden the match. */
 export function escapeLike(value: string): string {
   return value.replace(/[%_\\]/g, '\\$&');
+}
+
+/**
+ * Quote a value for use INSIDE a PostgREST `or(...)` filter string.
+ *
+ * That grammar is comma-delimited with `.` separating column/operator/value, so an unquoted
+ * value carrying `,` or `(` is re-parsed as syntax — a Greek business name
+ * ("ΠΛΑΚΑΚΙΩΝ, ΠΛΑΚΟΛΙΘΩΝ") is enough to do it. Inside double quotes only `"` and `\` need
+ * escaping. Composes with `escapeLike`: fold → escapeLike → quoteOrValue.
+ *
+ * A DIFFERENT contract from `escapeHtml` (invariant 11) — this is PostgREST filter grammar,
+ * not HTML. Never substitute one for the other.
+ */
+export function quoteOrValue(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 /**
@@ -247,7 +263,11 @@ export async function handleContacts(req: Request): Promise<Response> {
       // may relax or replace it — a request param must never influence tenant scope.
       if (ids) listQuery = listQuery.in('id', ids);
       if (search) {
-        const safe = escapeLike(search);
+        // Match the FOLDED haystack with a FOLDED term: `ilike` is case-insensitive but not
+        // accent-insensitive, so "Κώστας" never found "ΚΩΣΤΑΣ ΑΛΕΞΙΟΥ". `search_fold` is a
+        // generated column (name + email) written by public.crm_fold(); foldForSearch() is its
+        // twin — see _shared/searchFold.ts.
+        const safe = escapeLike(foldForSearch(search));
         // The list renders each contact's ATTACHED COMPANY, and the old client-side search matched
         // on that name too. `company` isn't a column here (it's the crm_company_contacts junction),
         // so resolve matching companies to their contact ids first and OR them in — otherwise
@@ -256,7 +276,7 @@ export async function handleContacts(req: Request): Promise<Response> {
         let companyQuery = supabase
           .from('crm_companies')
           .select('id')
-          .ilike('name', `%${safe}%`)
+          .ilike('search_fold', `%${safe}%`)
           .limit(MAX_FILTER_IDS);
         if (!scope.isGlobalOperator) {
           companyQuery = companyQuery.in('workspace_id', scope.workspaceIds);
@@ -273,9 +293,13 @@ export async function handleContacts(req: Request): Promise<Response> {
             .map((j: { contact_id: string }) => j.contact_id)
             .filter(Boolean))];
         }
-        const clauses = [`name.ilike.%${safe}%`, `email.ilike.%${safe}%`];
-        if (companyContactIds.length > 0) clauses.push(`id.in.(${companyContactIds.join(',')})`);
-        listQuery = listQuery.or(clauses.join(','));
+        // One column now covers name + email, so the common case needs no `.or()` at all —
+        // which also keeps the term out of PostgREST's comma-delimited filter grammar. When the
+        // attached-company clause IS needed, the term is quoted so a comma in a search
+        // ("ΠΛΑΚΑΚΙΩΝ, ΠΛΑΚΟΛΙΘΩΝ") can't be read as the start of a second condition.
+        listQuery = companyContactIds.length > 0
+          ? listQuery.or(`search_fold.ilike.${quoteOrValue(`%${safe}%`)},id.in.(${companyContactIds.join(',')})`)
+          : listQuery.ilike('search_fold', `%${safe}%`);
       }
       if (companyName) {
         const safeCompany = escapeLike(companyName);
@@ -300,9 +324,10 @@ export async function handleContacts(req: Request): Promise<Response> {
             .map((j: { contact_id: string }) => j.contact_id)
             .filter(Boolean))];
         }
-        const companyClauses = [`company.ilike.%${safeCompany}%`];
-        if (attachedContactIds.length > 0) companyClauses.push(`id.in.(${attachedContactIds.join(',')})`);
-        listQuery = listQuery.or(companyClauses.join(','));
+        // Quoted for the same reason as the search clause: a company name may contain a comma.
+        listQuery = attachedContactIds.length > 0
+          ? listQuery.or(`company.ilike.${quoteOrValue(`%${safeCompany}%`)},id.in.(${attachedContactIds.join(',')})`)
+          : listQuery.ilike('company', `%${safeCompany}%`);
       }
       if (profession) listQuery = listQuery.eq('profession', profession);
       if (status) listQuery = listQuery.eq('status', status);
