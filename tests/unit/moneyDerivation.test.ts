@@ -278,6 +278,48 @@ describe('quote totals have exactly one derivation', () => {
       'integrity check exists to catch.\n' + offenders.join('\n'),
     ).toEqual([]);
   });
+
+  /**
+   * A CONFIGURED line is a fourth thing that can carry a wrong number, and it went wrong by
+   * OMISSION rather than by arithmetic: the agent's `create_quote` took `product_id` + price and
+   * had no configuration field at all, so a selection the customer configured degraded to the base
+   * product — quoted at the base, invoiced at the upgrade. Nothing disagreed about a derivation;
+   * the option delta was simply dropped on the way to the quote (#341 join 3).
+   *
+   * `add_configuration_to_quote` reads the options, checks the option rules, prices through
+   * `get_configured_product_price` and inserts the row in ONE statement, so the price is frozen in
+   * the same breath it is read. Whoever WRITES the line must therefore not price the configuration
+   * itself — that would reopen the window between reading and freezing, and give a second place to
+   * "adjust" the figure on the way past.
+   */
+  const QUOTE_ITEM_WRITERS = [
+    ...walk(join(ROOT, 'src/modules/quotes')),
+    ...walk(join(ROOT, 'src/services')),
+    ...walk(join(ROOT, 'supabase/functions/_shared/tools')),
+  ].filter((f) => { try { return statSync(f).isFile(); } catch { return false; } });
+
+  it('nothing that inserts a quote line also prices a configuration itself', () => {
+    const offenders: string[] = [];
+    for (const f of QUOTE_ITEM_WRITERS) {
+      const src = stripComments(readFileSync(f, 'utf8'));
+      const writesLines = /from\(['"]quote_items['"]\)[\s\S]{0,200}\.(insert|upsert)\(/.test(src);
+      if (writesLines && src.includes('get_configured_product_price')) offenders.push(posix(f));
+    }
+    expect(
+      offenders,
+      'A file that inserts quote_items must not call `get_configured_product_price` — route the ' +
+      'line through `add_configuration_to_quote`, which prices and freezes it in one statement.\n' +
+      offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  it('the agent can still carry a configuration onto a quote', () => {
+    // The other half of the same rule. Without this, "route it through the RPC" is satisfied just
+    // as well by dropping the capability again — which is the state that produced the bug.
+    const src = readFileSync(join(ROOT, 'supabase/functions/_shared/tools/quote-tools.ts'), 'utf8');
+    expect(src, 'create_quote must accept a configuration_id line').toContain('configuration_id');
+    expect(src, 'configured lines must be inserted by the RPC').toContain('add_configuration_to_quote');
+  });
 });
 
 /**

@@ -37,10 +37,12 @@ import { serviceClient as svcClient } from '../supabase-client.ts';
 import { round2 } from '../money.ts';
 import { foldForSearch, escapeLike } from '../searchFold.ts';
 
-// One line item as the model supplies it. Either `product_id` (catalog, auto-priced)
-// or `name` + `unit_price` (custom). `unit_price` on a catalog line overrides pricing.
+// One line item as the model supplies it. Either `product_id` (catalog, auto-priced),
+// `configuration_id` (a saved configuration — priced WITH its options), or `name` + `unit_price`
+// (custom). `unit_price` on a catalog line overrides pricing.
 const itemSchema = z.object({
   product_id: z.string().uuid().optional().describe('Catalog product UUID. When set and no unit_price is given, the seller price is resolved automatically from the workspace pricing rules.'),
+  configuration_id: z.string().uuid().optional().describe('Saved product configuration UUID (a product plus its chosen options, from the configurator). The line is priced from the configuration — base price PLUS the option deltas — and linked back to it. Use this instead of product_id whenever the customer picked options; passing the bare product_id quotes the base price and silently drops what they chose.'),
   name: z.string().optional().describe('Custom product name (required when product_id is not set).'),
   description: z.string().optional().describe('Custom product description.'),
   sku: z.string().optional().describe('Custom SKU / code.'),
@@ -174,6 +176,26 @@ export const createCreateQuoteTool = (
         if (input.customer_company_id && input.customer_contact_id) {
           return JSON.stringify({ success: false, error: 'Set only one customer — a company OR a contact, not both.' });
         }
+        // Refuse a configured line that also carries a price or a product, rather than silently
+        // preferring one. A configuration IS the product plus its options, and its price comes from
+        // the derivation — so a `unit_price` next to it is a number that would have been dropped,
+        // and dropping the wrong one of those two is how a customer gets quoted the base and
+        // invoiced the upgrade.
+        for (const it of items as QuoteItemInput[]) {
+          if (!it.configuration_id) continue;
+          if (it.unit_price != null || it.discounted_price != null) {
+            return JSON.stringify({
+              success: false,
+              error: 'A configured line is priced from its configuration — remove unit_price / discounted_price, or drop configuration_id and quote it as a custom line.',
+            });
+          }
+          if (it.product_id) {
+            return JSON.stringify({
+              success: false,
+              error: 'Pass configuration_id OR product_id, not both — the configuration already names its product.',
+            });
+          }
+        }
         const vatRate = input.vat_rate ?? 24;
         const generatePdf = input.generate_pdf !== false; // default true
         const customerCompanyId = input.customer_company_id ?? null;
@@ -224,7 +246,14 @@ export const createCreateQuoteTool = (
         // (the branded PDF already shows full detail; this surfaces it as data too).
         const lineSummaries: Array<{ label: string; line_total: number; pricing_status?: string; room?: string | null }> = [];
         let subtotal = 0;
+        // A configured line is NOT resolved here. `add_configuration_to_quote` reads the chosen
+        // options, checks the option rules, prices through the same derivation and inserts the row
+        // in ONE statement — so the price is frozen in the same breath it is read. Pricing it here
+        // would be a second path to a configured price, and the quantity this tool must get right
+        // is exactly the one the platform has already been burned by.
+        const configuredItems = items.filter((i: QuoteItemInput) => i.configuration_id);
         for (const it of items) {
+          if (it.configuration_id) continue;
           const resolved = await resolveLine(sb, workspaceId, quoteId, it, customerCompanyId, customerContactId);
           if ('error' in resolved) {
             await rollback();
@@ -239,11 +268,54 @@ export const createCreateQuoteTool = (
           });
           subtotal += resolved.line_total ?? 0; // call-for-price lines contribute 0 to the total
         }
-        const { error: itemsErr } = await sb.from('quote_items').insert(payloads);
-        if (itemsErr) {
-          await rollback();
-          return JSON.stringify({ success: false, error: `Failed to add items: ${itemsErr.message}` });
+        if (payloads.length > 0) {
+          const { error: itemsErr } = await sb.from('quote_items').insert(payloads);
+          if (itemsErr) {
+            await rollback();
+            return JSON.stringify({ success: false, error: `Failed to add items: ${itemsErr.message}` });
+          }
         }
+
+        // Configured lines, each inserted and priced by the RPC. It also enforces the option rules
+        // (`excludes` / `requires`) and refuses a configuration from a different workspace than the
+        // quote — both raise, and both messages are worth showing: "this combination is not
+        // available: Oak cannot be combined with Brass" is the answer the customer needs, not a
+        // generic failure.
+        let configuredCount = 0;
+        for (const it of configuredItems) {
+          const { data: added, error: cfgErr } = await sb.rpc('add_configuration_to_quote', {
+            p_quote_id: quoteId,
+            p_configuration_id: it.configuration_id,
+            p_quantity: Math.max(1, Math.round(it.quantity ?? 1)),
+          });
+          if (cfgErr || !added) {
+            await rollback();
+            return JSON.stringify({
+              success: false,
+              error: cfgErr?.message || 'Could not add the configured product to the quote.',
+            });
+          }
+          const r = added as {
+            unit_price: number | null;
+            line_total: number | null;
+            pricing_status: string;
+            options: Record<string, string>;
+          };
+          configuredCount += 1;
+          const optionLabel = Object.entries(r.options ?? {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
+          lineSummaries.push({
+            label: [it.name || 'Configured product', optionLabel].filter(Boolean).join(' — '),
+            line_total: r.line_total ?? 0,
+            pricing_status: r.pricing_status,
+            room: it.room ?? null,
+          });
+          // An unpriced configuration contributes 0, exactly as a call-for-price catalog line does.
+          subtotal += r.line_total ?? 0;
+        }
+
+        // Every count from here on is BOTH kinds of line — a quote that says "1 item"
+        // while the PDF shows two is the same class of lie as a wrong total.
+        const lineCount = payloads.length + configuredCount;
 
         // 3) Totals — replicate QuotePDFService.saveItemPrices (cash discount → VAT).
         let cashPct = 0;
@@ -267,7 +339,7 @@ export const createCreateQuoteTool = (
           vat_amount: round2(vatAmount),
           grand_total: round2(grandTotal),
           cash_discount_pct: cashPct,
-          total_items: payloads.length,
+          total_items: lineCount,
           updated_at: new Date().toISOString(),
         }).eq('id', quoteId);
 
@@ -292,7 +364,7 @@ export const createCreateQuoteTool = (
               vat_rate: vatRate,
               vat_amount: round2(vatAmount),
               grand_total: round2(grandTotal),
-              item_count: payloads.length,
+              item_count: lineCount,
               items: lineSummaries,
               pdf_url: null,
               pdf_error: pdfErr?.message || pdfRes?.error || 'PDF generation failed',
@@ -320,7 +392,7 @@ export const createCreateQuoteTool = (
           vat_rate: vatRate,
           vat_amount: round2(vatAmount),
           grand_total: round2(grandTotal),
-          item_count: payloads.length,
+          item_count: lineCount,
           items: lineSummaries,
           pdf_url: pdfUrl,
         });
@@ -329,13 +401,13 @@ export const createCreateQuoteTool = (
           success: true,
           quote_id: quoteId,
           quote_number: quoteNumber,
-          item_count: payloads.length,
+          item_count: lineCount,
           subtotal: round2(subtotal),
           vat_rate: vatRate,
           grand_total: round2(grandTotal),
           currency: 'EUR',
           pdf_generated: Boolean(pdfUrl),
-          message: `Created quote${quoteNumber ? ` ${quoteNumber}` : ''} with ${payloads.length} item(s), total €${round2(grandTotal).toFixed(2)}. It's open on the canvas and available on the Quotes page.`,
+          message: `Created quote${quoteNumber ? ` ${quoteNumber}` : ''} with ${lineCount} item(s), total €${round2(grandTotal).toFixed(2)}. It's open on the canvas and available on the Quotes page.`,
         });
       } catch (e) {
         return JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) });
@@ -346,7 +418,9 @@ export const createCreateQuoteTool = (
       description:
         'Create a real, editable quote from a list of products and generate its branded PDF, then open it on the canvas. ' +
         'Use for "make/create/build a quote" requests. Each item is either a catalog product (pass product_id — the seller ' +
-        'price is resolved automatically) or a custom item (pass name + unit_price + unit, e.g. 75 sqm at €34/sqm → ' +
+        'price is resolved automatically), a CONFIGURED product (pass configuration_id — priced with the chosen options ' +
+        'and linked to them; use this whenever the customer picked options, because a bare product_id quotes the base ' +
+        'price and drops what they chose), or a custom item (pass name + unit_price + unit, e.g. 75 sqm at €34/sqm → ' +
         '{name:"Tagina", unit:"sqm", quantity:75, unit_price:34}). Optionally link a CRM customer (company OR contact). ' +
         'The quote is saved to the Quotes module and can be refined there. Returns the quote id, totals, and PDF.',
       schema: z.object({

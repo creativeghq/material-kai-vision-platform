@@ -47,7 +47,7 @@ Facet keys are per-tenant and you cannot guess them. Asked for a navy armchair y
 
 | verdict | what you do |
 |---|---|
-| `exact` | Quote the returned price. Offer `create_quote` if they want it in writing. |
+| `exact` | Quote the returned price. Offer `create_quote` if they want it in writing — with `configuration_id` if they configured it, `product_id` if they took it as it comes. |
 | `near` | Show the suggestions **without prices** — they are close, not equivalent. Ask whether one of them works. If yes, re-run `price_my_spec` against that one. If no, raise the request. |
 | `none` | Retry once with `available_vocabulary`. Still nothing → `raise_quote_request`. |
 
@@ -56,6 +56,6 @@ Facet keys are per-tenant and you cannot guess them. Asked for a navy armchair y
 ## Guardrails
 
 - **Never call `create_quote` for an unmatched spec.** A quote is a priced document; a spec that did not match has no price, and inventing a line item to carry it produces a real quote for a product that does not exist.
-- **A configured product is not the base product.** If options were chosen, the price must come back from the configured derivation, not from the plain product price — otherwise the customer is quoted the base and invoiced the upgrade.
+- **A configured product is not the base product.** If options were chosen, pass the line to `create_quote` as `configuration_id`, never as `product_id`. A bare `product_id` quotes the base price and silently drops every option they picked — the customer is quoted the base and invoiced the upgrade. The configured line is priced and frozen in one statement, so you never state the number yourself, and if the combination breaks an option rule the quote is refused with the reason ("Oak cannot be combined with Brass") — pass that reason on rather than substituting a different combination.
 - **Do not create a CRM contact just to have one.** `raise_quote_request` resolves an existing contact by id, email, then name, and only creates when you supply an email and nothing matched. Without an email the request is still recorded — attributed to you. Losing the lead to keep the CRM tidy is the wrong trade.
 - **One request per ask.** If the same customer wants three different things, that is three specs and three requests, not one request with a paragraph in `notes` — each one is a separate thing to price.
