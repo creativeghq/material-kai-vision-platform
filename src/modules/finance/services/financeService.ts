@@ -81,7 +81,18 @@ export interface Invoice {
   vat_rate: number;
   vat_amount: number;
   total: number;
+  /** CASH only. Credit-note settlement is `amount_credited` — see the note there. */
   amount_paid: number;
+  /**
+   * Settled by credit note rather than by cash.
+   *
+   * `_recompute_invoice_status_after_allocation` splits the two on purpose: it sums allocations
+   * carrying a `credit_note_id` into this column and leaves `amount_paid` as money that actually
+   * arrived, so `paid_at` never claims a date for an invoice nobody paid. Both reduce `amount_due`.
+   * The column was maintained correctly from the day it shipped and read by nothing — this type
+   * did not even declare it — so a credited invoice and a paid one rendered identically.
+   */
+  amount_credited: number;
   amount_due: number;
   issued_at: string | null;
   due_at: string | null;

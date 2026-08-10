@@ -33,6 +33,13 @@ export interface Order {
    */
   covers_order_id: string | null;
   source_quote_id: string | null;
+  /**
+   * The inbox conversation this order was raised from, written by
+   * `create_order_from_thread_intake`. Declared and surfaced here because it was neither: the
+   * column was written from the day it shipped and read by nothing, so an order born out of a
+   * customer conversation lost every trace of it the moment it was created.
+   */
+  source_thread_id: string | null;
   order_number: string | null;
   status: OrderStatus;
   payment_status: OrderPaymentStatus;
@@ -631,7 +638,7 @@ export const ordersService = {
         project_id: input.projectId ?? null,
         title: `${input.orderType === 'purchase' ? 'Purchase' : 'Sales'} order created${(order as any).order_number ? ` #${(order as any).order_number}` : ''}`,
         body: `A ${input.orderType} order was created (${total.toFixed(2)} ${input.currency ?? 'EUR'}).`,
-        action_url: '/finance?tab=orders',
+        action_url: `/finance/orders/${orderId}`,
       }));
     return orderId;
   },
@@ -1142,7 +1149,7 @@ export const ordersService = {
         currency: (data as any).currency ?? 'EUR',
         title: `Order ${(data as any).order_number ? `#${(data as any).order_number} ` : ''}→ ${ORDER_STATUS_LABEL[status] ?? status}`,
         body: `Order status changed to "${ORDER_STATUS_LABEL[status] ?? status}".`,
-        action_url: '/finance?tab=orders',
+        action_url: `/finance/orders/${id}`,
       }));
   },
 

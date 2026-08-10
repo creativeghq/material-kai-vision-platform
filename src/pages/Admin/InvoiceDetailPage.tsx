@@ -328,6 +328,16 @@ const InvoiceDetailPage: React.FC = () => {
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
               {(invoice.payments ?? []).length} payment(s) recorded
+              {/* Cash and credit settle an invoice differently and must not read the same.
+                  `_recompute_invoice_status_after_allocation` deliberately keeps amount_paid
+                  CASH-ONLY and books credit-note allocations into amount_credited — and until
+                  now nothing in the app read the second half, so "the customer paid €500" and
+                  "we credited them €500" rendered identically while the ledger knew better. */}
+              {Number(invoice.amount_credited ?? 0) > 0.005 && (
+                <> · <span className="text-amber-600 dark:text-amber-400">
+                  {formatMoney(Number(invoice.amount_credited), invoice.currency)} credited
+                </span></>
+              )}
             </div>
           </CardContent>
         </Card>

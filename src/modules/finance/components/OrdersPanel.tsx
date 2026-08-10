@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
@@ -2448,6 +2448,22 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 <p className="text-[11px] text-muted-foreground max-w-xs">Un-invoiced orders age in Receivables/Payables against the expected payment date.</p>
               )}
             </div>
+
+            {/* Where this order came from. `create_order_from_thread_intake` has stamped the
+                conversation on every order it raised and nothing ever showed it, so the customer
+                exchange that produced the order was unreachable from the order itself — the same
+                write-only-link shape as "Covered by". */}
+            {order.source_thread_id && (
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Raised from</span>
+                <div className="mt-1">
+                  <Link to={`/inbox?thread=${order.source_thread_id}`} className="text-xs hover:underline">
+                    <MessageSquare className="mr-1 inline h-3 w-3 text-muted-foreground" />
+                    <span className="font-medium">the customer conversation</span>
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* The forward view, from the purchase side: the customer order this was bought to
                 serve. The header picker SETS it; this states it as a link, because "which sale is
