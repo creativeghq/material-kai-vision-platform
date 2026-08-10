@@ -106,12 +106,21 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
     console.log(`[seo-analyze] Analyzing "${body.article_plan.title}" (auto_fix: ${autoFix}, max: ${maxIterations})`);
 
     // Run analysis
-    let analysis = analyzeContent(content, body.article_plan, body.serp_signals);
+    let analysis = analyzeContent(content, body.article_plan, body.serp_signals, body.content_brief);
 
     console.log(`[seo-analyze] Initial score: ${analysis.overallScore}/100, ${analysis.fixes.length} issues`);
 
-    // Auto-fix loop
-    if (autoFix && analysis.overallScore < MIN_ACCEPTABLE_SCORE) {
+    // Auto-fix loop.
+    //
+    // Gated on `reachableScore`, not `overallScore`: some fixes are not auto-fixable
+    // (meta-tag lengths are plan-level, intent mismatch needs a human re-plan, and the
+    // two helpful-content checks are answered by configuring the brief). Those penalties
+    // are still in the score, but the loop cannot remove them — so measuring progress
+    // against the raw score meant an article whose only remaining problems were
+    // unfixable never reached 70 and burned every paid iteration (5 credits each)
+    // re-editing prose that was already done. Compare against the best score the loop
+    // could actually achieve instead.
+    if (autoFix && reachableScore(analysis) < MIN_ACCEPTABLE_SCORE) {
       for (let i = 0; i < maxIterations; i++) {
         const autoFixableFixes = analysis.fixes.filter(
           (f) => f.autoFixable && !f.applied,
@@ -144,10 +153,10 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
         fixIterations++;
 
         // Re-analyze
-        analysis = analyzeContent(content, body.article_plan, body.serp_signals);
-        console.log(`[seo-analyze] Post-fix score: ${analysis.overallScore}/100`);
+        analysis = analyzeContent(content, body.article_plan, body.serp_signals, body.content_brief);
+        console.log(`[seo-analyze] Post-fix score: ${analysis.overallScore}/100 (reachable: ${reachableScore(analysis)})`);
 
-        if (analysis.overallScore >= MIN_ACCEPTABLE_SCORE) break;
+        if (reachableScore(analysis) >= MIN_ACCEPTABLE_SCORE) break;
       }
     }
 
@@ -192,10 +201,32 @@ export async function handleAnalyze(req: Request, body: any): Promise<Response> 
 // CONTENT ANALYSIS ENGINE (15+ checks)
 // ════════════════════════════════════════════════════════════════
 
+/** Penalty each severity subtracts from the 100-point base. Single source — the
+ *  score loop and `reachableScore` must never drift apart. */
+const SEVERITY_PENALTY: Record<ContentFix['severity'], number> = {
+  critical: 15,
+  high: 10,
+  medium: 5,
+  low: 2,
+};
+
+/**
+ * The score the auto-fix loop could reach if it fixed everything it is able to —
+ * i.e. the current score with the penalties from NON-auto-fixable fixes added back.
+ * Used to decide whether another paid fix iteration is worth running.
+ */
+function reachableScore(analysis: ContentAnalysisResult): number {
+  const unfixable = analysis.fixes
+    .filter((f) => !f.autoFixable)
+    .reduce((sum, f) => sum + (SEVERITY_PENALTY[f.severity] ?? 0), 0);
+  return Math.min(100, analysis.overallScore + unfixable);
+}
+
 function analyzeContent(
   markdown: string,
   plan: ArticlePlan,
   serpSignals?: SerpSignalBlob,
+  brief?: ContentBrief,
 ): ContentAnalysisResult {
   const fixes: ContentFix[] = [];
   const content = markdown.toLowerCase();
@@ -222,15 +253,27 @@ function analyzeContent(
     keywordDensity[sec] = wordCount > 0 ? Math.round((count / wordCount) * 100 * 100) / 100 : 0;
   }
 
-  // ── Check 1: Primary keyword density (1-2%) ──
-  if (primaryDensity < 0.8) {
+  // ── Check 1: Primary keyword density ──
+  // ASYMMETRIC ON PURPOSE. Keyword density has not been a positive ranking signal
+  // for many years, but stuffing is still a penalty, so the two directions are not
+  // mirror images:
+  //   - too LOW  → informational only (`low`, NOT auto-fixable). It used to be
+  //     `high` + auto-fixable, which sent the Gemini fix loop back into the prose to
+  //     inject repetitions of the keyword purely to move a number — the
+  //     search-engine-first writing Google's helpful-content guidance penalizes, at
+  //     the cost of the readability the same analyzer scores two checks later.
+  //     Placement (checks 3/4/5: first 100 words, H1, an H2) is what actually
+  //     matters and is still enforced.
+  //   - too HIGH → still `medium` + auto-fixable. Removing stuffing improves the
+  //     prose and the ranking at the same time; there is no tension to resolve.
+  if (primaryDensity < 0.4) {
     fixes.push({
       category: 'keyword_density',
-      severity: 'high',
-      description: `Primary keyword "${plan.primaryKeyword}" density is ${primaryDensity.toFixed(2)}% (target: 1-2%)`,
-      suggestion: `Add more natural mentions of "${plan.primaryKeyword}" throughout the article`,
+      severity: 'low',
+      description: `Primary keyword "${plan.primaryKeyword}" appears ${primaryCount}× (${primaryDensity.toFixed(2)}% density) — low enough that topical relevance may be unclear`,
+      suggestion: `Check that "${plan.primaryKeyword}" (or a close variation) reads naturally in the intro, at least one H2, and the conclusion. Do NOT pad the body with repetitions to raise this number — density is not a ranking factor.`,
       affectedSection: null,
-      autoFixable: true,
+      autoFixable: false,
       applied: false,
     });
   } else if (primaryDensity > 2.5) {
@@ -645,15 +688,56 @@ function analyzeContent(
     }
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // HELPFUL-CONTENT CHECKS (Google "Who / How / Why" self-assessment)
+  // ════════════════════════════════════════════════════════════════
+  // Neither is auto-fixable: both are answered by configuring the content brief,
+  // not by rewriting the draft. An LLM told to "add first-hand experience" or
+  // "add an author" invents both, which is the failure mode these checks exist to
+  // prevent — so they surface in the report and stop there.
+
+  // ── Check 22: Provenance — who wrote this, and is the automation disclosed ──
+  const prov = brief?.provenance;
+  const hasAuthor = !!(prov?.authorName || prov?.authorTitle);
+  if (!hasAuthor || !prov?.aiDisclosure) {
+    const missing: string[] = [];
+    if (!hasAuthor) missing.push('no author byline');
+    if (!prov?.aiDisclosure) missing.push('no AI-usage disclosure');
+    fixes.push({
+      category: 'provenance',
+      severity: 'medium',
+      description: `Article has ${missing.join(' and ')}. Google's helpful-content self-assessment asks who wrote it, how it was produced, and why.`,
+      suggestion: 'Set `provenance` on the content brief (author name + title, publisher, AI disclosure). The pipeline then emits schema.org author/publisher and appends a visible byline. Leaving it unset is preferable to inventing an author — this is a configuration gap, not a writing one.',
+      affectedSection: null,
+      autoFixable: false,
+      applied: false,
+    });
+  }
+
+  // ── Check 23: First-hand experience — is there anything here the SERP lacks ──
+  // The research, the plan and the SERP signals are all derived from the pages this
+  // article is trying to outrank. With no proprietary input the output is, by
+  // construction, a restatement of what already ranks.
+  const fx = brief?.firsthandExperience;
+  const hasFirsthand = !!(
+    fx && (fx.proprietaryData?.length || fx.ownedExamples?.length || fx.methodology || fx.credentials)
+  );
+  if (!hasFirsthand) {
+    fixes.push({
+      category: 'firsthand_experience',
+      severity: 'medium',
+      description: 'No first-hand experience supplied — every input to this article was derived from the pages it is competing against.',
+      suggestion: 'Add `firsthandExperience` to the content brief: your own measurements, your own products/projects as examples, how you know it, and what qualifies you. This is the "Experience" in E-E-A-T and the only input that carries information Google cannot already get from the incumbent results.',
+      affectedSection: null,
+      autoFixable: false,
+      applied: false,
+    });
+  }
+
   // ── Calculate overall score ──
   let score = 100;
   for (const fix of fixes) {
-    switch (fix.severity) {
-      case 'critical': score -= 15; break;
-      case 'high': score -= 10; break;
-      case 'medium': score -= 5; break;
-      case 'low': score -= 2; break;
-    }
+    score -= SEVERITY_PENALTY[fix.severity] ?? 0;
   }
   score = Math.max(0, Math.min(100, score));
 
@@ -704,6 +788,7 @@ function buildSectionScores(
     h2h6Headings: makeScore(['h2_keyword', 'heading_hierarchy']),
     contentDepth: makeScore(['content_depth']),
     keywordDensity: makeScore(['keyword_density', 'keyword_placement']),
+    helpfulContent: makeScore(['provenance', 'firsthand_experience']),
   };
 }
 
@@ -770,11 +855,26 @@ function analyzeGEO(markdown: string, plan: ArticlePlan): GEOScore {
   const directAnswers = Math.min(10, directAnswerCount * 4);
   if (directAnswerCount < 2) recommendations.push('Add concise 40-60 word answer paragraphs after questions for featured snippet targeting');
 
-  // 9. Authority tone (5 pts) — penalize hedging language
-  const hedgePatterns = /\bmight\b|\bmaybe\b|\bcould be\b|\bperhaps\b|\bsomewhat\b|\bpossibly\b|\bit seems\b/gi;
-  const hedgeCount = (markdown.match(hedgePatterns) || []).length;
-  const authorityTone = Math.max(0, 5 - hedgeCount);
-  if (hedgeCount > 3) recommendations.push('Reduce hedging language ("might", "maybe", "perhaps") — use confident, authoritative tone');
+  // 9. Claim attribution (5 pts) — penalize confident claims with nobody behind them.
+  //
+  // This signal used to penalize HEDGING ("might", "maybe", "perhaps"), which scored an
+  // article higher the more flatly it asserted things it could not support — and the
+  // auto-fix loop acted on it, stripping qualifiers out of claims that genuinely varied
+  // by case. Combined with LLM-generated `[SOURCE:]` markers nobody verifies, that
+  // manufactured exactly the "easily verified factual error" Google's helpful-content
+  // guidance penalizes, and it was worst on the YMYL topics where it matters most.
+  //
+  // The real authority problem is the opposite one: the appeal to an unnamed authority.
+  // "Studies show" with no study is a weaker signal than "this varies by substrate".
+  const vagueAuthorityPatterns =
+    /\bstudies show\b|\bresearch shows\b|\bexperts (say|agree|recommend)\b|\bit is (widely )?(believed|known|considered)\b|\bmany (believe|say|argue)\b|\bsome (say|argue|believe)\b|\bit'?s no secret\b|\bstatistics show\b/gi;
+  const vagueCount = (markdown.match(vagueAuthorityPatterns) || []).length;
+  const claimAttribution = Math.max(0, 5 - vagueCount * 2);
+  if (vagueCount > 0) {
+    recommendations.push(
+      `${vagueCount} appeal(s) to an unnamed authority ("studies show", "experts agree") — name the source or drop the claim. An unattributed statistic is a liability, not an authority signal.`,
+    );
+  }
 
   // 10. Self-contained paragraphs (10 pts) — each paragraph makes a complete claim
   const contentParagraphs = paragraphs.filter((p) => !p.startsWith('#') && p.trim().length > 20);
@@ -789,7 +889,7 @@ function analyzeGEO(markdown: string, plan: ArticlePlan): GEOScore {
 
   const overall = statisticsWithAttribution + namedEntities + structuredDefinitions +
     expertQuotes + faqCoverage + schemaCoverage + sourceCitationScore +
-    directAnswers + authorityTone + selfContainedParagraphs;
+    directAnswers + claimAttribution + selfContainedParagraphs;
 
   return {
     overall: Math.min(100, overall),
@@ -802,7 +902,7 @@ function analyzeGEO(markdown: string, plan: ArticlePlan): GEOScore {
       schemaCoverage,
       sourceCitations: sourceCitationScore,
       directAnswers,
-      authorityTone,
+      claimAttribution,
       selfContainedParagraphs,
     },
     recommendations: recommendations.slice(0, 5), // Top 5 recommendations

@@ -26,6 +26,7 @@ import type {
   PipelineStage,
   KeywordResearchResult,
   ArticlePlan,
+  ContentBrief,
   ContentAnalysisResult,
   ArticleOutput,
   MissingTopic,
@@ -320,12 +321,23 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       progress_percentage: 92,
     }, 'Building SEO report...');
 
+    // Append the visible byline / disclosure before HTML conversion, so the markdown
+    // the operator copies into their CMS carries it too. No-ops when the brief has no
+    // `provenance` block — an invented byline is worse than none, and the analyzer
+    // already reports the gap.
+    const publishedAt = new Date().toISOString();
+    const publishedMarkdown = appendProvenanceBlock(finalMarkdown, body.content_brief, website);
+
     // Generate HTML from markdown (basic conversion)
-    const htmlContent = markdownToHtml(finalMarkdown);
+    const htmlContent = markdownToHtml(publishedMarkdown);
 
     // Build schema markup
-    const schemaMarkup = buildSchemaMarkup(plan, finalMarkdown);
-    const faqSchema = buildFaqSchema(plan, finalMarkdown);
+    const schemaMarkup = buildSchemaMarkup(plan, publishedMarkdown, {
+      brief: body.content_brief,
+      website,
+      publishedAt,
+    });
+    const faqSchema = buildFaqSchema(plan, publishedMarkdown);
 
     // Build gaps/gains
     const gapsGains = buildGapsGains(finalMarkdown, research);
@@ -492,7 +504,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
     // fix_iterations, geo_score, credits_used, processing_time_ms) are preserved in
     // stages_data.extra instead of taking the whole statement down with them.
     await updateArticle(supabase, articleId, {
-      markdown_content: finalMarkdown,
+      markdown_content: publishedMarkdown,
       html_content: htmlContent,
       word_count: finalWordCount,
       reading_time_minutes: Math.ceil(finalWordCount / 200),
@@ -529,7 +541,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
       topic: body.topic,
       targetKeyword: body.target_keyword,
       title: plan.title,
-      contentMarkdown: finalMarkdown,
+      contentMarkdown: publishedMarkdown,
       contentHtml: htmlContent,
       wordCount: finalWordCount,
       metaTitle: plan.metaTitle,
@@ -714,6 +726,10 @@ function markdownToHtml(markdown: string): string {
   // Links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
 
+  // Horizontal rule — must run BEFORE the list rule, which would otherwise read
+  // `---` as a bullet, and before paragraph wrapping, which would emit `<p>---</p>`.
+  html = html.replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm, '<hr />');
+
   // Unordered lists
   html = html.replace(/^[-*]\s+(.+)$/gm, '<li>$1</li>');
 
@@ -727,7 +743,8 @@ function markdownToHtml(markdown: string): string {
       !trimmed.startsWith('<h') &&
       !trimmed.startsWith('<li') &&
       !trimmed.startsWith('<ul') &&
-      !trimmed.startsWith('<ol')
+      !trimmed.startsWith('<ol') &&
+      !trimmed.startsWith('<hr')
     ) {
       result.push(`<p>${trimmed}</p>`);
     } else {
@@ -738,9 +755,57 @@ function markdownToHtml(markdown: string): string {
   return result.join('\n');
 }
 
-/** Build JSON-LD schema markup */
-function buildSchemaMarkup(plan: ArticlePlan, markdown: string): object {
+/**
+ * Human-readable label for the AI-disclosure setting. Google's helpful-content
+ * guidance asks for automation to be disclosed rather than concealed; which of the
+ * three it is, is the operator's call, so we render what they configured and never
+ * pick one for them.
+ */
+const AI_DISCLOSURE_TEXT: Record<string, string> = {
+  ai_generated: 'This article was generated with AI assistance and reviewed before publication.',
+  ai_assisted: 'This article was written with AI assistance and edited by our team.',
+  human_written: 'This article was written by our team.',
+};
+
+/**
+ * Build JSON-LD schema markup.
+ *
+ * `author` / `publisher` / `datePublished` / `dateModified` come from the brief's
+ * `provenance` block and the connected website. NOTHING here is invented: with no
+ * configured author the `author` property is omitted entirely rather than filled with
+ * the site name pretending to be a byline — a fabricated author is a worse signal
+ * than a missing one, and the analyzer already raises a `provenance` fix for it.
+ */
+function buildSchemaMarkup(
+  plan: ArticlePlan,
+  markdown: string,
+  ctx: {
+    brief?: ContentBrief | null;
+    website?: { url: string; domain: string; display_name: string | null } | null;
+    publishedAt: string;
+  },
+): object {
   const schemas: object[] = [];
+  const prov = ctx.brief?.provenance;
+
+  const author = prov?.authorName
+    ? {
+      '@type': 'Person',
+      name: prov.authorName,
+      ...(prov.authorTitle ? { jobTitle: prov.authorTitle } : {}),
+      ...(prov.authorBio ? { description: prov.authorBio } : {}),
+      ...(prov.authorUrl ? { url: prov.authorUrl } : {}),
+    }
+    : null;
+
+  const publisherName = prov?.publisherName || ctx.website?.display_name || ctx.website?.domain || null;
+  const publisher = publisherName
+    ? {
+      '@type': 'Organization',
+      name: publisherName,
+      ...(ctx.website?.url ? { url: ctx.website.url } : {}),
+    }
+    : null;
 
   // Article schema (always)
   schemas.push({
@@ -749,6 +814,11 @@ function buildSchemaMarkup(plan: ArticlePlan, markdown: string): object {
     headline: plan.title,
     description: plan.metaDescription,
     keywords: [plan.primaryKeyword, ...plan.secondaryKeywords.slice(0, 5)].join(', '),
+    datePublished: ctx.publishedAt,
+    dateModified: ctx.publishedAt,
+    ...(author ? { author } : {}),
+    ...(publisher ? { publisher } : {}),
+    ...(prov?.reviewedBy ? { reviewedBy: { '@type': 'Person', name: prov.reviewedBy } } : {}),
   });
 
   // FAQPage schema (if FAQ questions exist)
@@ -770,6 +840,56 @@ function buildSchemaMarkup(plan: ArticlePlan, markdown: string): object {
   }
 
   return schemas.length === 1 ? schemas[0] : schemas;
+}
+
+/**
+ * Append a visible byline + AI-disclosure block to the article markdown.
+ *
+ * Google's helpful-content self-assessment is explicit that the "Who / How / Why"
+ * answers should be *visible to readers*, not only present in structured data — so
+ * this goes into the markdown the operator copies into their CMS, not just the JSON-LD.
+ *
+ * Returns the markdown unchanged when the brief has no `provenance` block. That is the
+ * deliberate behaviour: the pipeline never fabricates an author, and the analyzer
+ * reports the omission as a `provenance` fix instead.
+ */
+function appendProvenanceBlock(
+  markdown: string,
+  brief: ContentBrief | null | undefined,
+  website: { display_name: string | null; domain: string } | null,
+): string {
+  const prov = brief?.provenance;
+  if (!prov) return markdown;
+
+  const lines: string[] = [];
+
+  if (prov.authorName) {
+    const role = [prov.authorTitle, prov.publisherName || website?.display_name || website?.domain]
+      .filter(Boolean)
+      .join(', ');
+    const byline = prov.authorUrl ? `[${prov.authorName}](${prov.authorUrl})` : prov.authorName;
+    lines.push(`**Written by ${byline}**${role ? ` — ${role}` : ''}`);
+    if (prov.authorBio) lines.push('', prov.authorBio);
+  }
+
+  if (prov.reviewedBy) {
+    lines.push('', `**Reviewed by ${prov.reviewedBy}**`);
+  }
+
+  const disclosure = prov.aiDisclosure ? AI_DISCLOSURE_TEXT[prov.aiDisclosure] : null;
+  if (disclosure) {
+    lines.push('', `_${disclosure}_`);
+  }
+
+  // Methodology answers Google's "How" for any proprietary numbers cited in the body.
+  const methodology = brief?.firsthandExperience?.methodology;
+  if (methodology) {
+    lines.push('', `_How we know: ${methodology}_`);
+  }
+
+  if (lines.length === 0) return markdown;
+
+  return `${markdown.trimEnd()}\n\n---\n\n${lines.join('\n')}\n`;
 }
 
 /** Build FAQ schema array */

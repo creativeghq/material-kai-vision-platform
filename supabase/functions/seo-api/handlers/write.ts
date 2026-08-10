@@ -224,6 +224,8 @@ Every article MUST follow this structure in this exact order:
 - **Semantic richness**: use 4–6 of the listed LSI terms naturally across the body.
 - **Answer-first paragraphs**: every section opens with the answer, then explains. Inverted pyramid.
 - **Statistics with sources**: when citing a number, attribute it inline like "(Source: Company Name, 2024)".
+- **NEVER invent a source, a URL, a statistic, a quote or a person.** A fabricated citation is the fastest possible route to the "easily verified factual error" Google's helpful-content guidance penalizes, and it is worse than having no citation at all. If you do not have a real, verifiable source for a claim, write the claim without a citation and without a number — or leave it out. Do NOT emit a \`[SOURCE:]\` marker you cannot stand behind.
+- **Calibrated confidence**: state what is well-established plainly, and keep the qualifier when something genuinely varies by case ("in most installations", "depending on substrate"). Do not flatten real uncertainty into false certainty to sound authoritative.
 - **Self-contained paragraphs**: each paragraph stands alone — search engines can quote it without surrounding context.
 - **Active voice, second person** ("you / your") for instructional/how-to sections.
 - **Sentence length**: vary. Mix short punchy sentences with longer explanatory ones. Avg 14–20 words.
@@ -264,6 +266,9 @@ Business goal: ${brief.businessObjective}
 Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
   }
 
+  // E-E-A-T: the only input carrying information the SERP does not already have.
+  prompt += buildFirsthandExperienceBlock(brief);
+
   // Dynamic context from the article plan
   prompt += `
 
@@ -284,6 +289,64 @@ Call to action: ${brief.callToAction || 'No hard CTA — focus on value'}`;
   prompt += buildSerpSignalsWriterBlock(research?.serpSignals);
 
   return prompt;
+}
+
+/**
+ * First-hand experience block — the "E" in E-E-A-T.
+ *
+ * Every other input to the writer (research, SERP signals, competitor content
+ * scores) is derived from the pages we are trying to outrank, so an article built
+ * from those alone is by construction a better-formatted restatement of what is
+ * already ranking. Google's helpful-content guidance calls that out directly
+ * ("adds substantial value beyond source material", "demonstrates first-hand
+ * expertise"). This block is the only place where information the SERP does not
+ * contain enters the prompt.
+ *
+ * Returns '' when the brief carries none — the analyzer raises a `firsthand_experience`
+ * fix in that case rather than the writer inventing experience it does not have.
+ */
+function buildFirsthandExperienceBlock(brief?: ContentBrief): string {
+  const fx = brief?.firsthandExperience;
+  if (!fx) return '';
+
+  const data = fx.proprietaryData?.filter(Boolean) ?? [];
+  const examples = fx.ownedExamples?.filter(Boolean) ?? [];
+  if (!data.length && !examples.length && !fx.methodology && !fx.credentials) return '';
+
+  let block = `
+
+=== FIRST-HAND EXPERIENCE (E-E-A-T — USE THIS, IT IS WHY THIS ARTICLE EXISTS) ===
+Everything else in this prompt was derived from pages already ranking for this query.
+The material below is ours and appears nowhere else on the SERP. Weave it through the
+body — it is the article's reason to outrank the incumbents, not a decorative extra.`;
+
+  if (fx.credentials) {
+    block += `\n\n**Our standing to write this**: ${fx.credentials}
+Reflect this in how directly the article speaks. Do not claim credentials beyond this line.`;
+  }
+
+  if (data.length) {
+    block += `\n\n**Our own data** — cite these as ours ("in our own testing", "across the N orders we handled"), NOT as an external source:
+${data.map((d) => `- ${d}`).join('\n')}
+Put at least one of these inside a \`> [!example]\` block with the concrete number visible.`;
+  }
+
+  if (examples.length) {
+    block += `\n\n**Our own examples** — real products/projects/customers to reference by name:
+${examples.map((e) => `- ${e}`).join('\n')}
+Use at least one as the concrete example required by the ARTICLE STRUCTURE rules, instead of a generic hypothetical.`;
+  }
+
+  if (fx.methodology) {
+    block += `\n\n**How we know it** (Google's "How"): ${fx.methodology}
+State this explicitly wherever our data is cited — one clause is enough ("measured across 40 samples over six months"). Unexplained proprietary numbers read as invented.`;
+  }
+
+  block += `\n\nHARD RULE: do not extend, round up, or extrapolate beyond the facts listed above, and do not
+invent additional first-hand experience to match. If the material does not cover a section, write that
+section from general knowledge without claiming we experienced it.`;
+
+  return block;
 }
 
 /**

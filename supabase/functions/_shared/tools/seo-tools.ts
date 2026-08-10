@@ -253,7 +253,9 @@ export const createSEOArticleWriterTool = (userId: string, onProgress?: (status:
       description: 'Write a full SEO article from an article plan. Uses Claude Opus to generate high-quality long-form content following the plan structure. Requires an article plan from seo_article_planner tool.',
       schema: z.object({
         article_plan: z.any().describe('Full article plan from seo_article_planner tool'),
-        content_brief: z.any().optional().describe('Optional content brief with brand voice and audience details'),
+        content_brief: z.any().optional().describe(
+          'Optional content brief with brand voice and audience details. Include `firsthandExperience` {proprietaryData[], ownedExamples[], methodology, credentials} when the user has their own data, products or projects to cite — it is the only input to the writer that is not derived from the competing pages. Never invent its contents.',
+        ),
         _workflow_run_id: z.string().optional().describe('Workflow run_id from the wizard prefix.'),
       }),
     }
@@ -385,7 +387,13 @@ export const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => 
       schema: z.object({
         topic: z.string().describe('The broad topic or niche (e.g. "sustainable architecture")'),
         target_keyword: z.string().describe('The primary keyword to target (e.g. "recycled concrete aggregates")'),
-        content_brief: z.any().optional().describe('Optional content brief with audience, brand voice, business context'),
+        content_brief: z.any().optional().describe(
+          'Optional content brief with audience, brand voice, business context. Two blocks materially change the output and are worth asking the user for: ' +
+          '`provenance` {authorName, authorTitle, authorBio, authorUrl, publisherName, reviewedBy, aiDisclosure: "ai_generated"|"ai_assisted"|"human_written"} — emits schema.org author/publisher and a visible byline; ' +
+          '`firsthandExperience` {proprietaryData[], ownedExamples[], methodology, credentials} — the user\'s own measurements, products and projects. ' +
+          'Every other input to the article is derived from the pages it is competing against, so this is the only information Google cannot already get from the incumbents. ' +
+          'NEVER invent values for either block — ask the user, or omit them and let the analyzer report the gap.',
+        ),
         auto_fix: z.boolean().optional().describe('Auto-fix content if quality score is below 70 (default: true)'),
         max_fix_iterations: z.number().optional().describe('Max auto-fix iterations (default: 2)'),
         content_type: z.string().optional().describe('Article type: guide, listicle, comparison, how-to, case-study (default: guide)'),

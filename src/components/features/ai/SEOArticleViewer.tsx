@@ -257,6 +257,7 @@ const SECTION_NAMES: Record<string, string> = {
   h2h6Headings: 'H2-H6 Headings',
   contentDepth: 'Content Depth',
   keywordDensity: 'Keyword Density',
+  helpfulContent: 'Helpful Content (E-E-A-T)',
 };
 
 const GEO_SIGNAL_NAMES: Record<string, string> = {
@@ -268,7 +269,10 @@ const GEO_SIGNAL_NAMES: Record<string, string> = {
   schemaCoverage: 'Schema Coverage',
   sourceCitations: 'Source Citations',
   directAnswers: 'Direct Answers',
+  // `authorityTone` is retained for articles generated before 2026-08-10 — the signal
+  // was replaced by `claimAttribution`, but their stored geoScore blobs still carry it.
   authorityTone: 'Authority Tone',
+  claimAttribution: 'Claim Attribution',
   selfContainedParagraphs: 'Self-Contained Paragraphs',
 };
 

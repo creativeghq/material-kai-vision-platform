@@ -79,6 +79,33 @@ The five original functions (`seo-research` / `seo-plan` / `seo-write` / `seo-an
 
 Every action is surfaced to the `kai` agent as a first-class tool, so the same work can be done from chat or from the dashboard (capability-fabric parity). The DataForSEO gap capabilities were promoted from internal helpers to agent tools in the same pass.
 
+### 5.1 Helpful-content / E-E-A-T (2026-08-10)
+
+Every other input to the writer — research, SERP signals, competitor content scores — is derived
+from the pages the article is trying to outrank, so an article built from those alone is by
+construction a better-formatted restatement of what already ranks. Two `ContentBrief` blocks are
+the only inputs that carry information the SERP does not already contain:
+
+| Brief field | Feeds | Absent → |
+|---|---|---|
+| `provenance` (author, title, bio, publisher, `reviewedBy`, `aiDisclosure`) | schema.org `author`/`publisher`/`datePublished`/`reviewedBy`, plus a visible byline appended to the markdown at finalize | `provenance` fix, `medium` |
+| `firsthandExperience` (`proprietaryData`, `ownedExamples`, `methodology`, `credentials`) | a dedicated writer-prompt block; the required `[!example]` block uses a real example instead of a hypothetical | `firsthand_experience` fix, `medium` |
+
+**Neither check is auto-fixable, and neither ever synthesises its own input.** An LLM told to "add
+an author" or "add first-hand experience" invents both, which is the exact failure these checks
+exist to catch — a fabricated byline is a worse signal than a missing one. They report and stop.
+Both land in the `helpfulContent` section score.
+
+Three scoring rules were corrected in the same pass because they pushed *against* the guidance:
+
+- **Keyword density is now asymmetric.** Too low is informational (`low`, not auto-fixable); it used to be `high` + auto-fixable, which sent the fix loop back into the prose to inject keyword repetitions purely to move a number that has not been a positive ranking signal for years. Placement (first 100 words / H1 / an H2) is what is actually enforced. Too high is still auto-fixed — removing stuffing improves prose and ranking together.
+- **`authorityTone` → `claimAttribution`.** The old signal penalised hedging ("might", "perhaps"), i.e. scored an article *up* for asserting things it could not support, and the fix loop stripped qualifiers out of claims that genuinely vary by case. It now penalises the real problem — the appeal to an unnamed authority ("studies show", "experts agree"). The writer prompt gained a matching hard rule: never invent a source, URL, statistic, quote or person.
+- **The auto-fix loop is gated on `reachableScore`, not `overallScore`** — the raw score with non-auto-fixable penalties added back. Previously an article whose only remaining problems were unfixable (plan-level meta lengths, intent mismatch, and now the two checks above) could never reach 70, so it burned all three paid iterations re-editing prose that was already finished.
+
+Still open, deliberately not built: no scaled-content guard (Phase 5 auto-suggests write-next
+topics with no check against the site's declared focus) and no YMYL gate. The `[SOURCE:]` and
+`[INTERNAL:]` quotas in checks 11/12 remain arbitrary counts.
+
 ---
 
 ## 6. Crons

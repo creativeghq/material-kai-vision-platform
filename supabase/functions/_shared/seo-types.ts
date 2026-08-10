@@ -174,6 +174,40 @@ export interface ContentBrief {
   requiredPoints: string[];
   internalLinksContext: string[];
 
+  // ── E-E-A-T provenance — Google's "Who / How / Why" self-assessment ──
+  // Feeds the JSON-LD author/publisher block AND the visible byline appended at
+  // finalize. Optional on purpose: when it is absent the analyzer raises a
+  // `provenance` fix rather than the pipeline inventing an author, because a
+  // fabricated byline is worse than no byline.
+  provenance?: {
+    authorName: string | null;
+    authorTitle: string | null;
+    authorBio: string | null;
+    authorUrl: string | null;
+    /** Falls back to the connected website's display name when null. */
+    publisherName: string | null;
+    /** Named human who checked the draft — the strongest signal on YMYL topics. */
+    reviewedBy: string | null;
+    /** "How" — Google asks for automation to be disclosed, not hidden. */
+    aiDisclosure: 'ai_generated' | 'ai_assisted' | 'human_written' | null;
+  } | null;
+
+  // ── First-hand experience — the "E" in E-E-A-T ──────────────────────
+  // Everything else the writer sees is derived from the SERP it is trying to
+  // outrank, so without this block the article contains nothing a reader could
+  // not already get from the incumbents. This is the only input that carries
+  // information Google cannot find anywhere else.
+  firsthandExperience?: {
+    /** Numbers we measured ourselves, not sourced from a competitor page. */
+    proprietaryData: string[];
+    /** Our own products, projects, installations, customers. */
+    ownedExamples: string[];
+    /** How we know it — test setup, sample size, time period. */
+    methodology: string | null;
+    /** Why we are qualified — years in the trade, certifications, volume handled. */
+    credentials: string | null;
+  } | null;
+
   // Cluster Context
   clusterContext: {
     pillarTopic: string | null;
@@ -267,7 +301,15 @@ export interface GEOScore {
     schemaCoverage: number;
     sourceCitations: number;
     directAnswers: number;
-    authorityTone: number;
+    /**
+     * Unattributed-claim penalty. This was a HEDGING penalty ("might", "perhaps",
+     * "possibly") until 2026-08-10, which scored an article UP for stating things
+     * it could not support as flat fact — the exact inverse of Google's
+     * helpful-content guidance on easily-verified factual errors, and actively
+     * dangerous on YMYL topics. It now penalizes the real problem: a confident
+     * claim with nobody behind it ("studies show", "experts agree").
+     */
+    claimAttribution: number;
     selfContainedParagraphs: number;
   };
   recommendations: string[];
@@ -294,6 +336,8 @@ export interface ContentAnalysisResult {
     h2h6Headings: SectionScore;
     contentDepth: SectionScore;
     keywordDensity: SectionScore;
+    /** Google's "Who / How / Why" — author byline, AI disclosure, first-hand experience. */
+    helpfulContent: SectionScore;
   };
 }
 
