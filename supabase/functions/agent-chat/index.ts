@@ -21,6 +21,9 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 // Cluster → tool_ids, GENERATED from agentToolsCatalog.TOOLKITS (the picker's own
 // source). Boot-safe: a plain data module with no npm deps and no env reads.
 import { TOOLKIT_CLUSTERS } from '../_shared/toolkitClusters.generated.ts';
+// Type-only — erased at compile time, so it costs nothing at boot. The implementation is
+// loaded inside initRuntime() alongside the other lazy modules.
+import type { AgentMemory as AgentMemoryType } from '../_shared/agent-memory.ts';
 
 // Runtime singletons — initialized once on first request
 let _initialized = false;
@@ -57,7 +60,7 @@ async function initRuntime() {
   if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY must be set');
 
   // Load all shared modules + npm packages in parallel
-  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod, aiLoggerMod] = await Promise.all([
+  const [creditMod, promptMod, lgCoreMod, authMod, skillsMod, flowMod, sbMod, anthropicMod, toolsMod, zodMod, lgMod, msgMod, aiLoggerMod, memoryMod] = await Promise.all([
     import('../_shared/credit-utils.ts'),
     import('../_shared/prompt-utils.ts'),
     import('../_shared/langgraph-core.ts'),
@@ -71,6 +74,7 @@ async function initRuntime() {
     import('@langchain/langgraph'),
     import('@langchain/core/messages'),
     import('../_shared/ai-logger.ts'),
+    import('../_shared/agent-memory.ts'),
   ]);
 
   debitAgentChatTurn = creditMod.debitAgentChatTurn;
@@ -104,7 +108,7 @@ async function initRuntime() {
   aiCallLogger = new aiLoggerMod.AICallLogger(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   // Initialize singletons that depend on loaded modules
-  longTermMemory = new LongTermMemory();
+  longTermMemory = new memoryMod.AgentMemory(supabase);
   buildAgentStateAnnotation();
 
   modelHaiku = new ChatAnthropic({
@@ -123,116 +127,12 @@ async function initRuntime() {
   _initialized = true;
 }
 
-/**
- * Long-term Memory System
- * Stores and retrieves important facts from previous conversations
- */
-class LongTermMemory {
-  private tableName = 'agent_memories';
-
-  /**
-   * Store a memory/fact from conversation
-   */
-  async store(userId: string, workspaceId: string, memory: {
-    content: string;
-    type: 'preference' | 'fact' | 'context' | 'relationship';
-    agentId: string;
-    conversationId?: string;
-    metadata?: Record<string, any>;
-  }): Promise<void> {
-    try {
-      await supabase
-        .from(this.tableName)
-        .insert({
-          user_id: userId,
-          workspace_id: workspaceId,
-          memory_type: memory.type,
-          content: memory.content,
-          agent_id: memory.agentId,
-          conversation_id: memory.conversationId,
-          metadata: memory.metadata || {},
-          created_at: new Date().toISOString(),
-        });
-    } catch (error) {
-      console.error('Memory store error:', error);
-    }
-  }
-
-  /**
-   * Retrieve relevant memories for context
-   */
-  async retrieve(userId: string, workspaceId: string, options?: {
-    limit?: number;
-    types?: string[];
-    agentId?: string;
-  }): Promise<any[]> {
-    try {
-      let query = supabase
-        .from(this.tableName)
-        .select('*')
-        .eq('user_id', userId)
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false })
-        .limit(options?.limit || 20);
-
-      if (options?.types && options.types.length > 0) {
-        query = query.in('memory_type', options.types);
-      }
-
-      if (options?.agentId) {
-        query = query.eq('agent_id', options.agentId);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Memory retrieve error:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Memory retrieve error:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Format memories as context string for agent
-   */
-  formatForContext(memories: any[]): string {
-    if (!memories || memories.length === 0) return '';
-
-    const grouped = memories.reduce((acc: any, mem: any) => {
-      const type = mem.memory_type || 'general';
-      if (!acc[type]) acc[type] = [];
-      acc[type].push(mem.content);
-      return acc;
-    }, {});
-
-    let context = '\n## Long-Term Memory Context\n';
-
-    if (grouped.preference && grouped.preference.length > 0) {
-      context += '\n### User Preferences:\n';
-      grouped.preference.forEach((p: string) => context += `- ${p}\n`);
-    }
-
-    if (grouped.fact && grouped.fact.length > 0) {
-      context += '\n### Known Facts:\n';
-      grouped.fact.forEach((f: string) => context += `- ${f}\n`);
-    }
-
-    if (grouped.context && grouped.context.length > 0) {
-      context += '\n### Previous Context:\n';
-      grouped.context.forEach((c: string) => context += `- ${c}\n`);
-    }
-
-    return context;
-  }
-}
-
 // Singletons — initialized in initRuntime()
-let longTermMemory: LongTermMemory;
+// Long-term memory lives in _shared/agent-memory.ts (#233): an LLM promotion gate, cosine
+// recall over voyage-4 vectors, and provenance/recall traces. The version that used to sit
+// here wrote by regex and read by `order by created_at desc`, and had promoted exactly one
+// memory across 800+ real runs.
+let longTermMemory: AgentMemoryType;
 
 /**
  * LangGraph State Annotation
@@ -1276,16 +1176,24 @@ async function executeAgent(
     throw new Error(`Failed to load agent configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
-  // 🧠 Long-term Memory: Retrieve relevant memories for context
+  // 🧠 Long-term Memory: recall the slice relevant to THIS turn (#233).
+  // Ranked by cosine against the user's message, not by `created_at desc` — the old
+  // recency read meant a user with 30 memories got their 10 newest regardless of what
+  // they had just asked about. `match_reason` on each row says which tier answered
+  // (pinned preference / semantic / recency fallback) so a degraded read is visible.
   try {
-    const memories = await longTermMemory.retrieve(userId, workspaceId, {
+    const memories = await longTermMemory.recall(userId, workspaceId, agentId, userInput, {
       limit: 10,
-      agentId: agentId,
+      conversationId: conversation_id ?? null,
     });
 
     if (memories.length > 0) {
-      const memoryContext = longTermMemory.formatForContext(memories);
-      systemPrompt = systemPrompt + memoryContext;
+      systemPrompt = systemPrompt + longTermMemory.formatForContext(memories);
+      const degraded = memories.filter((m) => m.match_reason === 'recency_fallback').length;
+      console.log(
+        `🧠 Recalled ${memories.length} memories for ${agentId}` +
+        (degraded ? ` (${degraded} via recency fallback — not semantically ranked)` : ''),
+      );
     }
   } catch (memError) {
     console.warn('⚠️ Could not load long-term memories:', memError);
@@ -2605,100 +2513,44 @@ function checkAgentAccess(role: string, agentId: string): { allowed: boolean; ro
 
 
 /**
- * Extract and store important memories from conversation
- * Identifies preferences, facts, and context for long-term memory
+ * Promotion gate — run the finished turn past the distiller and store what survives (#233).
+ *
+ * The gate itself is in `_shared/agent-memory.ts`. This wrapper exists to bill it: the
+ * distiller is a real Haiku call, and its tokens go through the SAME `log_agent_usage`
+ * path as the turn that produced them, so memory never becomes an unattributed line of
+ * platform spend. One billing derivation, not a second one bolted onto the side.
+ *
+ * Fire-and-forget: memory is worth a turn's tokens, never a turn's failure.
  */
-async function extractAndStoreMemories(
+async function promoteTurnToMemory(
   userId: string,
   workspaceId: string,
   agentId: string,
   userInput: string,
   agentResponse: string,
-  toolResults?: any[]
+  conversationId?: string | null,
 ) {
-  try {
-    // Extract preferences from user input
-    const preferencePatterns = [
-      /i (?:prefer|like|want|love|enjoy|need) (.+?)(?:\.|,|$)/gi,
-      /my (?:favorite|preferred|usual) (?:is|are) (.+?)(?:\.|,|$)/gi,
-      /i'm (?:looking for|interested in) (.+?)(?:\.|,|$)/gi,
-    ];
+  const result = await longTermMemory.promote({
+    userId,
+    workspaceId,
+    agentId,
+    userInput,
+    agentResponse,
+    conversationId: conversationId ?? null,
+  });
 
-    for (const pattern of preferencePatterns) {
-      const matches = userInput.matchAll(pattern);
-      for (const match of matches) {
-        if (match[1] && match[1].length > 5 && match[1].length < 200) {
-          await longTermMemory.store(userId, workspaceId, {
-            content: `User prefers: ${match[1].trim()}`,
-            type: 'preference',
-            agentId,
-            metadata: { source: 'user_input', extractedFrom: match[0] },
-          });
-        }
-      }
-    }
+  if (result.usage && result.usage.totalTokens > 0) {
+    await logAgentUsage(userId, workspaceId, `${agentId}:memory`, {
+      ...result.usage,
+      turnCount: 1,
+    });
+  }
 
-    // Extract facts from successful tool results
-    if (toolResults && toolResults.length > 0) {
-      for (const toolResult of toolResults) {
-        // Store material search context
-        if (toolResult.tool === 'material_search' && toolResult.result?.success) {
-          const searchQuery = toolResult.result?.query || '';
-          const resultCount = toolResult.result?.results?.length || 0;
-          if (searchQuery && resultCount > 0) {
-            await longTermMemory.store(userId, workspaceId, {
-              content: `User searched for "${searchQuery}" and found ${resultCount} materials`,
-              type: 'context',
-              agentId,
-              metadata: { tool: 'material_search', resultCount },
-            });
-          }
-        }
-
-        // Store 3D generation context
-        if (toolResult.tool === 'generate_3d' && toolResult.result?.success) {
-          const roomType = toolResult.result?.room_type || 'room';
-          const style = toolResult.result?.style || '';
-          await longTermMemory.store(userId, workspaceId, {
-            content: `User generated 3D design for ${roomType}${style ? ` in ${style} style` : ''}`,
-            type: 'context',
-            agentId,
-            metadata: { tool: 'generate_3d', roomType, style },
-          });
-        }
-
-        // Store company/contact research context
-        if (toolResult.tool === 'company_enrichment' && toolResult.result?.found) {
-          const companyName = toolResult.result?.company?.name || '';
-          if (companyName) {
-            await longTermMemory.store(userId, workspaceId, {
-              content: `User researched company: ${companyName}`,
-              type: 'relationship',
-              agentId,
-              metadata: { tool: 'company_enrichment', companyName },
-            });
-          }
-        }
-
-        // Store CRM saves
-        if (toolResult.tool === 'save_to_crm' && toolResult.result?.success) {
-          const companyName = toolResult.result?.company_name || '';
-          const contactCount = toolResult.result?.contacts_created || 0;
-          if (companyName) {
-            await longTermMemory.store(userId, workspaceId, {
-              content: `User saved ${companyName} to CRM with ${contactCount} contacts`,
-              type: 'relationship',
-              agentId,
-              metadata: { tool: 'save_to_crm', companyName, contactCount },
-            });
-          }
-        }
-      }
-    }
-
-  } catch (error) {
-    console.error('Memory extraction error:', error);
-    // Non-critical - don't throw
+  if (result.promoted > 0) {
+    console.log(
+      `🧠 Promoted ${result.promoted} memories (${result.superseded} superseding, ` +
+      `${result.embedded} embedded, ${result.skipped} rejected) for ${agentId}`,
+    );
   }
 }
 
@@ -3189,9 +3041,9 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             throw new Error('Agent execution failed to return a valid result');
           }
 
-          // 🧠 Extract and store memories from conversation (non-blocking)
-          extractAndStoreMemories(userId, workspaceId, agentId, userInput, finalResult.text, finalResult.toolResults)
-            .catch(err => console.warn('⚠️ Memory extraction failed:', err));
+          // 🧠 Promotion gate: distil this turn into long-term memory (non-blocking)
+          promoteTurnToMemory(userId, workspaceId, agentId, userInput, finalResult.text, conversation_id)
+            .catch(err => console.warn('⚠️ Memory promotion failed:', err));
 
           // 🔄 Emit flow events based on tool results (fire-and-forget)
           if (finalResult.toolResults?.length) {

@@ -15,7 +15,7 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 - Real-time prompt updates
 - Role-based access control (RBAC) tool gating
 - Tool orchestration with LangChain.js
-- Long-term memory for cross-conversation context
+- Long-term memory for cross-conversation context — LLM promotion gate + semantic recall (#233)
 - Skills system for domain-specific knowledge injection
 - Multimodal support (images sent as vision content blocks)
 
@@ -46,7 +46,7 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 │              Database (PostgreSQL/Supabase)                 │
 │  - prompts table (unified for all AI prompts)               │
 │  - agent_checkpoints (conversation state)                   │
-│  - agent_memories (long-term memory)                        │
+│  - agent_memories (long-term memory, halfvec-searchable)    │
 └─────────────────────────────────────────────────────────────┘
 
 ---
@@ -369,6 +369,12 @@ All requests require:
 2. Verify agent status is 'active' in database
 3. Check API keys are configured
 4. Review rate limits
+
+### Agent Never Remembers Anything
+The memory system fails silently by design of the failure, not the code — see
+[langgraph-implementation.md → Long-Term Memory](langgraph-implementation.md#long-term-memory)
+and run `select * from dic_detect__ops_silent_zero()`; the `agent_memory_*` probes name
+which half (promote / embed / recall) is dead.
 
 ### B2B Search Failing
 1. Verify `ANTHROPIC_API_KEY` is set and has sufficient quota
