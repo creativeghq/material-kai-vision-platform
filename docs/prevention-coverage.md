@@ -225,9 +225,10 @@ identically to a MISS, so a 97.5% hit rate reduced the meter by exactly zero.
 | [tests/unit/companyIdentity.test.ts](../tests/unit/companyIdentity.test.ts) | `npm test`, blocking | shape 8 — one identity lookup for every create-a-business surface, `crm_companies` direct-insert ratchet | **yes** — asserts its own scan matched >500 files before trusting the verdict, so an inert glob fails instead of reporting clean |
 | [tests/unit/productRelationDerivation.test.ts](../tests/unit/productRelationDerivation.test.ts) | `npm test`, blocking | shape 1 off the money path — a second client-side derivation of "what relates to this product" (#267) | **yes** — asserts its scan matched >100 files, and was watched to fail on a planted violation before shipping |
 | `product_edges` composite FKs | every write | invariant 1 — an edge's two products must both sit in the edge's workspace | n/a — declarative; unlike a trigger it cannot be disabled |
+| `ops.product_edges_never_written` | nightly | shape 4 on the edge rebuild — it ran and wrote nothing, or has not run for 3 days | **yes** — both branches were watched to fire on planted state, and the healthy case was confirmed to return **0** rows first, so a probe that always fires would have been caught |
 
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
-what it found. Ten of twenty qualify. That is the gap.
+what it found. Eleven of twenty-one qualify. That is the gap.
 
 > **`db.plpgsql-lint` has one known false-positive shape: runtime-created temp tables.**
 > `plpgsql_check` analyses statically, so a `create temporary table X` inside a function makes it
