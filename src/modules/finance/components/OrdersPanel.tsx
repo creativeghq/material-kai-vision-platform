@@ -1675,6 +1675,16 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   }, [order]);
 
   /**
+   * Controlled rather than `defaultValue`, so a panel can hand the operator off to the tab that
+   * owns the action it is describing — a purchase order's Invoices tab pointing at Expenses, where
+   * the supplier's bill actually lives. Falls back whenever the remembered tab is not on offer
+   * (opening a different order, or one of the other type).
+   */
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+  useEffect(() => { setActiveTab(null); }, [orderId]);
+  const currentTab = activeTab && orderTabs.includes(activeTab) ? activeTab : orderTabs[0];
+
+  /**
    * The FORWARD view, and its control: the customer's sales order this purchase was made to serve.
    *
    * `raise_cover_purchase_orders` sets `covers_order_id` when the sale comes first, and the New
@@ -2678,7 +2688,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             <OrderCustomsCard orderId={order.id} />
 
             {orderTabs.length > 0 && (
-            <Tabs defaultValue={orderTabs[0]} className="w-full">
+            <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
               <TabsList>
                 {orderTabs.includes('suppliers') && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
                 {orderTabs.includes('invoices') && <TabsTrigger value="invoices">Invoices</TabsTrigger>}
@@ -2693,19 +2703,24 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 Empty means one of two different things, so it says which: a line with no cost owes
                 nobody anything, while a line with a cost and no supplier is a payable we cannot
                 attribute — and that one is fixable right there on the line. */}
-            {order.order_type === 'sales' && supExposure.length === 0 && (
+            {order.order_type === 'sales' && (
               <div className="rounded-md border border-border/60">
-                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Suppliers on this order — what we owe</div>
-                <p className="px-3 py-2 text-[11px] text-muted-foreground">
-                  {items.some((it) => it.unit_cost != null && Number(it.unit_cost) > 0 && !it.supplier_company_id)
-                    ? 'No supplier is set on the lines that carry a cost, so what we owe cannot be attributed. Set one from the line above.'
-                    : 'No line on this order carries a cost, so there is nothing owed to a supplier.'}
-                </p>
-              </div>
-            )}
-            {order.order_type === 'sales' && supExposure.length > 0 && (
-              <div className="rounded-md border border-border/60">
-                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Suppliers on this order — what we owe</div>
+                <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                  <span>Suppliers on this order — what we owe</span>
+                  {/* The rollup is derived from the LINES, so there is nothing to add here directly.
+                      What an operator actually wants at this point is to book the cost — the same
+                      expense form the per-supplier Pay button opens, with nothing pre-filled. */}
+                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
+                    <ArrowUpRight className="h-3 w-3 mr-1 text-red-400" /> Add supplier cost
+                  </Button>
+                </div>
+                {supExposure.length === 0 && (
+                  <p className="px-3 py-2 text-[11px] text-muted-foreground">
+                    {items.some((it) => it.unit_cost != null && Number(it.unit_cost) > 0 && !it.supplier_company_id)
+                      ? 'No supplier is set on the lines that carry a cost, so what we owe cannot be attributed. Set one from the line above.'
+                      : 'No line on this order carries a cost, so there is nothing owed to a supplier.'}
+                  </p>
+                )}
                 {supExposure.map((s) => (
                   <div key={s.supplier_company_id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
                     <span className="inline-flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-muted-foreground" /> {s.name}</span>
@@ -2736,14 +2751,30 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 document is issued when the goods get one — so the empty line says that plainly
                 rather than leaving a blank panel that reads as a failure to load. */}
             <div className="rounded-md border border-border/60">
-              <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
-                Invoices{fin && fin.invoices.length > 0 ? ` (${fin.invoices.length})` : ''}
+              <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                <span>Invoices{fin && fin.invoices.length > 0 ? ` (${fin.invoices.length})` : ''}</span>
+                {/* Same guard as the Actions menu: an order already invoiced must not raise a second
+                    document from the same lines. Nothing is offered on a purchase — a purchase is
+                    documented by the supplier's own bill, which is an expense, and the empty state
+                    below sends you there rather than pretending there is an invoice to issue. */}
+                {order.order_type === 'sales' && (fin?.invoices.length ?? 0) === 0 && (
+                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" disabled={saving} onClick={createInvoice}>
+                    <FileText className="h-3 w-3 mr-1" /> {salesDocKind === 'receipt' ? 'Create receipt' : 'Create invoice'}
+                  </Button>
+                )}
               </div>
               {!fin || fin.invoices.length === 0 ? (
-                <p className="px-3 py-2 text-[11px] text-muted-foreground">
-                  {order.order_type === 'sales'
-                    ? 'Nothing has been invoiced to the customer yet.'
-                    : 'The supplier has not been invoiced against this order.'}
+                <p className="flex flex-wrap items-center gap-x-1 gap-y-0.5 px-3 py-2 text-[11px] text-muted-foreground">
+                  {order.order_type === 'sales' ? (
+                    'Nothing has been invoiced to the customer yet.'
+                  ) : (
+                    <>
+                      A purchase is documented by the supplier’s own bill, not an invoice you issue.
+                      <button type="button" className="text-foreground underline underline-offset-2 hover:text-primary" onClick={() => setActiveTab('expenses')}>
+                        Book it under Expenses
+                      </button>
+                    </>
+                  )}
                 </p>
               ) : fin.invoices.map((iv) => (
                 <div key={iv.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
@@ -2787,9 +2818,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               <div className="rounded-md border border-border/60">
                 <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
                   <span>Expenses on this order{fin && fin.supplierBills.length > 0 ? ` (${fin.supplierBills.length})` : ''}</span>
-                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => setLinkExpenseOpen(true)}>
-                    <Link2 className="h-3 w-3 mr-1" /> Attach existing
-                  </Button>
+                  {/* An order holds MANY expenses (`supplier_bills.order_id` is not unique), so both
+                      stay available after the first one: "Add" books a new cost, "Attach" claims one
+                      already sitting in Payables — the transport invoice that landed a week late. */}
+                  <span className="flex items-center gap-1">
+                    <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
+                      <ArrowUpRight className="h-3 w-3 mr-1 text-red-400" /> Add {(fin?.supplierBills.length ?? 0) > 0 ? 'another' : 'expense'}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => setLinkExpenseOpen(true)}>
+                      <Link2 className="h-3 w-3 mr-1" /> Attach existing
+                    </Button>
+                  </span>
                 </div>
                 {!fin || fin.supplierBills.length === 0 ? (
                   <p className="px-3 py-2 text-[11px] text-muted-foreground">
@@ -2834,7 +2873,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 instead of disappearing. */}
             {(!fin || (fin.payments.length === 0 && fin.creditApplied.length === 0)) && (
               <div className="rounded-md border border-border/60">
-                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Payments &amp; expenses</div>
+                <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                  <span>Payments &amp; expenses</span>
+                  {/* The order's own settlement, seeded with what is still outstanding — a sale is
+                      settled by the customer paying us, a purchase by us paying the supplier, and
+                      the same dialog records both. */}
+                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => setPayInOpen({ amount: outstanding > 0.005 ? outstanding : undefined })}>
+                    {order.order_type === 'purchase'
+                      ? <ArrowUpRight className="h-3 w-3 mr-1 text-red-400" />
+                      : <ArrowDownLeft className="h-3 w-3 mr-1 text-emerald-500" />}
+                    Record payment
+                  </Button>
+                </div>
                 <p className="px-3 py-2 text-[11px] text-muted-foreground">
                   No cash has moved on this order yet — nothing received, nothing paid out.
                 </p>
@@ -2842,7 +2892,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             )}
             {fin && (fin.payments.length > 0 || fin.creditApplied.length > 0) && (
               <div className="rounded-md border border-border/60">
-                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Payments &amp; expenses</div>
+                <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                  <span>Payments &amp; expenses</span>
+                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => setPayInOpen({ amount: outstanding > 0.005 ? outstanding : undefined })}>
+                    {order.order_type === 'purchase'
+                      ? <ArrowUpRight className="h-3 w-3 mr-1 text-red-400" />
+                      : <ArrowDownLeft className="h-3 w-3 mr-1 text-emerald-500" />}
+                    Record payment
+                  </Button>
+                </div>
                 {/* Credit re-homed onto this order from an on-account payment — no fresh cash, so it's
                     read-only here (to reverse it, un-apply from the source payment). Counts in Received. */}
                 {fin.creditApplied.map((c) => (
@@ -2936,13 +2994,29 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 `no_lines` is not "matched": there is nothing to compare, and letting that render as
                 a blank tab would read like a verdict that everything agrees. */}
             {order.order_type === 'purchase' && (!match || match.match_status === 'no_lines') && (
-              <div className="rounded-md border border-border/60 p-3 space-y-1">
+              <div className="rounded-md border border-border/60 p-3 space-y-2">
                 <span className="text-xs font-semibold">3-way match</span>
                 <p className="text-[11px] text-muted-foreground">
                   Nothing to compare yet. The check needs lines on the order with a cost — then it
                   weighs what you <strong>ordered</strong> against what actually <strong>arrived</strong>{' '}
                   and what the supplier <strong>billed</strong>.
                 </p>
+                {/* The billed side is the half an operator can act on from here: without the
+                    supplier's own bill the match sits at "awaiting bill" indefinitely, and a
+                    purchase raised by hand rather than from the Inbox has no other way in. */}
+                <span className="flex items-center gap-1">
+                  <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
+                    <ArrowUpRight className="h-3 w-3 mr-1 text-red-400" /> Record the supplier’s bill
+                  </Button>
+                  {/* Same status gate the Actions menu applies — a fulfilled or cancelled order has
+                      nothing left to receive, and offering it here would be a button that only ever
+                      reports back that it did nothing. */}
+                  {order.status !== 'fulfilled' && order.status !== 'cancelled' && (
+                    <Button size="sm" variant="ghost" className="h-6 text-[11px]" disabled={saving} onClick={receiveWarehouse}>
+                      <PackageCheck className="h-3 w-3 mr-1" /> Receive the goods
+                    </Button>
+                  )}
+                </span>
               </div>
             )}
             {order.order_type === 'purchase' && match && match.match_status !== 'no_lines' && (
