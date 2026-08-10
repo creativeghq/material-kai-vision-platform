@@ -187,7 +187,7 @@ export const OrdersPanel: React.FC<{
    */
   const [templatePrefill, setTemplatePrefill] = useState<OrderPrefill | null>(null);
 
-  // App Launcher deep-link: /finance?tab=orders&new=order opens the New (sales) order flow;
+  // App Launcher deep-link: /finance?tab=doc_orders&new=order opens the New (sales) order flow;
   // `&template=<id>` seeds it from a saved order template.
   // Only in the standalone finance list — never when embedded in a project/party tab.
   useEffect(() => {
@@ -1648,30 +1648,31 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   }, [order?.id, order?.order_type]);
 
   /**
-   * Which reference tabs this order actually has content for, in reading order. Derived from the
-   * SAME conditions the panels themselves use, so a tab can never be offered with nothing behind
-   * it — and `orderTabs[0]` gives the default without hardcoding a tab that may not exist.
+   * The reference tabs, in reading order. EVERY tab an order of this type can have is offered,
+   * whether or not it holds anything — each says so itself when empty.
    *
-   * Declared after `coveredBy` on purpose: it reads that state, and a dependency array evaluated
-   * before the `const` it names is a TDZ crash, not a stale value.
+   * They used to appear only once they had content, which made the tab strip change shape under
+   * the operator: the same order showed three tabs, then four once an invoice was issued, and
+   * "there is no Payments tab" was indistinguishable from "no payment has been recorded". An empty
+   * tab is an answer; a missing one is a question about the UI.
+   *
+   * The two type gates are NOT emptiness gates and stay:
+   *   • Suppliers is sales-only. `create()` stamps every PURCHASE line with the order's own
+   *     supplier, so on a purchase order the block re-derives the order's OWN payable with a
+   *     different formula (getOrderSupplierExposure, not get_order_settlements) — 'owe X' beside a
+   *     differently-derived Outstanding — and its Pay button opens NewExpenseDialog, booking a
+   *     SECOND supplier bill that double-counts the cost in P&L. It answers what a SALE costs us.
+   *   • 3-Way Match is purchase-only: there is no PO cost × goods received × supplier bill to
+   *     compare on a sale.
    */
   const orderTabs = useMemo(() => {
     if (!order) return [] as string[];
     const t: string[] = [];
-    // SALES orders only. `create()` stamps every PURCHASE line with the order's own supplier, so
-    // on a purchase order this block re-derived the order's OWN payable with a different formula
-    // (getOrderSupplierExposure, not get_order_settlements) — 'owe X' beside a differently-derived
-    // Outstanding — and its Pay button opens NewExpenseDialog, which books ANOTHER supplier bill
-    // and double-counts the cost in P&L. Its stated purpose is what a SALE costs us to fulfil.
-    if (order.order_type === 'sales' && supExposure.length > 0) t.push('suppliers');
-    if (fin && fin.invoices.length > 0) t.push('invoices');
-    // "Covered by" lives in this tab, so a sale with cover but no loaded finance still needs it —
-    // otherwise the tab is absent and the block it holds is unreachable.
-    if (fin || coveredBy.length > 0) t.push('expenses');
-    if (fin && (fin.payments.length > 0 || fin.creditApplied.length > 0)) t.push('payments');
-    if (order.order_type === 'purchase' && match && match.match_status !== 'no_lines') t.push('match');
+    if (order.order_type === 'sales') t.push('suppliers');
+    t.push('invoices', 'expenses', 'payments');
+    if (order.order_type === 'purchase') t.push('match');
     return t;
-  }, [order, supExposure, fin, match, coveredBy]);
+  }, [order]);
 
   /**
    * The FORWARD view, and its control: the customer's sales order this purchase was made to serve.
@@ -2688,7 +2689,20 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
 
               <TabsContent value="suppliers" className="mt-3 space-y-3">
             {/* What we owe suppliers on this order — line costs grouped by the line's supplier,
-                minus money-out already paid to them. "Pay" pre-fills a money-out for the balance. */}
+                minus money-out already paid to them. "Pay" pre-fills a money-out for the balance.
+                Empty means one of two different things, so it says which: a line with no cost owes
+                nobody anything, while a line with a cost and no supplier is a payable we cannot
+                attribute — and that one is fixable right there on the line. */}
+            {order.order_type === 'sales' && supExposure.length === 0 && (
+              <div className="rounded-md border border-border/60">
+                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Suppliers on this order — what we owe</div>
+                <p className="px-3 py-2 text-[11px] text-muted-foreground">
+                  {items.some((it) => it.unit_cost != null && Number(it.unit_cost) > 0 && !it.supplier_company_id)
+                    ? 'No supplier is set on the lines that carry a cost, so what we owe cannot be attributed. Set one from the line above.'
+                    : 'No line on this order carries a cost, so there is nothing owed to a supplier.'}
+                </p>
+              </div>
+            )}
             {order.order_type === 'sales' && supExposure.length > 0 && (
               <div className="rounded-md border border-border/60">
                 <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Suppliers on this order — what we owe</div>
@@ -2718,18 +2732,26 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </TabsContent>
 
               <TabsContent value="invoices" className="mt-3 space-y-3">
-            {/* Attached invoices */}
-            {fin && fin.invoices.length > 0 && (
-              <div className="rounded-md border border-border/60">
-                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Invoices</div>
-                {fin.invoices.map((iv) => (
-                  <div key={iv.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
-                    <span className="font-mono text-xs">{iv.internal_number ?? iv.id.slice(0, 8)} · {humanizeLabel(iv.status)}</span>
-                    <span className="tabular-nums">{formatMoney(Number(iv.total), iv.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(iv.amount_due), iv.currency)}</span></span>
-                  </div>
-                ))}
+            {/* Attached invoices. An order with none is the ordinary state, not a fault — the
+                document is issued when the goods get one — so the empty line says that plainly
+                rather than leaving a blank panel that reads as a failure to load. */}
+            <div className="rounded-md border border-border/60">
+              <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+                Invoices{fin && fin.invoices.length > 0 ? ` (${fin.invoices.length})` : ''}
               </div>
-            )}
+              {!fin || fin.invoices.length === 0 ? (
+                <p className="px-3 py-2 text-[11px] text-muted-foreground">
+                  {order.order_type === 'sales'
+                    ? 'Nothing has been invoiced to the customer yet.'
+                    : 'The supplier has not been invoiced against this order.'}
+                </p>
+              ) : fin.invoices.map((iv) => (
+                <div key={iv.id} className="flex justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
+                  <span className="font-mono text-xs">{iv.internal_number ?? iv.id.slice(0, 8)} · {humanizeLabel(iv.status)}</span>
+                  <span className="tabular-nums">{formatMoney(Number(iv.total), iv.currency)} <span className="text-[10px] text-muted-foreground">due {formatMoney(Number(iv.amount_due), iv.currency)}</span></span>
+                </div>
+              ))}
+            </div>
 
               </TabsContent>
 
@@ -2759,15 +2781,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 the header carries the count and the attach action, and each row can be detached
                 again (detaching NEVER deletes the expense — it stays in Payables, just on no
                 order, which is also how you move one to a different order). */}
-            {fin && (
+            {/* Rendered even before `fin` resolves: the tab is always offered, and a tab that opens
+                onto nothing at all reads as broken. Attaching an expense does not need the rollup. */}
+            {(
               <div className="rounded-md border border-border/60">
                 <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                  <span>Expenses on this order{fin.supplierBills.length > 0 ? ` (${fin.supplierBills.length})` : ''}</span>
+                  <span>Expenses on this order{fin && fin.supplierBills.length > 0 ? ` (${fin.supplierBills.length})` : ''}</span>
                   <Button size="sm" variant="ghost" className="h-6 text-[11px]" onClick={() => setLinkExpenseOpen(true)}>
                     <Link2 className="h-3 w-3 mr-1" /> Attach existing
                   </Button>
                 </div>
-                {fin.supplierBills.length === 0 ? (
+                {!fin || fin.supplierBills.length === 0 ? (
                   <p className="px-3 py-2 text-[11px] text-muted-foreground">
                     No cost is booked against this order yet.
                   </p>
@@ -2805,7 +2829,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </TabsContent>
 
               <TabsContent value="payments" className="mt-3 space-y-3">
-            {/* Attached payments */}
+            {/* Attached payments. "No cash has moved" is a real and important answer about an
+                order — it is the difference between unpaid and unknown — so the tab states it
+                instead of disappearing. */}
+            {(!fin || (fin.payments.length === 0 && fin.creditApplied.length === 0)) && (
+              <div className="rounded-md border border-border/60">
+                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Payments &amp; expenses</div>
+                <p className="px-3 py-2 text-[11px] text-muted-foreground">
+                  No cash has moved on this order yet — nothing received, nothing paid out.
+                </p>
+              </div>
+            )}
             {fin && (fin.payments.length > 0 || fin.creditApplied.length > 0) && (
               <div className="rounded-md border border-border/60">
                 <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">Payments &amp; expenses</div>
@@ -2898,7 +2932,19 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
 
               {/* A verdict on everything else in this dialog, so it reads last. */}
               <TabsContent value="match" className="mt-3 space-y-3">
-            {/* 3-way match — purchase orders only: PO cost × goods received × supplier bill. */}
+            {/* 3-way match — purchase orders only: PO cost × goods received × supplier bill.
+                `no_lines` is not "matched": there is nothing to compare, and letting that render as
+                a blank tab would read like a verdict that everything agrees. */}
+            {order.order_type === 'purchase' && (!match || match.match_status === 'no_lines') && (
+              <div className="rounded-md border border-border/60 p-3 space-y-1">
+                <span className="text-xs font-semibold">3-way match</span>
+                <p className="text-[11px] text-muted-foreground">
+                  Nothing to compare yet. The check needs lines on the order with a cost — then it
+                  weighs what you <strong>ordered</strong> against what actually <strong>arrived</strong>{' '}
+                  and what the supplier <strong>billed</strong>.
+                </p>
+              </div>
+            )}
             {order.order_type === 'purchase' && match && match.match_status !== 'no_lines' && (
               <div className="rounded-md border border-border/60 p-3 space-y-2">
                 <div className="flex items-center gap-2">
