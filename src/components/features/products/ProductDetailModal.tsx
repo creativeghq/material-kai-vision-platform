@@ -38,6 +38,7 @@ import { ProductStockPanel } from '@/components/business/marketplace/ProductStoc
 import { ProductCostCard } from '@/components/business/marketplace/ProductCostCard';
 import { ProductPackagingCard } from '@/components/business/marketplace/ProductPackagingCard';
 import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
+import { ProductEmbedReadinessCard } from '@/components/features/products/ProductEmbedReadinessCard';
 import { ProductConfigurator } from '@/components/features/configurator/ProductConfigurator';
 import { ProductOptionsEditor } from '@/components/features/configurator/ProductOptionsEditor';
 import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
@@ -2582,6 +2583,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
             );
           })()}
+
+          {/* Readiness first (#341 join 5): it is the checklist for everything below it, and the
+              only surface that says a product needs a model before the SDK can carry it. */}
+          {isOwnProduct && activeWorkspaceId && (
+            <div className="mt-6">
+              <ProductEmbedReadinessCard productId={product.id} />
+            </div>
+          )}
 
           {/* 3D model management (#321) — own-workspace products only. Buyers of
               someone else's catalog see the viewer, not the upload surface. */}

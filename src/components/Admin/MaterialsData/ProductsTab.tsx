@@ -19,6 +19,11 @@ import { SmartPagination } from '@/components/core/ui/smart-pagination';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { formatDate } from '@/utils/datetime';
 import {
+  readinessFor,
+  readinessSummary,
+  type ProductEmbedReadiness,
+} from '@/services/productEmbedReadinessService';
+import {
   getManufacturer,
   getMaterialCategory,
   getProductName,
@@ -27,6 +32,11 @@ import {
 interface Product {
   id: string;
   name: string;
+  // Carried through to the detail modal, which gates its own-workspace surfaces (3D upload,
+  // configurator, embed readiness) on `product.workspace_id === activeWorkspaceId`. The admin
+  // wrapper used to drop it, so from THIS list — the catalogue management surface — none of those
+  // rendered and nobody was ever asked for a model (#341).
+  workspace_id?: string | null;
   metadata: any;
   created_at: string;
   source_document_id: string;
@@ -52,6 +62,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [reembeddingId, setReembeddingId] = useState<string | null>(null);
+  const [readiness, setReadiness] = useState<Map<string, ProductEmbedReadiness>>(new Map());
   const { toast } = useToast();
 
   const ITEMS_PER_PAGE = 20;
@@ -101,8 +112,15 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
         .range(from, to);
 
       if (error) throw error;
-      setProducts((data as Product[]) || []);
+      const rows = (data as Product[]) || [];
+      setProducts(rows);
       setTotalCount(count || 0);
+      // One batched call for the whole page — the same shape get_order_settlements uses, so the
+      // column costs one query rather than one per row. A failure leaves the column showing "—"
+      // and nothing else on the page notices.
+      readinessFor(rows.map((p) => p.id))
+        .then(setReadiness)
+        .catch(() => setReadiness(new Map()));
     } catch (error) {
       console.error('Failed to load products:', error);
       toast({
@@ -258,6 +276,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                   <TableHead>Category</TableHead>
                   <TableHead>Manufacturer</TableHead>
                   <TableHead>Embedding</TableHead>
+                  <TableHead>Sellable online</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -316,6 +335,24 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                           </Button>
                         </div>
                       )}
+                    </TableCell>
+                    {/* #341 join 5 — the same derived answer the product panel shows, so a catalogue
+                        can be scanned for what is missing instead of opened one product at a time.
+                        Plain coloured words, never a filled pill (design system). */}
+                    <TableCell>
+                      {(() => {
+                        const r = readiness.get(product.id);
+                        if (!r) return <span className="text-xs text-muted-foreground">—</span>;
+                        const { met, total, blocked } = readinessSummary(r);
+                        return (
+                          <span
+                            className={`text-xs ${blocked ? 'text-red-500 dark:text-red-400' : met === total ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}
+                            title={blocked ? 'No published price — the embed cannot serve this product at all' : `${met} of ${total} ready`}
+                          >
+                            {blocked ? 'Not published' : `${met}/${total}`}
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       {formatDate(product.created_at)}

@@ -33,6 +33,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // Convert admin product to unified Product format
   const unifiedProduct = {
     id: product.id,
+    // The unified modal decides `isOwnProduct` from this, and gates the 3D upload card, the
+    // configurator and the embed-readiness panel on it. Dropping it here meant the admin
+    // catalogue — the one screen where someone manages products — showed none of them.
+    workspace_id: product.workspace_id,
     name: extractStringValue(product.name),
     description: extractStringValue(product.description),
     category: product.metadata?.material_category || 'Uncategorized',

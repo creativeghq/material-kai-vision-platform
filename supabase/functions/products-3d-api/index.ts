@@ -116,6 +116,13 @@ async function loadOptions(
  *
  * Server-side and non-negotiable: the scope lives on the key row, never in a request parameter,
  * because the key is publishable and anything the request can assert an attacker can assert too.
+ *
+ * This is the LIST filter; `isProductInScope` below is the GATE, and the gate is authoritative —
+ * it re-asks about the one id through `embed_scope_covers_product`, the single SQL copy of the
+ * rule. Kept as a query here because the shape differs (a capped set for a listing, not a yes/no),
+ * and because it is deliberately allowed to truncate at MAX_SCOPE_ID_FILTER where the gate never
+ * may. If the two ever disagree the gate wins, so the failure is a product appearing in a listing
+ * and 404-ing when opened — visible, and never the reverse.
  */
 async function scopeRestriction(
   supabase: ReturnType<typeof serviceClient>,
@@ -151,18 +158,26 @@ async function isProductInScope(
   ctx: EmbedKeyContext,
   productId: string,
 ): Promise<boolean> {
-  if (ctx.scopeType === 'all') return true;
-  if (ctx.scopeValues.length === 0) return false;
-  if (ctx.scopeType === 'products') return ctx.scopeValues.includes(productId);
-
-  const { data } = await supabase
-    .from('products')
-    .select('id')
-    .eq('workspace_id', ctx.workspaceId)
-    .eq('id', productId)
-    .in('category_id', ctx.scopeValues)
-    .maybeSingle();
-  return !!data;
+  // THE RULE LIVES IN SQL, and this is now a pass-through (#341 join 5).
+  //
+  // It used to be spelled out here. Then the readiness panel needed the same answer — "which of my
+  // keys can actually serve this product" — and a second spelling of one rule is precisely what
+  // `embed.spec_offer_match_drift` exists to catch elsewhere: a panel promising a merchant their
+  // product is reachable while this endpoint 404s it. `embed_scope_covers_product` is the single
+  // copy; both callers pass the scope they already hold, so nothing re-reads the key row.
+  //
+  // Fails CLOSED: an RPC error answers "not in scope" rather than falling through to serve.
+  const { data, error } = await supabase.rpc('embed_scope_covers_product', {
+    p_workspace_id: ctx.workspaceId,
+    p_scope_type: ctx.scopeType,
+    p_scope_values: ctx.scopeValues,
+    p_product_id: productId,
+  });
+  if (error) {
+    console.error('embed_scope_covers_product failed:', error.message);
+    return false;
+  }
+  return data === true;
 }
 
 interface ModelRow {
