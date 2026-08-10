@@ -2,6 +2,11 @@ name = "inbound-email-worker"
 main = "src/index.ts"
 compatibility_date = "2026-08-01"
 
+# This Worker has no fetch handler — Email Routing invokes it, HTTP never does. Publishing it to
+# workers.dev would expose a URL that answers nothing, and on an account without a workers.dev
+# subdomain wrangler tries to register one mid-deploy and fails on a name clash. Say no explicitly.
+workers_dev = false
+
 # Workers Free is enough: the free tier's 10 ms limit is CPU time, not wall-clock, and this
 # handler awaits I/O rather than computing. Breaching it means parsing crept in that belongs in
 # email-webhooks.
