@@ -1,26 +1,58 @@
+/**
+ * Product recommendations — reads the gold-layer `product_edges` table.
+ *
+ * There is ONE derivation of "what relates to this product" (issue #267):
+ * `rebuild_product_edges(workspace)` derives the edges in SQL from silver, and
+ * `get_related_products(...)` is the only read path. This file formats; it never
+ * re-derives. The previous `find_similar_products` / `find_complementary_products`
+ * RPCs were a second, live-per-query derivation that answered the same question
+ * differently — they are gone, and
+ * [tests/unit/productRelationDerivation.test.ts] fails the build if they come back.
+ */
+
 import { supabase } from '@/integrations/supabase/client';
 
-export interface SimilarProduct {
-  product_id: string;
-  similarity: number;
-  match_source: 'vector' | 'same_collection' | 'fallback';
-}
+/** Edge types carried by `product_edges` (CHECK-constrained in the DB). */
+export type ProductEdgeType =
+  | 'material_family'
+  | 'pattern_match'
+  | 'collection'
+  | 'complementary'
+  | 'alternative';
 
-export interface ComplementaryProduct {
-  product_id: string;
-  similarity: number;
-  match_source: 'multi_signal' | 'category_rule' | 'cross_collection';
-  relationship_label: string | null;
-}
+export type RecommendationMode = 'similar' | 'complementary';
+
+/**
+ * Which edge types answer each panel. "Similar" is everything that makes two
+ * products interchangeable or kin; "complementary" is the pairing relation, derived
+ * from `category_complement_rules` at rebuild time.
+ */
+const MODE_EDGE_TYPES: Record<RecommendationMode, ProductEdgeType[]> = {
+  similar: ['collection', 'material_family', 'pattern_match', 'alternative'],
+  complementary: ['complementary'],
+};
 
 export interface RecommendedProduct {
   id: string;
   name: string;
   thumbnail_url: string | null;
   category: string | null;
+  /** Edge weight, 0..1 — the strength the derivation assigned. */
   similarity: number;
-  match_source: string;
-  relationship_label?: string | null;
+  edge_type: ProductEdgeType;
+  /** Evidence text from the derivation, e.g. "Same collection: AXIS". */
+  reason: string | null;
+}
+
+/** Shape `get_related_products` returns (jsonb array). */
+interface RelatedEdgeRow {
+  id: string;
+  name: string | null;
+  description: string | null;
+  relationship_type: ProductEdgeType;
+  relevance_score: number | null;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
 }
 
 /** Fetch the primary image URL for a set of product IDs */
@@ -29,7 +61,6 @@ async function fetchThumbnails(
 ): Promise<Record<string, string | null>> {
   if (productIds.length === 0) return {};
 
-  // Try image_product_associations first
   const { data: assocData } = await supabase
     .from('image_product_associations' as any)
     .select('product_id, image_id, overall_score')
@@ -40,7 +71,6 @@ async function fetchThumbnails(
   const map: Record<string, string | null> = {};
 
   if (assocData && (assocData as any[]).length > 0) {
-    // Get image URLs from document_images
     const imageIds = [...new Set((assocData as any[]).map((r: any) => r.image_id))];
     const { data: imgData } = await supabase
       .from('document_images')
@@ -64,7 +94,6 @@ async function fetchThumbnails(
     }
   }
 
-  // Remaining products without images
   for (const id of productIds) {
     if (!(id in map)) map[id] = null;
   }
@@ -72,78 +101,62 @@ async function fetchThumbnails(
   return map;
 }
 
-/** Hydrate raw RPC rows with product name, category, and thumbnail */
-async function hydrateProducts(
-  rows: Array<{ product_id: string; similarity: number; match_source: string; relationship_label?: string | null }>,
-): Promise<RecommendedProduct[]> {
+/** The RPC already returns name/metadata — only the thumbnail needs a second trip. */
+async function hydrate(rows: RelatedEdgeRow[]): Promise<RecommendedProduct[]> {
   if (rows.length === 0) return [];
 
-  const ids = rows.map((r) => r.product_id);
-
-  const [{ data: products }, thumbnails] = await Promise.all([
-    supabase
-      .from('products')
-      .select('id, name, category_id, properties')
-      .in('id', ids),
-    fetchThumbnails(ids),
-  ]);
-
-  const productMap: Record<string, any> = {};
-  if (products) {
-    for (const p of products as any[]) productMap[p.id] = p;
-  }
+  const thumbnails = await fetchThumbnails(rows.map((r) => r.id));
 
   return rows
+    .filter((row) => row.id && row.name)
     .map((row) => {
-      const p = productMap[row.product_id];
-      if (!p) return null;
+      const meta = (row.metadata ?? {}) as Record<string, unknown>;
       const category =
-        p.properties?.category ||
-        p.properties?.type ||
-        p.category_id ||
+        (typeof meta.category === 'string' && meta.category) ||
+        (typeof meta.type === 'string' && meta.type) ||
         null;
-      const rec: RecommendedProduct = {
-        id: row.product_id,
-        name: p.name,
-        thumbnail_url: thumbnails[row.product_id] ?? null,
+
+      return {
+        id: row.id,
+        name: row.name as string,
+        thumbnail_url: thumbnails[row.id] ?? null,
         category,
-        similarity: row.similarity,
-        match_source: row.match_source,
-        relationship_label: (row as any).relationship_label ?? null,
+        similarity: row.relevance_score ?? 0,
+        edge_type: row.relationship_type,
+        reason: row.reason ?? null,
       };
-      return rec;
-    })
-    .filter((r): r is RecommendedProduct => r !== null);
+    });
 }
 
 export const productRecommendationsService = {
-  /** Products most visually similar to the given product (same collection or vector) */
-  async getSimilar(productId: string, limit = 8): Promise<RecommendedProduct[]> {
-    const { data, error } = await supabase.rpc('find_similar_products', {
-      source_product_id: productId,
-      match_count: limit,
+  /**
+   * Related products for one product, read from the persisted edge set.
+   *
+   * Throws on RPC failure rather than returning `[]` — an empty strip must mean
+   * "no edges derived", never "the read failed" (the silent-zero shape).
+   */
+  async getRelated(
+    workspaceId: string,
+    productId: string,
+    mode: RecommendationMode,
+    limit = 10,
+  ): Promise<RecommendedProduct[]> {
+    if (!workspaceId || !productId) return [];
+
+    const { data, error } = await supabase.rpc('get_related_products', {
+      p_workspace_id: workspaceId,
+      p_product_id: productId,
+      p_types: MODE_EDGE_TYPES[mode],
+      p_limit: limit,
     });
 
     if (error) {
-      console.error(`[recommendations] getSimilar error: ${error.message ?? JSON.stringify(error)}`);
-      return [];
+      console.error(
+        `[recommendations] get_related_products (${mode}) failed: ${error.message ?? JSON.stringify(error)}`,
+      );
+      throw error;
     }
 
-    return hydrateProducts((data as SimilarProduct[]) ?? []);
-  },
-
-  /** Products that pair well with the given product (cross-collection harmony) */
-  async getComplementary(productId: string, limit = 8): Promise<RecommendedProduct[]> {
-    const { data, error } = await supabase.rpc('find_complementary_products', {
-      source_product_id: productId,
-      match_count: limit,
-    });
-
-    if (error) {
-      console.error(`[recommendations] getComplementary error: ${error.message ?? JSON.stringify(error)}`);
-      return [];
-    }
-
-    return hydrateProducts((data as ComplementaryProduct[]) ?? []);
+    return hydrate((data as unknown as RelatedEdgeRow[]) ?? []);
   },
 };

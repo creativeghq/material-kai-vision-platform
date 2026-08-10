@@ -1,11 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 
-/** `role` (workspace_members.role) and `employment` (hr_employees) are AUTO kinds: their members
- *  are derived by crm_resync_auto_category_members, never typed by hand. */
-export type CrmCategoryKind =
-  | 'professional_type' | 'role' | 'employment'
-  | 'manual' | 'industry' | 'lead_status' | 'lead_source';
-export type CrmCategoryMemberKind = 'platform_user' | 'crm_contact' | 'crm_company';
+// The kind vocabulary + the hand-assignment rule live in a client-free module (see the note
+// there); re-exported here so every existing import site keeps working.
+export { AUTO_CATEGORY_KINDS, isHandAssignableKind } from './crmCategoryKinds';
+export type { CrmCategoryKind, CrmCategoryMemberKind } from './crmCategoryKinds';
+
+import type { CrmCategoryKind, CrmCategoryMemberKind } from './crmCategoryKinds';
 
 export interface CrmCategory {
   id: string;

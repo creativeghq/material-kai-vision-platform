@@ -28,14 +28,14 @@ import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { WorkspaceQuotaBadge } from '@/components/core/WorkspaceQuotaBadge';
 import { AdminStatCard } from '@/components/Admin/AdminStatCard';
 import { usersAPI, contactsAPI, companiesAPI, type CrmListFilters } from '@/services/crm.service';
-import { crmCategoriesService, type CrmCategorySummary } from '@/services/crmCategoriesService';
+import { crmCategoriesService, isHandAssignableKind, type CrmCategorySummary } from '@/services/crmCategoriesService';
 import { humanizeLabel } from '@/utils/humanize';
 import { CategoriesPanel } from './CategoriesPage';
 import { AddCompanyModal } from '../components/AddCompanyModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
 import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
-import { FilterBar, useFilters, type FilterValues } from '@/components/core/filters';
-import { buildCompanyFilters, buildContactFilters, buildUserFilters } from './crmFilters';
+import { FilterBar, optionsFromRows, useFilters, type FilterOption, type FilterValues } from '@/components/core/filters';
+import { buildCompanyFilters, buildContactFilters, buildUserFilters, categoryFacetOptions } from './crmFilters';
 import {
   PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS,
   professionalTypeLabel, roleLabel, type Option,
@@ -172,10 +172,10 @@ export const CRMManagement: React.FC = () => {
   // crm_company_contacts junction. Resolve it to a contact-id allowlist and reuse the
   // same server-side `ids` param as the category filters, rather than teaching the list
   // endpoint a junction join.
-  // Bounded id+name lookup backing the company dropdowns (the contacts "company" filter
-  // and the bulk "Assign company" action). Separate from the paged table feed, which no
-  // longer holds every company — this is a picker, not the data set.
-  const [companyLookup, setCompanyLookup] = useState<Array<{ id: string; name: string }>>([]);
+  // Bounded lookup backing the company dropdowns (the contacts "company" filter, the bulk
+  // "Assign company" action, and the companies "Business activity" facet). Separate from the
+  // paged table feed, which no longer holds every company — this is a picker, not the data set.
+  const [companyLookup, setCompanyLookup] = useState<Array<{ id: string; name: string; profession: string | null }>>([]);
 
   // Per-tab selection (users keyed by user_id; contacts/companies by id)
   const [selUsers, setSelUsers] = useState<Set<string>>(new Set());
@@ -293,8 +293,9 @@ export const CRMManagement: React.FC = () => {
   const loadCompanyLookup = async () => {
     try {
       const res = await companiesAPI.listCompanies(500, 0);
-      setCompanyLookup(((res.data || []) as Array<{ id: string; name: string }>)
-        .filter((c) => c.id && c.name).map((c) => ({ id: c.id, name: c.name })));
+      setCompanyLookup(((res.data || []) as Array<{ id: string; name: string; profession?: string | null }>)
+        .filter((c) => c.id && c.name)
+        .map((c) => ({ id: c.id, name: c.name, profession: c.profession ?? null })));
     } catch { /* picker data only — never block the page on it */ }
   };
 
@@ -343,20 +344,45 @@ export const CRMManagement: React.FC = () => {
 
   // ── option lists ──────────────────────────────────────────────────────────
   const roleOptions: Option[] = useMemo(() => roles.map((r) => ({ value: r.id, label: roleLabel(r.name) })), [roles]);
-  const categoryOptions: Option[] = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
-  // Industries are their own `kind='industry'` categories. Surface them as a
-  // dedicated company filter, and drop them from the generic company "category"
-  // filter so they aren't listed twice.
-  const industryOptions: Option[] = useMemo(
-    () => categories.filter((c) => c.kind === 'industry').map((c) => ({ value: c.id, label: c.name })),
+
+  // Membership facets — see `categoryFacetOptions`. Industries get their own company field, so
+  // they are excluded from the generic company "category" one: otherwise the same nine options
+  // are listed twice in the same modal.
+  const industryOptions = useMemo(
+    () => categoryFacetOptions(categories, 'company', {
+      kindAllowed: (k) => k === 'industry', keep: str(companyValues.industry),
+    }), [categories, companyValues.industry]);
+  const companyCategoryOptions = useMemo(
+    () => categoryFacetOptions(categories, 'company', {
+      kindAllowed: (k) => k !== 'industry', keep: str(companyValues.category),
+    }), [categories, companyValues.category]);
+  const contactCategoryOptions = useMemo(
+    () => categoryFacetOptions(categories, 'contact', { keep: str(contactValues.category) }),
+    [categories, contactValues.category]);
+
+  /**
+   * Categories offered for MANUAL assignment (the bulk "Add to category" action). NOT the same
+   * set as the filter facets: an empty category is a perfectly good assignment target, but the
+   * AUTO kinds are not — their members are derived by `crm_resync_auto_category_members`, and a
+   * hand-added row is never reclaimed (the resync only deletes `source='auto'`), so it would sit
+   * there forever contradicting the roster it exists to mirror.
+   */
+  const assignableCategoryOptions: Option[] = useMemo(
+    () => categories
+      .filter((c) => c.is_active && isHandAssignableKind(c.kind))
+      .map((c) => ({ value: c.id, label: c.name })),
     [categories]);
-  const companyCategoryOptions: Option[] = useMemo(
-    () => categories.filter((c) => c.kind !== 'industry').map((c) => ({ value: c.id, label: c.name })),
-    [categories]);
+
   // Sourced from the bounded lookup, not the table feed — the companies table now holds
   // one page, so deriving the picker from it would list only 20 names.
   const companyNameOptions: Option[] = useMemo(() =>
     [...new Set(companyLookup.map((c) => c.name))].sort().map((n) => ({ value: n, label: n })),
+    [companyLookup]);
+  // Company `profession` holds the ΑΑΔΕ ΚΑΔ activity text, not the professional-type enum —
+  // derive the options from what is actually stored (with counts) instead of offering five
+  // values the column never contains. Same bounded lookup as the name picker.
+  const companyProfessionOptions: FilterOption[] = useMemo(
+    () => optionsFromRows(companyLookup, (c) => c.profession ?? ''),
     [companyLookup]);
   const subscriptionOptions: Option[] = useMemo(() =>
     [...new Set(users.map((u) => u.subscription_tier).filter(Boolean))].sort().map((s) => ({ value: s as string, label: s as string })),
@@ -366,10 +392,15 @@ export const CRMManagement: React.FC = () => {
   const userGroups = useMemo(
     () => buildUserFilters({ roleOptions, subscriptionOptions }), [roleOptions, subscriptionOptions]);
   const contactGroups = useMemo(
-    () => buildContactFilters({ categoryOptions, companyNameOptions }), [categoryOptions, companyNameOptions]);
+    () => buildContactFilters({ categoryOptions: contactCategoryOptions, companyNameOptions }),
+    [contactCategoryOptions, companyNameOptions]);
   const companyGroups = useMemo(
-    () => buildCompanyFilters({ categoryOptions: companyCategoryOptions, industryOptions }),
-    [companyCategoryOptions, industryOptions]);
+    () => buildCompanyFilters({
+      categoryOptions: companyCategoryOptions,
+      industryOptions,
+      professionOptions: companyProfessionOptions,
+    }),
+    [companyCategoryOptions, industryOptions, companyProfessionOptions]);
 
   // ── filtered lists ────────────────────────────────────────────────────────
   // Users are the only client-side tab, so they get the full hook (matching + preview).
@@ -443,8 +474,7 @@ export const CRMManagement: React.FC = () => {
   const applyCompanyBulk = async (action: string, value: string) => {
     const ids = [...selCompanies];
     if (action === 'category') return runBulk(ids, (id) => crmCategoriesService.addMember(value, { crm_company_id: id }), 'Added to category', loadCategories, () => setSelCompanies(new Set()));
-    const patch = action === 'status' ? { status: value } : { profession: value };
-    return runBulk(ids, (id) => companiesAPI.updateCompany(id, patch), 'Updated', loadCompanies, () => setSelCompanies(new Set()));
+    return runBulk(ids, (id) => companiesAPI.updateCompany(id, { profession: value }), 'Updated', loadCompanies, () => setSelCompanies(new Set()));
   };
 
   const userBulkActions: BulkSelectAction[] = [
@@ -452,18 +482,20 @@ export const CRMManagement: React.FC = () => {
     { key: 'role', label: 'Set account tier', placeholder: 'Pick a tier', options: roleOptions },
     { key: 'status', label: 'Set status', placeholder: 'Pick a status', options: STATUS_OPTIONS },
     { key: 'profession', label: 'Professional type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
-    { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: categoryOptions },
+    { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: assignableCategoryOptions },
   ];
   const contactBulkActions: BulkSelectAction[] = [
     { key: 'company', label: 'Assign company', placeholder: 'Pick a company', options: companyNameOptions },
     { key: 'status', label: 'Set status', placeholder: 'Pick a status', options: STATUS_OPTIONS },
     { key: 'profession', label: 'Professional type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
-    { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: categoryOptions },
+    { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: assignableCategoryOptions },
   ];
+  // No "Set status": crm_companies has no status column, so the PATCH dropped it at the
+  // writable-columns allowlist and the bar still toasted "Updated N" — a button that
+  // reported success and changed nothing. Same reason the status FILTER isn't offered.
   const companyBulkActions: BulkSelectAction[] = [
-    { key: 'status', label: 'Set status', placeholder: 'Pick a status', options: STATUS_OPTIONS },
     { key: 'profession', label: 'Professional type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
-    { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: categoryOptions },
+    { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: assignableCategoryOptions },
   ];
 
   // ── single-row handlers (unchanged behaviour) ─────────────────────────────

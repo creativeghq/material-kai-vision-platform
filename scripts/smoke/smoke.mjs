@@ -112,9 +112,11 @@ await check('mivaa.embeddings.clip-text', ['MIVAA_BASE_URL'], async () => {
   return '1024D ok';
 });
 
-// 3 + 4. Recommendation RPCs — guards the dropped-column class of regression.
-//   We fetch a real product id (anon), then call each RPC. If an RPC references a
-//   non-existent column again, Postgres errors and the check FAILS.
+// 3 + 4. Product relationships. `get_related_products` is the ONLY read path for
+//   related products (issue #267) and it is workspace-asserted, so anon must be
+//   refused — that refusal IS the check. The dropped-column class of regression that
+//   the old find_similar_products / find_complementary_products calls guarded here is
+//   now covered for every function by the plpgsql lint gate below.
 let sampleProductId = null;
 await check('db.products.sample', ['DB_KEY'], async () => {
   const { res, json } = await http(`${SUPABASE_URL}/rest/v1/products?select=id&limit=1`, {
@@ -129,19 +131,21 @@ await check('db.products.sample', ['DB_KEY'], async () => {
   return sampleProductId;
 });
 
-for (const rpc of ['find_similar_products', 'find_complementary_products']) {
-  await check(`db.rpc.${rpc}`, ['DB_KEY'], async () => {
-    skipIf(!sampleProductId, 'no sample product (empty catalog) — cannot exercise RPC');
-    const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/${rpc}`, {
-      method: 'POST',
-      headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source_product_id: sampleProductId, match_count: 3 }),
-    });
-    assert(res.ok, `rpc ${rpc} → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
-    assert(Array.isArray(json), `rpc ${rpc} did not return an array`);
-    return `${json.length} rows`;
+await check('db.rpc.get_related_products.anon-denied', ['DB_KEY'], async () => {
+  const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/get_related_products`, {
+    method: 'POST',
+    headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      p_workspace_id: '00000000-0000-0000-0000-000000000000',
+      p_product_id: sampleProductId ?? '00000000-0000-0000-0000-000000000000',
+      p_limit: 3,
+    }),
   });
-}
+  // Anon holds no EXECUTE grant, so PostgREST must refuse. A 2xx here means the
+  // grant was widened and one workspace's edges are readable by the public key.
+  assert(!res.ok, `anon executed get_related_products → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  return `refused with ${res.status}`;
+});
 
 // 4b. plpgsql contract lint — fails if ANY function has an error-level issue (broken
 //   column/table ref, type mismatch). This is the class that 500'd recommendations and

@@ -38,6 +38,18 @@ that was really the supplier's.
 - **Proven to fire:** 2026-08-01 — the test was verified against all five historical offenders, and its widened regex caught a live re-introduction at `OrdersPanel.tsx:1685` (`total − settled` recomputed in the frontend).
 - **Blind spot:** derivation drift in SQL. The test reads TypeScript only.
 
+**The same shape, off the money path (2026-08-10, #267):** "what relates to this product" had two
+derivations. Search enrichment, agent tools and the admin backfill read the gold-layer `product_edges`
+(derived once by `rebuild_product_edges`); the product-detail *Related* tab called
+`find_similar_products` / `find_complementary_products`, which re-derived it live per query from a
+different signal mix — and scored same-name variants with `random()`, then fell through to "most
+recently added products" at 0.50 when nothing matched. Both RPCs are dropped;
+`get_related_products` is the only read path.
+
+- **Guarded by:** [tests/unit/productRelationDerivation.test.ts](../tests/unit/productRelationDerivation.test.ts)
+- **Proven to fire:** 2026-08-10 — a planted `src/services/__guardProbe.ts` naming a dropped RPC failed 2 of the 5 assertions before being removed.
+- **Blind spot:** same as above — TypeScript only. A new SQL function that re-derives relationships is invisible to it.
+
 ### 2. Two doors — same data, one door checks and the other doesn't
 `buildClientViewPdf` called `fetchSheets`/`fetchProductChips`/`fetchQuoteFfeItems` with no scope
 argument while the sibling sheet path passed all three scopes. `catalog-translate-pdf` fetched a
@@ -211,9 +223,11 @@ identically to a MISS, so a 97.5% hit rate reduced the meter by exactly zero.
 | [tests/unit/escapeHtmlParity.test.ts](../tests/unit/escapeHtmlParity.test.ts) | `npm test`, blocking | invariant 11 — the three `escapeHtml` twins (Vite / Deno edge / Vercel `api/`) stay byte-equivalent | **yes** — imports all three and diffs them over a shared corpus, so a twin that stops matching fails the build rather than reporting clean |
 | `lint_plpgsql_errors()` via `db.plpgsql-lint` | smoke monitor, 2-hourly | every `public` plpgsql function still compiles against the live schema | yes — baseline is a strict **zero**, so any new breakage fails instead of blending into a known-broken list |
 | [tests/unit/companyIdentity.test.ts](../tests/unit/companyIdentity.test.ts) | `npm test`, blocking | shape 8 — one identity lookup for every create-a-business surface, `crm_companies` direct-insert ratchet | **yes** — asserts its own scan matched >500 files before trusting the verdict, so an inert glob fails instead of reporting clean |
+| [tests/unit/productRelationDerivation.test.ts](../tests/unit/productRelationDerivation.test.ts) | `npm test`, blocking | shape 1 off the money path — a second client-side derivation of "what relates to this product" (#267) | **yes** — asserts its scan matched >100 files, and was watched to fail on a planted violation before shipping |
+| `product_edges` composite FKs | every write | invariant 1 — an edge's two products must both sit in the edge's workspace | n/a — declarative; unlike a trigger it cannot be disabled |
 
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
-what it found. Nine of eighteen qualify. That is the gap.
+what it found. Ten of twenty qualify. That is the gap.
 
 > **`db.plpgsql-lint` has one known false-positive shape: runtime-created temp tables.**
 > `plpgsql_check` analyses statically, so a `create temporary table X` inside a function makes it

@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import {
   NONE_VALUE,
   countActive,
+  foldForSearch,
   isFieldActive,
   type FilterField,
   type FilterGroupDef,
@@ -70,11 +71,13 @@ const OptionList: React.FC<{
   onToggle: (value: string) => void;
 }> = ({ field, selected, onToggle }) => {
   const [q, setQ] = useState('');
-  const searchable = field.type === 'multi' ? (field.searchable ?? field.options.length > 8) : field.options.length > 8;
+  const searchable = field.searchable ?? field.options.length > 8;
+  // foldForSearch, not toLowerCase: these lists are full of Greek company and contact names,
+  // where the accent and the final sigma are exactly what the user types differently.
   const shown = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = foldForSearch(q).trim();
     if (!needle) return field.options;
-    return field.options.filter((o) => o.label.toLowerCase().includes(needle) || (o.hint ?? '').toLowerCase().includes(needle));
+    return field.options.filter((o) => foldForSearch(o.label).includes(needle) || foldForSearch(o.hint).includes(needle));
   }, [field.options, q]);
 
   return (

@@ -7,6 +7,7 @@ export {
   applyFilters,
   countActive,
   describeValue,
+  foldForSearch,
   isFieldActive,
   optionsFromRows,
   type BoolField,

@@ -7,22 +7,28 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Loader2, Layers, Sparkles, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
-import { productRecommendationsService, RecommendedProduct } from '@/services/productRecommendationsService';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import {
+  productRecommendationsService,
+  ProductEdgeType,
+  RecommendationMode,
+  RecommendedProduct,
+} from '@/services/productRecommendationsService';
 
 interface ProductRecommendationsPanelProps {
   productId: string;
-  mode: 'similar' | 'complementary';
+  mode: RecommendationMode;
   /** Called when user clicks a result card — parent opens that product's modal */
   onProductClick: (productId: string) => void;
 }
 
-const SOURCE_LABEL: Record<string, string> = {
-  vector:           'AI match',
-  same_collection:  'Same collection',
-  fallback:         'Other products',
-  multi_signal:     'Strong match',
-  category_rule:    'Recommended pairing',
-  cross_collection: 'From another collection',
+/** Labels for the `product_edges` edge types the read RPC returns. */
+const EDGE_LABEL: Record<ProductEdgeType, string> = {
+  collection:      'Same collection',
+  material_family: 'Same material',
+  pattern_match:   'Matching finish',
+  alternative:     'Similar spec',
+  complementary:   'Pairs with',
 };
 
 export const ProductRecommendationsPanel: React.FC<ProductRecommendationsPanelProps> = ({
@@ -30,19 +36,23 @@ export const ProductRecommendationsPanel: React.FC<ProductRecommendationsPanelPr
   mode,
   onProductClick,
 }) => {
+  const { activeWorkspaceId } = useWorkspace();
   const [products, setProducts] = useState<RecommendedProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
-    if (!productId) return;
+    if (!productId || !activeWorkspaceId) return;
     setLoading(true);
     setError(false);
     try {
-      const results = mode === 'similar'
-        ? await productRecommendationsService.getSimilar(productId, 10)
-        : await productRecommendationsService.getComplementary(productId, 10);
+      const results = await productRecommendationsService.getRelated(
+        activeWorkspaceId,
+        productId,
+        mode,
+        10,
+      );
       setProducts(results);
     } catch (e) {
       console.error('[ProductRecommendationsPanel] load error:', e);
@@ -51,7 +61,7 @@ export const ProductRecommendationsPanel: React.FC<ProductRecommendationsPanelPr
       setLoading(false);
       setLoaded(true);
     }
-  }, [productId, mode]);
+  }, [productId, mode, activeWorkspaceId]);
 
   // Lazy load — only fires when the component first mounts (i.e. tab is opened)
   useEffect(() => {
@@ -59,7 +69,9 @@ export const ProductRecommendationsPanel: React.FC<ProductRecommendationsPanelPr
   }, [loaded, load]);
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (loading) {
+  // No workspace resolved yet counts as loading: the read is workspace-scoped,
+  // so showing "none found" before it arrives would be a lie.
+  if (loading || !activeWorkspaceId) {
     return (
       <div className="flex items-center justify-center py-12 gap-3 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
@@ -134,11 +146,11 @@ export const ProductRecommendationsPanel: React.FC<ProductRecommendationsPanelPr
                 </div>
               )}
 
-              {/* Relationship label badge (complementary mode) */}
-              {product.relationship_label && (
+              {/* Why the derivation drew this edge, e.g. "Same collection: AXIS" */}
+              {product.reason && (
                 <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 bg-gradient-to-t from-black/70 to-transparent">
                   <span className="text-[9px] text-white font-medium leading-tight line-clamp-1">
-                    {product.relationship_label}
+                    {product.reason}
                   </span>
                 </div>
               )}
@@ -158,7 +170,7 @@ export const ProductRecommendationsPanel: React.FC<ProductRecommendationsPanelPr
                 variant="outline"
                 className="text-[9px] px-1.5 py-0 h-4 font-normal text-muted-foreground border-muted-foreground/30 mt-1"
               >
-                {SOURCE_LABEL[product.match_source] ?? product.match_source}
+                {EDGE_LABEL[product.edge_type] ?? product.edge_type}
               </Badge>
             </div>
           </button>

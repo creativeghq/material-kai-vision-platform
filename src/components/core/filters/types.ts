@@ -48,6 +48,8 @@ export interface SelectField extends BaseField {
   type: 'select';
   options: FilterOption[];
   placeholder?: string;
+  /** Show a search box above the list. Auto-enabled past 8 options. */
+  searchable?: boolean;
 }
 
 /** Many choices OR-ed together. Row matches if any selected value is present. */
@@ -148,7 +150,25 @@ export function describeValue(field: FilterField, value: FilterValue): string {
   }
 }
 
-const normalize = (v: unknown) => String(v ?? '').toLowerCase();
+/**
+ * The fold every search box in the filter system compares through — case-insensitive AND
+ * diacritic-insensitive.
+ *
+ * `toLowerCase()` alone is not enough for a Greek CRM. `Κώστας` and `ΚΩΣΤΑΣ` differ only by
+ * accents, and the final sigma `ς` is a different codepoint from `σ`, so typing a name the
+ * way it is actually spelled ("κωστάς") matched nothing in a list holding "ΚΩΣΤΑΣ ΑΛΕΞΙΟΥ".
+ * Same for Latin accents (`Trendafil` vs `Трендафил` is a different alphabet and still
+ * won't match — transliteration is not this function's job).
+ */
+export function foldForSearch(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip combining accents: ά→α, é→e
+    .toLowerCase()
+    .replace(/ς/g, 'σ'); // final sigma ς folds onto the medial σ
+}
+
+const normalize = foldForSearch;
 
 /** Coerce whatever the accessor returned into the string set we compare against. */
 function accessorValues(raw: any): string[] {

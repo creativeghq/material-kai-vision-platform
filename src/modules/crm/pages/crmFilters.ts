@@ -16,11 +16,63 @@
  */
 import { Building2, Tags, User } from 'lucide-react';
 import type { FilterGroupDef, FilterOption } from '@/components/core/filters';
+import type { CrmCategoryKind } from '@/services/crmCategoriesService';
+import { humanizeLabel } from '@/utils/humanize';
 import { CLIENT_SUPPLIER_OPTIONS, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS } from '../crmConstants';
 
 const professionOptions = PROFESSIONAL_TYPE_OPTIONS as FilterOption[];
 const statusOptions = STATUS_OPTIONS as FilterOption[];
 const kindOptions = CLIENT_SUPPLIER_OPTIONS as FilterOption[];
+
+/** The three lists a category can narrow, and the `crm_categories_summary` count that says so. */
+export type CategoryFacetEntity = 'company' | 'contact' | 'user';
+
+/** The `crm_categories_summary` shape this module needs — nothing more. */
+export interface CategoryFacetRow {
+  id: string;
+  name: string;
+  kind: CrmCategoryKind;
+  is_active: boolean;
+  user_count: number;
+  contact_count: number;
+  company_count: number;
+}
+
+const FACET_COUNT: Record<CategoryFacetEntity, (c: CategoryFacetRow) => number> = {
+  company: (c) => c.company_count,
+  contact: (c) => c.contact_count,
+  user: (c) => c.user_count,
+};
+
+/**
+ * Category options for one list, as a FACET rather than a catalogue.
+ *
+ * A category is offered only when it currently holds a member of that entity kind — only when
+ * ticking it can actually narrow this list — and the count rides along on the option so an
+ * empty result is visible before the click.
+ *
+ * This is what the companies tab was getting wrong: it offered every non-industry category,
+ * and most of them can never contain a company at all. `crm_resync_auto_category_members`
+ * fills `role` categories with platform USERS and `employment` categories with CONTACTS, and
+ * the lead_status / lead_source vocabulary only ever tags contacts. The handful that did match
+ * were the "Suppliers" professional-type category — the same word as the Relationship filter
+ * one group up, holding 3 of the 35 companies flagged `is_supplier`.
+ *
+ * `keep` is the value currently applied: an active filter must stay visible in the modal even
+ * if its last member just left the category, or it goes on filtering the table with no
+ * checkbox left to untick.
+ */
+export function categoryFacetOptions(
+  categories: CategoryFacetRow[],
+  entity: CategoryFacetEntity,
+  opts: { kindAllowed?: (kind: CrmCategoryKind) => boolean; keep?: string } = {},
+): FilterOption[] {
+  const countOf = FACET_COUNT[entity];
+  const kindAllowed = opts.kindAllowed ?? (() => true);
+  return categories
+    .filter((c) => c.id === opts.keep || (c.is_active && kindAllowed(c.kind) && countOf(c) > 0))
+    .map((c) => ({ value: c.id, label: c.name, count: countOf(c), hint: humanizeLabel(c.kind) }));
+}
 
 export function buildUserFilters(ctx: {
   roleOptions: FilterOption[];
@@ -55,6 +107,13 @@ export function buildUserFilters(ctx: {
   ];
 }
 
+/**
+ * Membership options are FACETS, not a catalogue — the page passes only categories that
+ * currently hold a member of this entity kind (see `categoryOptionsFor` in CRMPage). A
+ * dimension that already has its own field on the tab is never repeated here: two controls
+ * carrying the same vocabulary AND together, so "Suppliers" picked in both could return
+ * fewer rows than either one alone.
+ */
 export function buildContactFilters(ctx: {
   categoryOptions: FilterOption[];
   companyNameOptions: FilterOption[];
@@ -89,16 +148,28 @@ export function buildContactFilters(ctx: {
 
 // No `status` filter: crm_companies has no status column, so it could only ever match zero
 // rows (or 400 server-side). Deliberately absent rather than shipped inert.
+//
+// And no `professionOptions` — the shared five-value enum — for the same reason one step
+// further in: on a COMPANY, `profession` does NOT hold that vocabulary. The ΑΑΔΕ enrichment
+// writes the primary ΚΑΔ activity description into it ("ΧΟΝΔΡΙΚΟ ΕΜΠΟΡΙΟ ΠΛΑΚΑΚΙΩΝ…"), and
+// the server matches the column with `.eq`, so every option the enum offered matched zero
+// rows, every time. The field below filters the same column on the values it actually holds,
+// derived by the page from the company lookup.
 export function buildCompanyFilters(ctx: {
   categoryOptions: FilterOption[];
   industryOptions: FilterOption[];
+  professionOptions: FilterOption[];
 }): FilterGroupDef[] {
   return [
     {
       key: 'general', label: 'General', icon: Building2,
       fields: [
         { key: 'q', type: 'text', label: 'Search', placeholder: 'Search companies…' },
-        { key: 'profession', type: 'select', label: 'Professional type', options: professionOptions },
+        {
+          key: 'profession', type: 'select', label: 'Business activity',
+          description: 'The ΑΑΔΕ activity (ΚΑΔ) recorded on the company.',
+          options: ctx.professionOptions,
+        },
         { key: 'kind', type: 'select', label: 'Relationship', options: kindOptions },
       ],
     },

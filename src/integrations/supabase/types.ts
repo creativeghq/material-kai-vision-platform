@@ -35129,15 +35129,6 @@ export type Database = {
           vat_rate: number
         }[]
       }
-      find_complementary_products: {
-        Args: { match_count?: number; source_product_id: string }
-        Returns: {
-          match_source: string
-          product_id: string
-          relationship_label: string
-          similarity: number
-        }[]
-      }
       find_operator_catalog_matches: {
         Args: {
           p_brand?: string
@@ -35163,14 +35154,6 @@ export type Database = {
           created_at: string
           name: string
           size_bytes: number
-        }[]
-      }
-      find_similar_products: {
-        Args: { match_count?: number; source_product_id: string }
-        Returns: {
-          match_source: string
-          product_id: string
-          similarity: number
         }[]
       }
       forecast_demand: { Args: { p_workspace_id: string }; Returns: Json }
@@ -37198,6 +37181,7 @@ export type Database = {
         Args: { p_key: string; p_product_id: string }
         Returns: string
       }
+      product_edge_tokens: { Args: { vals: string[] }; Returns: string[] }
       product_m2_per_piece: { Args: { p_product_id: string }; Returns: number }
       product_net_mass_kg: {
         Args: { p_product_id: string; p_quantity: number; p_unit?: string }
