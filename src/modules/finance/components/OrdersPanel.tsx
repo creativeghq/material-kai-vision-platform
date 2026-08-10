@@ -1648,8 +1648,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   }, [order?.id, order?.order_type]);
 
   /**
-   * The reference tabs, in reading order. EVERY tab an order of this type can have is offered,
-   * whether or not it holds anything — each says so itself when empty.
+   * The tabs, in reading order. EVERY tab an order of this type can have is offered, whether or
+   * not it holds anything — each says so itself when empty.
+   *
+   * The order's own body (classification, lines, totals, cash) is `details`, the first tab and the
+   * default. Only the record's identity and the controls that act on the whole order — party,
+   * status, Actions — stay above the strip, because they are true of every tab rather than the
+   * contents of one.
    *
    * They used to appear only once they had content, which made the tab strip change shape under
    * the operator: the same order showed three tabs, then four once an invoice was issued, and
@@ -1667,10 +1672,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    */
   const orderTabs = useMemo(() => {
     if (!order) return [] as string[];
-    const t: string[] = [];
+    const t: string[] = ['details'];
     if (order.order_type === 'sales') t.push('suppliers');
     t.push('invoices', 'expenses', 'payments');
     if (order.order_type === 'purchase') t.push('match');
+    t.push('customs');
     return t;
   }, [order]);
 
@@ -2253,11 +2259,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     {/* The order's own settlement: a sale is settled by the customer paying us, a
                         purchase by us paying the supplier. Same action, opposite direction — the
                         label followed the sales case on both and so read as a lie on a purchase. */}
-                    <DropdownMenuItem className="items-start" onClick={() => setPayInOpen({ amount: outstanding > 0.005 ? outstanding : undefined })}>
+                    {/* One line per item, no explanatory second line: a menu is a list of verbs.
+                        What the action means belongs in the panel it opens — the direction here,
+                        for instance, is already carried by the arrow and its colour. */}
+                    <DropdownMenuItem onClick={() => setPayInOpen({ amount: outstanding > 0.005 ? outstanding : undefined })}>
                       {order.order_type === 'purchase'
-                        ? <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
-                        : <ArrowDownLeft className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-emerald-500" />}
-                      <span className="flex flex-col"><span>Record payment</span><span className="text-[10px] text-muted-foreground">{order.order_type === 'purchase' ? 'Money paid to the supplier.' : 'Money received from the customer.'}</span></span>
+                        ? <ArrowUpRight className="h-3.5 w-3.5 mr-2 text-red-400" />
+                        : <ArrowDownLeft className="h-3.5 w-3.5 mr-2 text-emerald-500" />}
+                      Record payment
                     </DropdownMenuItem>
                     {/* A cost booked against this order. On a sales order that is the cost side of
                         the sale (goods bought in, transport); on a purchase order it is the
@@ -2273,24 +2282,16 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         one: a purchase order raised by hand rather than from the Inbox had no way to
                         record what the supplier billed, which left 3-way match permanently at
                         "awaiting bill". */}
-                    <DropdownMenuItem className="items-start" onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
-                      <ArrowUpRight className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-red-400" />
-                      <span className="flex flex-col">
-                        <span>Add {(fin?.supplierBills.length ?? 0) > 0 ? 'another expense' : 'expense'}</span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {order.order_type === 'purchase'
-                            ? 'An extra cost on this purchase — freight, customs, an installer. Not the supplier’s own bill.'
-                            : 'A cost against this sale.'}
-                        </span>
-                      </span>
+                    <DropdownMenuItem onClick={() => { setExpensePrefill({}); setExpenseOpen(true); }}>
+                      <ArrowUpRight className="h-3.5 w-3.5 mr-2 text-red-400" />
+                      Add {(fin?.supplierBills.length ?? 0) > 0 ? 'another expense' : 'expense'}
                     </DropdownMenuItem>
                     {/* The same link, for a cost that is ALREADY booked — the transport invoice that
                         landed a week after the goods, or anything sitting in the Inbox that was
                         added to Expenses on its own. Without this the link could only ever be
                         written at the moment the expense was created. */}
-                    <DropdownMenuItem className="items-start" onClick={() => setLinkExpenseOpen(true)}>
-                      <Link2 className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-muted-foreground" />
-                      <span className="flex flex-col"><span>Attach an existing expense</span><span className="text-[10px] text-muted-foreground">Put a cost you already booked onto this order.</span></span>
+                    <DropdownMenuItem onClick={() => setLinkExpenseOpen(true)}>
+                      <Link2 className="h-3.5 w-3.5 mr-2 text-muted-foreground" /> Attach an existing expense
                     </DropdownMenuItem>
                     {/* "Pay from account credit" was here. Money received now lands on what is owed
                         by itself, so an order with the customer's cash available against it is
@@ -2306,12 +2307,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         email PDF stays as the universal fallback. Once handed off, neither shows —
                         the round-trip status in the header is the record. */}
                     {order.order_type === 'purchase' && handoff?.available && !order.paired_order_id && (
-                      <DropdownMenuItem className="items-start" onClick={sendToSupplierInApp}>
-                        <Send className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-primary" />
-                        <span className="flex flex-col">
-                          <span>Send in-app{handoff.supplierWorkspaceName ? ` to ${handoff.supplierWorkspaceName}` : ''}</span>
-                          <span className="text-[10px] text-muted-foreground">This supplier uses the platform — a draft sales order lands in their workspace and their reply tracks here.</span>
-                        </span>
+                      <DropdownMenuItem onClick={sendToSupplierInApp}>
+                        <Send className="h-3.5 w-3.5 mr-2 text-primary" />
+                        Send in-app{handoff.supplierWorkspaceName ? ` to ${handoff.supplierWorkspaceName}` : ''}
                       </DropdownMenuItem>
                     )}
                     {order.order_type === 'purchase' && !order.paired_order_id && (
@@ -2330,12 +2328,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       </DropdownMenuItem>
                     )}
                     {order.order_type === 'sales' && (order.status === 'confirmed' || order.status === 'partially_fulfilled') && (
-                      <DropdownMenuItem className="items-start" onClick={coverShortfall}>
-                        <PackagePlus className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0 text-amber-500" />
-                        <span className="flex flex-col">
-                          <span>Cover shortfall from suppliers</span>
-                          <span className="text-[10px] text-muted-foreground">Drafts a purchase order per supplier for whatever stock can’t cover.</span>
-                        </span>
+                      <DropdownMenuItem onClick={coverShortfall}>
+                        <PackagePlus className="h-3.5 w-3.5 mr-2 text-amber-500" /> Cover shortfall from suppliers
                       </DropdownMenuItem>
                     )}
                     {/* One action, not two. "Re-order" and "Duplicate order" differed only in which
@@ -2343,21 +2337,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                         the choice belongs inside the form as a toggle, not as two menu entries the
                         operator has to tell apart. It also no longer writes a draft just to show
                         you one: nothing is saved until you save. */}
-                    <DropdownMenuItem className="items-start" onClick={startReorder}>
-                      <RotateCcw className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
-                      <span className="flex flex-col">
-                        <span>Order again</span>
-                        <span className="text-[10px] text-muted-foreground">Same items and party — choose today’s prices or the original ones.</span>
-                      </span>
+                    <DropdownMenuItem onClick={startReorder}>
+                      <RotateCcw className="h-3.5 w-3.5 mr-2" /> Order again
                     </DropdownMenuItem>
                     {/* The named, reusable version of the same idea (#322): the basket without the
                         party, kept in the template library for any future order. */}
-                    <DropdownMenuItem className="items-start" onClick={() => setSaveTemplateOpen(true)}>
-                      <Layers className="h-3.5 w-3.5 mr-2 mt-0.5 shrink-0" />
-                      <span className="flex flex-col">
-                        <span>Save as template</span>
-                        <span className="text-[10px] text-muted-foreground">Keeps the lines, not the party or the totals.</span>
-                      </span>
+                    <DropdownMenuItem onClick={() => setSaveTemplateOpen(true)}>
+                      <Layers className="h-3.5 w-3.5 mr-2" /> Save as template
                     </DropdownMenuItem>
                     {order.order_type === 'sales' && (
                       <DropdownMenuItem onClick={() => navigate('/finance?tab=doc_dispatch')}>
@@ -2379,6 +2365,19 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 </DropdownMenu>
               </div>
             </div>
+
+            <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList>
+                <TabsTrigger value="details">Details</TabsTrigger>
+                {orderTabs.includes('suppliers') && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
+                <TabsTrigger value="invoices">Invoices</TabsTrigger>
+                <TabsTrigger value="expenses">Expenses</TabsTrigger>
+                <TabsTrigger value="payments">Payments</TabsTrigger>
+                {orderTabs.includes('match') && <TabsTrigger value="match">3-Way Match</TabsTrigger>}
+                <TabsTrigger value="customs">Customs</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="details" className="mt-3 space-y-4">
 
             {/* The "apply this customer's credit" banner used to live here. Money received now lands
                 on what is owed by itself (`auto_allocate_workspace`), so there is nothing left for
@@ -2677,25 +2676,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               );
             })()}
 
-            {/* Everything below "Earned vs Collected" is REFERENCE material — the documents and
-                cash behind the figures above. Stacked, it was several screens of scrolling to reach
-                the payments list. Tabbed, each is one click and the order's own summary stays put.
-                A tab appears only when it has something in it, so an order with no invoices does
-                not offer an empty Invoices tab. */}
-            {/* Rendered above the tabs rather than as one of them: the card returns null unless
-                the order actually has classified goods, so it costs nothing when irrelevant and
-                does not need a place in the orderTabs computation. */}
-            <OrderCustomsCard orderId={order.id} />
-
-            {orderTabs.length > 0 && (
-            <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList>
-                {orderTabs.includes('suppliers') && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
-                {orderTabs.includes('invoices') && <TabsTrigger value="invoices">Invoices</TabsTrigger>}
-                {orderTabs.includes('expenses') && <TabsTrigger value="expenses">Expenses</TabsTrigger>}
-                {orderTabs.includes('payments') && <TabsTrigger value="payments">Payments</TabsTrigger>}
-                {orderTabs.includes('match') && <TabsTrigger value="match">3-Way Match</TabsTrigger>}
-              </TabsList>
+              </TabsContent>
 
               <TabsContent value="suppliers" className="mt-3 space-y-3">
             {/* What we owe suppliers on this order — line costs grouped by the line's supplier,
@@ -3075,8 +3056,14 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             )}
 
               </TabsContent>
+
+              {/* What this order costs at the border. A tab of its own now rather than a card
+                  wedged above the strip: it is one more thing the order is, and it says so itself
+                  when the order carries nothing declarable. */}
+              <TabsContent value="customs" className="mt-3">
+                <OrderCustomsCard orderId={order.id} />
+              </TabsContent>
             </Tabs>
-            )}
 
             {/* Order note — stays OUTSIDE the tabs: it belongs to the order itself, not to any one
                 of the documents behind it, and burying it in a tab would hide the field people

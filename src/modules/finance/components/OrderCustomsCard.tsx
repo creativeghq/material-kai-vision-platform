@@ -13,7 +13,6 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Ship, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -85,19 +84,29 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
   if (loading) {
     return <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>;
   }
-  // Nothing classified and nothing missing means this order has no goods worth declaring.
-  if (!data || (data.distinct_subheadings === 0 && data.unclassified_lines === 0)) return null;
+  // Nothing classified and nothing missing means this order has no goods worth declaring. It is a
+  // tab of its own now, so it says that rather than rendering nothing.
+  if (!data || (data.distinct_subheadings === 0 && data.unclassified_lines === 0)) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Nothing on this order needs declaring — no line carries goods with a commodity code.
+      </p>
+    );
+  }
 
   const cur = data.currency ?? 'EUR';
 
   return (
-    <Card className="dashboard-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    /* Deliberately unboxed: no card surface, no border, no fill. The card chrome this used to wear
+       is a near-white glass surface on the light theme, which stamped a white panel onto the cream
+       page and read as a foreign object rather than a section of the order. */
+    <div className="space-y-3">
+      <div>
+        <h4 className="flex items-center gap-2 text-sm font-medium">
           <Ship className="h-4 w-4 text-primary" />
           Customs
-        </CardTitle>
-        <CardDescription>
+        </h4>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           {data.low_value_regime
             ? <>
                 <span className="font-medium text-foreground">
@@ -107,9 +116,12 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
                 {' — '}€{data.duty_per_subheading} per sub-heading. Fewer sub-headings, less duty.
               </>
             : data.applies_note}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
+        </p>
+      </div>
+
+      {/* A header row over no rows is furniture, not information: when every line is still
+          unclassified the table has nothing to say, and the gap editors below are the whole point. */}
+      {data.subheadings.length > 0 && (
         <Table>
           {/* Flat on purpose: the shared table chrome (a muted header band + a hairline under
               every row) reads as a second panel stacked inside the card on the light theme.
@@ -139,9 +151,10 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
             ))}
           </TableBody>
         </Table>
+      )}
 
-        {(data.unclassified_lines > 0 || data.unweighed_lines > 0) && (
-          <p className="flex items-start gap-2 px-4 pt-2 pb-3 text-xs text-amber-500">
+      {(data.unclassified_lines > 0 || data.unweighed_lines > 0) && (
+          <p className="flex items-start gap-2 px-3 text-xs text-amber-500">
             <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             {/* An unclassified line is precisely the one that holds up a clearance, so it is
                 counted here rather than quietly excluded from the estimate above. */}
@@ -160,7 +173,7 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
             code is a snapshot of what it cleared under, so this must not be routed through the
             product, and it must stay available after the supplier's bill has locked the figures. */}
         {gaps.length > 0 && (
-          <div className="px-4 pb-4 pt-1 space-y-3">
+          <div className="px-3 space-y-3">
             {gaps.map((l) => (
               <div key={l.id} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
                 <div className="space-y-1 min-w-0">
@@ -209,8 +222,7 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 };
 
