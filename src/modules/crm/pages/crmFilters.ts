@@ -123,7 +123,12 @@ export function buildContactFilters(ctx: {
       key: 'general', label: 'General', icon: User,
       fields: [
         { key: 'q', type: 'text', label: 'Search', placeholder: 'Search contacts…' },
-        { key: 'profession', type: 'select', label: 'Professional type', options: professionOptions },
+        // No professional-type field: `crm_contacts.profession` is the FISCAL activity —
+        // `partyFromCrm` puts it on the invoice as "Δραστηριότητα" — not an app segmentation
+        // enum, so matching it `.eq` against the five-value vocabulary can only ever return
+        // nothing. Segmentation lives in `contact_group`, the categories, and is_client/
+        // is_supplier. Filtering contacts BY activity wants a free-text server-side ilike,
+        // which the list endpoint does not offer yet — better absent than inert.
         { key: 'status', type: 'select', label: 'Status', options: statusOptions },
         { key: 'kind', type: 'select', label: 'Relationship', options: kindOptions },
       ],

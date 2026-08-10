@@ -243,12 +243,11 @@ export const CRMManagement: React.FC = () => {
   // values bag here — this is the only place they are interpreted.
   const contactQuery: CrmListFilters = useMemo(() => ({
     search: contactSearch,
-    profession: str(contactValues.profession),
     status: str(contactValues.status),
     kind: str(contactValues.kind) as CrmListFilters['kind'],
     companyName: str(contactValues.company),
     ids: contactIdsFilter,
-  }), [contactSearch, contactValues.profession, contactValues.status, contactValues.kind,
+  }), [contactSearch, contactValues.status, contactValues.kind,
        contactValues.company, contactIdsFilter]);
 
   const companyQuery: CrmListFilters = useMemo(() => ({
@@ -468,14 +467,13 @@ export const CRMManagement: React.FC = () => {
   const applyContactBulk = async (action: string, value: string) => {
     const ids = [...selContacts];
     if (action === 'category') return runBulk(ids, (id) => crmCategoriesService.addMember(value, { crm_contact_id: id }), 'Added to category', loadCategories, () => setSelContacts(new Set()));
-    const patch = action === 'company' ? { company: value } : action === 'status' ? { status: value } : { profession: value };
+    const patch = action === 'company' ? { company: value } : { status: value };
     return runBulk(ids, (id) => contactsAPI.updateContact(id, patch), 'Updated', loadContacts, () => setSelContacts(new Set()));
   };
-  const applyCompanyBulk = async (action: string, value: string) => {
-    const ids = [...selCompanies];
-    if (action === 'category') return runBulk(ids, (id) => crmCategoriesService.addMember(value, { crm_company_id: id }), 'Added to category', loadCategories, () => setSelCompanies(new Set()));
-    return runBulk(ids, (id) => companiesAPI.updateCompany(id, { profession: value }), 'Updated', loadCompanies, () => setSelCompanies(new Set()));
-  };
+  // Category is the only bulk edit a company has — see companyBulkActions for why the other
+  // two went: one wrote a column that does not exist, the other wrote a fiscal field.
+  const applyCompanyBulk = async (_action: string, value: string) =>
+    runBulk([...selCompanies], (id) => crmCategoriesService.addMember(value, { crm_company_id: id }), 'Added to category', loadCategories, () => setSelCompanies(new Set()));
 
   const userBulkActions: BulkSelectAction[] = [
     // Account TIER — global, platform-wide. Team roles are per-workspace (Profile → Team).
@@ -484,17 +482,26 @@ export const CRMManagement: React.FC = () => {
     { key: 'profession', label: 'Professional type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
     { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: assignableCategoryOptions },
   ];
+  /*
+   * No "Professional type" on contacts or companies. `profession` on those two tables is the
+   * FISCAL activity: `partyFromCrm` copies it onto the myDATA counterpart and the invoice PDF
+   * prints it as "Δραστηριότητα". Writing the five-value app enum there puts the literal string
+   * `supplier` on a legal document, and on a company it also overwrites the ΑΑΔΕ ΚΑΔ activity
+   * the lookup filled in. Segmentation belongs to `contact_group`, the categories, and
+   * is_client / is_supplier — all of which are already offered.
+   *
+   * The users bar keeps it: `user_profiles.professional_type` is a genuine enum column with no
+   * fiscal role, and it is the one the professional-type categories auto-sync from.
+   */
   const contactBulkActions: BulkSelectAction[] = [
     { key: 'company', label: 'Assign company', placeholder: 'Pick a company', options: companyNameOptions },
     { key: 'status', label: 'Set status', placeholder: 'Pick a status', options: STATUS_OPTIONS },
-    { key: 'profession', label: 'Professional type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
     { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: assignableCategoryOptions },
   ];
-  // No "Set status": crm_companies has no status column, so the PATCH dropped it at the
-  // writable-columns allowlist and the bar still toasted "Updated N" — a button that
-  // reported success and changed nothing. Same reason the status FILTER isn't offered.
+  // No "Set status" either: crm_companies has no status column, so the PATCH dropped it at the
+  // writable-columns allowlist and the bar still toasted "Updated N" — a button that reported
+  // success and changed nothing. Same reason the status FILTER isn't offered.
   const companyBulkActions: BulkSelectAction[] = [
-    { key: 'profession', label: 'Professional type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
     { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: assignableCategoryOptions },
   ];
 
@@ -712,7 +719,8 @@ export const CRMManagement: React.FC = () => {
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
                         <TableHead>Company</TableHead>
-                        <TableHead>Type</TableHead>
+                        {/* `profession` — the party's declared activity, not an app type. */}
+                        <TableHead>Activity</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -793,7 +801,8 @@ export const CRMManagement: React.FC = () => {
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
                         <TableHead>Website</TableHead>
-                        <TableHead>Type</TableHead>
+                        {/* ΑΑΔΕ ΚΑΔ activity (falls back to industry when unresolved). */}
+                        <TableHead>Activity</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>

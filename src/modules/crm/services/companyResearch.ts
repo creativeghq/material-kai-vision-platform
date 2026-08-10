@@ -167,8 +167,8 @@ export const greekAfm = (vat: string | null | undefined, countryCode?: string | 
 
 const isBlank = (v: unknown) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
 
-/** Map an ΑΑΔΕ lookup onto crm_companies columns. */
-function aadeFields(res: AadeLookupResult, existing: Record<string, unknown>): Record<string, unknown> {
+/** Map an ΑΑΔΕ lookup onto crm_companies columns. Exported for the seeding guard test. */
+export function aadeFields(res: AadeLookupResult, existing: Record<string, unknown>): Record<string, unknown> {
   const r = res.basic_rec;
   const primary = res.activities.find((a) => a.kind === 1) ?? res.activities[0] ?? null;
   const secondary = res.activities.filter((a) => a.kind !== 1);
@@ -192,7 +192,12 @@ function aadeFields(res: AadeLookupResult, existing: Record<string, unknown>): R
     country: r.postal_area_description ? ((existing.country as string) || 'Greece') : undefined,
     country_code: (existing.country_code as string) || 'EL',
     tax_office: r.doy_descr ?? undefined,
-    profession: primary?.description ?? undefined,
+    // `profession` is the activity PRINTED ON THE FISCAL DOCUMENT — partyFromCrm feeds it to
+    // the myDATA counterpart and the PDF renders it as "Δραστηριότητα". Seed it from the primary
+    // ΚΑΔ only while it is blank: an operator who corrected the printed line must not have it
+    // silently reverted by the next lookup. The registry's own copy always lands in
+    // `kad_primary_description` below, which stays authoritative for classification.
+    profession: isBlank(existing.profession) ? (primary?.description ?? undefined) : undefined,
     commercial_title: r.commer_title ?? undefined,
     legal_status: r.legal_status_descr ?? undefined,
     kad_primary: primary?.code ?? undefined,
