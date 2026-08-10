@@ -122,7 +122,13 @@ describe('the embed builder always offers a way forward', () => {
   it('the verdict is rendered above the viewport, not stranded below the product', () => {
     // Rendered after it, "We have exactly that" lands underneath the product's own cart button and
     // reads as a caption for whatever happens to be last on screen.
-    const render = method('render');
+    //
+    // Measured from the WIZARD branch on purpose. Deep-link mode (#341 join 6) returns earlier and
+    // renders the viewport with no heading at all — correctly, since there is no verdict when the
+    // page named the product — and measuring from the top of the method picks up that call first,
+    // which failed this assertion against ordering that is still right.
+    const full = method('render');
+    const render = full.slice(full.indexOf('const steps'));
     const headingAt = render.indexOf('stageHeading()');
     const viewportAt = render.indexOf('renderViewport()');
     expect(headingAt, 'the verdict heading is not rendered at all').toBeGreaterThan(-1);
@@ -264,5 +270,53 @@ describe('the embed builder cannot call the API without its key', () => {
     const url = method('url');
     expect(url).toContain('encodeURIComponent(this.apiKey)');
     expect(SRC).not.toContain('x-embed-key');
+  });
+});
+
+/**
+ * Deep-link mode (#341 join 6) — `<materialkai-builder product-id="…">`.
+ *
+ * The program shipped two components and asked merchants to choose between them. They are one
+ * entry with two modes: naming a product is the first question already answered. The distinction
+ * is what gets deleted here, not the product widget — that still exists and is still what mounts
+ * inside, on a match and on this path.
+ *
+ * Two ways this breaks quietly, both guarded below:
+ *   • the wizard renders anyway, so a page about ONE product opens by asking what the visitor is
+ *     after — and the verdict heading answers a question nobody asked;
+ *   • the vocabulary is fetched regardless, spending a request (and a slice of the key's rate
+ *     limit) on chips that are never drawn.
+ */
+describe('the embed builder is also the deep link', () => {
+  // `method()` matches `private …` declarations; connectedCallback is a public lifecycle hook.
+  // Loosening that helper to make `private` optional would make it match CALL sites (`this.render(`)
+  // and silently slice the wrong text for every other assertion in this file.
+  const connected = (() => {
+    const start = SRC.indexOf('connectedCallback() {');
+    expect(start, 'connectedCallback not found — was it renamed?').toBeGreaterThan(-1);
+    return SRC.slice(start, SRC.indexOf('\n  }', start));
+  })();
+
+  it('a named product skips the wizard entirely', () => {
+    expect(connected).toContain("getAttribute('product-id')");
+    expect(connected).toContain('this.deepLinkProductId');
+    // The product must reach the viewport, which is what mounts <materialkai-product>.
+    expect(connected).toContain('this.matchedProductId');
+  });
+
+  it('does not fetch the spec vocabulary for a page that already knows the product', () => {
+    const beforeReturn = connected.slice(0, connected.indexOf('return;'));
+    expect(beforeReturn).not.toContain('loadFacets');
+    // …and still loads it in the normal path, or the builder has no questions to ask.
+    expect(connected).toContain('void this.loadFacets()');
+  });
+
+  it('renders the product alone — no steps, no verdict, no result panel', () => {
+    const render = method('render');
+    const early = render.slice(0, render.indexOf('const steps'));
+    expect(early, 'deep-link mode must return before the wizard chrome is built')
+      .toContain('this.deepLinkProductId');
+    expect(early).toContain('renderViewport');
+    expect(early).not.toContain('stageHeading');
   });
 });

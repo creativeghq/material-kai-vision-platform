@@ -145,6 +145,8 @@ export class MaterialKaiBuilder extends HTMLElement {
   private widgetId: string | undefined;
   /** What the viewport at the top is currently showing. */
   private matchedProductId: string | null = null;
+  /** Set when the host page named a product: the wizard is skipped entirely (#341 join 6). */
+  private deepLinkProductId: string | null = null;
   private generatedUrl: string | null = null;
   private generating = false;
   /** Whether this key may generate at all — decides if the "See it" step is offered. */
@@ -156,6 +158,21 @@ export class MaterialKaiBuilder extends HTMLElement {
   }
 
   connectedCallback() {
+    // DEEP-LINK MODE (#341 join 6). `<materialkai-builder product-id="…">` is the same entry with
+    // the first question already answered — the visitor arrived on a page about one product, so
+    // asking "what are you after" would be pretending not to know.
+    //
+    // This exists so a merchant learns ONE tag. `<materialkai-product>` is still exported and still
+    // works (it is what mounts inside here, on a match and on this path), but it is no longer a
+    // second thing to choose between: the builder IS the entry, and naming a product is a mode of
+    // it rather than a different component.
+    const deepLink = this.getAttribute('product-id');
+    if (deepLink) {
+      this.deepLinkProductId = deepLink;
+      this.matchedProductId = deepLink;
+      this.render();
+      return;
+    }
     this.render();
     void this.loadFacets();
   }
@@ -247,6 +264,10 @@ export class MaterialKaiBuilder extends HTMLElement {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name, email, message, spec: this.spec,
+          // What they were looking at when they asked (#341 join 7). The spec says what they typed;
+          // this says what they SAW, which is what they are actually anchored on. The server only
+          // keeps it if it is one of our own generation objects.
+          generated_image_url: this.generatedUrl || undefined,
           turnstile_token: this.turnstileToken || undefined,
         }),
       });
@@ -405,6 +426,17 @@ export class MaterialKaiBuilder extends HTMLElement {
   private render() {
     const style = document.createElement('style');
     style.textContent = STYLE;
+
+    // Deep-link mode: the product IS the answer, so there is no wizard to draw — no step dots, no
+    // verdict heading ("We have exactly that" would be answering a question nobody asked), and no
+    // result panel, which has no result to read. Just the product, exactly as
+    // `<materialkai-product>` renders it, because that is what mounts inside.
+    if (this.deepLinkProductId) {
+      const only = document.createElement('div');
+      only.appendChild(this.renderViewport());
+      this.root.replaceChildren(style, only);
+      return;
+    }
 
     const steps = document.createElement('div');
     steps.className = 'step';

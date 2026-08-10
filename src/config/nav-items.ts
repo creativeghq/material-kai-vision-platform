@@ -26,6 +26,7 @@ import {
   ImagePlus,
   Building2,
   Layers,
+  Ruler,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
@@ -124,6 +125,11 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Interior Design is agent-first (the Vision agent + generation toolkit on the canvas), so the
   // Studio Hub entry deep-links into the Agent Hub with Vision pre-selected rather than a static page.
   { id: 'interior', label: 'Interior Design', path: '/agent-hub?capability=interior', icon: Sofa, surface: 'app', hub: 'studio', description: 'Design, render & stage rooms with the AI studio.' },
+  // Room Planner (#321 M3 / #259). Built, tested, and reachable from NOTHING until now — the route
+  // existed in App.tsx and no surface linked it, so the only way in was typing the URL. Gated like
+  // MoodBoards (no module, no extra capability): it draws the workspace's own catalogue on a plan,
+  // and `room_layouts` is workspace-scoped by RLS.
+  { id: 'room-planner', label: 'Room Planner', path: '/room-planner', icon: Ruler, surface: 'app', hub: 'studio', description: 'Arrange catalog products on a floor plan, at their real size.' },
   // Catalogs — agent-driven builder (Pepper); the create/extract tools self-gate to admin/owner.
   { id: 'catalogs', label: 'Catalogs', path: '/agent-hub?capability=catalog', icon: BookOpen, requireCapability: 'agent.use', moduleSlug: 'presentation-catalogs', surface: 'app', hub: 'studio', description: 'Build branded product catalogs — in the AI studio.' },
   // Image Studio — general image generation/editing (Vision + Gemini pipeline), for marketing
@@ -270,6 +276,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   // Design studio
   'moodboard',
   'interior',
+  'room-planner',
   'catalogs',
   'image-studio',
   // Vertical modules
