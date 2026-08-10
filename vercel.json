@@ -19,7 +19,7 @@
       "destination": "/api/sitemap"
     },
     {
-      "source": "/((?!api|assets|avatars|models|static|documentation|favicon.ico|robots.txt|sitemap.xml|llms.txt).*)",
+      "source": "/((?!api|assets|avatars|models|static|documentation|embed|fonts|favicon\\.ico|robots\\.txt|sitemap\\.xml|llms\\.txt|site\\.webmanifest|sw\\.js|wp-admin|wp-content|wp-includes|wp-json|xmlrpc|phpmyadmin|cgi-bin|actuator|server-status)(?!\\.(?!well-known))(?!.*/\\.)(?!.*\\.(?:php|phtml|asp|aspx|jsp|cgi|pl|sql|bak|old|swp|zip|rar|7z|tar|tgz|gz|env)(?:$|/)).*)",
       "destination": "/index.html"
     }
   ],

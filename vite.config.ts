@@ -124,9 +124,13 @@ export default defineConfig(({ mode }) => {
               //
               // The rule: a manualChunks entry does not "organise" a dependency, it PINS it. Only
               // map a package you want every visitor to download.
-              // Charts — recharts v3 uses function components (no forwardRef),
-              // safe in its own chunk; Rollup import ordering guarantees React loads first
-              'recharts': 'vendor-charts',
+              //
+              // Re-added and re-removed 2026-08-10. The pin came back under a comment about
+              // forwardRef safety — which was true and beside the point: the question is never
+              // "is this chunk safe", it is "does every visitor need it". The rebuilt artifact
+              // carried vendor-charts-*.js at exactly 362,395 bytes, the same number written
+              // above, modulepreloaded from index.html on every anonymous page load. If you are
+              // about to add this line a third time, the answer is still no.
               // Supabase
               '@supabase/supabase-js': 'vendor-supabase',
               // Sentry

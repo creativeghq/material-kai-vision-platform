@@ -160,6 +160,31 @@ where the record was born.
 - **Proven to fire:** 2026-08-07 — a throwaway `src/__ratchet_probe.ts` with a raw `crm_companies` insert was added and the ratchet named it, then removed. The test also asserts its own source scan matched >500 files first, so an inert glob fails loudly instead of passing vacuously (shape 4, applied to the guard itself).
 - **Blind spot:** `crm_contacts` has the same shape and no ratchet. The guard is per-table and per-verb — a thin create that goes through an RPC or an edge function rather than a client-side `.insert(` is invisible to it.
 
+### 9. Silent cost regression — correct code that bills you
+A close relative of shape 1's "a wrong number is a valid number", moved to the infrastructure bill.
+A `manualChunks` entry does not *organise* a dependency, it **PINS** it: the named chunk becomes a
+static import of the entry, so `index.html` emits a `modulepreload` and every anonymous visitor
+downloads it on first paint. Audit #308 found `recharts` pinned that way — 362,395 bytes of charting
+library shipped to landing pages that render no charts — and removed it, leaving a 15-line comment
+explaining why. It was re-added on 2026-08-09 under a comment about `forwardRef` safety, which was
+*true and irrelevant*: the question is never "is this chunk safe to split", it is "does every visitor
+need these bytes".
+
+Nothing could see it. The build succeeds, the bundle works, every test passes, the typecheck is clean
+and the page renders correctly — it is simply 24% heavier for everyone, forever, and the only symptom
+is a line on a usage dashboard nobody reads until a quota email arrives. **The comment was the guard,
+and the comment lost.**
+
+The same window produced the sibling shape on the request side: the SPA catch-all in `vercel.json`
+answered **200 with the full 5.5 KB app shell for every URL in existence**, so `/wp-login.php`,
+`/.env` and `/.git/config` all read as valid pages to a scanner — and on Vercel a cache HIT is billed
+identically to a MISS, so a 97.5% hit rate reduced the meter by exactly zero.
+
+- **Guarded by:** [tests/unit/edgeRequestSurface.test.ts](../tests/unit/edgeRequestSurface.test.ts) — asserts no optional package is pinned into `manualChunks` (`recharts`, `@sentry/react`), and that the catch-all still serves all 37 real client-side routes while 404-ing 31 scanner paths. Both directions matter: over-widening the exclusions 404s a real customer, which is worse than the traffic it saves.
+- **Proven to fire:** 2026-08-10 — both regressions were reintroduced into the real files and the suite run. The recharts assertion failed; restoring the old permissive rewrite regex failed all 31 scanner assertions. Green again on restore.
+- **Why it is a source-text check, not a build check:** the defect is visible in `vite.config.ts` and `vercel.json` without a 93-second build, so the guard costs milliseconds and runs in the normal unit suite. The cost is that it reasons about config, not the emitted artifact — see the blind spot.
+- **Blind spot:** it pins a **named list** of packages. A *new* heavy dependency pinned for the first time is invisible, as is a chunk that lands in the eager path through a static import chain rather than a `manualChunks` entry. Closing that properly means asserting a byte budget on `dist/index.html`'s modulepreload set in CI, which needs a build step. Also unguarded: `@mdxeditor/editor` pulls 1.2 MB plus 75 CodeMirror language-mode chunks (`apl`, `brainfuck`, `commonlisp`, …) for one component — correctly lazy, so it costs no visitor anything today, but nothing stops it becoming eager.
+
 ---
 
 ## Mechanism inventory
@@ -181,6 +206,7 @@ where the record was born.
 | `ops.storage_paths_unregistered` | nightly | shape 4d | **yes** — reads `build_storage_reference_set()`'s own body, so it cannot drift from what the cron actually honours |
 | `ops.money_without_currency` | nightly | shape 6 | no — but all three branches were watched to fire before shipping |
 | `ops.unsent_queue_backlog` | nightly | shape 4c | no — but it fired on real production data on introduction |
+| [tests/unit/edgeRequestSurface.test.ts](../tests/unit/edgeRequestSurface.test.ts) | `npm test`, blocking | shape 9 — eager-bundle pins + the SPA catch-all's 404 surface | **yes** — both regressions reintroduced into the real files on 2026-08-10 and watched to fail (1 assertion, then all 31), not re-implemented in the test |
 | `pdf.product_resume_incomplete` | nightly | shape 4b | no — but it was watched to fire on a planted marker before shipping |
 | [tests/unit/escapeHtmlParity.test.ts](../tests/unit/escapeHtmlParity.test.ts) | `npm test`, blocking | invariant 11 — the three `escapeHtml` twins (Vite / Deno edge / Vercel `api/`) stay byte-equivalent | **yes** — imports all three and diffs them over a shared corpus, so a twin that stops matching fails the build rather than reporting clean |
 | `lint_plpgsql_errors()` via `db.plpgsql-lint` | smoke monitor, 2-hourly | every `public` plpgsql function still compiles against the live schema | yes — baseline is a strict **zero**, so any new breakage fails instead of blending into a known-broken list |

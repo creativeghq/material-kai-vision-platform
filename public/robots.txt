@@ -1,16 +1,219 @@
+# MaterialsHub — crawl policy
+#
+# A crawler obeys ONLY the most specific User-agent group that matches it, and
+# ignores every other group. That is why the Disallow list is repeated verbatim
+# under Googlebot and Bingbot instead of living once under `*` — a named group
+# with no Disallow lines is an unrestricted crawl, which is what this file
+# granted until 2026-08-10.
+#
+# Two things are being kept out of the index here:
+#   1. The authenticated app surface. It renders an empty shell to a crawler
+#      anyway, so crawling it is pure cost.
+#   2. Tokenised share URLs (/q/, /i/, /sheets/, /pay/, /statement/, ...). The
+#      token IS the credential; an indexed one is a public document.
+#
+# This file is advisory. Scanners probing for /wp-login.php and /.env do not
+# read it — those are handled by the rewrite exclusions in vercel.json, which
+# return a real 404 instead of the 5.5 KB app shell.
+
 User-agent: Googlebot
 Allow: /
+Disallow: /admin
+Disallow: /auth
+Disallow: /profile
+Disallow: /settings
+Disallow: /billing
+Disallow: /inbox
+Disallow: /tasks
+Disallow: /monitoring
+Disallow: /analytics
+Disallow: /factory-analytics
+Disallow: /agent-hub
+Disallow: /search-hub
+Disallow: /finance
+Disallow: /crm
+Disallow: /my-hr
+Disallow: /pos
+Disallow: /health
+Disallow: /ready
+Disallow: /q/
+Disallow: /i/
+Disallow: /c/
+Disallow: /u/
+Disallow: /pay/
+Disallow: /statement/
+Disallow: /sheets/
+Disallow: /portal/
+Disallow: /tenant/
+Disallow: /buyer/
+Disallow: /supplier-portal
+Disallow: /client-portal
 
 User-agent: Bingbot
 Allow: /
+Disallow: /admin
+Disallow: /auth
+Disallow: /profile
+Disallow: /settings
+Disallow: /billing
+Disallow: /inbox
+Disallow: /tasks
+Disallow: /monitoring
+Disallow: /analytics
+Disallow: /factory-analytics
+Disallow: /agent-hub
+Disallow: /search-hub
+Disallow: /finance
+Disallow: /crm
+Disallow: /my-hr
+Disallow: /pos
+Disallow: /health
+Disallow: /ready
+Disallow: /q/
+Disallow: /i/
+Disallow: /c/
+Disallow: /u/
+Disallow: /pay/
+Disallow: /statement/
+Disallow: /sheets/
+Disallow: /portal/
+Disallow: /tenant/
+Disallow: /buyer/
+Disallow: /supplier-portal
+Disallow: /client-portal
 
+# Social unfurlers fetch one URL that a person deliberately pasted; they do not
+# crawl. Left permissive so link previews keep working.
 User-agent: Twitterbot
 Allow: /
 
 User-agent: facebookexternalhit
 Allow: /
 
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Slackbot-LinkExpanding
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+# AI training / answer-engine crawlers. Blocked outright: they crawl broadly and
+# repeatedly, and this platform's public surface is three sitemap URLs, so there
+# is nothing here worth the traffic. Delete a line to opt back in.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: OAI-SearchBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Perplexity-User
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: meta-externalagent
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: ImagesiftBot
+Disallow: /
+
+User-agent: AI2Bot
+Disallow: /
+
+User-agent: YouBot
+Disallow: /
+
+User-agent: Omgilibot
+Disallow: /
+
+# High-volume commercial SEO scrapers. DataForSeoBot is deliberately NOT here —
+# the platform's own seo-domain-tracker integrates DataForSEO.
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
 User-agent: *
 Allow: /
+Crawl-delay: 10
+Disallow: /admin
+Disallow: /auth
+Disallow: /profile
+Disallow: /settings
+Disallow: /billing
+Disallow: /inbox
+Disallow: /tasks
+Disallow: /monitoring
+Disallow: /analytics
+Disallow: /factory-analytics
+Disallow: /agent-hub
+Disallow: /search-hub
+Disallow: /finance
+Disallow: /crm
+Disallow: /my-hr
+Disallow: /pos
+Disallow: /health
+Disallow: /ready
+Disallow: /q/
+Disallow: /i/
+Disallow: /c/
+Disallow: /u/
+Disallow: /pay/
+Disallow: /statement/
+Disallow: /sheets/
+Disallow: /portal/
+Disallow: /tenant/
+Disallow: /buyer/
+Disallow: /supplier-portal
+Disallow: /client-portal
 
 Sitemap: https://app.materialshub.gr/sitemap.xml
