@@ -392,6 +392,23 @@ export const QuoteRequestsAdmin: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell className="max-w-md">
+                        {/* What they were LOOKING AT (#341 join 7). The facets say what they typed;
+                            the picture is what they are anchored on, and quoting against a spec
+                            while the customer pictures something else is how a quote gets rejected
+                            for reasons nobody can name. Labelled, because it is not a catalogue
+                            photo and must never be mistaken for one. */}
+                        {r.generated_image_url && (
+                          <div className="mb-2">
+                            <a href={r.generated_image_url} target="_blank" rel="noreferrer">
+                              <img
+                                src={r.generated_image_url}
+                                alt="AI impression the customer was shown"
+                                className="h-16 w-16 rounded-lg object-cover border border-border/60"
+                              />
+                            </a>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">AI impression — not a catalogue photo</div>
+                          </div>
+                        )}
                         {Object.keys(r.spec).length > 0 ? (
                           <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
                             {Object.entries(r.spec).map(([k, v]) => (

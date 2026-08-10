@@ -140,6 +140,11 @@ export interface UnquotedRequest {
   contact_email: string | null;
   spec: Record<string, unknown>;
   from_embed: boolean;
+  /**
+   * The AI impression the visitor was looking at when they asked (#341 join 7), when the catalogue
+   * had nothing to show them. Null means none was generated — never "we lost it".
+   */
+  generated_image_url: string | null;
 }
 
 // =====================================================
@@ -1024,7 +1029,7 @@ export class QuotesService {
   async listUnquotedRequests(workspaceId: string): Promise<UnquotedRequest[]> {
     const { data, error } = await supabase
       .from('quote_requests')
-      .select('id, created_at, status, source, spec, notes, customer_contact_id, embed_key_id')
+      .select('id, created_at, status, source, spec, notes, customer_contact_id, embed_key_id, generated_image_url')
       .eq('workspace_id', workspaceId)
       .is('quote_id', null)
       .order('created_at', { ascending: false })
@@ -1058,6 +1063,7 @@ export class QuotesService {
         // including the parts the catalog could not satisfy.
         spec: (r.spec ?? {}) as Record<string, unknown>,
         from_embed: r.embed_key_id != null,
+        generated_image_url: (r as { generated_image_url?: string | null }).generated_image_url ?? null,
       };
     });
   }

@@ -747,6 +747,20 @@ Deno.serve(withApiLogging((req) => {
       contactId = (created as { id: string }).id;
     }
 
+    // The AI impression the visitor was looking at when they asked (#341 join 7). Kept because the
+    // operator quoting this is otherwise reading a facet list and imagining what the customer had
+    // on screen — while the picture they are anchored on existed and was discarded.
+    //
+    // VALIDATED, not trusted. This caller is anonymous, so an arbitrary string here would be stored
+    // and then rendered in the admin: a stranger would be choosing what an operator's browser
+    // loads. Only our own public generation objects are accepted; anything else is dropped and the
+    // request still lands, because losing the lead over a bad image URL would be the worse failure.
+    const generatedPrefix = `${supabaseUrl}/storage/v1/object/public/generation-images/`;
+    const claimedImage = typeof params.generated_image_url === 'string' ? params.generated_image_url : null;
+    const generatedImageUrl = claimedImage && claimedImage.startsWith(generatedPrefix) && claimedImage.length <= 2048
+      ? claimedImage
+      : null;
+
     const { data: request, error: qErr } = await supabase.from('quote_requests').insert({
       workspace_id: workspaceId,
       user_id: null,
@@ -758,6 +772,7 @@ Deno.serve(withApiLogging((req) => {
       // negotiation on a figure that came from nowhere.
       spec,
       embed_key_id: auth.ctx.keyId,
+      generated_image_url: generatedImageUrl,
       notes: typeof params.message === 'string' ? params.message.slice(0, 1000) : null,
     }).select('id').single();
     if (qErr) return embedJson({ error: 'Could not record your request' }, 500, cors);
