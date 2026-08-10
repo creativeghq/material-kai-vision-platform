@@ -64,18 +64,34 @@ function stripComments(src: string): string {
 interface Emit { event: string; file: string; line: number }
 
 function collectEmits(): Emit[] {
-  // Only a STRING LITERAL first argument. A variable (`emitFlowEvent(evt, …)`) cannot be checked
+  // Only a STRING LITERAL event name. A variable (`emitFlowEvent(evt, …)`) cannot be checked
   // statically and is skipped rather than guessed at — a guard that invents findings is worse
   // than one with a known blind spot, and this one's blind spot is narrow and deliberate.
-  const RE = /(?:emitFlowEvent|flowEventService\.emit)\(\s*'([a-zA-Z0-9_.]+)'/g;
+  //
+  // TWO call shapes, because the event name is not always the first argument:
+  //   emitFlowEvent('x', …)                              — name first
+  //   flowEventService.emit('x', …)                      — name first
+  //   emitFlowEventToWorkspaceRoles(ws, roles, 'x', …)   — name THIRD
+  //   flowEventService.emitToWorkspaceRoles(ws, roles, 'x', …)
+  //
+  // The role-fanout form was invisible here until #342. That is why `order_created` — emitted by
+  // `ordersService.create` since the orders module shipped — was reported as having no in-repo
+  // emitter: the guard could not see the call. A blind spot in the check that exists to find
+  // blind spots is worth more than the finding it hid.
+  const RE_FIRST = /(?:emitFlowEvent|flowEventService\.emit)\(\s*'([a-zA-Z0-9_.]+)'/g;
+  const RE_THIRD =
+    /(?:emitFlowEventToWorkspaceRoles|flowEventService\.emitToWorkspaceRoles)\(\s*[^,]+,\s*\[[^\]]*\]\s*,\s*'([a-zA-Z0-9_.]+)'/g;
   const out: Emit[] = [];
   for (const root of SCAN_ROOTS) {
     for (const file of walk(root)) {
       const src = stripComments(readFileSync(file, 'utf8'));
-      const lines = src.split('\n');
-      for (const [i, line] of lines.entries()) {
-        for (const m of line.matchAll(RE)) {
-          out.push({ event: m[1], file: relative(process.cwd(), file).split('\\').join('/'), line: i + 1 });
+      const rel = relative(process.cwd(), file).split('\\').join('/');
+      // Matched against the whole file, not per line: the fanout form is routinely wrapped
+      // across lines by the formatter, and a per-line scan would silently miss every one.
+      for (const re of [RE_FIRST, RE_THIRD]) {
+        for (const m of src.matchAll(re)) {
+          const line = src.slice(0, m.index ?? 0).split('\n').length;
+          out.push({ event: m[1], file: rel, line });
         }
       }
     }

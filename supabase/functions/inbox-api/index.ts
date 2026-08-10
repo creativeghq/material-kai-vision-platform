@@ -16,8 +16,20 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';
-import { emitFlowEvent } from '../_shared/flow-events.ts';
-import { sendWhatsAppReply } from '../_shared/zernio.ts';
+import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { sendWhatsAppReply, sendWhatsAppMessage } from '../_shared/zernio.ts';
+import {
+  intakeDisplayTotal,
+  orderIntakeSettings,
+  readIntake,
+  runOrderIntake,
+  writeIntake,
+  type IntakeConfirmation,
+  type IntakeItem,
+  type OrderIntake,
+} from '../_shared/order-intake/index.ts';
+import { matchByText } from '../_shared/order-intake/match.ts';
+import { resolveLinePrice } from '../_shared/order-intake/price.ts';
 import { generateWithClaudeTools } from '../_shared/ai-client.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
@@ -349,6 +361,78 @@ async function loadInboxAgentPersona(db: DbClient): Promise<string> {
  * owner can't pay. Only fires on a fresh inbound CUSTOMER message (loop/takeover guard below).
  * Best-effort — any failure leaves the thread for a human, never throws.
  */
+/**
+ * Order intake (#342 §3). Runs immediately BEFORE `maybeRunAgentReply` at every place an inbound
+ * customer message lands, so both channels get it from one chokepoint and neither webhook needed
+ * a change.
+ *
+ * It produces a PROPOSAL on `inbox_threads.metadata.order_intake`. Nothing reaches `orders` until
+ * a member approves it — see `create_order_from_thread_intake`.
+ *
+ * Same guard as the agent reply: only a fresh inbound CUSTOMER text triggers it, so the assistant
+ * quoting an order back, a member's reply, or a system event cannot re-trigger extraction and
+ * re-bill for it. Best-effort throughout — a failure leaves the thread for a human.
+ */
+async function maybeRunOrderIntake(db: DbClient, threadId: string): Promise<void> {
+  try {
+    const thread = await getThreadOrThrow(db, threadId);
+    const workspaceId = String(thread.workspace_id);
+
+    const settings = await orderIntakeSettings(db, workspaceId);
+    if (!settings.enabled) return;
+
+    // Loop / human-takeover guard, identical to maybeRunAgentReply's.
+    const { data: history } = await db
+      .from('inbox_messages')
+      .select('message_type, sender_participant_id')
+      .eq('thread_id', threadId)
+      .is('deleted_at', null)
+      .neq('message_type', 'note')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const latest = ((history || []) as Array<{ message_type: string; sender_participant_id: string | null }>)[0];
+    if (!latest || latest.message_type !== 'text' || !latest.sender_participant_id) return;
+    const { data: sender } = await db.from('inbox_participants')
+      .select('participant_type').eq('id', latest.sender_participant_id).maybeSingle();
+    if ((sender as { participant_type?: string } | null)?.participant_type !== 'customer') return;
+
+    const owner = await workspaceOwner(db, workspaceId);
+    if (!owner) return;
+
+    const scope = await resolveThreadCustomerScope(db, threadId);
+    const result = await runOrderIntake(db, {
+      threadId,
+      workspaceId,
+      channel: String(thread.channel),
+      ownerUserId: owner,
+      contactId: scope.contactId,
+      companyId: scope.companyId,
+      settings,
+    });
+
+    // Log the no-op reason too. "Intake never fires" must be diagnosable rather than silent —
+    // an empty result and a disabled toggle look identical from the outside otherwise.
+    if (!result.ran) {
+      console.log(`[inbox-api] order intake skipped on ${threadId}: ${result.reason}`);
+      return;
+    }
+
+    // A proposal is a business event: tell the people who can approve it.
+    await emitFlowEventToWorkspaceRoles(
+      workspaceId, ['owner', 'admin'], 'inbox.order_intake_ready',
+      (uid: string) => ({
+        type: 'inbox_order_intake', user_id: uid, workspace_id: workspaceId,
+        thread_id: threadId,
+        title: 'An order arrived in the Inbox',
+        body: `${result.intake?.items.length ?? 0} line(s) read from a ${thread.channel} conversation — review and approve.`,
+        action_url: `/inbox?thread=${threadId}`,
+      }),
+    ).catch(() => {});
+  } catch (e) {
+    console.warn('[inbox-api] order intake failed:', e instanceof Error ? e.message : String(e));
+  }
+}
+
 async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void> {
   try {
     const thread = await getThreadOrThrow(db, threadId);
@@ -807,6 +891,191 @@ async function insertMessageAndNotify(
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Order intake helpers (#342 §4)
+// ──────────────────────────────────────────────────────────────────────────
+
+/** The intake currently stored on a thread. */
+async function loadIntake(db: DbClient, threadId: string): Promise<OrderIntake | null> {
+  const { data } = await db.from('inbox_threads').select('metadata').eq('id', threadId).maybeSingle();
+  return readIntake((data as { metadata?: unknown } | null)?.metadata);
+}
+
+/**
+ * Resolve `{thread, intake}` for an intake action, enforcing membership first. 404 (not 403) on a
+ * thread the caller cannot see, so thread ids stay un-enumerable.
+ */
+async function intakeContext(
+  db: DbClient,
+  userId: string,
+  payload: Json,
+  operator: boolean,
+): Promise<{ thread: Record<string, unknown>; intake: OrderIntake | null }> {
+  const threadId = String(payload.thread_id || '');
+  if (!threadId) throw new HttpError(400, 'thread_id is required');
+  const thread = await getThreadOrThrow(db, threadId);
+  const access = await resolveThreadAccess(db, userId, thread, operator);
+  // Intake is a business surface: members only. A customer participant must never see the
+  // proposal, the matched cost, or the margin implied by it.
+  if (!access.isMember && !operator) throw new HttpError(404, 'Conversation not found');
+  return { thread, intake: await loadIntake(db, threadId) };
+}
+
+/** A row must belong to the thread's workspace. Returns 404, never "wrong workspace". */
+async function assertOwnedByWorkspace(
+  db: DbClient,
+  table: 'crm_contacts' | 'crm_companies' | 'products',
+  id: string,
+  workspaceId: string,
+  label: string,
+): Promise<void> {
+  const { data } = await db.from(table).select('id').eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+  if (!(data as { id?: string } | null)?.id) throw new HttpError(404, `That ${label} was not found`);
+}
+
+/** Re-run the resolver for every catalog line — used when the customer (and so the price) changes. */
+async function repriceItems(
+  db: DbClient,
+  workspaceId: string,
+  intake: OrderIntake,
+): Promise<IntakeItem[]> {
+  const out: IntakeItem[] = [];
+  for (const item of intake.items) {
+    // A price a member typed is theirs to keep; only resolver-priced lines are recomputed.
+    if (!item.product_id || item.unit_price_source === 'manual') { out.push(item); continue; }
+    const priced = await resolveLinePrice(db, {
+      workspaceId,
+      productId: item.product_id,
+      companyId: intake.customer_company_id,
+      contactId: intake.customer_contact_id,
+    });
+    out.push({
+      ...item,
+      unit_price: priced.unit_price,
+      unit_cost: priced.unit_cost,
+      measurement_unit_code: priced.measurement_unit_code ?? item.measurement_unit_code,
+      needs_review: priced.unit_price == null,
+    });
+  }
+  return out;
+}
+
+/** Plain-text read-back of an approved order. Used for every confirmation channel. */
+function orderConfirmationText(intake: OrderIntake, orderNumber: string | null): string {
+  const lines = intake.items.map((it) => {
+    const price = it.unit_price == null ? '' : ` @ ${it.unit_price.toFixed(2)} ${intake.currency}`;
+    return `• ${it.quantity} × ${it.description}${price}`;
+  });
+  const totals = intakeDisplayTotal(intake.items);
+  const head = orderNumber ? `Your order ${orderNumber} is confirmed.` : 'Your order is confirmed.';
+  const tail = totals.unpriced > 0
+    ? `\n\nTotal so far: ${totals.net.toFixed(2)} ${intake.currency} (${totals.unpriced} item(s) still to be priced — we will follow up).`
+    : `\n\nTotal: ${totals.net.toFixed(2)} ${intake.currency} (excl. VAT).`;
+  return `${head}\n\n${lines.join('\n')}${tail}`;
+}
+
+/**
+ * Tell the customer their order was accepted (#342 §4a) — and REPORT which channel did it.
+ *
+ * This exists because of a gap #209 left open and this feature walks straight into: `send_message`
+ * returns 409 on a freeform WhatsApp reply outside Meta's 24-hour service window. An order that
+ * arrives at 18:00 and is approved at 09:00 the next morning is outside it. Without this, the
+ * order would be created and the confirmation would silently fail — a real order the customer was
+ * never told about, with nothing complaining. That is the platform's signature silent-zero shape.
+ *
+ * Approval NEVER rolls back because a message failed: the order is the commitment, the message is
+ * best-effort. But the outcome is stored on the intake, so "approved but never told" is a state
+ * you can query rather than a guess.
+ */
+async function sendOrderConfirmation(
+  db: DbClient,
+  thread: Record<string, unknown>,
+  intake: OrderIntake,
+  orderId: string,
+): Promise<IntakeConfirmation> {
+  const at = new Date().toISOString();
+  const { data: orderRow } = await db.from('orders').select('order_number').eq('id', orderId).maybeSingle();
+  const body = orderConfirmationText(intake, (orderRow as { order_number?: string } | null)?.order_number ?? null);
+  const channel = String(thread.channel);
+
+  try {
+    if (channel === 'whatsapp') {
+      const meta = (thread.metadata || {}) as Record<string, unknown>;
+      const accountId = meta.zernio_account_id as string | undefined;
+      const conversationId = meta.zernio_conversation_id as string | undefined;
+      const phone = meta.contact_phone as string | undefined;
+      if (!accountId) return { channel: 'none', status: 'unavailable', at, detail: 'no WhatsApp binding' };
+
+      const win = await whatsappWindow(db, String(thread.id));
+      if (win?.open && conversationId) {
+        // Both Zernio helpers RESOLVE with { success:false } instead of throwing, so a bare
+        // `await` reads as success on every failure. Checking the result is the whole point of
+        // this function — reporting "sent" for a message that never left is the silent zero.
+        const res = await sendWhatsAppReply({ accountId, conversationId, message: body });
+        return res.success
+          ? { channel: 'whatsapp', status: 'sent', at }
+          : { channel: 'whatsapp', status: 'failed', at, detail: res.error ?? 'relay refused' };
+      }
+
+      // Window shut → an approved template is the only way back in. This is #209's last open
+      // lever, built for exactly one template rather than as a general picker.
+      const templateName = (await resolveSecret(db, 'WHATSAPP_ORDER_CONFIRMATION_TEMPLATE')).value;
+      if (!templateName || !phone) {
+        return {
+          channel: 'none', status: 'unavailable', at,
+          detail: 'the 24-hour window is closed and no approved order_confirmation template is configured',
+        };
+      }
+      const sent = await sendWhatsAppMessage({
+        accountId,
+        to: phone,
+        message: body,
+        templateName,
+        templateLanguage: (await resolveSecret(db, 'WHATSAPP_ORDER_CONFIRMATION_TEMPLATE_LANG')).value || 'en',
+        templateParams: [
+          (orderRow as { order_number?: string } | null)?.order_number ?? '',
+          intakeDisplayTotal(intake.items).net.toFixed(2),
+          intake.currency,
+        ],
+      });
+      return sent.success
+        ? { channel: 'whatsapp_template', status: 'sent', at }
+        : { channel: 'whatsapp_template', status: 'failed', at, detail: sent.error ?? 'template send refused' };
+    }
+
+    if (channel === 'email') {
+      // The reply goes out on the thread, which relays through the normal email path.
+      await insertMessageAndNotify(db, {
+        thread,
+        senderParticipantId: null,
+        body,
+        attachments: [],
+        messageType: 'text',
+        senderUserId: null,
+        senderLabel: 'Order confirmation',
+      });
+      return { channel: 'email', status: 'sent', at };
+    }
+
+    await insertMessageAndNotify(db, {
+      thread,
+      senderParticipantId: null,
+      body,
+      attachments: [],
+      messageType: 'text',
+      senderUserId: null,
+      senderLabel: 'Order confirmation',
+    });
+    return { channel: 'none', status: 'sent', at };
+  } catch (e) {
+    // `channel` is the thread's own channel string; narrow it to the confirmation vocabulary so
+    // a future inbox_channel value cannot widen this record without the compiler noticing.
+    const failedOn: IntakeConfirmation['channel'] =
+      channel === 'whatsapp' || channel === 'email' ? channel : 'none';
+    return { channel: failedOn, status: 'failed', at, detail: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // JWT actions
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -815,6 +1084,12 @@ async function handleJwtAction(
   userId: string,
   action: string,
   payload: Json,
+  /**
+   * The same connection with RLS ENFORCED as the caller (#197 item 4). Used only by
+   * `approve_intake`, which must call `create_order_from_thread_intake` under the member's own
+   * identity so the RPC's `auth.uid()` guard is what decides — not our service-role bypass.
+   */
+  asUser?: DbClient | null,
 ): Promise<Response> {
   const operator = await isOperator(db, userId);
 
@@ -1029,6 +1304,9 @@ async function handleJwtAction(
         await db.from('inbox_participants').update({ last_read_at: new Date().toISOString() }).eq('id', senderParticipantId);
       }
       if (!access.isMember && messageType !== 'note') {
+        // Intake FIRST, so the proposal exists before the assistant answers and the reply can
+        // acknowledge the order rather than contradict it. No-op unless the workspace opted in.
+        await maybeRunOrderIntake(db, threadId);
         // A customer (claimed-account) message lets the agent take first crack. No-op unless the
         // thread is agent-active; maybeRunAgentReply gates + bills internally.
         await maybeRunAgentReply(db, threadId);
@@ -1210,10 +1488,19 @@ async function handleJwtAction(
         const { data: tl } = await db.from('inbox_thread_labels')
           .select('thread_id, inbox_labels(id, name, color)')
           .in('thread_id', threadIds);
-        for (const r of (tl || []) as Array<{ thread_id: string; inbox_labels: { id: string; name: string; color: string } | null }>) {
+        // The embed is many-to-one at runtime (a thread_label points at ONE label), so PostgREST
+        // returns an object — but the generated types describe every embed as an array. Accept
+        // both and normalize rather than asserting one and being wrong on the other.
+        type EmbeddedLabel = { id: string; name: string; color: string };
+        const rows = (tl || []) as unknown as Array<{
+          thread_id: string;
+          inbox_labels: EmbeddedLabel | EmbeddedLabel[] | null;
+        }>;
+        for (const r of rows) {
           if (!r.inbox_labels) continue;
+          const labels = Array.isArray(r.inbox_labels) ? r.inbox_labels : [r.inbox_labels];
           const arr = labelsByThread.get(r.thread_id) || [];
-          arr.push(r.inbox_labels);
+          for (const l of labels) if (l?.id) arr.push(l);
           labelsByThread.set(r.thread_id, arr);
         }
       }
@@ -1805,6 +2092,229 @@ async function handleJwtAction(
       return json({ draft });
     }
 
+    // ── Order intake (#342 §4) ────────────────────────────────────────────────────────────
+    //
+    // Every action derives its workspace from the THREAD and requires the caller to be a member
+    // of it (invariant 1). None of them touches `orders` — only `approve_intake` does, and it
+    // does so through the RPC, under the caller's own JWT.
+
+    case 'get_thread_intake': {
+      const { thread, intake } = await intakeContext(db, userId, payload, operator);
+      const callerRole = await callerRoleInWorkspace(db, userId, String(thread.workspace_id));
+      return json({
+        intake,
+        totals: intake ? intakeDisplayTotal(intake.items) : null,
+        // Hidden, not merely disabled, for roles the RPC would refuse — an Approve button that
+        // always throws is worse than no button.
+        can_approve: operator || ['owner', 'admin', 'sales', 'sales_manager'].includes(callerRole || ''),
+      });
+    }
+
+    case 'update_intake': {
+      const { thread, intake } = await intakeContext(db, userId, payload, operator);
+      if (!intake) throw new HttpError(404, 'This conversation has no order to edit');
+      if (intake.status !== 'pending_review') throw new HttpError(409, `This order has already been ${intake.status}`);
+      const workspaceId = String(thread.workspace_id);
+
+      const next: OrderIntake = { ...intake, updated_at: new Date().toISOString() };
+
+      // The party is re-validated here AND again in the RPC. Belt and braces on purpose: this
+      // check gives the reviewer a real error message, the RPC's is the one that is load-bearing.
+      if ('customer_contact_id' in payload) {
+        const id = payload.customer_contact_id ? String(payload.customer_contact_id) : null;
+        if (id) await assertOwnedByWorkspace(db, 'crm_contacts', id, workspaceId, 'customer');
+        next.customer_contact_id = id;
+      }
+      if ('customer_company_id' in payload) {
+        const id = payload.customer_company_id ? String(payload.customer_company_id) : null;
+        if (id) await assertOwnedByWorkspace(db, 'crm_companies', id, workspaceId, 'company');
+        next.customer_company_id = id;
+      }
+      if (typeof payload.currency === 'string') next.currency = payload.currency.slice(0, 8);
+      if ('notes' in payload) next.notes = payload.notes ? String(payload.notes).slice(0, 2000) : null;
+      if ('requested_delivery_date' in payload) {
+        next.requested_delivery_date = payload.requested_delivery_date
+          ? String(payload.requested_delivery_date).slice(0, 10) : null;
+      }
+
+      // Changing the party changes the price: the resolver folds in that customer's discount and
+      // pricing layer. Re-resolving here is what stops an intake being approved at the price of
+      // whoever the thread happened to be attributed to when the model first read it.
+      const partyChanged = 'customer_contact_id' in payload || 'customer_company_id' in payload;
+      if (partyChanged) {
+        next.items = await repriceItems(db, workspaceId, next);
+      }
+
+      await writeIntake(db, String(thread.id), next);
+      return json({ intake: next, totals: intakeDisplayTotal(next.items) });
+    }
+
+    case 'update_intake_items': {
+      const { thread, intake } = await intakeContext(db, userId, payload, operator);
+      if (!intake) throw new HttpError(404, 'This conversation has no order to edit');
+      if (intake.status !== 'pending_review') throw new HttpError(409, `This order has already been ${intake.status}`);
+      const workspaceId = String(thread.workspace_id);
+
+      const incoming = Array.isArray(payload.items) ? payload.items as Array<Record<string, unknown>> : null;
+      if (!incoming) throw new HttpError(400, 'items must be an array');
+      if (incoming.length > 100) throw new HttpError(400, 'An order may not have more than 100 lines');
+
+      const items: IntakeItem[] = [];
+      for (const [i, raw] of incoming.entries()) {
+        const prev = intake.items.find((it) => it.line_no === Number(raw.line_no));
+        const productId = raw.product_id ? String(raw.product_id) : null;
+        if (productId) await assertOwnedByWorkspace(db, 'products', productId, workspaceId, 'product');
+
+        const quantity = Number(raw.quantity);
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          throw new HttpError(400, `Line ${i + 1}: quantity must be a positive number`);
+        }
+
+        // An explicitly supplied price is the member's own decision and is recorded as such.
+        // Otherwise the resolver answers — the model never gets a say either way.
+        const manualPrice = raw.unit_price === null || raw.unit_price === undefined
+          ? undefined : Number(raw.unit_price);
+        let unitPrice = manualPrice;
+        let unitCost = prev?.unit_cost ?? null;
+        let unit = prev?.measurement_unit_code ?? null;
+        let source: IntakeItem['unit_price_source'] = manualPrice === undefined ? 'resolver' : 'manual';
+
+        const productChanged = productId !== (prev?.product_id ?? null);
+        if (manualPrice === undefined && productId && (productChanged || prev?.unit_price == null)) {
+          const priced = await resolveLinePrice(db, {
+            workspaceId, productId,
+            companyId: intake.customer_company_id, contactId: intake.customer_contact_id,
+          });
+          unitPrice = priced.unit_price ?? undefined;
+          unitCost = priced.unit_cost;
+          unit = priced.measurement_unit_code ?? unit;
+          source = 'resolver';
+        } else if (manualPrice === undefined) {
+          unitPrice = prev?.unit_price ?? undefined;
+        }
+
+        items.push({
+          line_no: i,
+          raw_text: String(raw.raw_text ?? prev?.raw_text ?? ''),
+          product_id: productId,
+          match_method: productChanged && productId ? 'manual' : (prev?.match_method ?? 'none'),
+          match_confidence: productChanged ? null : (prev?.match_confidence ?? null),
+          candidates: prev?.candidates,
+          description: String(raw.description ?? prev?.description ?? '').slice(0, 500) || 'Item',
+          quantity,
+          unit_price: unitPrice === undefined || Number.isNaN(unitPrice) ? null : unitPrice,
+          unit_cost: unitCost,
+          measurement_unit_code: unit,
+          vat_percent: prev?.vat_percent ?? null,
+          unit_price_source: source,
+          // A line a human has just set is reviewed by definition, unless it still has no price.
+          needs_review: unitPrice === undefined || unitPrice === null,
+        });
+      }
+
+      const next: OrderIntake = { ...intake, items, updated_at: new Date().toISOString() };
+      await writeIntake(db, String(thread.id), next);
+      return json({ intake: next, totals: intakeDisplayTotal(next.items) });
+    }
+
+    case 'search_intake_products': {
+      const { thread } = await intakeContext(db, userId, payload, operator);
+      const query = String(payload.query || '').trim();
+      if (query.length < 2) return json({ candidates: [] });
+      const match = await matchByText(db, String(thread.workspace_id), query);
+      return json({ candidates: match.candidates });
+    }
+
+    case 'approve_intake': {
+      const { thread, intake } = await intakeContext(db, userId, payload, operator);
+      if (!intake) throw new HttpError(404, 'This conversation has no order to approve');
+      if (!asUser) throw new HttpError(401, 'Unauthorized');
+
+      // The RPC decides. It runs under the caller's own identity, so our service-role client
+      // cannot widen who may approve — the guard lives in one place, in SQL.
+      const { data, error } = await asUser.rpc('create_order_from_thread_intake', {
+        p_thread_id: String(thread.id),
+      });
+      if (error) {
+        const code = error.code === '42501' ? 403 : error.code === 'P0002' ? 404 : 400;
+        throw new HttpError(code, error.message);
+      }
+      const orderId = String(data);
+
+      // Re-read: the RPC stamped status/order_id/reviewed_* into the metadata.
+      const fresh = await loadIntake(db, String(thread.id));
+
+      // Tell the customer (#342 §4a). Best-effort and REPORTED — approval never rolls back
+      // because a message failed, and "approved but never told" must be visible rather than
+      // silently successful.
+      const confirmation = await sendOrderConfirmation(db, thread, fresh ?? intake, orderId);
+      if (fresh) {
+        await writeIntake(db, String(thread.id), { ...fresh, confirmation });
+      }
+
+      const { data: orderRow } = await db.from('orders')
+        .select('order_number, total, currency').eq('id', orderId).maybeSingle();
+      const orderNumber = (orderRow as { order_number?: string } | null)?.order_number ?? null;
+
+      await insertMessageAndNotify(db, {
+        thread,
+        senderParticipantId: null,
+        body: `Order ${orderNumber || ''} created from this conversation.`.replace(/\s+/g, ' ').trim(),
+        attachments: [],
+        messageType: 'system',
+        senderUserId: null,
+        senderLabel: 'Order created',
+      });
+
+      await emitFlowEventToWorkspaceRoles(
+        String(thread.workspace_id), ['owner', 'admin'], 'order_created',
+        (uid: string) => ({
+          type: 'order_created', user_id: uid, workspace_id: String(thread.workspace_id),
+          order_id: orderId, order_number: orderNumber, order_type: 'sales', status: 'draft',
+          total: (orderRow as { total?: number } | null)?.total ?? 0,
+          currency: (orderRow as { currency?: string } | null)?.currency ?? 'EUR',
+          title: `Order created from the Inbox${orderNumber ? ` #${orderNumber}` : ''}`,
+          body: 'Approved from a customer conversation. It is a pre-order until confirmed.',
+          action_url: '/finance?tab=orders',
+        }),
+      ).catch(() => {});
+
+      return json({
+        order_id: orderId,
+        order_number: orderNumber,
+        confirmation,
+        intake: fresh ? { ...fresh, confirmation } : null,
+      });
+    }
+
+    case 'reject_intake': {
+      const { thread, intake } = await intakeContext(db, userId, payload, operator);
+      if (!intake) throw new HttpError(404, 'This conversation has no order to reject');
+      if (intake.status !== 'pending_review') throw new HttpError(409, `This order has already been ${intake.status}`);
+      const reason = payload.reason ? String(payload.reason).slice(0, 500) : null;
+      const next: OrderIntake = {
+        ...intake,
+        status: 'rejected',
+        notes: reason ?? intake.notes,
+        reviewed_by: userId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      await writeIntake(db, String(thread.id), next);
+      await insertMessageAndNotify(db, {
+        thread,
+        senderParticipantId: null,
+        body: reason
+          ? `The order read from this conversation was dismissed: ${reason}`
+          : 'The order read from this conversation was dismissed.',
+        attachments: [],
+        messageType: 'system',
+        senderUserId: null,
+        senderLabel: 'Order dismissed',
+      });
+      return json({ intake: next });
+    }
+
     case 'archive_thread': {
       // Soft-delete: moves the thread into the 30-day Archived view (purge cron deletes after).
       const threadId = String(payload.thread_id || '');
@@ -1914,6 +2424,8 @@ async function handleTokenAction(db: DbClient, action: string, payload: Json): P
         senderUserId: null,
         senderLabel: 'Customer reply',
       });
+      // #342: read any order out of the conversation before the assistant answers it.
+      await maybeRunOrderIntake(db, String(thread.id));
       // Phase-2: auto-reply if the thread is handed to the agent.
       await maybeRunAgentReply(db, String(thread.id));
       return json({ message: { id: (msg as { id: string }).id, created_at: (msg as { created_at: string }).created_at } });
@@ -2059,7 +2571,12 @@ async function handler(req: Request): Promise<Response> {
   if (action === 'internal_agent_reply') {
     const authHeader = req.headers.get('authorization') || '';
     if (authHeader !== `Bearer ${SERVICE_ROLE_KEY}`) throw new HttpError(401, 'Unauthorized');
-    await maybeRunAgentReply(db, String(payload.thread_id || ''));
+    const threadId = String(payload.thread_id || '');
+    // #342: this is the shared inbound chokepoint for BOTH channels — zernio-webhook-handler
+    // (WhatsApp) and email-webhooks (email) already call it, so neither needed a change to get
+    // order intake. Intake runs first so the assistant's reply can acknowledge the order.
+    await maybeRunOrderIntake(db, threadId);
+    await maybeRunAgentReply(db, threadId);
     return json({ ok: true });
   }
 
@@ -2092,7 +2609,7 @@ async function handler(req: Request): Promise<Response> {
   if (!auth.success || !auth.userId) {
     return json({ error: auth.error || 'Unauthorized' }, 401);
   }
-  return handleJwtAction(db, auth.userId, action, payload);
+  return handleJwtAction(db, auth.userId, action, payload, auth.supabaseAsUser);
 }
 
 Deno.serve(withApiLogging('inbox-api', handler));

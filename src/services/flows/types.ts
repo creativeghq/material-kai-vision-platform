@@ -63,6 +63,8 @@ export type TriggerType =
   // multi-tenant inbox (dotted keys; payload-only, no custom config UI)
   | 'inbox.message_received'
   | 'inbox.thread_assigned'
+  // #342: an order was read out of a customer conversation and is waiting for approval
+  | 'inbox.order_intake_ready'
   // Surplus marketplace: a new listing matched a buyer's saved alert
   | 'marketplace_want_match'
   // Expense cards (trip / monthly / …): submit→finance, review→rep, request→rep
@@ -226,6 +228,7 @@ export interface FreightQuoteRequestedTriggerConfig {}
 export interface OrderDispatchedTriggerConfig {}
 export interface InboxMessageReceivedTriggerConfig {}
 export interface InboxThreadAssignedTriggerConfig {}
+export interface InboxOrderIntakeReadyTriggerConfig {}
 export interface MarketplaceWantMatchTriggerConfig {}
 export interface ExpenseCardSubmittedTriggerConfig {}
 export interface ExpenseCardReviewedTriggerConfig {}
@@ -404,6 +407,7 @@ export type TriggerConfigMap = {
   order_dispatched: OrderDispatchedTriggerConfig;
   'inbox.message_received': InboxMessageReceivedTriggerConfig;
   'inbox.thread_assigned': InboxThreadAssignedTriggerConfig;
+  'inbox.order_intake_ready': InboxOrderIntakeReadyTriggerConfig;
   marketplace_want_match: MarketplaceWantMatchTriggerConfig;
   expense_card_submitted: ExpenseCardSubmittedTriggerConfig;
   expense_card_reviewed: ExpenseCardReviewedTriggerConfig;

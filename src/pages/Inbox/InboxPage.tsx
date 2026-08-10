@@ -7,6 +7,7 @@ import {
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
   User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet,
   Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2,
+  ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
@@ -39,7 +40,8 @@ import {
   inboxApi, signInboxAttachment, LABEL_COLORS, labelChipClass,
   type InboxThread, type InboxMessage, type InboxParticipant, type InboxChannel,
   type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings, type InboxLabel,
-  type InboxThreadStatus,
+  type InboxThreadStatus, type OrderIntake, type IntakeItem, type IntakeTotals,
+  type IntakeConfirmation,
 } from '@/services/inboxApi';
 
 type ChannelFilter = 'all' | InboxChannel;
@@ -85,11 +87,14 @@ function money(amount: number | null | undefined, currency: string | null | unde
   return formatMoney(amount, currency || 'EUR');
 }
 
-/** Per-source presentation for a thread's channel (the "Team / Customer / WhatsApp" tag). Email is
- *  not an inbound channel — inbox threads are internal (in-app chats) or WhatsApp (via Zernio). */
+/** Per-source presentation for a thread's channel (the "Team / Customer / WhatsApp / Email" tag).
+ *  Email became a real inbound channel in #342 (Cloudflare Email Routing → email-webhooks). */
 function channelMeta(t: InboxThread): { label: string; Icon: typeof MessageCircle; className: string } {
   if (t.channel === 'whatsapp') {
     return { label: 'WhatsApp', Icon: MessageCircle, className: 'bg-green-500/15 text-green-400 border-green-500/30' };
+  }
+  if (t.channel === 'email') {
+    return { label: 'Email', Icon: Mail, className: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
   }
   if (t.thread_type === 'internal') {
     return { label: 'Team', Icon: Users, className: 'bg-sky-500/15 text-sky-300 border-sky-500/30' };
@@ -765,6 +770,14 @@ const InboxPage: React.FC = () => {
                           {t.agent_state === 'active' && (
                             <Badge variant="outline" className="text-[10px] border-primary/40 text-primary"><Bot className="w-2.5 h-2.5 mr-0.5" />AI</Badge>
                           )}
+                          {/* #342: an order waiting for approval is the one thing worth seeing
+                              from the list — otherwise it is only discoverable by opening the
+                              thread, which is how an order sits unactioned for a week. */}
+                          {(t.metadata as { order_intake?: { status?: string } } | null)?.order_intake?.status === 'pending_review' && (
+                            <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                              <ShoppingCart className="w-2.5 h-2.5 mr-0.5" />Order
+                            </Badge>
+                          )}
                           <LabelChips labels={t.labels} />
                         </div>
                       </div>
@@ -951,6 +964,9 @@ const InboxPage: React.FC = () => {
                 participants={participants}
                 labels={labels}
                 isMember={isMember}
+                // Approving writes a `system` message onto the thread; reopen so the transcript
+                // shows it without the member having to click away and back.
+                onIntakeChanged={() => { void openThread(activeThread.id); }}
               />
             </div>
           </SheetContent>
@@ -1058,13 +1074,214 @@ const SectionTitle: React.FC<{ icon: React.ReactNode; children: React.ReactNode;
   </h3>
 );
 
+/**
+ * Order intake (#342) — the "assign / set as an actual order" surface.
+ *
+ * Deliberately small: fix the customer, fix an obviously-wrong line, approve. It is NOT a second
+ * order editor — per-line supplier, warehouse, customs, discounts and dispatch all already live
+ * on the real order, and the panel links there the moment one exists.
+ */
+const OrderIntakePanel: React.FC<{
+  thread: InboxThread;
+  context: InboxThreadContext | null;
+  onChanged: () => void;
+}> = ({ thread, context, onChanged }) => {
+  const { toast } = useToast();
+  const [intake, setIntake] = useState<OrderIntake | null>(null);
+  const [totals, setTotals] = useState<IntakeTotals | null>(null);
+  const [canApprove, setCanApprove] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await inboxApi.getThreadIntake(thread.id);
+      setIntake(res.intake);
+      setTotals(res.totals);
+      setCanApprove(res.can_approve);
+    } catch {
+      setIntake(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [thread.id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  if (loading || !intake) return null;
+
+  const pending = intake.status === 'pending_review';
+  const needsCustomer = !intake.customer_contact_id && !intake.customer_company_id;
+  const reviewCount = intake.items.filter((i) => i.needs_review).length;
+
+  const assignThreadContact = async () => {
+    if (!context?.contact?.id) return;
+    setBusy(true);
+    try {
+      const res = await inboxApi.updateIntake(thread.id, { customer_contact_id: context.contact.id });
+      setIntake(res.intake);
+      setTotals(res.totals);
+      // Prices are re-resolved server-side against the newly assigned customer, so the numbers
+      // shown after this are that customer's, not the ones read before anyone was assigned.
+      toast({ title: 'Customer assigned', description: 'Line prices were re-checked for this customer.' });
+    } catch (e) {
+      toast({ title: 'Could not assign', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const approve = async () => {
+    setBusy(true);
+    try {
+      const res = await inboxApi.approveIntake(thread.id);
+      await load();
+      onChanged();
+      // The confirmation is REPORTED, never assumed. An order the customer was never told about
+      // is the failure this whole path exists to make visible (#342 §4a).
+      const c: IntakeConfirmation = res.confirmation;
+      if (c?.status === 'sent') {
+        toast({
+          title: `Order ${res.order_number ?? ''} created`.trim(),
+          description: 'The customer has been sent a confirmation.',
+        });
+      } else {
+        toast({
+          title: `Order ${res.order_number ?? ''} created — customer NOT notified`.trim(),
+          description: c?.detail || 'The confirmation could not be delivered. Reply on the thread to tell them.',
+          variant: 'destructive',
+        });
+      }
+    } catch (e) {
+      toast({ title: 'Could not approve', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reject = async () => {
+    setBusy(true);
+    try {
+      await inboxApi.rejectIntake(thread.id);
+      await load();
+      onChanged();
+    } catch (e) {
+      toast({ title: 'Could not dismiss', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="p-5 border-b border-white/10">
+      <SectionTitle icon={<ShoppingCart className="h-4 w-4" />} count={intake.items.length}>
+        {intake.status === 'approved' ? 'Order created' : intake.status === 'rejected' ? 'Order dismissed' : 'Order to approve'}
+      </SectionTitle>
+
+      {intake.status === 'approved' && intake.order_id ? (
+        <>
+          <p className="text-xs text-muted-foreground mb-3">
+            This conversation became a pre-order. Confirm it, price the rest and dispatch from Finance.
+          </p>
+          {intake.confirmation && intake.confirmation.status !== 'sent' && (
+            <div className="flex items-start gap-2 text-xs text-destructive mb-3">
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span>The customer was not notified. {intake.confirmation.detail}</span>
+            </div>
+          )}
+          <a
+            href="/finance?tab=orders"
+            className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+          >
+            Open in Finance <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </>
+      ) : intake.status === 'rejected' ? (
+        <p className="text-xs text-muted-foreground">
+          Dismissed. A new message from this customer starts a fresh reading.
+        </p>
+      ) : (
+        <>
+          <div className="space-y-1.5 mb-3">
+            {intake.items.map((it: IntakeItem) => (
+              <div key={it.line_no} className="flex items-start gap-2 text-sm py-1.5 px-2 -mx-2 rounded-lg hover:bg-accent transition-colors">
+                <span className="text-muted-foreground shrink-0 tabular-nums">{it.quantity}×</span>
+                <div className="flex-1 min-w-0">
+                  <div className="truncate">{it.description}</div>
+                  <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                    {it.match_method === 'visual' && <ImageIcon className="w-3 h-3" />}
+                    {it.needs_review
+                      ? <span className="text-warning">{it.unit_price == null ? 'needs a price' : 'check this match'}</span>
+                      : <span className="truncate">{it.raw_text}</span>}
+                  </div>
+                </div>
+                <span className="text-xs shrink-0 tabular-nums">
+                  {it.unit_price == null ? '—' : formatMoney(it.quantity * it.unit_price, intake.currency)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between text-sm border-t border-white/10 pt-2.5 mb-3">
+            <span className="text-muted-foreground">Total (excl. VAT)</span>
+            <span style={{ fontWeight: 600 }}>{formatMoney(totals?.net ?? 0, intake.currency)}</span>
+          </div>
+
+          {reviewCount > 0 && (
+            <div className="flex items-start gap-2 text-xs text-warning mb-3">
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span>{reviewCount} line{reviewCount === 1 ? '' : 's'} need a look before this is right.</span>
+            </div>
+          )}
+
+          {needsCustomer && (
+            <div className="mb-3">
+              <p className="text-xs text-muted-foreground mb-2">
+                Assign a customer before approving — the price depends on who is buying.
+              </p>
+              {context?.contact?.id && (
+                <Button size="sm" variant="outline" className="rounded-full w-full" disabled={busy} onClick={assignThreadContact}>
+                  Use {context.contact.name || 'this contact'}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {canApprove && (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="rounded-full flex-1"
+                disabled={busy || needsCustomer}
+                onClick={approve}
+              >
+                {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Approve as pre-order'}
+              </Button>
+              <Button size="sm" variant="ghost" className="rounded-full" disabled={busy} onClick={reject}>
+                Dismiss
+              </Button>
+            </div>
+          )}
+          {!canApprove && (
+            <p className="text-[11px] text-muted-foreground">
+              An owner, admin or sales manager approves orders.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
 const DetailsRail: React.FC<{
   thread: InboxThread;
   context: InboxThreadContext | null;
   participants: InboxParticipant[];
   labels: Map<string, ParticipantLabel>;
   isMember: boolean;
-}> = ({ thread, context, participants, labels, isMember }) => {
+  onIntakeChanged?: () => void;
+}> = ({ thread, context, participants, labels, isMember, onIntakeChanged }) => {
   const contact = context?.contact ?? null;
   const company = context?.company ?? null;
   const quotes = context?.quotes ?? [];
@@ -1131,6 +1348,11 @@ const DetailsRail: React.FC<{
           </span>
         </div>
       </div>
+
+      {/* Order intake (#342) — above Customer value, because an order waiting for approval is the
+          most actionable thing on the thread. Renders nothing unless a proposal exists, and is
+          members-only (inbox-api 404s the action for a customer participant). */}
+      {isMember && <OrderIntakePanel thread={thread} context={context} onChanged={() => onIntakeChanged?.()} />}
 
       {/* Customer value — lifetime value + open balance from the customer's invoices
           (via inbox-api). Falls back to quoted-total + project-count on older API

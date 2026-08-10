@@ -1,19 +1,40 @@
 /**
- * Email Webhooks Handler
- * Processes webhook events from Resend for bounces, complaints, delivery, opens, and clicks.
+ * Email Webhooks Handler — two inbound directions, one function (merge rule).
  *
- * Resend uses Svix for webhook signing. Signature verification uses HMAC-SHA256.
- * Set RESEND_WEBHOOK_SECRET in Supabase Edge Function secrets (from Resend dashboard → Webhooks).
+ * 1. **Resend delivery events** (the original surface): bounces, complaints, deliveries, opens,
+ *    clicks. Svix-signed; verification is HMAC-SHA256 with RESEND_WEBHOOK_SECRET.
+ * 2. **Inbound mail** (#342 §1): the Cloudflare Email Worker calls `inbound_begin` then
+ *    `inbound_stored`, authenticated by INBOUND_WEBHOOK_SECRET. Everything tenancy-related —
+ *    recipient resolution, the auth/loop/dupe gates, and the workspace/thread/customer
+ *    correlation — happens HERE, never in the Worker.
+ *
+ * Both branches fail closed when their secret is unset.
  */
 
 import { createClient } from '@supabase/supabase-js';
+import type { DbClient } from '../_shared/supabase-client.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import {
+  RAW_EMAIL_BUCKET,
+  alreadyProcessed,
+  bareAddress,
+  deliverToInbox,
+  isAutomatedSender,
+  isPlatformAddress,
+  logInbound,
+  parseAuthResults,
+  parseRawEmail,
+  resolveCustomer,
+  resolveRecipient,
+  workspaceOwner,
+  type InboundEnvelope,
+} from '../_shared/inbound-email.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, svix-id, svix-timestamp, svix-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, svix-id, svix-timestamp, svix-signature, x-inbound-secret',
 };
 
 // Map Resend event types to our internal event_type values
@@ -96,6 +117,181 @@ async function verifyResendSignature(
   }
 }
 
+const inboundJson = (body: Record<string, unknown>, status = 200): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
+/**
+ * Inbound branch (#342 §1). Two actions, called in order by the Cloudflare Email Worker:
+ *
+ *   `inbound_begin`  — does this recipient exist? If so, hand back a signed upload URL scoped to
+ *                      one object path. This is what lets the Worker `setReject()` an unknown
+ *                      address at SMTP time WITHOUT knowing which addresses exist: it asks, we
+ *                      decide, it relays a boolean.
+ *   `inbound_stored` — the raw `.eml` is in storage; parse it, run the gates, correlate, deliver.
+ *
+ * The Worker never receives a database credential, so the worst a leaked shared secret buys is
+ * "upload an email and ask whether an address exists" — not database access.
+ */
+async function handleInbound(
+  req: Request,
+  suppliedSecret: string,
+  db: DbClient,
+): Promise<Response> {
+  // Fail CLOSED. An unset secret must never fall through to processing unauthenticated mail
+  // (invariant 6, mirrors stripe-webhooks and the Svix branch below).
+  const expected = Deno.env.get('INBOUND_WEBHOOK_SECRET') || '';
+  if (!expected) {
+    console.error('INBOUND_WEBHOOK_SECRET not set — refusing to process inbound mail');
+    return inboundJson({ error: 'Inbound email is not configured' }, 503);
+  }
+  if (!timingSafeEqualStr(suppliedSecret, expected)) {
+    return inboundJson({ error: 'Invalid inbound secret' }, 401);
+  }
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = await req.json();
+  } catch {
+    return inboundJson({ error: 'Invalid JSON body' }, 400);
+  }
+
+  const action = String(payload.action || '');
+  const envelope: InboundEnvelope = {
+    from: (payload.from as string) ?? null,
+    to: (payload.to as string) ?? null,
+    message_id: (payload.message_id as string) ?? null,
+    subject: (payload.subject as string) ?? null,
+    size: (payload.size as number) ?? null,
+    storage_path: (payload.storage_path as string) ?? null,
+  };
+
+  // ── inbound_begin ────────────────────────────────────────────────────────────────────────
+  if (action === 'inbound_begin') {
+    const address = await resolveRecipient(db, envelope.to);
+    if (!address) {
+      await logInbound(db, { envelope, outcome: 'rejected_unknown_address' });
+      // Uninformative on purpose — a descriptive refusal is an address-enumeration oracle.
+      return inboundJson({ accept: false });
+    }
+
+    const now = new Date();
+    const yyyy = now.getUTCFullYear();
+    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+    // Timestamp-prefixed so a spoofed duplicate Message-ID can never overwrite a stored message.
+    const storagePath = `inbound-email/${yyyy}/${mm}/${now.getTime()}-${crypto.randomUUID()}.eml`;
+
+    const { data, error } = await db.storage
+      .from(RAW_EMAIL_BUCKET)
+      .createSignedUploadUrl(storagePath);
+    if (error || !data?.signedUrl) {
+      await logInbound(db, {
+        workspaceId: address.workspace_id, envelope, matchedAddressId: address.id,
+        outcome: 'error', error: `signed upload url failed: ${error?.message ?? 'unknown'}`,
+      });
+      return inboundJson({ error: 'Could not allocate storage' }, 503);
+    }
+
+    return inboundJson({ accept: true, upload_url: data.signedUrl, storage_path: storagePath });
+  }
+
+  // ── inbound_stored ───────────────────────────────────────────────────────────────────────
+  if (action !== 'inbound_stored') {
+    return inboundJson({ error: `unknown action: ${action}` }, 400);
+  }
+  if (!envelope.storage_path) {
+    return inboundJson({ error: 'storage_path is required' }, 400);
+  }
+
+  // Cloudflare retries; a duplicate must not double-post into the thread.
+  if (await alreadyProcessed(db, envelope.message_id)) {
+    await logInbound(db, { envelope, outcome: 'duplicate' });
+    return inboundJson({ ok: true, outcome: 'duplicate' });
+  }
+
+  // Re-resolve the recipient rather than trusting anything carried over from inbound_begin —
+  // the tenant binding is derived here, on every call (invariant 1).
+  const address = await resolveRecipient(db, envelope.to);
+  if (!address) {
+    await logInbound(db, { envelope, outcome: 'rejected_unknown_address' });
+    return inboundJson({ ok: true, outcome: 'rejected_unknown_address' });
+  }
+
+  const { data: blob, error: dlErr } = await db.storage
+    .from(RAW_EMAIL_BUCKET)
+    .download(envelope.storage_path);
+  if (dlErr || !blob) {
+    await logInbound(db, {
+      workspaceId: address.workspace_id, envelope, matchedAddressId: address.id,
+      outcome: 'error', error: `download failed: ${dlErr?.message ?? 'no body'}`,
+    });
+    // 5xx so the Worker rejects and the sending server retries.
+    return inboundJson({ error: 'Could not read the stored message' }, 503);
+  }
+
+  const parsed = await parseRawEmail(await blob.arrayBuffer());
+  const auth = parseAuthResults(parsed.headers.get('authentication-results'));
+  const fromAddress = parsed.from.address || bareAddress(envelope.from) || '';
+  const toAddress = bareAddress(envelope.to) || address.full_address;
+
+  const logBase = {
+    workspaceId: address.workspace_id,
+    envelope: { ...envelope, message_id: parsed.messageId ?? envelope.message_id },
+    matchedAddressId: address.id,
+    auth,
+  };
+
+  // Spoofing gate. DMARC fail means the sender is not who they claim, so the message is stored
+  // and visible but never auto-replied to. DKIM pass alone is enough — forwarding breaks SPF,
+  // and "use my own address" is a forwarding flow by design.
+  const dmarcFailed = auth.dmarc === 'fail' && auth.dkim !== 'pass';
+  if (dmarcFailed) {
+    await logInbound(db, { ...logBase, outcome: 'quarantined_auth_fail' });
+    return inboundJson({ ok: true, outcome: 'quarantined_auth_fail' });
+  }
+
+  // Loop gate: never auto-reply to an autoresponder, a mailing list, a bounce, or ourselves.
+  const platformSender = await isPlatformAddress(db, fromAddress);
+  const automated = isAutomatedSender(parsed.headers, fromAddress);
+  const autoReplyAllowed = !automated && !platformSender;
+
+  const owner = await workspaceOwner(db, address.workspace_id);
+  const customer = await resolveCustomer(
+    db, address.workspace_id, fromAddress, parsed.from.name, owner ?? address.user_id,
+  );
+
+  try {
+    const { threadId } = await deliverToInbox(db, {
+      address, parsed, customer, toAddress, fromAddress,
+      storagePath: envelope.storage_path, autoReplyAllowed,
+    });
+
+    await logInbound(db, { ...logBase, outcome: 'routed_inbox', threadId });
+
+    // Hand off to the single agent/intake chokepoint, exactly as zernio-webhook-handler does.
+    // Best-effort: a failure here leaves a delivered thread for a human, never loses the mail.
+    if (autoReplyAllowed) {
+      await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/inbox-api`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'internal_agent_reply', thread_id: threadId }),
+      }).catch(() => {});
+    }
+
+    return inboundJson({ ok: true, outcome: 'routed_inbox', thread_id: threadId });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await logInbound(db, { ...logBase, outcome: 'error', error: msg });
+    // 5xx so the Worker rejects and the sender retries rather than believing it was delivered.
+    return inboundJson({ error: msg }, 503);
+  }
+}
+
 Deno.serve(withApiLogging('email-webhooks', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
@@ -107,6 +303,14 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
+
+    // Branch discriminator. The header's PRESENCE selects inbound; its VALUE authenticates
+    // (verified inside, before anything is parsed). Checked ahead of the Svix branch because
+    // that one reads and signature-checks the body for a different sender entirely.
+    const inboundSecret = req.headers.get('x-inbound-secret');
+    if (inboundSecret !== null) {
+      return await handleInbound(req, inboundSecret, supabaseClient);
+    }
 
     // Read raw body (needed for signature verification)
     const rawBody = await req.text();

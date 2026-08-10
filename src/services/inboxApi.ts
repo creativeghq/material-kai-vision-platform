@@ -11,7 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
  */
 
 export type InboxThreadType = 'internal' | 'customer' | 'upstream';
-export type InboxChannel = 'internal' | 'whatsapp';
+/** `email` is inbound via Cloudflare Email Routing → `email-webhooks` (#342); outbound stays Resend. */
+export type InboxChannel = 'internal' | 'whatsapp' | 'email';
 export type InboxThreadStatus = 'open' | 'snoozed' | 'closed';
 export type InboxMessageType = 'text' | 'system' | 'agent' | 'note';
 export type InboxParticipantType = 'member' | 'customer' | 'agent';
@@ -187,6 +188,60 @@ export interface InboxAgentSettings {
   allow_account_data: boolean;
 }
 
+// ── Order intake (#342) ──
+// A PROPOSAL read out of a customer conversation. It lives on the thread's metadata and nothing
+// exists in `orders` until a member approves it.
+
+export type IntakeMatchMethod = 'mivaa' | 'ilike' | 'visual' | 'manual' | 'none';
+
+export interface IntakeItem {
+  line_no: number;
+  /** The customer's own words, kept so a reviewer can check the reading against the source. */
+  raw_text: string;
+  product_id: string | null;
+  match_method: IntakeMatchMethod;
+  match_confidence: number | null;
+  candidates?: Array<{ product_id: string; name: string; score: number | null }>;
+  description: string;
+  quantity: number;
+  /** Ex-VAT. Null = nothing could price it; a flagged gap, never a guess. */
+  unit_price: number | null;
+  unit_cost: number | null;
+  measurement_unit_code: string | null;
+  vat_percent: number | null;
+  unit_price_source: 'resolver' | 'manual';
+  needs_review: boolean;
+}
+
+export interface IntakeConfirmation {
+  channel: 'whatsapp' | 'whatsapp_template' | 'email' | 'none';
+  status: 'sent' | 'failed' | 'unavailable';
+  at: string;
+  detail?: string | null;
+}
+
+export interface OrderIntake {
+  status: 'pending_review' | 'approved' | 'rejected';
+  channel: string;
+  source_message_id: string | null;
+  customer_contact_id: string | null;
+  customer_company_id: string | null;
+  currency: string;
+  confidence: number | null;
+  requested_delivery_date: string | null;
+  notes: string | null;
+  order_id: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  confirmation?: IntakeConfirmation | null;
+  items: IntakeItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** Sum of the lines, for DISPLAY only — `recompute_order_totals` is the authoritative total. */
+export interface IntakeTotals { net: number; priced: number; unpriced: number }
+
 export interface NewParticipantInput {
   type: InboxParticipantType;
   user_id?: string;
@@ -304,6 +359,51 @@ export const inboxApi = {
   // ── AI "help me write" — a draft reply for a member to review/edit/send ──
   suggestReply(thread_id: string) {
     return call<{ draft: string }>('suggest_reply', { thread_id });
+  },
+
+  // ── Order intake (#342) — members only; the workspace comes from the thread, never the body ──
+
+  /** The proposal on a thread, its display total, and whether this member may approve it. */
+  getThreadIntake(thread_id: string) {
+    return call<{ intake: OrderIntake | null; totals: IntakeTotals | null; can_approve: boolean }>(
+      'get_thread_intake', { thread_id },
+    );
+  },
+  /** Assign the customer / currency / notes. Changing the party re-resolves every line's price. */
+  updateIntake(thread_id: string, changes: {
+    customer_contact_id?: string | null;
+    customer_company_id?: string | null;
+    currency?: string;
+    notes?: string | null;
+    requested_delivery_date?: string | null;
+  }) {
+    return call<{ intake: OrderIntake; totals: IntakeTotals }>('update_intake', { thread_id, ...changes });
+  },
+  /** Replace the lines wholesale — fix one, drop one, add one. */
+  updateIntakeItems(thread_id: string, items: Array<Partial<IntakeItem>>) {
+    return call<{ intake: OrderIntake; totals: IntakeTotals }>('update_intake_items', { thread_id, items });
+  },
+  /** Catalog search for repointing a line (same MIVAA → ilike ladder the extraction uses). */
+  searchIntakeProducts(thread_id: string, query: string) {
+    return call<{ candidates: Array<{ product_id: string; name: string; score: number | null }> }>(
+      'search_intake_products', { thread_id, query },
+    );
+  },
+  /**
+   * Approve → a DRAFT sales order ("Pre-order"). Idempotent: a second call returns the same order.
+   * `confirmation` reports whether the customer was actually told (#342 §4a) — approval never
+   * rolls back because a message failed, so the caller must surface this rather than assume.
+   */
+  approveIntake(thread_id: string) {
+    return call<{
+      order_id: string;
+      order_number: string | null;
+      confirmation: IntakeConfirmation;
+      intake: OrderIntake | null;
+    }>('approve_intake', { thread_id });
+  },
+  rejectIntake(thread_id: string, reason?: string) {
+    return call<{ intake: OrderIntake }>('reject_intake', { thread_id, reason });
   },
 
   // ── Token actions (public customer thread) ──

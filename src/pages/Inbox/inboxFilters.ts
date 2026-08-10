@@ -26,7 +26,24 @@ export function buildInboxFilters(labels: InboxLabel[], threads: InboxThread[] =
           options: [
             { value: 'internal', label: 'Team' },
             { value: 'whatsapp', label: 'WhatsApp' },
+            { value: 'email', label: 'Email' },
           ],
+        },
+        {
+          // #342: an order read out of a conversation is the most actionable state a thread can
+          // be in, so it is a first-class filter rather than something you find by scrolling.
+          // Client-side (the intake lives in thread metadata, which list_threads returns).
+          key: 'order_intake', type: 'multi', label: 'Order',
+          description: 'Conversations an order was read out of.',
+          options: [
+            { value: 'pending_review', label: 'Waiting for approval' },
+            { value: 'approved', label: 'Approved' },
+            { value: 'rejected', label: 'Dismissed' },
+          ],
+          accessor: (t: InboxThread) => {
+            const intake = (t.metadata as { order_intake?: { status?: string } } | null)?.order_intake;
+            return intake?.status ? [intake.status] : [];
+          },
         },
         {
           key: 'thread_type', type: 'multi', label: 'Type',

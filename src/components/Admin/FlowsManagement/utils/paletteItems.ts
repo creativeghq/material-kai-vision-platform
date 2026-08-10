@@ -187,6 +187,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'inbox.thread_assigned', group: 'Inbox',
     label: 'Inbox Thread Assigned', description: 'A thread is assigned/handed to a member', icon: 'UserPlus', color: 'emerald',
     defaultData: { label: 'Inbox Thread Assigned', category: 'trigger', triggerType: 'inbox.thread_assigned', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'inbox.order_intake_ready', group: 'Inbox',
+    label: 'Inbox Order Ready to Approve', description: 'An order was read out of a customer conversation and awaits approval', icon: 'ShoppingCart', color: 'emerald',
+    defaultData: { label: 'Inbox Order Ready to Approve', category: 'trigger', triggerType: 'inbox.order_intake_ready', config: {} } as TriggerNodeData },
 
   // Real estate
   { type: 'triggerNode', category: 'trigger', subType: 'realestate.buyer_matches_found', group: 'Real Estate',

@@ -2,6 +2,7 @@
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
     "http/": "https://deno.land/std@0.168.0/http/",
-    "@peculiar/x509": "npm:@peculiar/x509@1"
+    "@peculiar/x509": "npm:@peculiar/x509@1",
+    "postal-mime": "npm:postal-mime@^2.7.6"
   }
 }

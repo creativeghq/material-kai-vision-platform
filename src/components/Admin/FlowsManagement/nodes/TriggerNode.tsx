@@ -75,6 +75,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   order_dispatched: Truck,
   'inbox.message_received': Inbox,
   'inbox.thread_assigned': UserPlus,
+  'inbox.order_intake_ready': ShoppingCart,
   marketplace_want_match: Package,
   expense_card_submitted: ClipboardCheck,
   finance_document_requested: ClipboardCheck,

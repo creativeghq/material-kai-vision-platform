@@ -1,0 +1,15 @@
+name = "inbound-email-worker"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# Workers Paid ($5/mo). The Free plan can fail handlers that stream a 20 MiB body.
+
+[vars]
+# The receiving subdomain. Its MX points at Cloudflare Email Routing with a single catch-all
+# rule bound to this Worker. The apex domain's MX is NOT touched.
+RECEIVING_DOMAIN = "mail.materialshub.gr"
+WEBHOOK_URL = "https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-webhooks"
+
+# Secret — set with `wrangler secret put INBOUND_WEBHOOK_SECRET`, never in this file.
+# The SAME value must be set as INBOUND_WEBHOOK_SECRET on the Supabase edge functions, or the
+# inbound branch fails closed (503) and no mail is accepted.
