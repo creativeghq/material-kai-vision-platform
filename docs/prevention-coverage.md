@@ -62,10 +62,10 @@ action checked ownership.
 - **Blind spot:** resolved per file+table, so a file that checks ownership on one path to a table and forgets it on a second path is not reported. Also: a site that fetches `workspace_id` and never compares it reads as fetch-then-verify.
 
 ### 3. Dead input — a control that changes nothing
-Lists and toggles that never reach the engine; a tool registered on an agent but absent from
-`SERVER_TOOLKITS` is stripped and unreachable.
+Lists and toggles that never reach the engine; a tool registered on an agent but absent from every
+toolkit cluster is stripped and unreachable.
 
-- **Guarded by:** [tests/unit/toolkitCoverage.test.ts](../tests/unit/toolkitCoverage.test.ts) (the two-copy rule), `AGENT_RESULT_TITLES` registration, and — for the API half — [test_no_unread_request_fields.py](../mivaa-pdf-extractor/tests/unit/test_no_unread_request_fields.py), which fails the build on any `*Request` field no code reads.
+- **Guarded by:** [tests/unit/toolkitCoverage.test.ts](../tests/unit/toolkitCoverage.test.ts) (coverage, reachability, options, and — since the two-copy rule became a generated projection, #266 Phase 3.5 — projection freshness plus a check that no second cluster map has reappeared), `AGENT_RESULT_TITLES` registration, and — for the API half — [test_no_unread_request_fields.py](../mivaa-pdf-extractor/tests/unit/test_no_unread_request_fields.py), which fails the build on any `*Request` field no code reads.
 - **Proven to fire:** 2026-08-09, all three new mechanisms mutation-tested by stashing the fix and confirming the failure (4 of 7, 3 of 9, and 6 of 14 assertions failed as intended).
 - **Blind spot:** still large for UI-level controls, but the API half is now covered rather than absent.
 - **Worked example, 2026-08-09 (#277/#338):** the Search page offered Color/Texture/Style/Material modes that were **not differentiated at the backend at all** — every one returned the same fused result. Fixing that surfaced the same shape four more times. `visual_search` sent `aspect` to `strategy=image`, a branch that never reads it: Pydantic validated the field, the branch dropped it, and every "find a similar texture to this image" returned plain visual similarity. A sweep of all 132 `*Request` models then found **ten** fields accepted and never read, two of them harmful — `include_content` was sent by the frontend on *every* search and read nowhere, and `enable_embedding` defaulted true and unread, so passing `false` billed the caller for embeddings they had declined. Six belonged to models **no route referenced at all** and were deleted; the rest are honored. `KNOWN_UNREAD` is now empty and asserted `== 0` — a floor, not a ceiling.

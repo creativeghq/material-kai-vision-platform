@@ -111,25 +111,31 @@ deploy. Adding a trigger: follow §8 of [docs/flows-notification-system.md](docs
 locked default flow + a `flow_area_registry` row. Typecheck before done.
 
 ## Agent tools — the tool file is the source, everything else is derived or guarded
-A tool registered on an agent but absent from **`SERVER_TOOLKITS`** is silently stripped and unreachable.
-Adding a tool requires updating `SERVER_TOOLKITS` **and** the client `TOOLKITS` catalog — two copies that must
-stay in sync. Every new tool's `onChunk` type MUST be registered in `AGENT_RESULT_TITLES` in `AgentHub.tsx`, or
-the output is silently dropped.
+A tool registered on an agent but absent from every toolkit cluster is silently stripped and unreachable.
+Clusters are declared **once**, in the client `TOOLKITS` catalog (`agentToolsCatalog.ts`); agent-chat's binder
+map is a generated projection of it (`_shared/toolkitClusters.generated.ts`). **Never hand-write a
+`SERVER_TOOLKITS` map** — that hand-kept mirror is what this replaced, and a second copy is a red build. Every
+new tool's `onChunk` type MUST be registered in `AGENT_RESULT_TITLES` in `AgentHub.tsx`, or the output is
+silently dropped.
 
-**Run `npm run tools:manifest` after touching any `tool(fn, {...})` definition.** The committed
-`src/components/features/ai/toolManifest.generated.ts` is an AST projection of every tool's name, factory and
-zod schema (issue #266); a stale one is a red build.
+**Run `npm run tools:manifest` after touching any `tool(fn, {...})` definition or the `TOOLKITS` catalog.** It
+emits two committed files: `src/components/features/ai/toolManifest.generated.ts` (an AST projection of every
+tool's name, factory and zod schema) and the edge-side `toolkitClusters.generated.ts` (issue #266). A stale one
+is a red build.
 [tests/unit/toolkitCoverage.test.ts](tests/unit/toolkitCoverage.test.ts) reads it and enforces, for **every**
 toolkit: the tool is in a cluster; its factory is actually instantiated (a tool nothing constructs is
-unreachable however good the picker looks); the two mirrors agree; and a quick-start's `run` sends only params
-the schema declares, supplies every REQUIRED one, coerces numbers, doesn't let a form field overwrite a
-`fixedArgs` pin, and offers exactly the values its `z.enum` accepts.
+unreachable however good the picker looks); the projection is fresh and no second copy has reappeared; and a
+quick-start's `run` sends only params the schema declares, supplies every REQUIRED one, coerces numbers,
+doesn't let a form field overwrite a `fixedArgs` pin, and offers exactly the values its `z.enum` accepts.
 
 **Never hand-mirror a tool's enum into a form.** Set `autoFields: true` on the quick-start and the fields come
 from the manifest (enum → select, boolean → yes/no, number → number, `.describe()` → help). Hand-writing them
 is how "Showroom Spots" and `'table list'` ended up as values no enum accepted, and how five tools' options
-stayed invisible for months. Debt lists (`KNOWN_UNCLUSTERED`, `KNOWN_UNBOUND`, `OPTIONS_EXEMPT`) are
-shrink-only; each entry carries its reason.
+stayed invisible for months. `confirm` is on `NEVER_ASK` and must stay there — it is the human-in-the-loop
+Approve/Decline gate (invariant 9), not a field a quick-start may pre-answer on the user's behalf.
+Coverage and reachability have **no** escape hatch: `KNOWN_UNCLUSTERED` and `KNOWN_UNBOUND` were deleted, not
+emptied, so both now fail outright. `OPTIONS_EXEMPT` is the one survivor — shrink-only, each entry with its
+stated reason.
 
 ## Templates — one table, one registry, an allowlist per type
 "Reusable starting point for a record" is **one** system (`entity_templates`, issue #322), not a table per
