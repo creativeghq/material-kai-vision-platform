@@ -409,6 +409,28 @@ describe('toolkit options coverage', () => {
     ).toEqual([]);
   });
 
+  it('every quick-start `generation.mode` is a real generate_gemini mode', () => {
+    // These pin the tool's `mode` enum from OUTSIDE the run/argMap machinery — the
+    // interior flows force a pipeline rather than passing a tool arg — so nothing else
+    // here would notice a typo, and the pin would silently select no mode at all.
+    // Because a pinned mode COUNTS as surfacing generate_gemini's options above, an
+    // unchecked one would also let the tool leave OPTIONS_EXEMPT on a value that
+    // does not exist.
+    const allowed = new Set(
+      (byName.get(GEMINI_TOOL)?.params ?? []).find((p) => p.name === 'mode')?.enum ?? [],
+    );
+    expect(allowed.size, `${GEMINI_TOOL}.mode is no longer an enum — update this test`).toBeGreaterThan(3);
+
+    const bad = quickStarts
+      .filter((x) => x.qs.generation?.mode && !allowed.has(x.qs.generation.mode))
+      .map((x) => `${x.toolkit}/"${x.qs.label}" → mode "${x.qs.generation!.mode}"`)
+      .sort();
+    expect(
+      bad,
+      `Quick-start pins a generation mode ${GEMINI_TOOL}.mode does not declare:\n  ${bad.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
   it('every option-bearing tool surfaces its options somewhere (or is exempt)', () => {
     const hidden = TOOL_MANIFEST
       .filter((t) => enumParams(t.name).length > 0)
