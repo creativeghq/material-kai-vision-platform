@@ -261,7 +261,12 @@ async function handleInbound(
   // Loop gate: never auto-reply to an autoresponder, a mailing list, a bounce, or ourselves.
   const platformSender = await isPlatformAddress(db, fromAddress);
   const automated = isAutomatedSender(parsed.headers, fromAddress);
-  const autoReplyAllowed = !automated && !platformSender;
+  // …and never without the owner having asked for it. `auto_reply_enabled` was resolved and typed
+  // but never read, so "Assistant answers email" was a dead switch: the agent answered every
+  // message whatever the toggle said, and the column DEFAULTS to false — so an address replied to
+  // strangers, unattended and on credit, from the moment it was created. It is also the
+  // human-in-the-loop control for invariant 9, which makes it the last switch that may be inert.
+  const autoReplyAllowed = address.auto_reply_enabled === true && !automated && !platformSender;
 
   const owner = await workspaceOwner(db, address.workspace_id);
   const customer = await resolveCustomer(

@@ -190,3 +190,38 @@ describe('#342 sending identity stays separated from the reply path', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('#342 the assistant answers only when the owner asked it to', () => {
+  const src = stripComments(readFileSync(WEBHOOKS_SRC, 'utf8'));
+
+  // This one shipped inert. `auto_reply_enabled` was selected in resolveRecipient and declared on
+  // the ResolvedAddress interface, so every reader assumed it was load-bearing — and the gate was
+  // `!automated && !platformSender`, which never mentions it. The toggle in the Inbox changed
+  // nothing, and since the column DEFAULTS to false, the shipped behaviour was the opposite of the
+  // schema's intent: a brand-new address auto-replied to strangers, unattended, on credit.
+  //
+  // A column that is fetched but never read is invisible to typecheck (the value is used — it is
+  // assigned to a field), invisible to lint, and invisible to any integrity probe, because the
+  // stored data is perfectly correct. Only a source-level assertion sees it.
+  it('reads auto_reply_enabled in the decision, not merely into a variable', () => {
+    const gate = src.match(/const\s+autoReplyAllowed\s*=\s*([^;]+);/);
+    expect(gate, 'the autoReplyAllowed gate has been renamed or removed').toBeTruthy();
+    expect(
+      gate![1],
+      'auto_reply_enabled is not part of the auto-reply decision — the Inbox toggle is dead again',
+    ).toMatch(/auto_reply_enabled/);
+  });
+
+  it('still suppresses loops and automated senders', () => {
+    const gate = src.match(/const\s+autoReplyAllowed\s*=\s*([^;]+);/)![1];
+    // Both must survive alongside the toggle: two of our own addresses with auto-reply on is an
+    // infinite exchange, and answering a bounce or a mailing list is the classic mail storm.
+    expect(gate, 'the automated-sender suppression was dropped').toMatch(/automated/);
+    expect(gate, 'the loop guard against our own addresses was dropped').toMatch(/platformSender/);
+  });
+
+  it('resolves only active addresses, so a disabled mailbox accepts nothing', () => {
+    const shared = stripComments(readFileSync(INBOUND_SHARED, 'utf8'));
+    expect(shared).toMatch(/\.eq\(\s*['"]is_active['"]\s*,\s*true\s*\)/);
+  });
+});
