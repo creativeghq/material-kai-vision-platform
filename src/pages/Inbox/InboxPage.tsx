@@ -41,7 +41,7 @@ import {
   type InboxThread, type InboxMessage, type InboxParticipant, type InboxChannel,
   type WhatsAppWindow, type InboxThreadContext, type InboxAgentSettings, type InboxLabel,
   type InboxThreadStatus, type OrderIntake, type IntakeItem, type IntakeTotals,
-  type IntakeConfirmation,
+  type IntakeConfirmation, type UserEmailAddress,
 } from '@/services/inboxApi';
 
 type ChannelFilter = 'all' | InboxChannel;
@@ -1589,9 +1589,155 @@ const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ workspace
               )}
             </>
           )}
+          <Separator className="bg-white/10" />
+          <MyEmailAddressSection workspaceId={workspaceId} />
         </div>
       </PopoverContent>
     </Popover>
+  );
+};
+
+/**
+ * The user's own inbound email address (#342). Their address, not the workspace's — mail sent to it
+ * lands in this workspace's Inbox as an `email` thread.
+ *
+ * Allocation is a deliberate click rather than something that happens on first render: the address
+ * is a published identity you print on a business card, so it appears when the person asks for it.
+ */
+const MyEmailAddressSection: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [address, setAddress] = useState<UserEmailAddress | null>(null);
+  const [domain, setDomain] = useState('');
+  const [copied, setCopied] = useState(false);
+  // Set when the derived handle is already someone else's. Nothing is allocated in that case and
+  // the person picks their own, rather than being handed `basilis.kanonidis2@`.
+  const [conflict, setConflict] = useState<string | null>(null);
+  const [chosen, setChosen] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    inboxApi.getMyEmailAddress(workspaceId)
+      .then((r) => { if (alive) { setAddress(r.address); setDomain(r.domain); } })
+      .catch(() => { /* the address surface is optional chrome — never block the popover on it */ })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [workspaceId]);
+
+  const REJECTION: Record<string, string> = {
+    plus: 'A plus sign is reserved — it is how replies find their conversation.',
+    reserved: 'That name is reserved. Please pick another.',
+    shape: 'Use letters, numbers, dots, dashes and underscores, starting and ending with a letter or number.',
+    empty: 'Please type a name.',
+  };
+
+  const allocate = async (localPart?: string) => {
+    setBusy(true);
+    try {
+      const r = await inboxApi.getMyEmailAddress(workspaceId, true, localPart);
+      if (!r.address) {
+        // A conflict is an answer, not an error: two people share a name, so this one chooses.
+        setConflict(r.invalid_reason ? (REJECTION[r.invalid_reason] ?? 'That name cannot be used.')
+          : 'That name is taken. Choose another.');
+        if (!localPart && r.suggested_local_part) setChosen(r.suggested_local_part);
+        return;
+      }
+      setAddress(r.address);
+      setConflict(null);
+      toast({ title: 'Your email address is ready', description: r.address.full_address });
+    } catch (e) {
+      toast({ title: 'Could not create an address', description: (e as Error).message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
+  const copy = async () => {
+    if (!address) return;
+    try {
+      await navigator.clipboard.writeText(address.full_address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* clipboard is best-effort; the address is selectable either way */ }
+  };
+
+  const toggleAutoReply = async (v: boolean) => {
+    if (!address) return;
+    const prev = address;
+    setAddress({ ...address, auto_reply_enabled: v });
+    try {
+      const r = await inboxApi.setEmailAddressSettings({ auto_reply_enabled: v });
+      setAddress(r.address);
+    } catch (e) {
+      setAddress(prev);
+      toast({ title: 'Failed to save', description: (e as Error).message, variant: 'destructive' });
+    }
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <div className="text-sm font-medium">Your email address</div>
+        <div className="text-xs text-muted-foreground">
+          Mail sent here arrives in this Inbox. Replies go out from the workspace and thread back
+          automatically.
+        </div>
+      </div>
+
+      {!address && !conflict ? (
+        <Button size="sm" variant="outline" className="rounded-full w-full" disabled={busy} onClick={() => allocate()}>
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `Create my @${domain} address`}
+        </Button>
+      ) : !address ? (
+        <div className="space-y-2">
+          <div className="text-xs text-destructive">{conflict}</div>
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={chosen}
+              onChange={(e) => setChosen(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && chosen.trim()) allocate(chosen.trim()); }}
+              placeholder="firstname.lastname"
+              className="h-8 text-xs"
+              autoFocus
+            />
+            <span className="text-xs text-muted-foreground shrink-0">@{domain}</span>
+          </div>
+          <Button
+            size="sm" variant="outline" className="rounded-full w-full"
+            disabled={busy || !chosen.trim()}
+            onClick={() => allocate(chosen.trim())}
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Use this address'}
+          </Button>
+        </div>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={copy}
+            className="w-full flex items-center gap-2 text-xs rounded-lg border border-white/10 bg-white/5 px-2.5 py-2 hover:bg-accent transition-colors"
+            title="Copy to clipboard"
+          >
+            <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <span className="flex-1 truncate text-left">{address.full_address}</span>
+            {copied ? <Check className="w-3.5 h-3.5 text-success shrink-0" /> : <Link2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+          </button>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <Label className="text-sm">Assistant answers email</Label>
+              <div className="text-xs text-muted-foreground">
+                Replies to mail sent here without waiting for you.
+              </div>
+            </div>
+            <Switch checked={address.auto_reply_enabled} onCheckedChange={toggleAutoReply} />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Already have an address customers use? Forward it here instead of changing your MX.
+          </p>
+        </>
+      )}
+    </div>
   );
 };
 

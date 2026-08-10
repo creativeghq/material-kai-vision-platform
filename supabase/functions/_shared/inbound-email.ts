@@ -57,56 +57,117 @@ interface ResolvedAddress {
   agent_ref: string | null;
 }
 
-// ── envelope helpers ────────────────────────────────────────────────────────────────────────
+// ── envelope + addressing helpers ───────────────────────────────────────────────────────────
+// Pure and Deno-free, so they live next door and are unit-tested directly
+// (tests/unit/inboundEmailAddressing.test.ts). Re-exported here so callers see one module.
+export {
+  bareAddress,
+  normalizeSubject,
+  parseMessageIdRefs,
+  buildOutboundMessageId,
+  threadIdFromOurMessageId,
+  splitPlusTag,
+  threadIdFromTag,
+  buildReplyToAddress,
+  handleFromIdentity,
+  validateChosenLocalPart,
+  RESERVED_LOCAL_PARTS,
+} from './inbound-email-addressing.ts';
+export type { LocalPartRejection } from './inbound-email-addressing.ts';
+import {
+  bareAddress,
+  splitPlusTag,
+  threadIdFromTag,
+  normalizeSubject,
+  parseMessageIdRefs,
+  threadIdFromOurMessageId,
+  handleFromIdentity,
+  validateChosenLocalPart,
+} from './inbound-email-addressing.ts';
+import type { LocalPartRejection } from './inbound-email-addressing.ts';
 
-/** Bare address out of `Name <a@b.c>` / `<a@b.c>` / `a@b.c`, lowercased. */
-export function bareAddress(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const m = String(raw).match(/<([^>]+)>/);
-  const addr = (m ? m[1] : String(raw)).trim().toLowerCase();
-  return addr.includes('@') ? addr : null;
-}
+// ── address allocation (touches the database, so it stays here) ────────────────────────────
+
+/** The outcome of asking for an address. `taken` is a normal answer, not a failure. */
+export type AddressAllocation =
+  | { ok: true; id: string; full_address: string; created: boolean }
+  | { ok: false; reason: 'taken'; suggested: string }
+  | { ok: false; reason: 'invalid'; detail: LocalPartRejection }
+  | { ok: false; reason: 'error'; message: string };
 
 /**
- * Subject with any number of reply/forward prefixes stripped — English and Greek, since a Greek
- * mail client answers with `ΑΠ:` / `ΣΧΕΤ:` and the heuristic would otherwise treat every reply as
- * a new conversation.
+ * Get-or-create this user's inbound address. Local parts are GLOBALLY unique because every tenant
+ * shares one receiving domain.
+ *
+ * **No suffixes of any kind.** An auto-generated `basilis.kanonidis2@` is an address its owner has
+ * to explain every time they say it out loud, handed to whichever of two identical names signed up
+ * second. When the derived handle is taken we allocate NOTHING and return `taken` with the handle
+ * we tried, so the user chooses their own (`args.localPart`). Two people with the same full name on
+ * one platform is rare enough to be worth one question.
+ *
+ * No random suffix either: this is an address you print on a business card. What protects it is
+ * `setReject()` on unknown recipients, the DKIM gate and per-sender limits — not obscurity.
  */
-export function normalizeSubject(subject: string | null | undefined): string {
-  let s = String(subject || '').trim();
-  // Repeat: real threads accumulate "Re: Fwd: Re:".
-  for (let i = 0; i < 10; i++) {
-    const next = s.replace(/^\s*(re|fwd?|aw|απ|σχετ|προωθ)\s*(\[\d+\])?\s*:\s*/i, '');
-    if (next === s) break;
-    s = next;
+export async function allocateUserEmailAddress(
+  db: DbClient,
+  args: { userId: string; workspaceId: string; domain: string; localPart?: string | null },
+): Promise<AddressAllocation> {
+  const { data: existing } = await db
+    .from('user_email_addresses')
+    .select('id, full_address')
+    .eq('user_id', args.userId)
+    .maybeSingle();
+  if (existing) {
+    const row = existing as { id: string; full_address: string };
+    return { ok: true, ...row, created: false };
   }
-  return s.replace(/\s+/g, ' ').trim().toLowerCase();
-}
 
-/** Message-IDs out of an In-Reply-To / References header value, newest last. */
-export function parseMessageIdRefs(...values: Array<string | null | undefined>): string[] {
-  const out: string[] = [];
-  for (const v of values) {
-    if (!v) continue;
-    for (const m of String(v).matchAll(/<([^<>\s]+)>/g)) out.push(m[1]);
+  let local: string;
+  if (args.localPart != null && String(args.localPart).trim() !== '') {
+    const checked = validateChosenLocalPart(args.localPart);
+    if (!checked.ok) return { ok: false, reason: 'invalid', detail: checked.reason };
+    local = checked.localPart;
+  } else {
+    const { data: profile } = await db
+      .from('user_profiles').select('full_name, email').eq('user_id', args.userId).maybeSingle();
+    const p = (profile as { full_name?: string; email?: string } | null) ?? null;
+    local = handleFromIdentity(p?.full_name ?? null, p?.email ?? null);
+    // A derived handle can land on a reserved name — `Ada Support` slugs to `support`. Refuse it
+    // the same way a typed one is refused, rather than minting an address that speaks for the
+    // platform.
+    const checked = validateChosenLocalPart(local);
+    if (!checked.ok) return { ok: false, reason: 'taken', suggested: local };
   }
-  return [...new Set(out)];
-}
 
-/**
- * Our own outbound Message-ID carries the thread it belongs to, so a reply threads exactly with
- * no lookup and no heuristic. Format: `inbox.{threadId}.{messageId}@{domain}`.
- */
-export function buildOutboundMessageId(threadId: string, messageId: string, domain: string): string {
-  return `inbox.${threadId}.${messageId}@${domain}`;
-}
+  const full = `${local}@${args.domain}`.toLowerCase();
+  const { data, error } = await db
+    .from('user_email_addresses')
+    .insert({
+      user_id: args.userId,
+      workspace_id: args.workspaceId,
+      local_part: local,
+      full_address: full,
+    })
+    .select('id, full_address')
+    .single();
 
-/** The thread id inside one of our own Message-IDs, or null when it isn't ours. */
-export function threadIdFromOurMessageId(messageId: string): string | null {
-  const m = messageId.match(
-    /^inbox\.([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\./i,
-  );
-  return m ? m[1] : null;
+  if (!error && data) {
+    const row = data as { id: string; full_address: string };
+    return { ok: true, ...row, created: true };
+  }
+
+  // 23505 on user_id means a concurrent request already allocated for this user — re-read and
+  // return theirs. On full_address it means the handle belongs to someone else.
+  if (error && error.code === '23505') {
+    const { data: raced } = await db
+      .from('user_email_addresses').select('id, full_address')
+      .eq('user_id', args.userId).maybeSingle();
+    if (raced) return { ok: true, ...(raced as { id: string; full_address: string }), created: false };
+    return { ok: false, reason: 'taken', suggested: local };
+  }
+
+  console.warn('[inbound-email] address allocation failed:', error?.message);
+  return { ok: false, reason: 'error', message: error?.message ?? 'unknown' };
 }
 
 // ── gates ───────────────────────────────────────────────────────────────────────────────────
@@ -179,12 +240,14 @@ export async function isPlatformAddress(db: DbClient, address: string | null): P
  * it ever existed.
  */
 export async function resolveRecipient(db: DbClient, to: string | null): Promise<ResolvedAddress | null> {
-  const addr = bareAddress(to);
-  if (!addr) return null;
+  // Match on the BASE address: replies come back to `basilis+t.<threadId>@…`, which is the same
+  // mailbox. Looking up the tagged form verbatim would reject every reply to our own mail.
+  const { base } = splitPlusTag(to);
+  if (!base) return null;
   const { data } = await db
     .from('user_email_addresses')
     .select('id, user_id, workspace_id, full_address, auto_reply_enabled, agent_ref')
-    .eq('full_address', addr)
+    .eq('full_address', base)
     .eq('is_active', true)
     .maybeSingle();
   return (data as ResolvedAddress | null) ?? null;
@@ -298,10 +361,21 @@ export async function resolveThread(
     references: string | null;
     subject: string | null;
   },
-): Promise<{ threadId: string | null; matchedBy: 'token' | 'message_id' | 'heuristic' | null }> {
+): Promise<{ threadId: string | null; matchedBy: 'reply_tag' | 'token' | 'message_id' | 'heuristic' | null }> {
   const refs = parseMessageIdRefs(opts.inReplyTo, opts.references);
 
-  // 1. Our own token. A reply to something we sent threads exactly, with no lookup.
+  // 0. The recipient tag. We sent `Reply-To: basilis+t.<threadId>@…`, so a reply carries the
+  //    thread in the field mail is ROUTED on — the one part of the round trip no intermediary
+  //    rewrites. Still workspace-checked: the tag is attacker-supplied like anything else.
+  const tagThread = threadIdFromTag(splitPlusTag(opts.toAddress).tag);
+  if (tagThread) {
+    const { data } = await db
+      .from('inbox_threads').select('id')
+      .eq('id', tagThread).eq('workspace_id', opts.workspaceId).maybeSingle();
+    if ((data as { id?: string } | null)?.id) return { threadId: tagThread, matchedBy: 'reply_tag' };
+  }
+
+  // 1. Our own Message-ID token, when the ESP passed our header through unaltered.
   for (const ref of refs) {
     const threadId = threadIdFromOurMessageId(ref);
     if (!threadId) continue;
@@ -344,7 +418,9 @@ export async function resolveThread(
       .limit(50);
     for (const t of (data || []) as Array<{ id: string; subject: string | null; metadata: Record<string, unknown> }>) {
       const meta = (t.metadata || {}) as { email_to?: string; email_from?: string };
-      if ((meta.email_to || '').toLowerCase() !== opts.toAddress) continue;
+      // Compare the BASE mailbox: metadata stores the untagged address, while opts.toAddress may
+      // carry a +t.<threadId> tag that step 0 already tried and failed on.
+      if ((meta.email_to || '').toLowerCase() !== (splitPlusTag(opts.toAddress).base || '')) continue;
       if ((meta.email_from || '').toLowerCase() !== opts.fromAddress) continue;
       if (normalizeSubject(t.subject) !== norm) continue;
       return { threadId: t.id, matchedBy: 'heuristic' };
@@ -535,7 +611,9 @@ export async function deliverToInbox(
   });
 
   const meta = {
-    email_to: args.toAddress,
+    // The untagged mailbox. Storing the tagged form would make the heuristic compare a value that
+    // differs on every reply, and would leak a thread id into a field used for matching.
+    email_to: splitPlusTag(args.toAddress).base ?? args.toAddress,
     email_from: args.fromAddress,
     email_address_id: address.id,
     raw_storage_bucket: RAW_EMAIL_BUCKET,

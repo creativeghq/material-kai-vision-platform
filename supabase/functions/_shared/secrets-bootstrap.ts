@@ -10,6 +10,8 @@
 // at the top of the handler manually.
 
 let bootstrapped: Promise<void> | null = null;
+/** One warning per worker when the runtime refuses env.set — see the catch below. */
+let warnedEnvSetUnsupported = false;
 
 export function bootstrapSecretsFromDb(supabase: { from: (t: string) => any }): Promise<void> {
   // Memoised — every call after the first is a no-op in the same worker.
@@ -28,8 +30,23 @@ export function bootstrapSecretsFromDb(supabase: { from: (t: string) => any }): 
         if (Deno.env.get(row.key)) continue;
         try {
           Deno.env.set(row.key, row.value);
-        } catch {
-          // Some Deno permission setups deny env.set; that's fine — we silently skip.
+        } catch (err) {
+          // NOT fine, and not silent any more. The Supabase edge runtime throws "The operation is
+          // not supported" on every env.set, so this bootstrap has never actually populated
+          // anything there — and the bare `catch {}` that used to be here meant a DB-only secret
+          // read through `Deno.env.get()` came back undefined for ever, with nothing logged.
+          // #342 lost an hour to it: email-webhooks reported INBOUND_WEBHOOK_SECRET unset on a
+          // COLD boot, which memoisation could not explain.
+          // Warn ONCE per worker — one line is the difference between a five-minute diagnosis and
+          // an hour; one line per key on every boot is noise that gets muted.
+          if (!warnedEnvSetUnsupported) {
+            warnedEnvSetUnsupported = true;
+            console.warn(
+              `[secrets-bootstrap] Deno.env.set is unavailable here (${(err as Error).message}). ` +
+              'platform_secrets values will NOT appear in Deno.env — read them with ' +
+              '_shared/secrets.ts → resolveSecret(), which queries the table directly.',
+            );
+          }
         }
       }
     } catch (err) {

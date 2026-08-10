@@ -180,6 +180,66 @@ Delivery goes through the [Flows](flows-notification-system.md) engine, not hard
 
 ---
 
+## 10a. Email channel (#342)
+
+### One address per USER, not per workspace
+
+`user_email_addresses` is 1:1 with `auth.users` (enforced by a UNIQUE column, not convention). Role
+mailboxes (`sales@`, `info@`) and per-agent mailboxes are deliberately out — one person, one
+address, and any agent can be pointed at it. `workspace_id` on the row decides which tenant the mail
+files into, because a user can belong to several and threads, contacts and the credit debit are all
+workspace-scoped.
+
+Local parts must be **globally** unique, because every tenant shares one receiving domain. Non-Latin
+names go through the platform's existing ELOT 743 / Transliteration Act mapper first —
+`Γιάννης Παπαδόπουλος` → `giannis.papadopoulos@`, not `user4821@`.
+
+**No suffixes of any kind.** On a collision the allocator writes nothing and returns
+`conflict: 'taken'` with the handle it tried, and the user picks their own. `basilis.kanonidis2@` is
+an address its owner has to spell out every time they say it aloud, handed to whichever of two
+identical names signed up second; two people sharing a full name on one platform is rare enough to
+be worth one question. A random suffix is rejected for the same reason — this is an address you
+print on a business card, and what protects it is `setReject()` on unknown recipients, the DKIM gate
+and per-sender limits, not obscurity.
+
+A chosen handle goes through `validateChosenLocalPart` before it reaches the column, which refuses
+`+` explicitly (it is the thread delimiter — a local part containing one would make every reply
+resolve to a *different* mailbox), anything the column CHECK would reject, and the reserved
+role names. `postmaster`/`abuse`/`security` belong to whoever runs the domain; `sales`/`support`/
+`info` would let one workspace's user appear to speak for the platform.
+
+Allocation is an explicit click (`get_my_email_address` with `allocate:true`), surfaced in the
+Inbox settings popover along with a copy button and an "assistant answers email" toggle. It is never
+a side effect of opening the Inbox.
+
+### How a reply finds its thread
+
+Outbound replies go out with `Reply-To: basilis+t.<threadId>@mail.…`. **The recipient address is
+what threads a reply**, because it is the one field in the round trip that no intermediary rewrites
+— a custom `Message-ID` header is a request an ESP may decline, and then the token we stored matches
+nothing. Cloudflare's catch-all accepts any local part, so this needs no extra routing rule, and
+`resolveRecipient` matches on the untagged base mailbox.
+
+The full ladder is: **reply tag** → our own `Message-ID` token → a stored `Message-ID` from
+`In-Reply-To`/`References` → subject+sender heuristic (fenced to `open` threads within 30 days) →
+a new thread. Every step is workspace-checked; a tag is attacker-supplied like anything else.
+
+### Sending
+
+`insertMessageAndNotify` relays an `email` thread through `email-api` with
+`emailType: 'agent_reply'`, threading headers, and **`requireWorkspaceSender` deliberately unset** —
+an inbox reply is not a business document and must never borrow the finance sending identity. An
+assistant-authored message additionally carries `Auto-Submitted: auto-replied` / `Precedence:
+auto_reply` so two autoresponders cannot ping-pong; a finance send must **never** carry those, which
+[tests/security/inbound-email-isolation.test.ts](../tests/security/inbound-email-isolation.test.ts)
+enforces.
+
+The send result is checked and a failure **throws** (502, "stored but NOT delivered"), for the same
+reason the WhatsApp relay does: a stored message with a cleared composer and no delivery is
+indistinguishable from success from the operator's side.
+
+---
+
 ## 11. Order intake (#342)
 
 An order that arrives as a **conversation** — over email or WhatsApp — becomes a real sales order

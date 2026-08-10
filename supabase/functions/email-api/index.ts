@@ -36,7 +36,19 @@ interface SendEmailRequest {
   bcc?: string[];
   replyTo?: string;
   tags?: Record<string, string>;
-  emailType?: 'transactional' | 'marketing' | 'notification';
+  /**
+   * The send CLASS, declared rather than inferred from which function happened to call
+   * (#229 §6 / #342). `agent_reply` is an Inbox/assistant reply on an email thread: it must
+   * never borrow the finance sending identity, and `email_logs` records it so you can query
+   * after the fact whether any invoice ever went out on an agent reply path.
+   */
+  emailType?: 'transactional' | 'marketing' | 'notification' | 'agent_reply';
+  /**
+   * Extra SMTP headers. Used by the Inbox email channel for RFC 5322 threading
+   * (`In-Reply-To` / `References`) and the auto-reply markers an assistant reply carries.
+   * Merged UNDER the platform's own headers so a caller cannot overwrite List-Unsubscribe.
+   */
+  headers?: Record<string, string>;
   /** Resend attachments — base64 content (no data: prefix). */
   attachments?: Array<{ filename: string; content: string }>;
   /** When set, the send uses this workspace's BYOK Resend key + sender (workspace_email_config)
@@ -595,7 +607,8 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           reply_to: replyTo,
           tags,
           attachments: body.attachments,
-          headers: unsubHeaders,
+          // Caller headers first so the platform's own (List-Unsubscribe) always win a clash.
+          headers: { ...(body.headers || {}), ...(unsubHeaders || {}) },
         });
 
         // Update log with Resend message ID

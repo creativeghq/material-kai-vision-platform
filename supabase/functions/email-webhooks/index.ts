@@ -14,6 +14,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
+import { resolveSecret } from '../_shared/secrets.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import {
@@ -142,7 +143,12 @@ async function handleInbound(
 ): Promise<Response> {
   // Fail CLOSED. An unset secret must never fall through to processing unauthenticated mail
   // (invariant 6, mirrors stripe-webhooks and the Svix branch below).
-  const expected = Deno.env.get('INBOUND_WEBHOOK_SECRET') || '';
+  //
+  // resolveSecret, NOT Deno.env.get: the Supabase edge runtime throws on Deno.env.set, so
+  // secrets-bootstrap cannot put a platform_secrets value into env and a DB-configured secret
+  // read through env is undefined for ever. The resolver queries the table directly and still
+  // prefers a real deployment env var when one exists.
+  const expected = (await resolveSecret(db, 'INBOUND_WEBHOOK_SECRET')).value || '';
   if (!expected) {
     console.error('INBOUND_WEBHOOK_SECRET not set — refusing to process inbound mail');
     return inboundJson({ error: 'Inbound email is not configured' }, 503);

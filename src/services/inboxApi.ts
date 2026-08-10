@@ -188,6 +188,20 @@ export interface InboxAgentSettings {
   allow_account_data: boolean;
 }
 
+/**
+ * A user's inbound email address (#342). One per user on the shared receiving domain — mail sent
+ * to it lands in `workspace_id`'s Inbox as a `channel='email'` thread.
+ */
+export interface UserEmailAddress {
+  id: string;
+  full_address: string;
+  workspace_id: string;
+  /** Let the assistant answer on this address without a member's involvement. */
+  auto_reply_enabled: boolean;
+  agent_ref: string | null;
+  is_active: boolean;
+}
+
 // ── Order intake (#342) ──
 // A PROPOSAL read out of a customer conversation. It lives on the thread's metadata and nothing
 // exists in `orders` until a member approves it.
@@ -359,6 +373,34 @@ export const inboxApi = {
   // ── AI "help me write" — a draft reply for a member to review/edit/send ──
   suggestReply(thread_id: string) {
     return call<{ draft: string }>('suggest_reply', { thread_id });
+  },
+
+  // ── Inbound email address (#342) — one per user, on the shared receiving domain ──
+
+  /**
+   * This user's inbound address. Returns `{address: null, can_allocate: true}` until they ask for
+   * one — allocation is explicit, never a side effect of opening the Inbox, because the address is
+   * a published identity.
+   */
+  getMyEmailAddress(workspace_id: string, allocate = false, local_part?: string) {
+    return call<{
+      address: UserEmailAddress | null;
+      domain: string;
+      can_allocate: boolean;
+      /** Set when nothing was allocated and the user has to choose — not an error. */
+      conflict?: 'taken' | 'invalid';
+      /** The handle we derived and could not have, so the UI can prefill something close to it. */
+      suggested_local_part?: string;
+      invalid_reason?: 'empty' | 'shape' | 'plus' | 'reserved';
+    }>('get_my_email_address', { workspace_id, allocate, local_part });
+  },
+  setEmailAddressSettings(changes: {
+    auto_reply_enabled?: boolean;
+    is_active?: boolean;
+    agent_ref?: string | null;
+    workspace_id?: string;
+  }) {
+    return call<{ address: UserEmailAddress }>('set_email_address_settings', changes);
   },
 
   // ── Order intake (#342) — members only; the workspace comes from the thread, never the body ──

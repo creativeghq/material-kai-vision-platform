@@ -19,6 +19,11 @@ import { authenticate } from '../_shared/auth.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { sendWhatsAppReply, sendWhatsAppMessage } from '../_shared/zernio.ts';
 import {
+  allocateUserEmailAddress,
+  buildOutboundMessageId,
+  buildReplyToAddress,
+} from '../_shared/inbound-email.ts';
+import {
   intakeDisplayTotal,
   orderIntakeSettings,
   readIntake,
@@ -43,6 +48,8 @@ const ATTACHMENT_BUCKET = 'generation-images';
 // Phase-2 agent takeover (§9): the workspace owner is billed per auto-reply.
 const INBOX_AGENT_REPLY_COST = 1;
 const DEFAULT_INBOX_AGENT_ID = 'kai';
+/** Receiving domain for inbound mail (#342). Overridable via the INBOUND_EMAIL_DOMAIN secret. */
+const DEFAULT_INBOUND_DOMAIN = 'mail.materialshub.gr';
 // Base URL for customer-facing links the agent may hand out (e.g. invoice pay links).
 const PUBLIC_APP_URL = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
 
@@ -854,6 +861,102 @@ async function insertMessageAndNotify(
     }
   }
 
+  // Email relay (#342). Without this an email thread is write-only: a member replies, sees their
+  // own bubble, the composer clears — and the customer is never sent anything. Same failure the
+  // WhatsApp branch above was fixed for, so it is built the same way: send, CHECK the result, and
+  // fail loudly rather than leave a delivered-looking message that never left.
+  if (thread.channel === 'email' && (messageType === 'text' || messageType === 'agent') && body) {
+    const meta = (thread.metadata as Json) || {};
+    const toAddress = String(meta.email_from || '');
+    const ourMailbox = String(meta.email_to || '');
+    if (toAddress && ourMailbox) {
+      const messageId = (msg as { id: string }).id;
+      const domain = ourMailbox.split('@')[1] || '';
+
+      // Everything the customer's client needs to keep this in ONE conversation:
+      //  • Reply-To carries the thread id, which is what actually threads the reply (the
+      //    recipient address is the one field no intermediary rewrites).
+      //  • In-Reply-To / References chain to their last message, so clients nest it visually.
+      const { data: lastInbound } = await db
+        .from('inbox_messages')
+        .select('metadata')
+        .eq('thread_id', threadId)
+        .eq('metadata->>direction', 'incoming')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const inboundId = ((lastInbound as { metadata?: Record<string, unknown> } | null)?.metadata
+        ?.email_message_id ?? null) as string | null;
+
+      const ourMessageId = buildOutboundMessageId(threadId, messageId, domain);
+      const headers: Record<string, string> = { 'Message-ID': `<${ourMessageId}>` };
+      if (inboundId) {
+        headers['In-Reply-To'] = `<${inboundId}>`;
+        headers['References'] = `<${inboundId}>`;
+      }
+      // An assistant-authored reply is marked as automated so a customer's autoresponder does not
+      // ping-pong with ours. A finance document must NEVER carry these (guarded by
+      // tests/security/inbound-email-isolation.test.ts).
+      if (messageType === 'agent') {
+        headers['Auto-Submitted'] = 'auto-replied';
+        headers['Precedence'] = 'auto_reply';
+      }
+
+      const subjectBase = String(thread.subject || 'Your message');
+      const subject = /^re:/i.test(subjectBase) ? subjectBase : `Re: ${subjectBase}`;
+
+      let sendErr: string | null = null;
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/email-api`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'send',
+            to: toAddress,
+            subject,
+            // Plain text only: the body is a member's own words, and building an HTML string
+            // around untrusted content is how invariant 11 gets violated by accident.
+            text: body,
+            replyTo: buildReplyToAddress(ourMailbox, threadId),
+            headers,
+            emailType: 'agent_reply',
+            workspace_id: String(thread.workspace_id),
+            // Deliberately NOT requireWorkspaceSender: an inbox reply is not a business document
+            // and must never be pinned to (or borrow) the finance sending identity.
+            tags: { feature: 'inbox_email_reply', thread_id: threadId },
+          }),
+        });
+        if (!res.ok) sendErr = `email-api returned ${res.status}`;
+        else {
+          const payload = await res.json().catch(() => null) as { success?: boolean; error?: string } | null;
+          if (payload && payload.success === false) sendErr = payload.error || 'send failed';
+        }
+      } catch (e) {
+        sendErr = e instanceof Error ? e.message : String(e);
+      }
+
+      await db.from('inbox_messages').update({
+        metadata: {
+          ...(msg as { metadata?: Record<string, unknown> }).metadata,
+          channel: 'email',
+          direction: 'outgoing',
+          // Stored so a reply quoting this Message-ID threads via ladder step 1.
+          email_message_id: ourMessageId,
+          email_to: toAddress,
+          delivery_status: sendErr ? 'relay_failed' : 'sent',
+          ...(sendErr ? { relay_error: sendErr } : {}),
+        },
+      }).eq('id', messageId);
+
+      if (sendErr) {
+        throw new HttpError(502, `Message stored but NOT delivered by email: ${sendErr}`);
+      }
+    }
+  }
+
   // In-app bell to every OTHER active participant that has an account (members + converted
   // customers). Notes go to members only. Pure token customers (no user_id) get no bell.
   if (messageType !== 'system') {
@@ -1043,7 +1146,8 @@ async function sendOrderConfirmation(
     }
 
     if (channel === 'email') {
-      // The reply goes out on the thread, which relays through the normal email path.
+      // insertMessageAndNotify's email branch actually sends (and throws on a failed send), so
+      // the catch below turns a delivery failure into status:'failed' rather than a false 'sent'.
       await insertMessageAndNotify(db, {
         thread,
         senderParticipantId: null,
@@ -2090,6 +2194,95 @@ async function handleJwtAction(
         throw new HttpError(502, 'The assistant could not draft a reply — try again.');
       }
       return json({ draft });
+    }
+
+    // ── Inbound email address (#342 §1) ───────────────────────────────────────────────────
+    //
+    // One address per USER, on the shared receiving domain. Get-or-create: without this the
+    // address table is read-only and every inbound message resolves to nothing, which is exactly
+    // the state the feature shipped in until this action existed.
+
+    case 'get_my_email_address': {
+      const domain = (await resolveSecret(db, 'INBOUND_EMAIL_DOMAIN')).value || DEFAULT_INBOUND_DOMAIN;
+      // The workspace the mail files into. A user can be in several, so it must be exactly one;
+      // default to the one they are asking from and let them move it.
+      const workspaceId = String(payload.workspace_id || '');
+      if (!workspaceId) throw new HttpError(400, 'workspace_id is required');
+      const callerRole = await callerRoleInWorkspace(db, userId, workspaceId);
+      if (!operator && !callerRole) throw new HttpError(403, 'You are not a member of that workspace');
+
+      const { data: existing } = await db
+        .from('user_email_addresses')
+        .select('id, full_address, workspace_id, auto_reply_enabled, agent_ref, is_active')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      // Allocation is explicit, never a side effect of opening the Inbox: an address is a
+      // published identity, so it appears when the user asks for one.
+      if (!existing && payload.allocate !== true) {
+        return json({ address: null, domain, can_allocate: true });
+      }
+
+      if (!existing) {
+        const result = await allocateUserEmailAddress(db, {
+          userId, workspaceId, domain,
+          // Only supplied on the second attempt, after the derived handle came back taken.
+          localPart: payload.local_part ? String(payload.local_part) : null,
+        });
+        if (!result.ok) {
+          // `taken` and `invalid` are answers, not failures: there is no address yet and the user
+          // has to choose one. A 500 here would read as "the platform is broken" for what is
+          // simply two people sharing a name.
+          if (result.reason === 'taken') {
+            return json({
+              address: null, domain, can_allocate: true,
+              conflict: 'taken', suggested_local_part: result.suggested,
+            });
+          }
+          if (result.reason === 'invalid') {
+            return json({
+              address: null, domain, can_allocate: true,
+              conflict: 'invalid', invalid_reason: result.detail,
+            });
+          }
+          throw new HttpError(500, 'Could not allocate an email address');
+        }
+      }
+
+      const { data: row } = await db
+        .from('user_email_addresses')
+        .select('id, full_address, workspace_id, auto_reply_enabled, agent_ref, is_active')
+        .eq('user_id', userId)
+        .maybeSingle();
+      return json({ address: row, domain, can_allocate: false });
+    }
+
+    case 'set_email_address_settings': {
+      const { data: row } = await db
+        .from('user_email_addresses').select('id, workspace_id').eq('user_id', userId).maybeSingle();
+      if (!row) throw new HttpError(404, 'You do not have an email address yet');
+
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (typeof payload.auto_reply_enabled === 'boolean') patch.auto_reply_enabled = payload.auto_reply_enabled;
+      if (typeof payload.is_active === 'boolean') patch.is_active = payload.is_active;
+      if ('agent_ref' in payload) patch.agent_ref = payload.agent_ref ? String(payload.agent_ref) : null;
+      if (payload.workspace_id) {
+        // Moving the address moves where a stranger's mail lands, so it must be a workspace the
+        // caller actually belongs to — never trusted from the body (invariant 1).
+        const target = String(payload.workspace_id);
+        const role = await callerRoleInWorkspace(db, userId, target);
+        if (!operator && !role) throw new HttpError(403, 'You are not a member of that workspace');
+        patch.workspace_id = target;
+      }
+
+      const { error } = await db.from('user_email_addresses').update(patch).eq('id', (row as { id: string }).id);
+      if (error) throw new HttpError(500, `Failed to save: ${error.message}`);
+
+      const { data: fresh } = await db
+        .from('user_email_addresses')
+        .select('id, full_address, workspace_id, auto_reply_enabled, agent_ref, is_active')
+        .eq('user_id', userId).maybeSingle();
+      return json({ address: fresh });
     }
 
     // ── Order intake (#342 §4) ────────────────────────────────────────────────────────────
