@@ -111,8 +111,11 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
       </CardHeader>
       <CardContent className="p-0">
         <Table>
-          <TableHeader>
-            <TableRow>
+          {/* Flat on purpose: the shared table chrome (a muted header band + a hairline under
+              every row) reads as a second panel stacked inside the card on the light theme.
+              Column labels are muted and small enough to hold the header without it. */}
+          <TableHeader className="bg-transparent border-0">
+            <TableRow className="border-0">
               <TableHead>Sub-heading</TableHead>
               <TableHead>What it covers</TableHead>
               <TableHead className="text-right">Lines</TableHead>
@@ -122,7 +125,7 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
           </TableHeader>
           <TableBody>
             {data.subheadings.map((s) => (
-              <TableRow key={s.subheading}>
+              <TableRow key={s.subheading} className="border-0">
                 <TableCell className="font-mono text-xs">{formatTaricCode(s.subheading.padEnd(10, '0'))}</TableCell>
                 <TableCell className="text-muted-foreground max-w-md truncate">{s.description ?? '—'}</TableCell>
                 <TableCell className="text-right tabular-nums">{s.lines}</TableCell>
@@ -138,7 +141,7 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
         </Table>
 
         {(data.unclassified_lines > 0 || data.unweighed_lines > 0) && (
-          <p className="flex items-start gap-2 border-t border-border/50 px-4 py-3 text-xs text-amber-500">
+          <p className="flex items-start gap-2 px-4 pt-2 pb-3 text-xs text-amber-500">
             <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             {/* An unclassified line is precisely the one that holds up a clearance, so it is
                 counted here rather than quietly excluded from the estimate above. */}
@@ -157,7 +160,7 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
             code is a snapshot of what it cleared under, so this must not be routed through the
             product, and it must stay available after the supplier's bill has locked the figures. */}
         {gaps.length > 0 && (
-          <div className="border-t border-border/50 px-4 py-3 space-y-3">
+          <div className="px-4 pb-4 pt-1 space-y-3">
             {gaps.map((l) => (
               <div key={l.id} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
                 <div className="space-y-1 min-w-0">
@@ -170,14 +173,20 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
                     value={l.taric_code ?? ''}
                     disabled={savingId === l.id}
                     onChange={(code) => void saveLine(l.id, { taricCode: code })}
-                    triggerClassName="w-full h-9"
+                    // Borderless and unfilled: the shared trigger/input chrome is a white
+                    // overlay (`bg-white/8` + `border-white/12`) built for the dark theme, and
+                    // on the cream card it stamps a white panel over the card. The hover tint
+                    // carries the affordance instead. An unrecognised code still announces
+                    // itself in the trigger's own content (red text + "not in the nomenclature"),
+                    // which is what survives here now that its red border has no width.
+                    triggerClassName="w-full h-9 border-0 bg-transparent px-2 hover:bg-muted/60"
                   />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground" htmlFor={`mass-${l.id}`}>Net mass (kg)</Label>
                   <Input
                     id={`mass-${l.id}`}
-                    className="h-9 w-32 text-sm tabular-nums"
+                    className="h-9 w-32 border-0 bg-transparent px-2 text-sm tabular-nums hover:bg-muted/60"
                     type="number"
                     min={0}
                     step="0.001"
