@@ -926,6 +926,9 @@ export const NewOrderModal: React.FC<{
           workspaceId, items: lineItems,
           companyId: link.party.party_type === 'company' ? link.party.id : null,
           contactId: link.party.party_type === 'contact' ? link.party.id : null,
+          // We are recording the purchase in the same breath, so who supplies the customer's
+          // lines is not a question anyone should have to answer again on the sale.
+          supplierCompanyId: !isSales ? coId : null,
         });
         coversOrderId = await ordersService.create({
           workspaceId,
@@ -966,6 +969,13 @@ export const NewOrderModal: React.FC<{
         supplierContactId: !isSales ? ctId : null,
         items: lineItems,
       });
+      // Bought for a sale that already existed: it has lines of its own that nothing mirrored, so
+      // the supplier crosses by stamp instead. (The 'customer' branch above mirrored the lines and
+      // carried the supplier with them, so there is nothing left to fill.) Best-effort — the order
+      // is committed and must not report failure because a courtesy stamp did not land.
+      if (coversOrderId && link.kind === 'sales_order') {
+        await ordersService.stampLineSuppliersFromCover(coversOrderId).catch(() => 0);
+      }
       // The goods on a received document already arrived, so stock them as part of creating the
       // order. Best-effort: a receipt failure must not lose the order that was just created —
       // it stays receivable from the order itself.
@@ -1619,27 +1629,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     return () => { cancelled = true; };
   }, [order?.id, order?.project_id]);
   /**
-   * Which reference tabs this order actually has content for, in reading order. Derived from the
-   * SAME conditions the panels themselves use, so a tab can never be offered with nothing behind
-   * it — and `orderTabs[0]` gives the default without hardcoding a tab that may not exist.
-   */
-  const orderTabs = useMemo(() => {
-    if (!order) return [] as string[];
-    const t: string[] = [];
-    // SALES orders only. `create()` stamps every PURCHASE line with the order's own supplier, so
-    // on a purchase order this block re-derived the order's OWN payable with a different formula
-    // (getOrderSupplierExposure, not get_order_settlements) — 'owe X' beside a differently-derived
-    // Outstanding — and its Pay button opens NewExpenseDialog, which books ANOTHER supplier bill
-    // and double-counts the cost in P&L. Its stated purpose is what a SALE costs us to fulfil.
-    if (order.order_type === 'sales' && supExposure.length > 0) t.push('suppliers');
-    if (fin && fin.invoices.length > 0) t.push('invoices');
-    if (fin) t.push('expenses');
-    if (fin && (fin.payments.length > 0 || fin.creditApplied.length > 0)) t.push('payments');
-    if (order.order_type === 'purchase' && match && match.match_status !== 'no_lines') t.push('match');
-    return t;
-  }, [order, supExposure, fin, match]);
-
-  /**
    * The reverse view: purchase orders raised to cover THIS sale. `raise_cover_purchase_orders` has
    * been writing `covers_order_id` since it shipped and nothing ever displayed it, so the POs it
    * created looked unrelated to the sale that caused them.
@@ -1657,6 +1646,32 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     })();
     return () => { cancelled = true; };
   }, [order?.id, order?.order_type]);
+
+  /**
+   * Which reference tabs this order actually has content for, in reading order. Derived from the
+   * SAME conditions the panels themselves use, so a tab can never be offered with nothing behind
+   * it — and `orderTabs[0]` gives the default without hardcoding a tab that may not exist.
+   *
+   * Declared after `coveredBy` on purpose: it reads that state, and a dependency array evaluated
+   * before the `const` it names is a TDZ crash, not a stale value.
+   */
+  const orderTabs = useMemo(() => {
+    if (!order) return [] as string[];
+    const t: string[] = [];
+    // SALES orders only. `create()` stamps every PURCHASE line with the order's own supplier, so
+    // on a purchase order this block re-derived the order's OWN payable with a different formula
+    // (getOrderSupplierExposure, not get_order_settlements) — 'owe X' beside a differently-derived
+    // Outstanding — and its Pay button opens NewExpenseDialog, which books ANOTHER supplier bill
+    // and double-counts the cost in P&L. Its stated purpose is what a SALE costs us to fulfil.
+    if (order.order_type === 'sales' && supExposure.length > 0) t.push('suppliers');
+    if (fin && fin.invoices.length > 0) t.push('invoices');
+    // "Covered by" lives in this tab, so a sale with cover but no loaded finance still needs it —
+    // otherwise the tab is absent and the block it holds is unreachable.
+    if (fin || coveredBy.length > 0) t.push('expenses');
+    if (fin && (fin.payments.length > 0 || fin.creditApplied.length > 0)) t.push('payments');
+    if (order.order_type === 'purchase' && match && match.match_status !== 'no_lines') t.push('match');
+    return t;
+  }, [order, supExposure, fin, match, coveredBy]);
 
   /**
    * The FORWARD view, and its control: the customer's sales order this purchase was made to serve.
@@ -1693,6 +1708,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    * Ad-hoc lines have nothing to look up and are reported back rather than sold at cost in silence.
    * The purchase keeps its own lines untouched — a purchase settles on money OUT and a sale on
    * money IN, and merging the two is the mistake `OrderLinkPicker` exists to make unavailable.
+   *
+   * Prices cross re-derived; the SUPPLIER crosses as-is. Attaching to a sale that already exists
+   * mirrors nothing, so there `stamp_order_line_suppliers_from_cover` stamps the sale's unassigned
+   * lines from the covering purchase instead — same answer, arrived at from the other side.
    */
   const linkToCustomer = async (v: OrderLinkTarget) => {
     if (!order) return;
@@ -1704,6 +1723,9 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         coversOrderId: v.orderId,
         ...(order.project_id ? {} : (v.projectId ? { projectId: v.projectId } : {})),
       });
+      // The link just answered "who supplies this line" for the sale. Best-effort: the link itself
+      // is saved and must not be reported as failed because the courtesy stamp did not land.
+      await ordersService.stampLineSuppliersFromCover(v.orderId).catch(() => 0);
       return;
     }
     if (v.kind !== 'customer') return;
@@ -1720,11 +1742,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
           measurement_unit_code: it.measurement_unit_code ?? null,
           vat_percent: Number(it.vat_percent ?? 0),
           vat_category: it.vat_category ?? null,
-          supplier_company_id: null,
+          supplier_company_id: it.supplier_company_id ?? null,
           update_warehouse: it.update_warehouse ?? true,
         })),
         companyId: v.party.party_type === 'company' ? v.party.id : null,
         contactId: v.party.party_type === 'contact' ? v.party.id : null,
+        supplierCompanyId: order.supplier_company_id ?? null,
       });
       const salesOrderId = await ordersService.create({
         workspaceId: order.workspace_id,
@@ -2398,23 +2421,6 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </div>
             )}
 
-            {/* The project link moved inline into the header row above (beside Status), so all that
-                remains here is the reverse view: which purchase orders were raised to cover this
-                sale. Rendered only when there are any. */}
-            {coveredBy.length > 0 && (
-              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Covered by</span>
-                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                  {coveredBy.map((po) => (
-                    <Link key={po.id} to={`${financeBase}/orders/${po.id}`} className="text-xs hover:underline">
-                      <span className="font-medium">{po.order_number ?? po.id.slice(0, 8)}</span>
-                      <span className="text-muted-foreground"> · {po.status} · {formatMoney(Number(po.total), po.currency)}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {!editing ? (
               <>
                 <div className="rounded-md border border-border/60 overflow-x-auto">
@@ -2728,6 +2734,26 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               </TabsContent>
 
               <TabsContent value="expenses" className="mt-3 space-y-3">
+            {/* The purchase orders raised to cover this sale. It lives with the expenses because
+                that is what it is — the cost side of this order, alongside the bills booked on it —
+                rather than a loose block wedged between the order's own summary and its lines.
+                (The purchase-side mirror, "Bought for", stays up in the header: the sale a purchase
+                serves is the demand behind it, not a cost on it.) */}
+            {coveredBy.length > 0 && (
+              <div className="rounded-md border border-border/60">
+                <div className="border-b border-border/60 px-3 py-1.5 text-[11px] font-medium text-muted-foreground">
+                  Covered by — purchase orders raised for this sale
+                </div>
+                {coveredBy.map((po) => (
+                  <Link key={po.id} to={`${financeBase}/orders/${po.id}`}
+                    className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0 hover:bg-muted/40">
+                    <span className="font-mono text-xs">{po.order_number ?? po.id.slice(0, 8)} · {humanizeLabel(po.status)}</span>
+                    <span className="tabular-nums">{formatMoney(Number(po.total), po.currency)}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
             {/* Every expense attached to this order — the supplier's own bill plus any extra cost
                 put on it. Many per order by design (`supplier_bills.order_id` is not unique), so
                 the header carries the count and the attach action, and each row can be detached

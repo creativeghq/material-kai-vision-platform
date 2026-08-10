@@ -720,18 +720,30 @@ export const ordersService = {
    * Ad-hoc lines (no `product_id`) have nothing to look up. They are carried at cost and reported in
    * `unpriced` so the operator is told which lines still need a price, rather than a zero-margin
    * line quietly reaching the customer.
+   *
+   * `supplierCompanyId` is the purchase's own supplier, and every mirrored line keeps it. On a SALES
+   * line `supplier_company_id` answers "who do we buy this from" — it is what `getOrderSupplierExposure`
+   * groups our payable by and what the line's "Mark paid" pays. This used to be nulled on the way
+   * across on the reasoning that a supplier stamp belongs to the purchase side, which had it exactly
+   * backwards: the mirror is created FROM the purchase, so the one moment the answer is known for
+   * certain is this one. Nulling it meant a sale raised from a purchase showed "+ supplier" on every
+   * line and an empty Suppliers tab, with the operator re-picking by hand what the purchase already said.
    */
   async mirrorLinesForSale(opts: {
     workspaceId: string;
     items: NewOrderItem[];
     companyId?: string | null;
     contactId?: string | null;
+    /** Who the purchase being mirrored buys from — the fallback for lines carrying no supplier. */
+    supplierCompanyId?: string | null;
   }): Promise<{ items: NewOrderItem[]; unpriced: string[] }> {
     const unpriced: string[] = [];
+    const fallbackSupplier = opts.supplierCompanyId ?? null;
     const items = await Promise.all(opts.items.map(async (it) => {
+      const sup = it.supplier_company_id ?? fallbackSupplier;
       if (!it.product_id) {
         unpriced.push(it.description);
-        return { ...it, supplier_company_id: null };
+        return { ...it, supplier_company_id: sup };
       }
       const pr = await this.resolveLinePricing({
         workspaceId: opts.workspaceId, productId: it.product_id, orderType: 'sales',
@@ -739,14 +751,15 @@ export const ordersService = {
       }).catch(() => null);
       if (pr?.unit_price == null) {
         unpriced.push(it.description);
-        return { ...it, supplier_company_id: null };
+        return { ...it, supplier_company_id: sup };
       }
       return {
         ...it,
         unit_price: pr.unit_price,
         unit_cost: pr.unit_cost ?? it.unit_cost ?? null,
-        // A sales line is not bought from our supplier — that stamp belongs to the purchase side.
-        supplier_company_id: null,
+        // The line we are actually buying from wins over the product's default supplier: the
+        // catalog names who usually supplies it, this purchase names who is supplying it now.
+        supplier_company_id: sup ?? pr.supplier_company_id ?? null,
       };
     }));
     return { items, unpriced };
@@ -1239,6 +1252,22 @@ export const ordersService = {
       out.set(r.product_id, (out.get(r.product_id) ?? 0) + free);
     }
     return out;
+  },
+
+  /**
+   * Fill in the supplier on a sale's unassigned lines from the purchase orders covering it.
+   *
+   * For the case the mirror cannot serve: a sale that already existed when the purchase was
+   * pointed at it. The link IS the answer to "who supplies this line", and leaving the operator to
+   * re-pick a supplier the covering PO already names is asking them to re-enter known data.
+   *
+   * Only unambiguous matches are stamped (see the function's own comment) and an existing supplier
+   * is never overwritten, so calling it after any link is safe. Returns how many lines it filled.
+   */
+  async stampLineSuppliersFromCover(salesOrderId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('stamp_order_line_suppliers_from_cover', { p_order_id: salesOrderId });
+    if (error) throw error;
+    return Number(data ?? 0);
   },
 
   /** Set / clear the supplier on a specific ORDER LINE (the "+ supplier" picker). Also seeds the
