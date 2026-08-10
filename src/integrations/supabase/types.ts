@@ -19363,45 +19363,31 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "product_edges_dst_product_id_fkey"
-            columns: ["dst_product_id"]
+            columns: ["dst_product_id", "workspace_id"]
             isOneToOne: false
-            referencedRelation: "catalog_master_price_drift"
-            referencedColumns: ["operator_product_id"]
+            referencedRelation: "products"
+            referencedColumns: ["id", "workspace_id"]
           },
           {
             foreignKeyName: "product_edges_dst_product_id_fkey"
-            columns: ["dst_product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_edges_dst_product_id_fkey"
-            columns: ["dst_product_id"]
+            columns: ["dst_product_id", "workspace_id"]
             isOneToOne: false
             referencedRelation: "products_effective_facts"
-            referencedColumns: ["product_id"]
+            referencedColumns: ["product_id", "workspace_id"]
           },
           {
             foreignKeyName: "product_edges_src_product_id_fkey"
-            columns: ["src_product_id"]
-            isOneToOne: false
-            referencedRelation: "catalog_master_price_drift"
-            referencedColumns: ["operator_product_id"]
-          },
-          {
-            foreignKeyName: "product_edges_src_product_id_fkey"
-            columns: ["src_product_id"]
+            columns: ["src_product_id", "workspace_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "workspace_id"]
           },
           {
             foreignKeyName: "product_edges_src_product_id_fkey"
-            columns: ["src_product_id"]
+            columns: ["src_product_id", "workspace_id"]
             isOneToOne: false
             referencedRelation: "products_effective_facts"
-            referencedColumns: ["product_id"]
+            referencedColumns: ["product_id", "workspace_id"]
           },
           {
             foreignKeyName: "product_edges_workspace_id_fkey"
