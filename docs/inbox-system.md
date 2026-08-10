@@ -28,10 +28,11 @@ Four tables in `public` (all writes are performed by `inbox-api` under the servi
 ### `inbox_threads`
 `id, workspace_id, thread_type, channel, subject, status, created_by, last_message_at, metadata, agent_id, agent_state, created_at, updated_at`
 
-- `thread_type ∈ {internal, customer, upstream}`; `channel ∈ {internal, whatsapp}`.
+- `thread_type ∈ {internal, customer, upstream}`; `channel ∈ {internal, whatsapp, email}` (email added by #342).
 - `status ∈ {open, snoozed, closed}` (bumped to `open` on every new message).
 - `agent_state ∈ {off, suggesting, active, paused}` and `agent_id` drive the AI takeover ([§4](#4-ai-assistant-takeover-9)).
 - `metadata` carries channel binding for WhatsApp (`zernio_account_id`, `zernio_conversation_id`, `channel_id`, `contact_phone`) and, for marketplace threads, `marketplace_listing_id` / `marketplace_inquiry_id` / `buyer_workspace_id`.
+- `metadata.order_intake` holds an **order proposal** read out of the conversation (#342, [§11](#11-order-intake-342)). It is deliberately not a table and never an `orders` row until a member approves it. Any writer must read-modify-write this column — clobbering it drops the WhatsApp relay binding above.
 
 ### `inbox_participants`
 `id, thread_id, participant_type, user_id, contact_id, agent_id, workspace_id, thread_role, added_by, joined_at, last_read_at, status, created_at, updated_at`
@@ -164,7 +165,7 @@ Delivery goes through the [Flows](flows-notification-system.md) engine, not hard
 
 - **Route** `/inbox` → [`InboxPage`](../src/pages/Inbox/InboxPage.tsx), wrapped in `AuthGuard` + `CapabilityGuard capability="inbox.use"`. Three-pane desktop layout (Conversations · Conversation · Details rail); single-pane mobile drill-in with the rail in a bottom sheet.
   - **Members** get full controls (AI Bot toggle, agent settings, add teammate, status select, reply/private-note switch). **End-users** (`persona==='end_user'`) get a read/reply surface only.
-  - **Channel filters** All / Internal / WhatsApp; operators get an "All workspaces" toggle (`scope:'all'`).
+  - **Channel filters** All / Internal / WhatsApp / Email, plus an **Order** filter (#342); operators get an "All workspaces" toggle (`scope:'all'`).
   - **Realtime**: members subscribe to `inbox_messages` inserts on the open thread + a `inbox_threads` list channel. The details rail is populated by `get_thread_context`.
   - Client service: [`inboxApi`](../src/services/inboxApi.ts).
 - **Public route** `/i/:token` → [`PublicInboxThreadPage`](../src/pages/PublicInboxThreadPage.tsx). Minimal chrome, one thread, reply box + attachments. Anonymous customers can't use RLS realtime, so it **polls every 15s** via `token_get_thread`. A "Create account to continue" modal routes to signup carrying the token (`/auth?mode=signup&inbox_token=…&redirect=/inbox`); on return the app calls `token_claim` (a fallback in `InboxPage` also claims a token stashed in `localStorage` across the email-confirmation round trip).
@@ -175,4 +176,82 @@ Delivery goes through the [Flows](flows-notification-system.md) engine, not hard
 
 **Shipped:** the thread/message/participant/token backbone; directional ACL + shared team inbox; WhatsApp inbound reply-capture with assign-on-reply + 24h-window enforcement; the AI takeover (auto-engage, credit metering, data-grounded thread-scoped tools, human-takeover pause, editable persona); per-workspace `auto_respond` / `allow_account_data` settings **with the UI toggle**; the CRM/finance context rail; the public tokenized thread page + `token_claim` conversion; the marketplace inquiry bridge; Flows-based notifications.
 
-**Pending (per CLAUDE.md tracker):** the full WhatsApp **cut-over** — template-driven re-engagement outside Meta's 24h window and a dedicated agent-facing WhatsApp reply box — remains a fast-follow. Everything documented above reflects the current code.
+**Pending (per CLAUDE.md tracker):** a dedicated agent-facing WhatsApp reply box. Template-driven re-engagement outside Meta's 24h window is no longer wholly pending — #342 built it for one concrete template (`order_confirmation`, §11); a general template picker in the composer is still a fast-follow. Everything documented above reflects the current code.
+
+---
+
+## 11. Order intake (#342)
+
+An order that arrives as a **conversation** — over email or WhatsApp — becomes a real sales order
+without anyone re-typing it.
+
+### The proposal is not an order
+
+Extraction writes a proposal to **`inbox_threads.metadata.order_intake`**, and **nothing exists in
+`orders` until a member approves it**. That placement was measured, not assumed: `orders` is read by
+71 SQL functions, 7 triggers and 11 TS files, ~30 of them set-scanning. A `status='proposed'` row
+would need ~30 query edits and still leave four things a filter cannot fix — `tg_order_number` is
+BEFORE INSERT so every AI proposal burns a customer-visible `ORD-YYYY-NNNN`,
+`_notify_upstream_order_created` is AFTER INSERT, `dic_heal__finance_order_total_mismatch` would
+rewrite the model's numbers on the nightly sweep, and `order_items` write RLS is owner/admin, which
+makes "sales may approve" *harder*. One nullable `orders.source_thread_id` is the only schema change
+to the orders model.
+
+There is **one intake per thread**, by construction — it is a single jsonb key, so a follow-up
+("and one box of the grey") amends the proposal under review instead of racing a second one. It
+stores no money total; `_recompute_order_totals_core` is the authoritative number.
+
+### The pipeline
+
+`maybeRunOrderIntake` runs immediately **before** `maybeRunAgentReply` at all three places an
+inbound customer message lands (`send_message`, `token_send_message`, `internal_agent_reply`), so
+both channels are served from one chokepoint and neither webhook needed a change. Gated on
+`workspaces.settings.order_intake.enabled` — **opt-in**, unlike the agent's opt-out, because
+extraction spends credits on every inbound message.
+
+[`_shared/order-intake/`](../supabase/functions/_shared/order-intake/): a Haiku classifier (free,
+most mail is not an order) → schema-enforced extraction with the conversation fenced as DATA
+(invariant 9) → catalog matching (MIVAA multi_vector → `ilike` fallback → **visual**, for "2 boxes
+of this" plus a photo) → pricing via `get_product_price_for_workspace` and nothing else. The model
+reads quantities and descriptions; it never supplies a price or a product id. Credits are debited
+before the extraction call and refunded when it yields nothing.
+
+`p_quantity` is deliberately **not** passed to the price resolver, so an intake line prices
+identically to the same line typed into a quote. Passing it would make order intake the platform's
+first caller to fire quantity breaks — an untested pricing path, on a money quantity.
+
+### Approval
+
+`create_order_from_thread_intake(thread_id)` — SECURITY DEFINER, callable by
+**owner / admin / sales / sales_manager**. It is the one path that lets a `sales` member write to
+`orders` (which `is_workspace_finance_manager` otherwise limits to owner/admin), and it is safe
+because the privilege has **no reachable parameter**: `order_type` and `status` are literals, so it
+can only ever produce a **draft sales order** ("Pre-order"). Stored jsonb is untrusted input, so
+every column is written explicitly and every `product_id` is re-validated against the workspace
+(a foreign one degrades to an ad-hoc line). Idempotent via `order_intake.order_id`.
+
+> **Why the totals split.** SECURITY DEFINER changes the ROLE, not the JWT, so `auth.uid()` inside
+> it is still the caller — and the public `recompute_order_totals` self-guards on
+> `is_workspace_finance_manager`. Approval therefore raised `order not found` for exactly the sales
+> roles it exists to empower, while working fine for an owner. The fix was **not** to recompute the
+> money locally (that is a second derivation of a money quantity); the arithmetic moved into
+> `_recompute_order_totals_core`, REVOKEd from clients, and the permission check stayed at the
+> public entry point — the same shape `_deliver_order_line_core` already uses for the stock ledger.
+
+### Telling the customer
+
+`approve_intake` resolves a confirmation channel explicitly and **reports which one ran**: freeform
+WhatsApp inside the 24h window → the approved `order_confirmation` template outside it → the email
+thread → none. Both Zernio helpers resolve `{success:false}` rather than throwing, so the result is
+checked; reporting "sent" for a message that never left is precisely the failure this path exists
+to prevent. **Approval never rolls back because a message failed** — the order is the commitment,
+the notification is best-effort and visible. The outcome is stored on the intake, and
+`ops.silent_zero` probes for orders approved from the Inbox where nothing was ever confirmed.
+
+### Surface
+
+The details rail gains an **Order** panel above Customer value: proposed lines, needs-review
+markers, a customer picker, Approve / Dismiss. Approve is **hidden** for roles the RPC would refuse.
+It is deliberately small — not a second order editor; per-line supplier, warehouse, customs and
+dispatch stay on the real order, which it links to once one exists. The conversation list gains an
+**Order** badge and an order filter, so a proposal is visible without opening the thread.

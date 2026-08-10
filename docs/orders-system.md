@@ -46,6 +46,16 @@ becomes `accepted` (admin or public path). It creates a **sales order** (`confir
 `quote_id` + `order_id`) with its items. Idempotent (one order per quote). Issuing that draft later
 runs the normal "Issue invoice" path (gapless number + myDATA transmit).
 
+### Inbox conversation → Order (approved by a human, #342)
+An order that arrives as an **email or WhatsApp conversation** is read into a proposal on
+`inbox_threads.metadata.order_intake` and becomes an order only when a member approves it —
+`create_order_from_thread_intake(thread_id)` writes a **draft sales order** and stamps
+`orders.source_thread_id`. Nothing reaches this table before that click, so the proposal never
+consumes an `ORD-YYYY-NNNN`, never notifies upstream, and never trips the integrity checks.
+Callable by **owner/admin/sales/sales_manager**: it is the one path that lets a `sales` member write
+to `orders`, and it is safe because `order_type` and `status` are literals inside the function.
+See [inbox-system.md §11](inbox-system.md#11-order-intake-342).
+
 ### POS checkout → Order (automatic)
 `generate_order_from_invoice(invoice_id, mark_delivered)` builds a sales order from an invoice + its
 items (idempotent, links `invoices.order_id`). POS `finalizeSale` calls it with `mark_delivered=true`,
@@ -154,7 +164,17 @@ the company the same way.
 
 ## RPCs
 `generate_order_from_quote(uuid)` · `generate_order_from_invoice(uuid, boolean)` ·
-`recompute_order_payment_status(uuid)`.
+`recompute_order_payment_status(uuid)` · `create_order_from_thread_intake(uuid)` (#342).
+
+**Order totals are derived in one place, behind two doors.** `_recompute_order_totals_core` holds
+the arithmetic and is REVOKEd from every client role; `recompute_order_totals` is the public entry
+point and keeps the `is_workspace_finance_manager` gate. The split exists because SECURITY DEFINER
+changes the ROLE, not the JWT: `auth.uid()` inside a definer function is still the caller, so the
+guarded wrapper raised `order not found` for the sales roles `create_order_from_thread_intake` is
+meant to empower — while passing for an owner, which is how the first test missed it. Recomputing
+the money inside the approval RPC would have been a second derivation of a money quantity; moving
+the arithmetic down and leaving the check at the entry point keeps exactly one. Same shape as
+`_deliver_order_line_core`.
 
 ## Not an edge function
 Orders are accessed via direct, RLS-gated Supabase table access (`ordersService.ts`) + the DB

@@ -83,6 +83,31 @@ from the day it shipped.
 - **Blind spot:** `ops.silent_zero` probes are hardcoded (deliberately — admin-editable SQL run by a SECURITY DEFINER function would be a privilege-escalation surface). A new metric gets no probe until someone writes a migration.
 - **Worked example of paying that cost, 2026-08-08 (#239):** the page-embedding channel shipped with `ops.page_embeddings_never_written` in the same change. Worth noting *why* it needed one at all: the fusion weights make its silent failure actively misleading rather than merely invisible. The `page` channel carries 8–15% of every weight profile, so with no vectors written, search reports eight healthy channels while ranking on seven — and because `multi_vector_search` normalizes by *active* weights, the scores stay plausibly scaled and nothing looks off. A feature whose absence degrades a number without changing its shape is exactly this defect class, and the probe is the only thing that can see it.
 
+- **A second worked example, 2026-08-10 (#233) — the gate that admitted nothing.** Agent long-term memory had every part an architecture review looks for: a typed, workspace-scoped table, a write path invoked on every turn, a read path spliced into every system prompt. The write path was three regexes over the user message (`/i (?:prefer|like|want)…/`) plus an `if (toolResult.tool === 'material_search')` ladder; the read path was `order by created_at desc limit 20`. Across **801 agent runs / 30 conversations / 45 user messages** it had promoted **one** memory — "User generated 3D design for room", with `style` empty. Nothing could see it: the stored row was consistent, so no integrity check applied; a regex that matches nothing is a valid regex, so no typecheck applied; and recency retrieval *returns rows*, so the prompt always looked populated. It was found by counting rows by hand.
+  - **The generalization: a filter whose accept rate is ~0 and whose output nobody counts is indistinguishable from an empty input stream.** Ambiguous zero usually shows up as an unstamped *number*; here it was an unwritten *row*, and the two are the same defect. Any promotion/classification/dedup step needs a probe on what it emitted, judged against the activity that should have fed it — which is necessarily **cross-table**, since the write lands somewhere other than the trigger.
+  - **Guarded by:** `ops.silent_zero` probes `agent_memory_never_promoted` (turns happened, nothing stored), `agent_memory_never_embedded` (recall has silently degraded to recency), `agent_memory_never_recalled` (memories exist, none has ever reached a prompt) + [tests/unit/agentMemory.test.ts](../tests/unit/agentMemory.test.ts).
+  - **Proven to fire:** 2026-08-10 — `agent_memory_never_promoted` returned `activity 31 / signal 0` against the live DB on introduction, i.e. it reported the very defect being fixed *before* the fix shipped. The unit guard was mutation-tested by planting a regex promoter, a `JSON.parse` salvage and a `created_at` read back into the module: 3 of 27 assertions failed, and the module was restored byte-identical.
+  - **Calibration is part of the guard, not a detail.** The three probes were first written at a 7-day window / `min_activity` 20 — thresholds this platform's chat volume (31 user turns per *month*) can never reach, so they would have reported clean forever. A probe that cannot attain its own minimum is the defect it is meant to catch, wearing a badge. Re-cut to 30 days with reachable minimums and confirmed firing.
+  - **Blind spot:** the probes measure *volume*, not *quality*. A promotion gate that faithfully stores 5 useless memories per turn passes all three, and only `recall_count` staying low would hint at it.
+
+### 4f. Guarded twice — a definer function whose callee re-checks the caller it can no longer see
+`create_order_from_thread_intake` (#342) exists so **sales** members can approve an Inbox order into
+a draft sales order — the one path that lets them write `orders` at all. It called
+`recompute_order_totals`, which self-guards on `is_workspace_finance_manager`. SECURITY DEFINER
+changes the ROLE, not the JWT, so `auth.uid()` inside it is still the caller: approval raised
+`order not found` for exactly the role it exists to empower, and **passed for an owner**, which is
+how the first pass of testing missed it entirely.
+
+The wrong fix is to recompute the money locally — that is shape 5, a second derivation of a money
+quantity. The right one is to split: `_recompute_order_totals_core` holds the arithmetic and is
+REVOKEd from every client role, `recompute_order_totals` keeps the gate at the public entry point.
+Same shape as `_deliver_order_line_core`.
+
+- **Guarded by:** [tests/integration/order-intake-approval.test.ts](../tests/integration/order-intake-approval.test.ts) — approves as a **real signed-in `sales` user** under real RLS, and separately asserts that same user still cannot INSERT into `orders` directly, so the RPC stays the only door.
+- **Proven to fire:** 2026-08-10 — found live. The owner-path test passed; the sales-path run raised `P0002 order not found` from inside `recompute_order_totals`, which is what surfaced the bug. Re-run after the split: draft sales order, total 37.20, and the public wrapper still refuses a non-finance-manager.
+- **Current state:** fixed; the core is REVOKEd from `anon` and `authenticated` (verified via `has_function_privilege`).
+- **Blind spot:** the integration tier self-skips without `SUPABASE_SERVICE_ROLE_KEY`, so this only actually runs in CI. A local `npm test` reports it as skipped, not passed.
+
 ### 4e. Wrong latent space — a vector that is the right SHAPE and the wrong MEANING
 Dimension is not identity. `voyage-4` and `voyage-multimodal-3.5` both return 1024D, so querying
 `vecs.page_embeddings` with an ordinary text embedding is accepted by Postgres, returns neighbours

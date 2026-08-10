@@ -27,6 +27,15 @@ Complete documentation for the Resend email system with domain management, templ
 
 ---
 
+> **Inbound (2026-08-10, #342):** this document describes the **outbound** system. Receiving is a
+> separate path and a separate vendor: **Cloudflare Email Routing** delivers to
+> [`cloudflare/email-worker/`](../cloudflare/email-worker/README.md), which stores the raw `.eml`
+> and hands it to the `email-webhooks` inbound branch, which resolves the workspace, thread and
+> customer and files it in the Inbox. **Resend stays outbound-only.** Receiving is an MX record and
+> sending authentication is TXT, so one domain does both. `email_logs.email_type` gained
+> `agent_reply` so an assistant reply can never be mistaken for — or borrow the identity of — a
+> finance document. See [inbox-system.md §11](inbox-system.md#11-order-intake-342).
+
 ## Overview
 
 The Email System provides enterprise-grade email capabilities using **Resend** with comprehensive tracking, analytics, and template management. All email operations are handled through Supabase Edge Functions with the Resend API key stored securely as a Supabase Secret.
