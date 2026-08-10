@@ -254,15 +254,6 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
-    name: 'checkJobStatus',
-    file: 'supabase/functions/_shared/tools/database-tools.ts',
-    factory: 'createCheckJobStatusTool',
-    description: 'Check the current status and progress of a PDF processing job.',
-    params: [
-      { name: 'jobId', type: 'string', optional: false, description: 'Job ID to check status for' },
-    ],
-  },
-  {
     name: 'checkServerHealth',
     file: 'supabase/functions/_shared/tools/ops-tools.ts',
     factory: 'createCheckServerHealthTool',
@@ -447,15 +438,6 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'company_id', type: 'string', optional: true, description: 'The crm company UUID to enrich.' },
       { name: 'company_query', type: 'string', optional: true, description: 'Fuzzy company name to resolve (if you don\'t have the id).' },
-    ],
-  },
-  {
-    name: 'estimate_cost',
-    file: 'supabase/functions/_shared/tools/ops-tools.ts',
-    factory: 'createCostEstimationTool',
-    description: 'Estimate total cost of selected materials from the catalog.',
-    params: [
-      { name: 'materialIds', type: 'array', optional: false, description: 'Array of material/product IDs to estimate cost for' },
     ],
   },
   {
@@ -677,42 +659,6 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'product_id', type: 'string', optional: false },
       { name: 'include_sources', type: 'boolean', optional: true, description: 'Include the discovered retailer rows (adds one backend read).' },
-    ],
-  },
-  {
-    name: 'getDocumentEntities',
-    file: 'supabase/functions/_shared/tools/database-tools.ts',
-    factory: 'createGetDocumentEntitiesTool',
-    description: 'Get all document entities (certificates, logos, specifications, factory documents) extracted from a PDF',
-    params: [
-      { name: 'documentId', type: 'string', optional: false, description: 'Document ID to get entities for' },
-    ],
-  },
-  {
-    name: 'getMetadataExtraction',
-    file: 'supabase/functions/_shared/tools/database-tools.ts',
-    factory: 'createGetMetadataExtractionTool',
-    description: 'Get extracted metadata summary including factory information, technical specifications, and certifications',
-    params: [
-      { name: 'documentId', type: 'string', optional: false, description: 'Document ID to get metadata for' },
-    ],
-  },
-  {
-    name: 'getRelationshipCounts',
-    file: 'supabase/functions/_shared/tools/database-tools.ts',
-    factory: 'createGetRelationshipCountsTool',
-    description: 'Get counts of all relationship types (chunk-product, product-image, chunk-image, product-document) for a document',
-    params: [
-      { name: 'documentId', type: 'string', optional: false, description: 'Document ID to get relationship counts for' },
-    ],
-  },
-  {
-    name: 'getStageDetails',
-    file: 'supabase/functions/_shared/tools/database-tools.ts',
-    factory: 'createGetStageDetailsTool',
-    description: 'Get detailed metrics and information for the current processing stage of a job',
-    params: [
-      { name: 'jobId', type: 'string', optional: false, description: 'Job ID to get stage details for' },
     ],
   },
   {

@@ -1,5 +1,5 @@
 /**
- * Ops Tools: createCheckServerHealthTool, createQuerySentryTool, createCostEstimationTool
+ * Ops Tools: createCheckServerHealthTool, createQuerySentryTool
  */
 
 const { tool } = await import('npm:@langchain/core@1.1.15/tools');
@@ -107,74 +107,6 @@ export const createQuerySentryTool = () => {
       schema: z.object({
         jobId: z.string().describe('Job ID to search for in Sentry'),
         timeRange: z.string().default('1h').describe('Time range for error search (e.g., 1h, 24h)'),
-      }),
-    }
-  );
-};
-
-/**
- * LangChain Tool: Material Cost Estimation
- */
-export const createCostEstimationTool = (workspaceId: string) => {
-  return tool(
-    async ({ materialIds }) => {
-      try {
-        // Query products table for pricing information
-        const { data: products, error } = await supabase
-          .from('products')
-          .select('id, name, metadata')
-          .eq('workspace_id', workspaceId)
-          .in('id', materialIds);
-
-        if (error) {
-          throw new Error(`Failed to fetch materials: ${error.message}`);
-        }
-
-        if (!products || products.length === 0) {
-          return JSON.stringify({
-            success: false,
-            error: 'No materials found with the provided IDs',
-          });
-        }
-
-        // Calculate total cost from metadata
-        const materialsWithPrices = products.map(product => {
-          const price = product.metadata?.price || product.metadata?.cost || 0;
-          const unit = product.metadata?.unit || 'unit';
-          const quantity = product.metadata?.quantity || 1;
-
-          return {
-            id: product.id,
-            name: product.name,
-            price: parseFloat(price.toString()),
-            unit,
-            quantity: parseFloat(quantity.toString()),
-            subtotal: parseFloat(price.toString()) * parseFloat(quantity.toString()),
-          };
-        });
-
-        const totalCost = materialsWithPrices.reduce((sum, item) => sum + item.subtotal, 0);
-
-        return JSON.stringify({
-          success: true,
-          materials: materialsWithPrices,
-          total_cost: totalCost,
-          currency: 'USD',
-          material_count: materialsWithPrices.length,
-        });
-      } catch (error) {
-        console.error('Cost estimation tool error:', error);
-        return JSON.stringify({
-          success: false,
-          error: error instanceof Error ? error.message : 'Cost estimation failed',
-        });
-      }
-    },
-    {
-      name: 'estimate_cost',
-      description: 'Estimate total cost of selected materials from the catalog. Calculates pricing based on material metadata (price, quantity, unit).',
-      schema: z.object({
-        materialIds: z.array(z.string()).describe('Array of material/product IDs to estimate cost for'),
       }),
     }
   );

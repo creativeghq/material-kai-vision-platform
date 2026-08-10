@@ -22,27 +22,38 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Sofa, Bed, UtensilsCrossed, Droplets, Monitor, Wind, Trees, Waves, ChevronLeft, ChevronRight, Check, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TOOL_MANIFEST_BY_NAME } from './toolManifest.generated';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-export const STAGING_ROOMS = [
-  { value: 'Living Room',  label: 'Living Room',  icon: Sofa },
-  { value: 'Bedroom',      label: 'Bedroom',      icon: Bed },
-  { value: 'Dining Room',  label: 'Dining Room',  icon: UtensilsCrossed },
-  { value: 'Kitchen',      label: 'Kitchen',      icon: UtensilsCrossed },
-  { value: 'Bathroom',     label: 'Bathroom',     icon: Droplets },
-  { value: 'Office',       label: 'Office',       icon: Monitor },
-  { value: 'Balcony',      label: 'Balcony',      icon: Wind },
-  { value: 'Garden',       label: 'Garden',       icon: Trees },
-  { value: 'Swimming Pool',label: 'Pool',         icon: Waves },
-] as const;
+/**
+ * Rooms and styles are the `virtual_staging` tool's own `room` / `furnitureStyle`
+ * z.enum members, read from the generated manifest — NOT a hand-kept copy of them
+ * (issue #266). These lists used to be typed out here, which is how an option can ship
+ * in the schema and never reach a picker, or a picker can keep offering a value the
+ * enum has dropped. Icons and the display label stay local, because the schema has no
+ * opinion about either; anything the maps don't cover falls back rather than vanishing.
+ */
+const stagingEnum = (param: 'room' | 'furnitureStyle'): string[] =>
+  TOOL_MANIFEST_BY_NAME['virtual_staging']?.params.find((p) => p.name === param)?.enum ?? [];
 
-export const STAGING_STYLES = [
-  'Modern', 'Scandinavian', 'Transitional', 'Rustic',
-  'Mid-Century Modern', 'Urban Industrial', 'Farmhouse', 'Coastal',
-  'Traditional', 'Modern Organic', 'Scandinavian Oasis', 'Transitional Luxury',
-  'B&W Modern', 'Farmhouse Hacienda', 'Metro Industrial', 'NYC Modern',
-] as const;
+const ROOM_ICONS: Record<string, typeof Sofa> = {
+  'Living Room': Sofa, 'Bedroom': Bed, 'Dining Room': UtensilsCrossed,
+  'Kitchen': UtensilsCrossed, 'Bathroom': Droplets, 'Office': Monitor,
+  'Balcony': Wind, 'Garden': Trees, 'Swimming Pool': Waves,
+};
+const ROOM_LABELS: Record<string, string> = { 'Swimming Pool': 'Pool' };
+
+export const STAGING_ROOMS = stagingEnum('room').map((value) => ({
+  value,
+  label: ROOM_LABELS[value] ?? value,
+  icon: ROOM_ICONS[value] ?? Sofa,
+}));
+
+// 'Default (AI decides)' is a real enum member the AGENT may pass, but this wizard is a
+// three-step picker whose whole job is to make the user choose — so it is filtered out
+// here deliberately, rather than by omission.
+export const STAGING_STYLES = stagingEnum('furnitureStyle').filter((s) => s !== 'Default (AI decides)');
 
 // Style → suggested furniture_items
 const STYLE_FURNITURE: Record<string, string> = {

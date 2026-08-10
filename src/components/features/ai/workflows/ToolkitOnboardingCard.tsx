@@ -17,11 +17,17 @@ import {
   Briefcase, FolderKanban,
   Users, CalendarOff, CalendarPlus, LayoutDashboard,
   Package, PackagePlus, AlertTriangle,
+  Banknote, Calculator, CalendarDays, FileText, Flame, Link, ListPlus, Network,
+  Pencil, Percent, Radar, RefreshCw, ShoppingCart, Tag, UserPlus, Video, Wallet,
 } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { cn } from '@/lib/utils';
 import type { ToolkitDefinition, ToolkitQuickStart } from '../agentToolsCatalog';
 
+// Every `icon:` a quick-start declares must resolve here — an unknown name degrades
+// silently to a generic Sparkles, which is how 17 of them (Video, Pencil, Percent,
+// Wallet, …) rendered identically for months. Held to the catalog by
+// tests/unit/toolkitCoverage.test.ts, which used to check only the PICKER's map.
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe, Link2,
   FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Plus, Send,
@@ -29,6 +35,8 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Briefcase, FolderKanban,
   Users, CalendarOff, CalendarPlus, LayoutDashboard,
   Package, PackagePlus, AlertTriangle,
+  Banknote, Calculator, CalendarDays, FileText, Flame, Link, ListPlus, Network,
+  Pencil, Percent, Radar, RefreshCw, ShoppingCart, Tag, UserPlus, Video, Wallet,
 };
 
 interface Props {

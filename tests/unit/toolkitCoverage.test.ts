@@ -8,8 +8,7 @@
  *   • agent-chat SERVER_TOOLKITS  → what `load_toolkit` can bind mid-chat
  *   • each quick-start's `form`   → which of a tool's options a user can actually pick
  *
- * Nothing held those together, so the catalog drifted in FOUR dimensions. Each has a
- * check below:
+ * Nothing held those together, so the catalog drifted in four dimensions:
  *
  *   1. COVERAGE      — a tool ships in no cluster: chat-only, invisible in the picker.
  *   2. REACHABILITY  — a tool is fully defined but its factory is never instantiated,
@@ -18,6 +17,17 @@
  *                      or offered in the picker and unbindable).
  *   4. OPTIONS       — a tool's `z.enum` choices never become form fields, or a
  *                      hand-written `select` drifts from the enum it mirrors.
+ *
+ * 1, 2 and 4 are checked below. 3 no longer CAN drift: agent-chat's cluster map is
+ * generated from TOOLKITS (`toolkitClusters.generated.ts`) rather than typed out a
+ * second time, so the tests for it check that the projection is fresh and that no
+ * second copy has reappeared — not that two copies happen to agree today.
+ *
+ * The escape hatches are gone. `KNOWN_UNCLUSTERED` and `KNOWN_UNBOUND` were emptied
+ * and then DELETED, so 1 and 2 now fail outright rather than growing a list.
+ * `OPTIONS_EXEMPT` survives because some tools genuinely have no form surface (an id
+ * only a prior result can supply, a guided wizard) — every entry carries its reason,
+ * and it is shrink-only.
  *
  * WHY THE MANIFEST. This file used to extract tools with /name: '([a-z][a-z0-9_]+)',/.
  * That regex was wrong in both directions and nothing could tell:
@@ -40,14 +50,23 @@ import { TOOLKITS } from '@/components/features/ai/agentToolsCatalog';
 import { deriveAutoFields } from '@/components/features/ai/toolAutoFields';
 import { TOOL_MANIFEST } from '@/components/features/ai/toolManifest.generated';
 // @ts-expect-error — plain ESM script, no types; tests/ is outside tsconfig anyway.
-import { generate } from '../../scripts/gen-tool-manifest.mjs';
+import { generate, generateToolkitClusters } from '../../scripts/gen-tool-manifest.mjs';
 
 const ROOT = process.cwd();
 const AGENT_CHAT = join(ROOT, 'supabase/functions/agent-chat/index.ts');
 const MANIFEST_FILE = join(ROOT, 'src/components/features/ai/toolManifest.generated.ts');
-const QUOTED_RE = /'([A-Za-z][A-Za-z0-9_]*)'/g;
+const CLUSTERS_FILE = join(ROOT, 'supabase/functions/_shared/toolkitClusters.generated.ts');
 
 const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+
+/** The identifiers registered in a component's `const ICON_MAP = {...}`. */
+function iconMapKeys(relPath: string): Set<string> {
+  const src = read(join(ROOT, relPath));
+  const start = src.indexOf('const ICON_MAP');
+  if (start < 0) throw new Error(`no ICON_MAP in ${relPath}`);
+  const body = src.slice(start, src.indexOf('};', start));
+  return new Set(body.match(/[A-Z][A-Za-z0-9]+/g) ?? []);
+}
 
 // Genuinely not user-facing: runtime meta-tools the agent drives itself.
 // `submit_findings` used to be listed here purely to silence the old regex's
@@ -59,33 +78,23 @@ const INTERNAL_TOOLS = new Set([
   'queryDatabase', 'querySentry', 'checkServerHealth',
 ]);
 
-// Implemented + agent-bound tools that DON'T yet belong to a toolkit cluster — reachable
-// only by typing in chat, invisible in the toolkit picker. Tracked tech-debt: SHRINK by
-// giving each a cluster; never grow it (a new orphan should fail the build instead).
-const KNOWN_UNCLUSTERED = new Set([
-  // Generation extras (belong in the Interior Design cluster). generate_gemini and
-  // virtual_staging ARE bound — they piggyback on the generate_3d branch — they just
-  // have no cluster of their own.
-  'generate_gemini', 'virtual_staging',
-  // HVAC / energy calculators
-  'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
-  // Bound only through `config.tools.includes('estimate_cost')` and listed by no
-  // AGENT_CONFIGS entry, so today it is doubly invisible: no cluster AND no agent.
-  'estimate_cost',
-]);
-
-// Defined but NEVER INSTANTIATED — the factory is exported and nothing calls it, so
-// no agent can reach the tool no matter what the picker says. This is the failure
-// `generate_video` had (defined, clustered later, callable by nobody). SHRINK by
-// wiring the factory into agent-chat's registerTools, or by deleting the dead tool.
-const KNOWN_UNBOUND = new Set([
-  // database-tools.ts exports 6 factories; only createQueryDatabaseTool is ever
-  // called. These 5 have been unreachable since they were written — the old
-  // name-only guard could not express the question, and the camelCase regex could
-  // not even see them.
-  'checkJobStatus', 'getStageDetails', 'getRelationshipCounts',
-  'getDocumentEntities', 'getMetadataExtraction',
-]);
+// COVERAGE DEBT: none. `KNOWN_UNCLUSTERED` and `KNOWN_UNBOUND` are gone — every
+// implemented tool is now either in a cluster or in INTERNAL_TOOLS above, and every
+// tool is instantiated somewhere. The escape hatches were deleted rather than left
+// empty on purpose: an empty allowlist is an invitation to add one entry "just for
+// now", and the two tests below now fail outright instead.
+//
+// What emptied them (issue #266, Phase 3/4):
+//   • generate_gemini + virtual_staging → the `generation` cluster. They were always
+//     instantiated by its `generate_3d` branch; only the listing was missing.
+//   • the two HVAC calculators → the new alwaysOn `calculators` cluster, replacing
+//     agent-chat's hardcoded CORE_ALWAYS_TOOLS re-add.
+//   • estimate_cost → DELETED. Listed by no agent, and it multiplied
+//     products.metadata.price by .quantity — a second derivation of a money quantity
+//     that bypasses get_product_price_for_workspace.
+//   • the 5 database-tools diagnostics → DELETED. Never instantiated since they were
+//     written, service-role reads keyed by a caller-supplied id (invariant 1), and
+//     getRelationshipCounts filtered a chunk id by a document id.
 
 // Tools whose z.enum options reach NO form field anywhere — the choices exist only in
 // the schema, so a user can pick one solely by naming it in prose. SHRINK by adding a
@@ -98,6 +107,11 @@ const OPTIONS_EXEMPT = new Set([
   'create_purchase_order', 'read_document_section',
   // Driven by an attached image or a guided wizard, not by a field form.
   'visual_search', 'generate_presentation_sheet',
+  // Same shape: its `room` / `furnitureStyle` enums are the VirtualStagingModal's two
+  // picker steps. Not a promise — that wizard READS them from the manifest
+  // (STAGING_ROOMS / STAGING_STYLES), so it cannot drift from the schema even though
+  // this file cannot see inside it.
+  'virtual_staging',
   // 20+ params including arrays and per-source object toggles — collected
   // conversationally by their agent, not by one modal.
   'track_job_search', 'add_purchase_item',
@@ -105,24 +119,17 @@ const OPTIONS_EXEMPT = new Set([
   // the KB quick-start is deliberately a plain question box, and deriving the other
   // four params to reach it would bury the one field that matters.
   'knowledge_base_search',
-  // Router tools whose clusters have no action-pinned quick-start yet, so their
-  // `action` enum has no surface. Debt, not design — each shrinks off this list the
-  // day its cluster gains one (manage_stock / manage_hr / manage_my_hr already have).
-  'manage_crm', 'manage_docs', 'manage_finance', 'manage_inbox', 'manage_messaging',
-  'manage_reviews', 'manage_real_estate', 'manage_appointments', 'manage_contracts',
-  'manage_email_campaign', 'manage_company_assets',
   // INTERNAL_TOOLS — ops-only, not picker material.
   'checkServerHealth', 'queryDatabase',
-  // KNOWN_UNCLUSTERED — no cluster yet, so nowhere to put a quick-start. These leave
-  // this list at the same time they leave that one.
-  'generate_gemini', 'virtual_staging',
-  'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
 ]);
 
 // ── Manifest-derived facts ───────────────────────────────────────────
 const implemented = new Set(TOOL_MANIFEST.map((t) => t.name));
 const byName = new Map(TOOL_MANIFEST.map((t) => [t.name, t]));
 const clustered = new Set(TOOLKITS.flatMap((t) => t.tool_ids));
+
+/** The tool whose `mode` enum a quick-start's `generation.mode` pins. */
+const GEMINI_TOOL = 'generate_gemini';
 
 /** Enum-bearing params of a tool, keyed by param name. */
 const enumParams = (name: string) =>
@@ -177,6 +184,11 @@ function mirroredEnumParam(
 const surfacedTools = (() => {
   const out = new Set<string>();
   for (const { cluster, qs, fields } of quickStarts) {
+    // An interior quick-start that pins `generation.mode` IS a surface for
+    // generate_gemini's `mode` enum — one labelled button per mode ("Test on a room",
+    // "Edit a photo", "Floor plan → 3D") instead of one select with ten options.
+    if (qs.generation?.mode && cluster.tool_ids.includes(GEMINI_TOOL)) out.add(GEMINI_TOOL);
+
     const target = qs.run?.tool;
     if (target) {
       const enums = new Set(enumParams(target).map((p) => p.name));
@@ -197,66 +209,6 @@ const surfacedTools = (() => {
   }
   return out;
 })();
-
-// ── SERVER_TOOLKITS parsing (a Deno module — cannot be imported here) ─
-// Parsed by brace-matching the value AFTER the `=`: anchoring on the first `{`
-// instead grabs the TYPE annotation (`Record<string, { ... }>`) and silently
-// yields zero clusters, i.e. a green build that checks nothing.
-
-function balanced(src: string, openIdx: number): string {
-  const open = src[openIdx];
-  const close = open === '{' ? '}' : ']';
-  let depth = 0;
-  for (let i = openIdx; i < src.length; i++) {
-    if (src[i] === open) depth++;
-    else if (src[i] === close && --depth === 0) return src.slice(openIdx, i + 1);
-  }
-  throw new Error('unbalanced block');
-}
-
-/** The initializer block of `<anchor> ... = <{...}|[...]>`. */
-function valueBlock(src: string, anchor: string): string {
-  const a = src.indexOf(anchor);
-  if (a < 0) throw new Error(`anchor missing: ${anchor}`);
-  let i = src.indexOf('=', a) + 1;
-  while (/\s/.test(src[i])) i++;
-  return balanced(src, i);
-}
-
-/** Direct-child `{...}` literals of a block (depth-2 opens). */
-function childObjects(body: string): Array<{ at: number; src: string }> {
-  const out: Array<{ at: number; src: string }> = [];
-  let depth = 0;
-  for (let i = 0; i < body.length; i++) {
-    const c = body[i];
-    if (c === '{' || c === '[') {
-      depth++;
-      if (depth === 2 && c === '{') {
-        const blk = balanced(body, i);
-        out.push({ at: i, src: blk });
-        i += blk.length - 1;
-        depth--;
-      }
-    } else if (c === '}' || c === ']') depth--;
-  }
-  return out;
-}
-
-const idsOf = (blk: string): Set<string> => {
-  const m = blk.match(/tool_ids:\s*\[([\s\S]*?)\]/);
-  return new Set(m ? [...m[1].matchAll(QUOTED_RE)].map((x) => x[1]) : []);
-};
-
-/** SERVER_TOOLKITS — keyed object: `'<id>': { tool_ids: [...] }`. */
-function serverToolkits(): Record<string, Set<string>> {
-  const body = valueBlock(read(AGENT_CHAT), 'const SERVER_TOOLKITS');
-  const out: Record<string, Set<string>> = {};
-  for (const { at, src } of childObjects(body)) {
-    const key = [...body.slice(0, at).matchAll(/'([a-z0-9-]+)'\s*:\s*$/g)].pop();
-    if (key) out[key[1]] = idsOf(src);
-  }
-  return out;
-}
 
 // ─────────────────────────────────────────────────────────────────────
 
@@ -291,15 +243,18 @@ describe('toolkit coverage', () => {
     expect(dead, `agentToolsCatalog clusters reference non-existent tools: ${dead.join(', ')}`).toEqual([]);
   });
 
-  it('every implemented tool is clustered, internal, or tracked debt (no NEW orphans)', () => {
-    const newOrphans = [...implemented]
-      .filter((t) => !clustered.has(t) && !INTERNAL_TOOLS.has(t) && !KNOWN_UNCLUSTERED.has(t) && !KNOWN_UNBOUND.has(t))
+  it('every implemented tool is clustered or internal (no orphans at all)', () => {
+    // No debt list to fall back on any more: a tool that ships into no cluster fails
+    // the build. If it is genuinely runtime plumbing, add it to INTERNAL_TOOLS with
+    // the reason; otherwise give it a cluster.
+    const orphans = [...implemented]
+      .filter((t) => !clustered.has(t) && !INTERNAL_TOOLS.has(t))
       .sort();
     expect(
-      newOrphans,
-      `New tool(s) not surfaced in any toolkit cluster: ${newOrphans.join(', ')}. ` +
-        `Add each to a cluster's tool_ids in agentToolsCatalog.ts, or (if truly internal) ` +
-        `to INTERNAL_TOOLS / KNOWN_UNCLUSTERED in this test.`,
+      orphans,
+      `Tool(s) not surfaced in any toolkit cluster — reachable only by typing in chat: ` +
+        `${orphans.join(', ')}. Add each to a cluster's tool_ids in agentToolsCatalog.ts, ` +
+        `or (if truly internal) to INTERNAL_TOOLS in this test.`,
     ).toEqual([]);
   });
 
@@ -310,30 +265,12 @@ describe('toolkit coverage', () => {
     const unreachable = TOOL_MANIFEST
       .filter((t) => !binder.includes(t.factory) && !binder.includes(`'${t.name}'`))
       .map((t) => t.name)
-      .filter((n) => !KNOWN_UNBOUND.has(n))
       .sort();
     expect(
       unreachable,
       `Tool(s) defined but never instantiated — no agent can call them: ${unreachable.join(', ')}. ` +
-        `Wire the factory into registerTools in agent-chat/index.ts, delete the dead tool, ` +
-        `or record it in KNOWN_UNBOUND.`,
+        `Wire the factory into registerTools in agent-chat/index.ts, or delete the dead tool.`,
     ).toEqual([]);
-  });
-
-  it('KNOWN_UNCLUSTERED stays honest — prune tools once they get a cluster', () => {
-    const stale = [...KNOWN_UNCLUSTERED].filter((t) => !implemented.has(t) || clustered.has(t)).sort();
-    expect(stale, `Prune from KNOWN_UNCLUSTERED (now clustered or removed): ${stale.join(', ')}`).toEqual([]);
-  });
-
-  it('KNOWN_UNBOUND stays honest — prune once the factory is wired up', () => {
-    const binder = read(AGENT_CHAT);
-    const stale = [...KNOWN_UNBOUND]
-      .filter((n) => {
-        const t = byName.get(n);
-        return !t || binder.includes(t.factory) || binder.includes(`'${n}'`);
-      })
-      .sort();
-    expect(stale, `Prune from KNOWN_UNBOUND (now bound or removed): ${stale.join(', ')}`).toEqual([]);
   });
 
   it('INTERNAL_TOOLS stays honest — only lists tools that still exist', () => {
@@ -498,57 +435,51 @@ describe('toolkit options coverage', () => {
   });
 });
 
-describe('toolkit mirror parity (SERVER_TOOLKITS ⇄ TOOLKITS)', () => {
-  const server = serverToolkits();
-  const front: Record<string, Set<string>> = Object.fromEntries(
-    TOOLKITS.map((t) => [t.id, new Set(t.tool_ids)]),
-  );
+describe('toolkit cluster projection (agent-chat ← TOOLKITS)', () => {
+  // agent-chat used to hold a SECOND, hand-written copy of cluster → tool_ids. The two
+  // disagreed by four entire clusters (flows / knowledge-graph / social / tech-radar
+  // were bindable by the agent and impossible to enable from the picker) and by two
+  // tools inside `projects`. The old tests here DIFFED the two copies; these check
+  // instead that there is only one copy left, because a projection cannot drift.
+  const { source: clusterSource, problems } = generateToolkitClusters() as {
+    source: string;
+    problems: string[];
+  };
 
-  it('parses the server mirror (guards against a silently-empty parse)', () => {
-    expect(Object.keys(server).length, 'SERVER_TOOLKITS parsed empty').toBeGreaterThan(15);
-    expect(Object.keys(front).length, 'TOOLKITS parsed empty').toBeGreaterThan(15);
+  it('generates cleanly — every TOOLKITS entry is a readable literal', () => {
+    expect(problems, `gen-tool-manifest.mjs could not parse TOOLKITS:\n  ${problems.join('\n  ')}`).toEqual([]);
   });
 
-  it('no picker cluster is missing from the server (would render an unbindable toolkit)', () => {
-    const ghosts = Object.keys(front).filter((k) => !server[k]).sort();
+  it('is NOT stale — regenerating produces the committed edge-function module', () => {
     expect(
-      ghosts,
-      `Picker offers toolkit(s) the server cannot bind: ${ghosts.join(', ')}. ` +
-        `Add each to SERVER_TOOLKITS in agent-chat/index.ts.`,
-    ).toEqual([]);
+      read(CLUSTERS_FILE),
+      'toolkitClusters.generated.ts is out of date with agentToolsCatalog.TOOLKITS. ' +
+        'Run: npm run tools:manifest',
+    ).toBe(clusterSource.replace(/\r\n/g, '\n'));
   });
 
-  it('no server cluster is missing from the picker', () => {
-    const pickerless = Object.keys(server).filter((k) => !front[k]).sort();
+  it('agent-chat consumes the generated map and declares no cluster map of its own', () => {
+    // The specific regression: someone re-adds `const SERVER_TOOLKITS = {...}` next to
+    // the import "just for this one cluster", and both copies are live again.
+    const binder = read(AGENT_CHAT);
     expect(
-      pickerless,
-      `Server binds toolkit(s) with no picker entry: ${pickerless.join(', ')}. ` +
-        `Add a ToolkitDefinition to TOOLKITS in agentToolsCatalog.ts.`,
-    ).toEqual([]);
+      binder.includes("import { TOOLKIT_CLUSTERS } from '../_shared/toolkitClusters.generated.ts'"),
+      'agent-chat/index.ts no longer imports the generated TOOLKIT_CLUSTERS map.',
+    ).toBe(true);
+    expect(
+      /const\s+SERVER_TOOLKITS\s*[:=]/.test(binder),
+      'agent-chat/index.ts declares its own SERVER_TOOLKITS again — that is the ' +
+        'hand-written mirror this projection replaced. Edit TOOLKITS in ' +
+        'agentToolsCatalog.ts and re-run `npm run tools:manifest` instead.',
+    ).toBe(false);
   });
 
-  it('clusters present in BOTH mirrors have identical tool_ids', () => {
-    const drift: string[] = [];
-    for (const id of Object.keys(server)) {
-      if (!front[id]) continue;
-      const serverOnly = [...server[id]].filter((t) => !front[id].has(t));
-      const pickerOnly = [...front[id]].filter((t) => !server[id].has(t));
-      if (serverOnly.length) drift.push(`${id}: server-only (not in picker) → ${serverOnly.join(', ')}`);
-      if (pickerOnly.length) drift.push(`${id}: picker-only (NOT bindable) → ${pickerOnly.join(', ')}`);
-    }
-    expect(drift, `SERVER_TOOLKITS and TOOLKITS disagree:\n  ${drift.join('\n  ')}`).toEqual([]);
-  });
-
-  it('every icon referenced by TOOLKITS resolves in the picker ICON_MAP', () => {
+  it('every cluster icon resolves in the picker ICON_MAP', () => {
     // ICON_MAP[toolkit.icon] || Wrench — an unknown name degrades silently to a
     // generic wrench instead of failing, so nothing surfaced 11 pre-existing
     // misses (incl. 'Plus' and 'Percent'). Assert coverage instead.
     const used = new Set(TOOLKITS.map((t) => t.icon));
-
-    const pickerSrc = read(join(ROOT, 'src/components/features/ai/ToolkitPickerModal.tsx'));
-    const mapStart = pickerSrc.indexOf('const ICON_MAP');
-    const mapBody = pickerSrc.slice(mapStart, pickerSrc.indexOf('};', mapStart));
-    const registered = new Set(mapBody.match(/[A-Z][A-Za-z0-9]+/g) ?? []);
+    const registered = iconMapKeys('src/components/features/ai/ToolkitPickerModal.tsx');
 
     expect(used.size, 'no toolkit icons parsed — regex broke').toBeGreaterThan(20);
     const missing = [...used].filter((i) => !registered.has(i)).sort();
@@ -557,6 +488,22 @@ describe('toolkit mirror parity (SERVER_TOOLKITS ⇄ TOOLKITS)', () => {
       `Icon(s) referenced by TOOLKITS but absent from ICON_MAP (they render as a ` +
         `generic Wrench): ${missing.join(', ')}. Import them in ToolkitPickerModal.tsx ` +
         `and add them to ICON_MAP.`,
+    ).toEqual([]);
+  });
+
+  it('every QUICK-START icon resolves in the onboarding card ICON_MAP', () => {
+    // Quick-start icons render in ToolkitOnboardingCard, against ITS map — a third
+    // hand-kept list. The picker's map was the only one checked, so 'Video', 'Pencil',
+    // 'Percent' and friends had been silently falling back to a generic Sparkles.
+    const used = new Set(quickStarts.map((x) => x.qs.icon).filter((i): i is string => !!i));
+    const registered = iconMapKeys('src/components/features/ai/workflows/ToolkitOnboardingCard.tsx');
+
+    expect(used.size, 'no quick-start icons parsed — regex broke').toBeGreaterThan(20);
+    const missing = [...used].filter((i) => !registered.has(i)).sort();
+    expect(
+      missing,
+      `Icon(s) referenced by a quick-start but absent from ToolkitOnboardingCard's ` +
+        `ICON_MAP (they render as a generic Sparkles): ${missing.join(', ')}.`,
     ).toEqual([]);
   });
 });

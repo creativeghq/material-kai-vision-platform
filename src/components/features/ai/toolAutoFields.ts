@@ -60,7 +60,14 @@ function fieldFor(param: ToolManifestParam): ToolkitFormField {
  *    overwrite the pin, since buildToolInput applies form values after fixedArgs;
  *  - plumbing the caller supplies (ids resolved from context, workflow correlation).
  */
-const NEVER_ASK = new Set(['_workflow_run_id']);
+const NEVER_ASK = new Set([
+  '_workflow_run_id',
+  // `confirm` is the human-in-the-loop gate on every state-mutating router tool
+  // (security invariant 9): the tool previews, emits an action_confirmation, and the
+  // Approve/Decline card sets confirm:true. Rendering it as a "Yes/No" field would let
+  // a quick-start pre-approve its own outbound message, contract void or campaign send.
+  'confirm',
+]);
 
 /**
  * Params to leave out of a derived form.

@@ -18,6 +18,9 @@
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+// Cluster → tool_ids, GENERATED from agentToolsCatalog.TOOLKITS (the picker's own
+// source). Boot-safe: a plain data module with no npm deps and no env reads.
+import { TOOLKIT_CLUSTERS } from '../_shared/toolkitClusters.generated.ts';
 
 // Runtime singletons — initialized once on first request
 let _initialized = false;
@@ -921,7 +924,10 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_quote', 'generate_quote_pdf', 'list_my_quotes',
       // Generation / design (so JARVIS handles 3D renders, lighting, and VR inline —
       // no "switch to another agent". Interior-designer remains the specialist.)
-      'generate_3d', 'apply_lighting_preset', 'generate_vr_world',
+      // generate_gemini + virtual_staging are instantiated by the `generate_3d` branch
+      // in registerTools; listing them here is what makes the toolkit filter and
+      // load_toolkit agree with what the agent can actually call.
+      'generate_3d', 'generate_gemini', 'virtual_staging', 'apply_lighting_preset', 'generate_vr_world',
       // Trip cards / sales expenses (all users; 0 cr — DB-only)
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L); 0 cr
@@ -952,7 +958,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
-      'material_search', 'generate_3d', 'analyze_inspiration_url',
+      'material_search', 'generate_3d', 'generate_gemini', 'virtual_staging', 'analyze_inspiration_url',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
       // Image-driven post-processing tools (require an existing room image in the conversation)
@@ -1174,8 +1180,10 @@ async function executeAgent(
   // ─── Per-turn tool gating ────────────────────────────────────────────────
   // The frontend sends `selected_toolkits` — the user's currently-active
   // toolkit IDs from the visual ToolkitPickerModal (always includes the Core
-  // toolkit). We resolve those to a set of tool IDs server-side using the
-  // SERVER_TOOLKITS map below (mirrored from agentToolsCatalog.ts).
+  // toolkit). We resolve those to a set of tool IDs server-side using
+  // TOOLKIT_CLUSTERS, which is GENERATED from the same agentToolsCatalog.TOOLKITS
+  // the picker renders — not a second hand-written copy of it, which is what this
+  // used to be and how four clusters ended up bindable-but-not-enableable.
   // Default behavior (selected_toolkits empty or missing): bind only the Core
   // toolkit's tools (lean ~1.5k tokens) PLUS the `load_toolkit` meta-tool, so
   // the agent can request more capabilities mid-conversation if the user's
@@ -1184,193 +1192,26 @@ async function executeAgent(
   // bind for viewers/members even if they're in an active toolkit.
   // Toolkits + load_toolkit are the single source of truth for tool-binding.
 
-  const SERVER_TOOLKITS: Record<string, { alwaysOn?: boolean; tool_ids: string[] }> = {
-    'core': {
-      alwaysOn: true,
-      tool_ids: ['knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url'],
-    },
-    'catalogs': {
-      tool_ids: [
-        'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs',
-        'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material',
-        'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
-      ],
-    },
-    'mentions': {
-      tool_ids: ['track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions'],
-    },
-    'price-monitoring': {
-      tool_ids: ['track_product_prices', 'get_price_summary'],
-    },
-    'email-marketing': {
-      tool_ids: ['manage_email_campaign'],
-    },
-    'finance': {
-      tool_ids: ['manage_finance'],
-    },
-    'crm': {
-      tool_ids: ['create_company_from_vat', 'enrich_company_from_aade', 'manage_crm'],
-    },
-    'messaging': {
-      tool_ids: ['manage_messaging'],
-    },
-    'contracts': {
-      tool_ids: ['manage_contracts'],
-    },
-    'inbox': {
-      tool_ids: ['manage_inbox'],
-    },
-    'reviews': {
-      tool_ids: ['manage_reviews'],
-    },
-    'appointments': {
-      tool_ids: ['manage_appointments'],
-    },
-    'job-research': {
-      tool_ids: ['track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites'],
-    },
-    'flows-toolkit': {
-      tool_ids: ['manage_flows'],
-    },
-    'hr': {
-      tool_ids: ['manage_hr'],
-    },
-    'my-hr': {
-      tool_ids: ['manage_my_hr'],
-    },
-    'stock': {
-      tool_ids: ['manage_stock'],
-    },
-    'projects': {
-      tool_ids: ['create_project', 'list_my_projects', 'find_project', 'add_task', 'add_purchase_item', 'generate_purchase_sheet'],
-    },
-    // These clusters were MISSING — their tools are declared on agents (kai / property-advisor) but
-    // had no toolkit home, so the startup filter stripped them and load_toolkit couldn't reach them
-    // → whole surfaces (real-estate, sourcing, trip cards, docs, expenses) were dead from chat.
-    'real-estate': {
-      tool_ids: ['manage_real_estate'],
-    },
-    'sourcing': {
-      tool_ids: ['source_product', 'create_purchase_order', 'send_purchase_order'],
-    },
-    'trip-expenses': {
-      tool_ids: ['create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card'],
-    },
-    'expenses': {
-      tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments'],
-    },
-    'company-assets': {
-      tool_ids: ['manage_company_assets'],
-    },
-    'docs': {
-      tool_ids: ['search_workspace_docs', 'manage_docs'],
-    },
-    'quotes': {
-      tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes'],
-    },
-    'social': {
-      tool_ids: ['manage_social'],
-    },
-    'tech-radar': {
-      tool_ids: ['review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding'],
-    },
-    'knowledge-graph': {
-      tool_ids: [
-        'product_provenance', 'product_price_history', 'projects_using_product',
-        'products_in_project', 'customer_overview', 'supplier_overview',
-        'products_by_brand', 'brand_overview', 'related_products', 'find_products_by_spec',
-        'price_my_spec',
-        'search_crm_by_kad',
-      ],
-    },
-    'presentation-sheets': {
-      tool_ids: ['generate_presentation_sheet'],
-    },
-    'generation': {
-      tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video'],
-    },
-    'seo-research': {
-      tool_ids: [
-        'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions',
-        'seo_search_intent', 'seo_keyword_overview', 'seo_ai_keyword_volume',
-        'seo_serp_audit', 'seo_audit_url', 'seo_historical_serps',
-        'seo_gsc_striking_distance', 'seo_gsc_top_movers',
-        'seo_keyword_ideas', 'seo_related_keywords', 'seo_search_volume', 'seo_ai_overview',
-      ],
-    },
-    'seo-domain': {
-      tool_ids: [
-        'seo_domain_snapshot', 'seo_ranked_keywords', 'seo_domain_competitors',
-        'seo_keyword_gap', 'seo_traffic_estimation', 'seo_subdomains',
-        'seo_relevant_pages', 'seo_categories_for_domain',
-        'seo_historical_rank_overview', 'seo_keywords_for_site', 'seo_domain_intersection',
-      ],
-    },
-    'seo-backlinks': {
-      tool_ids: ['seo_backlinks_summary', 'seo_backlinks_anchors', 'seo_referring_domains',
-        'seo_backlinks_timeseries', 'seo_backlinks_competitors'],
-    },
-    'seo-content': {
-      tool_ids: [
-        'seo_content_sentiment', 'seo_domain_technologies', 'seo_domain_whois',
-        'seo_site_crawl_start', 'seo_site_crawl_status', 'seo_llm_mentions_search',
-        'seo_onpage_issues',
-      ],
-    },
-    'seo-multi-engine': {
-      tool_ids: [
-        'seo_youtube_search', 'seo_local_pack', 'seo_google_trends',
-        'seo_amazon_asin', 'seo_app_keywords', 'seo_trustpilot_search',
-        'seo_pinterest_search', 'seo_reddit_search',
-        'seo_google_maps', 'seo_gbp_info',
-      ],
-    },
-    'seo-composite': {
-      tool_ids: ['seo_site_review', 'seo_brand_search_audit'],
-    },
-    'seo-article': {
-      tool_ids: [
-        'create_seo_article', 'seo_keyword_research', 'seo_article_planner',
-        'seo_article_writer', 'seo_content_analyzer',
-      ],
-    },
-    'b2b': {
-      tool_ids: [
-        'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment',
-        'contact_discovery', 'email_validate', 'save_to_crm',
-      ],
-    },
-    'sub-agents': {
-      tool_ids: ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'],
-    },
-    'admin-misc': {
-      tool_ids: ['dispatch_background_task', 'price_lookup', 'seo_dataforseo_call'],
-    },
-  };
-
   const META_TOOLS = ['load_toolkit'];
-  // Core "always-available" tools that belong to no toolkit but survive the filter (see the
-  // CORE_ALWAYS_TOOLS re-add below). They are legitimately homed, so the orphan audit must know them.
-  const CORE_ALWAYS_TOOLS = ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison'];
 
   // PREVENTION (root cause of the real-estate/sourcing/trip/docs orphaning): every tool declared on
-  // an agent MUST live in some SERVER_TOOLKITS cluster, be a meta-tool, or be a core-always tool,
-  // otherwise the startup filter strips it for non-curated agents AND load_toolkit can't reach it — a
-  // silent capability loss with zero error. Surface any drift once per cold start so nothing slips through.
+  // an agent MUST live in some cluster or be a meta-tool, otherwise the startup filter strips it for
+  // non-curated agents AND load_toolkit can't reach it — a silent capability loss with zero error.
+  // Surface any drift once per cold start so nothing slips through.
   if (!(globalThis as any).__agentToolkitAuditLogged) {
     (globalThis as any).__agentToolkitAuditLogged = true;
     try {
-      const homed = new Set<string>([...META_TOOLS, ...CORE_ALWAYS_TOOLS]);
-      for (const def of Object.values(SERVER_TOOLKITS)) for (const t of def.tool_ids) homed.add(t);
+      const homed = new Set<string>(META_TOOLS);
+      for (const def of Object.values(TOOLKIT_CLUSTERS)) for (const t of def.tool_ids) homed.add(t);
       const orphans = new Set<string>();
       for (const cfg of Object.values(AGENT_CONFIGS) as any[]) for (const t of (cfg?.tools ?? [])) if (!homed.has(t)) orphans.add(t);
       if (orphans.size) console.error(`[agent-chat] ORPHANED TOOLS — declared on an agent but in NO toolkit (stripped at startup, unreachable via load_toolkit): ${[...orphans].join(', ')}`);
     } catch (e) { console.warn('[agent-chat] toolkit audit failed', e); }
   }
 
-  // Resolve toolkits → tool IDs. Core is always included.
+  // Resolve toolkits → tool IDs. alwaysOn clusters (core, calculators) are always included.
   const toolkitToolIds = new Set<string>();
-  for (const [id, def] of Object.entries(SERVER_TOOLKITS)) {
+  for (const [id, def] of Object.entries(TOOLKIT_CLUSTERS)) {
     if (def.alwaysOn || (selectedToolkits || []).includes(id)) {
       for (const t of def.tool_ids) toolkitToolIds.add(t);
     }
@@ -1388,10 +1229,10 @@ async function executeAgent(
     ? [...config.tools]
     : config.tools.filter((t) => toolkitToolIds.has(t));
   for (const m of META_TOOLS) if (!baseTools.includes(m)) baseTools.push(m);
-  // Core "always-available" tools (deterministic, free, self-contained; belong to no toolkit) must
-  // survive the toolkit filter, or an agent that declares them (kai, interior-designer) would have
-  // them stripped and the registration guard at ~L1770 would never fire. (Set defined above.)
-  for (const c of CORE_ALWAYS_TOOLS) if (config.tools.includes(c) && !baseTools.includes(c)) baseTools.push(c);
+  // The two HVAC calculators used to need a hardcoded re-add here, because they were
+  // deterministic, free and homed in NO cluster — so the filter above stripped them. They
+  // now live in the `calculators` cluster, which is alwaysOn, so the filter keeps them by
+  // the same rule it keeps `core`. Same behaviour, one less special case.
   config = { ...config, tools: baseTools };
 
   // Extract previously generated image URLs from assistant messages (for edit mode).
@@ -1523,8 +1364,14 @@ async function executeAgent(
   const needsSearch = config.tools.some((t: string) => ['knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url'].includes(t));
   const needsDocs = config.tools.includes('search_workspace_docs') || config.tools.includes('manage_docs');
   const needsGen = config.tools.some((t: string) => ['generate_3d'].includes(t));
-  const needsOps = config.tools.some((t: string) => ['check_server_health', 'query_sentry', 'cost_estimation'].includes(t));
-  const needsDb = config.tools.includes('query_database');
+  // These two gated on snake_case names no tool has ever had — the registrations below
+  // key off `checkServerHealth` / `querySentry` / `queryDatabase`. So the modules never
+  // loaded, the factories stayed undefined, and an agent that declared one of these
+  // would have died on `createQueryDatabaseTool()` rather than gaining the tool. Nothing
+  // caught it because no AGENT_CONFIGS entry declares them, which made the whole branch
+  // dead in both directions.
+  const needsOps = config.tools.some((t: string) => ['checkServerHealth', 'querySentry'].includes(t));
+  const needsDb = config.tools.includes('queryDatabase');
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
   const needsB2b = config.tools.some((t: string) => ['b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
   const needsSeo = config.tools.some((t: string) => ['seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer', 'seo_pipeline'].includes(t));
@@ -1638,7 +1485,6 @@ async function executeAgent(
   const createGenerateVRWorldTool = generationMod?.createGenerateVRWorldTool;
   const createCheckServerHealthTool = opsMod?.createCheckServerHealthTool;
   const createQuerySentryTool = opsMod?.createQuerySentryTool;
-  const createCostEstimationTool = opsMod?.createCostEstimationTool;
   const createQueryDatabaseTool = dbMod?.createQueryDatabaseTool;
   const createResearchAnalysisTool = subAgentMod?.createResearchAnalysisTool;
   const createAnalyticsAnalysisTool = subAgentMod?.createAnalyticsAnalysisTool;
@@ -2403,9 +2249,13 @@ async function executeAgent(
   if (config.tools.includes('querySentry')) {
     tools.push(createQuerySentryTool());
   }
-  if (config.tools.includes('estimate_cost')) {
-    tools.push(createCostEstimationTool(workspaceId));
-  }
+  // `estimate_cost` was registered here and listed by no AGENT_CONFIGS entry, so it was
+  // unreachable. Deleted rather than wired up (issue #266): it multiplied
+  // products.metadata.price by products.metadata.quantity, a SECOND derivation of a
+  // money quantity that bypasses get_product_price_for_workspace and its markup ladder
+  // entirely. `price_lookup` and `price_my_spec` are the derived answer — and
+  // price_my_spec deliberately returns NO price on an inexact match rather than
+  // estimating one.
 
     return tools;
   } // ── end registerTools ──────────────────────────────────────────────────
@@ -2418,7 +2268,7 @@ async function executeAgent(
   const applyToolkitInRun = async (
     toolkitId: string,
   ): Promise<{ success: boolean; tool_ids?: string[]; toolkit_name?: string; error?: string }> => {
-    const def = (SERVER_TOOLKITS as Record<string, { tool_ids: string[] }>)[toolkitId];
+    const def = TOOLKIT_CLUSTERS[toolkitId];
     if (!def) return { success: false, error: `Unknown toolkit "${toolkitId}".` };
     // Only bind tools this agent is actually allowed to use.
     const allowedIds = def.tool_ids.filter((t) => agentFullToolIds.has(t));
@@ -2445,7 +2295,7 @@ async function executeAgent(
   // Register load_toolkit ONCE on the live tool list, wired to the in-run loader.
   try {
     const { createLoadToolkitTool } = await import('../_shared/tools/toolkit-tools.ts');
-    const loadableToolkitIds = Object.keys(SERVER_TOOLKITS).filter((id) => id !== 'core');
+    const loadableToolkitIds = Object.keys(TOOLKIT_CLUSTERS).filter((id) => !TOOLKIT_CLUSTERS[id].alwaysOn);
     tools.push(createLoadToolkitTool(isAdmin, onChunk, applyToolkitInRun, loadableToolkitIds));
   } catch (loadToolkitErr) {
     console.warn('⚠️ Could not register load_toolkit tool:', loadToolkitErr);

@@ -21,6 +21,11 @@
  *
  *     src/components/features/ai/toolManifest.generated.ts
  *
+ * …and, in the other direction, projects the catalog's cluster map down to the edge
+ * function so the two are no longer separate hand-written copies:
+ *
+ *     supabase/functions/_shared/toolkitClusters.generated.ts
+ *
  * WHY A STATIC AST PARSE and not runtime introspection: the tool factories build
  * Supabase clients at call time, and the modules are Deno with `npm:` specifiers +
  * top-level await — importing them from Node needs a Deno runtime plus env and has
@@ -37,8 +42,8 @@
  *     collected and the run FAILS LOUDLY, plus floor asserts on the totals.
  *
  * Usage:  node scripts/gen-tool-manifest.mjs [--check]
- *   (no flag) rewrite the generated file
- *   --check   exit 1 if the committed file is stale (used by CI / the guard test)
+ *   (no flag) rewrite the generated files
+ *   --check   exit 1 if either committed file is stale (used by CI / the guard test)
  */
 import ts from 'typescript';
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
@@ -48,11 +53,14 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TOOLS_DIR = join(ROOT, 'supabase/functions/_shared/tools');
 const OUT_FILE = join(ROOT, 'src/components/features/ai/toolManifest.generated.ts');
+const CATALOG_FILE = join(ROOT, 'src/components/features/ai/agentToolsCatalog.ts');
+const CLUSTERS_OUT = join(ROOT, 'supabase/functions/_shared/toolkitClusters.generated.ts');
 
 // Sanity floors. The audit in #266 counted 126 implemented tools and 28 with enum
 // options; a parse that drops below these is broken, not a shrunken codebase.
 const MIN_TOOLS = 100;
 const MIN_ENUM_TOOLS = 20;
+const MIN_CLUSTERS = 20;
 
 // ── zod → manifest type mapping ──────────────────────────────────────
 const BASE_TYPES = {
@@ -388,34 +396,161 @@ export function generate() {
   return { tools, source: renderManifest(tools), problems: fatal, enumTools };
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Toolkit clusters — agentToolsCatalog.TOOLKITS → the edge function's map
+//
+// agent-chat used to hold its OWN copy of cluster → tool_ids, commented "mirrored
+// from agentToolsCatalog.ts". Only the frontend copy drove the picker; only the
+// server copy drove what `load_toolkit` could bind. They drifted by four whole
+// clusters (flows / knowledge-graph / social / tech-radar were bindable mid-chat and
+// impossible to enable from the picker) and by two tools inside `projects`.
+//
+// A test could only ever report that drift after the fact. Projecting the map out of
+// the catalog removes the second copy, so there is nothing left to disagree.
+// ─────────────────────────────────────────────────────────────────────
+
+/** The `[...]` initializer of `export const TOOLKITS ... = [...]`. */
+function toolkitsArray(sf) {
+  for (const stmt of sf.statements) {
+    if (!ts.isVariableStatement(stmt)) continue;
+    for (const d of stmt.declarationList.declarations) {
+      if (!ts.isIdentifier(d.name) || d.name.text !== 'TOOLKITS' || !d.initializer) continue;
+      let init = d.initializer;
+      while (ts.isAsExpression(init) || ts.isSatisfiesExpression(init)) init = init.expression;
+      // NOTE: anchor on the DECLARATION, never on the first `[` in the source text.
+      // The type annotation (`: ToolkitDefinition[]`) carries brackets of its own, and
+      // a text-anchored parser grabs those and silently yields zero clusters.
+      if (ts.isArrayLiteralExpression(init)) return init;
+    }
+  }
+  return null;
+}
+
+export function buildToolkitClusters() {
+  const src = readFileSync(CATALOG_FILE, 'utf8');
+  const sf = ts.createSourceFile(CATALOG_FILE, src, ts.ScriptTarget.Latest, true);
+  const problems = [];
+  const clusters = [];
+
+  const arr = toolkitsArray(sf);
+  if (!arr) return { clusters, problems: ['agentToolsCatalog.ts: no readable `export const TOOLKITS = [...]`'] };
+
+  for (const el of arr.elements) {
+    if (!ts.isObjectLiteralExpression(el)) {
+      problems.push('TOOLKITS entry is not an object literal (spread?)');
+      continue;
+    }
+    let id = null; let alwaysOn = false; let toolIds = null;
+    for (const p of el.properties) {
+      if (!ts.isPropertyAssignment(p)) continue;
+      const key = propName(p);
+      if (key === 'id') id = lit(p.initializer);
+      else if (key === 'alwaysOn') alwaysOn = p.initializer.kind === ts.SyntaxKind.TrueKeyword;
+      else if (key === 'tool_ids') {
+        if (!ts.isArrayLiteralExpression(p.initializer)) { problems.push(`${id ?? '?'}: tool_ids is not an array literal`); continue; }
+        const vals = p.initializer.elements.map(lit);
+        if (vals.some((v) => v === null)) problems.push(`${id ?? '?'}: non-literal entry in tool_ids`);
+        else toolIds = vals;
+      }
+    }
+    if (!id) { problems.push('TOOLKITS entry with no literal `id`'); continue; }
+    if (!toolIds) { problems.push(`${id}: unreadable tool_ids`); continue; }
+    clusters.push({ id, alwaysOn, tool_ids: toolIds });
+  }
+
+  const dupes = clusters.map((c) => c.id).filter((v, i, a) => a.indexOf(v) !== i);
+  if (dupes.length) problems.push(`duplicate toolkit id(s): ${[...new Set(dupes)].join(', ')}`);
+
+  return { clusters, problems };
+}
+
+export function renderToolkitClusters(clusters) {
+  const body = clusters.map((c) => {
+    const ids = c.tool_ids.map(q).join(', ');
+    return [
+      `  ${q(c.id)}: {`,
+      ...(c.alwaysOn ? ['    alwaysOn: true,'] : []),
+      c.tool_ids.length ? `    tool_ids: [${ids}],` : '    tool_ids: [],',
+      '  },',
+    ].join('\n');
+  }).join('\n');
+
+  return `/* eslint-disable */
+/**
+ * AUTO-GENERATED — DO NOT EDIT BY HAND.
+ *
+ * Source of truth: \`TOOLKITS\` in src/components/features/ai/agentToolsCatalog.ts.
+ * Regenerate with:  npm run tools:manifest
+ *
+ * agent-chat used to keep a hand-written copy of this map. Only the catalog copy drove
+ * the ToolkitPickerModal and only the agent-chat copy drove \`load_toolkit\`, so four
+ * clusters were bindable by the agent and impossible for a user to enable. This file is
+ * a projection of the catalog, not a mirror of it — staleness is a red build
+ * (tests/unit/toolkitCoverage.test.ts re-runs the generator and diffs).
+ */
+
+export interface ToolkitCluster {
+  /** Bound for every agent that declares the tool, with no user opt-in. */
+  alwaysOn?: boolean;
+  tool_ids: string[];
+}
+
+export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
+${body}
+};
+`;
+}
+
+export function generateToolkitClusters() {
+  const { clusters, problems } = buildToolkitClusters();
+  const fatal = [...problems];
+  if (clusters.length < MIN_CLUSTERS) {
+    fatal.push(`only ${clusters.length} toolkit clusters parsed (floor ${MIN_CLUSTERS}) — the parser is broken`);
+  }
+  return { clusters, source: renderToolkitClusters(clusters), problems: fatal };
+}
+
+const normalized = (s) => s.replace(/\r\n/g, '\n');
+const readOrNull = (p) => { try { return readFileSync(p, 'utf8'); } catch { return null; } };
+const rel = (p) => relative(ROOT, p).replace(/\\/g, '/');
+
 function main() {
   const check = process.argv.includes('--check');
   const { tools, source, problems, enumTools } = generate();
+  const { clusters, source: clusterSource, problems: clusterProblems } = generateToolkitClusters();
 
-  if (problems.length) {
+  const fatal = [...problems, ...clusterProblems];
+  if (fatal.length) {
     console.error('✗ tool manifest generation failed:');
-    for (const p of problems) console.error(`   • ${p}`);
+    for (const p of fatal) console.error(`   • ${p}`);
     process.exit(1);
   }
 
-  const current = (() => { try { return readFileSync(OUT_FILE, 'utf8'); } catch { return null; } })();
-  const normalized = (s) => s.replace(/\r\n/g, '\n');
+  const outputs = [
+    { file: OUT_FILE, source, current: readOrNull(OUT_FILE) },
+    { file: CLUSTERS_OUT, source: clusterSource, current: readOrNull(CLUSTERS_OUT) },
+  ];
 
   if (check) {
-    if (normalized(current ?? '') !== normalized(source)) {
-      console.error('✗ toolManifest.generated.ts is STALE. Run: npm run tools:manifest');
+    const stale = outputs.filter((o) => normalized(o.current ?? '') !== normalized(o.source));
+    if (stale.length) {
+      for (const o of stale) console.error(`✗ ${rel(o.file)} is STALE.`);
+      console.error('Run: npm run tools:manifest');
       process.exit(1);
     }
-    console.log(`✓ tool manifest up to date (${tools.length} tools, ${enumTools} with options)`);
+    console.log(
+      `✓ generated files up to date (${tools.length} tools, ${enumTools} with options, ` +
+      `${clusters.length} toolkit clusters)`,
+    );
     return;
   }
 
-  writeFileSync(OUT_FILE, source, 'utf8');
-  const changed = normalized(current ?? '') !== normalized(source);
+  for (const o of outputs) writeFileSync(o.file, o.source, 'utf8');
+  const changed = outputs.filter((o) => normalized(o.current ?? '') !== normalized(o.source));
   console.log(
-    `${changed ? '✎ wrote' : '= unchanged'} ${relative(ROOT, OUT_FILE).replace(/\\/g, '/')} ` +
+    `${changed.length ? `✎ wrote ${changed.map((o) => rel(o.file)).join(', ')}` : '= unchanged'} ` +
     `— ${tools.length} tools, ${enumTools} with enum options, ` +
-    `${tools.reduce((n, t) => n + t.params.length, 0)} params`,
+    `${tools.reduce((n, t) => n + t.params.length, 0)} params, ${clusters.length} toolkit clusters`,
   );
 }
 

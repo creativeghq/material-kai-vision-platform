@@ -909,6 +909,22 @@ const INTERIOR_DESIGNER_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'generate_gemini', name: 'Design / Edit Image', category: 'Generation',
+    desc: 'Generate or edit an interior image — redesign, targeted edit, copy a style, render a floor plan, product shot, or a seamless material texture.',
+    examples: [
+      'Change the floor to warm oak and make the walls warmer',
+      'Redesign this room in a japandi style',
+    ],
+  },
+  {
+    id: 'virtual_staging', name: 'Virtual Staging', category: 'Generation',
+    imageRequired: true,
+    desc: 'Furnish an empty room photo with AI-generated furniture in a chosen style.',
+    examples: [
+      'Stage this empty living room in a Scandinavian style',
+    ],
+  },
+  {
     id: 'generate_presentation_sheet', name: 'Presentation Sheet', category: 'Generation',
     desc: 'Build A3 moodboard sheets (material board / color palette / concept board / lighting plan / annotated render / etc.).',
     examples: [
@@ -1218,6 +1234,47 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    // alwaysOn, because that is what these two already were: agent-chat carried a
+    // hardcoded CORE_ALWAYS_TOOLS list to re-add them after the toolkit filter,
+    // precisely because they belonged to no cluster. Giving them one expresses the
+    // same behaviour in the vocabulary the rest of the system uses, and the picker
+    // finally shows the two calculators it was silently binding all along.
+    id: 'calculators',
+    name: 'Calculators',
+    description: 'Deterministic HVAC/energy maths — heat-pump sizing and an annual running-cost comparison across six heating methods. Free, instant, no upstream API.',
+    icon: 'Calculator',
+    alwaysOn: true,
+    tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison'],
+    quick_starts: [
+      {
+        // autoFields, not a hand-written form: between them these two tools declare
+        // six enums (insulation, climate zone, emitter, glazing, A/C type) that no
+        // UI had ever offered.
+        label: 'Size a heat pump',
+        description: 'Required kW from area, insulation, climate zone and emitter',
+        icon: 'Calculator',
+        prompt: 'How big a heat pump do I need for a 120 m² apartment, post-1980 insulation, zone C, with fan coils?',
+        run: { tool: 'calculate_heat_pump_sizing' },
+        autoFields: true,
+        form: [
+          { key: 'floor_area_m2', label: 'Heated floor area (m²)', kind: 'number', required: true, placeholder: '120' },
+        ],
+      },
+      {
+        label: 'Compare heating costs',
+        description: 'Annual running cost of six heating methods for one dwelling',
+        icon: 'Flame',
+        prompt: 'Compare heating costs for a 200 m² home at 132 kWh/m²·yr — which is cheapest to run?',
+        run: { tool: 'calculate_heating_cost_comparison' },
+        autoFields: true,
+        form: [
+          { key: 'floor_area_m2', label: 'Heated floor area (m²)', kind: 'number', required: true, placeholder: '200' },
+          { key: 'specific_energy_kwh_m2_yr', label: 'Energy intensity (kWh/m²·yr)', kind: 'number', required: true, placeholder: '132', help: 'From the ΠΕΑ energy certificate. ~40–60 well-insulated, ~70–90 partial, ~90–120 uninsulated.' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'catalogs',
     name: 'Catalogs',
     description: 'Build email-gated catalog landing pages from manufacturer PDFs. 8-step workflow + optional re-pricing.',
@@ -1357,7 +1414,22 @@ export const TOOLKITS: ToolkitDefinition[] = [
     moduleSlug: 'contracts',
     tool_ids: ['manage_contracts'],
     quick_starts: [
-      { label: 'My contracts', description: 'List recent contracts', prompt: 'List my recent contracts and their status.', icon: 'ListChecks' },
+      {
+        label: 'My contracts', description: 'List recent contracts', icon: 'ListChecks',
+        prompt: 'List my recent contracts and their status.',
+        promptTemplate: 'List my {{context}} contracts and their status.',
+        run: { tool: 'manage_contracts', fixedArgs: { action: 'list' } },
+        form: [
+          // manage_contracts.context — the four business areas a contract can belong to.
+          { key: 'context', label: 'Area', kind: 'select', options: [
+            { value: 'hr', label: 'HR' },
+            { value: 'finance', label: 'Finance' },
+            { value: 'project', label: 'Project' },
+            { value: 'realestate', label: 'Real estate' },
+          ] },
+        ],
+      },
+      // Sending needs a contract_id only a prior list can supply, so it stays a prompt.
       { label: 'Send for signature', description: 'Send a draft contract to sign', prompt: 'Send a draft contract for e-signature — help me pick which one.', icon: 'Send' },
     ],
   },
@@ -1369,7 +1441,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
     moduleSlug: 'inbox',
     tool_ids: ['manage_inbox'],
     quick_starts: [
-      { label: 'Open conversations', description: 'List recent customer threads', prompt: 'Show my open customer conversations.', icon: 'ListChecks' },
+      {
+        label: 'Open conversations', description: 'List recent customer threads', icon: 'ListChecks',
+        prompt: 'Show my open customer conversations.',
+        run: { tool: 'manage_inbox', fixedArgs: { action: 'list' } },
+      },
+      // Replying needs a thread_id only the list above can supply.
       { label: 'Reply to a thread', description: 'Draft and send a customer reply', prompt: 'Help me reply to a customer conversation.', icon: 'Send' },
     ],
   },
@@ -1381,7 +1458,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
     moduleSlug: 'reviews',
     tool_ids: ['manage_reviews'],
     quick_starts: [
-      { label: 'Unanswered reviews', description: 'Reviews you have not replied to', prompt: 'Show the reviews about me that I haven\'t replied to yet.', icon: 'ListChecks' },
+      {
+        label: 'Unanswered reviews', description: 'Reviews you have not replied to', icon: 'ListChecks',
+        prompt: 'Show the reviews about me that I haven\'t replied to yet.',
+        run: { tool: 'manage_reviews', fixedArgs: { action: 'list', only_unanswered: true } },
+      },
+      // Replying needs a review_id only the list above can supply.
       { label: 'Reply to a review', description: 'Draft and post a public reply', prompt: 'Help me reply to a review about me.', icon: 'Send' },
     ],
   },
@@ -1393,8 +1475,24 @@ export const TOOLKITS: ToolkitDefinition[] = [
     moduleSlug: 'crm',
     tool_ids: ['manage_appointments'],
     quick_starts: [
-      { label: 'This week', description: 'Upcoming appointments', prompt: 'What appointments do I have coming up this week?', icon: 'CalendarDays' },
-      { label: 'Schedule one', description: 'Book a new appointment', prompt: 'Schedule an appointment for me — I\'ll give you the details.', icon: 'CalendarPlus' },
+      {
+        label: 'This week', description: 'Upcoming appointments', icon: 'CalendarDays',
+        prompt: 'What appointments do I have coming up this week?',
+        run: { tool: 'manage_appointments', fixedArgs: { action: 'list', days: 7 } },
+      },
+      {
+        label: 'Schedule one', description: 'Book a new appointment', icon: 'CalendarPlus',
+        prompt: 'Schedule an appointment for me — I\'ll give you the details.',
+        promptTemplate: 'Schedule "{{subject}}" with {{party_name}} at {{meeting_at}}.',
+        run: { tool: 'manage_appointments', fixedArgs: { action: 'schedule' } },
+        form: [
+          { key: 'subject', label: 'Subject', kind: 'text', required: true, placeholder: 'Site visit — Kolonaki apartment' },
+          { key: 'meeting_at', label: 'When', kind: 'text', required: true, placeholder: '2026-08-14 10:00' },
+          { key: 'party_name', label: 'With', kind: 'text', placeholder: 'Maria Papadopoulou' },
+          { key: 'location', label: 'Location', kind: 'text', placeholder: 'Office / address / video link' },
+          { key: 'notes', label: 'Notes', kind: 'textarea' },
+        ],
+      },
     ],
   },
   {
@@ -1405,8 +1503,32 @@ export const TOOLKITS: ToolkitDefinition[] = [
     moduleSlug: 'real-estate',
     tool_ids: ['manage_real_estate'],
     quick_starts: [
-      { label: 'My listings', description: 'List active properties', prompt: 'Show my real-estate listings.', icon: 'ListChecks' },
-      { label: 'New listing', description: 'Create a property listing', prompt: 'Create a new property listing — I\'ll give you the details.', icon: 'Plus' },
+      {
+        label: 'My listings', description: 'List active properties', icon: 'ListChecks',
+        prompt: 'Show my real-estate listings.',
+        run: { tool: 'manage_real_estate', fixedArgs: { action: 'list_properties' } },
+      },
+      {
+        label: 'New listing', description: 'Create a property listing', icon: 'Plus',
+        prompt: 'Create a new property listing — I\'ll give you the details.',
+        promptTemplate: 'Create a property listing "{{title}}" in {{town}} at {{price}}.',
+        run: { tool: 'manage_real_estate', fixedArgs: { action: 'create_listing' }, coerce: { price: 'number', area: 'number' } },
+        form: [
+          { key: 'title', label: 'Title', kind: 'text', required: true, placeholder: '3-bed maisonette with sea view' },
+          { key: 'town', label: 'Town / area', kind: 'text', required: true, placeholder: 'Voula' },
+          { key: 'price', label: 'Price (€)', kind: 'number', required: true, placeholder: '450000' },
+          { key: 'area', label: 'Area (m²)', kind: 'number', placeholder: '120' },
+          // property_type / transaction_type are free strings in the schema, not enums —
+          // a select here would invent options the tool never declared.
+          { key: 'property_type', label: 'Property type', kind: 'text', placeholder: 'apartment / maisonette / plot' },
+          { key: 'transaction_type', label: 'Transaction', kind: 'text', placeholder: 'sale / rent' },
+        ],
+      },
+      {
+        label: 'Find leads', description: 'Buyers matching your listings', icon: 'Users',
+        prompt: 'Find buyer leads for my listings.',
+        run: { tool: 'manage_real_estate', fixedArgs: { action: 'find_leads' } },
+      },
     ],
   },
   {
@@ -1450,8 +1572,49 @@ export const TOOLKITS: ToolkitDefinition[] = [
     icon: 'Package',
     tool_ids: ['manage_company_assets'],
     quick_starts: [
-      { label: 'List assets', description: 'Company assets & holders', prompt: 'List our company assets and who holds each one.', icon: 'ListChecks' },
-      { label: 'Add an asset', description: 'Register a company asset', prompt: 'Add a company asset — I\'ll give you the details.', icon: 'Plus' },
+      {
+        label: 'List assets', description: 'Company assets & holders', icon: 'ListChecks',
+        prompt: 'List our company assets and who holds each one.',
+        promptTemplate: 'List our {{category}} assets and who holds each one.',
+        run: { tool: 'manage_company_assets', fixedArgs: { action: 'list' } },
+        // autoFields would derive every `add`-only field too; the category filter is
+        // the only one `list` reads, so it is the only one asked for.
+        form: [
+          { key: 'category', label: 'Category', kind: 'select', options: [
+            { value: 'vehicle', label: 'Vehicle' },
+            { value: 'phone', label: 'Phone' },
+            { value: 'laptop', label: 'Laptop' },
+            { value: 'payment_card', label: 'Payment card' },
+            { value: 'equipment', label: 'Equipment' },
+            { value: 'other', label: 'Other' },
+          ] },
+        ],
+      },
+      {
+        label: 'Add an asset', description: 'Register a company asset', icon: 'Plus',
+        prompt: 'Add a company asset — I\'ll give you the details.',
+        promptTemplate: 'Register a {{category}} asset "{{name}}".',
+        run: { tool: 'manage_company_assets', fixedArgs: { action: 'add' }, coerce: { cost: 'number' } },
+        form: [
+          { key: 'name', label: 'Name', kind: 'text', required: true, placeholder: 'Toyota Yaris — ΙΖΚ 1234' },
+          { key: 'category', label: 'Category', kind: 'select', required: true, options: [
+            { value: 'vehicle', label: 'Vehicle' },
+            { value: 'phone', label: 'Phone' },
+            { value: 'laptop', label: 'Laptop' },
+            { value: 'payment_card', label: 'Payment card' },
+            { value: 'equipment', label: 'Equipment' },
+            { value: 'other', label: 'Other' },
+          ] },
+          { key: 'identifier', label: 'Identifier', kind: 'text', placeholder: 'Plate / IMEI / serial / last 4' },
+          { key: 'acquisition_type', label: 'Acquired as', kind: 'select', options: [
+            { value: 'owned', label: 'Owned' },
+            { value: 'leased', label: 'Leased' },
+            { value: 'financed', label: 'Financed' },
+          ] },
+          { key: 'cost', label: 'Cost (€)', kind: 'number', placeholder: '14500' },
+          { key: 'supplier', label: 'Supplier', kind: 'text' },
+        ],
+      },
     ],
   },
   {
@@ -1462,7 +1625,24 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['search_workspace_docs', 'manage_docs'],
     quick_starts: [
       { label: 'Search docs', description: 'Find something in your docs', prompt: 'Search my workspace documents for…', icon: 'Search' },
-      { label: 'Write a doc', description: 'Draft a new internal doc', prompt: 'Write a workspace doc about…', icon: 'Plus' },
+      {
+        label: 'Write a doc', description: 'Draft a new internal doc', icon: 'Plus',
+        prompt: 'Write a workspace doc about…',
+        promptTemplate: 'Write a workspace doc titled "{{title}}".',
+        run: { tool: 'manage_docs', fixedArgs: { action: 'create' } },
+        // Hand-written rather than autoFields: the schema's proposed_content / reason /
+        // doc_id belong to the `suggest_edit` branch and mean nothing when creating.
+        form: [
+          { key: 'title', label: 'Title', kind: 'text', required: true, placeholder: 'Returns policy' },
+          { key: 'content', label: 'Content', kind: 'textarea', placeholder: 'Leave empty to have the agent draft it.' },
+          { key: 'category', label: 'Category', kind: 'text', placeholder: 'Operations' },
+          { key: 'tags', label: 'Tags', kind: 'tags', placeholder: 'One per line, or comma-separated' },
+          { key: 'status', label: 'Status', kind: 'select', default: 'draft', options: [
+            { value: 'published', label: 'Published' },
+            { value: 'draft', label: 'Draft' },
+          ] },
+        ],
+      },
     ],
   },
   {
@@ -1473,8 +1653,23 @@ export const TOOLKITS: ToolkitDefinition[] = [
     moduleSlug: 'messaging',
     tool_ids: ['manage_messaging'],
     quick_starts: [
-      { label: 'My channels', description: 'List connected WhatsApp numbers', prompt: 'List my connected WhatsApp channels.', icon: 'ListChecks' },
-      { label: 'Send a message', description: 'Send a WhatsApp to a customer', prompt: 'Send a WhatsApp message — ask me for the number and the text.', icon: 'Send' },
+      {
+        label: 'My channels', description: 'List connected WhatsApp numbers', icon: 'ListChecks',
+        prompt: 'List my connected WhatsApp channels.',
+        run: { tool: 'manage_messaging', fixedArgs: { action: 'list_channels' } },
+      },
+      {
+        label: 'Send a message', description: 'Send a WhatsApp to a customer', icon: 'Send',
+        prompt: 'Send a WhatsApp message — ask me for the number and the text.',
+        promptTemplate: 'Send a WhatsApp to {{to}}: {{content}}',
+        // `confirm` is deliberately absent — the tool previews and the Approve/Decline
+        // card supplies it (invariant 9). A quick-start must never pre-approve a send.
+        run: { tool: 'manage_messaging', fixedArgs: { action: 'send' } },
+        form: [
+          { key: 'to', label: 'To (phone)', kind: 'text', required: true, placeholder: '+30 69XXXXXXXX' },
+          { key: 'content', label: 'Message', kind: 'textarea', required: true },
+        ],
+      },
     ],
   },
   {
@@ -1487,8 +1682,36 @@ export const TOOLKITS: ToolkitDefinition[] = [
     quick_starts: [
       { label: 'Company from VAT', description: 'Look up a VAT/ΑΦΜ and add the company', prompt: 'Add a company to the CRM from a VAT or ΑΦΜ number — ask me for it.', icon: 'Plus' },
       { label: 'Refresh from ΑΑΔΕ', description: 'Update an existing company from ΑΑΔΕ', prompt: 'Refresh a company\'s details from ΑΑΔΕ — I\'ll tell you which one.', icon: 'RefreshCw' },
-      { label: 'Add a contact', description: 'Add a person to the CRM', prompt: 'Add a new contact to the CRM — I\'ll give you their details.', icon: 'UserPlus' },
-      { label: 'Log an activity', description: 'Record a note/call on a contact', prompt: 'Log an activity on a contact — e.g. that I called them.', icon: 'Pencil' },
+      {
+        label: 'Add a contact', description: 'Add a person to the CRM', icon: 'UserPlus',
+        prompt: 'Add a new contact to the CRM — I\'ll give you their details.',
+        promptTemplate: 'Add {{name}} to the CRM.',
+        run: { tool: 'manage_crm', fixedArgs: { action: 'create_contact' } },
+        form: [
+          { key: 'name', label: 'Full name', kind: 'text', required: true, placeholder: 'Μαρία Παπαδοπούλου' },
+          { key: 'email', label: 'Email', kind: 'text' },
+          { key: 'phone', label: 'Phone', kind: 'text' },
+          { key: 'company_name', label: 'Company', kind: 'text' },
+        ],
+      },
+      {
+        label: 'Log an activity', description: 'Record a note/call on a contact', icon: 'Pencil',
+        prompt: 'Log an activity on a contact — e.g. that I called them.',
+        promptTemplate: 'Log a {{kind}} on {{contact_query}}: {{note}}',
+        run: { tool: 'manage_crm', fixedArgs: { action: 'log_activity' } },
+        form: [
+          { key: 'contact_query', label: 'Contact', kind: 'text', required: true, help: 'Name, email or phone — the tool resolves it.' },
+          // manage_crm.kind — the four activity types the schema accepts.
+          { key: 'kind', label: 'Activity', kind: 'select', default: 'note', options: [
+            { value: 'note', label: 'Note' },
+            { value: 'call', label: 'Call' },
+            { value: 'email', label: 'Email' },
+            { value: 'meeting', label: 'Meeting' },
+          ] },
+          { key: 'title', label: 'Title', kind: 'text', placeholder: 'Called about the Voula quote' },
+          { key: 'note', label: 'Details', kind: 'textarea' },
+        ],
+      },
     ],
   },
   {
@@ -1499,8 +1722,35 @@ export const TOOLKITS: ToolkitDefinition[] = [
     moduleSlug: 'sales-finance',
     tool_ids: ['manage_finance'],
     quick_starts: [
-      { label: 'Unpaid invoices', description: 'List invoices still owed', prompt: 'Show me all unpaid invoices.', icon: 'FileText' },
-      { label: 'Customer balance', description: 'What does a customer owe?', prompt: 'What is the open balance for a customer? Help me pick which one.', icon: 'Wallet' },
+      {
+        label: 'Unpaid invoices', description: 'List invoices still owed', icon: 'FileText',
+        prompt: 'Show me all unpaid invoices.',
+        promptTemplate: 'Show me unpaid {{direction}} invoices.',
+        run: { tool: 'manage_finance', fixedArgs: { action: 'list_invoices', unpaid_only: true } },
+        form: [
+          // manage_finance.direction — sales (money IN) vs purchase (money OUT). The two
+          // are opposite sides of the trade and must never be netted together, so the
+          // filter is offered explicitly rather than guessed from the sentence.
+          { key: 'direction', label: 'Direction', kind: 'select', default: 'in', options: [
+            { value: 'in', label: 'Sales — owed to us' },
+            { value: 'out', label: 'Purchases — we owe' },
+          ] },
+        ],
+      },
+      {
+        label: 'Customer balance', description: 'What does a customer owe?', icon: 'Wallet',
+        prompt: 'What is the open balance for a customer? Help me pick which one.',
+        promptTemplate: 'What is the open balance for {{customer_name}}?',
+        run: { tool: 'manage_finance', fixedArgs: { action: 'customer_balance' } },
+        form: [
+          { key: 'customer_name', label: 'Customer', kind: 'text', required: true, placeholder: 'ACME AE' },
+        ],
+      },
+      {
+        label: 'Recent orders', description: 'List orders across the workspace', icon: 'ShoppingCart',
+        prompt: 'List our recent orders.',
+        run: { tool: 'manage_finance', fixedArgs: { action: 'list_orders' } },
+      },
     ],
   },
   {
@@ -1511,8 +1761,19 @@ export const TOOLKITS: ToolkitDefinition[] = [
     moduleSlug: 'email-marketing',
     tool_ids: ['manage_email_campaign'],
     quick_starts: [
+      // Drafting needs a template_id + category_ids that only `list_templates` and the
+      // CRM categories can supply, so it stays a prompt.
       { label: 'Draft a campaign', description: 'Compose a draft campaign to a CRM audience', prompt: 'Draft an email campaign — show me my templates and audience categories first.', icon: 'Plus' },
-      { label: 'My campaigns', description: 'List recent email campaigns', prompt: 'List my recent email campaigns and their status.', icon: 'ListChecks' },
+      {
+        label: 'My campaigns', description: 'List recent email campaigns', icon: 'ListChecks',
+        prompt: 'List my recent email campaigns and their status.',
+        run: { tool: 'manage_email_campaign', fixedArgs: { action: 'list' } },
+      },
+      {
+        label: 'My templates', description: 'List available email templates', icon: 'Palette',
+        prompt: 'List my email templates.',
+        run: { tool: 'manage_email_campaign', fixedArgs: { action: 'list_templates' } },
+      },
     ],
   },
   {
@@ -1999,6 +2260,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
     icon: 'Sparkles',
     tool_ids: [
       'generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video',
+      // Both drive quick-starts in this cluster already (the gemini-edit canvas and
+      // the staging wizard) — they were simply never listed, so the picker undercounted
+      // the kit and load_toolkit could not bind them.
+      'generate_gemini', 'virtual_staging',
     ],
     quick_starts: [
       // Every image-required interior flow captures its inputs (photo first, then
@@ -2155,6 +2420,17 @@ export const TOOLKITS: ToolkitDefinition[] = [
             { value: 'before_after', label: 'Before / after transition' },
             { value: 'floorplan_flythrough', label: 'Floor-plan flythrough' },
             { value: 'social_reel', label: 'Social reel — 9:16 short form' },
+          ] },
+          // The promptTemplate has always interpolated {{model}} and the form never
+          // collected it, so every rendered sentence read "using the  model" and the
+          // four models lived only in the schema. Values are generate_video's `model`
+          // z.enum — the drift guard resolves this key against it, not against
+          // generate_vr_world.model, by matching the offered values.
+          { key: 'model', label: 'Model', kind: 'select', default: 'veo-2', options: [
+            { value: 'veo-2', label: 'Veo 2 — 30 credits' },
+            { value: 'kling-v3.0', label: 'Kling v3.0 — 20 credits' },
+            { value: 'wan2.1-i2v-720p', label: 'Wan 2.1 720p — 12 credits' },
+            { value: 'runway-gen4-turbo', label: 'Runway Gen-4 Turbo — 40 credits' },
           ] },
           { key: 'aspect_ratio', label: 'Aspect ratio', kind: 'select', default: '16:9', options: [
             { value: '16:9', label: '16:9 — standard' },
