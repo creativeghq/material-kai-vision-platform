@@ -26,6 +26,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../../_shared/secrets-bootstrap.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
+import { chargeCronWorkspace, chargeCronUser } from '../../_shared/cron-billing.ts';
 import { SEO_MODULE } from './entitlement.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -67,7 +68,26 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
         .limit(20);
       if (error) throw error;
       const results: any[] = [];
+      let skippedUnpaid = 0;
       for (const td of due || []) {
+        // Meter the owner BEFORE the paid audit. `runAuditFor` calls MIVAA's composite
+        // site-review — domain rank, ranked keywords, competitors, backlinks, anchors — which
+        // is DataForSEO spend on the operator's account. Registered cron_key
+        // 'seo-toolkit-audit' (3 cr) existed and nothing called it, so this hourly cron ran
+        // free: an admin could see a price on the dashboard that governed nothing.
+        // Fails open on a metering error; false only when the payer is out of credits.
+        const gate = td.workspace_id
+          ? await chargeCronWorkspace(sb, td.workspace_id, 'seo-toolkit-audit', {
+              description: `SEO audit: ${td.domain}`,
+            })
+          : await chargeCronUser(sb, td.user_id, 'seo-toolkit-audit', {
+              description: `SEO audit: ${td.domain}`,
+            });
+        if (!gate.allowed) {
+          skippedUnpaid++;
+          results.push({ id: td.id, ok: false, skipped: 'insufficient_credits' });
+          continue;
+        }
         try {
           const r = await runAuditFor(sb, td, 'cron');
           results.push({ id: td.id, ok: true, audit_id: r.audit_id });
@@ -75,7 +95,9 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
           results.push({ id: td.id, ok: false, error: e instanceof Error ? e.message : String(e) });
         }
       }
-      return jsonResponse({ ok: true, processed: due?.length || 0, results });
+      return jsonResponse({
+        ok: true, processed: due?.length || 0, skipped_insufficient_credits: skippedUnpaid, results,
+      });
     }
 
     // ── Branch B: user-driven (Authorization: Bearer <user_jwt>) ──
