@@ -33,10 +33,18 @@ import {
   type EmbedAnalyticsSummary,
 } from '@/services/embedKeysService';
 
-/** What the widget emits, in the order a visit produces them. */
+/**
+ * What the widget emits, in the order a visit produces them.
+ *
+ * THE THIRD OF THREE PLACES an event type has to appear: the widget emits it, the endpoint's
+ * allowlist accepts it, and this list displays it. Miss the second and the beacon is refused with a
+ * 400 it swallows; miss this one and the rows are written and shown to nobody. Both read as zero,
+ * from opposite ends. `embed_configure` was missing from the last two until #341.
+ */
 const EMBED_EVENT_LABELS: Array<[string, string]> = [
   ['embed_view', 'Views'],
   ['embed_model_load', '3D loads'],
+  ['embed_configure', 'Options changed'],
   ['embed_ar_launch', 'AR launches'],
   ['embed_add_to_cart', 'Add to cart'],
 ];

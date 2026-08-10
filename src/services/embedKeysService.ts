@@ -101,8 +101,8 @@ export function generateEmbedKey(): string {
  *
  * Counts come from the SQL summary rather than by pulling rows and tallying them here — the same
  * reason prices are derived in SQL. `by_event` is keyed by the event types the widget emits
- * (`embed_view`, `embed_model_load`, `embed_ar_launch`, `embed_add_to_cart`); a type with no
- * events is simply absent, not zero.
+ * (`embed_view`, `embed_model_load`, `embed_configure`, `embed_ar_launch`, `embed_add_to_cart`); a
+ * type with no events is simply absent, not zero.
  */
 export interface EmbedAnalyticsSummary {
   days: number;

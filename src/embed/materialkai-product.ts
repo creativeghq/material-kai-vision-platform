@@ -396,6 +396,13 @@ export class MaterialKaiProduct extends HTMLElement {
     this.renderOptions();
     this.applySelectionToModel();
     void this.reprice();
+    // The one event on #258's list that was never emitted. It is also the most interesting one a
+    // merchant can read: a visitor who repaints the sofa four times and leaves is a different story
+    // from one who never touched a swatch, and neither is visible from views and carts alone.
+    //
+    // Emitted on a real CHANGE, not on every render — re-selecting the current value returns above,
+    // so the count means "changed their mind", not "clicked something".
+    this.track('embed_configure');
   }
 
   /** Repaint the already-loaded scene. No reload — the geometry did not change. */

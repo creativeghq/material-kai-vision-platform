@@ -46,7 +46,12 @@ const MAX_SCOPE_ID_FILTER = 5000;
  * Embed events the ingest accepts. An allowlist, not free text: `event_type` is written by an
  * anonymous caller, and an open column becomes a place to store whatever anyone likes.
  */
-const EMBED_EVENT_TYPES = ['embed_view', 'embed_model_load', 'embed_ar_launch', 'embed_add_to_cart'];
+// The allowlist IS the contract: an event the widget emits and this list omits is refused with a
+// 400 the beacon swallows, so it reads as zero forever. `embed_configure` was on #258's list and in
+// neither place until #341.
+const EMBED_EVENT_TYPES = [
+  'embed_view', 'embed_model_load', 'embed_ar_launch', 'embed_add_to_cart', 'embed_configure',
+];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
