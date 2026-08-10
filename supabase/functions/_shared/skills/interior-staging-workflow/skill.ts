@@ -1,7 +1,11 @@
 // Source of truth for the Interior Staging Workflow skill.
 // See note in b2b-manufacturer-research/skill.ts about .ts-not-.md.
+//
+// Generated from SKILL.md — edit the markdown, not this file.
+// A plain template literal, not String.raw: String.raw keeps the backslash of an escaped
+// backtick, so the text the model reads comes out as \`tool_name\` rather than `tool_name`.
 
-export default String.raw`---
+export default `---
 name: Interior Staging Workflow
 slug: interior-staging-workflow
 description: Stage or redesign a photographed room using the platform's Gemini + virtual-staging tools in the correct order. Use when the user uploads a room photo and asks to "stage", "redesign", "change the furniture/materials/lighting", or "show me this room with X". Ensures before/after comparability.

@@ -22,6 +22,7 @@
     "db:migrate:dry-run": "node scripts/database/apply-migrations.js --dry-run",
     "openapi:edge": "node scripts/build-openapi-edge.mjs",
     "tools:manifest": "node scripts/gen-tool-manifest.mjs",
+    "skills:sync": "node scripts/gen-skill-ts.mjs",
     "build:embed": "vite build --config vite.embed.config.ts"
   },
   "dependencies": {

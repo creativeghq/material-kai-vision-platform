@@ -1200,6 +1200,21 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'raise_quote_request',
+    file: 'supabase/functions/_shared/tools/quote-tools.ts',
+    factory: 'createRaiseQuoteRequestTool',
+    description: 'Record an unpriced customer request as a real lead, for when the catalogue cannot satisfy a specification — the follow-up to a `price_my_spec` verdict of "near" or "none".',
+    params: [
+      { name: 'spec', type: 'object', optional: true, description: 'What they asked for, as key/value — the same spec you sent to price_my_spec, e.g. {"fabric":"linen","available_colors":"sunset"}' },
+      { name: 'product_type', type: 'string', optional: true, description: 'What the thing IS, e.g. "lounge armchair", "floor tile"' },
+      { name: 'contact_id', type: 'string', optional: true, description: 'Existing CRM contact id, when the customer is already known.' },
+      { name: 'contact_name', type: 'string', optional: true, description: 'The customer\'s name, when they are not already a CRM contact.' },
+      { name: 'contact_email', type: 'string', optional: true, description: 'Their email. Required to create a new contact; without it the request is attributed to you.' },
+      { name: 'notes', type: 'string', optional: true, description: 'What they said in their own words — dimensions, deadline, budget, anything the facets cannot carry.' },
+      { name: 'items_count', type: 'number', optional: true, description: 'How many of the thing they want (default 1).' },
+    ],
+  },
+  {
     name: 'read_document_section',
     file: 'supabase/functions/_shared/tools/search-tools.ts',
     factory: 'createReadDocumentSectionTool',

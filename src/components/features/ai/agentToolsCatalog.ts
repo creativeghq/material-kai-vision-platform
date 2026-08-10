@@ -344,6 +344,14 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'raise_quote_request', name: 'Raise Quote Request', category: 'Quotes',
+    desc: 'Record an unpriced request for something the catalogue cannot satisfy, so the lead lands in Quotes → Requests instead of dying in the chat. Carries the spec and the contact, never a price.',
+    examples: [
+      'They want that armchair in linen — we do not stock it. Log the request for them',
+      'Raise a quote request for a 3m oak table, contact maria@example.com',
+    ],
+  },
+  {
     id: 'generate_quote_pdf', name: 'Generate Quote PDF', category: 'Quotes',
     desc: 'Generate or regenerate the branded PDF for an existing quote and open it on the canvas.',
     examples: [
@@ -2217,9 +2225,9 @@ export const TOOLKITS: ToolkitDefinition[] = [
   {
     id: 'quotes',
     name: 'Quotes',
-    description: 'Build client quotes from chat: add catalog or custom products (e.g. 75 sqm at €34/sqm), auto-price + VAT, generate the branded PDF, and open it on the canvas. Saved to the Quotes module.',
+    description: 'Build client quotes from chat: add catalog or custom products (e.g. 75 sqm at €34/sqm), auto-price + VAT, generate the branded PDF, and open it on the canvas. Saved to the Quotes module. When the catalogue cannot price something, record it as an unpriced request instead of guessing.',
     icon: 'FileText',
-    tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes'],
+    tool_ids: ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request'],
     quick_starts: [
       {
         label: 'New quote', description: 'Create a quote from products', icon: 'Plus',
@@ -2235,6 +2243,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'My quotes', description: 'List recent quotes', icon: 'ListChecks',
         prompt: 'Show my recent quotes.',
         run: { tool: 'list_my_quotes' },
+      },
+      {
+        // Prompt-only on purpose: the spec is a record, and record-shaped params are never asked
+        // for in a form. The agent builds it from the conversation, which is where the spec lives.
+        label: 'Log a request', description: 'Capture something we cannot price yet', icon: 'Inbox',
+        prompt: 'A customer wants something we do not stock. Ask me what they asked for and who they are, then raise a quote request for it — no price.',
       },
     ],
   },

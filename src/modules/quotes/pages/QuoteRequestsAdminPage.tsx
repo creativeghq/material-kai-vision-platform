@@ -57,6 +57,15 @@ interface UserProfile {
   email?: string | null;
 }
 
+// Where an unquoted request came from. `from_embed` (embed_key_id IS NOT NULL) still decides the
+// widget case — it is the stronger evidence — so this only has to name the rest. Unknown values
+// fall through to the raw string rather than rendering blank.
+const SOURCE_LABELS: Record<string, string> = {
+  app: 'In-app request',
+  embed: 'Website embed',
+  agent: 'Assistant',
+};
+
 export const QuoteRequestsAdmin: React.FC = () => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
@@ -373,7 +382,11 @@ export const QuoteRequestsAdmin: React.FC = () => {
                   {inbox.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell>
-                        <div className="font-medium">{r.contact_name ?? 'Unknown'}</div>
+                        {/* A chat-raised request can legitimately have no contact — the member had
+                            the spec but not an email. "Unknown" reads as lost data; it is not. */}
+                        <div className="font-medium">
+                          {r.contact_name ?? (r.source === 'agent' ? 'No contact given' : 'Unknown')}
+                        </div>
                         {r.contact_email && (
                           <div className="text-xs text-muted-foreground">{r.contact_email}</div>
                         )}
@@ -398,7 +411,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {r.from_embed ? 'Website embed' : r.source}
+                        {r.from_embed ? 'Website embed' : SOURCE_LABELS[r.source] ?? r.source}
                       </TableCell>
                       <TableCell className={`text-sm ${statusTone(r.status)}`}>{r.status}</TableCell>
                       <TableCell className="text-sm">{formatDate(r.created_at)}</TableCell>

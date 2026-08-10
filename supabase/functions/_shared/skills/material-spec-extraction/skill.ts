@@ -1,7 +1,11 @@
 // Source of truth for the Material Specification Extraction skill.
 // See note in b2b-manufacturer-research/skill.ts about .ts-not-.md.
+//
+// Generated from SKILL.md — edit the markdown, not this file.
+// A plain template literal, not String.raw: String.raw keeps the backslash of an escaped
+// backtick, so the text the model reads comes out as \`tool_name\` rather than `tool_name`.
 
-export default String.raw`---
+export default `---
 name: Material Specification Extraction
 slug: material-spec-extraction
 description: Extract a structured specification from an uploaded material image or datasheet URL — color (with hex), material type, texture/finish, dimensions, applications, and compliance. Use when the user asks to "identify", "extract specs from", "tell me about this material", or provides a TDS/datasheet.

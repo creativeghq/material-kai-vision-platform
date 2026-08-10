@@ -312,6 +312,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   seo_ai_overview_card: 'Google AI Overview',
   seo_google_maps_card: 'Google Maps results',
   seo_gbp_info_card: 'Google Business Profile',
+  // Quotes — the unpriced rung (#341). The priced ones render their own cards.
+  quote_request_raised: 'Quote request recorded',
   // Contracts
   contracts_list: 'Contracts',
   contract_created: 'Contract drafted',

@@ -33,3 +33,19 @@ export function foldForSearch(value: unknown): string {
     .toLowerCase()
     .replace(/ς/g, 'σ'); // final sigma ς folds onto the medial σ
 }
+
+/**
+ * Escape PostgREST ilike wildcards so a value carrying `%` or `_` cannot broaden the match.
+ *
+ * Lives HERE, beside `foldForSearch`, because it is never used alone: every folded search is
+ * `escapeLike(foldForSearch(term))`, and a caller that reaches for one needs the other. It was
+ * previously exported from `crm-api/handlers/contacts-api-handler.ts`, so anything outside
+ * crm-api had to import a handler or write a second copy — and a second copy of an escaper is
+ * exactly how the three escapeHtml twins drifted to three different strengths.
+ *
+ * A DIFFERENT contract from `escapeHtml` (invariant 11): PostgREST filter grammar, not HTML.
+ * Never substitute one for the other.
+ */
+export function escapeLike(value: string): string {
+  return value.replace(/[%_\\]/g, '\\$&');
+}

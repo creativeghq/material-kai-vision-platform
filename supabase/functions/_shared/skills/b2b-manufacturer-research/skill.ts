@@ -2,8 +2,12 @@
 // Kept as .ts (not .md) because the Supabase Edge Runtime does not support
 // `with { type: 'text' }` imports. The companion SKILL.md mirrors this for
 // human/PR review — keep the two in sync when editing.
+//
+// Generated from SKILL.md — edit the markdown, not this file.
+// A plain template literal, not String.raw: String.raw keeps the backslash of an escaped
+// backtick, so the text the model reads comes out as \`tool_name\` rather than `tool_name`.
 
-export default String.raw`---
+export default `---
 name: B2B Manufacturer Research
 slug: b2b-manufacturer-research
 description: Research a specific manufacturer or supplier — verify legitimacy, extract certifications, MOQ, lead time, regions served, and return a structured sourcing report with verifiable sources. Use when the user asks to "research", "verify", "check", or "find info about" a specific company, brand, or factory.

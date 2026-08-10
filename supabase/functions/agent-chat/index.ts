@@ -821,13 +821,19 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'add_purchase_item', 'generate_purchase_sheet',
       // Quotes (all users; 0 cr — creates real quotes + branded PDF, opens on canvas)
-      'create_quote', 'generate_quote_pdf', 'list_my_quotes',
+      'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request',
       // Generation / design (so JARVIS handles 3D renders, lighting, and VR inline —
       // no "switch to another agent". Interior-designer remains the specialist.)
       // generate_gemini + virtual_staging are instantiated by the `generate_3d` branch
       // in registerTools; listing them here is what makes the toolkit filter and
       // load_toolkit agree with what the agent can actually call.
       'generate_3d', 'generate_gemini', 'virtual_staging', 'apply_lighting_preset', 'generate_vr_world',
+      // generate_video's push site says it "was never pushed onto any agent, so it was
+      // unreachable" — but the fix stopped at the push and never listed it here, and BOTH
+      // binding paths read this list, so it stayed exactly as unreachable as before. The
+      // upstream function debits credits before the provider call, so binding it spends nothing
+      // it does not first charge.
+      'generate_video',
       // Trip cards / sales expenses (all users; 0 cr — DB-only)
       'create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L); 0 cr
@@ -841,6 +847,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'product_provenance', 'product_price_history', 'projects_using_product',
       'products_in_project', 'customer_overview', 'supplier_overview',
       'products_by_brand', 'brand_overview', 'related_products', 'find_products_by_spec',
+      // price_my_spec was bound by registerTools but listed by NO agent, and both binding paths
+      // gate on this list — the startup pass on config.tools, and load_toolkit via
+      // agentFullToolIds. So the tool existed, appeared in the knowledge_graph cluster, passed
+      // coverage (its factory IS called) and could never be reached by anyone (#341).
+      'price_my_spec',
     ],
     // systemPrompt loaded from database (key: 'kai')
   },
@@ -862,7 +873,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
       // Image-driven post-processing tools (require an existing room image in the conversation)
-      'apply_lighting_preset', 'generate_vr_world',
+      'apply_lighting_preset', 'generate_vr_world', 'generate_video',
       // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
       'generate_presentation_sheet',
       // Project Workspace — interior designers benefit most from the container
@@ -949,7 +960,10 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
       'knowledge_base_search', 'read_document_section', 'material_search',
-      'create_quote', 'generate_quote_pdf', 'list_my_quotes',
+      'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request',
+      // The verdict half of the same flow: Trinity quotes, so Trinity must be able to find out
+      // whether there is a price to quote before it says one out loud.
+      'price_my_spec',
       'customer_overview', 'supplier_overview', 'product_price_history',
       'products_in_project', 'projects_using_product', 'price_lookup',
       'create_project', 'list_my_projects', 'find_project',
@@ -1329,7 +1343,7 @@ async function executeAgent(
   const needsStock = config.tools.includes('manage_stock');
   const needsRealEstate = config.tools.includes('manage_real_estate');
   const needsCrm = config.tools.some((t: string) => ['search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm'].includes(t));
-  const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes'].includes(t));
+  const needsQuotes = config.tools.some((t: string) => ['create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request'].includes(t));
   const needsSocial = config.tools.includes('manage_social');
   // Tech Radar spends real Anthropic + web-search $ per call with no credit debit
   // (internal ops capability) — gate to admin/owner like price_lookup.
@@ -1488,6 +1502,7 @@ async function executeAgent(
   const createCreateQuoteTool = quotesMod?.createCreateQuoteTool;
   const createGenerateQuotePdfTool = quotesMod?.createGenerateQuotePdfTool;
   const createListMyQuotesTool = quotesMod?.createListMyQuotesTool;
+  const createRaiseQuoteRequestTool = quotesMod?.createRaiseQuoteRequestTool;
   const createManageSocialTool = socialMod?.createManageSocialTool;
   const createTrackJobSearchTool = jobResearchMod?.createTrackJobSearchTool;
   const createListMyJobSearchesTool = jobResearchMod?.createListMyJobSearchesTool;
@@ -1889,6 +1904,12 @@ async function executeAgent(
   }
   if (config.tools.includes('list_my_quotes') && createListMyQuotesTool) {
     tools.push(createListMyQuotesTool(userId, workspaceId, onChunk));
+  }
+  // The unpriced half of the same module (#341). Bound wherever create_quote is, because the
+  // decision between them is made mid-conversation off a `price_my_spec` verdict — an agent that
+  // can quote a match but cannot record a miss will invent a price rather than admit the gap.
+  if (config.tools.includes('raise_quote_request') && createRaiseQuoteRequestTool) {
+    tools.push(createRaiseQuoteRequestTool(userId, workspaceId, onChunk));
   }
 
   // Social toolkit (Hermes; module-gated social-media; publish/schedule/analytics over connected accounts)

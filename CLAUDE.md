@@ -137,6 +137,19 @@ Coverage and reachability have **no** escape hatch: `KNOWN_UNCLUSTERED` and `KNO
 emptied, so both now fail outright. `OPTIONS_EXEMPT` is the one survivor — shrink-only, each entry with its
 stated reason.
 
+**A push site is not a binding. `AGENT_CONFIGS[agentId].tools` is.** Both binding paths read that list — the
+startup `registerTools(new Set(config.tools))` and `load_toolkit`, which clamps to the same set — so a tool
+with a perfect `if (config.tools.includes('x')) tools.push(...)` line that no agent *lists* is unreachable by
+anyone. `price_my_spec` and `generate_video` were both live in that state; `generate_video`'s own earlier fix
+stopped at the push site. Guarded by the "listed by at least one agent" case in `toolkitCoverage.test.ts`.
+
+**Skills: `agents:` holds agent IDS, not display names** — JARVIS is `kai`, Trinity is `erp`. `getSkillsForAgent`
+matches on the id, so a skill listing `trinity` is offered to nobody, silently. A skill also has to be imported
+into `SKILL_FILES` (`skills-loader.ts`), and its `SKILL.md`/`skill.ts` twins must match — the `.md` is what gets
+reviewed, the `.ts` is what ships. Run **`npm run skills:sync`** after editing any `SKILL.md`; never hand-edit
+the `.ts`, and never use `String.raw` (it leaks the backslash of every escaped backtick into the prompt).
+Guarded by [tests/unit/skillsRegistry.test.ts](tests/unit/skillsRegistry.test.ts).
+
 ## Templates — one table, one registry, an allowlist per type
 "Reusable starting point for a record" is **one** system (`entity_templates`, issue #322), not a table per
 entity. Adding a type = an adapter in `src/services/templates/` + a value in the CHECK constraint

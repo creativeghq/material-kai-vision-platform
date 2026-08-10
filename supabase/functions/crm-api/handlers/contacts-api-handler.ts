@@ -4,7 +4,7 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
 import { getCrmScope, scopeAllows, rowInScope, type CrmScope } from './_scope.ts';
 import { emitFlowEvent } from '../../_shared/flow-events.ts';
-import { foldForSearch } from '../../_shared/searchFold.ts';
+import { foldForSearch, escapeLike } from '../../_shared/searchFold.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -18,10 +18,9 @@ const LIST_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
  *  sends the ids, so an unbounded list would be a cheap way to build a huge query. */
 export const MAX_FILTER_IDS = 1000;
 
-/** Escape PostgREST ilike wildcards so a user typing `%` or `_` can't broaden the match. */
-export function escapeLike(value: string): string {
-  return value.replace(/[%_\\]/g, '\\$&');
-}
+// Moved to _shared/searchFold.ts, beside the fold it always composes with. Re-exported here so
+// the existing importer (companies-api-handler) keeps working and no second copy appears.
+export { escapeLike };
 
 /**
  * Quote a value for use INSIDE a PostgREST `or(...)` filter string.

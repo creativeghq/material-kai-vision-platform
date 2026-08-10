@@ -9,6 +9,9 @@
  *                           open it in the Studio canvas.
  *   - generate_quote_pdf  — (re)generate the PDF for an existing quote by id.
  *   - list_my_quotes      — the user's recent quotes with status + totals.
+ *   - raise_quote_request — record an UNPRICED request (quote_requests row) for a spec the
+ *                           catalogue could not satisfy, so the lead survives the conversation.
+ *                           The counterpart to create_quote: that one prices, this one refuses to.
  *
  * This mirrors `QuotesService` / `QuotePDFService` exactly so a quote the agent
  * builds is a first-class quote — it shows up (and is editable) in the Quotes
@@ -32,6 +35,7 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { round2 } from '../money.ts';
+import { foldForSearch, escapeLike } from '../searchFold.ts';
 
 // One line item as the model supplies it. Either `product_id` (catalog, auto-priced)
 // or `name` + `unit_price` (custom). `unit_price` on a catalog line overrides pricing.
@@ -454,6 +458,190 @@ export const createListMyQuotesTool = (
       schema: z.object({
         limit: z.number().optional().describe('Max quotes to return (default 10, max 50).'),
         status: z.string().optional().describe("Optional status filter: draft / submitted / quoted / accepted / rejected / expired."),
+      }),
+    },
+  );
+};
+
+// ── raise_quote_request (#341 join 1 — the bottom rung, writable from chat) ────────────────────
+
+/**
+ * Record "we could not price this, but they still want it" as a real lead.
+ *
+ * THE RUNG THAT ONLY THE EMBED COULD WRITE. `quote_requests` had exactly one writer —
+ * `products-3d-api?action=request_quote` — so a specification designed in conversation died in the
+ * transcript while the identical specification typed into a merchant's website became a row an
+ * operator could act on. On a catalogue this thin nearly every request lands here (`price_my_spec`
+ * answers `none` for almost everything), which makes this the difference between the agent capturing
+ * demand and the agent apologising.
+ *
+ * SAME ROW, SAME RULES AS THE EMBED, and deliberately so:
+ *   • NO `total_estimated`. Nothing here has been priced; a number would anchor the negotiation on a
+ *     figure nobody derived. `price_my_spec` refuses to estimate for the same reason — this tool
+ *     exists precisely for the case where it refused.
+ *   • The workspace comes from the session, never from the model (invariant 1).
+ *   • The payload is an explicit literal, never a spread of what the model produced (invariant 8).
+ *
+ * DIFFERENT FROM THE EMBED IN TWO WAYS, both because the caller is known here:
+ *   • `user_id` is the signed-in member, so the request carries who was in the room. The embed's
+ *     visitor is anonymous and writes NULL.
+ *   • No bot gate. The embed needs Turnstile because it mints a CRM contact for a stranger; this
+ *     path already required a verified JWT to reach.
+ *
+ * CONTACT RESOLUTION IS SEARCH-FIRST. A silently-created duplicate contact is how a CRM rots, and
+ * this workspace's names are frequently Greek — so an existing contact is looked up by id, then by
+ * email, then by name, and a new one is created ONLY when an email was supplied and nothing matched.
+ * With neither a contact nor an email the request still lands, attributed to the member who raised
+ * it — the CHECK on the table wants a requester, not specifically a contact, and losing the lead to
+ * enforce tidier CRM data would be the wrong trade.
+ */
+export const createRaiseQuoteRequestTool = (
+  userId: string,
+  workspaceId: string,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async (input: {
+      spec?: Record<string, string>;
+      product_type?: string;
+      contact_id?: string;
+      contact_name?: string;
+      contact_email?: string;
+      notes?: string;
+      items_count?: number;
+    }) => {
+      const sb = svcClient();
+      try {
+        if (!workspaceId) {
+          return JSON.stringify({ success: false, error: 'No active workspace.' });
+        }
+
+        // The noun travels inside the spec, the same shape `price_my_spec` sends to
+        // `resolve_product_spec` — so a request raised after a miss carries exactly what was asked
+        // for, and the demand signal planned over this column reads one shape, not two.
+        const spec: Record<string, string> = { ...(input.spec ?? {}) };
+        if (input.product_type) spec.product_type = input.product_type;
+        if (Object.keys(spec).length === 0 && !input.notes) {
+          return JSON.stringify({
+            success: false,
+            error: 'Nothing to record. Pass the specification you discussed (spec / product_type), or notes describing it.',
+          });
+        }
+
+        const email = (input.contact_email ?? '').trim();
+        if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+          return JSON.stringify({ success: false, error: `"${email}" does not look like an email address.` });
+        }
+        const contactName = (input.contact_name ?? '').trim();
+
+        // Resolve, then create — never create blind. Each step is workspace-scoped, so a contact id
+        // the model invented or remembered from another tenant resolves to nothing rather than
+        // attaching this workspace's lead to a stranger.
+        let contactId: string | null = null;
+        if (input.contact_id) {
+          const { data: byId } = await sb.from('crm_contacts')
+            .select('id').eq('id', input.contact_id).eq('workspace_id', workspaceId).maybeSingle();
+          if (!byId) {
+            return JSON.stringify({ success: false, error: 'That contact does not exist in this workspace.' });
+          }
+          contactId = (byId as { id: string }).id;
+        }
+        if (!contactId && email) {
+          const { data: byEmail } = await sb.from('crm_contacts')
+            .select('id').eq('workspace_id', workspaceId).ilike('email', email).limit(1);
+          if (byEmail && byEmail.length > 0) contactId = (byEmail[0] as { id: string }).id;
+        }
+        if (!contactId && contactName) {
+          // The FOLDED haystack with a FOLDED term, exactly as the CRM list endpoints search.
+          // `ilike` is case-insensitive but not accent-insensitive, so "Κώστας" would not have
+          // found "ΚΩΣΤΑΣ" — and the miss does not surface as an error, it surfaces as a second
+          // contact for a person already in the CRM.
+          const { data: byName } = await sb.from('crm_contacts')
+            .select('id')
+            .eq('workspace_id', workspaceId)
+            .ilike('search_fold', `%${escapeLike(foldForSearch(contactName))}%`)
+            .limit(2);
+          // Only an unambiguous hit. Two people called "Γιώργος Παπαδόπουλος" is a question for a
+          // human, not a coin flip that silently attributes the lead to one of them.
+          if (byName && byName.length === 1) contactId = (byName[0] as { id: string }).id;
+        }
+        let contactCreated = false;
+        if (!contactId && email) {
+          const { data: created, error: cErr } = await sb.from('crm_contacts')
+            .insert({
+              workspace_id: workspaceId,
+              name: (contactName || email).slice(0, 200),
+              email,
+            })
+            .select('id').single();
+          if (cErr || !created) {
+            return JSON.stringify({ success: false, error: 'Could not create the contact for this request.' });
+          }
+          contactId = (created as { id: string }).id;
+          contactCreated = true;
+        }
+
+        const { data: request, error } = await sb.from('quote_requests').insert({
+          workspace_id: workspaceId,
+          user_id: userId,
+          customer_contact_id: contactId,
+          source: 'agent',
+          status: 'pending',
+          items_count: Math.max(1, Math.min(input.items_count ?? 1, 999)),
+          // NO total_estimated — see the note above. This is the whole point of the tool.
+          spec,
+          notes: input.notes ? input.notes.slice(0, 1000) : null,
+        }).select('id, created_at').single();
+        if (error) return JSON.stringify({ success: false, error: error.message });
+
+        const row = request as { id: string; created_at: string };
+        onChunk?.({
+          type: 'quote_request_raised',
+          request_id: row.id,
+          workspace_id: workspaceId,
+          spec,
+          contact_id: contactId,
+          contact_created: contactCreated,
+          notes: input.notes ?? null,
+          // Where it landed, stated rather than implied — this is the payoff the customer is told
+          // about ("someone will come back to you"), so it must be true.
+          destination: 'Quotes → Requests → Incoming',
+          timestamp: Date.now(),
+        });
+
+        return JSON.stringify({
+          success: true,
+          request_id: row.id,
+          spec,
+          contact_id: contactId,
+          contact_created: contactCreated,
+          guidance:
+            'Recorded as an unpriced request in Quotes → Requests → Incoming. Tell the customer it has been '
+            + 'passed on and someone will come back with a price. Do NOT give them a figure — nothing here has '
+            + 'been priced, and inventing one commits the workspace to a number it never agreed to.',
+        });
+      } catch (e) {
+        return JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) });
+      }
+    },
+    {
+      name: 'raise_quote_request',
+      description:
+        'Record an unpriced customer request as a real lead, for when the catalogue cannot satisfy a specification — '
+        + 'the follow-up to a `price_my_spec` verdict of "near" or "none". Lands in Quotes → Requests → Incoming with '
+        + 'the spec, the contact and no price. Use whenever a customer wants something you could not price: a miss '
+        + 'means "let me get that quoted for you", never "we do not do that". Do NOT use it for a specification that '
+        + 'matched exactly — quote that price and use create_quote.',
+      schema: z.object({
+        spec: z.record(z.string()).optional().describe(
+          'What they asked for, as key/value — the same spec you sent to price_my_spec, e.g. {"fabric":"linen","available_colors":"sunset"}',
+        ),
+        product_type: z.string().optional().describe('What the thing IS, e.g. "lounge armchair", "floor tile"'),
+        contact_id: z.string().uuid().optional().describe('Existing CRM contact id, when the customer is already known.'),
+        contact_name: z.string().optional().describe("The customer's name, when they are not already a CRM contact."),
+        contact_email: z.string().optional().describe('Their email. Required to create a new contact; without it the request is attributed to you.'),
+        notes: z.string().optional().describe('What they said in their own words — dimensions, deadline, budget, anything the facets cannot carry.'),
+        items_count: z.number().optional().describe('How many of the thing they want (default 1).'),
       }),
     },
   );

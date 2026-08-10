@@ -17,8 +17,14 @@
  *                      or offered in the picker and unbindable).
  *   4. OPTIONS       — a tool's `z.enum` choices never become form fields, or a
  *                      hand-written `select` drifts from the enum it mirrors.
+ *   5. BINDING       — the factory IS instantiated behind `config.tools.includes('x')`,
+ *                      and no agent config lists 'x'. Both binding paths read that list,
+ *                      so the tool is as unreachable as in 2 — but 2's check passes,
+ *                      because the binder does mention it. `price_my_spec` (#337) and
+ *                      `generate_video` were both live in this state; generate_video's
+ *                      own fix for 2 stopped at the push site and left it in 5.
  *
- * 1, 2 and 4 are checked below. 3 no longer CAN drift: agent-chat's cluster map is
+ * 1, 2, 4 and 5 are checked below. 3 no longer CAN drift: agent-chat's cluster map is
  * generated from TOOLKITS (`toolkitClusters.generated.ts`) rather than typed out a
  * second time, so the tests for it check that the projection is fresh and that no
  * second copy has reappeared — not that two copies happen to agree today.
@@ -270,6 +276,43 @@ describe('toolkit coverage', () => {
       unreachable,
       `Tool(s) defined but never instantiated — no agent can call them: ${unreachable.join(', ')}. ` +
         `Wire the factory into registerTools in agent-chat/index.ts, or delete the dead tool.`,
+    ).toEqual([]);
+  });
+
+  it('every clustered tool is listed by at least one agent (the binding list both paths read)', () => {
+    // The test above accepts "the binder mentions the tool" as reachability. That proxy is too
+    // weak, and two tools proved it: `price_my_spec` (#337) and `generate_video` — each had a
+    // real `if (config.tools.includes('x')) tools.push(...)` line, so the binder mentioned them
+    // and this file passed, while NEITHER could ever be called by anyone.
+    //
+    // Both binding paths gate on AGENT_CONFIGS[agentId].tools:
+    //   • startup      — registerTools(new Set(config.tools))
+    //   • load_toolkit — def.tool_ids.filter(t => agentFullToolIds.has(t)), and that set IS
+    //                    AGENT_CONFIGS[agentId].tools
+    // So a tool absent from every agent's list is unreachable no matter how correct its push
+    // site, its cluster entry and its manifest row look. Nothing else in the build can see it:
+    // the tool exists, typechecks, and simply never appears.
+    const src = read(AGENT_CHAT);
+    const start = src.indexOf('const AGENT_CONFIGS');
+    expect(start, 'AGENT_CONFIGS not found in agent-chat — this guard is reading the wrong file').toBeGreaterThan(-1);
+    const block = src.slice(start, src.indexOf('\n};', start) + 3);
+    const listed = new Set<string>();
+    for (const m of block.matchAll(/tools:\s*\[([\s\S]*?)\]/g)) {
+      for (const q of m[1].matchAll(/'([a-zA-Z0-9_]+)'/g)) listed.add(q[1]);
+    }
+    // A sanity floor: if the slice ever stops matching the real block, `listed` goes near-empty
+    // and this test would "pass" by flagging everything — loud, but for the wrong reason.
+    expect(listed.size, 'parsed suspiciously few tools from AGENT_CONFIGS — the slice is wrong').toBeGreaterThan(50);
+
+    const unlisted = [...clustered]
+      .filter((t) => implemented.has(t) && !listed.has(t))
+      .sort();
+    expect(
+      unlisted,
+      `Tool(s) in a toolkit cluster that NO agent config lists — bound by neither path, so they ` +
+        `are unreachable however good the push site looks: ${unlisted.join(', ')}. Add each to ` +
+        `the \`tools:\` array of every agent that should have it in AGENT_CONFIGS ` +
+        `(supabase/functions/agent-chat/index.ts).`,
     ).toEqual([]);
   });
 
