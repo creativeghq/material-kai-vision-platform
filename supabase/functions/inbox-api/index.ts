@@ -2217,12 +2217,11 @@ async function handleJwtAction(
         .eq('user_id', userId)
         .maybeSingle();
 
-      // Allocation is explicit, never a side effect of opening the Inbox: an address is a
-      // published identity, so it appears when the user asks for one.
-      if (!existing && payload.allocate !== true) {
-        return json({ address: null, domain, can_allocate: true });
-      }
-
+      // Allocated on first read, not behind a button. This was explicit — "an address is a
+      // published identity, so it appears when the user asks for one" — and in practice that
+      // reasoning cost every new user a step before their Inbox could receive anything, which is
+      // a worse trade than minting a mailbox nobody ends up using. Opening the Inbox IS the ask.
+      // Still idempotent: user_id is UNIQUE, so a second reader gets the first one's address.
       if (!existing) {
         const result = await allocateUserEmailAddress(db, {
           userId, workspaceId, domain,

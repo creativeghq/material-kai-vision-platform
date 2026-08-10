@@ -1617,8 +1617,21 @@ const MyEmailAddressSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
 
   useEffect(() => {
     let alive = true;
+    // Reading allocates. A member who opens the Inbox can receive mail immediately, without
+    // first finding and pressing a button — the address only ever comes back null when the
+    // derived handle collides with someone else's and this person has to pick their own.
     inboxApi.getMyEmailAddress(workspaceId)
-      .then((r) => { if (alive) { setAddress(r.address); setDomain(r.domain); } })
+      .then((r) => {
+        if (!alive) return;
+        setAddress(r.address);
+        setDomain(r.domain);
+        if (!r.address && r.conflict) {
+          setConflict(r.conflict === 'invalid'
+            ? 'We could not build an address from your name. Please choose one.'
+            : 'That name is taken. Choose another.');
+          if (r.suggested_local_part) setChosen(r.suggested_local_part);
+        }
+      })
       .catch(() => { /* the address surface is optional chrome — never block the popover on it */ })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
@@ -1634,7 +1647,7 @@ const MyEmailAddressSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
   const allocate = async (localPart?: string) => {
     setBusy(true);
     try {
-      const r = await inboxApi.getMyEmailAddress(workspaceId, true, localPart);
+      const r = await inboxApi.getMyEmailAddress(workspaceId, localPart);
       if (!r.address) {
         // A conflict is an answer, not an error: two people share a name, so this one chooses.
         setConflict(r.invalid_reason ? (REJECTION[r.invalid_reason] ?? 'That name cannot be used.')
@@ -1685,9 +1698,11 @@ const MyEmailAddressSection: React.FC<{ workspaceId: string }> = ({ workspaceId 
       </div>
 
       {!address && !conflict ? (
-        <Button size="sm" variant="outline" className="rounded-full w-full" disabled={busy} onClick={() => allocate()}>
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `Create my @${domain} address`}
-        </Button>
+        // Reaching here means the read failed outright — the allocation itself cannot leave the
+        // address null without also setting a conflict.
+        <div className="text-xs text-muted-foreground">
+          Your address could not be loaded. Reopen this panel to try again.
+        </div>
       ) : !address ? (
         <div className="space-y-2">
           <div className="text-xs text-destructive">{conflict}</div>

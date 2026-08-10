@@ -378,11 +378,11 @@ export const inboxApi = {
   // ── Inbound email address (#342) — one per user, on the shared receiving domain ──
 
   /**
-   * This user's inbound address. Returns `{address: null, can_allocate: true}` until they ask for
-   * one — allocation is explicit, never a side effect of opening the Inbox, because the address is
-   * a published identity.
+   * This user's inbound address, allocating one on first read. There is no "create it" step —
+   * a member who opens the Inbox can receive mail immediately. `local_part` is only needed on the
+   * rare second call, when the derived handle turned out to belong to someone else.
    */
-  getMyEmailAddress(workspace_id: string, allocate = false, local_part?: string) {
+  getMyEmailAddress(workspace_id: string, local_part?: string) {
     return call<{
       address: UserEmailAddress | null;
       domain: string;
@@ -392,7 +392,7 @@ export const inboxApi = {
       /** The handle we derived and could not have, so the UI can prefill something close to it. */
       suggested_local_part?: string;
       invalid_reason?: 'empty' | 'shape' | 'plus' | 'reserved';
-    }>('get_my_email_address', { workspace_id, allocate, local_part });
+    }>('get_my_email_address', { workspace_id, local_part });
   },
   setEmailAddressSettings(changes: {
     auto_reply_enabled?: boolean;
