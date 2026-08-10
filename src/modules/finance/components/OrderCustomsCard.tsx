@@ -12,7 +12,8 @@
  * silently restated.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, Ship, AlertTriangle } from 'lucide-react';
+import { Loader2, Ship, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { Button } from '@/components/core/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -45,7 +46,16 @@ interface GapLine {
   taric_code: string | null; net_mass_kg: number | null;
 }
 
-export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => {
+export const OrderCustomsCard: React.FC<{
+  orderId: string;
+  /**
+   * Book what the border costs. Duty, clearance and the broker's fee are ordinary costs on the
+   * order like freight is — this panel is simply where you find out how much they are, so it is
+   * also where you should be able to record them. The parent owns the expense dialog; this hands
+   * it the figure it just derived rather than making the operator retype it.
+   */
+  onAddCost?: (suggested: { amount?: number; description: string }) => void;
+}> = ({ orderId, onAddCost }) => {
   const { toast } = useToast();
   const [data, setData] = useState<Preview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -101,7 +111,8 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
        is a near-white glass surface on the light theme, which stamped a white panel onto the cream
        page and read as a foreign object rather than a section of the order. */
     <div className="space-y-3">
-      <div>
+      <div className="flex items-start justify-between gap-2">
+        <div>
         <h4 className="flex items-center gap-2 text-sm font-medium">
           <Ship className="h-4 w-4 text-primary" />
           Customs
@@ -117,6 +128,24 @@ export const OrderCustomsCard: React.FC<{ orderId: string }> = ({ orderId }) => 
               </>
             : data.applies_note}
         </p>
+        </div>
+        {/* Seeded with the estimate when there is one — under the low-value regime the duty is a
+            derived figure sitting right there, and retyping a number the panel already computed is
+            how it gets retyped wrong. Outside that regime the rate depends on the goods, so the
+            amount is left for the operator and only the description is carried. */}
+        {onAddCost && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 shrink-0 text-[11px]"
+            onClick={() => onAddCost({
+              amount: data.low_value_regime && data.estimated_duty > 0 ? data.estimated_duty : undefined,
+              description: 'Customs duty & clearance',
+            })}
+          >
+            <ArrowUpRight className="h-3 w-3 mr-1 text-red-400" /> Book as expense
+          </Button>
+        )}
       </div>
 
       {/* A header row over no rows is furniture, not information: when every line is still

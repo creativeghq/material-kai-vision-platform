@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
@@ -1633,16 +1633,30 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
    * been writing `covers_order_id` since it shipped and nothing ever displayed it, so the POs it
    * created looked unrelated to the sale that caused them.
    */
-  const [coveredBy, setCoveredBy] = useState<Array<{ id: string; order_number: string | null; status: string; total: number; currency: string }>>([]);
+  const [coveredBy, setCoveredBy] = useState<Array<{
+    id: string; order_number: string | null; status: string; total: number; currency: string;
+    supplier_company_id: string | null; settled: number; outstanding: number;
+  }>>([]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (!order || order.order_type !== 'sales') { setCoveredBy([]); return; }
       const { data } = await supabase.from('orders')
-        .select('id, order_number, status, total, currency')
+        .select('id, order_number, status, total, currency, supplier_company_id')
         .eq('covers_order_id', order.id).neq('status', 'cancelled')
         .order('created_at', { ascending: false });
-      if (!cancelled) setCoveredBy((data ?? []) as any);
+      const rows = (data ?? []) as Array<{ id: string; order_number: string | null; status: string; total: number; currency: string; supplier_company_id: string | null }>;
+      // How much of that purchase is actually settled comes from `orderBalances` —
+      // `get_order_settlements`, the one derivation. Re-summing allocations here would be the
+      // sixth implementation of a money quantity that already has an answer.
+      const bal = rows.length ? await ordersService.orderBalances(rows.map((r) => r.id)).catch(() => new Map()) : new Map();
+      if (!cancelled) {
+        setCoveredBy(rows.map((r) => ({
+          ...r,
+          settled: Number(bal.get(r.id)?.settled ?? 0),
+          outstanding: Number(bal.get(r.id)?.outstanding ?? Number(r.total)),
+        })));
+      }
     })();
     return () => { cancelled = true; };
   }, [order?.id, order?.order_type]);
@@ -1710,6 +1724,22 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     })();
     return () => { cancelled = true; };
   }, [order?.id, order?.covers_order_id]);
+
+  /**
+   * What this SALE still owes a supplier — the one rule, used everywhere the figure appears.
+   *
+   * `getOrderSupplierExposure` only sees cash tagged to THIS order, so when a purchase order was
+   * raised to buy the goods (its bill and its payment carry the PURCHASE's order_id) the sale kept
+   * claiming the full cost was outstanding after the supplier had been paid in full. The answer for
+   * those goods is already derived on the purchase order by `get_order_settlements`; this defers to
+   * it rather than re-deriving the same money from a second set of rows — the exact habit that put
+   * five disagreeing settlement formulas in this codebase. Returns the covering order too, so the
+   * UI can name where the figure comes from instead of stating it flat.
+   */
+  const supplierOwedAfterCover = useCallback((s: { supplier_company_id: string; owed: number }) => {
+    const po = coveredBy.find((c) => c.supplier_company_id === s.supplier_company_id);
+    return { po, owed: Math.max(0, po ? po.outstanding : s.owed) };
+  }, [coveredBy]);
 
   /** The picker's value — derived from `covers`, so it can never disagree with the block below it. */
   const coversValue: OrderLinkTarget = covers
@@ -2367,7 +2397,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             </div>
 
             <Tabs value={currentTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList>
+              {/* gap-1: the shared TabsList packs its triggers flush, so with this many the active
+                  one's fill runs straight into its neighbours' labels and the strip reads as one
+                  block rather than a row of choices. */}
+              <TabsList className="gap-1">
                 <TabsTrigger value="details">Details</TabsTrigger>
                 {orderTabs.includes('suppliers') && <TabsTrigger value="suppliers">Suppliers</TabsTrigger>}
                 <TabsTrigger value="invoices">Invoices</TabsTrigger>
@@ -2657,7 +2690,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 a profitable-but-uncollected order never reads as lost money. Sales only — payables
                 already have the "Suppliers on this order" block below. */}
             {fin && order.order_type === 'sales' && orderMargin != null && (() => {
-              const supplierOwed = supExposure.reduce((a, s) => a + Math.max(0, s.owed), 0);
+              const supplierOwed = supExposure.reduce((a, s) => a + supplierOwedAfterCover(s).owed, 0);
               const hasGap = outstanding > 0.005 || supplierOwed > 0.005;
               if (!hasGap) return null;
               return (
@@ -2675,6 +2708,26 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 </div>
               );
             })()}
+
+            {/* The order's own note, on the order's own tab. It used to sit below the strip and
+                outside every panel, so it repeated itself under Invoices, Payments and everything
+                else — a field belonging to the record reading as one belonging to whichever tab you
+                were on. Captured when the order is placed; prints on the invoice and the receipt. */}
+            <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+              <Label className="text-[10px] text-muted-foreground">Order note</Label>
+              <Textarea
+                key={order.id}
+                rows={2}
+                defaultValue={order.notes ?? ''}
+                disabled={saving}
+                placeholder="Note from whoever placed the order — e.g. pickup / delivery instructions. Prints on the invoice & receipt."
+                className="text-sm"
+                onBlur={(e) => {
+                  const v = e.target.value.trim() || null;
+                  if (v !== (order.notes ?? null)) void saveMeta({ notes: v });
+                }}
+              />
+            </div>
 
               </TabsContent>
 
@@ -2702,7 +2755,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       : 'No line on this order carries a cost, so there is nothing owed to a supplier.'}
                   </p>
                 )}
-                {supExposure.map((s) => (
+                {supExposure.map((s) => {
+                  // Deferred to the covering purchase order when there is one — see
+                  // `supplierOwedAfterCover`. The Pay button goes with it: it books a supplier
+                  // bill, and pressing it for goods a paid purchase order already covers is a
+                  // second payable for one delivery.
+                  const { po } = supplierOwedAfterCover(s);
+                  return (
                   <div key={s.supplier_company_id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
                     <span className="inline-flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-muted-foreground" /> {s.name}</span>
                     <span className="flex items-center gap-3 tabular-nums">
@@ -2711,17 +2770,30 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                           ? `cost ${formatMoney(s.cost_net, order.currency)} + ${formatMoney(s.cost - s.cost_net, order.currency)} VAT = ${formatMoney(s.cost, order.currency)} · paid ${formatMoney(s.paid, order.currency)}`
                           : `cost ${formatMoney(s.cost, order.currency)} · paid ${formatMoney(s.paid, order.currency)}`}
                       </span>
-                      <span className={s.owed > 0.005 ? 'text-red-400 font-medium' : 'text-emerald-500'}>
-                        {s.owed > 0.005 ? `owe ${formatMoney(s.owed, order.currency)}` : s.owed < -0.005 ? `overpaid ${formatMoney(-s.owed, order.currency)}` : 'settled'}
-                      </span>
-                      {s.owed > 0.005 && (
-                        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => openPaySupplier(s)}>
-                          <Banknote className="h-3.5 w-3.5 mr-1" /> Pay
-                        </Button>
+                      {po ? (
+                        <Link to={`${financeBase}/orders/${po.id}`} className="text-[11px] hover:underline">
+                          <span className={po.outstanding > 0.005 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-500'}>
+                            {po.outstanding > 0.005
+                              ? `${formatMoney(po.outstanding, po.currency)} owed on ${po.order_number ?? 'the purchase order'}`
+                              : `paid on ${po.order_number ?? 'the purchase order'}`}
+                          </span>
+                        </Link>
+                      ) : (
+                        <>
+                          <span className={s.owed > 0.005 ? 'text-red-400 font-medium' : 'text-emerald-500'}>
+                            {s.owed > 0.005 ? `owe ${formatMoney(s.owed, order.currency)}` : s.owed < -0.005 ? `overpaid ${formatMoney(-s.owed, order.currency)}` : 'settled'}
+                          </span>
+                          {s.owed > 0.005 && (
+                            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => openPaySupplier(s)}>
+                              <Banknote className="h-3.5 w-3.5 mr-1" /> Pay
+                            </Button>
+                          )}
+                        </>
                       )}
                     </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -2782,7 +2854,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   <Link key={po.id} to={`${financeBase}/orders/${po.id}`}
                     className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0 hover:bg-muted/40">
                     <span className="font-mono text-xs">{po.order_number ?? po.id.slice(0, 8)} · {humanizeLabel(po.status)}</span>
-                    <span className="tabular-nums">{formatMoney(Number(po.total), po.currency)}</span>
+                    {/* Settlement, not just the figure: "there is a purchase order for €2,580" and
+                        "that €2,580 has been paid" are different facts, and only the second one
+                        tells the operator whether this sale still costs them anything. */}
+                    <span className="flex items-center gap-3">
+                      <span className={`text-[11px] ${po.outstanding > 0.005 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-500'}`}>
+                        {po.outstanding > 0.005 ? `${formatMoney(po.outstanding, po.currency)} still owed` : 'paid'}
+                      </span>
+                      <span className="tabular-nums">{formatMoney(Number(po.total), po.currency)}</span>
+                    </span>
                   </Link>
                 ))}
               </div>
@@ -2813,7 +2893,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 </div>
                 {!fin || fin.supplierBills.length === 0 ? (
                   <p className="px-3 py-2 text-[11px] text-muted-foreground">
-                    No cost is booked against this order yet.
+                    {/* "No cost is booked against this order" was false whenever a purchase order
+                        covered the sale: the cost was booked, on that order, and saying otherwise
+                        while the block directly above listed it made the panel argue with itself. */}
+                    {coveredBy.length > 0
+                      ? 'No cost is booked directly on this order — what it costs to fulfil sits on the purchase order(s) above. Anything extra (freight, customs, an installer) goes here.'
+                      : 'No cost is booked against this order yet.'}
                   </p>
                 ) : fin.supplierBills.map((b) => (
                   <div key={b.id} className="flex items-center justify-between gap-2 border-t border-border/40 px-3 py-1.5 text-sm first:border-t-0">
@@ -3061,28 +3146,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                   wedged above the strip: it is one more thing the order is, and it says so itself
                   when the order carries nothing declarable. */}
               <TabsContent value="customs" className="mt-3">
-                <OrderCustomsCard orderId={order.id} />
+                <OrderCustomsCard
+                  orderId={order.id}
+                  onAddCost={(s) => { setExpensePrefill({ amount: s.amount, description: `${order.order_number ?? order.id.slice(0, 8)} — ${s.description}` }); setExpenseOpen(true); }}
+                />
               </TabsContent>
             </Tabs>
-
-            {/* Order note — stays OUTSIDE the tabs: it belongs to the order itself, not to any one
-                of the documents behind it, and burying it in a tab would hide the field people
-                actually type into. Captured when the order is placed; prints on invoice + receipt. */}
-            <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-              <Label className="text-[10px] text-muted-foreground">Order note</Label>
-              <Textarea
-                key={order.id}
-                rows={2}
-                defaultValue={order.notes ?? ''}
-                disabled={saving}
-                placeholder="Note from whoever placed the order — e.g. pickup / delivery instructions. Prints on the invoice & receipt."
-                className="text-sm"
-                onBlur={(e) => {
-                  const v = e.target.value.trim() || null;
-                  if (v !== (order.notes ?? null)) void saveMeta({ notes: v });
-                }}
-              />
-            </div>
           </div>
         )}
         <DialogFooter>
