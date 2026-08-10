@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 import { formatAddressLine } from '@/services/crm.service';
@@ -394,17 +395,17 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (term.length < 2) { setCustomerOptions([]); return; }
     const t = setTimeout(async () => {
       // Search across more than just the name — a short-name you remember might be
-      // the email, the website domain, or the VAT number. Match all of them on both
-      // people and businesses, and tag each result so it's clear which is which.
-      const like = `%${term}%`;
+      // the email, the website domain, or the VAT number. `search_fold` holds all of them,
+      // accent-folded, so a Greek customer is found however their name is typed.
+      const like = foldedLike(term);
       const [contacts, companies] = await Promise.all([
         supabase.from('crm_contacts')
           .select('id, name, first_name, last_name, email, website, vat_number')
-          .or(`name.ilike.${like},first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},website.ilike.${like},vat_number.ilike.${like}`)
+          .ilike(CRM_SEARCH_COLUMN, like)
           .limit(8),
         supabase.from('crm_companies')
           .select('id, name, email, website, vat_number')
-          .or(`name.ilike.${like},email.ilike.${like},website.ilike.${like},vat_number.ilike.${like}`)
+          .ilike(CRM_SEARCH_COLUMN, like)
           .limit(8),
       ]);
       const opts: Customer[] = [];

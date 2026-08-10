@@ -10,6 +10,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import {
   financeService, type PlannedPaymentCategory, type PlannedPaymentDirection,
 } from '@/modules/finance/services/financeService';
@@ -86,10 +87,10 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
       const [companies, contacts] = await Promise.all([
         supabase.from('crm_companies').select('id, name')
           .eq(direction === 'out' ? 'is_supplier' : 'is_customer', true)
-          .ilike('name', `%${term}%`).limit(8),
+          .ilike(CRM_SEARCH_COLUMN, foldedLike(term)).limit(8),
         supabase.from('crm_contacts').select('id, name, first_name, last_name, email')
           .eq(filterCol, true)
-          .or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`).limit(8),
+          .ilike(CRM_SEARCH_COLUMN, foldedLike(term)).limit(8),
       ]);
       const opts: Party[] = [];
       for (const c of companies.data ?? []) opts.push({ type: 'company', id: c.id, label: `${c.name} (company)` });

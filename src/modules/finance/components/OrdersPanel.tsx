@@ -19,6 +19,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import {
   formatMoney, financeService, VAT_CATEGORIES,
   type PaymentWithAllocation, type PaymentMethod,
@@ -691,7 +692,7 @@ export const NewOrderModal: React.FC<{
     if (!open) return;
     const term = partySearch.trim();
     if (term.length < 2) { setPartyOpts([]); return; }
-    const like = `%${term}%`;
+    const like = foldedLike(term);
     const t = setTimeout(async () => {
       // Same role and workspace filters the per-LINE SupplierPickerDialog applies (and tells the
       // user about). Without them a purchase order could be raised against a company the line-level
@@ -699,10 +700,10 @@ export const NewOrderModal: React.FC<{
       // reached across every workspace's CRM.
       let companyQ = supabase.from('crm_companies').select('id, name, vat_number, email')
         .eq('workspace_id', workspaceId)
-        .or(`name.ilike.${like},vat_number.ilike.${like},email.ilike.${like}`).limit(8);
+        .ilike(CRM_SEARCH_COLUMN, like).limit(8);
       let contactQ = supabase.from('crm_contacts').select('id, name, vat_number, email')
         .eq('workspace_id', workspaceId)
-        .or(`name.ilike.${like},vat_number.ilike.${like},email.ilike.${like}`).limit(8);
+        .ilike(CRM_SEARCH_COLUMN, like).limit(8);
       if (!isSales) {
         companyQ = companyQ.eq('is_supplier', true);
         contactQ = contactQ.eq('is_supplier', true);
@@ -3218,7 +3219,7 @@ const SupplierPickerDialog: React.FC<{
     const t = term.trim();
     if (t.length < 2) { setOpts([]); return; }
     const h = setTimeout(async () => {
-      const { data } = await supabase.from('crm_companies').select('id, name').eq('is_supplier', true).ilike('name', `%${t}%`).limit(8);
+      const { data } = await supabase.from('crm_companies').select('id, name').eq('is_supplier', true).ilike(CRM_SEARCH_COLUMN, foldedLike(t)).limit(8);
       setOpts((data ?? []) as Array<{ id: string; name: string }>);
     }, 200);
     return () => clearTimeout(h);

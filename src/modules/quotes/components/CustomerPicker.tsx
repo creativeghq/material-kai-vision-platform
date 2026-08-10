@@ -7,6 +7,7 @@ import { Input } from '@/components/core/ui/input';
 import { Button } from '@/components/core/ui/button';
 import { Label } from '@/components/core/ui/label';
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 
 export type QuoteCustomer = { type: 'company' | 'contact'; id: string; label: string };
 
@@ -24,10 +25,12 @@ export const CustomerPicker: React.FC<{
     const term = search.trim();
     if (term.length < 2) { setOptions([]); return; }
     const t = setTimeout(async () => {
+      const like = foldedLike(term);
       const [companies, contacts] = await Promise.all([
-        supabase.from('crm_companies').select('id, name').eq('is_customer', true).ilike('name', `%${term}%`).limit(6),
+        supabase.from('crm_companies').select('id, name').eq('is_customer', true)
+          .ilike(CRM_SEARCH_COLUMN, like).limit(6),
         supabase.from('crm_contacts').select('id, name, first_name, last_name, email').eq('is_client', true)
-          .or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`).limit(6),
+          .ilike(CRM_SEARCH_COLUMN, like).limit(6),
       ]);
       const opts: QuoteCustomer[] = [];
       for (const c of companies.data ?? []) opts.push({ type: 'company', id: (c as any).id, label: `${(c as any).name} (company)` });

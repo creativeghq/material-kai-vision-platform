@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { quotesService, type QuoteWithItems } from '@/modules/quotes/services/QuotesService';
 import { StatementActions } from '@/modules/finance/components/StatementActions';
 import { formatDate } from '@/utils/datetime';
@@ -296,9 +297,9 @@ const NewOrderDialog: React.FC<{
         const [{ data: contacts }, { data: companies }] = await Promise.all([
           supabase.from('crm_contacts')
             .select('id, name, first_name, last_name, email')
-            .or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`)
+            .ilike(CRM_SEARCH_COLUMN, foldedLike(term))
             .limit(6),
-          supabase.from('crm_companies').select('id, name').ilike('name', `%${term}%`).limit(6),
+          supabase.from('crm_companies').select('id, name').ilike(CRM_SEARCH_COLUMN, foldedLike(term)).limit(6),
         ]);
         if (cancelled) return;
         const opts: CustomerOption[] = [];

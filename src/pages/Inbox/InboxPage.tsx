@@ -9,6 +9,7 @@ import {
   Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { marketplaceService } from '@/services/marketplaceService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -1623,7 +1624,7 @@ const NewThreadDialog: React.FC<{ workspaceId: string; onClose: () => void; onCr
         .limit(40);
       const term = contactQuery.trim();
       if (term.length >= 2) {
-        q = q.or(`name.ilike.%${term}%,email.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
+        q = q.ilike(CRM_SEARCH_COLUMN, foldedLike(term));
       }
       const { data } = await q;
       if (cancelled) return;

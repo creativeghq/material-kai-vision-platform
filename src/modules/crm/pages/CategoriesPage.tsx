@@ -25,6 +25,7 @@ import {
   type CrmCategoryKind,
 } from '@/services/crmCategoriesService';
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { CRM_CATEGORY_FILTERS } from './crmCategoryFilters';
 import { formatNumber } from '@/utils/decimal';
@@ -447,8 +448,8 @@ const CategoryMembersDialog: React.FC<{
     try {
       const [usersRes, contactsRes, companiesRes] = await Promise.all([
         supabase.from('user_profiles').select('user_id, full_name, email').or(`email.ilike.%${q}%,full_name.ilike.%${q}%`).limit(10),
-        supabase.from('crm_contacts').select('id, name, email').or(`email.ilike.%${q}%,name.ilike.%${q}%`).limit(10),
-        supabase.from('crm_companies').select('id, name, email').or(`email.ilike.%${q}%,name.ilike.%${q}%`).limit(10),
+        supabase.from('crm_contacts').select('id, name, email').ilike(CRM_SEARCH_COLUMN, foldedLike(q)).limit(10),
+        supabase.from('crm_companies').select('id, name, email').ilike(CRM_SEARCH_COLUMN, foldedLike(q)).limit(10),
       ]);
       const out: typeof searchResults = [];
       for (const r of (usersRes.data || []) as any[]) {

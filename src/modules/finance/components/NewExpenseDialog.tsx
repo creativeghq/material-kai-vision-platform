@@ -16,6 +16,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import {
   financeService, type PaymentMethod, type BankAccountBalance, type RecurringCadence,
 } from '@/modules/finance/services/financeService';
@@ -251,9 +252,10 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (term.length < 2) { setPartyOptions([]); return; }
     const t = setTimeout(async () => {
       const [companies, contacts] = await Promise.all([
-        supabase.from('crm_companies').select('id, name, is_supplier').ilike('name', `%${term}%`).limit(8),
+        supabase.from('crm_companies').select('id, name, is_supplier')
+          .ilike(CRM_SEARCH_COLUMN, foldedLike(term)).limit(8),
         supabase.from('crm_contacts').select('id, name, first_name, last_name, email, is_supplier')
-          .or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,email.ilike.%${term}%`).limit(8),
+          .ilike(CRM_SEARCH_COLUMN, foldedLike(term)).limit(8),
       ]);
       const opts: Party[] = [];
       for (const c of companies.data ?? []) {

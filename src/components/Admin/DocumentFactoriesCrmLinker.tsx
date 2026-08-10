@@ -15,6 +15,7 @@ import {
   Building2, Check, Plus, Loader2, ExternalLink, AlertCircle,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { quoteOrValue } from '@/services/crmSearch';
 import { useToast } from '@/hooks/use-toast';
 import { companiesAPI } from '@/services/crm.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -143,10 +144,14 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
     if (factories.length === 0) { setMatchesByKey(new Map()); return; }
     setLoading(true);
     try {
-      // One round-trip: OR ilike across all candidates
+      // One round-trip: OR ilike across all candidates.
+      // Deliberately an EXACT name match, not a `search_fold` substring — the result is keyed
+      // back by lowercased name below, so a fuzzy hit would attach the wrong company.
+      // Quoted because these names come out of PDF metadata: PostgREST's or() grammar is
+      // comma-delimited, and one "Tiles, Inc" 400s the whole batch.
       const ors = factories.map((f) => {
         const safe = f.name.replace(/[%_]/g, '\\$&');
-        return `name.ilike.${safe}`;
+        return `name.ilike.${quoteOrValue(safe)}`;
       }).join(',');
       const { data, error } = await supabase
         .from('crm_companies')

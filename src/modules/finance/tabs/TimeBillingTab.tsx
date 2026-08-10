@@ -11,6 +11,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { timeTrackingService, type TimeEntry, type TimeReportUserRow, type TimeReportContactRow } from '@/modules/finance/services/timeTrackingService';
 import { parseDecimal } from '@/utils/decimal';
@@ -105,8 +106,10 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
     if (term.length < 2) { setOptions([]); return; }
     const t = setTimeout(async () => {
       const [contacts, companies] = await Promise.all([
-        supabase.from('crm_contacts').select('id, name, first_name, last_name, email').or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`).limit(6),
-        supabase.from('crm_companies').select('id, name').ilike('name', `%${term}%`).limit(6),
+        supabase.from('crm_contacts').select('id, name, first_name, last_name, email')
+          .ilike(CRM_SEARCH_COLUMN, foldedLike(term)).limit(6),
+        supabase.from('crm_companies').select('id, name')
+          .ilike(CRM_SEARCH_COLUMN, foldedLike(term)).limit(6),
       ]);
       const opts: Customer[] = [];
       for (const c of contacts.data ?? []) opts.push({ type: 'contact', id: (c as any).id, label: (c as any).name || [(c as any).first_name, (c as any).last_name].filter(Boolean).join(' ') || (c as any).email || (c as any).id });

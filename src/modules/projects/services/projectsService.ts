@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { edgeError } from '@/utils/edgeError';
 import { escapeHtml } from '@/utils/escapeHtml';
@@ -1599,7 +1600,7 @@ class ProjectsService {
 
   async searchCompanies(query: string, limit = 10) {
     const q = (supabase as any).from('crm_companies').select('id, name, email').limit(limit);
-    if (query.trim()) q.ilike('name', `%${query}%`);
+    if (query.trim()) q.ilike(CRM_SEARCH_COLUMN, foldedLike(query));
     q.order('name', { ascending: true });
     const { data, error } = await q;
     if (error) throw error;
@@ -1622,9 +1623,7 @@ class ProjectsService {
       .from('crm_contacts')
       .select('id, name, first_name, last_name, email')
       .limit(limit);
-    if (query.trim()) {
-      q.or(`name.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%,email.ilike.%${query}%`);
-    }
+    if (query.trim()) q.ilike(CRM_SEARCH_COLUMN, foldedLike(query));
     q.order('name', { ascending: true });
     const { data, error } = await q;
     if (error) throw error;

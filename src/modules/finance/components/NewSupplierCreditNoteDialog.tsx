@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Plus, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { financeService, formatMoney, round2, VAT_CATEGORIES, type SupplierBill } from '@/modules/finance/services/financeService';
 import { vatOf } from '@/modules/finance/lib/vatMath';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
@@ -88,8 +89,10 @@ export const NewSupplierCreditNoteDialog: React.FC<{
     if (term.length < 2 || billId) { setSupOptions([]); return; }
     const t = setTimeout(async () => {
       const [companies, contacts] = await Promise.all([
-        supabase.from('crm_companies').select('id, name').eq('is_supplier', true).ilike('name', `%${term}%`).limit(6),
-        supabase.from('crm_contacts').select('id, name, first_name, last_name').eq('is_supplier', true).or(`name.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`).limit(6),
+        supabase.from('crm_companies').select('id, name').eq('is_supplier', true)
+          .ilike(CRM_SEARCH_COLUMN, foldedLike(term)).limit(6),
+        supabase.from('crm_contacts').select('id, name, first_name, last_name').eq('is_supplier', true)
+          .ilike(CRM_SEARCH_COLUMN, foldedLike(term)).limit(6),
       ]);
       const opts: Supplier[] = [];
       for (const c of companies.data ?? []) opts.push({ type: 'company', id: (c as any).id, label: `${(c as any).name} (company)` });
