@@ -9,7 +9,8 @@
  */
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Loader2, Plus, Ruler, Box, Map as MapIcon } from 'lucide-react';
+import { Loader2, Plus, Ruler, Box, Map as MapIcon, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,8 +40,64 @@ export const RoomPlannerPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [modelUrls, setModelUrls] = useState<Map<string, string>>(new Map());
+  const [quoting, setQuoting] = useState(false);
+  const navigate = useNavigate();
 
   const layout = useMemo(() => layouts.find((l) => l.id === layoutId) ?? null, [layouts, layoutId]);
+
+  /**
+   * Put this plan on a quote.
+   *
+   * Adds to the workspace's most recent open quote, or creates one named after the room when there
+   * is none — asking "which quote?" before anything exists is a dead end, and this is the first
+   * time a plan has been able to become money at all. The pricing happens entirely in
+   * `add_layout_to_quote`; nothing here computes a figure.
+   */
+  const addToQuote = useCallback(async () => {
+    if (!layout || !activeWorkspaceId) return;
+    setQuoting(true);
+    try {
+      const open = await roomPlannerService.openQuotes(activeWorkspaceId);
+      let quoteId = open[0]?.id;
+      if (!quoteId) {
+        const { data: auth } = await supabase.auth.getUser();
+        const { data, error } = await supabase
+          .from('quotes')
+          .insert({
+            workspace_id: activeWorkspaceId,
+            user_id: auth.user?.id ?? null,
+            name: layout.name ?? 'Room plan',
+            status: 'draft',
+            currency: 'EUR',
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
+        quoteId = (data as { id: string }).id;
+      }
+      const res = await roomPlannerService.addToQuote(layout.id, quoteId);
+      toast({
+        title: `${res.lines_added} line${res.lines_added === 1 ? '' : 's'} added to the quote`,
+        // Said out loud rather than left for the operator to notice on the PDF: a call-for-price
+        // line contributes nothing to the total, so a quote can look finished and be short.
+        description: res.lines_without_price > 0
+          ? `${res.lines_without_price} of them have no price yet and are marked call for price.`
+          : undefined,
+      });
+      // `/quotes?quote=<id>` — the shape the moodboard handoff already uses. There is no
+      // `/quotes/:id` route, so the obvious spelling lands on the catch-all: a link that goes
+      // nowhere, which is exactly the failure `deepLinkTargets` exists to catch.
+      navigate(`/quotes?quote=${quoteId}`);
+    } catch (e) {
+      toast({
+        title: 'Could not add this plan to a quote',
+        description: e instanceof Error ? e.message : String(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setQuoting(false);
+    }
+  }, [layout, activeWorkspaceId, navigate, toast]);
 
   const loadLayouts = useCallback(async () => {
     if (!activeWorkspaceId) return;
@@ -224,6 +281,23 @@ export const RoomPlannerPanel: React.FC = () => {
               ? <><Box className="mr-1 h-3.5 w-3.5" />3D view</>
               : <><MapIcon className="mr-1 h-3.5 w-3.5" />Floor plan</>}
           </Button>
+
+          {/* The plan produces something (#341). Until now a finished arrangement was a closed
+              loop: real products at their real size, and nothing came out of it. */}
+          {layout && items.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full"
+              disabled={quoting}
+              onClick={addToQuote}
+            >
+              {quoting
+                ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                : <FileText className="mr-1 h-3.5 w-3.5" />}
+              Add to quote
+            </Button>
+          )}
 
           {layout && (
             <>

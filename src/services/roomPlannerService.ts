@@ -46,6 +46,41 @@ export const roomPlannerService = {
     return data ?? [];
   },
 
+  /**
+   * Turn this plan into quote lines (#341).
+   *
+   * The whole derivation is one SQL statement: prices are read and FROZEN onto the lines together,
+   * repeats collapse into one line with a quantity, and a layout from another workspace is refused.
+   * Nothing is priced here — this call formats the answer it gets back.
+   */
+  async addToQuote(layoutId: string, quoteId: string): Promise<{
+    lines_added: number;
+    lines_without_price: number;
+  }> {
+    const { data, error } = await supabase.rpc('add_layout_to_quote', {
+      p_quote_id: quoteId,
+      p_layout_id: layoutId,
+    });
+    if (error) throw error;
+    return data as never;
+  },
+
+  /** Open quotes this plan could be added to — the workspace's, newest first. */
+  async openQuotes(workspaceId: string): Promise<Array<{ id: string; name: string }>> {
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('id, name, status')
+      .eq('workspace_id', workspaceId)
+      .in('status', ['draft', 'pending', 'sent'])
+      .order('updated_at', { ascending: false })
+      .limit(25);
+    if (error) throw error;
+    return (data ?? []).map((q: { id: string; name: string | null }) => ({
+      id: q.id,
+      name: q.name ?? 'Untitled quote',
+    }));
+  },
+
   async createLayout(workspaceId: string, name: string): Promise<RoomLayout> {
     const { data: auth } = await supabase.auth.getUser();
     const { data, error } = await supabase
