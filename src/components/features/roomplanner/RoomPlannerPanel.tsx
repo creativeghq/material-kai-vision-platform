@@ -26,6 +26,8 @@ import { RoomScene3D, type SceneItem } from './RoomScene3D';
 import { roomCameraPosition } from './roomScene';
 import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/CanvasChrome';
 import { occupiedAreaM2 } from './roomGeometry';
+import { PRESET_OPTIONS, DEFAULT_PRESET } from '@/components/features/lighting/PresetLighting';
+import type { PresetKey } from '@/components/features/lighting/lightingPresets';
 import {
   roomPlannerService, SURFACE_KEYS,
   type RoomLayout, type ResolvedLayoutItem, type LayoutSurface, type SurfaceKey,
@@ -362,6 +364,36 @@ export const RoomPlannerPanel: React.FC = () => {
               : <><MapIcon className="mr-1 h-3.5 w-3.5" />Floor plan</>}
           </Button>
 
+          {/* Lighting (#335). The presets already existed and only the material viewer could use
+              them; a plan is something you show a client, so it gets the same choice and keeps it. */}
+          {layout && view === '3d' && (
+            <div className="min-w-[10rem]">
+              <Label className="text-xs">Lighting</Label>
+              <Select
+                value={layout.lighting_preset ?? DEFAULT_PRESET}
+                onValueChange={async (v) => {
+                  try {
+                    await roomPlannerService.updateLayout(layout.id, { lighting_preset: v });
+                    setLayouts((ls) => ls.map((l) => (l.id === layout.id ? { ...l, lighting_preset: v } : l)));
+                  } catch (err) {
+                    toast({
+                      title: 'Could not change the lighting',
+                      description: err instanceof Error ? err.message : 'Unknown error',
+                      variant: 'destructive',
+                    });
+                  }
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PRESET_OPTIONS.map((o) => (
+                    <SelectItem key={o.key} value={o.key}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* The plan produces something (#341). Until now a finished arrangement was a closed
               loop: real products at their real size, and nothing came out of it. */}
           {layout && (items.length > 0 || surfaces.length > 0) && (
@@ -431,6 +463,7 @@ export const RoomPlannerPanel: React.FC = () => {
                       onPointerMissed={() => setSelectedId(null)}
                     >
                       <RoomScene3D
+                      lighting={(layout?.lighting_preset as PresetKey) ?? DEFAULT_PRESET}
                         room={{ widthM: Number(layout.room_width_m), depthM: Number(layout.room_depth_m) }}
                         items={sceneItems}
                         selectedId={selectedId}

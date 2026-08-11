@@ -10,7 +10,9 @@
  * missing pieces are precisely the ones a tenant needs prompting to upload.
  */
 import React, { Suspense, useMemo } from 'react';
-import { useGLTF, OrbitControls, Environment, Grid } from '@react-three/drei';
+import { useGLTF, OrbitControls, Grid } from '@react-three/drei';
+import { PresetLighting, DEFAULT_PRESET } from '@/components/features/lighting/PresetLighting';
+import type { PresetKey } from '@/components/features/lighting/lightingPresets';
 import {
   cloneSceneWithOwnMaterials,
 } from '@/components/features/ar/materialOverrides';
@@ -27,6 +29,8 @@ interface RoomSceneProps {
   items: SceneItem[];
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
+  /** Which of the shared lighting presets to light the room with (#335). */
+  lighting?: PresetKey;
 }
 
 /** One product, scaled to its planned footprint and stood on the floor. */
@@ -68,12 +72,11 @@ const PlaceholderBox: React.FC<{ item: SceneItem; selected: boolean }> = ({ item
   );
 };
 
-export const RoomScene3D: React.FC<RoomSceneProps> = ({ room, items, selectedId, onSelect }) => (
+export const RoomScene3D: React.FC<RoomSceneProps> = ({
+  room, items, selectedId, onSelect, lighting = DEFAULT_PRESET,
+}) => (
   <>
-    <Environment preset="apartment" background={false} />
-    <ambientLight intensity={0.5} />
-    <directionalLight position={[6, 10, 6]} intensity={1.1} />
-    <directionalLight position={[-5, 6, -4]} intensity={0.35} />
+    <PresetLighting preset={lighting} />
 
     {/* Floor at true size, so the room reads as the room and not as infinite space. */}
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]} receiveShadow>

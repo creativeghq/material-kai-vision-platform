@@ -14,7 +14,18 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import { modelPublicUrl } from '@/services/product3dService';
 
-export type RoomLayout = Tables<'room_layouts'>;
+/**
+ * `Tables<'room_layouts'>` is generated from the database, and the committed `types.ts` is stale —
+ * it predates `room_height_m` and `lighting_preset`. Regenerating needs a Supabase access token
+ * this environment does not have, and doing it wholesale would also pull in unrelated schema from
+ * work in flight. Declared here instead, narrowly, so the columns are typed where they are used.
+ */
+export type RoomLayout = Tables<'room_layouts'> & {
+  /** Wall height, for surface area. Defaults to 2.7 m in SQL. */
+  room_height_m: number;
+  /** Which LIGHTING_PRESETS key lights the 3D view (#335). */
+  lighting_preset: string;
+};
 
 /** The six faces of a rectangular room. Fixed, because the area maths keys off them. */
 export type SurfaceKey = 'floor' | 'ceiling' | 'wall_north' | 'wall_east' | 'wall_south' | 'wall_west';
@@ -160,7 +171,10 @@ export const roomPlannerService = {
     return data;
   },
 
-  async updateLayout(id: string, patch: Partial<Pick<RoomLayout, 'name' | 'room_width_m' | 'room_depth_m' | 'notes'>>): Promise<void> {
+  async updateLayout(
+    id: string,
+    patch: Partial<Pick<RoomLayout, 'name' | 'room_width_m' | 'room_depth_m' | 'notes' | 'room_height_m' | 'lighting_preset'>>,
+  ): Promise<void> {
     const { error } = await supabase
       .from('room_layouts')
       .update({ ...patch, updated_at: new Date().toISOString() })

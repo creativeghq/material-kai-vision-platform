@@ -92,3 +92,42 @@ describe('the surfaces feature keeps its two invariants', () => {
     }
   });
 });
+
+/**
+ * Lighting presets, everywhere (#335).
+ *
+ * The catalogue — natural daylight, golden hour, overcast, showroom spots, warm evening, night —
+ * has been usable in the material lighting viewer for a while. Every other 3D surface hardcoded
+ * three lights and the `apartment` environment, so a tenant could light a material sample the way
+ * they wanted and had no say over the product viewer or the room they were planning.
+ *
+ * Two things to hold: nothing goes back to literals, and the storable values cannot drift from the
+ * offerable ones — a CHECK constraint listing a preset the code does not have (or vice versa) fails
+ * only when someone picks that one.
+ */
+describe('lighting presets are shared, not hardcoded', () => {
+  const PRESETS = ['natural_daylight', 'golden_hour', 'overcast', 'showroom_spots', 'warm_evening', 'night'];
+
+  it('the catalogue still carries every preset the database will store', () => {
+    // The CHECK on room_layouts.lighting_preset lists exactly these. If one is renamed here, a
+    // saved plan referring to it becomes unstorable — and the failure appears when a tenant picks
+    // it, not when it is renamed.
+    const cat = read('src/components/features/lighting/lightingPresets.ts');
+    for (const key of PRESETS) {
+      expect(cat, `${key} missing from LIGHTING_PRESETS`).toContain(`${key}:`);
+    }
+  });
+
+  it('the 3D surfaces light themselves from the catalogue, not from literals', () => {
+    for (const f of [
+      'src/components/features/ar/ProductModelViewer.tsx',
+      'src/components/features/roomplanner/RoomScene3D.tsx',
+    ]) {
+      const src = read(f);
+      expect(src, `${f} should use the shared rig`).toContain('PresetLighting');
+      // The exact shape that was there before: a hardcoded environment and a hand-tuned ambient.
+      expect(src, `${f} still hardcodes an Environment preset`).not.toMatch(/Environment\s+preset="/);
+      expect(src, `${f} still hardcodes ambient light`).not.toMatch(/<ambientLight/);
+    }
+  });
+});

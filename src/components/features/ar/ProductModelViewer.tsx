@@ -11,7 +11,9 @@
  * the preview's.
  */
 import React, { useEffect, useMemo } from 'react';
-import { useGLTF, OrbitControls, Environment } from '@react-three/drei';
+import { useGLTF, OrbitControls } from '@react-three/drei';
+import { PresetLighting, DEFAULT_PRESET } from '@/components/features/lighting/PresetLighting';
+import type { PresetKey } from '@/components/features/lighting/lightingPresets';
 
 import {
   applyMaterialOverrides, cloneSceneWithOwnMaterials, unmatchedTargets, type MaterialOverride,
@@ -60,17 +62,15 @@ interface ProductModelStageProps {
   url: string;
   overrides?: MaterialOverride[];
   onUnmatchedTargets?: (names: string[]) => void;
+  /** Which of the shared lighting presets to light this with (#335). */
+  lighting?: PresetKey;
 }
 
 export const ProductModelStage: React.FC<ProductModelStageProps> = ({
-  url, overrides, onUnmatchedTargets,
+  url, overrides, onUnmatchedTargets, lighting = DEFAULT_PRESET,
 }) => (
   <>
-    <Environment preset="apartment" background={false} />
-    <ambientLight intensity={0.4} />
-    <directionalLight position={[5, 8, 5]} intensity={1.0} castShadow />
-    <directionalLight position={[-3, 4, -2]} intensity={0.4} />
-    <pointLight position={[0, 5, 0]} intensity={0.3} />
+    <PresetLighting preset={lighting} castShadow />
 
     <ProductModel url={url} overrides={overrides} onUnmatchedTargets={onUnmatchedTargets} />
 
