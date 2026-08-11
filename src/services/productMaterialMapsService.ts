@@ -104,6 +104,30 @@ export const productMaterialMapsService = {
   },
 
   /**
+   * Selected texture per OPTION VALUE for a product, as `valueId -> albedo url` (#321).
+   *
+   * One query rather than one per option: a product with four fabrics would otherwise fire four
+   * requests every time the configurator mounts.
+   */
+  async selectedByOptionValue(productId: string): Promise<Map<string, string>> {
+    const { data, error } = await supabase
+      .from('product_material_maps')
+      .select('option_value_id, storage_bucket, albedo_path')
+      .eq('product_id', productId)
+      .eq('is_selected', true)
+      .not('option_value_id', 'is', null);
+    if (error) throw error;
+    const out = new Map<string, string>();
+    for (const row of (data ?? []) as Array<{
+      option_value_id: string; storage_bucket: string; albedo_path: string | null;
+    }>) {
+      const url = publicUrl(row.storage_bucket, row.albedo_path);
+      if (url) out.set(row.option_value_id, url);
+    }
+    return out;
+  },
+
+  /**
    * Derive a tileable albedo from the product's own image and record it as a candidate.
    *
    * `model_tier` picks the provider through the shared routing, so running this twice with

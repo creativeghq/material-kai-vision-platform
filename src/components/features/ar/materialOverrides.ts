@@ -18,7 +18,10 @@
  *    error anywhere — the exact silent-zero shape this codebase keeps rediscovering. `applyMaterialOverrides`
  *    returns per-target hit counts so the UI can say "this option matches no material in the model".
  */
-import { Color, type Material, type Mesh, type Object3D } from 'three';
+import {
+  Color, RepeatWrapping, SRGBColorSpace, TextureLoader,
+  type Material, type Mesh, type Object3D, type Texture,
+} from 'three';
 
 export interface MaterialOverride {
   /** glTF material name, e.g. `Fabric_Navy`. The material is the swap unit, not the mesh. */
@@ -26,6 +29,40 @@ export interface MaterialOverride {
   baseColorHex?: string | null;
   roughness?: number | null;
   metalness?: number | null;
+  /**
+   * A derived tileable texture for this option (#321).
+   *
+   * This is what makes a velvet and a linen at the same colour look different. Without it an
+   * option can only move three scalars, and two fabrics with the same hue render identically —
+   * which is the gap #260 item 6 named.
+   */
+  albedoUrl?: string | null;
+  /** How many times the texture repeats across the material. Fabric weave is small; a tile is not. */
+  textureRepeat?: number | null;
+}
+
+/**
+ * Textures are cached by URL for the lifetime of the page.
+ *
+ * Loading is async and `applyMaterialOverrides` is called on every selection change, so without a
+ * cache switching back and forth re-downloads the same image each time. Keyed by URL, never by
+ * material — the same texture legitimately dresses several materials.
+ */
+const textureCache = new Map<string, Texture>();
+const textureLoader = new TextureLoader();
+
+function loadTexture(url: string, repeat: number): Texture {
+  const cached = textureCache.get(url);
+  if (cached) return cached;
+  const tex = textureLoader.load(url);
+  // sRGB, because it is a colour image. Left in linear space it renders washed out — the same
+  // colour-space trap the fixture generator hit from the other direction.
+  tex.colorSpace = SRGBColorSpace;
+  tex.wrapS = RepeatWrapping;
+  tex.wrapT = RepeatWrapping;
+  tex.repeat.set(repeat, repeat);
+  textureCache.set(url, tex);
+  return tex;
 }
 
 /** How many mesh materials each target actually matched. Zero means the name is wrong. */
@@ -35,6 +72,7 @@ interface Standardish extends Material {
   color?: Color;
   roughness?: number;
   metalness?: number;
+  map?: Texture | null;
 }
 
 /**
@@ -110,6 +148,19 @@ export function applyMaterialOverrides(root: Object3D, overrides: MaterialOverri
       }
       if (override.roughness != null && 'roughness' in target) target.roughness = override.roughness;
       if (override.metalness != null && 'metalness' in target) target.metalness = override.metalness;
+      if ('map' in target) {
+        if (override.albedoUrl) {
+          target.map = loadTexture(override.albedoUrl, override.textureRepeat ?? 1);
+          // A texture carries its own colour. Leaving a tint multiplied over it makes a navy
+          // velvet render navy-times-navy, so the base colour goes back to white unless the option
+          // deliberately asked for a tint.
+          if (!override.baseColorHex && target.color) target.color.setStyle('#ffffff');
+        } else if (override.baseColorHex) {
+          // Switching from a textured option BACK to a plain colour has to clear the texture, or
+          // the previous fabric stays visible under the new colour.
+          target.map = null;
+        }
+      }
       target.needsUpdate = true;
     }
   });

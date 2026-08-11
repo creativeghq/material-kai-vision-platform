@@ -25,6 +25,7 @@ import { formatMoney } from '@/utils/decimal';
 import { ProductModelStage } from '@/components/features/ar/ProductModelViewer';
 import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/CanvasChrome';
 import { product3dService, modelPublicUrl } from '@/services/product3dService';
+import { productMaterialMapsService } from '@/services/productMaterialMapsService';
 import {
   productConfiguratorService, selectionToValueIds, describeViolation,
   type OptionGroupWithValues, type ConfiguredPrice,
@@ -107,9 +108,22 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     return () => { cancelled = true; };
   }, [activeWorkspaceId, productId, valueIds]);
 
+  // Per-option textures (#321). A velvet and a linen at the same hue are identical until one
+  // carries its own weave; without this the swap can only move three scalars.
+  const [optionTextures, setOptionTextures] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    productMaterialMapsService
+      .selectedByOptionValue(productId)
+      .then((m) => { if (!cancelled) setOptionTextures(m); })
+      // A failed lookup costs the texture, not the configurator: colour and roughness still swap.
+      .catch(() => { if (!cancelled) setOptionTextures(new Map()); });
+    return () => { cancelled = true; };
+  }, [productId]);
+
   const overrides = useMemo(
-    () => productConfiguratorService.materialOverrides(groups, selection),
-    [groups, selection],
+    () => productConfiguratorService.materialOverrides(groups, selection, optionTextures),
+    [groups, selection, optionTextures],
   );
 
   const handleUnmatched = useCallback((names: string[]) => setUnmatched(names), []);

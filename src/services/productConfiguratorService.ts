@@ -17,6 +17,7 @@
  * this is the answer and the reason).
  */
 import { supabase } from '@/integrations/supabase/client';
+import type { MaterialOverride } from '@/components/features/ar/materialOverrides';
 import type { Tables } from '@/integrations/supabase/types';
 
 export type ProductOptionGroup = Tables<'product_option_groups'>;
@@ -76,13 +77,16 @@ export function describeViolation(v: OptionViolation): string {
     : `${v.when_label} requires ${v.then_label}`;
 }
 
-/** The visual part of a choice, applied to a glTF material by name. */
-export interface MaterialOverride {
-  targetMaterialName: string;
-  baseColorHex?: string | null;
-  roughness?: number | null;
-  metalness?: number | null;
-}
+/**
+ * The visual part of a choice, applied to a glTF material by name.
+ *
+ * RE-EXPORTED, not redeclared. This file carried its own copy of the interface, which meant the
+ * renderer could learn a new field (a texture) while the thing that BUILDS the overrides could
+ * not — two declarations of one contract, free to disagree, exactly the shape the escapeHtml
+ * twins and the settlement halves took. `materialOverrides.ts` is React-free, so a service can
+ * import it directly.
+ */
+export type { MaterialOverride } from '@/components/features/ar/materialOverrides';
 
 export const productConfiguratorService = {
   /** Compatibility rules for a product, with both sides' labels resolved for display. */
@@ -189,6 +193,11 @@ export const productConfiguratorService = {
   materialOverrides(
     groups: OptionGroupWithValues[],
     selection: Record<string, string>,
+    /**
+     * Derived texture per option VALUE id (#321). Optional: without it an option still swaps
+     * colour and roughness, which is what it did before textures existed.
+     */
+    texturesByValueId?: Map<string, string>,
   ): MaterialOverride[] {
     const out: MaterialOverride[] = [];
     for (const g of groups) {
@@ -202,6 +211,12 @@ export const productConfiguratorService = {
         baseColorHex: value.base_color_hex,
         roughness: value.roughness,
         metalness: value.metalness,
+        // The whole point of a per-option texture: a velvet and a linen at the same hue are three
+        // identical scalars until one of them carries its own weave.
+        albedoUrl: texturesByValueId?.get(value.id) ?? null,
+        // Fabric on furniture wants the weave repeated, or a single stretched photo reads as a
+        // print rather than a material.
+        textureRepeat: 4,
       });
     }
     return out;
