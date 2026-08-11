@@ -179,6 +179,11 @@ Complete documentation for Material Kai Vision Platform.
 - Optional per-result explanations
 - opus or haiku model choice
 
+**[installed-base.md](installed-base.md)** - Installed base (customer equipment, warranties, recurring service) NEW (2026-08, #343)
+- `customer_assets` + warranties + service plans; auto-registered from a delivered sales line
+- No `next_due_on` anywhere: the next date IS the plan's single open occurrence
+- Reminders emit `asset.service_due` / `asset.service_overdue` / `asset.warranty_expiring`
+
 **[crm-system.md](crm-system.md)** - CRM System ✨ NEW
 - Contacts, companies, platform user management
 - Integration with messaging and quotes

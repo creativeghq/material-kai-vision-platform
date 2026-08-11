@@ -284,8 +284,11 @@ identically to a MISS, so a 97.5% hit rate reduced the meter by exactly zero.
 | `product_edges` composite FKs | every write | invariant 1 — an edge's two products must both sit in the edge's workspace | n/a — declarative; unlike a trigger it cannot be disabled |
 | `ops.product_edges_never_written` | nightly | shape 4 on the edge rebuild — it ran and wrote nothing, or has not run for 3 days | **yes** — both branches were watched to fire on planted state, and the healthy case was confirmed to return **0** rows first, so a probe that always fires would have been caught |
 
+| [tests/unit/installedBaseDerivation.test.ts](../tests/unit/installedBaseDerivation.test.ts) | `npm test`, blocking | shape 1 off the money path — a cached `next_due_on` or a client-side recomputation of a service date (#343), plus a hardcoded notification/email send in the reminder cron | **yes** — the banned-identifier regex was checked in BOTH directions against the realistic spellings (a snake_case-only first draft waved `nextDueOn` straight through), then a real violation was appended to `customerAssetsService.ts` and watched to fail before being reverted |
+| `ops.asset_reminders_silent_zero` | nightly | shape 4 on the equipment reminder cron — it ran, exited 0, and told nobody | **yes** — watched to fire on a planted 30-day-overdue occurrence AND watched to stay silent once that row was stamped, so a probe that always fires would have been caught. Fixing the second half changed the probe: the overdue-only path leaves `reminded_at` null by design, which the first draft reported as neglect |
+
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
-what it found. Eleven of twenty-one qualify. That is the gap.
+what it found. Thirteen of twenty-three qualify. That is the gap.
 
 > **`db.plpgsql-lint` has one known false-positive shape: runtime-created temp tables.**
 > `plpgsql_check` analyses statically, so a `create temporary table X` inside a function makes it

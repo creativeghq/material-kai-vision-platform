@@ -11068,5 +11068,74 @@
       }
     },
     "docs": "docs/page-monitoring.md"
+  },
+  {
+    "name": "customer-assets-api",
+    "tag": "CRM",
+    "summary": "Installed base: a customer's equipment, its warranties and its recurring service schedules (#343).",
+    "description": "Action-discriminated JWT endpoint over customer_assets, customer_asset_warranties, customer_asset_service_plans and customer_asset_service_events, plus the per-product defaults in product_service_defaults. Reads and writes run through the caller's own RLS context; registration and service completion go through SECURITY DEFINER RPCs that call assert_workspace_member. There is no next_due_on field anywhere: the next due date IS the plan's single open service event, served by the customer_asset_service_due view. Ownership mismatches return 404, never 403.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      "list",
+      "get",
+      "register",
+      "update",
+      "delete",
+      "apply_defaults",
+      "warranty.save",
+      "warranty.delete",
+      "plan.save",
+      "plan.delete",
+      "service.due",
+      "service.complete",
+      "service.skip",
+      "defaults.list",
+      "defaults.save",
+      "defaults.delete"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "action": {
+          "type": "string",
+          "description": "Which operation to run (see actions)."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Target workspace; verified against the caller's memberships."
+        },
+        "asset_id": {
+          "type": "string",
+          "description": "Equipment id, for the asset-scoped actions."
+        },
+        "event_id": {
+          "type": "string",
+          "description": "Service occurrence id, for service.complete / service.skip."
+        }
+      }
+    },
+    "response": "{ assets } | { asset, warranties, plans, events } | { asset_id } | { due } | { next_event_id } | { defaults } | { success }"
+  },
+  {
+    "name": "asset-service-reminders-cron",
+    "tag": "CRM",
+    "summary": "Cron: emit equipment service-due, service-overdue and warranty-expiring flow events (#343).",
+    "description": "Runs daily via pg_cron (x-cron-secret via isCronAuthorized). Scans the customer_asset_service_due view for open occurrences inside their lead-time window and customer_asset_warranties approaching ends_on, then emits asset.service_due, asset.service_overdue and asset.warranty_expiring flow events with the recipient resolved from the plan assignee, the customer's responsible sales users, or the workspace owners/admins. It never writes a user_notifications row or calls email-api directly — the seeded system-default flows deliver. Each reminder is stamped on its row so it fires once, and only after the emit actually succeeded; a transient failure leaves the row unstamped for the next tick. Backed by the ops.asset_reminders_silent_zero integrity probe.",
+    "security": [
+      "cronSecret"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [],
+    "response": "{ success, scanned_due, scanned_warranties, serviceDue, serviceOverdue, warrantyExpiring, failed }"
   }
 ]

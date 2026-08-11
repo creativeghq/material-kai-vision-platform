@@ -389,6 +389,17 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Watched Page Changed', description: 'A watched non-price page changed — supplier terms, a regulatory notice, partner API docs or a competitor page', icon: 'FileSearch', color: 'blue',
     defaultData: { label: 'Watched Page Changed', category: 'trigger', triggerType: 'page_watch_changed', config: {} } as TriggerNodeData },
 
+  // Installed base (#343) — a customer's equipment needs work, or its cover is running out
+  { type: 'triggerNode', category: 'trigger', subType: 'asset.service_due', group: 'CRM',
+    label: 'Equipment Service Due', description: 'A unit of customer equipment is inside its reminder window for a scheduled service (e.g. clean the AC filters)', icon: 'Wrench', color: 'emerald',
+    defaultData: { label: 'Equipment Service Due', category: 'trigger', triggerType: 'asset.service_due', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'asset.service_overdue', group: 'CRM',
+    label: 'Equipment Service Overdue', description: 'A scheduled service passed its due date and is still open', icon: 'AlarmClock', color: 'emerald',
+    defaultData: { label: 'Equipment Service Overdue', category: 'trigger', triggerType: 'asset.service_overdue', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'asset.warranty_expiring', group: 'CRM',
+    label: 'Warranty Expiring', description: 'A customer equipment warranty is approaching its end date', icon: 'ShieldCheck', color: 'emerald',
+    defaultData: { label: 'Warranty Expiring', category: 'trigger', triggerType: 'asset.warranty_expiring', config: {} } as TriggerNodeData },
+
   // Upstream line-level RFQ between networked workspaces
   { type: 'triggerNode', category: 'trigger', subType: 'rfq_lines_requested', group: 'Quotes',
     label: 'RFQ Lines Requested', description: 'A downstream workspace routed unpriced quote lines up to its supplier/parent for pricing (notify the parent admins)', icon: 'Send', color: 'emerald',
@@ -552,6 +563,8 @@ export const TENANT_ALLOWED_SUBTYPES: ReadonlySet<string> = new Set<string>([
   // triggers
   'scheduled', 'quote_approved', 'invoice_paid', 'bank_payment_unmatched', 'card_spend_threshold', 'payment_received', 'payment_sent', 'payment_reversed',
   'inbox.message_received', 'appointment_booked', 'contract_signed',
+  // Installed base (#343) — a tenant's own customers' equipment; nothing cross-workspace here.
+  'asset.service_due', 'asset.service_overdue', 'asset.warranty_expiring',
   // actions (send_sms is the engine's WhatsApp alias)
   'send_email', 'send_sms', 'create_notification', 'send_agent_message',
 ]);

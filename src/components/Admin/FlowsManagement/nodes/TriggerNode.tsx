@@ -19,6 +19,7 @@ import {
   BatteryLow,
   UserMinus,
   Timer,
+  Wrench, AlarmClock, ShieldCheck,
 } from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
@@ -141,6 +142,9 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   'seo.backlink_movement': Search,
   'seo.site_health_changed': Search,
   page_watch_changed: FileText,
+  'asset.service_due': Wrench,
+  'asset.service_overdue': AlarmClock,
+  'asset.warranty_expiring': ShieldCheck,
 };
 
 function TriggerNodeComponent({ data, selected }: NodeProps) {

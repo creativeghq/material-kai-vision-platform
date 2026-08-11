@@ -289,6 +289,7 @@ Full reference: `.claude/design-system.md`.
 | Finance / orders / quotes | [docs/finance-system.md](docs/finance-system.md), [docs/orders-system.md](docs/orders-system.md), [docs/quotes-system-architecture.md](docs/quotes-system-architecture.md) |
 | Bank feed & reconciliation (Revolut Business) | [docs/banking-revolut.md](docs/banking-revolut.md) — the feed is **per-leg**: match a row in isolation and an internal pocket move settles a customer invoice |
 | CRM / HR / Projects / Real estate | [docs/crm-system.md](docs/crm-system.md), [docs/hr-system.md](docs/hr-system.md), [docs/projects.md](docs/projects.md), [docs/real-estate-system.md](docs/real-estate-system.md) |
+| Installed base — customer equipment, warranties, recurring service | [docs/installed-base.md](docs/installed-base.md) — there is **no `next_due_on`**: the next service date IS the plan's single open occurrence, and completing one is the only thing that opens the next |
 | Knowledge base | [docs/knowledge-base-implementation.md](docs/knowledge-base-implementation.md) |
 | XML import | [docs/xml-import-orchestrator.md](docs/xml-import-orchestrator.md) |
 | Moodboard sheets & client views | [docs/moodboard-presentation-sheets.md](docs/moodboard-presentation-sheets.md) |

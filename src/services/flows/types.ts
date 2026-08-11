@@ -174,7 +174,13 @@ export type TriggerType =
   | 'seo.site_health_changed'
   // A watched non-price page changed — supplier T&C, a regulatory notice, partner
   // API docs, a competitor page (#331). Fired by the Firecrawl monitoring webhook.
-  | 'page_watch_changed';
+  | 'page_watch_changed'
+  // Installed base (#343): a customer's equipment needs recurring service, or its warranty
+  // is running out. Emitted by asset-service-reminders-cron; payload carries both the internal
+  // recipient and the customer's email so one flow can serve either audience.
+  | 'asset.service_due'
+  | 'asset.service_overdue'
+  | 'asset.warranty_expiring';
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
@@ -223,6 +229,12 @@ export interface SupplierPoReceivedTriggerConfig {}
 export interface CatalogMasterUpdatedTriggerConfig {}
 export interface SupplierPriceChangedTriggerConfig {}
 export interface PageWatchChangedTriggerConfig {}
+/** Payload-only. Fires once per occurrence when `due_on - lead_days` is reached. */
+export interface AssetServiceDueTriggerConfig {}
+/** Payload-only. Fires once per occurrence when `due_on` has passed and it is still open. */
+export interface AssetServiceOverdueTriggerConfig {}
+/** Payload-only. Fires once per configured offset in `remind_days_before`. */
+export interface AssetWarrantyExpiringTriggerConfig {}
 export interface InventoryLowStockTriggerConfig {}
 export interface FreightQuoteRequestedTriggerConfig {}
 export interface OrderDispatchedTriggerConfig {}
@@ -473,6 +485,9 @@ export type TriggerConfigMap = {
   'seo.backlink_movement': SeoBacklinkMovementTriggerConfig;
   'seo.site_health_changed': SeoSiteHealthChangedTriggerConfig;
   page_watch_changed: PageWatchChangedTriggerConfig;
+  'asset.service_due': AssetServiceDueTriggerConfig;
+  'asset.service_overdue': AssetServiceOverdueTriggerConfig;
+  'asset.warranty_expiring': AssetWarrantyExpiringTriggerConfig;
 };
 
 // =====================================================

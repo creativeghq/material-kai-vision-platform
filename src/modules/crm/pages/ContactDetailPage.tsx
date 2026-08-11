@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Home, Sparkles, Loader2, RefreshCw, FolderKanban } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, X, ChevronDown, Home, Sparkles, Loader2, RefreshCw, FolderKanban, Wrench } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { CustomerAccountOverview, CustomerTopItemsCard, PartyPaymentsCard } from '@/modules/finance/components/CustomerFinanceTabs';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -50,6 +50,7 @@ import { useModule } from '@/modules/_core';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { PropertyBuyerPanel } from '@/modules/real-estate/components/PropertyBuyerPanel';
 import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
+import { EquipmentServiceTab } from '@/components/business/crm/EquipmentServiceTab';
 import { scoreLead, leadScoreTint } from '@/modules/crm/services/leadScoring';
 import { financeService } from '@/modules/finance/services/financeService';
 import { researchCompany, summarizeResearch, greekAfm } from '@/modules/crm/services/companyResearch';
@@ -184,7 +185,10 @@ export const ContactDetailPage: React.FC = () => {
   // Bump to force the Activity timeline to reload after we log a new activity.
   const [activityRefresh, setActivityRefresh] = useState(0);
   // Which top-level record tab is showing (activity-first record layout, 2026-07).
-  const [mainTab, setMainTab] = useState('activity');
+  // `?tab=` so a notification can deep-link straight to the right tab — the reminder emails
+  // from the installed base land on Equipment, not on Activity with nothing to see.
+  const [searchParams] = useSearchParams();
+  const [mainTab, setMainTab] = useState(searchParams.get('tab') || 'activity');
   // Opens the shared Activity email composer from the sidebar / Details quick-actions.
   const activityRef = useRef<CrmRecordActivityHandle>(null);
   const bumpActivity = () => setActivityRefresh((n) => n + 1);
@@ -785,6 +789,7 @@ export const ContactDetailPage: React.FC = () => {
                   <TabsTrigger value="company" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Building2 className="h-4 w-4 mr-2" />Company</TabsTrigger>
                 )}
                 <TabsTrigger value="projects" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FolderKanban className="h-4 w-4 mr-2" />Projects</TabsTrigger>
+                <TabsTrigger value="equipment" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wrench className="h-4 w-4 mr-2" />Equipment</TabsTrigger>
                 {realEstateEnabled && (
                   <TabsTrigger value="property" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Home className="h-4 w-4 mr-2" />Property</TabsTrigger>
                 )}
@@ -1070,6 +1075,15 @@ export const ContactDetailPage: React.FC = () => {
                   <PartyProjectsCard contactId={contact.id} partyName={contact.name} />
                 ) : (
                   <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to attach projects.</CardContent></Card>
+                )}
+              </TabsContent>
+
+              {/* Equipment & service — the installed base (#343). */}
+              <TabsContent value="equipment" className="space-y-4">
+                {contact.id ? (
+                  <EquipmentServiceTab contactId={contact.id} />
+                ) : (
+                  <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this contact first to register equipment.</CardContent></Card>
                 )}
               </TabsContent>
 

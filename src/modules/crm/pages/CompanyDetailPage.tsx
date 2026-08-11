@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
-import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers, Wrench } from 'lucide-react';
 import { PartyProjectsCard } from '@/modules/projects/components/PartyProjectsCard';
+import { EquipmentServiceTab } from '@/components/business/crm/EquipmentServiceTab';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import {
   CustomerAccountOverview,
@@ -169,7 +170,9 @@ export const CompanyDetailPage: React.FC = () => {
   // Which top-level record tab is showing (activity-first record layout, 2026-07).
   // Companies open on Activity — the unified feed (notes/calls/meetings/tracked actions),
   // aligned with the contact record.
-  const [mainTab, setMainTab] = useState('activity');
+  // `?tab=` so a notification can deep-link straight to the right tab (see ContactDetailPage).
+  const [searchParams] = useSearchParams();
+  const [mainTab, setMainTab] = useState(searchParams.get('tab') || 'activity');
   // Bump to force the Activity timeline to reload after the PAGE logs something
   // (registry enrichment, etc). Email logging is owned by CrmRecordActivity itself.
   const [activityRefresh, setActivityRefresh] = useState(0);
@@ -762,6 +765,7 @@ export const CompanyDetailPage: React.FC = () => {
                 )}
                 <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Users className="h-4 w-4 mr-2"/>Contacts ({company.contacts?.length || 0})</TabsTrigger>
                 <TabsTrigger value="projects" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><FolderKanban className="h-4 w-4 mr-2"/>Projects</TabsTrigger>
+                <TabsTrigger value="equipment" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Wrench className="h-4 w-4 mr-2"/>Equipment</TabsTrigger>
                 {company.is_supplier && (
                   <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"><Package className="h-4 w-4 mr-2"/>Products</TabsTrigger>
                 )}
@@ -1147,6 +1151,15 @@ export const CompanyDetailPage: React.FC = () => {
               />
             ) : (
               <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to attach projects.</CardContent></Card>
+            )}
+          </TabsContent>
+
+          {/* Equipment & service — the installed base (#343). */}
+          <TabsContent value="equipment" className="space-y-4">
+            {company.id ? (
+              <EquipmentServiceTab companyId={company.id} />
+            ) : (
+              <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Save this company first to register equipment.</CardContent></Card>
             )}
           </TabsContent>
 

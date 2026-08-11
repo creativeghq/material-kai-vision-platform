@@ -35,6 +35,7 @@ import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDraw
 import { ProductPricePanel } from '@/components/features/pricing/ProductPricePanel';
 import { ProductFiscalCard } from '@/components/business/marketplace/ProductFiscalCard';
 import { ProductStockPanel } from '@/components/business/marketplace/ProductStockPanel';
+import { ProductServiceDefaultsPanel } from '@/components/features/products/ProductServiceDefaultsPanel';
 import { ProductCostCard } from '@/components/business/marketplace/ProductCostCard';
 import { ProductPackagingCard } from '@/components/business/marketplace/ProductPackagingCard';
 import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
@@ -467,6 +468,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const isOwnProduct = !!activeWorkspaceId && product.workspace_id === activeWorkspaceId;
   /** Warehouse rows, locations, the movement ledger, listings. Operations data. */
   const canSeeStock = isOwnProduct && can('warehouse.manage');
+  // Catalog-level after-sale config (#343). Same shape as the fiscal gate: whoever runs pricing,
+  // the warehouse or finance sets it — it is not a `pricing.manage`-only field.
+  const canSeeService = isOwnProduct && canAny('pricing.manage', 'warehouse.manage', 'finance.manage');
   /** "In stock / Low / Out" and a total, nothing else — so a rep doesn't quote thin air. */
   const canSeeAvailability = isOwnProduct && canAny('warehouse.manage', 'sales.portal');
   /** What we PAID and to whom. Owner/admin personas, plus the sales manager who carries margin. */
@@ -1676,6 +1680,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <TabsTrigger value="stock" className="flex items-center gap-2">
                 <Boxes className="h-4 w-4" />
                 Stock
+              </TabsTrigger>
+            )}
+            {/* Service — what happens to a unit of this product after it is delivered (#343). */}
+            {canSeeService && (
+              <TabsTrigger value="service" className="flex items-center gap-2">
+                <Wrench className="h-4 w-4" />
+                Service
               </TabsTrigger>
             )}
           </TabsList>
@@ -2905,6 +2916,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             >
               <ProductStockPanel productId={product.id} workspaceId={activeWorkspaceId} />
             </ModuleTabGate>
+          </div>
+        </TabsContent>
+      )}
+
+      {canSeeService && activeWorkspaceId && (
+        <TabsContent value="service" className="mt-6">
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+              <Wrench className="h-4 w-4" />
+              Warranty &amp; service defaults
+            </h3>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Say it once here and every unit sold inherits it — the warranty period, and the
+              recurring maintenance the customer gets reminded about.
+            </p>
+            <ProductServiceDefaultsPanel productId={product.id} workspaceId={activeWorkspaceId} />
           </div>
         </TabsContent>
       )}
