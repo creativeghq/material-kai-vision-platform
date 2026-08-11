@@ -25,7 +25,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   },
   'calculators': {
     alwaysOn: true,
-    tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison'],
+    tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost'],
   },
   'catalogs': {
     tool_ids: ['create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs', 'translate_pdf_to_catalog', 'add_material_to_catalog', 'find_image_for_material', 'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog'],

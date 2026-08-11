@@ -727,7 +727,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'search_workspace_docs',
       'manage_docs',
       // Calculators (all users; deterministic, free, no upstream API)
-      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       // CRM roster query — "which businesses have ΚΑΔ X?" + create-from-VAT (all users; workspace-scoped)
       'search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm',
       // Sub-agent orchestration (admin/owner only — gated at injection time)
@@ -871,7 +871,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       'material_search', 'generate_3d', 'generate_gemini', 'virtual_staging', 'analyze_inspiration_url',
       // Calculators (all users; deterministic, free, no upstream API)
-      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       // Image-driven post-processing tools (require an existing room image in the conversation)
       'apply_lighting_preset', 'generate_vr_world', 'generate_video',
       // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
@@ -897,7 +897,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'search_crm_by_kad', 'manage_appointments',
       // core search + calculators (all users)
       'knowledge_base_search', 'read_document_section', 'material_search', 'analyze_inspiration_url',
-      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison',
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
     ],
     // systemPrompt loaded from the database (prompts.category = 'property-advisor')
   },
@@ -1541,11 +1541,13 @@ async function executeAgent(
 
   // 🌡️ Heat-pump sizer — deterministic, free, no upstream API. Self-contained
   // import (no shared module batch needed).
-  if (config.tools.includes('calculate_heat_pump_sizing') || config.tools.includes('calculate_heating_cost_comparison')) {
+  if (config.tools.includes('calculate_heat_pump_sizing') || config.tools.includes('calculate_heating_cost_comparison') || config.tools.includes('calculate_kitchen_cost')) {
     try {
       const calcMod = await import('../_shared/tools/calculator-tools.ts');
       if (config.tools.includes('calculate_heat_pump_sizing')) tools.push(calcMod.createHeatPumpSizingTool(onChunk));
       if (config.tools.includes('calculate_heating_cost_comparison')) tools.push(calcMod.createHeatingCostComparisonTool(onChunk));
+      // Takes the client: kitchen rates live in the blueprint, not in constants like the two above.
+      if (config.tools.includes('calculate_kitchen_cost')) tools.push(calcMod.createKitchenCostTool(supabase, onChunk));
     } catch (calcErr) {
       console.warn('⚠️ Could not register calculator tools:', calcErr);
     }

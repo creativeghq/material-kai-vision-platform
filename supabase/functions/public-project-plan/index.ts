@@ -16,7 +16,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { evaluateFormula, computeLinePricing, round2 } from '../_shared/blueprint/formula.ts';
+import { computeBlueprint } from '../_shared/blueprint/compute.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { verifyTurnstile as verifyTurnstileShared } from '../_shared/turnstile.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
@@ -62,83 +62,6 @@ async function quotaUsed(supabase: DbClient, ip: string): Promise<number> {
     .eq('ip_address', ip)
     .gte('created_at', since);
   return count ?? 0;
-}
-
-interface ComputedTask {
-  id: string;
-  label: string;
-  unit: string | null;
-  quantity: number;
-  unit_price: number;
-  line_total: number;
-  is_allowance: boolean;
-  option_group: string | null;
-  selected: boolean;
-}
-
-/**
- * The ONE place this function turns a blueprint + dimensions into money. Both `estimate` and
- * `kitchen_lead` go through it, so a configurator total and a recorded lead can never disagree.
- *
- * `selectedIds` is the visitor's choice and is treated as untrusted:
- *  - an option_group honours it only when it names exactly ONE member; anything else (missing,
- *    duplicated, tampered) falls back to the tier:'good' default, so a group can never price at
- *    zero or twice.
- *  - an ungrouped line is on iff listed; pass `null` to fall back to each line's own
- *    `default_selected`, which is what an un-configured estimate wants.
- */
-function computeBlueprint(rows: any[], dims: Record<string, number>, selectedIds: Set<string> | null) {
-  const sectionsById: Record<string, { label: string; total: number; tasks: ComputedTask[] }> = {};
-  for (const r of rows) if (r.kind === 'section') sectionsById[r.id] = { label: r.label, total: 0, tasks: [] };
-  const ungrouped: ComputedTask[] = [];
-  let subtotal = 0;
-
-  const byGroup: Record<string, any[]> = {};
-  for (const r of rows) {
-    if (r.kind === 'task' && r.option_group) (byGroup[r.option_group] ||= []).push(r);
-  }
-  const optSelected: Record<string, string> = {};
-  for (const [grp, members] of Object.entries(byGroup)) {
-    const chosen = selectedIds ? members.filter((m) => selectedIds.has(m.id)) : [];
-    const pick = chosen.length === 1
-      ? chosen[0]
-      : (members.find((m) => m.tier === 'good')
-        ?? [...members].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0]);
-    if (pick) optSelected[grp] = pick.id;
-  }
-
-  for (const r of rows) {
-    if (r.kind !== 'task') continue;
-    const selected = r.option_group
-      ? optSelected[r.option_group] === r.id
-      : (selectedIds ? selectedIds.has(r.id) : r.default_selected !== false);
-    let qty: number;
-    if (r.quantity_formula && String(r.quantity_formula).trim()) {
-      const ev = evaluateFormula(r.quantity_formula, dims);
-      qty = ev.ok ? ev.value : Number(r.default_quantity ?? 1);
-    } else qty = Number(r.default_quantity ?? 1);
-    qty = round2(qty);
-    const { unit_price, line_total } = computeLinePricing({
-      is_allowance: r.is_allowance, allowance_amount: r.allowance_amount,
-      material_cost: r.material_cost, labor_rate: r.labor_rate, margin_pct: r.margin_pct,
-      quantity: qty, is_selected: selected,
-    });
-    const task: ComputedTask = {
-      id: r.id, label: r.label, unit: r.unit, quantity: qty, unit_price, line_total,
-      is_allowance: !!r.is_allowance, option_group: r.option_group ?? null, selected,
-    };
-    if (selected) subtotal += line_total;
-    const sec = r.parent_id ? sectionsById[r.parent_id] : null;
-    if (sec) { sec.tasks.push(task); if (selected) sec.total += line_total; }
-    else ungrouped.push(task);
-  }
-
-  return {
-    sectionsById,
-    ungrouped,
-    subtotal: round2(subtotal),
-    sections: Object.values(sectionsById).map((s) => ({ ...s, total: round2(s.total) })),
-  };
 }
 
 const handler = withApiLogging('public-project-plan', async (req: Request): Promise<Response> => {

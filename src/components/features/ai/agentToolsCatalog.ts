@@ -119,6 +119,15 @@ const KAI_TOOLS: AgentToolEntry[] = [
       'Is a heat pump cheaper to run than gas for my 150 m² apartment?',
     ],
   },
+  {
+    id: 'calculate_kitchen_cost', name: 'Kitchen Cost', category: 'Calculators',
+    credits: 0,
+    desc: 'Price a fitted kitchen from its running metres and finishes, off the live blueprint price list. Lists every model, worktop and add-on with what each costs for that kitchen. Free, instant, no upstream API.',
+    examples: [
+      'What would a 6 metre kitchen cost with a Fenix front and an HPL worktop?',
+      'Price a 4 m kitchen and show me what the worktop upgrades would add',
+    ],
+  },
 
   // ── Mention monitoring (all users; module-gated; per-tool credits) ─
   {
@@ -1252,7 +1261,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     description: 'Deterministic HVAC/energy maths — heat-pump sizing and an annual running-cost comparison across six heating methods. Free, instant, no upstream API.',
     icon: 'Calculator',
     alwaysOn: true,
-    tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison'],
+    tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost'],
     quick_starts: [
       {
         // autoFields, not a hand-written form: between them these two tools declare
@@ -1278,6 +1287,20 @@ export const TOOLKITS: ToolkitDefinition[] = [
         form: [
           { key: 'floor_area_m2', label: 'Heated floor area (m²)', kind: 'number', required: true, placeholder: '200' },
           { key: 'specific_energy_kwh_m2_yr', label: 'Energy intensity (kWh/m²·yr)', kind: 'number', required: true, placeholder: '132', help: 'From the ΠΕΑ energy certificate. ~40–60 well-insulated, ~70–90 partial, ~90–120 uninsulated.' },
+        ],
+      },
+      {
+        // Only the run length is asked for. The model/worktop choices are ROWS in the kitchen
+        // blueprint, not enum members, so there is nothing here to mirror — the tool returns the
+        // live list of finishes with its first answer and the user picks from that.
+        label: 'Price a kitchen',
+        description: 'Cost of a fitted kitchen from its running metres, off the live price list',
+        icon: 'Calculator',
+        prompt: 'What would a 6 metre kitchen cost? Show me the finishes and worktops available.',
+        run: { tool: 'calculate_kitchen_cost' },
+        autoFields: true,
+        form: [
+          { key: 'run_length_m', label: 'Base cabinet run (m)', kind: 'number', required: true, placeholder: '6', help: 'Add up the walls the kitchen runs along.' },
         ],
       },
     ],

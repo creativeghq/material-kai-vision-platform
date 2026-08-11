@@ -234,6 +234,19 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'calculate_kitchen_cost',
+    file: 'supabase/functions/_shared/tools/calculator-tools.ts',
+    factory: 'createKitchenCostTool',
+    description: 'Price a fitted kitchen from its running metres and finishes, using the live price list.',
+    params: [
+      { name: 'run_length_m', type: 'number', optional: false, description: 'Total length of the base cabinet run, in metres — add up the walls the kitchen runs along.' },
+      { name: 'wall_run_length_m', type: 'number', optional: true, description: 'Length of the wall/hanging unit run, in metres. Defaults to the price list default.' },
+      { name: 'worktop_length_m', type: 'number', optional: true, description: 'Worktop length, in metres. Defaults to the price list default.' },
+      { name: 'options', type: 'array', optional: true, description: 'Single-choice selections by name, e.g. a cabinet model ("Fenix") or a worktop ("HPL laminate"). At most one per choice group; omit to price the standard default.' },
+      { name: 'extras', type: 'array', optional: true, description: 'Optional add-ons to include, by name, e.g. "Le Mans corner unit — eco" or "Removal & disposal of old kitchen".' },
+    ],
+  },
+  {
     name: 'check_generation_status',
     file: 'supabase/functions/_shared/tools/generation-tools.ts',
     factory: 'createGenerationStatusTool',

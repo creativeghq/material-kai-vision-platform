@@ -13,6 +13,8 @@
 const { tool } = await import('npm:@langchain/core@1.1.15/tools');
 const { z } = await import('npm:zod@3.24.0');
 
+import { computeBlueprint, resolveSelection } from '../blueprint/compute.ts';
+
 type ChunkSink = ((chunk: any) => void) | undefined;
 
 type InsulationLevel = 'none' | 'medium' | 'modern' | 'passive';
@@ -261,6 +263,137 @@ export const createHeatingCostComparisonTool = (onChunk: ChunkSink) => {
         wood_price_per_kg: z.number().optional().describe('€/kg firewood (default 0.54).'),
         heat_pump_cop: z.number().optional().describe('Heat-pump seasonal COP (default 4).'),
         ac_type: z.enum(['inverter', 'simple']).optional().describe('A/C type: inverter (COP 3) or simple (COP 2). Default inverter.'),
+      }),
+    },
+  );
+};
+
+// ── Kitchen cost ──────────────────────────────────────────────────────────
+//
+// UNLIKE the two calculators above, this one holds NO rates. Kitchen pricing lives in the
+// `kitchen_cabinets` platform-starter blueprint, which is also what /tools/kitchen-cost and the
+// projects Plan tab read — so re-pricing in the Blueprints admin moves all three at once, and a
+// mirrored copy here would immediately become a second, wrong source.
+//
+// For the same reason the schema carries NO enum of models or worktops: those are rows. The tool
+// matches free text against the blueprint's own labels and REPORTS what it could not match, so
+// the agent corrects itself instead of silently quoting the default. The only structural coupling
+// is the three dimension keys, and an unknown one is ignored rather than assumed.
+
+const KITCHEN_PROJECT_TYPE = 'kitchen_cabinets';
+
+export const createKitchenCostTool = (supabase: any, onChunk: ChunkSink) => {
+  return tool(
+    async (input: {
+      run_length_m: number;
+      wall_run_length_m?: number;
+      worktop_length_m?: number;
+      options?: string[];
+      extras?: string[];
+    }) => {
+      const { data: bp } = await supabase
+        .from('blueprints')
+        .select('id, title, source_currency, dimensions_schema')
+        .eq('project_type', KITCHEN_PROJECT_TYPE)
+        .eq('is_platform_starter', true)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (!bp) return JSON.stringify({ success: false, error: 'The kitchen price list is not configured yet.' });
+
+      const { data: items } = await supabase
+        .from('blueprint_items').select('*').eq('blueprint_id', bp.id).order('sort_order');
+      const rows = (items ?? []) as Record<string, any>[];
+      const currency = bp.source_currency || 'EUR';
+
+      const schema = (bp.dimensions_schema ?? []) as { key: string; label?: string; unit?: string; default?: number }[];
+      const dims: Record<string, number> = {};
+      for (const d of schema) dims[d.key] = Number(d.default ?? 0);
+      const supplied: Record<string, number | undefined> = {
+        run_length: input.run_length_m,
+        wall_run_length: input.wall_run_length_m,
+        worktop_length: input.worktop_length_m,
+      };
+      for (const [k, v] of Object.entries(supplied)) {
+        if (v != null && Number.isFinite(Number(v)) && Number(v) >= 0 && k in dims) dims[k] = Number(v);
+      }
+
+      const extraLines = rows.filter((r) => r.kind === 'task' && !r.option_group);
+      const { selected, unmatched } = resolveSelection(rows, { options: input.options, extras: input.extras });
+
+      const computed = computeBlueprint(rows, dims, selected);
+      const allTasks = computed.sections.flatMap((s) => s.tasks).concat(computed.ungrouped);
+      const byId = new Map(allTasks.map((t) => [t.id, t]));
+
+      // What each alternative would cost for THIS kitchen — unit_price is per metre for a
+      // measured line, so the agent needs the resolved total to compare finishes honestly.
+      const priceOf = (t: { is_allowance: boolean; unit_price: number; quantity: number }) =>
+        Math.round((t.is_allowance ? t.unit_price : t.unit_price * t.quantity) * 100) / 100;
+
+      const options: Record<string, { label: string; unit_price: number; unit: string | null; total_for_this_kitchen: number }[]> = {};
+      for (const t of allTasks) {
+        if (!t.option_group) continue;
+        (options[t.option_group] ||= []).push({
+          label: t.label,
+          unit_price: t.unit_price,
+          unit: t.is_allowance ? null : t.unit,
+          total_for_this_kitchen: priceOf(t),
+        });
+      }
+
+      const availableExtras = extraLines
+        .filter((r) => r.default_selected === false)
+        .map((r) => {
+          const t = byId.get(r.id);
+          return {
+            label: r.label,
+            unit_price: t?.unit_price ?? 0,
+            unit: t?.is_allowance ? null : (t?.unit ?? null),
+            total_for_this_kitchen: t ? priceOf(t) : 0,
+            included: !!t?.selected,
+          };
+        });
+
+      const result = {
+        currency,
+        dimensions: schema.map((d) => ({ label: d.label ?? d.key, value: dims[d.key], unit: d.unit ?? null })),
+        subtotal: computed.subtotal,
+        chosen: allTasks.filter((t) => t.selected && t.option_group).map((t) => ({ group: t.option_group, label: t.label })),
+        sections: computed.sections
+          .filter((s) => s.tasks.some((t) => t.selected && t.line_total > 0))
+          .map((s) => ({
+            section: s.label,
+            total: s.total,
+            lines: s.tasks.filter((t) => t.selected && t.line_total > 0).map((t) => ({
+              label: t.label, quantity: t.quantity, unit: t.unit,
+              unit_price: t.unit_price, line_total: t.line_total,
+            })),
+          })),
+        available: { options, extras: availableExtras },
+        unmatched,
+      };
+
+      try {
+        onChunk?.({ type: 'kitchen_cost', input, result });
+      } catch {
+        /* stream may be closed */
+      }
+
+      return JSON.stringify({ success: true, ...result });
+    },
+    {
+      name: 'calculate_kitchen_cost',
+      description:
+        'Price a fitted kitchen from its running metres and finishes, using the live price list. Deterministic, free, instant — no external API. '
+        + 'Use when someone asks what a new kitchen costs, or to compare finishes and worktops. '
+        + 'Call it FIRST with only run_length_m: the result lists every available model, worktop and add-on with what each would cost for that kitchen. Then call again with the ones the user picked — never guess a model name. '
+        + 'ALWAYS check `unmatched` in the result: anything listed there was NOT applied and the standard default was priced instead, so correct the user rather than presenting the total as the spec they asked for. '
+        + 'Present the figure as a ballpark excluding VAT, with appliances and sink not included, subject to a survey.',
+      schema: z.object({
+        run_length_m: z.number().positive().describe('Total length of the base cabinet run, in metres — add up the walls the kitchen runs along.'),
+        wall_run_length_m: z.number().nonnegative().optional().describe('Length of the wall/hanging unit run, in metres. Defaults to the price list default.'),
+        worktop_length_m: z.number().nonnegative().optional().describe('Worktop length, in metres. Defaults to the price list default.'),
+        options: z.array(z.string()).optional().describe('Single-choice selections by name, e.g. a cabinet model ("Fenix") or a worktop ("HPL laminate"). At most one per choice group; omit to price the standard default.'),
+        extras: z.array(z.string()).optional().describe('Optional add-ons to include, by name, e.g. "Le Mans corner unit — eco" or "Removal & disposal of old kitchen".'),
       }),
     },
   );

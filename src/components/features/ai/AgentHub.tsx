@@ -104,6 +104,7 @@ import type { WorkflowRuntimeState } from './workflows/types';
 import { InspirationCard } from './InspirationCard';
 import { HeatPumpResultCard } from './HeatPumpResultCard';
 import { HeatingCostResultCard } from './HeatingCostResultCard';
+import { KitchenCostResultCard, type KitchenCostResult } from './KitchenCostResultCard';
 import { SearchSpecCard } from './SearchSpecCard';
 import { catalogsService } from '@/services/catalogsService';
 import { CatalogExtractionCandidatesCard, type ExtractionCandidate } from './CatalogExtractionCandidatesCard';
@@ -511,6 +512,10 @@ interface Message {
     input: Record<string, unknown>;
     result: import('@/lib/calculators/heatingCostComparison').HeatingCostResult;
   }; // Heating-method cost comparison
+  kitchenCostData?: {
+    input: Record<string, unknown>;
+    result: KitchenCostResult;
+  }; // Fitted-kitchen estimate off the blueprint price list
   searchSpec?: {
     intent: string;
     color_keywords?: string[];
@@ -2657,6 +2662,27 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     metadata: { agentId: selectedAgent, model: selectedModel, heatingCostData: heatingMsg.heatingCostData },
                   });
                 }
+              // Handle kitchen_cost — fitted-kitchen price off the live blueprint price list
+              } else if (chunk.type === 'kitchen_cost') {
+                const r = chunk.result;
+                const kitchenMsg: Message = {
+                  id: `msg-kitchencost-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Estimated kitchen cost: ${Math.round(r?.subtotal ?? 0)} ${r?.currency || 'EUR'} excluding VAT.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  kitchenCostData: { input: chunk.input, result: r },
+                };
+                setMessages(prev => [...prev, kitchenMsg]);
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: kitchenMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, kitchenCostData: kitchenMsg.kitchenCostData },
+                  });
+                }
               // Handle search_spec — explainable search dimensions
               } else if (chunk.type === 'search_spec') {
                 // Attach search spec to the NEXT materialData message (store in pending state)
@@ -3669,6 +3695,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           inspirationData: msg.metadata?.inspirationData as any | undefined,
           heatPumpData: msg.metadata?.heatPumpData as any | undefined,
           heatingCostData: msg.metadata?.heatingCostData as any | undefined,
+          kitchenCostData: msg.metadata?.kitchenCostData as any | undefined,
           searchSpec: msg.metadata?.searchSpec as any | undefined,
           mentionSummaryData: msg.metadata?.mentionSummaryData as any | undefined,
           sourcingOptionsData: msg.metadata?.sourcingOptionsData as any | undefined,
@@ -4382,6 +4409,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
     if (message.heatPumpData) return <HeatPumpResultCard result={message.heatPumpData.result} />;
     if (message.heatingCostData) return <HeatingCostResultCard result={message.heatingCostData.result} />;
+    if (message.kitchenCostData) return <KitchenCostResultCard result={message.kitchenCostData.result} />;
     if (message.sheetPdfData) {
       return (
         <SheetPreviewCard
@@ -5042,6 +5070,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         ) : (
                           <HeatingCostResultCard result={message.heatingCostData.result} />
                         )}
+                        <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
+                      </div>
+                    ) : message.kitchenCostData ? (
+                      <div className="space-y-3">
+                        <KitchenCostResultCard result={message.kitchenCostData.result} />
                         <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                       </div>
                     ) : message.techRadarData ? (
