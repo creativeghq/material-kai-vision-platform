@@ -8,9 +8,9 @@
  *      means, or the panel promises a merchant their product is embeddable and `products-3d-api`
  *      404s it. That rule now lives once, in `embed_scope_covers_product`; the tests below fail if
  *      a second opinion reappears in TypeScript.
- *   2. IT NAGS ABOUT THE IMPOSSIBLE. USDZ cannot be produced by anything in the platform (the
- *      asset pipeline is still open on #321), so counting it would park every product permanently
- *      below 100% for a reason nobody can act on — which is how a checklist gets ignored.
+ *   2. IT NAGS ABOUT THE IMPOSSIBLE. A checklist item nobody can satisfy parks every product below
+ *      100% forever, which is how a checklist gets ignored. USDZ was exactly that — nothing here
+ *      can produce one — and it was removed with iOS Quick Look on 2026-08-11.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -41,14 +41,19 @@ const base: ProductEmbedReadiness = {
 };
 
 describe('embed readiness — what it reports', () => {
-  it('counts everything actionable, and never USDZ', () => {
+  it('counts everything it shows, because everything it shows is actionable', () => {
     // The demo armchair's exact shape: everything a merchant can do, done. It must read as
     // complete, or the one fully-configured product in the catalogue still looks unfinished.
     const s = readinessSummary(base);
     expect(s.met).toBe(s.total);
     expect(s.blocked).toBe(false);
-    expect(requirementsOf(base).some((r) => r.key === 'usdz')).toBe(true); // still SHOWN…
-    expect(s.total).toBe(requirementsOf(base).length - 1);                 // …but never COUNTED
+    expect(s.total).toBe(requirementsOf(base).length);
+  });
+
+  it('never asks for a USDZ — nothing in the platform can make one', () => {
+    // iOS Quick Look was removed 2026-08-11. A checklist item nobody can ever satisfy is worse
+    // than a missing one: it parks every product below 100% for a reason with no fix.
+    expect(requirementsOf(base).some((r) => r.key === ('usdz' as never))).toBe(false);
   });
 
   it('treats a missing published price as the one hard gate', () => {

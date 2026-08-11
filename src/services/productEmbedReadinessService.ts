@@ -32,7 +32,7 @@ export interface ProductEmbedReadiness {
 }
 
 export interface ReadinessRequirement {
-  key: 'price' | 'attributes' | 'model' | 'options' | 'key' | 'usdz';
+  key: 'price' | 'attributes' | 'model' | 'options' | 'key';
   label: string;
   met: boolean;
   /** What stops working while this is missing — the reason it is worth doing. */
@@ -104,21 +104,14 @@ export function requirementsOf(r: ProductEmbedReadiness): ReadinessRequirement[]
           ? `${r.covering_key_ids.length} key${r.covering_key_ids.length === 1 ? '' : 's'} can serve it`
           : 'Create one at Profile → Keys, scoped to this product or its category.',
     },
-    {
-      key: 'usdz',
-      label: 'iPhone AR (USDZ)',
-      met: r.has_usdz,
-      consequence: 'iOS Quick Look needs a USDZ file. Android AR and the web viewer work from the GLB alone.',
-      detail: r.has_usdz ? undefined : 'Optional — needs converting the GLB, which the platform cannot do yet.',
-    },
   ];
 }
 
 /** How far along, for the list column. Counts only what the merchant can act on today. */
 export function readinessSummary(r: ProductEmbedReadiness): { met: number; total: number; blocked: boolean } {
-  // USDZ is excluded: nothing in the platform can produce one, so counting it would permanently
-  // report every product as incomplete for a reason nobody can fix (the asset pipeline, #321).
-  const actionable = requirementsOf(r).filter((q) => q.key !== 'usdz');
+  // Every requirement here is actionable. The USDZ row was removed on 2026-08-11 along with iOS
+  // Quick Look — a checklist item nobody could ever satisfy is worse than a missing one.
+  const actionable = requirementsOf(r);
   return {
     met: actionable.filter((q) => q.met).length,
     total: actionable.length,

@@ -4,8 +4,9 @@
  *
  * Two rendering paths (#321 asset foundation):
  * - A real glb/gltf model exists in `product_3d_models` → render it via
- *   ProductModelStage. On iOS, a usdz row additionally lights up a native
- *   AR Quick Look link (<a rel="ar">).
+ *   ProductModelStage. iOS Quick Look (usdz) was REMOVED 2026-08-11: nothing in the
+ *   platform can produce a usdz, so the path advertised a capability that would
+ *   never arrive and showed every iPhone visitor a "no AR model yet" placard.
  * - No model → the original PBR-textured swatch plane with the tiling slider.
  *
  * Still future: WebXR immersive-ar sessions (@react-three/xr v5 — R3F v8 line).
@@ -26,6 +27,8 @@ import {
 } from '@/components/core/ui/dialog';
 import { useARSupport } from './useARSupport';
 import { ProductModelStage } from './ProductModelViewer';
+import { PresetLighting, DEFAULT_PRESET, PRESET_OPTIONS } from '@/components/features/lighting/PresetLighting';
+import type { PresetKey } from '@/components/features/lighting/lightingPresets';
 import {
   productMaterialMapsService,
   type MaterialMapUrls,
@@ -132,16 +135,14 @@ interface SceneProps {
   roughnessUrl?: string;
   metalnessUrl?: string;
   tileScale: number;
+  /** Shared preset (#335) — a material is judged under light, so this is the control that matters. */
+  lighting: PresetKey;
 }
 
 const Scene: React.FC<SceneProps> = (props) => {
   return (
     <>
-      <Environment preset="apartment" background={false} />
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[5, 8, 5]} intensity={1.0} castShadow />
-      <directionalLight position={[-3, 4, -2]} intensity={0.4} />
-      <pointLight position={[0, 5, 0]} intensity={0.3} />
+      <PresetLighting preset={props.lighting} castShadow />
 
       <MaterialSwatch {...props} />
 
@@ -171,6 +172,7 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
 }) => {
   const { mode, isMobile } = useARSupport();
   const [tileScale, setTileScale] = useState(2);
+  const [lighting, setLighting] = useState<PresetKey>(DEFAULT_PRESET);
   const linkRef = useRef<HTMLAnchorElement>(null);
 
   // Real 3D models for this product, if any. null = still loading — the swatch
@@ -201,9 +203,7 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
   }, [isOpen, productId]);
 
   const glbModel = models?.find((m) => m.format === 'glb') ?? models?.find((m) => m.format === 'gltf');
-  const usdzModel = models?.find((m) => m.format === 'usdz');
   const modelUrl = glbModel ? modelPublicUrl(glbModel) : null;
-  const usdzUrl = usdzModel ? modelPublicUrl(usdzModel) : null;
 
   // A derived tileable texture if one exists, else the product photo.
   //
@@ -252,11 +252,6 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
                 AR Ready
               </span>
             )}
-            {mode === 'quicklook' && (
-              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
-                Quick Look
-              </span>
-            )}
           </div>
           <Button
             variant="ghost"
@@ -278,13 +273,14 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
                 style={{ width: '100%', height: '100%' }}
               >
                 {modelUrl ? (
-                  <ProductModelStage url={modelUrl} />
+                  <ProductModelStage url={modelUrl} lighting={lighting} />
                 ) : (
                   <Scene
                     albedoUrl={albedoUrl}
                     normalUrl={maps?.normal_url ?? undefined}
                     roughnessUrl={maps?.roughness_url ?? undefined}
                     tileScale={tileScale}
+                    lighting={lighting}
                   />
                 )}
               </Canvas>
@@ -302,10 +298,10 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
           </div>
 
           {/* Mobile AR hint */}
-          {isMobile && mode !== 'webxr' && mode !== 'quicklook' && (
+          {isMobile && mode !== 'webxr' && (
             <div className="absolute left-4 top-4 max-w-xs rounded-lg bg-black/60 px-3 py-2 text-xs text-white backdrop-blur-sm">
               <Smartphone className="mb-1 inline h-3 w-3" /> For the full AR
-              experience, use the latest Chrome on Android or Safari on iOS.
+              experience, use the latest Chrome on Android.
             </div>
           )}
 
@@ -323,31 +319,26 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
             </div>
           )}
 
-          {/* iOS Quick Look. With a USDZ on file this is a native AR launch:
-              Safari opens Quick Look in place when the tapped <a rel="ar">'s
-              first child is an <img>. Without one, the old "coming soon" hint. */}
-          {mode === 'quicklook' && usdzUrl && (
-            /* eslint-disable-next-line jsx-a11y/anchor-is-valid */
-            <a
-              rel="ar"
-              href={usdzUrl}
-              className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-xs font-medium text-white shadow-lg"
-            >
-              <img src={productImage} alt="" className="hidden" />
-              <View className="h-4 w-4" />
-              View in your space
-            </a>
-          )}
-          {mode === 'quicklook' && !usdzUrl && (
-            <div className="absolute left-4 top-4 max-w-xs rounded-lg bg-blue-600/80 px-3 py-2 text-xs text-white backdrop-blur-sm">
-              <Smartphone className="mb-1 inline h-3 w-3" /> No AR model for this
-              product yet. Use the 3D preview below for now.
-            </div>
-          )}
         </div>
 
         {/* Bottom controls bar */}
         <div className="flex flex-col gap-3 border-t bg-background/80 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
+          {/* Lighting (#335). Applies to BOTH paths — a model and a material are each judged under
+              light, and until now every viewer in the platform was pinned to one midday preset. */}
+          <div className="flex items-center gap-2">
+            <span className="whitespace-nowrap text-xs text-muted-foreground">Lighting</span>
+            <select
+              aria-label="Lighting preset"
+              className="h-7 rounded-md border border-border/60 bg-background px-2 text-xs"
+              value={lighting}
+              onChange={(e) => setLighting(e.target.value as PresetKey)}
+            >
+              {PRESET_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>{o.name}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Tile scale slider — tiling only applies to the swatch plane */}
           {modelUrl ? (
             <span className="text-xs text-muted-foreground">3D model preview</span>

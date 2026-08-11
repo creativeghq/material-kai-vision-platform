@@ -2,7 +2,8 @@
  * 3D model management for one product (#321 asset foundation).
  *
  * Upload/replace/remove the product's real 3D assets: glb/gltf drives the web
- * viewer (ARPreviewModal), usdz drives iOS AR Quick Look. Also captures the
+ * viewer (ARPreviewModal), AR on Android, the configurator and the planner. iOS
+ * Quick Look (usdz) was dropped 2026-08-11 — nothing here can produce one. Also captures the
  * real-world footprint in meters — AR true-to-scale and the future room
  * planner read it; the free-form `metadata.dimensions` string cannot serve
  * that. The caller gates this on own-workspace product ownership; RLS
@@ -77,7 +78,7 @@ export const Product3DModelCard: React.FC<Product3DModelCardProps> = ({ productI
         if (!modelFormatFromFilename(file.name)) {
           toast({
             title: 'Unsupported file',
-            description: `${file.name} — use .glb, .gltf or .usdz`,
+            description: `${file.name} — use .glb or .gltf`,
             variant: 'destructive',
           });
           continue;
@@ -134,8 +135,8 @@ export const Product3DModelCard: React.FC<Product3DModelCardProps> = ({ productI
             3D Model
           </h3>
           <p className="text-[11px] text-muted-foreground mt-1">
-            glb/gltf powers the 3D viewer; usdz powers AR on iPhone. Uploading a
-            format again replaces it.
+            glb/gltf powers the 3D viewer, AR on Android, the configurator and the
+            room planner. Uploading a format again replaces it.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -165,7 +166,7 @@ export const Product3DModelCard: React.FC<Product3DModelCardProps> = ({ productI
         <input
           ref={fileInputRef}
           type="file"
-          accept=".glb,.gltf,.usdz"
+          accept=".glb,.gltf"
           multiple
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}

@@ -479,14 +479,19 @@ export class MaterialKaiProduct extends HTMLElement {
     this.frame.replaceChildren(img, this.overlay);
   }
 
-  /** iOS AR Quick Look needs a USDZ; Android Scene Viewer takes the GLB. */
+  /**
+   * Android Scene Viewer, from the GLB.
+   *
+   * iOS is deliberately not offered. Quick Look needs a USDZ, nothing in the platform can produce
+   * one, and the branch that looked for it could only ever return null — so an iPhone gets the 3D
+   * viewer and no AR button, rather than a button that fails or a promise of a format that is not
+   * coming (2026-08-11).
+   */
   private arLink(): { href: string; ios: boolean } | null {
     if (!this.product) return null;
-    const usdz = this.product.models.find((m) => m.format === 'usdz');
     const glb = this.product.models.find((m) => m.format === 'glb');
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    if (isIOS && usdz) return { href: usdz.url, ios: true };
     if (!isIOS && /Android/.test(navigator.userAgent) && glb) {
       const fallback = encodeURIComponent(location.href);
       return {
