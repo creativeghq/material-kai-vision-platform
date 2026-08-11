@@ -79,13 +79,28 @@ const UNCHECKABLE = new Map([
    'type graph exceeds 12 GB even alone (@langchain/langgraph generics); no runner has the heap'],
 ]);
 
-/** Entrypoints: supabase/functions/<name>/index.ts, skipping _shared and friends. */
+/**
+ * Entrypoints: supabase/functions/<name>/index.ts, skipping _shared and friends —
+ * PLUS every _shared/tools/*.ts module, checked in its own right.
+ *
+ * The tools are not deployable entrypoints; they are here because the only function that
+ * imports them is `agent-chat`, and agent-chat is the one file this gate cannot check at any
+ * heap. That left ~40 modules — every agent tool body in the platform — with no compiler over
+ * them at all: tsconfig excludes supabase/**, and the transitive path died with agent-chat.
+ * Checking them directly costs ~20s and immediately found a duplicate key in a zod schema, an
+ * always-true comparison, and `.catch()` on a thenable that has none.
+ */
 function entrypoints() {
-  return readdirSync(FN_DIR)
+  const fns = readdirSync(FN_DIR)
     .filter((n) => !n.startsWith('_') && !n.startsWith('.'))
     .filter((n) => statSync(join(FN_DIR, n)).isDirectory())
     .map((n) => join(FN_DIR, n, 'index.ts'))
-    .filter(existsSync)
+    .filter(existsSync);
+  const toolsDir = join(FN_DIR, '_shared', 'tools');
+  const tools = existsSync(toolsDir)
+    ? readdirSync(toolsDir).filter((n) => n.endsWith('.ts')).map((n) => join(toolsDir, n))
+    : [];
+  return [...fns, ...tools]
     .filter((f) => !UNCHECKABLE.has(rel(f).replace(/^supabase\/functions\//, '')))
     .sort();
 }

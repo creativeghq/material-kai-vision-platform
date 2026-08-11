@@ -1,13 +1,13 @@
 {
   "_comment": "Per-file deno-check error counts. The gate fails when a count rises or a new file appears. Lower these as you fix things; regenerate with: node scripts/check-edge-functions.mjs --write-baseline",
-  "entrypoints": 126,
-  "total": 60,
+  "entrypoints": 169,
+  "total": 64,
   "uncheckable": {
     "agent-chat/index.ts": "type graph exceeds 12 GB even alone (@langchain/langgraph generics); no runner has the heap"
   },
   "files": {
     "health-check/index.ts": 5,
-    "_shared/tools/tech-radar-tools.ts": 4,
+    "_shared/tools/sub-agent-tools.ts": 4,
     "crm-api/handlers/companies-api-handler.ts": 4,
     "crm-lead-score/index.ts": 4,
     "finance-issue-invoice/index.ts": 4,
@@ -15,6 +15,7 @@
     "mivaa-gateway/index.ts": 3,
     "stripe-api/handlers/checkout.ts": 3,
     "_shared/langgraph-core.ts": 2,
+    "_shared/tools/presentation-sheet-tool.ts": 2,
     "background-agent-runner/index.ts": 2,
     "crm-api/handlers/stripe-api-handler.ts": 2,
     "finance-invoice-pdf/index.ts": 2,
@@ -27,6 +28,8 @@
     "_shared/fonts/open-sans.ts": 1,
     "_shared/react-email-renderer.ts": 1,
     "_shared/shipping/searates.ts": 1,
+    "_shared/tools/database-tools.ts": 1,
+    "_shared/tools/quote-tools.ts": 1,
     "check-material-alerts/index.ts": 1,
     "crm-api/handlers/address-units-api-handler.ts": 1,
     "finance-send-statement/index.ts": 1,

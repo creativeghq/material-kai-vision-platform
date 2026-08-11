@@ -23,13 +23,23 @@ const WORKFLOW = join(ROOT, '.github/workflows/edge-typecheck.yml');
 const BASELINE = join(ROOT, '.github/edge-typecheck-baseline.json');
 const FN_DIR = join(ROOT, 'supabase/functions');
 
-/** The entrypoints the gate is supposed to cover — same rule the script uses. */
+/**
+ * The entrypoints the gate is supposed to cover — same rule the script uses.
+ *
+ * Deployable functions PLUS every `_shared/tools/*.ts`. The tool modules are not deployable, but
+ * the only function importing them is `agent-chat`, which is the one file the gate cannot check
+ * at any heap — so without checking them directly they had no compiler over them at all.
+ */
 function entrypoints(): string[] {
-  return readdirSync(FN_DIR)
+  const fns = readdirSync(FN_DIR)
     .filter((n) => !n.startsWith('_') && !n.startsWith('.'))
     .filter((n) => statSync(join(FN_DIR, n)).isDirectory())
-    .filter((n) => existsSync(join(FN_DIR, n, 'index.ts')))
-    .sort();
+    .filter((n) => existsSync(join(FN_DIR, n, 'index.ts')));
+  const toolsDir = join(FN_DIR, '_shared', 'tools');
+  const tools = existsSync(toolsDir)
+    ? readdirSync(toolsDir).filter((n) => n.endsWith('.ts')).map((n) => `_shared/tools/${n}`)
+    : [];
+  return [...fns, ...tools].sort();
 }
 
 describe('edge-function typecheck gate', () => {

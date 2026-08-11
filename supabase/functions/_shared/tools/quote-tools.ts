@@ -28,7 +28,20 @@
  * check passes. Quote DB tools are 0 credits (no AI spend; the PDF is deterministic).
  */
 
-const { tool } = await import('npm:@langchain/core@1.1.15/tools');
+// `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
+// graph into every module that defines a tool, and that instantiation — not file size — is what
+// makes agent-chat exceed 12 GB and drop out of the edge typecheck gate entirely (inbox-api is a
+// comparable 2.8k lines and checks fine). Erasing it here costs the `tool()` config shape, which
+// `npm run tools:manifest` + tests/unit/toolkitCoverage.test.ts already enforce from the AST, and
+// buys a compiler over the tool bodies, which nothing had before.
+const { tool } = await import('npm:@langchain/core@1.1.15/tools') as {
+  tool: <S extends { _output: unknown }>(
+    fn: (input: S['_output']) => unknown,
+    cfg: { name: string; description: string; schema: S; [k: string]: unknown },
+  // Return stays `any`: consumers pass these to bindTools()/registerTools(), and narrowing it
+  // to `unknown` would break them. The INPUT is what we want typed, and S gives us that.
+  ) => any;
+};
 const { z } = await import('npm:zod@3.24.0');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 
@@ -57,7 +70,9 @@ const itemSchema = z.object({
   delivery_date: z.string().optional().describe('FF&E: delivery date (YYYY-MM-DD).'),
 });
 
-type QuoteItemInput = z.infer<typeof itemSchema>;
+// `z` is imported dynamically for its RUNTIME value, so it is not in scope as a type namespace.
+// The schema's inferred output is reachable through the _output brand instead.
+type QuoteItemInput = (typeof itemSchema)['_output'];
 
 interface ResolvedLine {
   payload: Record<string, unknown>;

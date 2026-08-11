@@ -218,14 +218,26 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     const computed = computeBlueprint((items ?? []) as any[], dims, chosen);
     const currency = bp.source_currency || 'EUR';
 
-    // Destination workspace: explicit opt-in only.
-    const { data: destinations } = await supabase
+    // Destination: the OPERATOR workspace, always.
+    //
+    // /tools/kitchen-cost is a platform surface with no tenant in the request — an anonymous
+    // visitor on the public site belongs to nobody — so the lead goes to the operator, which is
+    // `workspaces.is_root` (the same row `is_platform_operator()` keys on). There is deliberately
+    // no configuration knob and nothing is read from the body: a body-supplied destination would
+    // let anyone post enquiries into another tenant's inbox (invariant 1).
+    //
+    // When this calculator is later embedded FOR a specific dealer, that tenant must come from
+    // the signed embed key that identifies them, never from a request field.
+    const { data: roots } = await supabase
       .from('workspaces')
       .select('id, name')
-      .eq('settings->public_tool_leads->>enabled', 'true')
-      .order('created_at', { ascending: true })
-      .limit(1);
-    const workspace = (destinations ?? [])[0] as { id: string; name: string } | undefined;
+      .eq('is_root', true)
+      .limit(2);
+    // Exactly one, or refuse: picking "the first" root would silently deliver a customer's
+    // enquiry to whichever tenant happened to sort first.
+    const workspace = (roots ?? []).length === 1
+      ? (roots as { id: string; name: string }[])[0]
+      : undefined;
     if (!workspace) {
       await logLead('failed');
       return json({ success: false, error: 'leads_unavailable' }, 503);
