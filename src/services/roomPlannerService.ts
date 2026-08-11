@@ -16,6 +16,25 @@ import { modelPublicUrl } from '@/services/product3dService';
 
 export type RoomLayout = Tables<'room_layouts'>;
 
+/** The six faces of a rectangular room. Fixed, because the area maths keys off them. */
+export type SurfaceKey = 'floor' | 'ceiling' | 'wall_north' | 'wall_east' | 'wall_south' | 'wall_west';
+
+export const SURFACE_KEYS: SurfaceKey[] = [
+  'floor', 'ceiling', 'wall_north', 'wall_east', 'wall_south', 'wall_west',
+];
+
+export interface LayoutSurface {
+  id: string;
+  layout_id: string;
+  surface: SurfaceKey;
+  product_id: string;
+  product_name: string | null;
+  waste_pct: number;
+  area_m2: number;
+  /** Area plus waste — what actually gets ordered. */
+  order_qty_m2: number;
+}
+
 /** A layout item with its footprint already resolved. Mirrors `room_layout_items_resolved`. */
 export interface ResolvedLayoutItem {
   id: string;
@@ -44,6 +63,55 @@ export const roomPlannerService = {
       .order('updated_at', { ascending: false });
     if (error) throw error;
     return data ?? [];
+  },
+
+  /**
+   * The room's surfaces with their DERIVED area (#341).
+   *
+   * A tile has no footprint — you apply it to a surface rather than placing it — so half the
+   * catalogue could not go on a plan at all until these existed. Area comes from the view, never
+   * from here: it is a function of the room dimensions and a copy would quote last week's floor
+   * after a resize.
+   */
+  async listSurfaces(layoutId: string): Promise<LayoutSurface[]> {
+    const { data, error } = await supabase
+      .from('room_layout_surfaces_resolved')
+      .select('*')
+      .eq('layout_id', layoutId);
+    if (error) throw error;
+    return (data ?? []) as LayoutSurface[];
+  },
+
+  /** Apply a product to a surface, or clear it by passing null. */
+  async setSurface(
+    workspaceId: string,
+    layoutId: string,
+    surface: SurfaceKey,
+    productId: string | null,
+  ): Promise<void> {
+    if (!productId) {
+      const { error } = await supabase
+        .from('room_layout_surfaces')
+        .delete()
+        .eq('layout_id', layoutId)
+        .eq('surface', surface);
+      if (error) throw error;
+      return;
+    }
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from('room_layout_surfaces')
+      .upsert(
+        {
+          workspace_id: workspaceId,
+          layout_id: layoutId,
+          surface,
+          product_id: productId,
+          created_by: auth.user?.id ?? null,
+        },
+        { onConflict: 'layout_id,surface' },
+      );
+    if (error) throw error;
   },
 
   /**

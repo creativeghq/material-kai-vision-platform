@@ -26,7 +26,10 @@ import { RoomScene3D, type SceneItem } from './RoomScene3D';
 import { roomCameraPosition } from './roomScene';
 import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/CanvasChrome';
 import { occupiedAreaM2 } from './roomGeometry';
-import { roomPlannerService, type RoomLayout, type ResolvedLayoutItem } from '@/services/roomPlannerService';
+import {
+  roomPlannerService, SURFACE_KEYS,
+  type RoomLayout, type ResolvedLayoutItem, type LayoutSurface, type SurfaceKey,
+} from '@/services/roomPlannerService';
 
 export const RoomPlannerPanel: React.FC = () => {
   const { activeWorkspaceId } = useWorkspace();
@@ -40,6 +43,7 @@ export const RoomPlannerPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [modelUrls, setModelUrls] = useState<Map<string, string>>(new Map());
+  const [surfaces, setSurfaces] = useState<LayoutSurface[]>([]);
   const [quoting, setQuoting] = useState(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -134,6 +138,32 @@ export const RoomPlannerPanel: React.FC = () => {
   }, [layoutId, toast]);
 
   useEffect(() => { void loadItems(); }, [loadItems]);
+
+  const loadSurfaces = useCallback(async () => {
+    if (!layoutId) { setSurfaces([]); return; }
+    try {
+      setSurfaces(await roomPlannerService.listSurfaces(layoutId));
+    } catch { setSurfaces([]); }
+  }, [layoutId]);
+
+  useEffect(() => { void loadSurfaces(); }, [loadSurfaces]);
+
+  /** Apply a product to one face of the room, or clear it. */
+  const applySurface = async (surface: SurfaceKey, productId: string) => {
+    if (!activeWorkspaceId || !layoutId) return;
+    try {
+      await roomPlannerService.setSurface(
+        activeWorkspaceId, layoutId, surface, productId === '__none' ? null : productId,
+      );
+      await loadSurfaces();
+    } catch (err) {
+      toast({
+        title: 'Could not apply that product',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
 
   /**
    * `?product=<id>` — arriving from a product's "Place in a room".
@@ -334,7 +364,7 @@ export const RoomPlannerPanel: React.FC = () => {
 
           {/* The plan produces something (#341). Until now a finished arrangement was a closed
               loop: real products at their real size, and nothing came out of it. */}
-          {layout && items.length > 0 && (
+          {layout && (items.length > 0 || surfaces.length > 0) && (
             <Button
               size="sm"
               variant="outline"
@@ -426,8 +456,57 @@ export const RoomPlannerPanel: React.FC = () => {
               </div>
             </div>
 
+            {/* Surfaces (#341). A tile is not placed, it is applied — so the half of the catalogue
+                that is flooring, wallcovering or paint reaches a plan through here rather than as
+                a rectangle sitting on the floor. Area is derived from the room, never typed. */}
+            <div className="rounded-xl border border-border/60 p-3">
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <span className="text-xs font-medium">Surfaces</span>
+                <span className="text-[10px] text-muted-foreground">
+                  quantities include 10% waste for cuts and breakage
+                </span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {SURFACE_KEYS.map((key) => {
+                  const applied = surfaces.find((s2) => s2.surface === key);
+                  return (
+                    <div key={key} className="flex items-center gap-2">
+                      <span className="w-24 shrink-0 text-[11px] capitalize text-muted-foreground">
+                        {key.replace('_', ' ')}
+                      </span>
+                      <Select
+                        value={applied?.product_id ?? '__none'}
+                        onValueChange={(v) => applySurface(key, v)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* Applying a surface has to be undoable. Without this the only way to
+                              take a floor back off a plan is the database. */}
+                          <SelectItem value="__none">None</SelectItem>
+                          {products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {applied && (
+                        <span className="w-28 shrink-0 text-right text-[10px] text-muted-foreground">
+                          {Number(applied.order_qty_m2).toFixed(2)} m²
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
               <span>{items.length} item{items.length === 1 ? '' : 's'}</span>
+              {surfaces.length > 0 && (
+                <span>
+                  {surfaces.length} surface{surfaces.length === 1 ? '' : 's'} ·{' '}
+                  {surfaces.reduce((t, s2) => t + Number(s2.order_qty_m2), 0).toFixed(2)} m² to order
+                </span>
+              )}
               <span>{areaUsed} m² of {Math.round(roomArea * 100) / 100} m² floor</span>
               {view === '3d' && missingModels > 0 && (
                 <span className="text-muted-foreground">
