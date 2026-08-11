@@ -147,8 +147,11 @@ export const createResearchAnalysisTool = (workspaceId: string, userId?: string)
         let response;
         try {
           response = await modelWithTools.invoke([
+            // The persona is a MESSAGE. Passed as a call option it is silently dropped —
+            // these sub-agents ran with no system prompt at all until 2026-08-11.
+            ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
             { role: 'user', content: `${context ? `Context: ${context}\n\n` : ''}Research query: ${query}` }
-          ], { system: systemPrompt });
+          ]);
         } catch (e) {
           await refundCredits(supabase, userId, workspaceId, SUB_AGENT_CEILING, 'research_analysis', { reason: 'ai_call_failed' });
           throw e;
@@ -218,8 +221,11 @@ export const createAnalyticsAnalysisTool = (userId?: string, workspaceId?: strin
         let response;
         try {
           response = await analyticsModel.invoke([
+            // The persona is a MESSAGE. Passed as a call option it is silently dropped —
+            // these sub-agents ran with no system prompt at all until 2026-08-11.
+            ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
             { role: 'user', content: `Data type: ${dataType || 'general'}\nTime range: ${timeRange || 'all'}\nAnalysis request: ${query}` }
-          ], { system: systemPrompt });
+          ]);
         } catch (e) {
           await refundCredits(supabase, userId, workspaceId, SUB_AGENT_CEILING, 'analytics_analysis', { reason: 'ai_call_failed' });
           throw e;
@@ -292,8 +298,11 @@ export const createBusinessAnalysisTool = (workspaceId: string, userId?: string)
         let response;
         try {
           response = await modelWithTools.invoke([
+            // The persona is a MESSAGE. Passed as a call option it is silently dropped —
+            // these sub-agents ran with no system prompt at all until 2026-08-11.
+            ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
             { role: 'user', content: `Focus area: ${focus || 'general'}\nBusiness question: ${query}` }
-          ], { system: systemPrompt });
+          ]);
         } catch (e) {
           await refundCredits(supabase, userId, workspaceId, SUB_AGENT_CEILING, 'business_analysis', { reason: 'ai_call_failed' });
           throw e;
@@ -365,8 +374,11 @@ export const createProductAnalysisTool = (workspaceId: string, userId?: string) 
         let response;
         try {
           response = await modelWithTools.invoke([
+            // The persona is a MESSAGE. Passed as a call option it is silently dropped —
+            // these sub-agents ran with no system prompt at all until 2026-08-11.
+            ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
             { role: 'user', content: `Product category: ${productCategory || 'all'}\nProduct question: ${query}` }
-          ], { system: systemPrompt });
+          ]);
         } catch (e) {
           await refundCredits(supabase, userId, workspaceId, SUB_AGENT_CEILING, 'product_analysis', { reason: 'ai_call_failed' });
           throw e;

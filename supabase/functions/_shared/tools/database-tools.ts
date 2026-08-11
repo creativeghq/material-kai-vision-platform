@@ -137,34 +137,35 @@ export const createQueryDatabaseTool = () => {
             throw new Error(`Unknown query type: ${queryType}`);
         }
 
-        // For non-job queries
-        if (queryType !== 'jobs') {
-          const result = await query;
-          data = result.data;
-          error = result.error;
+        // The 'jobs' case returns inside the switch above, so everything reaching here is a
+        // document query. This used to be wrapped in `if (queryType !== 'jobs')`, a condition
+        // TypeScript narrows to always-true — dead code the compiler could not see until
+        // _shared/tools came under the gate.
+        const result = await query;
+        data = result.data;
+        error = result.error;
 
-          if (error) {
-            throw new Error(`Database query failed: ${error.message}`);
-          }
-
-          // Get total count
-          const countResult = await supabase
-            .from(tableName)
-            .select('*', { count: 'exact', head: true })
-            .eq('document_id', documentId);
-
-          totalCount = countResult.count;
-
-
-          return JSON.stringify({
-            success: true,
-            queryType,
-            documentId,
-            totalCount: totalCount || 0,
-            sampleCount: data?.length || 0,
-            samples: data || [],
-          });
+        if (error) {
+          throw new Error(`Database query failed: ${error.message}`);
         }
+
+        // Get total count
+        const countResult = await supabase
+          .from(tableName)
+          .select('*', { count: 'exact', head: true })
+          .eq('document_id', documentId);
+
+        totalCount = countResult.count;
+
+
+        return JSON.stringify({
+          success: true,
+          queryType,
+          documentId,
+          totalCount: totalCount || 0,
+          sampleCount: data?.length || 0,
+          samples: data || [],
+        });
       } catch (error) {
         console.error('Query database tool error:', error);
         return JSON.stringify({

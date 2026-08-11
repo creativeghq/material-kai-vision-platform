@@ -31,17 +31,28 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-type SheetType =
-  | 'material_board'
-  | 'color_palette'
-  | 'concept_board'
-  | 'lighting_plan'
-  | 'plumbing_plan'
-  | 'annotated_render'
-  | 'elevation_render_pair'
-  | 'ffe_schedule'
-  | 'area_breakdown'
-  | 'full_deck';
+/**
+ * The sheet vocabulary, declared ONCE. The handler's type and the tool's zod enum are both
+ * derived from it, so they cannot drift apart again — they already had: `electrical_plan` is a
+ * fully-built sheet (wizard, canvas, symbol placement, illustration, preview) and the enum
+ * accepted it while this union did not, which is the same two-copies-of-one-vocabulary failure
+ * CLAUDE.md documents for workspace roles.
+ */
+const SHEET_TYPES = [
+  'material_board',
+  'color_palette',
+  'concept_board',
+  'lighting_plan',
+  'plumbing_plan',
+  'electrical_plan',
+  'annotated_render',
+  'elevation_render_pair',
+  'ffe_schedule',
+  'area_breakdown',
+  'full_deck',
+] as const;
+
+type SheetType = (typeof SHEET_TYPES)[number];
 
 export const createPresentationSheetTool = (
   userId: string,
@@ -195,19 +206,7 @@ export const createPresentationSheetTool = (
         'initial_data payload — see the schema for each sheet_type.',
       schema: z.object({
         moodboard_id: z.string().uuid().describe('UUID of the moodboard the sheet attaches to'),
-        sheet_type: z.enum([
-          'material_board',
-          'color_palette',
-          'concept_board',
-          'lighting_plan',
-          'plumbing_plan',
-          'electrical_plan',
-          'annotated_render',
-          'elevation_render_pair',
-          'ffe_schedule',
-          'area_breakdown',
-          'full_deck',
-        ]).describe('Sheet type to generate'),
+        sheet_type: z.enum(SHEET_TYPES).describe('Sheet type to generate'),
         title: z.string().describe('Display title for the sheet, e.g. "Bathroom Wall Sheet"'),
         initial_data: z.object({
           // material_board
@@ -295,8 +294,8 @@ export const createPresentationSheetTool = (
             product_id: z.string().optional(),
             source: z.enum(['ai', 'manual', 'auto']).default('ai'),
           })).optional(),
-          // elevation_render_pair
-          elevation_image_url: z.string().optional(),
+          // elevation_render_pair — shared with area_breakdown below, declared once
+          elevation_image_url: z.string().optional().describe('elevation_render_pair / area_breakdown: elevation / front-view image'),
           render_image_url: z.string().optional(),
           dimensions: z.array(z.object({
             x1: z.number(), y1: z.number(),
@@ -323,7 +322,6 @@ export const createPresentationSheetTool = (
           subtitle: z.string().optional().describe('area_breakdown: e.g. "Modern Bathroom Design"'),
           hero_image_url: z.string().optional().describe('area_breakdown: main room render'),
           plan_image_url: z.string().optional().describe('area_breakdown: dimensioned plan / layout image'),
-          elevation_image_url: z.string().optional().describe('area_breakdown: elevation / front-view image'),
           finishes: z.array(z.object({
             label: z.string().describe('e.g. "Wall Tile"'),
             spec: z.string().optional().describe('e.g. "Matt Stone Finish — Light Grey"'),

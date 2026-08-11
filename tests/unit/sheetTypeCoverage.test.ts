@@ -104,7 +104,10 @@ describe('presentation sheet type coverage', () => {
   });
 
   it('every sheet type is creatable by the agent tool', () => {
-    const toolEnum = arrayMembers(SHEET_TOOL, 'sheet_type: z\\.enum\\(');
+    // Anchored on SHEET_TYPES, not the z.enum call: the tool declares its vocabulary ONCE and
+    // derives both the zod enum and its SheetType union from it, because those two had already
+    // drifted — the enum accepted electrical_plan and the union did not.
+    const toolEnum = arrayMembers(SHEET_TOOL, 'const SHEET_TYPES = ');
     const missing = ALL_TYPES.filter((t) => !toolEnum.includes(t));
     expect(missing, 'sheet types the agent cannot create').toEqual([]);
   });

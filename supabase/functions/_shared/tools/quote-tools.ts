@@ -76,7 +76,13 @@ type QuoteItemInput = (typeof itemSchema)['_output'];
 
 interface ResolvedLine {
   payload: Record<string, unknown>;
-  line_total: number;
+  /**
+   * NULL for a call-for-price line — a product whose price the catalog does not carry. Every
+   * consumer already coalesced it (`?? 0`, "call-for-price lines contribute 0 to the total");
+   * only this declaration claimed otherwise. Widening it changes no behaviour, it stops the
+   * type from asserting a number exists where the domain says one may not.
+   */
+  line_total: number | null;
   label: string;
 }
 
