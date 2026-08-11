@@ -59,7 +59,6 @@ All edge functions accept `*` for `Access-Control-Allow-Origin`. Send `OPTIONS` 
 31. [Supabase Storage API](#31-supabase-storage-api)
 32. [Generate Interior (Gemini)](#32-generate-interior-gemini)
 33. [Generate Interior Video v2](#33-generate-interior-video-v2)
-34. [Generate PBR Maps](#34-generate-pbr-maps)
 35. [Generate Region Edit](#35-generate-region-edit)
 36. [Generate Virtual Staging](#36-generate-virtual-staging)
 37. [Social Content Generation](#37-social-content-generation)
@@ -2187,52 +2186,6 @@ Body: { "prefixes": ["path/to/file.jpg"] }
 ```
 
 When `async_job: true`, poll the `generation_videos` table by `job_id` for `status` and `video_url`.
-
----
-
-## 34. Generate PBR Maps
-
-**Endpoint**: `POST /functions/v1/generate-pbr-maps`
-**Auth**: User JWT or Service Role Key (with `user_id` in body)
-**Description**: Generates PBR texture maps (albedo, normal, roughness, metalness, tileable) from product images. Tries MIVAA SVBRDF extraction first, falls back to Replicate.
-
-### Request Body
-
-```json
-{
-  "product_id": "uuid",
-  "source_image_url": "https://...material.jpg",
-  "generate_tileable": true,
-  "user_id": "uuid"
-}
-```
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `product_id` | string | Yes | Product UUID |
-| `source_image_url` | string | Yes | Material image URL |
-| `generate_tileable` | boolean | No | Default: `true` |
-
-### Credit Cost: 8 credits (fixed)
-
-### Response `200`
-
-```json
-{
-  "success": true,
-  "product_id": "uuid",
-  "pbr_maps": {
-    "albedo_url": "https://...",
-    "normal_url": "https://...",
-    "roughness_url": "https://...",
-    "metalness_url": "https://...",
-    "tileable_url": "https://...",
-    "status": "completed",
-    "generated_at": "2026-04-17T12:00:00Z"
-  },
-  "credits_used": 8
-}
-```
 
 ---
 

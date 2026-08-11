@@ -186,12 +186,13 @@ Generate 3D Gaussian Splat worlds from interior images via WorldLabs Marble.
 - **Documentation:** [vr-world-generation.md](../vr-world-generation.md)
 - **Access:** JWT
 
-#### PBR Maps (AR)
-Generate PBR texture maps for AR preview rendering.
-- **Function:** `generate-pbr-maps`
-- **Outputs:** albedo, normal, roughness, metalness (Replicate)
-- **Credits:** 8 per generation
-- **Documentation:** [ar-material-preview.md](../ar-material-preview.md)
+#### Material Maps (AR)
+Derive a tileable albedo from a product's own photo, for the AR/lighting material preview.
+- **Function:** `generate-interior-gemini` with `mode: 'material-texture'` — there is no
+  `generate-pbr-maps` function and there never has been; the endpoint documented here until
+  2026-08-11 did not exist, and `metadata.pbr_maps` was written 0 times.
+- **Output:** a tileable albedo, stored per product/option in `product_material_maps`
+- **Credits:** set by `resolveGenerationRouting` for the chosen provider (Gemini or Grok)
 - **Access:** JWT
 
 #### [AI Re-rank API](./ai-rerank-api.md)

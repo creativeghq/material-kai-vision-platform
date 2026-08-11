@@ -354,7 +354,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `generate-virtual-staging` | POST | JWT | Furnishes empty room photos (Replicate proplabs, 8 room types × 8 styles). | 20 | [generate-virtual-staging-api](api/generate-virtual-staging-api.md) |
 | `generate-region-edit` | POST | JWT | Masked inpainting with Grok Aurora. SAM 2 auto-mask + Pillow fallback. | 20 | [generate-region-edit-api](api/generate-region-edit-api.md) |
 | `generate-vr-world` | POST | JWT | WorldLabs Marble → 3D Gaussian Splat worlds (models: `marble-1.0-draft` / `marble-1.1`). Stored in `vr_worlds`. | 18 / 190 | [vr-world-generation](vr-world-generation.md) |
-| ~~`generate-pbr-maps`~~ | POST | JWT | **NOT WORKING** — no source in repo, has never written a `pbr_maps` value (0 rows). See [ar-material-preview](ar-material-preview.md). | — | [ar-material-preview](ar-material-preview.md) |
+| ~~`generate-pbr-maps`~~ | — | — | **REMOVED 2026-08-11.** Never existed as source; wrote a `pbr_maps` value 0 times. Replaced by `generate-interior-gemini` `mode: material-texture` → `product_material_maps`. | — | — |
 | `generate-quote-pdf` | POST | JWT | Branded quote PDFs with cover/backcover templates from `quote-templates` storage bucket. | — | — |
 
 ### 1.3 SEO suite (admin/owner only)

@@ -26,6 +26,10 @@ import {
 } from '@/components/core/ui/dialog';
 import { useARSupport } from './useARSupport';
 import { ProductModelStage } from './ProductModelViewer';
+import {
+  productMaterialMapsService,
+  type MaterialMapUrls,
+} from '@/services/productMaterialMapsService';
 // Loader + error boundary moved to CanvasChrome when the #260 configurator became a second
 // canvas surface — a copied error boundary drifts and nobody notices.
 import { CanvasLoader, ThreeErrorBoundary } from './CanvasChrome';
@@ -41,12 +45,6 @@ interface ARPreviewModalProps {
   productId: string;
   productName?: string;
   productImage: string;
-  pbrMaps?: {
-    tileable_url?: string;
-    normal_url?: string;
-    roughness_url?: string;
-    metalness_url?: string;
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +168,6 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
   productId,
   productName,
   productImage,
-  pbrMaps,
 }) => {
   const { mode, isMobile } = useARSupport();
   const [tileScale, setTileScale] = useState(2);
@@ -189,13 +186,33 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
     return () => { live = false; };
   }, [isOpen, productId]);
 
+  // AI-derived material maps for this product (#321). Loaded HERE rather than passed in: the
+  // prop used to be `product.metadata?.pbr_maps`, which no code has ever written — four callers
+  // handing down a value that was always undefined.
+  const [maps, setMaps] = useState<MaterialMapUrls | null>(null);
+  useEffect(() => {
+    if (!isOpen || !productId) return;
+    let live = true;
+    productMaterialMapsService
+      .selectedFor(productId)
+      .then((m) => { if (live) setMaps(m); })
+      .catch(() => { if (live) setMaps(null); });
+    return () => { live = false; };
+  }, [isOpen, productId]);
+
   const glbModel = models?.find((m) => m.format === 'glb') ?? models?.find((m) => m.format === 'gltf');
   const usdzModel = models?.find((m) => m.format === 'usdz');
   const modelUrl = glbModel ? modelPublicUrl(glbModel) : null;
   const usdzUrl = usdzModel ? modelPublicUrl(usdzModel) : null;
 
-  // Determine the best albedo source: tileable PBR > raw product image
-  const albedoUrl = pbrMaps?.tileable_url || productImage;
+  // A derived tileable texture if one exists, else the product photo.
+  //
+  // The fallback is NOT equivalent and the UI says so below: a product photo has lighting baked
+  // in, edges, and often a whole tile with its grout — tiled across a plane it reads as a
+  // photograph repeated, not a surface. Presenting it silently as a material is what this
+  // previously did.
+  const derivedAlbedo = maps?.albedo_url ?? null;
+  const albedoUrl = derivedAlbedo || productImage;
 
   const handleDownload = () => {
     if (!linkRef.current) return;
@@ -265,9 +282,8 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
                 ) : (
                   <Scene
                     albedoUrl={albedoUrl}
-                    normalUrl={pbrMaps?.normal_url}
-                    roughnessUrl={pbrMaps?.roughness_url}
-                    metalnessUrl={pbrMaps?.metalness_url}
+                    normalUrl={maps?.normal_url ?? undefined}
+                    roughnessUrl={maps?.roughness_url ?? undefined}
                     tileScale={tileScale}
                   />
                 )}
@@ -340,6 +356,14 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
               <span id="ar-tile-scale-label" className="whitespace-nowrap text-xs text-muted-foreground">
                 Tile Scale
               </span>
+              {/* Say which one this is. A product photo has its lighting baked in and usually its
+                  own edges, so tiled across a plane it reads as a repeated photograph rather than a
+                  surface — presenting that silently as a material is what this used to do. */}
+              {!derivedAlbedo && (
+                <span className="whitespace-nowrap text-[10px] text-muted-foreground/70">
+                  product photo, not a seamless texture
+                </span>
+              )}
               <Slider
                 aria-labelledby="ar-tile-scale-label"
                 value={[tileScale]}

@@ -278,7 +278,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               productImage={primaryImage?.url || ''}
               productName={product.name}
               productCategory={product.category}
-              pbrMaps={product.metadata?.pbr_maps}
+              productId={product.id}
             />
           )}
           {showAR && (
@@ -288,7 +288,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               productId={product.id}
               productName={product.name}
               productImage={primaryImage?.url || ''}
-              pbrMaps={product.metadata?.pbr_maps}
             />
           )}
         </Suspense>

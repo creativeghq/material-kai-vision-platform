@@ -1,10 +1,15 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from '@/components/core/ui/dialog';
 import { Loader2 } from 'lucide-react';
+
+import {
+  productMaterialMapsService,
+  type MaterialMapUrls,
+} from '@/services/productMaterialMapsService';
 
 const MaterialLightingViewer = lazy(() => import('./MaterialLightingViewer'));
 
@@ -14,11 +19,12 @@ interface LightingPreviewModalProps {
   productImage: string;
   productName?: string;
   productCategory?: string;
-  pbrMaps?: {
-    normal_url?: string;
-    roughness_url?: string;
-    metalness_url?: string;
-  };
+  /**
+   * Loads this product's AI-derived material maps (#321). Previously the caller handed down
+   * `product.metadata?.pbr_maps`, which nothing has ever written — so the viewer has always lit a
+   * flat photo with no surface detail.
+   */
+  productId?: string;
 }
 
 function LoadingFallback() {
@@ -38,8 +44,19 @@ export default function LightingPreviewModal({
   productImage,
   productName,
   productCategory,
-  pbrMaps,
+  productId,
 }: LightingPreviewModalProps) {
+  const [maps, setMaps] = useState<MaterialMapUrls | null>(null);
+  useEffect(() => {
+    if (!isOpen || !productId) return;
+    let live = true;
+    productMaterialMapsService
+      .selectedFor(productId)
+      .then((m) => { if (live) setMaps(m); })
+      .catch(() => { if (live) setMaps(null); });
+    return () => { live = false; };
+  }, [isOpen, productId]);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-6xl h-[85vh] p-4 flex flex-col gap-0 overflow-hidden">
@@ -58,10 +75,9 @@ export default function LightingPreviewModal({
           <Suspense fallback={<LoadingFallback />}>
             {isOpen && (
               <MaterialLightingViewer
-                albedoUrl={productImage}
-                normalUrl={pbrMaps?.normal_url}
-                roughnessUrl={pbrMaps?.roughness_url}
-                metalnessUrl={pbrMaps?.metalness_url}
+                albedoUrl={maps?.albedo_url ?? productImage}
+                normalUrl={maps?.normal_url ?? undefined}
+                roughnessUrl={maps?.roughness_url ?? undefined}
                 materialCategory={productCategory}
                 productName={productName}
               />

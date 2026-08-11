@@ -22,12 +22,6 @@ interface ProductData {
   name: string;
   image_url: string;
   metadata?: {
-    pbr_maps?: {
-      tileable_url?: string;
-      normal_url?: string;
-      roughness_url?: string;
-      metalness_url?: string;
-    };
     [key: string]: unknown;
   };
 }
@@ -159,7 +153,6 @@ const ARPage: React.FC = () => {
         productId={product.id}
         productName={product.name}
         productImage={product.image_url}
-        pbrMaps={product.metadata?.pbr_maps}
       />
     </div>
   );

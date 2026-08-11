@@ -39,6 +39,7 @@ import { ProductCostCard } from '@/components/business/marketplace/ProductCostCa
 import { ProductPackagingCard } from '@/components/business/marketplace/ProductPackagingCard';
 import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
 import { ProductEmbedReadinessCard } from '@/components/features/products/ProductEmbedReadinessCard';
+import { ProductMaterialMapsCard } from '@/components/features/products/ProductMaterialMapsCard';
 import { ProductConfigurator } from '@/components/features/configurator/ProductConfigurator';
 import { ProductOptionsEditor } from '@/components/features/configurator/ProductOptionsEditor';
 import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
@@ -2597,6 +2598,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {isOwnProduct && activeWorkspaceId && (
             <div className="mt-6">
               <Product3DModelCard productId={product.id} workspaceId={activeWorkspaceId} />
+            </div>
+          )}
+
+          {/* Material texture (#321). Sits next to the model card because it is the answer for the
+              products that will never have geometry — a tile or a fabric IS the surface. */}
+          {isOwnProduct && activeWorkspaceId && (
+            <div className="mt-6">
+              <ProductMaterialMapsCard
+                productId={product.id}
+                workspaceId={activeWorkspaceId}
+                productName={product.name}
+                sourceImageUrl={images[0]?.url ?? null}
+              />
             </div>
           )}
 
