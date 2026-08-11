@@ -23,6 +23,7 @@
     "openapi:edge": "node scripts/build-openapi-edge.mjs",
     "tools:manifest": "node scripts/gen-tool-manifest.mjs",
     "skills:sync": "node scripts/gen-skill-ts.mjs",
+    "gen:all": "npm run tools:manifest && npm run skills:sync",
     "build:embed": "vite build --config vite.embed.config.ts"
   },
   "dependencies": {
