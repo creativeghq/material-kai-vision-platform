@@ -205,5 +205,33 @@ absorbs one missed daily tick.
 A notification deep-links to `/crm/companies/{id}?tab=equipment` (or `/crm/contacts/{id}?…`); both
 detail pages read `?tab=` so the link lands on the right tab rather than on Activity.
 
-Warranty documents have columns (`document_bucket` + `document_path`, never a persisted signed URL)
-but no upload UI yet — that is the obvious next increment.
+### Warranty certificates
+
+Attached from the Equipment tab, one per warranty. The file goes to the **private**
+`pdf-documents` bucket under `warranties/{workspace_id}/{asset_id}/{warranty_id}-{filename}` —
+feature identity in the top-level folder, not the bucket name.
+
+Uploads go **through `customer-assets-api`**, not the browser's storage client: the bucket is
+service-role-write, so ownership is proven server-side on the RLS-bound client before the
+service-role write, rather than by widening client storage policies to a
+caller-supplied folder segment. PDF or image, 5 MB.
+
+The row stores `document_bucket` + `document_path` and **never a URL** (pipeline convention 7) —
+reads mint a 5-minute signed URL on demand, so a link can never rot.
+
+`customer_asset_warranties` is registered in `build_storage_reference_set()`. That is not
+optional: `storage-orphan-cleanup-cron` reaps every object not in that set, so an upload feature
+shipped without it would work perfectly and then lose every certificate overnight. It was
+appended programmatically rather than by retyping an 11k-character function, because a
+hand-copied rewrite is how you silently drop somebody else's branch and start reaping their files.
+
+### Deleting a unit is refused once it has been serviced
+
+`tg_block_asset_delete_with_history` raises when a `customer_assets` row has any non-open service
+event. `status = 'removed' | 'replaced' | 'decommissioned'` already says "this unit is gone" while
+keeping the record, and the Equipment dialog offers exactly that; the API surfaces the refusal as
+**409** with a message naming the alternative.
+
+A genuine purge (GDPR erasure, seeded test data) sets `app.allow_asset_purge` for the transaction.
+Nothing in the application does — it exists so the guard never becomes the reason a legal request
+cannot be honoured.

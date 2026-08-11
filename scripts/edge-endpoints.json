@@ -11073,7 +11073,7 @@
     "name": "customer-assets-api",
     "tag": "CRM",
     "summary": "Installed base: a customer's equipment, its warranties and its recurring service schedules (#343).",
-    "description": "Action-discriminated JWT endpoint over customer_assets, customer_asset_warranties, customer_asset_service_plans and customer_asset_service_events, plus the per-product defaults in product_service_defaults. Reads and writes run through the caller's own RLS context; registration and service completion go through SECURITY DEFINER RPCs that call assert_workspace_member. There is no next_due_on field anywhere: the next due date IS the plan's single open service event, served by the customer_asset_service_due view. Ownership mismatches return 404, never 403.",
+    "description": "Action-discriminated JWT endpoint over customer_assets, customer_asset_warranties, customer_asset_service_plans and customer_asset_service_events, plus the per-product defaults in product_service_defaults. Reads and writes run through the caller's own RLS context; registration and service completion go through SECURITY DEFINER RPCs that call assert_workspace_member. There is no next_due_on field anywhere: the next due date IS the plan's single open service event, served by the customer_asset_service_due view. Ownership mismatches return 404, never 403. Warranty certificates upload through this function (service-role write to the private pdf-documents bucket under warranties/, after ownership is proven on the RLS-bound client) and are read via a short-lived signed URL; the row stores bucket + path and never a URL. Deleting an asset that has logged service returns 409 - the DB refuses it so the history cannot be erased.",
     "security": [
       "supabaseJwt"
     ],
@@ -11089,6 +11089,9 @@
       "delete",
       "apply_defaults",
       "warranty.save",
+      "warranty.upload_document",
+      "warranty.document_url",
+      "warranty.delete_document",
       "warranty.delete",
       "plan.save",
       "plan.delete",
@@ -11121,7 +11124,7 @@
         }
       }
     },
-    "response": "{ assets } | { asset, warranties, plans, events } | { asset_id } | { due } | { history } | { next_event_id } | { defaults } | { success }"
+    "response": "{ assets } | { asset, warranties, plans, events } | { asset_id } | { due } | { history } | { next_event_id } | { defaults } | { warranty } | { url } | { success }"
   },
   {
     "name": "asset-service-reminders-cron",

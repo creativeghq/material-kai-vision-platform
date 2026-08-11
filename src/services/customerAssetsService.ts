@@ -259,8 +259,18 @@ export const customerAssetsService = {
     return call<{ asset: CustomerAsset }>('update', { asset_id: assetId, ...patch }).then((r) => r.asset);
   },
 
+  /**
+   * Hard delete. Refused by the database once the unit has any logged service — retiring it
+   * (`status: 'removed' | 'replaced' | 'decommissioned'`) is what you almost always want, and
+   * keeps the history. The API returns 409 with a message naming that alternative.
+   */
   remove(assetId: string) {
     return call<{ success: true }>('delete', { asset_id: assetId });
+  },
+
+  /** Retire a unit without losing anything. */
+  retire(assetId: string, status: Exclude<AssetStatus, 'active'> = 'removed') {
+    return this.update(assetId, { status });
   },
 
   /** Re-run the product defaults against an asset registered before those defaults existed. */
@@ -270,6 +280,38 @@ export const customerAssetsService = {
 
   saveWarranty(input: Partial<AssetWarranty> & { asset_id?: string; warranty_id?: string }) {
     return call<{ warranty: AssetWarranty }>('warranty.save', input).then((r) => r.warranty);
+  },
+
+  /**
+   * Attach (or replace) the warranty certificate. Goes through the API rather than the storage
+   * client: the bucket is private and service-role-write, so ownership is proven server-side
+   * instead of by widening client storage policies. 5 MB cap, PDF or image.
+   */
+  async uploadWarrantyDocument(warrantyId: string, file: File) {
+    const data_base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Could not read the file'));
+      reader.onload = () => {
+        const r = String(reader.result ?? '');
+        resolve(r.slice(r.indexOf(',') + 1));
+      };
+      reader.readAsDataURL(file);
+    });
+    return call<{ warranty: AssetWarranty }>('warranty.upload_document', {
+      warranty_id: warrantyId,
+      filename: file.name,
+      content_type: file.type,
+      data_base64,
+    }).then((r) => r.warranty);
+  },
+
+  /** A short-lived signed URL, minted per read — the row never stores one. */
+  warrantyDocumentUrl(warrantyId: string) {
+    return call<{ url: string }>('warranty.document_url', { warranty_id: warrantyId }).then((r) => r.url);
+  },
+
+  deleteWarrantyDocument(warrantyId: string) {
+    return call<{ success: true }>('warranty.delete_document', { warranty_id: warrantyId });
   },
 
   deleteWarranty(warrantyId: string) {

@@ -149,6 +149,40 @@ describe('reminders are emitted as flow events, never sent directly', () => {
   });
 });
 
+describe('warranty certificates', () => {
+  const api = stripComments(read(API));
+
+  it('stores bucket + path, never a URL', () => {
+    // Pipeline convention 7: a persisted signed URL expires and the row becomes a dead link.
+    // Re-signing on read is free.
+    expect(api).toContain('document_bucket');
+    expect(api).toContain('document_path');
+    expect(api).toContain('createSignedUrl');
+    expect(
+      /document_url\s*:|document_signed_url|\.update\([^)]*signedUrl/.test(api),
+      'a signed URL is being written to the warranty row; mint it per read instead',
+    ).toBe(false);
+  });
+
+  it('proves ownership on the RLS-bound client before the service-role write', () => {
+    // The upload is the one place this function touches storage with service-role. The
+    // preceding read MUST be on `db` (RLS) and filtered by workspace, or any authenticated
+    // user could overwrite another tenant's certificate by guessing a warranty id.
+    const upload = api.slice(api.indexOf("case 'warranty.upload_document'"),
+                             api.indexOf("case 'warranty.document_url'"));
+    expect(upload).toContain("db.from('customer_asset_warranties')");
+    expect(upload).toContain("eq('workspace_id', workspaceId)");
+    // ...and the ownership check must come BEFORE the upload call.
+    expect(upload.indexOf("eq('workspace_id', workspaceId)"))
+      .toBeLessThan(upload.indexOf('service.storage'));
+  });
+
+  it('rejects anything that is not a certificate, and caps the size', () => {
+    expect(api).toContain('WARRANTY_MIME');
+    expect(api).toContain('WARRANTY_MAX_BYTES');
+  });
+});
+
 describe('tenancy', () => {
   it('the API never trusts a body id against the service-role client', () => {
     const api = stripComments(read(API));

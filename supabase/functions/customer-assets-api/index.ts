@@ -51,6 +51,26 @@ const DEFAULT_WRITABLE = [
   'interval_days', 'lead_days', 'notify_internal', 'notify_customer', 'position', 'is_active',
 ] as const;
 
+/**
+ * Warranty certificates live in the PRIVATE `pdf-documents` bucket under a `warranties/`
+ * top-level folder — feature identity lives in the folder, not the bucket (storage doc).
+ * Writes are service-role and go through this function, so ownership is proven here rather
+ * than by widening client-side storage policies. Registered in
+ * `build_storage_reference_set()`, without which storage-orphan-cleanup-cron reaps them.
+ */
+const WARRANTY_BUCKET = 'pdf-documents';
+/** Certificates are scans. Anything else is a mis-upload, not a feature request. */
+const WARRANTY_MIME = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp'];
+const WARRANTY_MAX_BYTES = 5 * 1024 * 1024;
+const SIGNED_URL_TTL_SECONDS = 300;
+
+/** Keep a user-supplied filename from escaping its folder or carrying surprises. */
+function safeFilename(name: string): string {
+  const base = (name.split(/[\\/]/).pop() || 'document').trim();
+  const cleaned = base.replace(/[^A-Za-z0-9._-]/g, '_').replace(/^\.+/, '').slice(-80);
+  return cleaned || 'document';
+}
+
 const ASSET_SELECT =
   'id, workspace_id, customer_company_id, customer_contact_id, project_id, room_id, product_id, ' +
   'name, brand, model, serial_number, quantity, status, purchased_on, installed_on, ' +
@@ -175,7 +195,13 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
       if (!assetId) throw new HttpError(400, 'asset_id is required');
       const { error } = await db.from('customer_assets').delete()
         .eq('id', assetId).eq('workspace_id', workspaceId);
-      if (error) throw new HttpError(400, error.message);
+      if (error) {
+        // `tg_block_asset_delete_with_history` refuses once a service has been logged, so the
+        // record cannot be erased by accident. 409, not 400: the request is well-formed, the
+        // state forbids it. Its message names the alternative (set the status instead).
+        if (error.code === '23503') throw new HttpError(409, error.message);
+        throw new HttpError(400, error.message);
+      }
       return json({ success: true });
     }
 
@@ -217,6 +243,95 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
         .select('*').maybeSingle();
       if (error) throw new HttpError(400, error.message);
       return json({ warranty: data });
+    }
+
+    case 'warranty.upload_document': {
+      const warrantyId = String(body.warranty_id ?? '');
+      if (!warrantyId) throw new HttpError(400, 'warranty_id is required');
+
+      // Ownership through the RLS-bound client BEFORE the service-role write.
+      const { data: w } = await db.from('customer_asset_warranties')
+        .select('id, asset_id, document_bucket, document_path')
+        .eq('id', warrantyId).eq('workspace_id', workspaceId).maybeSingle();
+      if (!w) throw new HttpError(404, 'not found');
+
+      const contentType = String(body.content_type ?? '');
+      if (!WARRANTY_MIME.includes(contentType)) {
+        throw new HttpError(400, 'a warranty document must be a PDF or an image');
+      }
+      const b64 = String(body.data_base64 ?? '');
+      if (!b64) throw new HttpError(400, 'data_base64 is required');
+
+      let bytes: Uint8Array;
+      try {
+        const bin = atob(b64.includes(',') ? b64.slice(b64.indexOf(',') + 1) : b64);
+        bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      } catch {
+        throw new HttpError(400, 'data_base64 is not valid base64');
+      }
+      if (bytes.byteLength === 0) throw new HttpError(400, 'the file is empty');
+      if (bytes.byteLength > WARRANTY_MAX_BYTES) {
+        throw new HttpError(400, 'the file is larger than 5 MB');
+      }
+
+      const row = w as { asset_id: string; document_bucket: string | null; document_path: string | null };
+      const path = `warranties/${workspaceId}/${row.asset_id}/${warrantyId}-${safeFilename(String(body.filename ?? 'certificate'))}`;
+
+      const { error: upErr } = await service.storage.from(WARRANTY_BUCKET)
+        .upload(path, bytes, { contentType, upsert: true });
+      if (upErr) throw new HttpError(400, `upload failed: ${upErr.message}`);
+
+      // Replacing a certificate: drop the old object, but only after the new one landed, and
+      // never let a failed cleanup lose the new path — an orphan is cheap, a lost row is not.
+      if (row.document_path && row.document_path !== path) {
+        await service.storage.from(row.document_bucket || WARRANTY_BUCKET)
+          .remove([row.document_path]).catch(() => { /* reaped by the orphan cron */ });
+      }
+
+      const { data: updated, error } = await db.from('customer_asset_warranties')
+        .update({ document_bucket: WARRANTY_BUCKET, document_path: path })
+        .eq('id', warrantyId).eq('workspace_id', workspaceId).select('*').maybeSingle();
+      if (error) throw new HttpError(400, error.message);
+      return json({ warranty: updated });
+    }
+
+    case 'warranty.document_url': {
+      // Never persist a signed URL (pipeline convention 7) — mint one per read.
+      const warrantyId = String(body.warranty_id ?? '');
+      if (!warrantyId) throw new HttpError(400, 'warranty_id is required');
+      const { data: w } = await db.from('customer_asset_warranties')
+        .select('document_bucket, document_path')
+        .eq('id', warrantyId).eq('workspace_id', workspaceId).maybeSingle();
+      const row = w as { document_bucket: string | null; document_path: string | null } | null;
+      if (!row || !row.document_path) throw new HttpError(404, 'not found');
+
+      const { data: signed, error } = await service.storage
+        .from(row.document_bucket || WARRANTY_BUCKET)
+        .createSignedUrl(row.document_path, SIGNED_URL_TTL_SECONDS);
+      if (error || !signed?.signedUrl) throw new HttpError(400, error?.message || 'could not sign the document');
+      return json({ url: signed.signedUrl, expires_in: SIGNED_URL_TTL_SECONDS });
+    }
+
+    case 'warranty.delete_document': {
+      const warrantyId = String(body.warranty_id ?? '');
+      if (!warrantyId) throw new HttpError(400, 'warranty_id is required');
+      const { data: w } = await db.from('customer_asset_warranties')
+        .select('document_bucket, document_path')
+        .eq('id', warrantyId).eq('workspace_id', workspaceId).maybeSingle();
+      const row = w as { document_bucket: string | null; document_path: string | null } | null;
+      if (!row) throw new HttpError(404, 'not found');
+
+      // Clear the row first. If the object removal fails the file is merely orphaned and the
+      // cleanup cron takes it; clearing second could leave a row pointing at a deleted object.
+      const { error } = await db.from('customer_asset_warranties')
+        .update({ document_bucket: null, document_path: null })
+        .eq('id', warrantyId).eq('workspace_id', workspaceId);
+      if (error) throw new HttpError(400, error.message);
+      if (row.document_path) {
+        await service.storage.from(row.document_bucket || WARRANTY_BUCKET)
+          .remove([row.document_path]).catch(() => { /* reaped by the orphan cron */ });
+      }
+      return json({ success: true });
     }
 
     case 'warranty.delete': {

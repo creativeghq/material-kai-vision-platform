@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlarmClock, CheckCircle2, History, Loader2, Plus, ShieldCheck, Trash2, Wrench, SkipForward,
+  AlarmClock, CheckCircle2, Download, History, Loader2, Paperclip, Plus, ShieldCheck,
+  Trash2, Wrench, SkipForward,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -21,8 +22,8 @@ import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import {
   customerAssetsService, describeInterval, warrantyState,
-  type AssetDetail, type CustomerAsset, type ServiceDueRow, type ServiceHistoryRow,
-  type WarrantyKind,
+  type AssetDetail, type AssetWarranty, type CustomerAsset, type ServiceDueRow,
+  type ServiceHistoryRow, type WarrantyKind,
 } from '@/services/customerAssetsService';
 
 interface EquipmentServiceTabProps {
@@ -524,6 +525,31 @@ const AssetDetailDialog: React.FC<{
           </DialogDescription>
         </DialogHeader>
 
+        {/* Retiring a unit keeps its whole history; deleting it is refused by the database
+            once any service has been logged, so this is the control that gets used. */}
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Status</span>
+          <Select
+            value={asset.status}
+            disabled={busy}
+            onValueChange={(v) => void run(
+              () => customerAssetsService.update(asset.id, { status: v as CustomerAsset['status'] }),
+              'Status updated',
+            )}
+          >
+            <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="removed">Removed</SelectItem>
+              <SelectItem value="replaced">Replaced</SelectItem>
+              <SelectItem value="decommissioned">Decommissioned</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground">
+            Retiring keeps the service history; deleting the unit would erase it.
+          </span>
+        </div>
+
         {/* Warranties */}
         <section className="space-y-2">
           <h3 className="text-sm font-semibold flex items-center gap-2"><ShieldCheck className="h-4 w-4" />Warranty</h3>
@@ -536,6 +562,7 @@ const AssetDetailDialog: React.FC<{
                   <TableHead>Kind</TableHead>
                   <TableHead>Cover</TableHead>
                   <TableHead>Policy</TableHead>
+                  <TableHead>Certificate</TableHead>
                   <TableHead>State</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
@@ -546,6 +573,9 @@ const AssetDetailDialog: React.FC<{
                     <TableCell className="capitalize">{w.kind}</TableCell>
                     <TableCell className="text-xs">{w.starts_on} → {w.ends_on}</TableCell>
                     <TableCell className="font-mono text-xs">{w.policy_number || '—'}</TableCell>
+                    <TableCell>
+                      <WarrantyDocumentCell warranty={w} busy={busy} onChanged={onChanged} />
+                    </TableCell>
                     <TableCell className={statusTone(warrantyState(w) === 'expiring' ? 'warning' : warrantyState(w))}>
                       {warrantyState(w)}
                     </TableCell>
@@ -681,6 +711,85 @@ const AssetDetailDialog: React.FC<{
         )}
       </DialogContent>
     </Dialog>
+  );
+};
+
+// ── Warranty certificate ───────────────────────────────────────────────────
+/**
+ * Upload / view / remove the certificate for one warranty. The file lives in the private
+ * `pdf-documents` bucket; the row stores bucket + path and NEVER a URL, so nothing here can
+ * expire. Viewing mints a short-lived signed URL on demand.
+ */
+const WarrantyDocumentCell: React.FC<{
+  warranty: AssetWarranty;
+  busy: boolean;
+  onChanged: () => Promise<void>;
+}> = ({ warranty, busy, onChanged }) => {
+  const { toast } = useToast();
+  const [working, setWorking] = useState(false);
+  const inputId = `warranty-doc-${warranty.id}`;
+
+  const fail = (err: unknown) => toast({
+    title: 'That did not work',
+    description: err instanceof Error ? err.message : 'Unknown error',
+    variant: 'destructive',
+  });
+
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setWorking(true);
+    try {
+      await customerAssetsService.uploadWarrantyDocument(warranty.id, file);
+      toast({ title: 'Certificate attached' });
+      await onChanged();
+    } catch (err) { fail(err); } finally { setWorking(false); }
+  };
+
+  const view = async () => {
+    setWorking(true);
+    try {
+      const url = await customerAssetsService.warrantyDocumentUrl(warranty.id);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) { fail(err); } finally { setWorking(false); }
+  };
+
+  const detach = async () => {
+    setWorking(true);
+    try {
+      await customerAssetsService.deleteWarrantyDocument(warranty.id);
+      toast({ title: 'Certificate removed' });
+      await onChanged();
+    } catch (err) { fail(err); } finally { setWorking(false); }
+  };
+
+  const disabled = busy || working;
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        id={inputId}
+        type="file"
+        className="hidden"
+        accept="application/pdf,image/png,image/jpeg,image/webp"
+        onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ''; }}
+      />
+      {warranty.document_path ? (
+        <>
+          <Button size="sm" variant="ghost" disabled={disabled} onClick={() => void view()}>
+            {working ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          </Button>
+          <Button size="sm" variant="ghost" disabled={disabled} onClick={() => void detach()}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </>
+      ) : (
+        <Button size="sm" variant="ghost" disabled={disabled} asChild={false}
+          onClick={() => document.getElementById(inputId)?.click()}>
+          {working ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+          <span className="ml-1 text-xs">Attach</span>
+        </Button>
+      )}
+    </div>
   );
 };
 
