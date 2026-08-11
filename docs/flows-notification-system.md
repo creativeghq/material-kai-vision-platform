@@ -352,6 +352,30 @@ transition clean in **any** order:
 5. **Verify:** `npx tsc -p tsconfig.json --noEmit` (0 errors), commit. Edge functions +
    frontend deploy via the **"Deploy FE & Supabase"** GitHub Action on merge to `main`.
 
+### 8a. Branching: an edge out of a condition node MUST carry `sourceHandle`
+
+The engine follows a condition's outgoing edges by **handle**, not by position:
+
+```ts
+const branchEdges = edges.filter((e) => e.source === nodeId && e.sourceHandle === branch);
+```
+
+A passing `filter` (and a `delay`) returns branch **`'output'`**; `if_else` returns
+`'true'` / `'false'`; `switch` returns the case value. An edge with **no**
+`sourceHandle` matches nothing — so the condition evaluates, logs `passed: true`,
+routes nowhere, and the run is recorded as **`completed`**. No error, no failed step,
+a green run that performed no action. This cost real time while building the #343
+reminder flows; it is invisible from the product, because the graph is valid, the
+flow is active and the engine reports success.
+
+`loop` and `stop` are the exceptions. `loop` executes its children **inline**
+(`edges.filter(e => e.source === nodeId)`, no handle check) and marks them visited,
+so its edges legitimately carry no handle — nine seeded `loop → notify` flows are
+correct as written. `stop` is terminal.
+
+Backstop: **`ops.flow_condition_edge_unrouted`** flags any active flow with an
+unhandled edge out of a branching condition node.
+
 If the new feature instead needs an **external/webhook** or **scheduled** trigger
 (not a platform event), you don't add a new `TriggerType` value — reuse
 `webhook` / `scheduled` and configure the flow in the builder (see §2a).

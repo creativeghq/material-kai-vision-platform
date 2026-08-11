@@ -287,8 +287,10 @@ identically to a MISS, so a 97.5% hit rate reduced the meter by exactly zero.
 | [tests/unit/installedBaseDerivation.test.ts](../tests/unit/installedBaseDerivation.test.ts) | `npm test`, blocking | shape 1 off the money path — a cached `next_due_on` or a client-side recomputation of a service date (#343), plus a hardcoded notification/email send in the reminder cron | **yes** — the banned-identifier regex was checked in BOTH directions against the realistic spellings (a snake_case-only first draft waved `nextDueOn` straight through), then a real violation was appended to `customerAssetsService.ts` and watched to fail before being reverted |
 | `ops.asset_reminders_silent_zero` | nightly | shape 4 on the equipment reminder cron — it ran, exited 0, and told nobody | **yes** — watched to fire on a planted 30-day-overdue occurrence AND watched to stay silent once that row was stamped, so a probe that always fires would have been caught. Fixing the second half changed the probe: the overdue-only path leaves `reminded_at` null by design, which the first draft reported as neglect |
 
+| `ops.flow_condition_edge_unrouted` | nightly | a flow branch that evaluates and routes nowhere — the engine matches a condition's outgoing edges by `sourceHandle`, so an edge without one silently reaches no action while the run reports **completed** | **yes** — and the first cut was WRONG in the informative direction: it fired on 9 healthy `loop → notify` flows, because `loop` runs its children inline with no handle check. Corrected to exclude `loop`/`stop`, then watched to return 0 on the real graph AND to fire on a deliberately stripped handle |
+
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
-what it found. Thirteen of twenty-three qualify. That is the gap.
+what it found. Fourteen of twenty-four qualify. That is the gap.
 
 > **`db.plpgsql-lint` has one known false-positive shape: runtime-created temp tables.**
 > `plpgsql_check` analyses statically, so a `create temporary table X` inside a function makes it

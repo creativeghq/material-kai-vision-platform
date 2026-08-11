@@ -140,6 +140,26 @@ an empty recipient list is a reminder that fires into nothing.
 `notify_customer` and a Send Email to `{{trigger.data.customer_email}}`. Keeping that in the flow
 rather than in the cron is what makes "who hears about this" an admin decision.
 
+**Each seeded flow has two gated branches**, because either recipient can legitimately be
+absent:
+
+```
+trigger ─┬─ internal_gate (user_id is_not_empty)      ─→ create_notification
+         └─ customer_gate (notify_customer == true
+                           AND customer_email is_not_empty) ─→ send_email
+```
+
+Both gates are needed. A customer-only plan (`notify_internal = false`) emits `user_id: null`,
+which `create_notification` rejected with `invalid input syntax for type uuid: "null"` — and
+because a failed node **aborts the run**, opting out of the internal notification silently
+disabled the customer email downstream of it. Every gate edge carries
+`sourceHandle: 'output'`; without it the branch routes nowhere and the run still reports
+`completed` (see §8a of the flows doc).
+
+The warranty flow has the internal gate only — `asset.warranty_expiring` carries no
+`customer_email`, since an expiring warranty is a prompt to call the customer about renewing,
+not a notice to send them.
+
 **De-duplication** is stamped on the row — `reminded_at` / `overdue_reminded_at` on the occurrence,
 and a jsonb `offset -> timestamp` map on the warranty. A stamp is written **only after the emit
 succeeded**; a transient failure leaves the row unstamped so the next tick retries instead of
