@@ -10,7 +10,7 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Loader2, Plus, Ruler, Box, Map as MapIcon, FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +42,7 @@ export const RoomPlannerPanel: React.FC = () => {
   const [modelUrls, setModelUrls] = useState<Map<string, string>>(new Map());
   const [quoting, setQuoting] = useState(false);
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const layout = useMemo(() => layouts.find((l) => l.id === layoutId) ?? null, [layouts, layoutId]);
 
@@ -133,6 +134,55 @@ export const RoomPlannerPanel: React.FC = () => {
   }, [layoutId, toast]);
 
   useEffect(() => { void loadItems(); }, [loadItems]);
+
+  /**
+   * `?product=<id>` — arriving from a product's "Place in a room".
+   *
+   * Placed once, then the parameter is cleared: leaving it in the URL means a refresh (or the back
+   * button) silently drops another copy of the same sofa into the room, and the second one lands
+   * exactly on top of the first where nobody can see it.
+   *
+   * Waits for a layout to exist, and creates one if the workspace has none — sending someone here
+   * from a product only to show them an empty picker is the dead end this link is meant to remove.
+   */
+  const pendingProduct = searchParams.get('product');
+  useEffect(() => {
+    if (!pendingProduct || !activeWorkspaceId || loading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        let target = layout;
+        if (!target) {
+          target = await roomPlannerService.createLayout(activeWorkspaceId, 'New room');
+          if (cancelled) return;
+          setLayouts((l) => [target as RoomLayout, ...l]);
+          setLayoutId(target.id);
+        }
+        await roomPlannerService.addItem(
+          activeWorkspaceId, target.id, pendingProduct,
+          { xM: Number(target.room_width_m) / 2, yM: Number(target.room_depth_m) / 2 },
+          items.length,
+        );
+        if (cancelled) return;
+        await loadItems();
+      } catch (err) {
+        toast({
+          title: 'Could not place that product',
+          description: err instanceof Error ? err.message : 'Unknown error',
+          variant: 'destructive',
+        });
+      } finally {
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams);
+          next.delete('product');
+          setSearchParams(next, { replace: true });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+    // `items.length` is read for the sort order only; re-running on it would re-place the product.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingProduct, activeWorkspaceId, loading, layout]);
 
   // Products to place. Capped — this is a picker, not a catalog browser.
   useEffect(() => {

@@ -9,7 +9,8 @@
  * enforces workspace membership regardless.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Box, Trash2, Upload } from 'lucide-react';
+import { Box, Trash2, Upload, Ruler } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -137,16 +138,30 @@ export const Product3DModelCard: React.FC<Product3DModelCardProps> = ({ productI
             format again replaces it.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full text-xs"
-          disabled={busy}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload className="mr-1.5 h-3.5 w-3.5" />
-          {busy ? 'Uploading…' : 'Upload model'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* The planner draws this product's MEASURED footprint, so the way in belongs where the
+              measurement is. Offered only once a model exists: without one the planner falls back
+              to a 60 × 60 cm placeholder, and inviting someone to "place it to scale" at a size
+              nobody measured is the opposite of what the feature promises. */}
+          {models.length > 0 && (
+            <Button asChild variant="outline" size="sm" className="rounded-full text-xs">
+              <Link to={`/room-planner?product=${productId}`}>
+                <Ruler className="mr-1.5 h-3.5 w-3.5" />
+                Place in a room
+              </Link>
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full text-xs"
+            disabled={busy}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="mr-1.5 h-3.5 w-3.5" />
+            {busy ? 'Uploading…' : 'Upload model'}
+          </Button>
+        </div>
         <input
           ref={fileInputRef}
           type="file"
