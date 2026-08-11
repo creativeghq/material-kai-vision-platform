@@ -76,6 +76,24 @@ physically means. `p_skip => true` records a skip and still advances.
 There is deliberately no client path that writes `customer_asset_service_events` directly; doing so
 would close an occurrence without opening its successor and the schedule would silently end.
 
+### History outlives the schedule that produced it
+
+`plan_id` on an occurrence is `ON DELETE SET NULL`, **not** cascade, and the event carries its own
+`plan_title`. It shipped as cascade for a few hours, which meant the bin icon next to a schedule in
+the Equipment UI deleted every service ever performed under it — who came, when, what it cost —
+and the only visible symptom was a row count getting smaller.
+
+Deleting a plan now runs `tg_close_open_event_before_plan_delete`, which removes **only** the open
+occurrence (work nobody will now do) and leaves the completed and skipped ones orphaned but
+readable. A `case_open_needs_plan` CHECK stops the inverse mistake: an occurrence can only be
+`due` while its plan exists, so a detached row can never sit on the worklist with nothing able to
+complete it. Renaming a plan updates its open occurrence and leaves history under the title the
+work was actually done as.
+
+`customer_asset_service_history` is the customer-level ledger — every completed or skipped service
+across their whole installed base, with `plan_removed` flagging entries whose schedule is gone. The
+per-unit view of the same data is in the asset dialog.
+
 ---
 
 ## How a unit gets registered
@@ -160,7 +178,7 @@ absorbs one missed daily tick.
 
 | Where | What |
 |---|---|
-| CRM contact → **Equipment** | units, warranty state, next service, mark done/skip |
+| CRM contact → **Equipment** | units, warranty state, next service, mark done/skip, and the full service history across all their equipment |
 | CRM company → **Equipment** | the same, for a company customer |
 | Product → **Service** | `is_serviceable`, `default_warranty_months`, the default plans |
 

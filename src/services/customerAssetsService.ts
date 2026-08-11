@@ -117,6 +117,38 @@ export interface ServiceDueRow {
   project_name: string | null;
 }
 
+/**
+ * A row of `customer_asset_service_history` — work that actually happened. It outlives the plan
+ * that produced it: deleting a schedule sets `plan_id` to null but keeps `plan_title`, so the
+ * ledger still reads "Clean the filters, done 2026-05-02, EUR 45".
+ */
+export interface ServiceHistoryRow {
+  event_id: string;
+  workspace_id: string;
+  status: 'completed' | 'skipped';
+  due_on: string;
+  completed_on: string | null;
+  happened_on: string;
+  was_late: boolean;
+  performed_by_user_id: string | null;
+  performed_by_name: string | null;
+  cost: number | null;
+  notes: string | null;
+  linked_order_id: string | null;
+  plan_id: string | null;
+  plan_title: string;
+  plan_removed: boolean;
+  asset_id: string;
+  asset_name: string;
+  serial_number: string | null;
+  location_note: string | null;
+  project_id: string | null;
+  customer_company_id: string | null;
+  customer_contact_id: string | null;
+  customer_name: string | null;
+  project_name: string | null;
+}
+
 export interface ProductServiceDefault {
   id: string;
   workspace_id: string;
@@ -262,6 +294,17 @@ export const customerAssetsService = {
     limit?: number;
   } = {}) {
     return call<{ due: ServiceDueRow[] }>('service.due', filter).then((r) => r.due);
+  },
+
+  /** Everything already done for a customer, across every unit they own. */
+  serviceHistory(filter: {
+    customer_company_id?: string;
+    customer_contact_id?: string;
+    project_id?: string;
+    asset_id?: string;
+    limit?: number;
+  } = {}) {
+    return call<{ history: ServiceHistoryRow[] }>('service.history', filter).then((r) => r.history);
   },
 
   /**

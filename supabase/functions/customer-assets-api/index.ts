@@ -296,6 +296,22 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
       return json({ due: data ?? [] });
     }
 
+    case 'service.history': {
+      // Everything ever done for this customer, across every unit they own — including work
+      // whose schedule has since been deleted (the event keeps its own plan_title).
+      let q = db.from('customer_asset_service_history').select('*')
+        .eq('workspace_id', workspaceId)
+        .order('happened_on', { ascending: false })
+        .limit(Math.min(Number(body.limit ?? 200), 500));
+      if (body.customer_company_id) q = q.eq('customer_company_id', String(body.customer_company_id));
+      if (body.customer_contact_id) q = q.eq('customer_contact_id', String(body.customer_contact_id));
+      if (body.project_id) q = q.eq('project_id', String(body.project_id));
+      if (body.asset_id) q = q.eq('asset_id', String(body.asset_id));
+      const { data, error } = await q;
+      if (error) throw new HttpError(400, error.message);
+      return json({ history: data ?? [] });
+    }
+
     case 'service.complete':
     case 'service.skip': {
       const eventId = String(body.event_id ?? '');

@@ -79,6 +79,33 @@ describe('one derivation of "next due"', () => {
   });
 });
 
+describe('service history', () => {
+  it('the client reads history from the view, never by re-filtering raw events', () => {
+    // The view resolves `plan_title` through the event's own copy, so an entry whose schedule was
+    // deleted still reads correctly. Re-filtering `customer_asset_service_events` client-side
+    // would lose that and show a blank service name for every orphaned row.
+    const service = stripComments(read(SERVICE));
+    expect(service).toContain("'service.history'");
+    expect(service).toContain('ServiceHistoryRow');
+
+    const api = stripComments(read(API));
+    expect(
+      api,
+      'service.history must read customer_asset_service_history, not the raw events table',
+    ).toContain("from('customer_asset_service_history')");
+  });
+
+  it('history is scoped by customer, not only by asset', () => {
+    // The whole point of the customer-level ledger: "what have we ever done for this customer"
+    // must be answerable without opening every unit in turn.
+    const api = stripComments(read(API));
+    const historyCase = api.slice(api.indexOf("case 'service.history'"), api.indexOf("case 'service.complete'"));
+    for (const filter of ['customer_company_id', 'customer_contact_id']) {
+      expect(historyCase, `service.history cannot be filtered by ${filter}`).toContain(filter);
+    }
+  });
+});
+
 describe('reminders are emitted as flow events, never sent directly', () => {
   const cron = stripComments(read(CRON));
 

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlarmClock, CheckCircle2, Loader2, Plus, ShieldCheck, Trash2, Wrench, SkipForward,
+  AlarmClock, CheckCircle2, History, Loader2, Plus, ShieldCheck, Trash2, Wrench, SkipForward,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -21,7 +21,8 @@ import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import {
   customerAssetsService, describeInterval, warrantyState,
-  type AssetDetail, type CustomerAsset, type ServiceDueRow, type WarrantyKind,
+  type AssetDetail, type CustomerAsset, type ServiceDueRow, type ServiceHistoryRow,
+  type WarrantyKind,
 } from '@/services/customerAssetsService';
 
 interface EquipmentServiceTabProps {
@@ -65,6 +66,7 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
   const [loading, setLoading] = useState(true);
   const [assets, setAssets] = useState<CustomerAsset[]>([]);
   const [due, setDue] = useState<ServiceDueRow[]>([]);
+  const [history, setHistory] = useState<ServiceHistoryRow[]>([]);
   const [openAsset, setOpenAsset] = useState<AssetDetail | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -78,12 +80,14 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [a, d] = await Promise.all([
+      const [a, d, h] = await Promise.all([
         customerAssetsService.list(scope),
         customerAssetsService.serviceDue(scope),
+        customerAssetsService.serviceHistory(scope),
       ]);
       setAssets(a);
       setDue(d);
+      setHistory(h);
     } catch (err) {
       toast({
         title: 'Could not load equipment',
@@ -268,6 +272,62 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
           )}
         </CardContent>
       </Card>
+
+      {/* ── What has already been done, across every unit this customer owns ─────── */}
+      {history.length > 0 && (
+        <Card className="dashboard-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Service history
+            </CardTitle>
+            <CardDescription>
+              Every visit logged against this customer's equipment. Entries survive the removal
+              of the schedule that produced them.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>When</TableHead>
+                  <TableHead>Equipment</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Outcome</TableHead>
+                  <TableHead>By</TableHead>
+                  <TableHead className="text-right">Cost</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.map((h) => (
+                  <TableRow key={h.event_id}>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {h.happened_on}
+                      {h.was_late && <span className="ml-1 text-amber-600 dark:text-amber-400">late</span>}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <button type="button" className="hover:underline text-left" onClick={() => void openDetail(h.asset_id)}>
+                        {h.asset_name}
+                      </button>
+                    </TableCell>
+                    <TableCell>
+                      {h.plan_title}
+                      {h.plan_removed && (
+                        <span className="ml-1 text-xs text-muted-foreground">(schedule removed)</span>
+                      )}
+                    </TableCell>
+                    <TableCell className={statusTone(h.status)}>{h.status}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{h.performed_by_name || '—'}</TableCell>
+                    <TableCell className="text-right text-xs">
+                      {h.cost != null ? Number(h.cost).toFixed(2) : '—'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <AddEquipmentDialog
         open={addOpen}

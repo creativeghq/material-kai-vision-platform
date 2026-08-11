@@ -11068,7 +11068,7 @@
       }
     },
     "docs": "docs/page-monitoring.md"
-  },
+  },
   {
     "name": "customer-assets-api",
     "tag": "CRM",
@@ -11093,6 +11093,7 @@
       "plan.save",
       "plan.delete",
       "service.due",
+      "service.history",
       "service.complete",
       "service.skip",
       "defaults.list",
@@ -11120,7 +11121,7 @@
         }
       }
     },
-    "response": "{ assets } | { asset, warranties, plans, events } | { asset_id } | { due } | { next_event_id } | { defaults } | { success }"
+    "response": "{ assets } | { asset, warranties, plans, events } | { asset_id } | { due } | { history } | { next_event_id } | { defaults } | { success }"
   },
   {
     "name": "asset-service-reminders-cron",
