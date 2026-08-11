@@ -24,6 +24,13 @@ const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.
 // Service-role preferred for DB checks: catalog products are RLS-restricted (anon sees 0
 // rows), and the point is to validate the RPC logic, not RLS. CI is a trusted context.
 const DB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+// The ANON key, never the service-role one. `DB_KEY` prefers service-role, which INVERTS any
+// check whose subject is "anon must be refused" — service_role is refused by nothing, so such a
+// check fails forever and reports a grant regression that does not exist. That is what happened
+// to db.rpc.get_related_products.anon-denied: it went red on every run for days while the DB was
+// correct the whole time (has_function_privilege('anon', …) = false). No fallback here on
+// purpose — without a real anon key the check SKIPs rather than testing the wrong principal.
+const ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 const CRON = process.env.MIVAA_CRON_SECRET || '';
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 35000);
 
@@ -86,7 +93,7 @@ async function check(name, requiredEnv, fn) {
 }
 
 // Track which "env" keys we satisfied with a built-in default so check() doesn't SKIP them.
-const DEFAULTED = { MIVAA_BASE_URL: true, SUPABASE_URL: true, DB_KEY: !!DB_KEY };
+const DEFAULTED = { MIVAA_BASE_URL: true, SUPABASE_URL: true, DB_KEY: !!DB_KEY, ANON_KEY: !!ANON_KEY };
 
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 
@@ -131,10 +138,10 @@ await check('db.products.sample', ['DB_KEY'], async () => {
   return sampleProductId;
 });
 
-await check('db.rpc.get_related_products.anon-denied', ['DB_KEY'], async () => {
+await check('db.rpc.get_related_products.anon-denied', ['ANON_KEY'], async () => {
   const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/get_related_products`, {
     method: 'POST',
-    headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       p_workspace_id: '00000000-0000-0000-0000-000000000000',
       p_product_id: sampleProductId ?? '00000000-0000-0000-0000-000000000000',

@@ -534,6 +534,9 @@ jobs:
           MIVAA_BASE_URL: 'https://v1api.materialshub.gr'
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # The anon-denied checks need a REAL anon key; without it they would run as
+          # service-role and assert the opposite of what they are named for.
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           MIVAA_CRON_SECRET: ${{ secrets.MIVAA_CRON_SECRET }}
         run: node scripts/smoke/smoke.mjs
 
