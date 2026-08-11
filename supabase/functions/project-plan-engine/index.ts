@@ -42,6 +42,14 @@ interface ItemRow {
   option_group: string | null;
   tier: string | null;
   is_selected?: boolean;
+  /** blueprint_items only — whether a non-option line imports selected. See loadBlueprintTree. */
+  default_selected?: boolean;
+  /**
+   * The blueprint_item this row was expanded from. loadBlueprintTree re-ids every row, so a
+   * caller holding blueprint_item ids (a stored configuration) needs this to find its lines
+   * again. In-memory only — never written to project_plan_items.
+   */
+  source_item_id?: string;
   is_allowance: boolean;
   allowance_amount: number | null;
   source: string;
@@ -115,7 +123,17 @@ async function loadBlueprintTree(
   for (const r of rows) {
     const newId = idMap[r.id];
     const newParent = r.parent_id ? (idMap[r.parent_id] ?? parentId) : parentId;
-    out.push({ ...r, id: newId, parent_id: newParent });
+    out.push({
+      ...r,
+      id: newId,
+      parent_id: newParent,
+      source_item_id: r.id,
+      // A non-option line imports with the blueprint's own default, so optional extras
+      // (accessories, add-on mechanisms) land in the plan switched OFF rather than silently
+      // inflating the first estimate. Option members stay undefined so applyOptionDefaults
+      // below still resolves the group by tier:'good'.
+      is_selected: r.option_group ? undefined : (r.default_selected !== false),
+    });
     if (r.sub_blueprint_id) {
       // expand the referenced blueprint as children of this node
       await loadBlueprintTree(supabase, r.sub_blueprint_id, newId, depth + 1, new Set(visited), out);
@@ -331,6 +349,116 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       await supabase.from('project_plans').update({ subtotal }).eq('id', plan.id);
       const items = await loadPlanItems(supabase, plan.id);
       return json({ plan: { ...plan, subtotal }, items });
+    }
+
+    /**
+     * A kitchen estimate captured by the public calculator becomes a real project plan, which the
+     * existing `create-quote-from-plan` then turns into a quote. Mirrors order intake (#342): the
+     * jsonb on the thread is a PROPOSAL and untrusted input — nothing exists until a member calls
+     * this, and the plan is rebuilt FROM THE BLUEPRINT rather than from the stored numbers, so a
+     * tampered proposal can change which options were picked but never what they cost.
+     */
+    case 'create-plan-from-kitchen-estimate': {
+      const { thread_id } = body;
+      if (!thread_id) throw new HttpError(400, 'thread_id required');
+      if (!userId) throw new HttpError(400, 'A signed-in member must approve an estimate');
+
+      const { data: thread, error: thErr } = await supabase
+        .from('inbox_threads').select('id, workspace_id, metadata').eq('id', thread_id).maybeSingle();
+      if (thErr) throw new HttpError(400, thErr.message);
+      if (!thread) throw new HttpError(404, 'Thread not found');
+      await requireWorkspace(supabase, userId, thread.workspace_id, isService);
+
+      const metadata = (thread.metadata ?? {}) as Record<string, unknown>;
+      const est = metadata.kitchen_estimate as {
+        blueprint_id?: string; reference?: string; dimensions?: Record<string, number>;
+        selected_item_ids?: string[]; plan_id?: string; project_id?: string;
+        contact?: { name?: string };
+      } | undefined;
+      if (!est?.blueprint_id) throw new HttpError(404, 'No kitchen estimate on this thread');
+      // Idempotent — a second Approve returns the plan the first one made.
+      if (est.plan_id) return json({ plan_id: est.plan_id, project_id: est.project_id ?? null, already_exists: true });
+
+      const { data: bp, error: bpErr } = await supabase
+        .from('blueprints').select('*').eq('id', est.blueprint_id).maybeSingle();
+      if (bpErr) throw new HttpError(400, bpErr.message);
+      if (!bp) throw new HttpError(404, 'Blueprint not found');
+
+      const schema = (bp.dimensions_schema ?? []) as { key: string; default?: number }[];
+      const dims: Record<string, number> = {};
+      for (const d of schema) dims[d.key] = Number(d.default ?? 0);
+      for (const [k, v] of Object.entries(est.dimensions ?? {})) {
+        const n = Number(v);
+        if (Number.isFinite(n) && n >= 0 && k in dims) dims[k] = n;
+      }
+
+      const tree: ItemRow[] = [];
+      await loadBlueprintTree(supabase, est.blueprint_id, null, 0, new Set(), tree);
+      applyOptionDefaults(tree);
+
+      // Replay the visitor's choices onto the freshly-expanded tree, matched by source_item_id.
+      // Same trust rule as the public function: a group honours the choice only when exactly one
+      // of its members was picked, otherwise the tier default stands.
+      const chosen = new Set((est.selected_item_ids ?? []).map(String));
+      if (chosen.size > 0) {
+        const groups: Record<string, ItemRow[]> = {};
+        for (const it of tree) {
+          if (it.kind === 'section') continue;
+          if (it.option_group) (groups[it.option_group] ||= []).push(it);
+          else it.is_selected = chosen.has(String(it.source_item_id));
+        }
+        for (const members of Object.values(groups)) {
+          const picked = members.filter((m) => chosen.has(String(m.source_item_id)));
+          if (picked.length === 1) for (const m of members) m.is_selected = m === picked[0];
+        }
+      }
+
+      const projectName = `Kitchen — ${est.contact?.name || est.reference || 'website enquiry'}`;
+      const { data: project, error: projErr } = await supabase.from('projects').insert({
+        workspace_id: thread.workspace_id,
+        user_id: userId,
+        name: projectName,
+        status: 'planning',
+        budget_currency: bp.source_currency || 'EUR',
+      }).select('id').single();
+      if (projErr) throw new HttpError(400, `Failed to create project: ${projErr.message}`);
+
+      const { data: plan, error: planErr } = await supabase.from('project_plans').insert({
+        project_id: project.id,
+        workspace_id: thread.workspace_id,
+        user_id: userId,
+        blueprint_id: est.blueprint_id,
+        title: est.reference ? `${bp.title} (${est.reference})` : bp.title,
+        dimensions: dims,
+        source_currency: bp.source_currency || 'EUR',
+        status: 'draft',
+        created_by: userId,
+      }).select().single();
+      if (planErr) throw new HttpError(400, `Failed to create plan: ${planErr.message}`);
+
+      const { subtotal } = await writePlanItems(supabase, plan.id, tree, dims);
+      await supabase.from('project_plans').update({ subtotal }).eq('id', plan.id);
+
+      // Read-modify-write: metadata also carries the channel binding, and clobbering the column
+      // would drop it (inbox-system.md §2).
+      const { data: fresh } = await supabase
+        .from('inbox_threads').select('metadata').eq('id', thread_id).maybeSingle();
+      const current = (fresh?.metadata ?? metadata) as Record<string, unknown>;
+      const currentEst = (current.kitchen_estimate ?? est) as Record<string, unknown>;
+      await supabase.from('inbox_threads').update({
+        metadata: {
+          ...current,
+          kitchen_estimate: {
+            ...currentEst,
+            plan_id: plan.id,
+            project_id: project.id,
+            approved_by: userId,
+            approved_at: new Date().toISOString(),
+          },
+        },
+      }).eq('id', thread_id);
+
+      return json({ plan_id: plan.id, project_id: project.id, subtotal });
     }
 
     case 'rescale':

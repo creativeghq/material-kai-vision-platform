@@ -156,6 +156,15 @@ class ProjectPlansService {
     return callEngine<PlanWithItems>('restore-version', { plan_id: planId, version });
   }
 
+  /**
+   * Approve a kitchen estimate captured by the public calculator: materialises a project + plan
+   * from the proposal stored on the inbox thread. Idempotent — a second call returns the same
+   * plan. The quote is a separate, deliberate step (`createQuote`), exactly as with order intake.
+   */
+  async createFromKitchenEstimate(threadId: string): Promise<{ plan_id: string; project_id: string | null; already_exists?: boolean }> {
+    return callEngine('create-plan-from-kitchen-estimate', { thread_id: threadId });
+  }
+
   async createQuote(planId: string): Promise<string> {
     const { quote_id } = await callEngine<{ quote_id: string }>('create-quote-from-plan', { plan_id: planId });
     return quote_id;

@@ -7,8 +7,9 @@ import {
   FileText, FolderKanban, Tag, Users, Globe, Hash, ChevronRight, BadgeCheck,
   User as UserIcon, MessagesSquare, Settings2, ArrowLeft, CheckCircle2, Wallet,
   Archive, ArchiveRestore, Trash2, Sparkles, Check, MessageCircle, Link2,
-  ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon,
+  ShoppingCart, AlertTriangle, ExternalLink, Image as ImageIcon, CookingPot,
 } from 'lucide-react';
+import { projectPlansService } from '@/services/projectPlansService';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { marketplaceService } from '@/services/marketplaceService';
@@ -1074,6 +1075,110 @@ const SectionTitle: React.FC<{ icon: React.ReactNode; children: React.ReactNode;
   </h3>
 );
 
+interface KitchenEstimate {
+  reference?: string;
+  currency?: string;
+  subtotal?: number;
+  dimensions?: Record<string, number>;
+  lines?: { section: string; total: number }[];
+  contact?: { name?: string | null; shape?: string | null };
+  plan_id?: string | null;
+  project_id?: string | null;
+}
+
+/**
+ * Kitchen estimate — a configuration a visitor built on /tools/kitchen-cost.
+ *
+ * Same shape as order intake: what sits on the thread is a PROPOSAL, and nothing exists in
+ * projects or quotes until a member approves. Approving builds the project plan; turning that
+ * into a quote stays a second, deliberate click, because a quote is a priced document and
+ * conjuring one behind the operator is exactly what the templates rule forbids.
+ */
+const KitchenEstimatePanel: React.FC<{ thread: InboxThread }> = ({ thread }) => {
+  const { toast } = useToast();
+  const est = (thread.metadata as { kitchen_estimate?: KitchenEstimate } | null)?.kitchen_estimate;
+  const [busy, setBusy] = useState(false);
+  const [planId, setPlanId] = useState<string | null>(est?.plan_id ?? null);
+  const [projectId, setProjectId] = useState<string | null>(est?.project_id ?? null);
+
+  if (!est) return null;
+  const currency = est.currency || 'EUR';
+
+  const approve = async () => {
+    setBusy(true);
+    try {
+      const res = await projectPlansService.createFromKitchenEstimate(thread.id);
+      setPlanId(res.plan_id);
+      setProjectId(res.project_id);
+      toast({
+        title: res.already_exists ? 'Already approved' : 'Project plan created',
+        description: 'Open the plan to adjust rates, then create the quote.',
+      });
+    } catch (e) {
+      toast({ title: 'Could not create the plan', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const makeQuote = async () => {
+    if (!planId) return;
+    setBusy(true);
+    try {
+      const quoteId = await projectPlansService.createQuote(planId);
+      window.location.href = `/quotes/${quoteId}`;
+    } catch (e) {
+      toast({ title: 'Could not create the quote', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="p-5 border-b border-white/10">
+      <SectionTitle icon={<CookingPot className="h-4 w-4" />}>Kitchen estimate</SectionTitle>
+      <div className="rounded-xl bg-white/5 border border-white/10 p-3 space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-lg font-display" style={{ fontWeight: 700 }}>
+            {formatMoney(est.subtotal ?? 0, currency)}
+          </span>
+          {est.reference && <Badge variant="outline" className="text-[10px]">{est.reference}</Badge>}
+        </div>
+
+        {est.dimensions && (
+          <div className="text-xs text-muted-foreground">
+            {Object.entries(est.dimensions).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(' · ')}
+          </div>
+        )}
+        {est.contact?.shape && <div className="text-xs text-muted-foreground">{est.contact.shape}</div>}
+
+        {(est.lines ?? []).filter((l) => l.total > 0).map((l) => (
+          <div key={l.section} className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground truncate">{l.section}</span>
+            <span className="tabular-nums shrink-0">{formatMoney(l.total, currency)}</span>
+          </div>
+        ))}
+
+        {planId ? (
+          <div className="flex flex-col gap-2 pt-1">
+            {projectId && (
+              <a href={`/projects/${projectId}`} className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                Open the project plan <ChevronRight className="h-3 w-3" />
+              </a>
+            )}
+            <Button size="sm" className="rounded-full" disabled={busy} onClick={makeQuote}>
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Create quote'}
+            </Button>
+          </div>
+        ) : (
+          <Button size="sm" className="rounded-full w-full mt-1" disabled={busy} onClick={approve}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Create project & plan'}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 /**
  * Order intake (#342) — the "assign / set as an actual order" surface.
  *
@@ -1190,7 +1295,7 @@ const OrderIntakePanel: React.FC<{
             </div>
           )}
           <a
-            href="/finance?tab=orders"
+            href={`/finance/orders/${intake.order_id}`}
             className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
           >
             Open in Finance <ExternalLink className="w-3.5 h-3.5" />
@@ -1352,6 +1457,10 @@ const DetailsRail: React.FC<{
           most actionable thing on the thread. Renders nothing unless a proposal exists, and is
           members-only (inbox-api 404s the action for a customer participant). */}
       {isMember && <OrderIntakePanel thread={thread} context={context} onChanged={() => onIntakeChanged?.()} />}
+
+      {/* Kitchen estimate from the public calculator — same placement rationale as order intake:
+          an enquiry waiting to be turned into a plan is the most actionable thing on the thread. */}
+      {isMember && <KitchenEstimatePanel thread={thread} />}
 
       {/* Customer value — lifetime value + open balance from the customer's invoices
           (via inbox-api). Falls back to quoted-total + project-count on older API

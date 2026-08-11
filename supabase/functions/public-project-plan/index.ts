@@ -19,10 +19,12 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { evaluateFormula, computeLinePricing, round2 } from '../_shared/blueprint/formula.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { verifyTurnstile as verifyTurnstileShared } from '../_shared/turnstile.ts';
+import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANON_DAILY_QUOTA = 2; // combined across public tools, mirrors MIVAA
+const LEAD_DAILY_CAP = 3;   // kitchen estimates sent per IP per day (a write, not a lookup)
 
 
 // Trusted proxy hop (invariant #10) — never the client-spoofable leftmost x-forwarded-for entry.
@@ -62,6 +64,83 @@ async function quotaUsed(supabase: DbClient, ip: string): Promise<number> {
   return count ?? 0;
 }
 
+interface ComputedTask {
+  id: string;
+  label: string;
+  unit: string | null;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  is_allowance: boolean;
+  option_group: string | null;
+  selected: boolean;
+}
+
+/**
+ * The ONE place this function turns a blueprint + dimensions into money. Both `estimate` and
+ * `kitchen_lead` go through it, so a configurator total and a recorded lead can never disagree.
+ *
+ * `selectedIds` is the visitor's choice and is treated as untrusted:
+ *  - an option_group honours it only when it names exactly ONE member; anything else (missing,
+ *    duplicated, tampered) falls back to the tier:'good' default, so a group can never price at
+ *    zero or twice.
+ *  - an ungrouped line is on iff listed; pass `null` to fall back to each line's own
+ *    `default_selected`, which is what an un-configured estimate wants.
+ */
+function computeBlueprint(rows: any[], dims: Record<string, number>, selectedIds: Set<string> | null) {
+  const sectionsById: Record<string, { label: string; total: number; tasks: ComputedTask[] }> = {};
+  for (const r of rows) if (r.kind === 'section') sectionsById[r.id] = { label: r.label, total: 0, tasks: [] };
+  const ungrouped: ComputedTask[] = [];
+  let subtotal = 0;
+
+  const byGroup: Record<string, any[]> = {};
+  for (const r of rows) {
+    if (r.kind === 'task' && r.option_group) (byGroup[r.option_group] ||= []).push(r);
+  }
+  const optSelected: Record<string, string> = {};
+  for (const [grp, members] of Object.entries(byGroup)) {
+    const chosen = selectedIds ? members.filter((m) => selectedIds.has(m.id)) : [];
+    const pick = chosen.length === 1
+      ? chosen[0]
+      : (members.find((m) => m.tier === 'good')
+        ?? [...members].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0]);
+    if (pick) optSelected[grp] = pick.id;
+  }
+
+  for (const r of rows) {
+    if (r.kind !== 'task') continue;
+    const selected = r.option_group
+      ? optSelected[r.option_group] === r.id
+      : (selectedIds ? selectedIds.has(r.id) : r.default_selected !== false);
+    let qty: number;
+    if (r.quantity_formula && String(r.quantity_formula).trim()) {
+      const ev = evaluateFormula(r.quantity_formula, dims);
+      qty = ev.ok ? ev.value : Number(r.default_quantity ?? 1);
+    } else qty = Number(r.default_quantity ?? 1);
+    qty = round2(qty);
+    const { unit_price, line_total } = computeLinePricing({
+      is_allowance: r.is_allowance, allowance_amount: r.allowance_amount,
+      material_cost: r.material_cost, labor_rate: r.labor_rate, margin_pct: r.margin_pct,
+      quantity: qty, is_selected: selected,
+    });
+    const task: ComputedTask = {
+      id: r.id, label: r.label, unit: r.unit, quantity: qty, unit_price, line_total,
+      is_allowance: !!r.is_allowance, option_group: r.option_group ?? null, selected,
+    };
+    if (selected) subtotal += line_total;
+    const sec = r.parent_id ? sectionsById[r.parent_id] : null;
+    if (sec) { sec.tasks.push(task); if (selected) sec.total += line_total; }
+    else ungrouped.push(task);
+  }
+
+  return {
+    sectionsById,
+    ungrouped,
+    subtotal: round2(subtotal),
+    sections: Object.values(sectionsById).map((s) => ({ ...s, total: round2(s.total) })),
+  };
+}
+
 const handler = withApiLogging('public-project-plan', async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') throw new HttpError(405, 'POST only');
@@ -84,7 +163,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     if (ids.length) {
       const { data: items } = await supabase
         .from('blueprint_items')
-        .select('id, blueprint_id, parent_id, sort_order, kind, label, unit, quantity_formula, default_quantity, line_kind, material_cost, labor_rate, margin_pct, is_allowance, allowance_amount, option_group, tier')
+        .select('id, blueprint_id, parent_id, sort_order, kind, label, unit, quantity_formula, default_quantity, line_kind, material_cost, labor_rate, margin_pct, is_allowance, allowance_amount, option_group, tier, default_selected')
         .in('blueprint_id', ids)
         .order('sort_order', { ascending: true });
       for (const it of (items ?? []) as any[]) (itemsByBp[it.blueprint_id] ||= []).push(it);
@@ -127,39 +206,9 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     for (const d of (bp.dimensions_schema ?? []) as { key: string; default?: number }[]) dims[d.key] = Number(d.default ?? 0);
     for (const [k, v] of Object.entries(dimensions ?? {})) { const n = Number(v); if (!Number.isNaN(n)) dims[k] = n; }
 
-    // Compute (default inline rates only — no workspace services for anon)
-    const rows = (items ?? []) as any[];
-    const sectionsById: Record<string, { label: string; total: number; tasks: any[] }> = {};
-    for (const r of rows) if (r.kind === 'section') sectionsById[r.id] = { label: r.label, total: 0, tasks: [] };
-    const ungrouped: any[] = [];
-    let subtotal = 0;
-    // default option selection: one per option_group
-    const optSelected: Record<string, string> = {};
-    for (const r of rows) {
-      if (r.kind !== 'task' || !r.option_group) continue;
-      if (!optSelected[r.option_group] || r.tier === 'good') optSelected[r.option_group] = r.id;
-    }
-    for (const r of rows) {
-      if (r.kind !== 'task') continue;
-      const selected = r.option_group ? optSelected[r.option_group] === r.id : true;
-      let qty = 1;
-      if (r.quantity_formula && String(r.quantity_formula).trim()) {
-        const ev = evaluateFormula(r.quantity_formula, dims);
-        qty = ev.ok ? ev.value : Number(r.default_quantity ?? 1);
-      } else qty = Number(r.default_quantity ?? 1);
-      qty = round2(qty);
-      const { unit_price, line_total } = computeLinePricing({
-        is_allowance: r.is_allowance, allowance_amount: r.allowance_amount,
-        material_cost: r.material_cost, labor_rate: r.labor_rate, margin_pct: r.margin_pct,
-        quantity: qty, is_selected: selected,
-      });
-      const task = { label: r.label, unit: r.unit, quantity: qty, unit_price, line_total, is_allowance: !!r.is_allowance, option_group: r.option_group ?? null, selected };
-      if (selected) subtotal += line_total;
-      const sec = r.parent_id ? sectionsById[r.parent_id] : null;
-      if (sec) { sec.tasks.push(task); if (selected) sec.total += line_total; }
-      else ungrouped.push(task);
-    }
-    subtotal = round2(subtotal);
+    // Compute (default inline rates only — no workspace services for anon). No visitor
+    // selection on this action, so every line falls back to its blueprint default.
+    const computed = computeBlueprint((items ?? []) as any[], dims, null);
 
     // log success (counts toward the combined daily quota)
     await supabase.from('public_lookup_log').insert({
@@ -171,13 +220,228 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
       result: {
         blueprint: { id: bp.id, title: bp.title },
         currency: bp.source_currency || 'EUR',
-        subtotal,
-        sections: Object.values(sectionsById).map((s) => ({ ...s, total: round2(s.total) })),
-        ungrouped,
+        subtotal: computed.subtotal,
+        sections: computed.sections,
+        ungrouped: computed.ungrouped,
         used: used + 1,
         limit: ANON_DAILY_QUOTA,
       },
     });
+  }
+
+  // kitchen_lead — a visitor sends their configured kitchen in for a real quote.
+  //
+  // The client sends CHOICES, never money: the estimate is recomputed here from the blueprint,
+  // so a tampered total cannot become the recorded one. The destination workspace is resolved
+  // from an explicit opt-in flag and never from the request body (invariant 1); when no
+  // workspace has opted in the submission is REFUSED rather than dropped, because a lead that
+  // vanishes silently is the worst possible failure for this surface.
+  if (action === 'kitchen_lead') {
+    const { blueprint_id, dimensions, selected_item_ids, contact, turnstile_token } = body ?? {};
+    const name = String(contact?.name ?? '').trim().slice(0, 120);
+    const email = String(contact?.email ?? '').trim().slice(0, 200);
+    const phone = String(contact?.phone ?? '').trim().slice(0, 40);
+    const shape = String(contact?.shape ?? '').trim().slice(0, 160);
+    const notes = String(contact?.notes ?? '').trim().slice(0, 2000);
+
+    if (!blueprint_id) throw new HttpError(400, 'blueprint_id required');
+    if (!name || (!email && !phone)) {
+      throw new HttpError(400, 'A name and either an email or a phone number are required');
+    }
+
+    const ip = clientIp(req);
+    const logLead = (outcome: string) =>
+      supabase.from('public_lookup_log').insert({
+        scan_type: 'kitchen_lead', ip_address: ip, outcome, query_text: name,
+      }).then(() => {}, () => {});
+
+    if (!turnstile_token || !(await verifyTurnstile(supabase, String(turnstile_token), ip))) {
+      await logLead('captcha_failed');
+      throw new HttpError(400, 'Bot check failed. Please try again.');
+    }
+
+    // Own cap — a lead is a write, not a lookup, so it does not share the scan budget.
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const { count: leadsToday } = await supabase
+      .from('public_lookup_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('scan_type', 'kitchen_lead').eq('outcome', 'success')
+      .eq('ip_address', ip).gte('created_at', since);
+    if ((leadsToday ?? 0) >= LEAD_DAILY_CAP) {
+      await logLead('rate_limited');
+      return json({ success: false, error: 'rate_limited', limit: LEAD_DAILY_CAP }, 429);
+    }
+
+    const { data: bp, error: bpErr } = await supabase
+      .from('blueprints')
+      .select('id, title, source_currency, dimensions_schema, is_platform_starter')
+      .eq('id', blueprint_id).maybeSingle();
+    if (bpErr) throw new HttpError(400, bpErr.message);
+    if (!bp || !bp.is_platform_starter) throw new HttpError(404, 'Starter blueprint not found');
+
+    const { data: items, error: itErr } = await supabase
+      .from('blueprint_items').select('*').eq('blueprint_id', blueprint_id).order('sort_order');
+    if (itErr) throw new HttpError(400, itErr.message);
+
+    const schema = (bp.dimensions_schema ?? []) as { key: string; label?: string; unit?: string; default?: number }[];
+    const dims: Record<string, number> = {};
+    for (const d of schema) dims[d.key] = Number(d.default ?? 0);
+    for (const [k, v] of Object.entries(dimensions ?? {})) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n >= 0 && k in dims) dims[k] = n;
+    }
+
+    const chosen = Array.isArray(selected_item_ids) ? new Set(selected_item_ids.map(String)) : null;
+    const computed = computeBlueprint((items ?? []) as any[], dims, chosen);
+    const currency = bp.source_currency || 'EUR';
+
+    // Destination workspace: explicit opt-in only.
+    const { data: destinations } = await supabase
+      .from('workspaces')
+      .select('id, name')
+      .eq('settings->public_tool_leads->>enabled', 'true')
+      .order('created_at', { ascending: true })
+      .limit(1);
+    const workspace = (destinations ?? [])[0] as { id: string; name: string } | undefined;
+    if (!workspace) {
+      await logLead('failed');
+      return json({ success: false, error: 'leads_unavailable' }, 503);
+    }
+
+    // Find-or-create the CRM contact. Separate .eq() lookups rather than one .or() — a raw
+    // PostgREST filter string built from visitor input is an injection surface.
+    let contactId: string | null = null;
+    if (email) {
+      const { data } = await supabase.from('crm_contacts')
+        .select('id').eq('workspace_id', workspace.id).ilike('email', email).limit(1);
+      contactId = (data ?? [])[0]?.id ?? null;
+    }
+    if (!contactId && phone) {
+      const { data } = await supabase.from('crm_contacts')
+        .select('id').eq('workspace_id', workspace.id).eq('phone', phone).limit(1);
+      contactId = (data ?? [])[0]?.id ?? null;
+    }
+    if (!contactId) {
+      // Explicit allowlisted payload — never a spread of the request body (invariant 8).
+      const { data: created, error: cErr } = await supabase.from('crm_contacts').insert({
+        workspace_id: workspace.id,
+        name,
+        email: email || null,
+        phone: phone || null,
+        contact_type: 'private',
+        is_client: true,
+        lead_source: 'kitchen_calculator',
+        lead_status: 'new',
+      }).select('id').single();
+      if (cErr) throw new HttpError(400, `Could not record the enquiry: ${cErr.message}`);
+      contactId = created.id as string;
+    }
+
+    const reference = `KC-${crypto.randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+
+    const dimLine = schema
+      .map((d) => `  ${d.label ?? d.key}: ${dims[d.key]}${d.unit ? ` ${d.unit}` : ''}`)
+      .join('\n');
+    const breakdown = computed.sections
+      .filter((s) => s.tasks.some((t) => t.selected && t.line_total > 0))
+      .map((s) => {
+        const lines = s.tasks
+          .filter((t) => t.selected && t.line_total > 0)
+          .map((t) => `  ${t.label} — ${t.line_total.toFixed(2)} ${currency}`)
+          .join('\n');
+        return `${s.label}\n${lines}`;
+      })
+      .join('\n\n');
+    const messageBody = [
+      `New kitchen estimate from the website (${reference}).`,
+      '',
+      'Measurements',
+      dimLine,
+      '',
+      breakdown,
+      '',
+      `Estimated total: ${computed.subtotal.toFixed(2)} ${currency} (excl. VAT)`,
+      '',
+      'Contact',
+      `  Name: ${name}`,
+      email ? `  Email: ${email}` : null,
+      phone ? `  Phone: ${phone}` : null,
+      shape ? `  Kitchen shape: ${shape}` : null,
+      notes ? `\nNotes\n  ${notes}` : null,
+    ].filter((l) => l !== null).join('\n');
+
+    const { data: thread, error: tErr } = await supabase.from('inbox_threads').insert({
+      workspace_id: workspace.id,
+      thread_type: 'customer',
+      channel: 'email',
+      subject: `Kitchen estimate ${reference} — ${name}`,
+      status: 'open',
+      last_message_at: new Date().toISOString(),
+      last_message_preview: `Kitchen estimate ${computed.subtotal.toFixed(2)} ${currency}`,
+      // Mirrors metadata.order_intake (#342): a PROPOSAL, not a quote. Nothing exists in
+      // `quotes` until a member approves it.
+      metadata: {
+        kitchen_estimate: {
+          reference,
+          blueprint_id: bp.id,
+          blueprint_title: bp.title,
+          currency,
+          dimensions: dims,
+          subtotal: computed.subtotal,
+          selected_item_ids: computed.sections
+            .flatMap((s) => s.tasks).filter((t) => t.selected).map((t) => t.id),
+          lines: computed.sections.map((s) => ({
+            section: s.label,
+            total: s.total,
+            tasks: s.tasks.filter((t) => t.selected).map((t) => ({
+              label: t.label, unit: t.unit, quantity: t.quantity,
+              unit_price: t.unit_price, line_total: t.line_total,
+            })),
+          })),
+          contact: { name, email: email || null, phone: phone || null, shape: shape || null, notes: notes || null },
+          source: 'kitchen_calculator',
+          created_at: new Date().toISOString(),
+        },
+      },
+    }).select('id').single();
+    if (tErr) throw new HttpError(400, `Could not record the enquiry: ${tErr.message}`);
+
+    const { data: participant, error: pErr } = await supabase.from('inbox_participants').insert({
+      thread_id: thread.id,
+      participant_type: 'customer',
+      contact_id: contactId,
+      workspace_id: workspace.id,
+      thread_role: 'participant',
+      status: 'active',
+    }).select('id').single();
+    if (pErr) throw new HttpError(400, `Could not record the enquiry: ${pErr.message}`);
+
+    const { error: mErr } = await supabase.from('inbox_messages').insert({
+      thread_id: thread.id,
+      sender_participant_id: participant.id,
+      body: messageBody,
+      message_type: 'text',
+      metadata: { direction: 'incoming', source: 'kitchen_calculator', reference },
+    });
+    if (mErr) throw new HttpError(400, `Could not record the enquiry: ${mErr.message}`);
+
+    // Notify the people who answer enquiries, through Flows rather than a hardcoded insert.
+    await emitFlowEventToWorkspaceRoles(
+      workspace.id,
+      ['owner', 'admin', 'sales', 'sales_manager'],
+      'inbox.message_received',
+      (recipientUserId) => ({
+        user_id: recipientUserId,
+        workspace_id: workspace.id,
+        title: `New kitchen estimate — ${name}`,
+        body: `${computed.subtotal.toFixed(2)} ${currency} · ${reference}`,
+        action_url: `/inbox?thread=${thread.id}`,
+        type: 'inbox',
+      }),
+    ).catch(() => {});
+
+    await logLead('success');
+    return json({ success: true, reference, subtotal: computed.subtotal, currency });
   }
 
   throw new HttpError(400, `Unknown action: ${action}`);

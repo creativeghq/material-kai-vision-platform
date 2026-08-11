@@ -51,7 +51,12 @@ export function seedPlanItems(blueprintItems: any[], dims: Record<string, number
     line_kind: bi.line_kind, service_id: null, product_id: null,
     material_cost: bi.material_cost, labor_rate: bi.labor_rate, margin_pct: bi.margin_pct ?? 0,
     unit_price: 0, line_total: 0, option_group: bi.option_group, tier: bi.tier,
-    is_selected: true, is_allowance: !!bi.is_allowance, allowance_amount: bi.allowance_amount,
+    // Option members seed UNSELECTED so applyOptionDefaults below resolves the group by
+    // tier:'good' — seeding them all `true` made its `find(is_selected)` match the first
+    // member every time, so the good tier never won here while the engine honoured it.
+    // Everything else follows the blueprint's own default (optional extras start off).
+    is_selected: bi.option_group ? false : (bi.default_selected !== false),
+    is_allowance: !!bi.is_allowance, allowance_amount: bi.allowance_amount,
     source: 'template', created_at: '', updated_at: '',
   }));
   applyOptionDefaults(base);

@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ClipboardList,
   Columns3,
+  CookingPot,
   Flame,
   MessageSquareText,
   ScanSearch,
@@ -65,6 +66,14 @@ const TOOLS: ToolEntry[] = [
     description:
       'Compare the annual running cost of six heating methods — oil, gas, A/C, heat pump and fireplaces — for the same home.',
     icon: Flame,
+    badge: 'Free · instant',
+  },
+  {
+    slug: 'kitchen-cost',
+    title: 'Kitchen cost calculator',
+    description:
+      'Configure a kitchen — run length, cabinet finish, worktop, drawers and mechanisms — and watch the price update as you go.',
+    icon: CookingPot,
     badge: 'Free · instant',
   },
   {

@@ -54,6 +54,13 @@ export interface BlueprintItem {
   tier: 'good' | 'better' | 'best' | null;
   is_allowance: boolean;
   allowance_amount: number | null;
+  /**
+   * Whether a NON-option_group line starts selected when imported into a plan. Optional extras
+   * (accessories, add-on mechanisms, a removal service) seed as `false` so a configurator does
+   * not open with every extra already in the total. Members of an `option_group` ignore this —
+   * their default is the `tier: 'good'` member.
+   */
+  default_selected: boolean;
   source: 'manual' | 'template' | 'ai';
   created_at: string;
   updated_at: string;
@@ -189,6 +196,7 @@ class BlueprintsService {
       tier: it.tier ?? null,
       is_allowance: it.is_allowance ?? false,
       allowance_amount: it.allowance_amount ?? null,
+      default_selected: it.default_selected ?? true,
       source: it.source ?? 'manual',
     }));
     const { error } = await supabase.from('blueprint_items').insert(rows);
@@ -280,6 +288,10 @@ class BlueprintsService {
       tier: it.tier,
       is_allowance: it.is_allowance,
       allowance_amount: it.allowance_amount,
+      // Which optional extras the plan had switched on becomes the template's default.
+      // Option-group members record their state too, but readers ignore it for them
+      // and re-pick the tier:'good' member on import.
+      default_selected: it.is_selected !== false,
       source: 'template' as const,
     }));
     if (bpItems.length) {
