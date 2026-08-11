@@ -14,9 +14,9 @@
 
 import React, { Suspense, useState, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
-import { OrbitControls, Environment } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import { TextureLoader, RepeatWrapping } from 'three';
-import { X, Download, RotateCcw, Smartphone, ZoomIn, View } from 'lucide-react';
+import { X, Download, RotateCcw, Smartphone, ZoomIn } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/core/ui/button';
 import { Slider } from '@/components/core/ui/slider';
