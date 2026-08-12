@@ -62,6 +62,7 @@ import { PipelineStrategyMetricsPanel } from './PipelineStrategyMetricsPanel';
 import { CatalogOperationsTab } from './CatalogOperationsTab';
 import { SystemHealthMonitor } from '../SystemHealthMonitor';
 import { StorageAuditPanel } from '../StorageAuditPanel';
+import { GenerationProviderHealth } from '../GenerationProviderHealth';
 // Relocated here from the orphaned /admin/performance route.
 import { SystemPerformance } from '../SystemPerformance';
 // Relocated here from the misnamed /admin/training-models grab-bag.
@@ -644,6 +645,11 @@ const OperationsDashboardInner: React.FC = () => {
           {/* System Health Tab */}
           <TabsContent value="system-health" className="space-y-4">
             <SystemHealthMonitor />
+            {/* Generation providers — what each said when we last ASKED it. SystemHealthMonitor
+                infers health from ai_usage_logs, where the row is written before the call and never
+                corrected on failure, so Replicate's 402 on every model read as healthy for two
+                months (issue #4). This panel reads the active probe instead. */}
+            <GenerationProviderHealth />
             {/* Storage audit — orphan objects per bucket + run cleanup, across all buckets (PDFs, images, sheets, quotes, etc.) */}
             <StorageAuditPanel />
           </TabsContent>
