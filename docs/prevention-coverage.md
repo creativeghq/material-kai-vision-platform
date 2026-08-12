@@ -421,5 +421,18 @@ to desynchronise the two halves deliberately. Its clean run still means nothing.
   `email_logs` platform-wide, so one tenant's outbound collapsing is diluted by everyone else's
   successful sends. With a single active workspace this is invisible; with fifty tenants a
   workspace whose sender domain has been dropped will never reach the <20% global threshold. It had
-  to be isolated (delete in-window rows inside the transaction) before it would fire at all. Worth
-  scoping per workspace before onboarding.
+  to be isolated (delete in-window rows inside the transaction) before it would fire at all.
+
+  **Fixed the same day.** The check now buckets by workspace, with unattributed rows judged as their
+  own bucket rather than vanishing. Verified with the case the old rule could not see: one tenant at
+  2/20 delivered beside a healthy tenant at 200/200 — the new rule fires on the collapsed tenant,
+  while the old platform-wide rule computed **91.8% delivered and would have reported clean**.
+
+  Scoping it exposed the next layer: `email_logs.workspace_id` is populated ONLY from a
+  caller-supplied body field (`body.workspace_id ?? body.attribution_workspace_id ?? null` in
+  email-api), so any caller that omits it writes an unattributed row — **145 of 147 rows**. A column
+  that exists and is never written, the same shape as `digest_included_at`. Per-workspace delivery
+  monitoring stays blind for those sends and per-tenant email volume cannot be answered at all, so
+  the check now reports the attribution gap itself as a second branch. Open finding; the remedy is
+  threading workspace_id through the email-api callers (Flows send_email, send-quote-email, the
+  price/mention alerts).
