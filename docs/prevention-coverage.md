@@ -14,6 +14,7 @@ that has silently stopped working — and this platform has shipped several:
 | `no-fail-open-in-gate` (v2) | filter removed, looked right | `catch (...)` is a **parse error** in JS *and* TS → semgrep rejected the rule and kept scanning |
 | jsx-a11y plugin | installed and configured | every rule set to `'off'` under a comment reading "off for now" |
 | edge typecheck sweeps | reported success | one exited 0 on an unresolved import, one OOM'd mid-batch, one used the wrong import maps |
+| outbound email | no alert of any kind | `default_from_email` sat on a domain Resend had dropped; **136 sends, 1 delivered** over three days in July and nobody was told. There was no guard at all — the gap was not a broken check, it was a missing one |
 
 The pattern is identical every time: **a guard that reports nothing is indistinguishable from a
 clean codebase.** So "green" is not the question. "When did we last watch it fail on purpose?" is.
@@ -289,8 +290,10 @@ identically to a MISS, so a 97.5% hit rate reduced the meter by exactly zero.
 
 | `ops.flow_condition_edge_unrouted` | nightly | a flow branch that evaluates and routes nowhere — the engine matches a condition's outgoing edges by `sourceHandle`, so an edge without one silently reaches no action while the run reports **completed** | **yes** — and the first cut was WRONG in the informative direction: it fired on 9 healthy `loop → notify` flows, because `loop` runs its children inline with no handle check. Corrected to exclude `loop`/`stop`, then watched to return 0 on the real graph AND to fire on a deliberately stripped handle |
 
+| `ops.email_delivery_failing` | nightly | outbound mail failing at scale — the sender domain stops being verified and every send 403s | **yes, against real history** — returns 0 today, and the same predicate over the window ending 2026-07-28 gives 137 attempts / 1 delivered / **0.7%** -> fires. Uses a RATE, not zero, for the reason recorded above: an exact-zero test reported this platform clean while two endpoints sat at 0.8% and 4.5% |
+
 **"Self-proving"** means the mechanism demonstrates it can still detect, rather than only reporting
-what it found. Fourteen of twenty-four qualify. That is the gap.
+what it found. Fifteen of twenty-five qualify. That is the gap.
 
 > **`db.plpgsql-lint` has one known false-positive shape: runtime-created temp tables.**
 > `plpgsql_check` analyses statically, so a `create temporary table X` inside a function makes it
