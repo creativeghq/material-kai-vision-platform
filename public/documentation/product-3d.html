@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D, textures & options on a product | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / Product 3D &amp; materials</div>
+  <h1>3D, textures &amp; options on a product</h1>
+  <div class="routes"><span class="badge route">/admin/materials-data</span></div>
+  <p class="lead">Everything the platform can show a customer about a product — a 3D model they can turn, a material they can light, finishes they can pick, a room they can place it in, and an embed on someone else's website — comes from a handful of things you set <strong>on the product itself</strong>. This page is what they are, in the order worth doing them.</p>
+
+  <div class="callout"><p><strong>Where:</strong> the catalogue at <span class="badge route">/admin/materials-data</span> → <strong>Products</strong> → click a product. The cards below live on the product's 3D tab, and only for products in your own workspace.</p></div>
+
+  <h2>Start with the checklist</h2>
+  <p>The <strong>Ready to sell online</strong> card at the top tells you what this product still needs, and — more usefully — <em>what stops working</em> without each thing. The catalogue list carries the same number in its <strong>Sellable online</strong> column, so you can see at a glance which products are finished.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Needs</th><th>Without it</th></tr></thead>
+    <tbody>
+      <tr><td><strong>A published price</strong></td><td>The embed cannot return the product at all. This is the only hard gate.</td></tr>
+      <tr><td><strong>Attributes</strong></td><td>The spec builder cannot match it, so every visitor spec falls through to a quote request instead of a price.</td></tr>
+      <tr><td><strong>A 3D model</strong></td><td>No viewer, no AR, no configurator, no room planner. The widget falls back to the product photo.</td></tr>
+      <tr><td><strong>Option groups</strong></td><td>The embed is a picture rather than a configurator.</td></tr>
+      <tr><td><strong>An embed key covering it</strong></td><td>It is visible inside the platform only.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Nothing here blocks selling. A product with none of it still reaches customers — the spec builder captures them as a quote request, and the assistant can price or log the enquiry. The checklist says what is missing and why it matters, never "you may not publish this".</p>
+  <p>When a key covers the product, the same card hands you <strong>the snippet</strong>, pre-filled and ready to paste.</p>
+
+  <h2>Upload a 3D model</h2>
+  <p>Drop a <strong>.glb</strong> or <strong>.gltf</strong> on the <strong>3D Model</strong> card. It is <strong>measured on the way in</strong> — real width, height and depth in metres, read from the file — and those measurements are what the room planner and AR use to draw the product at its true size. You never type them.</p>
+  <p>Once a model exists, the card also offers <strong>Place in a room</strong>, which opens the <a href="room-planner.html">Room Planner</a> with the product already placed.</p>
+  <div class="callout"><p><strong>Android AR works from the .glb.</strong> iPhone AR (Quick Look) needs a USDZ, which the platform does not produce and does not accept — so an iPhone gets the 3D viewer rather than a button that leads nowhere.</p></div>
+
+  <h2>Material texture — for things that are a surface</h2>
+  <p>A tile, a fabric or a wood floor <em>is</em> the surface, so it never has a 3D model. For those, the <strong>Material texture</strong> card turns the product's own photo into a <strong>seamless tile</strong> the AR and lighting previews can render as a real surface you can light and orbit.</p>
+  <p>It is derived from your photo, not invented: the generator flattens <em>that product</em> into a tileable version of itself rather than imagining a material the customer will not receive. Two providers are offered — generate with both and keep whichever is closer. Each costs credits.</p>
+  <p>Once you pick one, <strong>+ relief</strong> derives a normal map from it. That is what makes light fall <em>into</em> a weave or a grout line instead of sliding across a flat picture of one. It is computed from the texture, costs nothing, and is instant.</p>
+  <div class="callout"><p><strong>Without a texture</strong>, the material preview stretches the raw product photo across a plane. It repeats visibly and carries the lighting from the day it was shot — the preview says so, rather than passing it off as a material.</p></div>
+
+  <h2>Options — finishes a customer can pick</h2>
+  <p>An option group targets <strong>one material name inside the 3D model</strong>, so choosing "Emerald Velvet" repaints every part that uses that material at once — one choice, four chair legs. The editor lists the model's own material names, so a target cannot be mistyped into something that matches nothing.</p>
+  <p>Each value can carry a colour, a roughness and a metalness. It can also carry <strong>its own texture</strong>: without one, a velvet and a linen at the same colour render identically, because three numbers cannot tell them apart. Use the <strong>For</strong> selector on the Material texture card to generate a texture per option value.</p>
+  <p>Prices follow automatically. An option's price difference is added by the same pricing rules the rest of the platform uses, and the total is worked out server-side — the configurator never does arithmetic on money.</p>
+
+  <h2>What all of it feeds</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Surface</th><th>Uses</th></tr></thead>
+    <tbody>
+      <tr><td>Product viewer &amp; AR</td><td>the model, or the texture when there is no model</td></tr>
+      <tr><td><a href="room-planner.html">Room Planner</a></td><td>the model's measured footprint; textures for floors and walls</td></tr>
+      <tr><td><a href="api-embed.html">Website embed</a></td><td>all of it, on a merchant's own site</td></tr>
+      <tr><td>Quotes</td><td>a configured selection becomes a priced line, options included</td></tr>
+      <tr><td>The assistant</td><td>prices a described spec, or logs it as an enquiry when it cannot</td></tr>
+    </tbody>
+  </table></div>
+  <p>Every one of those is a consequence of the product having a model, a price and some attributes. That is why the checklist exists, and why it is the first card on the page.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
