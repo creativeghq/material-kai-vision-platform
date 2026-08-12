@@ -373,7 +373,25 @@ interface GenerateInteriorRequest {
   user_id?: string;
   workspace_id?: string;
   conversation_id?: string;
+  // Call-site attribution, for the cost views (see ATTRIBUTION_SOURCES). Server-to-server only.
+  source?: string;
+  embed_key_id?: string;
 }
+
+/**
+ * Where a generation was triggered from, for `ai_usage_logs.metadata.source`.
+ *
+ * An ALLOWLIST rather than free text, and honoured only for service-role callers, because this is
+ * an attribution field: a value a user-JWT request could set is a value that can lie about who
+ * spent the credits. Everything else falls through to no source at all, which reads as "the app",
+ * and is the honest answer for a generation a signed-in member started themselves.
+ *
+ * Adding a value here is deliberate work. That is the point — a column that accepts anything is a
+ * column no cost view can group by.
+ */
+const ATTRIBUTION_SOURCES = ['embed'] as const;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -563,8 +581,12 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   const authHeader = req.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   let resolvedUserId: string;
+  // Only a server-to-server caller may attribute the spend to something other than "the app" —
+  // see ATTRIBUTION_SOURCES. Set here, next to the check that establishes it, rather than
+  // re-derived at the log insert where the reason would no longer be visible.
+  const isServiceCall = token === supabaseServiceKey;
 
-  if (token === supabaseServiceKey && body.user_id) {
+  if (isServiceCall && body.user_id) {
     // Internal server-to-server call (agent-chat, Python backend, etc.)
     resolvedUserId = body.user_id;
   } else {
@@ -981,15 +1003,45 @@ OUTPUT: Photorealistic professional interior photography. 24mm lens, corrected v
     const rawCostUsd = imagePricing ? imagePricing.cost_per_unit : null;
     const billedCostUsd = imagePricing ? rawCostUsd! * imagePricing.markup_multiplier : null;
 
+    // WHO the spend belongs to, not just who it was billed to.
+    //
+    // `workspace_id` was NULL on every row this function ever wrote, even though the same
+    // `body.workspace_id` had already decided which pool the credits came out of. Two things broke
+    // silently: no per-tenant cost view could see image generation at all, and the
+    // `is_workspace_admin(workspace_id)` RLS policy on this table could never match — so a
+    // workspace admin who was not personally the billed user saw none of their own workspace's AI
+    // spend. The credits were right the whole time; only the reporting was blind.
+    //
+    // `source` + `embed_key_id` answer the follow-up question. Without them an embed generation —
+    // triggered by an anonymous visitor on a merchant's website and charged to that merchant — is
+    // indistinguishable from an operator generating a product shot in-app, because both arrive as
+    // `mode: 'product-shot'`. A merchant cannot ask what their widget cost them, and nobody can ask
+    // which key is burning credits: the daily cap is per-key, but the spend was not.
+    const attributedSource = isServiceCall
+      && (ATTRIBUTION_SOURCES as readonly string[]).includes(String(body.source ?? ''))
+      ? String(body.source)
+      : null;
+    const attributedKeyId = attributedSource && UUID_RE.test(String(body.embed_key_id ?? ''))
+      ? String(body.embed_key_id)
+      : null;
+
     await supabase.from('ai_usage_logs').insert({
       user_id: resolvedUserId,
+      workspace_id: body.workspace_id ?? null,
       operation_type: 'interior_design_generation',
       model_name: modelLabel,
       credits_debited: credits,
       raw_cost_usd: rawCostUsd,
       billed_cost_usd: billedCostUsd,
       markup_multiplier: imagePricing?.markup_multiplier ?? null,
-      metadata: { mode, model: modelLabel, billing_type: 'per_unit', units: 1 },
+      metadata: {
+        mode,
+        model: modelLabel,
+        billing_type: 'per_unit',
+        units: 1,
+        ...(attributedSource ? { source: attributedSource } : {}),
+        ...(attributedKeyId ? { embed_key_id: attributedKeyId } : {}),
+      },
     }).then(() => {}, () => {});
 
     // Persist to generation_3d.

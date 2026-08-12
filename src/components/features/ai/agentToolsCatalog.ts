@@ -1981,6 +1981,34 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'website-embed',
+    name: 'Your Website',
+    // All users, 0 credits — DB reads over the same derivations the widget itself gates on.
+    description: 'Put your products on your own website. Check whether a product is ready for the embed, get the paste-ready snippet, and see what the widget is doing and costing.',
+    icon: 'Code2',
+    tool_ids: ['embed_readiness', 'embed_overview'],
+    quick_starts: [
+      {
+        label: 'Ready for my site?', description: 'What a product still needs to be embeddable', icon: 'Code2',
+        prompt: 'Is one of my products ready to show on my own website?',
+        promptTemplate: 'Is "{{product_name}}" ready to show on my own website? Give me the snippet if it is.',
+        run: { tool: 'embed_readiness', argMap: { product_name: 'product_name' } },
+        form: [
+          { key: 'product_name', label: 'Product name', kind: 'text', required: true, placeholder: 'Fenwick lounge chair' },
+        ],
+      },
+      {
+        // autoFields surfaces the `days` window rather than hand-mirroring it — the manifest is the
+        // source for what a form may offer, and a hand-written field is how an option drifts out of
+        // step with the schema that accepts it.
+        label: 'Is my embed live?', description: 'Keys, activity and what it costs', icon: 'Globe',
+        prompt: 'Is my website embed live, what is it doing, and what is it costing me?',
+        run: { tool: 'embed_overview' },
+        autoFields: true,
+      },
+    ],
+  },
+  {
     id: 'knowledge-graph',
     name: 'Product Intelligence',
     // All users, 0 credits — DB-only RPC reads over relationships that already exist.

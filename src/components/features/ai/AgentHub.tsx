@@ -376,6 +376,10 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // #337. Registered here or the payload is dropped and the user sees "Done — ran price_my_spec"
   // with no verdict — which on this tool means they cannot tell a real price from "we don't have it".
   spec_pricing_result: 'What that would cost',
+  // Website embed. Same rule as above: unregistered, the snippet the merchant is meant to COPY is
+  // the payload that gets dropped, and "Done — ran embed_readiness" is worth nothing to anyone.
+  embed_readiness_result: 'Ready for your website',
+  embed_overview_result: 'Your website embed',
   // Purchase sheet
   purchase_sheet_ready: 'Purchase sheet ready',
   // Trip / expense cards

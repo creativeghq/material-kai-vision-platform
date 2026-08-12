@@ -90,6 +90,9 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'stock': {
     tool_ids: ['manage_stock'],
   },
+  'website-embed': {
+    tool_ids: ['embed_readiness', 'embed_overview'],
+  },
   'knowledge-graph': {
     tool_ids: ['product_provenance', 'product_price_history', 'projects_using_product', 'products_in_project', 'customer_overview', 'supplier_overview', 'products_by_brand', 'brand_overview', 'related_products', 'find_products_by_spec', 'price_my_spec', 'search_crm_by_kad'],
   },

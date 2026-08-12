@@ -623,6 +623,13 @@ Deno.serve(withApiLogging((req) => {
           user_id: owner.user_id,
           workspace_id: workspaceId,
           aspect_ratio: '1:1',
+          // Attribution, not identity — the generator has already decided whose pool pays from
+          // `user_id`/`workspace_id`. This says the spend came from the WIDGET, and from which key,
+          // so "what did my website cost me this month" and "which key is burning credits" are
+          // answerable. Both arrive as `mode: 'product-shot'` otherwise, exactly like an operator
+          // generating a product shot in-app. Honoured only because this is a service-role call.
+          source: 'embed',
+          embed_key_id: auth.ctx.keyId,
         }),
       });
       const body = await res.json().catch(() => ({}));

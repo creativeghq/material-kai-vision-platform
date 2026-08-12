@@ -852,6 +852,11 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // agentFullToolIds. So the tool existed, appeared in the knowledge_graph cluster, passed
       // coverage (its factory IS called) and could never be reached by anyone (#341).
       'price_my_spec',
+      // The website embed (#321/#258/#337). Every other half of that program already had an agent
+      // path — price_my_spec calls the widget's own RPC, raise_quote_request writes the widget's
+      // own row — while nothing could tell a merchant the widget EXISTS. It was reachable only
+      // from the API documentation page, which is why it has never carried a real page.
+      'embed_readiness', 'embed_overview',
     ],
     // systemPrompt loaded from database (key: 'kai')
   },
@@ -964,6 +969,9 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // The verdict half of the same flow: Trinity quotes, so Trinity must be able to find out
       // whether there is a price to quote before it says one out loud.
       'price_my_spec',
+      // Same flow, one step further out: after quoting a spec, the useful next sentence is often
+      // "your customers could have done that themselves on your website".
+      'embed_readiness', 'embed_overview',
       'customer_overview', 'supplier_overview', 'product_price_history',
       'products_in_project', 'projects_using_product', 'price_lookup',
       'create_project', 'list_my_projects', 'find_project',
@@ -1968,6 +1976,17 @@ async function executeAgent(
       if (config.tools.includes('price_my_spec')) tools.push(graphMod.createPriceMySpecTool(workspaceId, onChunk));
     } catch (graphErr) {
       console.warn('⚠️ Could not register knowledge-graph tools:', graphErr);
+    }
+  }
+
+  // Website embed (all users; 0 cr — DB-only reads over the same derivations the widget uses).
+  if (config.tools.some((t: string) => ['embed_readiness', 'embed_overview'].includes(t))) {
+    try {
+      const embedMod = await import('../_shared/tools/embed-tools.ts');
+      if (config.tools.includes('embed_readiness')) tools.push(embedMod.createEmbedReadinessTool(workspaceId, onChunk));
+      if (config.tools.includes('embed_overview')) tools.push(embedMod.createEmbedOverviewTool(workspaceId, onChunk));
+    } catch (embedErr) {
+      console.warn('⚠️ Could not register website-embed tools:', embedErr);
     }
   }
 

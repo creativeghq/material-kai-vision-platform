@@ -39,6 +39,18 @@ export interface EmbedKeyInput {
   scope_type: EmbedScopeType;
   /** Category ids or product ids per `scope_type`. Must be empty iff scope_type is 'all'. */
   scope_values: string[];
+  /**
+   * May this key spend credits on an AI impression when the catalog cannot satisfy a spec?
+   *
+   * Default false, and it stayed false for every key ever created through this UI — because the
+   * column had no control. The spec builder's "see it" stage was therefore off for every merchant
+   * who did not go into the database by hand, which is all of them. The default stays false: a
+   * merchant who never asked cannot be billed, and a leaked key cannot be turned into a spending
+   * endpoint. But it now has to be a CHOICE rather than an absence.
+   */
+  allow_generation?: boolean;
+  /** Per-key ceiling on those generations per day. Meaningless while `allow_generation` is false. */
+  generation_daily_cap?: number;
 }
 
 export interface EmbedScopeOption {
@@ -83,6 +95,18 @@ export async function searchScopeProducts(workspaceId: string, term: string): Pr
 export const MAX_RATE_LIMIT_PER_MINUTE = 600;
 
 /**
+ * Default and ceiling for the daily AI-generation cap.
+ *
+ * The default MIRRORS the fallback `products-3d-api` applies when the column is null (`?? 20`), so
+ * a key created here and a key created any other way behave the same. The ceiling exists because
+ * this is the one embed control that spends money on a stranger's click: 200/day at 6 credits is
+ * already a deliberate budget, and a merchant who wants more should have to ask rather than
+ * mistype a zero.
+ */
+export const DEFAULT_GENERATION_DAILY_CAP = 20;
+export const MAX_GENERATION_DAILY_CAP = 200;
+
+/**
  * Mint a key value.
  *
  * `crypto.getRandomValues` rather than `Math.random()`: the value is public, but it must still be
@@ -111,6 +135,26 @@ export interface EmbedAnalyticsSummary {
   by_key: Array<{ embed_key_id: string; events: number }>;
   top_pages: Array<{ page: string; events: number }>;
   daily: Array<{ day: string; events: number }>;
+  /**
+   * What the widget SPENT, alongside what it did.
+   *
+   * `visualize` is the only action on the embed surface that costs money, and it is triggered by an
+   * anonymous stranger on the merchant's own website and charged to the merchant's pool. Until the
+   * writer started stamping `source` / `embed_key_id` / `workspace_id` on the usage row, that spend
+   * was indistinguishable from an operator generating a product shot in-app — so a merchant could
+   * see their daily cap but never what it had cost them, and nobody could say which key was
+   * burning credits.
+   *
+   * `by_key` covers only rows written since that attribution shipped; older embed generations are
+   * counted nowhere, because inferring which historical row came from a widget would be a guess
+   * dressed as a number.
+   */
+  generation: {
+    count: number;
+    credits: number;
+    billed_usd: number;
+    by_key: Array<{ embed_key_id: string; count: number; credits: number }>;
+  };
 }
 
 export const embedKeysService = {
@@ -153,6 +197,8 @@ export const embedKeysService = {
         // a harmless extra field.
         scope_type: input.scope_type,
         scope_values: input.scope_type === 'all' ? [] : input.scope_values,
+        allow_generation: input.allow_generation ?? false,
+        generation_daily_cap: clampDailyCap(input.generation_daily_cap),
         is_active: true,
         created_by: auth.user?.id ?? null,
       })
@@ -180,6 +226,10 @@ export const embedKeysService = {
             scope_values: patch.scope_type === 'all' ? [] : (patch.scope_values ?? []),
           }
           : {}),
+        ...(patch.allow_generation !== undefined ? { allow_generation: patch.allow_generation } : {}),
+        ...(patch.generation_daily_cap !== undefined
+          ? { generation_daily_cap: clampDailyCap(patch.generation_daily_cap) }
+          : {}),
         ...(patch.is_active !== undefined ? { is_active: patch.is_active } : {}),
         updated_at: new Date().toISOString(),
       })
@@ -201,4 +251,18 @@ function clampRate(value: number): number {
   const n = Math.floor(Number(value));
   if (!Number.isFinite(n) || n < 1) return 60;
   return Math.min(n, MAX_RATE_LIMIT_PER_MINUTE);
+}
+
+/**
+ * Clamp the daily generation cap, floor 1.
+ *
+ * Zero is NOT the off switch — `allow_generation` is. A cap of 0 reads as "never", but
+ * `consume_embed_generation_quota` grants the first call of each new day before it consults the
+ * cap at all, so a merchant who typed 0 to mean "stop" would still be billed once a day and would
+ * be right to call that a bug. Refusing 0 here keeps the one honest off switch the only off switch.
+ */
+function clampDailyCap(value: number | undefined): number {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n) || n < 1) return DEFAULT_GENERATION_DAILY_CAP;
+  return Math.min(n, MAX_GENERATION_DAILY_CAP);
 }

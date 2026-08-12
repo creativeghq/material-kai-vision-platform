@@ -444,6 +444,25 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'embed_overview',
+    file: 'supabase/functions/_shared/tools/embed-tools.ts',
+    factory: 'createEmbedOverviewTool',
+    description: 'Is the website embed live for this workspace, what is it doing, and what does it cost?',
+    params: [
+      { name: 'days', type: 'number', optional: true, description: 'Activity window in days (default 30, max 365).' },
+    ],
+  },
+  {
+    name: 'embed_readiness',
+    file: 'supabase/functions/_shared/tools/embed-tools.ts',
+    factory: 'createEmbedReadinessTool',
+    description: 'Check whether a product can be shown on the merchant\'s OWN website through the embed SDK, and return the ready-to-paste snippet when it can.',
+    params: [
+      { name: 'product_id', type: 'string', optional: true, description: 'The product id, when you already have one.' },
+      { name: 'product_name', type: 'string', optional: true, description: 'Product name to look up instead, e.g. "Fenwick lounge chair".' },
+    ],
+  },
+  {
     name: 'enrich_company_from_aade',
     file: 'supabase/functions/_shared/tools/crm-tools.ts',
     factory: 'createEnrichCompanyFromAadeTool',

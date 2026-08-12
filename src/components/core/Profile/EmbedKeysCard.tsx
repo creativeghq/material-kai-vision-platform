@@ -8,7 +8,7 @@
  * wildcard is spelled out as a warning rather than offered as a checkbox with a neutral label.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Code2, Copy, Loader2, Plus, Trash2, Globe, AlertTriangle } from 'lucide-react';
+import { Code2, Copy, Loader2, Plus, Trash2, Globe, AlertTriangle, Sparkles } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
@@ -29,7 +29,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 import {
   embedKeysService, normalizeOriginList, isWildcardOriginList,
   listScopeCategories, searchScopeProducts,
-  MAX_RATE_LIMIT_PER_MINUTE, type EmbedKey, type EmbedScopeType, type EmbedScopeOption,
+  MAX_RATE_LIMIT_PER_MINUTE, DEFAULT_GENERATION_DAILY_CAP, MAX_GENERATION_DAILY_CAP,
+  type EmbedKey, type EmbedScopeType, type EmbedScopeOption,
   type EmbedAnalyticsSummary,
 } from '@/services/embedKeysService';
 
@@ -77,6 +78,26 @@ function usageSnippet(apiKey: string): string {
 </materialkai-product>`;
 }
 
+/**
+ * The OTHER tag, which nothing in the platform used to offer.
+ *
+ * `<materialkai-builder>` ships in the same bundle as the product widget and is registered by the
+ * same script tag — but it was documented only, so the only way a merchant learned it existed was
+ * by reading the API page. That is the likeliest reason the whole spec-builder feature has never
+ * recorded a single quote request: not that visitors did not convert, but that the tag was never on
+ * anybody's website. A feature reachable only through documentation is a feature that is off.
+ *
+ * No `product-id` here: the builder starts from a question, not a product. It accepts one as an
+ * optional deep link, which is a different use and does not belong in the first snippet a merchant
+ * copies.
+ */
+function builderSnippet(apiKey: string): string {
+  const base = window.location.origin;
+  return `<script src="${base}/embed/materialkai-product.js" defer></script>
+
+<materialkai-builder api-key="${apiKey}"></materialkai-builder>`;
+}
+
 /** For anyone wiring their own storefront instead of using the tag. */
 function apiSnippet(apiKey: string): string {
   const base = supabaseConfig.projectUrl.replace(/\/$/, '');
@@ -98,6 +119,7 @@ export const EmbedKeysCard: React.FC = () => {
   const [form, setForm] = useState({
     name: '', origins: '', rate: DEFAULT_RATE, allowAny: false,
     scopeType: 'all' as EmbedScopeType, scopeValues: [] as string[],
+    allowGeneration: false, dailyCap: DEFAULT_GENERATION_DAILY_CAP,
   });
 
   // Scope pickers. Categories are a short fixed list (a global taxonomy, ~a dozen entries), so they
@@ -158,7 +180,10 @@ export const EmbedKeysCard: React.FC = () => {
   useEffect(() => { void load(); }, [load]);
 
   const resetForm = () => {
-    setForm({ name: '', origins: '', rate: DEFAULT_RATE, allowAny: false, scopeType: 'all', scopeValues: [] });
+    setForm({
+      name: '', origins: '', rate: DEFAULT_RATE, allowAny: false, scopeType: 'all', scopeValues: [],
+      allowGeneration: false, dailyCap: DEFAULT_GENERATION_DAILY_CAP,
+    });
     setProductTerm('');
     setProductHits([]);
     setChosenProducts({});
@@ -198,6 +223,8 @@ export const EmbedKeysCard: React.FC = () => {
         rate_limit_per_minute: form.rate,
         scope_type: form.scopeType,
         scope_values: form.scopeValues,
+        allow_generation: form.allowGeneration,
+        generation_daily_cap: form.dailyCap,
       });
       toast({ title: 'Embed key created' });
       setCreating(false);
@@ -218,6 +245,26 @@ export const EmbedKeysCard: React.FC = () => {
     try {
       await embedKeysService.update(key.id, { is_active: isActive });
       setKeys((prev) => prev.map((k) => (k.id === key.id ? { ...k, is_active: isActive } : k)));
+    } catch (err) {
+      toast({
+        title: 'Could not update the key',
+        description: err instanceof Error ? err.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  /**
+   * Turn AI impressions on or off for one key.
+   *
+   * Separate from `handleToggle` deliberately: that switch decides whether the key WORKS, this one
+   * decides whether it may SPEND. Collapsing them into one row of switches would make the
+   * expensive one look like the cheap one.
+   */
+  const handleGenerationToggle = async (key: EmbedKey, allow: boolean) => {
+    try {
+      await embedKeysService.update(key.id, { allow_generation: allow });
+      setKeys((prev) => prev.map((k) => (k.id === key.id ? { ...k, allow_generation: allow } : k)));
     } catch (err) {
       toast({
         title: 'Could not update the key',
@@ -293,6 +340,25 @@ export const EmbedKeysCard: React.FC = () => {
                   </div>
                 ))}
               </div>
+              {/* What it COST, next to what it did. `visualize` is the only action on the embed
+                  that spends credits, and it is triggered by strangers — so a merchant who cannot
+                  see this number is running an open tab they never get shown. */}
+              {analytics.generation?.count > 0 && (
+                <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-border/60 pt-3">
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Sparkles className="h-3.5 w-3.5" />AI impressions
+                  </span>
+                  <span className="text-sm tabular-nums">
+                    {analytics.generation.count}
+                    <span className="text-muted-foreground"> generated</span>
+                  </span>
+                  <span className="text-sm tabular-nums">
+                    {analytics.generation.credits}
+                    <span className="text-muted-foreground"> credits</span>
+                  </span>
+                </div>
+              )}
+
               {analytics.top_pages.length > 0 && (
                 <div className="mt-3 border-t border-border/60 pt-3">
                   <p className="text-xs text-muted-foreground">Where it is running</p>
@@ -320,6 +386,7 @@ export const EmbedKeysCard: React.FC = () => {
           ) : (
             keys.map((key) => {
               const wildcard = isWildcardOriginList(key.allowed_origins);
+              const spent = analytics?.generation?.by_key.find((k) => k.embed_key_id === key.id);
               return (
                 <div key={key.id} className="rounded-md border border-border/60 p-4 space-y-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -365,13 +432,39 @@ export const EmbedKeysCard: React.FC = () => {
                       <Copy className="h-3.5 w-3.5 mr-1" />Copy
                     </Button>
                     <Button size="sm" variant="outline" className="rounded-full shrink-0"
-                      onClick={() => copy(usageSnippet(key.api_key), 'Embed snippet')}>
-                      Embed code
+                      onClick={() => copy(usageSnippet(key.api_key), 'Product snippet')}>
+                      Product code
+                    </Button>
+                    <Button size="sm" variant="outline" className="rounded-full shrink-0"
+                      onClick={() => copy(builderSnippet(key.api_key), 'Builder snippet')}>
+                      Builder code
                     </Button>
                     <Button size="sm" variant="ghost" className="rounded-full shrink-0"
                       onClick={() => copy(apiSnippet(key.api_key), 'API snippet')}>
                       API
                     </Button>
+                  </div>
+
+                  {/* The spend switch, kept apart from the on/off switch above: that one decides
+                      whether the key works, this one decides whether it may cost money. */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 text-xs">
+                        <p>AI impressions for specs you don't stock</p>
+                        <p className="text-muted-foreground">
+                          {key.allow_generation
+                            ? `Up to ${key.generation_daily_cap ?? DEFAULT_GENERATION_DAILY_CAP} a day, charged to this workspace`
+                            : 'Off — the builder shows no picture when nothing matches'}
+                          {spent ? ` · ${spent.credits} credits in the last ${analytics?.days ?? 30} days` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={!!key.allow_generation}
+                      onCheckedChange={(v) => handleGenerationToggle(key, v)}
+                      aria-label={`${key.allow_generation ? 'Disable' : 'Enable'} AI impressions for ${key.key_name}`}
+                    />
                   </div>
 
                   <div className="flex items-start gap-2 text-xs">
@@ -536,6 +629,41 @@ export const EmbedKeysCard: React.FC = () => {
                 value={form.rate}
                 onChange={(e) => setForm((f) => ({ ...f, rate: Number(e.target.value) }))}
               />
+            </div>
+
+            {/* The only control here that spends money. Off by default and phrased as a cost, not
+                as a feature — a merchant should be able to decline it without reading the docs. */}
+            <div className="space-y-1.5 rounded-md border border-border/60 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="embed-key-generation" className="flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" />AI impressions
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    When a visitor specifies something you don't stock, the spec builder can draw an
+                    impression of it instead of showing nothing. Each one costs credits from this
+                    workspace and is triggered by the visitor, not by you.
+                  </p>
+                </div>
+                <Switch
+                  id="embed-key-generation"
+                  checked={form.allowGeneration}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, allowGeneration: v }))}
+                />
+              </div>
+              {form.allowGeneration && (
+                <div className="space-y-1.5 pt-1">
+                  <Label htmlFor="embed-key-cap">Most per day</Label>
+                  <Input
+                    id="embed-key-cap"
+                    type="number"
+                    min={1}
+                    max={MAX_GENERATION_DAILY_CAP}
+                    value={form.dailyCap}
+                    onChange={(e) => setForm((f) => ({ ...f, dailyCap: Number(e.target.value) }))}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
