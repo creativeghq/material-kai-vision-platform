@@ -771,6 +771,30 @@ All colors MUST be HSL.
     scrollbar-gutter: stable;
   }
 
+  /* Page roots must FILL this container, never shrink-wrap their content.
+     ------------------------------------------------------------------
+     <main> is `flex flex-col` (children need to grow to fill the height). Per the
+     flexbox spec a flex item is stretched on the cross axis only if NEITHER
+     cross-axis margin is `auto` — and virtually every page root here is
+     `max-w-… mx-auto`, which sets both. So page roots were never stretched: they
+     were shrink-to-fit, sized to their own content.
+
+     That is the real "dashboard grid blinks / expands multiple times" bug, and it
+     is why every previous attempt missed. Measured on production, the dashboard
+     root went w=1058 → 1438 → 1600 across three data waves while its HEIGHT stayed
+     at 588 and main's clientWidth stayed at 1900 the entire time. Every earlier fix
+     reserved VERTICAL space (min-h on the widget bodies, a fixed h on the insights
+     scroller, line-clamp on the tile labels) — all correct, and all irrelevant,
+     because nothing was ever moving vertically. The container was widening as text
+     landed, and `mx-auto` re-centred it each time.
+
+     `width: 100%` restores what a block-level `max-w-… mx-auto` does in a normal
+     block context: fill the parent, cap at max-width, centre with the auto margins.
+     box-sizing is border-box platform-wide, so page padding cannot overflow it. */
+  .page-wrapper > * {
+    width: 100%;
+  }
+
   /* Page container - ONLY left/right padding, NO top/bottom */
   .page-container {
     max-width: 100%;
