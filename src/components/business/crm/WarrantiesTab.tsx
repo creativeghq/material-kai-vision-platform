@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ordersService } from '@/modules/finance/services/ordersService';
 import {
@@ -74,9 +74,6 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
   const [openAsset, setOpenAsset] = useState<AssetDetail | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  // The CRM record pages exist at both /crm/… and /admin/crm/…, and an order link has to stay
-  // inside whichever shell the operator is already in.
-  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
 
   const scope = useMemo(() => ({
     ...(companyId ? { customer_company_id: companyId } : {}),
@@ -109,9 +106,10 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
   useEffect(() => { void load(); }, [load]);
 
   /**
-   * Order lines that already produced a unit. A partial unique index on `source_order_item_id`
-   * makes a second registration for the same line a 23505, so the picker has to know which lines
-   * are spoken for rather than offering them and failing on save.
+   * Order lines that already produced a unit. `uq_customer_assets_order_item` is unique on
+   * `source_order_item_id` and `register_customer_asset` has no conflict handling, so a second
+   * registration for the same line raises 23505 — the picker has to know which lines are spoken
+   * for rather than offering them and failing on save.
    */
   const takenLineIds = useMemo(
     () => new Set(assets.map((a) => a.source_order_item_id).filter(Boolean) as string[]),
@@ -287,11 +285,14 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
                       </TableCell>
                       {/* Where this unit came from. The link has been stored on every
                           automatically-registered unit since day one and shown nowhere, so a unit
-                          we sold looked exactly like one the customer already owned. */}
+                          we sold looked exactly like one the customer already owned.
+                          An order lives at `/finance/orders/:orderId` and nowhere else — there is
+                          no `/admin/finance` route, which is the prefix deepLinkTargets.test.ts
+                          was written about after five notification links were found under it. */}
                       <TableCell className="text-xs" onClick={(e) => e.stopPropagation()}>
                         {a.source_order
                           ? (
-                            <Link to={`${financeBase}/orders/${a.source_order.id}`} className="text-primary hover:underline">
+                            <Link to={`/finance/orders/${a.source_order.id}`} className="text-primary hover:underline">
                               {a.source_order.order_number || 'Order'}
                             </Link>
                           )

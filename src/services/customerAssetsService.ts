@@ -325,12 +325,20 @@ export const customerAssetsService = {
    * tell which one the reminders mean. We adopt the row the defaults created when there is one and
    * only insert when there is not.
    *
+   * `asset_id` is REQUIRED when the line already produced a unit. `register_customer_asset` is a
+   * plain insert with no conflict handling, and `uq_customer_assets_order_item` is unique on
+   * `source_order_item_id` — so registering a second time raises 23505 and the whole call fails.
+   * Editing the cover on an already-registered line is the common case (that is what the "covered
+   * to …" button opens), so this path must update rather than re-register.
+   *
    * `ends_on` is the operator's answer and is passed through, never recomputed here: a cover period
    * is a date the customer can hold us to, not a number this client is entitled to derive.
    */
   async warrantOrderLine(input: {
     order_id: string;
     order_item_id: string;
+    /** The unit this line already produced, when it has one. Omit to register a new one. */
+    asset_id?: string | null;
     name: string;
     customer_company_id?: string | null;
     customer_contact_id?: string | null;
@@ -345,7 +353,7 @@ export const customerAssetsService = {
     policy_number?: string | null;
   }): Promise<{ asset_id: string; warranty: AssetWarranty }> {
     const kind = input.kind ?? 'manufacturer';
-    const assetId = await this.register({
+    const assetId = input.asset_id ?? await this.register({
       name: input.name,
       customer_company_id: input.customer_company_id ?? null,
       customer_contact_id: input.customer_contact_id ?? null,

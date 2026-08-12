@@ -1480,6 +1480,8 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // installed base, keyed by order_item_id. The link has always been stored (`source_order_item_id`)
   // and never read, so a sold-and-covered line looked identical to one nobody had registered.
   const [lineAssets, setLineAssets] = useState<Map<string, OrderAssetRow>>(new Map());
+  /** True when the read FAILED. Distinct from "nothing is registered" — see the note in `load`. */
+  const [lineAssetsFailed, setLineAssetsFailed] = useState(false);
   const [warrantyPick, setWarrantyPick] = useState<OrderItem | null>(null);
   // Catalog names for linked lines, so a linked line can SAY what it points at rather than just
   // being silently unlinkable.
@@ -1535,16 +1537,24 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
           ? ordersService.supplierHandoffAvailable(id).catch(() => null)
           : Promise.resolve(null),
         // Only a sale puts a unit into a CUSTOMER's installed base; a purchase order has no
-        // customer to register it against. Best-effort: a workspace without the module still gets
-        // its order, just without the warranty column.
+        // customer to register it against.
+        //
+        // A FAILED read is recorded, not flattened to "nothing registered" — same reason as the
+        // payment audit above. Both look identical as an empty array, and here the wrong reading
+        // is actively harmful: every line would offer "warranty" as though it were uncovered, and
+        // clicking one would try to register a unit that already exists (23505).
         res.order.order_type === 'sales'
-          ? customerAssetsService.listByOrder(id).catch(() => [] as OrderAssetRow[])
-          : Promise.resolve([] as OrderAssetRow[]),
+          ? customerAssetsService.listByOrder(id).then(
+              (rows) => ({ ok: true as const, rows }),
+              () => ({ ok: false as const, rows: [] as OrderAssetRow[] }),
+            )
+          : Promise.resolve({ ok: true as const, rows: [] as OrderAssetRow[] }),
       ]);
       setProductNames(prodNames);
       setLineAssets(new Map(
-        assetRows.filter((a) => a.source_order_item_id).map((a) => [a.source_order_item_id as string, a]),
+        assetRows.rows.filter((a) => a.source_order_item_id).map((a) => [a.source_order_item_id as string, a]),
       ));
+      setLineAssetsFailed(!assetRows.ok);
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
       setBankAccounts(accounts);
       setPayAudit(audit.rows);
@@ -2582,14 +2592,20 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                               order + line onto the unit, so the customer's Warranties tab can say
                               where it came from and the order can say it is covered. Purchases are
                               excluded — a purchase order has no customer to register against. */}
-                          {isSalesOrder && lineWarranty(it) && (
+                          {isSalesOrder && lineAssetsFailed && (
+                            <span className="text-[10px] text-amber-600 inline-flex items-center gap-0.5"
+                              title="The installed-base read failed, so this line's warranty is unknown. Reload the order.">
+                              <ShieldCheck className="h-2.5 w-2.5" /> warranty unknown
+                            </span>
+                          )}
+                          {isSalesOrder && !lineAssetsFailed && lineWarranty(it) && (
                             <button type="button" className="text-[10px] text-emerald-500 hover:underline inline-flex items-center gap-0.5"
                               title={`Registered in the customer's installed base — covered to ${lineWarranty(it)!.ends_on}`}
                               onClick={() => setWarrantyPick(it)}>
                               <ShieldCheck className="h-2.5 w-2.5" /> covered to {lineWarranty(it)!.ends_on}
                             </button>
                           )}
-                          {isSalesOrder && !lineWarranty(it) && (
+                          {isSalesOrder && !lineAssetsFailed && !lineWarranty(it) && (
                             <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
                               title="Register this line in the customer's installed base with a warranty period"
                               onClick={() => setWarrantyPick(it)}>
@@ -3457,6 +3473,9 @@ const LineWarrantyDialog: React.FC<{
       await customerAssetsService.warrantOrderLine({
         order_id: order.id,
         order_item_id: item.id,
+        // Reuse the unit this line already produced. Registering a second one against the same
+        // line is a 23505 — which is what saving from the "covered to …" button used to do.
+        asset_id: existing?.id ?? null,
         name: item.description,
         customer_company_id: order.customer_company_id,
         customer_contact_id: order.customer_contact_id,
@@ -3535,8 +3554,11 @@ const LineWarrantyDialog: React.FC<{
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => void save()} disabled={saving || !endsOn || !hasCustomer}>
-            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save
+          {/* `resolving` gates Save on purpose: "cover months" fills the end date on blur, and
+              blur fires BEFORE the click that caused it. Without this, typing 36 and hitting Save
+              stores the end date the previous month count produced. */}
+          <Button onClick={() => void save()} disabled={saving || resolving || !endsOn || !hasCustomer}>
+            {(saving || resolving) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save
           </Button>
         </DialogFooter>
       </DialogContent>
