@@ -34,9 +34,9 @@ export const MydataSyncDialog: React.FC<{
   syncing?: boolean;
   onConfirm: (range: { dateFrom: string; dateTo: string }) => void;
 }> = ({ open, onOpenChange, syncing, onConfirm }) => {
-  const [period, setPeriod] = useState<Period>('this_month');
-  const [customFrom, setCustomFrom] = useState(() => rangeFor('this_month').from);
-  const [customTo, setCustomTo] = useState(() => rangeFor('this_month').to);
+  const [period, setPeriod] = useState<Period>('last_7_days');
+  const [customFrom, setCustomFrom] = useState(() => rangeFor('last_7_days').from);
+  const [customTo, setCustomTo] = useState(() => rangeFor('last_7_days').to);
 
   const range = period === 'custom' ? { from: customFrom, to: customTo } : rangeFor(period);
   const invalid = !range.from || !range.to || range.from > range.to;

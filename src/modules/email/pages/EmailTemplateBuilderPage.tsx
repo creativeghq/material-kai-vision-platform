@@ -798,7 +798,7 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
         {/* Row 1: nav + actions */}
         <div className="flex items-center justify-between px-4 py-2.5 gap-4">
           <div className="flex items-center gap-3 shrink-0">
-            <Button variant="ghost" size="sm" onClick={() => navigate(backPath || '/admin?tab=email')}>
+            <Button variant="ghost" size="sm" onClick={() => navigate(backPath || '/admin/emails?tab=templates')}>
               <ArrowLeft className="h-4 w-4 mr-1" />Back
             </Button>
             <div>

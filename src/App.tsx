@@ -120,6 +120,7 @@ const HeatingCostPage = lazy(() => import('./pages/Tools/HeatingCostPage'));
 const KitchenCostPage = lazy(() => import('./pages/Tools/KitchenCostPage'));
 const PublicQuotePage = lazy(() => import('./pages/PublicQuotePage'));
 const PublicClientViewPage = lazy(() => import('./pages/PublicClientViewPage'));
+const EmbedPlannerPage = lazy(() => import('./pages/EmbedPlannerPage'));
 const PublicListingPage = lazy(() => import('./pages/PublicListingPage'));
 const BuyerPortalPage = lazy(() => import('./pages/BuyerPortalPage'));
 const TenantPortalPage = lazy(() => import('./pages/TenantPortalPage'));
@@ -180,6 +181,10 @@ const App = () => (
                 <Route path="/sheets/share/:token" element={<PageErrorBoundary name="Shared Sheet"><SheetSharePage /></PageErrorBoundary>} />
                 <Route path="/q/:token" element={<PageErrorBoundary name="Public Quote"><PublicQuotePage /></PageErrorBoundary>} />
                 <Route path="/cv/:token" element={<PageErrorBoundary name="Client View"><PublicClientViewPage /></PageErrorBoundary>} />
+                {/* The embed's "place it" stage (#341 join 4). PUBLIC and unauthenticated by
+                    design: the visitor is a stranger on a merchant's website. The embed key in the
+                    query string is what scopes the catalogue, and this page writes nothing. */}
+                <Route path="/embed/planner" element={<PageErrorBoundary name="Embed Planner"><EmbedPlannerPage /></PageErrorBoundary>} />
                 {/* Public property listing page (anonymous, token-gated) */}
                 <Route path="/p/:token" element={<PageErrorBoundary name="Property Listing"><PublicListingPage /></PageErrorBoundary>} />
                 {/* Buyer portal: a saved search's shareable matches page (anonymous, token-gated) */}

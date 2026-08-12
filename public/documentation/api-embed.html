@@ -48,6 +48,11 @@
   <pre><code>&lt;materialkai-builder api-key="mk_embed_…" product-id="YOUR-PRODUCT-ID"&gt;&lt;/materialkai-builder&gt;</code></pre>
   <div class="callout"><p><strong>The fallback is the point, not the error case.</strong> A visitor who asks for something you don't stock becomes a <a href="quotes-requests.html">quote request</a> with everything they specified — and the picture they were looking at when they asked. A configurator bound to one product can only ever sell what somebody already photographed, modelled and priced.</p></div>
 
+  <h2>Letting a visitor plan a room</h2>
+  <p>A product with a 3D model gets a <strong>Plan your room</strong> button. It opens our hosted planner in a new tab, already scoped to your key, with that product placed at its real measured size — the visitor sets their room dimensions and arranges pieces to see how they fit.</p>
+  <p>It is a hosted page rather than part of the widget on purpose: the planner is a full 3D application, and loading it into every product page would cost every visitor for a feature few open. Nothing is saved — the arrangement lives in the visitor's browser and comes to you attached to their enquiry.</p>
+  <div class="callout"><p><strong>Only products with a model get the button.</strong> Without one the planner has no measured size to work from and would place a 60 × 60 cm placeholder — inviting somebody to check whether it fits, at a size nobody measured.</p></div>
+
   <h2>Your key is meant to be public</h2>
   <p>The embed key ships in your page's source. That's what it's for — like a Stripe publishable key or a Google Maps key. It is <strong>not</strong> a secret, and it is not what protects your catalog. Three things do:</p>
 

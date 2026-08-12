@@ -519,6 +519,26 @@ export class MaterialKaiProduct extends HTMLElement {
       nodes.push(a);
     }
 
+    // "Place it" — stage 4 of the flow, and the one a widget cannot host itself (#341 join 4).
+    //
+    // A LINK to our hosted planner rather than a planner in this bundle: shipping React and a 3D
+    // scene graph into a merchant's product page, for a feature most visitors never open, is a
+    // cost every visitor pays and few use. Offered only when the product HAS a model, because
+    // without one the planner has no measured size to place it at and would draw a 60 x 60
+    // placeholder — inviting someone to check whether it fits, at a size nobody measured.
+    if (this.product?.models.some((m) => m.format === 'glb' || m.format === 'gltf')) {
+      const plan = document.createElement('a');
+      plan.className = 'btn';
+      plan.target = '_blank';
+      plan.rel = 'noopener';
+      plan.href = `${this.appOrigin()}/embed/planner`
+        + `?key=${encodeURIComponent(this.getAttribute('api-key') ?? '')}`
+        + `&product=${encodeURIComponent(this.getAttribute('product-id') ?? '')}`;
+      plan.textContent = 'Plan your room';
+      plan.addEventListener('click', () => this.track('embed_plan_room'));
+      nodes.push(plan);
+    }
+
     // Add-to-cart is opt-in: without `show-add-to-cart` the widget is a viewer, and a merchant who
     // has not wired the event should not be shown a button that does nothing.
     if (this.hasAttribute('show-add-to-cart')) {
@@ -575,6 +595,24 @@ export class MaterialKaiProduct extends HTMLElement {
   }
 
   /** Fire-and-forget telemetry. Never blocks, never surfaces, never throws into the host page. */
+  /**
+   * Where the hosted pages live.
+   *
+   * Derived from the script tag's own src rather than hardcoded: the widget is served from the app
+   * origin, so whatever loaded this bundle is the right host for the planner too. A constant would
+   * be wrong on staging and in any self-hosted deployment.
+   */
+  private appOrigin(): string {
+    const src = (document.currentScript as HTMLScriptElement | null)?.src
+      ?? Array.from(document.querySelectorAll('script'))
+        .map((s) => s.src)
+        .find((u) => u.includes('materialkai-product'));
+    try {
+      if (src) return new URL(src).origin;
+    } catch { /* fall through to the page's own origin */ }
+    return location.origin;
+  }
+
   private track(eventType: string) {
     const productId = this.getAttribute('product-id');
     const apiKey = this.getAttribute('api-key');

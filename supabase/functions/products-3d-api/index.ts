@@ -50,7 +50,7 @@ const MAX_SCOPE_ID_FILTER = 5000;
 // 400 the beacon swallows, so it reads as zero forever. `embed_configure` was on #258's list and in
 // neither place until #341.
 const EMBED_EVENT_TYPES = [
-  'embed_view', 'embed_model_load', 'embed_ar_launch', 'embed_add_to_cart', 'embed_configure',
+  'embed_view', 'embed_model_load', 'embed_ar_launch', 'embed_add_to_cart', 'embed_configure', 'embed_plan_room',
 ];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

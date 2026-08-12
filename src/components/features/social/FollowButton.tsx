@@ -64,7 +64,7 @@ export const FollowButton: React.FC<FollowButtonProps> = ({ targetUserId, curren
         type: 'new_follower',
         title: 'You have a new follower',
         body: '',
-        action_url: '/profile?tab=followers',
+        action_url: '/profile?tab=profile',
         follower_id: currentUserId,
         following_id: targetUserId,
         followed_at: new Date().toISOString(),

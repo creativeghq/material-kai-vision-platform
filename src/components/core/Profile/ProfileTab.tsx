@@ -828,7 +828,7 @@ export const ProfileTab: React.FC = () => {
             type: 'preferred_factory',
             title: 'A user added your brand as a preferred brand',
             body: '',
-            action_url: '/analytics/factory',
+            action_url: '/factory-analytics',
           });
         });
     }

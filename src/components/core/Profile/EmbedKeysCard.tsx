@@ -46,6 +46,7 @@ const EMBED_EVENT_LABELS: Array<[string, string]> = [
   ['embed_view', 'Views'],
   ['embed_model_load', '3D loads'],
   ['embed_configure', 'Options changed'],
+  ['embed_plan_room', 'Room planner opened'],
   ['embed_ar_launch', 'AR launches'],
   ['embed_add_to_cart', 'Add to cart'],
 ];
