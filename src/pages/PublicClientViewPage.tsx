@@ -30,6 +30,21 @@ interface ClientViewData {
   sheets: CvSheet[];
   pdf_url: string | null;
   embed_vr: boolean;
+  /**
+   * The arranged room, if the designer chose to show it (#259 Ph4).
+   *
+   * Carries no prices: what it costs is the FF&E section's job, and only when that was enabled.
+   */
+  room_plan?: {
+    name: string | null;
+    width_m: number;
+    depth_m: number;
+    items: Array<{
+      id: string; name: string; x_m: number; y_m: number;
+      rotation_deg: number; width_m: number; depth_m: number;
+    }>;
+    surfaces: Array<{ surface: string; name: string | null; area_m2: number }>;
+  } | null;
   embed_lighting: boolean;
   embed_ffe: boolean;
   feedback_enabled: boolean;
@@ -173,6 +188,65 @@ export default function PublicClientViewPage() {
             The presentation PDF is still being prepared. Please check back shortly.
           </Card>
         )}
+
+        {/* The arranged room (#259 Ph4). Drawn to scale from the same resolved footprints the
+            planner uses, so what the client sees is what the designer laid out — not a redrawing
+            with its own idea of how big a sofa is. */}
+        {view.room_plan && view.room_plan.items.length > 0 && (() => {
+          const plan = view.room_plan;
+          const PAD = 16;
+          const W = 640;
+          const scale = Math.min(
+            (W - PAD * 2) / plan.width_m,
+            (420 - PAD * 2) / plan.depth_m,
+          );
+          const H = plan.depth_m * scale + PAD * 2;
+          const ox = (W - plan.width_m * scale) / 2;
+          const oy = PAD;
+          return (
+            <section>
+              <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
+                <Box className="h-5 w-5 text-primary" /> {plan.name || 'Room plan'}
+              </h2>
+              <Card className="dashboard-card p-4">
+                <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Room plan">
+                  <rect
+                    x={ox} y={oy} width={plan.width_m * scale} height={plan.depth_m * scale}
+                    className="fill-muted/40 stroke-border" strokeWidth={1}
+                  />
+                  {plan.items.map((i) => (
+                    <g
+                      key={i.id}
+                      transform={`translate(${ox + i.x_m * scale} ${oy + i.y_m * scale}) rotate(${i.rotation_deg})`}
+                    >
+                      <rect
+                        x={-i.width_m * scale / 2} y={-i.depth_m * scale / 2}
+                        width={i.width_m * scale} height={i.depth_m * scale}
+                        rx={2} className="fill-primary/20 stroke-primary/60" strokeWidth={1}
+                      />
+                      <text textAnchor="middle" y={4} fontSize={10} className="fill-foreground">
+                        {i.name.slice(0, 16)}
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {plan.width_m} × {plan.depth_m} m, drawn to scale.
+                </p>
+                {plan.surfaces.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                    {plan.surfaces.map((f) => (
+                      <li key={f.surface}>
+                        <span className="capitalize">{f.surface.replace('_', ' ')}</span>
+                        {f.name ? `: ${f.name}` : ''} — {f.area_m2.toFixed(1)} m²
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            </section>
+          );
+        })()}
 
         {/* 3D walkthrough */}
         {view.embed_vr && vr && vrUrl && (

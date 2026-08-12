@@ -83,7 +83,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
   // ---------- 1. CLIENT VIEW token? ----------
   const { data: view } = await supabase
     .from('project_client_views')
-    .select('id, project_id, created_by, title, cover, sheet_ids, pdf_storage_path, public_share_enabled, share_expires_at, embed_vr, embed_lighting, embed_ffe, feedback_enabled, vr_world_id, quote_id')
+    .select('id, project_id, created_by, title, cover, sheet_ids, pdf_storage_path, public_share_enabled, share_expires_at, embed_vr, embed_lighting, embed_ffe, feedback_enabled, vr_world_id, quote_id, embed_room_plan, room_layout_id')
     .eq('public_share_token', token)
     .maybeSingle();
 
@@ -208,6 +208,52 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       };
     }
 
+    // The room plan (#259 Ph4). Read through the RESOLVED view, so the client sees the same
+    // footprints the designer arranged — the size comes from the product's measured model, and a
+    // second copy of that resolution here would be free to disagree with the planner.
+    //
+    // Service role, so `embed_room_plan` is the access control: a plan attached but not toggled on
+    // must not be reachable by holding the token.
+    let room_plan: unknown = null;
+    if (view.embed_room_plan && view.room_layout_id) {
+      const { data: plan } = await supabase
+        .from('room_layouts')
+        .select('id, name, room_width_m, room_depth_m, room_height_m')
+        .eq('id', view.room_layout_id)
+        .maybeSingle();
+      if (plan) {
+        const { data: placed } = await supabase
+          .from('room_layout_items_resolved')
+          .select('id, product_name, x_m, y_m, rotation_deg, effective_width_m, effective_depth_m')
+          .eq('layout_id', view.room_layout_id);
+        const { data: faces } = await supabase
+          .from('room_layout_surfaces_resolved')
+          .select('surface, product_name, area_m2')
+          .eq('layout_id', view.room_layout_id);
+        room_plan = {
+          name: plan.name,
+          width_m: Number(plan.room_width_m),
+          depth_m: Number(plan.room_depth_m),
+          items: (placed || []).map((i: any) => ({
+            id: i.id,
+            name: i.product_name ?? 'Item',
+            x_m: Number(i.x_m),
+            y_m: Number(i.y_m),
+            rotation_deg: Number(i.rotation_deg),
+            width_m: Number(i.effective_width_m),
+            depth_m: Number(i.effective_depth_m),
+          })),
+          // No prices. This is the client's copy of the arrangement; what it costs is the FF&E
+          // section's job, and only when the designer turned that on.
+          surfaces: (faces || []).map((f: any) => ({
+            surface: f.surface,
+            name: f.product_name ?? null,
+            area_m2: Number(f.area_m2),
+          })),
+        };
+      }
+    }
+
     // WS4 #285 — the handover snag list. ONLY client_visible snags, and only the fields a client
     // needs: no assignee, no internal description, no severity triage. This runs on the service
     // role, so the `client_visible` filter here IS the access control — RLS is not in play.
@@ -245,6 +291,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
         vr_world,
         ffe,
         lighting_image_url: view.embed_lighting ? lightingImageUrl : null,
+        room_plan,
         snags,
       },
     });

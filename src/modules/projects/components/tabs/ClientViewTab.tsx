@@ -12,6 +12,8 @@ import { Input } from '@/components/core/ui/input';
 import { Switch } from '@/components/core/ui/switch';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { roomPlannerService } from '@/services/roomPlannerService';
 import { supabase } from '@/integrations/supabase/client';
 
 import { projectsService } from '../../services/projectsService';
@@ -54,6 +56,8 @@ interface FormState {
   feedbackEnabled: boolean;
   quoteId: string;
   vrWorldId: string;
+  embedRoomPlan: boolean;
+  roomLayoutId: string;
 }
 
 const emptyForm = (): FormState => ({
@@ -69,14 +73,18 @@ const emptyForm = (): FormState => ({
   feedbackEnabled: true,
   quoteId: '',
   vrWorldId: '',
+  embedRoomPlan: false,
+  roomLayoutId: '',
 });
 
 export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, projectName, isOwner }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [views, setViews] = useState<ClientView[]>([]);
   const [sheets, setSheets] = useState<AvailableSheet[]>([]);
   const [quotes, setQuotes] = useState<ProjectQuote[]>([]);
   const [vrWorlds, setVrWorlds] = useState<VrWorld[]>([]);
+  const [roomLayouts, setRoomLayouts] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
@@ -88,16 +96,22 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [v, s, q, w] = await Promise.all([
+      const [v, s, q, w, plans] = await Promise.all([
         clientViewsService.listForProject(projectId),
         projectsService.listProjectSheets(projectId),
         projectsService.listProjectQuotes(projectId),
         clientViewsService.listVrWorlds(),
+        // Room plans are workspace-scoped, not project-scoped — `room_layouts` has no project_id —
+        // so this offers the workspace's plans rather than pretending there is a narrower set.
+        activeWorkspaceId
+          ? roomPlannerService.listLayouts(activeWorkspaceId).catch(() => [])
+          : Promise.resolve([]),
       ]);
       setViews(v);
       setSheets(s);
       setQuotes((q || []).map((x: any) => ({ id: x.id, name: x.name, quote_number: x.quote_number, status: x.status ?? null, grand_total: x.grand_total ?? null, currency: x.currency ?? null })));
       setVrWorlds(w);
+      setRoomLayouts((plans ?? []).map((l) => ({ id: l.id, name: l.name ?? 'Untitled room' })));
       // Resolve the project's client name so the deck cover's "Prepared for" is prefilled.
       const { data: proj } = await supabase.from('projects').select('client_company_id, client_contact_id').eq('id', projectId).maybeSingle();
       const companyId = (proj as any)?.client_company_id as string | null;
@@ -139,6 +153,8 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
       feedbackEnabled: view.feedback_enabled,
       quoteId: view.quote_id || '',
       vrWorldId: view.vr_world_id || '',
+      embedRoomPlan: view.embed_room_plan ?? false,
+      roomLayoutId: view.room_layout_id || '',
     });
     setEditorOpen(true);
   };
@@ -181,6 +197,8 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
     feedback_enabled: form.feedbackEnabled,
     quote_id: form.quoteId || null,
     vr_world_id: form.vrWorldId || null,
+    embed_room_plan: form.embedRoomPlan,
+    room_layout_id: form.roomLayoutId || null,
   });
 
   const save = async (thenGenerate: boolean) => {
@@ -432,6 +450,33 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                       <SelectItem value="__none__">— none —</SelectItem>
                       {vrWorlds.map((w) => (
                         <SelectItem key={w.id} value={w.id}>{w.display_name || w.id.slice(0, 8)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {/* Room plan (#259 Ph4). The planner was private to whoever drew it — a designer
+                  could arrange a room to scale and had no way to show the client except a
+                  screenshot. Attached here rather than given its own share token: this surface
+                  already carries the expiry, the counter and the revoke. */}
+              <ToggleRow
+                label="Room plan"
+                desc="Show the floor plan you arranged, at real size"
+                checked={form.embedRoomPlan}
+                onChange={(v) => setForm({ ...form, embedRoomPlan: v })}
+              />
+              {form.embedRoomPlan && (
+                <div className="space-y-1.5">
+                  <Label>Plan</Label>
+                  <Select
+                    value={form.roomLayoutId || '__none__'}
+                    onValueChange={(v) => setForm({ ...form, roomLayoutId: v === '__none__' ? '' : v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="— none —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— none —</SelectItem>
+                      {roomLayouts.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

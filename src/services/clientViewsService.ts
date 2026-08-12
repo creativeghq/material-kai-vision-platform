@@ -29,6 +29,9 @@ export interface ClientView {
   feedback_enabled: boolean;
   vr_world_id: string | null;
   quote_id: string | null;
+  /** Room plan shown to the client (#259 Ph4). Attachment and visibility are separate. */
+  room_layout_id: string | null;
+  embed_room_plan: boolean;
   pdf_storage_path: string | null;
   pdf_generation_status: 'draft' | 'generating' | 'completed' | 'failed';
   pdf_generated_at: string | null;
@@ -55,6 +58,8 @@ export interface CreateClientViewInput {
   feedback_enabled?: boolean;
   vr_world_id?: string | null;
   quote_id?: string | null;
+  room_layout_id?: string | null;
+  embed_room_plan?: boolean;
 }
 
 export interface UpdateClientViewInput {
@@ -67,6 +72,8 @@ export interface UpdateClientViewInput {
   feedback_enabled?: boolean;
   vr_world_id?: string | null;
   quote_id?: string | null;
+  room_layout_id?: string | null;
+  embed_room_plan?: boolean;
 }
 
 export interface ClientViewFeedback {
