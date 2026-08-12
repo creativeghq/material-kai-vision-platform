@@ -847,7 +847,7 @@ async function handlePurchaseOrder(body: Body, admin: any, reader: any): Promise
       user_id: actorId,
       title: `Purchase order ${orderNumber} sent`,
       body: `Sent to ${supName} · ${Number(order.total || 0).toFixed(2)} ${currency}`,
-      action_url: `/finance?tab=orders&order=${order.id}`,
+      action_url: `/finance/orders/${order.id}`,
       // domain fields
       order_id: order.id,
       order_number: orderNumber,

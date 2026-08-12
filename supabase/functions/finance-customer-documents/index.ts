@@ -234,7 +234,7 @@ Deno.serve(withApiLogging('finance-customer-documents', async (req) => {
       customer_company_id: src.customer_company_id, customer_contact_id: src.customer_contact_id,
       title: `Customer reorder request${created.order_number ? ` #${created.order_number}` : ''}`,
       body: `A customer asked to order again (${total.toFixed(2)} ${src.currency}). A draft order is ready to review.`,
-      action_url: '/finance?tab=orders',
+      action_url: `/finance/orders/${created.id}`,
     }));
 
     return json({

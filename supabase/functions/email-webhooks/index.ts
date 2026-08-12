@@ -503,7 +503,7 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
           body: isBounce
             ? `${toEmail ?? 'A recipient'} bounced${event.data.bounce?.message ? ` (${event.data.bounce.message})` : ''}.`
             : `${toEmail ?? 'A recipient'} marked a campaign email as spam.`,
-          action_url: '/email-marketing?tab=campaigns',
+          action_url: '/marketing/email?tab=campaigns',
         };
         // Fan out per owner/admin so each event carries a CONCRETE user_id. The seeded
         // default flow ends in `create_notification`, which needs one — a workspace_id
@@ -538,7 +538,7 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
           link: isClick ? (event.data.click?.link ?? null) : null,
           title: isClick ? 'Campaign link clicked' : 'Campaign email opened',
           body: `${(emailLog as any).to_email ?? 'A recipient'} ${isClick ? 'clicked a link in' : 'opened'} a campaign email.`,
-          action_url: '/email-marketing?tab=campaigns',
+          action_url: '/marketing/email?tab=campaigns',
         });
       } catch { /* best-effort */ }
     }

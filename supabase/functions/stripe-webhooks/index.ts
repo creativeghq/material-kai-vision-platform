@@ -567,7 +567,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
         type: 'payment_success',
         title: 'Credits added to your account',
         body: `${creditAmount} credits have been added to your account.`,
-        action_url: '/settings/billing',
+        action_url: '/profile?tab=credits',
         credit_amount: parseFloat(creditAmount),
         payment_intent_id: paymentIntent.id,
       }).catch(() => {});
@@ -672,7 +672,7 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
     type: 'payment_failed',
     title: 'Payment failed',
     body: 'Your payment could not be processed. Please update your payment details.',
-    action_url: '/settings/billing',
+    action_url: '/profile?tab=billing',
     payment_intent_id: paymentIntent.id,
   }).catch(() => {});
 }

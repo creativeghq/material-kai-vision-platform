@@ -374,7 +374,7 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
               absence_type: absenceType, start_date: startDate, end_date: endDate, working_days: workingDays,
               title: `Absence requested: ${nm}`,
               body: `${nm} requested ${absenceType} leave ${startDate} → ${endDate} (${workingDays}d).`,
-              action_url: '/hr?tab=absences',
+              action_url: '/hr?tab=timeoff',
             }), { excludeUserId: userId });
         } catch { /* best-effort */ }
         return json({ absence: data }, 201);
@@ -412,7 +412,7 @@ Deno.serve(withApiLogging('hr-api', async (req) => {
               start_date: (data as any).start_date, end_date: (data as any).end_date,
               title: `Absence ${newStatus}: ${nm}`,
               body: `Your ${(data as any).absence_type} leave was ${newStatus}.`,
-              action_url: '/hr?tab=absences',
+              action_url: '/hr?tab=timeoff',
             });
           }
         } catch { /* best-effort */ }
