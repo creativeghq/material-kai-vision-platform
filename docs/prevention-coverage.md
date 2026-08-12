@@ -368,7 +368,20 @@ is a genuine *backstop* rather than a restatement of the constraint.
   happen to pick"). Re-keyed on the shape. **Broadening it immediately surfaced two live violations
   the narrow rule had been missing for as long as it existed** — `generate_order_from_quote` and
   `materialize_upstream_orders`, both minting invoice `subtotal_net` / `vat_amount` / `total`
-  straight from the cached `quotes` columns. Both open findings.
+  straight from the cached `quotes` columns.
+
+  **Resolved the same day.** `generate_order_from_quote` now reads `get_quote_totals` for BOTH the
+  order and the pre-invoice (it read the cache four times: order totals, invoice totals, and a
+  vat_rate hand-derived from cached vat/subtotal), and fails closed rather than falling back to the
+  cache — a wrong total is a valid `numeric`, so nothing downstream would raise. Verified by
+  corrupting the cached columns to 1/1/2 inside a rolled-back transaction and confirming the order
+  and invoice still came out at the derived 3000/720/3720.
+
+  `materialize_upstream_orders` was a FALSE POSITIVE and is now exempted by name with its reason:
+  it mints an inter-tier reseller invoice whose money is summed from item COSTS, reading the quote
+  only for currency and numbering. Exempted explicitly rather than by re-narrowing the pattern —
+  that would have silently restored the false negative which hid a live defect for months. The
+  exemption list may shrink, never grow without a reason written beside it.
 
 **Still unproven:** the remaining ~13 `critical` checks (catalog ×3, credits, embed,
 `finance.derived_doc_drift`, `finance.stock_bypasses_document_gate`, `ops.email_delivery_failing`,
