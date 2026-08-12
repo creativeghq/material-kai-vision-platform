@@ -18,6 +18,20 @@ export default {
 			fontFamily: {
 				sans: ['Averta', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
 				display: ['Aleo', 'Georgia', 'Times New Roman', 'serif'],
+				// Numerals + display metrics. The slab (Aleo) reads editorial at large
+				// sizes; instrumentation wants the grotesque.
+				metric: ['Averta', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+			},
+			fontSize: {
+				// Display tier — the platform previously topped out at text-4xl (36px),
+				// which is why page titles, card titles and body all sat in one band.
+				'metric-sm': ['1.75rem', { lineHeight: '0.92', letterSpacing: '-0.04em' }],
+				'metric-md': ['2.75rem', { lineHeight: '0.92', letterSpacing: '-0.04em' }],
+				'metric-lg': ['4rem', { lineHeight: '0.92', letterSpacing: '-0.04em' }],
+				'metric-xl': ['5.5rem', { lineHeight: '0.92', letterSpacing: '-0.045em' }],
+				'display-sm': ['2rem', { lineHeight: '1.05', letterSpacing: '-0.025em' }],
+				'display-md': ['2.75rem', { lineHeight: '1', letterSpacing: '-0.028em' }],
+				'display-lg': ['3.75rem', { lineHeight: '0.95', letterSpacing: '-0.03em' }],
 			},
 			colors: {
 				border: 'hsl(var(--border))',
@@ -83,6 +97,14 @@ export default {
 				info: {
 					DEFAULT: 'hsl(var(--info))',
 					foreground: 'hsl(var(--info-foreground))',
+				},
+				// The acid data accent. `--primary` has to stay legible as TEXT in both
+				// themes (1024 `text-primary` call sites cap how acid it can go in light
+				// mode); `vivid` is the uncapped FILL accent — meters, sparklines,
+				// positive deltas, the one primary CTA. Always near-black ink on top.
+				vivid: {
+					DEFAULT: 'hsl(var(--vivid))',
+					foreground: 'hsl(var(--vivid-foreground))',
 				},
 			},
 			borderRadius: {

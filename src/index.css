@@ -168,10 +168,29 @@ All colors MUST be HSL.
     --text-5xl: 3rem;      /* 48px */
     --text-6xl: 3.75rem;   /* 60px */
     --text-7xl: 4.5rem;    /* 72px */
+    --text-8xl: 6rem;      /* 96px */
+    --text-9xl: 8rem;      /* 128px */
+
+    /* ===== DISPLAY / METRIC TIER (2026 command-center redesign) =====
+       The platform had NO type tier above 36px, which is the single biggest
+       reason every screen read as flat: page titles (18px), card titles (16px)
+       and body (14px) all sat within one 4px band. These drive the oversized
+       two-tone numerals and hero headlines. */
+    --metric-sm:  1.75rem;  /* 28px — inline KPI inside a dense row */
+    --metric-md:  2.75rem;  /* 44px — standard stat tile */
+    --metric-lg:  4rem;     /* 64px — hero KPI */
+    --metric-xl:  5.5rem;   /* 88px — single-focus number */
+    --display-sm: 2rem;     /* 32px — page title */
+    --display-md: 2.75rem;  /* 44px — section hero */
+    --display-lg: 3.75rem;  /* 60px — page hero headline */
 
     /* ===== FONT FAMILY ===== */
     --font-sans: 'Averta', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     --font-display: 'Aleo', Georgia, 'Times New Roman', serif;
+    /* Numerals and display metrics use the grotesque (Averta), never the slab —
+       a slab serif at 88px reads editorial, not instrumental. Averta ships
+       100-900 self-hosted, so the weight contrast costs no extra network. */
+    --font-metric: 'Averta', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
     /* ===== FONT WEIGHTS (Open Sans - Complete Range) ===== */
     --font-light: 300;     /* Light */
@@ -183,41 +202,43 @@ All colors MUST be HSL.
 
     /* ===== DARK THEME COLOR SYSTEM ===== */
     /* Main Background - Near black */
-    --background: 258 22% 5%;   /* #0a090e — deep plum-black command center */
-    --foreground: 280 15% 93%;  /* warm near-white ink */
+    --background: 80 7% 4%;     /* #0a0b09 — near-black with a faint olive cast */
+    --foreground: 75 8% 94%;    /* cool near-white ink */
 
     /* Page container */
-    --page-background: 258 22% 5%;
+    --page-background: 80 7% 4%;
 
     /* Content sections/cards — elevation ladder step 1 */
-    --card: 266 22% 8%;         /* #141019 */
-    --card-foreground: 280 15% 93%;
+    --card: 80 6% 7%;           /* #121310 */
+    --card-foreground: 75 8% 94%;
 
-    --popover: 262 24% 12%;     /* #1b1626 — elevated */
-    --popover-foreground: 280 15% 93%;
+    --popover: 80 6% 11%;       /* #1c1e19 — elevated */
+    --popover-foreground: 75 8% 94%;
 
-    /* Primary — brightened magenta-plum (flat brand accent) */
-    --primary: 335 74% 60%;     /* #e64c8c */
-    --primary-foreground: 0 0% 100%;
+    /* Primary — ACID LIME. On the near-black page this clears ~15:1 as text AND
+       works as a fill, so the 1024 existing `text-primary` call sites stay
+       legible. Its foreground flips to near-black ink (never white). */
+    --primary: 74 89% 55%;      /* #c2f231 */
+    --primary-foreground: 80 45% 6%;  /* near-black ink ON lime fills */
 
     /* Brand gradient (plum) — reserved for IDENTITY surfaces only (PageHeader,
        logo, hero). No longer painted on every bg-primary fill; buttons, active
        tabs and nav now use the flat --primary accent. */
-    --brand-blue: 300 45% 30%;
-    --brand-red: 335 74% 60%;
-    --brand-gradient: linear-gradient(135deg, #3a1230 0%, #7a2456 46%, #c93d84 100%);
+    --brand-blue: 160 60% 26%;
+    --brand-red: 74 89% 55%;
+    --brand-gradient: linear-gradient(135deg, #10331c 0%, #3f7a24 46%, #c2f231 100%);
 
     /* Secondary — elevation ladder step 3 (recessed) */
-    --secondary: 262 24% 15%;  /* #241d31 */
+    --secondary: 80 6% 13%;  /* #212319 */
     --secondary-foreground: 0 0% 85%;
 
     /* Muted */
-    --muted: 262 24% 15%;
-    --muted-foreground: 258 14% 60%;  /* violet-grey */
+    --muted: 80 6% 13%;
+    --muted-foreground: 75 7% 60%;  /* neutral grey-olive */
 
-    /* Accent — subtle plum-tinted hover surface */
-    --accent: 280 22% 16%;
-    --accent-foreground: 300 40% 88%;
+    /* Accent — subtle olive-tinted hover surface */
+    --accent: 78 10% 15%;
+    --accent-foreground: 74 40% 88%;
 
     /* Amber - Vibrant warm highlight */
     --amber: 32 100% 65%;       /* Slightly toned amber */
@@ -229,18 +250,20 @@ All colors MUST be HSL.
     --destructive-foreground: 0 0% 100%;  /* White text */
 
     /* Borders - Subtle white borders */
-    --border: 260 16% 18%;
-    --input: 260 16% 18%;
-    --ring: 335 74% 60%;  /* Focus ring — magenta accent */
+    --border: 80 7% 15%;
+    --input: 80 7% 15%;
+    --ring: 74 89% 55%;  /* Focus ring — acid lime */
 
-    --radius: 0.5rem;  /* 8px */
+    /* 8px -> 16px. Tailwind derives rounded-md/-sm from this, so the whole app
+       moves to the softer 2026 geometry in one token. Pills stay --radius-full. */
+    --radius: 1rem;  /* 16px */
 
     /* Sidebar/TopNav - Dark theme */
-    --sidebar-background: 264 22% 7%;  /* rail — slightly lifted from bg */
-    --sidebar-foreground: 258 12% 60%;
-    --sidebar-accent: 335 74% 60%;  /* magenta active */
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 260 16% 18%;
+    --sidebar-background: 80 7% 6%;  /* rail — slightly lifted from bg */
+    --sidebar-foreground: 75 7% 60%;
+    --sidebar-accent: 74 89% 55%;  /* lime active */
+    --sidebar-accent-foreground: 80 45% 6%;
+    --sidebar-border: 80 7% 15%;
 
     /* Hero section background */
     --hero-background: 0 0% 11%;  /* Same as card */
@@ -290,12 +313,13 @@ All colors MUST be HSL.
     --info-foreground: 0 0% 100%;
     --info-bg: 210 60% 12%;  /* Dark blue bg */
 
-    /* Chart colors - Vibrant on dark */
-    --chart-1: 142 60% 50%;    /* Green */
-    --chart-2: 210 80% 55%;    /* Blue */
-    --chart-3: 271 70% 60%;    /* Purple */
-    --chart-4: 32 100% 65%;    /* Amber */
-    --chart-5: 349 80% 58%;    /* Red */
+    /* Chart colors — lime leads, then graphite/teal supports. Both reference
+       dashboards run ONE vivid hue against neutrals rather than a rainbow. */
+    --chart-1: 74 89% 55%;     /* Acid lime — the series that matters */
+    --chart-2: 75 6% 72%;      /* Light graphite */
+    --chart-3: 165 55% 45%;    /* Teal */
+    --chart-4: 32 95% 60%;     /* Amber — exceptions only */
+    --chart-5: 350 75% 58%;    /* Rose — negative only */
 
     /* Badge color system - Dark theme */
     --badge-pending-bg: 45 60% 12%;
@@ -323,13 +347,49 @@ All colors MUST be HSL.
     --badge-draft-border: 0 0% 25%;
 
     /* ===== GLASSMORPHISM SYSTEM (Dark) ===== */
-    --glass-background: rgba(255, 255, 255, 0.05);
+    --glass-background: rgba(255, 255, 255, 0.045);
     --glass-blur: 12px;
     --glass-border: rgba(255, 255, 255, 0.08);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 
     /* ===== REFINED SHADOWS (Dark) ===== */
     --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.4), 0 5px 20px -5px rgba(0, 0, 0, 0.3);
+
+    /* ========================================
+       2026 REDESIGN TOKENS (shared shape, per-theme colour)
+       ======================================== */
+
+    /* --- VIVID: the acid data accent -------------------------------------
+       `--primary` has to stay legible as TEXT in both themes (1024 call sites),
+       which caps how acid it can go in light mode. `--vivid` is the uncapped
+       fill accent: identical in both themes, ALWAYS on near-black ink, and
+       reserved for data ornament — meters, sparklines, positive deltas, the
+       active pill, the one primary CTA on a screen. Never body text. */
+    --vivid: 74 89% 55%;              /* #c2f231 */
+    --vivid-foreground: 80 45% 6%;    /* near-black ink on vivid fills */
+    --vivid-soft: 74 89% 55% / 0.14;  /* tint wash for chips + tracks */
+
+    /* --- Elevation ladder: recessed -> flush -> raised -> floating --------
+       Replaces "every surface is the same glass panel". A recessed panel groups
+       tiles; a raised card holds one idea; floating is for the hero. */
+    --elev-recess: inset 0 1px 2px rgba(0,0,0,0.4);
+    --elev-flat:   0 1px 2px rgba(0,0,0,0.25);
+    --elev-raise:  0 4px 16px -4px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05);
+    --elev-float:  0 24px 60px -18px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.07);
+    --surface-recess: rgba(255,255,255,0.028);
+
+    /* --- Mesh gradient: the ONE loud surface per screen -------------------
+       Both references keep exactly one saturated blurred-mesh panel and let
+       everything else stay quiet. Four blobs composited as radial gradients. */
+    --mesh-1: 74 89% 55%;    /* lime */
+    --mesh-2: 165 70% 45%;   /* teal */
+    --mesh-3: 258 70% 60%;   /* violet */
+    --mesh-4: 28 90% 58%;    /* amber */
+    --mesh-ink: 0 0% 100%;
+
+    /* --- Hatch: the "last period" comparison bar fill --------------------- */
+    --hatch-color: rgba(255,255,255,0.16);
+    --hatch-bg: rgba(255,255,255,0.035);
   }
 
 .dark {
@@ -361,9 +421,12 @@ All colors MUST be HSL.
     --popover: 48 30% 98%;
     --popover-foreground: 46 14% 21%;
 
-    /* Primary — muted khaki-olive (quiet-luxury); darkened to 37% L so white text
-       clears WCAG AA (≥4.5:1) in fills and the assistant chat bubble. */
-    --primary: 56 24% 37%;           /* #6b6842 — white text ~4.9:1 */
+    /* Primary — DEEP LIME. Same hue family as the dark theme's acid accent but
+       dropped to 24% L: acid lime as text on cream is ~1.4:1 and unreadable, and
+       `text-primary` has 1024 call sites. At 24% it clears AA as text on the oat
+       page (~8:1) AND takes white text as a fill. The acid pop in light mode
+       comes from `--vivid` on small deliberate fills, exactly as ClientIQ does. */
+    --primary: 74 72% 22%;           /* #47610f */
     --primary-foreground: 0 0% 100%;
 
     /* Secondary — warm sand, deeper than cards (active-nav pill tone) */
@@ -387,18 +450,18 @@ All colors MUST be HSL.
     --destructive: 12 51% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Olive brand gradient for identity surfaces (light) */
-    --brand-gradient: linear-gradient(135deg, #4a4726 0%, #65623c 46%, #8f8c5a 100%);
+    /* Lime brand gradient for identity surfaces (light) */
+    --brand-gradient: linear-gradient(135deg, #2c4008 0%, #4f7a15 46%, #9fd42a 100%);
 
     /* Borders / inputs — warm olive-grey lines */
     --border: 46 18% 82%;
     --input: 46 18% 83%;
-    --ring: 56 24% 37%;
+    --ring: 74 72% 22%;
 
     /* Sidebar / TopNav — ivory bar, olive active */
     --sidebar-background: 48 30% 97%;
     --sidebar-foreground: 48 12% 40%;
-    --sidebar-accent: 56 24% 37%;
+    --sidebar-accent: 74 72% 22%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 46 18% 82%;
 
@@ -446,12 +509,12 @@ All colors MUST be HSL.
     --info-foreground: 0 0% 100%;
     --info-bg: 210 85% 94%;
 
-    /* Chart colors — slightly deepened for contrast on light */
-    --chart-1: 142 60% 40%;
-    --chart-2: 210 80% 48%;
-    --chart-3: 271 60% 52%;
-    --chart-4: 32 90% 48%;
-    --chart-5: 349 72% 52%;
+    /* Chart colors — lime leads, graphite/teal support (deepened for light) */
+    --chart-1: 74 72% 30%;
+    --chart-2: 48 8% 45%;
+    --chart-3: 165 60% 32%;
+    --chart-4: 32 90% 42%;
+    --chart-5: 349 72% 48%;
 
     /* Badge color system — pale tint bg, deep text */
     --badge-pending-bg: 45 90% 90%;
@@ -488,6 +551,28 @@ All colors MUST be HSL.
 
     /* ===== REFINED SHADOWS (Light) ===== */
     --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.14), 0 5px 20px -5px rgba(0, 0, 0, 0.08);
+
+    /* ===== 2026 REDESIGN TOKENS (light) ===== */
+    /* Vivid is deliberately IDENTICAL to dark — the acid lime chip/meter/pill
+       reads the same in both modes because it always carries near-black ink. */
+    --vivid: 74 89% 55%;
+    --vivid-foreground: 80 45% 6%;
+    --vivid-soft: 74 89% 40% / 0.20;
+
+    --elev-recess: inset 0 1px 2px rgba(0,0,0,0.05);
+    --elev-flat:   0 1px 2px rgba(0,0,0,0.05);
+    --elev-raise:  0 4px 16px -4px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.6);
+    --elev-float:  0 24px 60px -18px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.7);
+    --surface-recess: rgba(60,55,30,0.045);
+
+    --mesh-1: 74 85% 52%;
+    --mesh-2: 165 65% 48%;
+    --mesh-3: 258 65% 62%;
+    --mesh-4: 28 88% 60%;
+    --mesh-ink: 0 0% 100%;
+
+    --hatch-color: rgba(60,55,30,0.20);
+    --hatch-bg: rgba(60,55,30,0.045);
   }
 
   /* ========================================
@@ -539,6 +624,16 @@ All colors MUST be HSL.
     --card-gradient-end: 214 30% 96%;
 
     --brand-gradient: linear-gradient(135deg, #0f2547 0%, #1c5091 46%, #2f6fed 100%);
+
+    /* Keep the data accent in-family — a lime meter inside the blue skin reads
+       as a bug, not a highlight. */
+    --vivid: 212 90% 52%;
+    --vivid-foreground: 0 0% 100%;
+    --vivid-soft: 212 90% 45% / 0.16;
+    --mesh-1: 212 90% 55%;
+    --mesh-2: 190 75% 50%;
+    --mesh-3: 258 70% 62%;
+    --mesh-4: 28 88% 60%;
   }
 
   /* Blue — DARK theme. Shifts the plum-black command center to a deep navy-black
@@ -576,6 +671,14 @@ All colors MUST be HSL.
     --sidebar-border: 217 25% 18%;
 
     --hero-background: 220 34% 9%;
+
+    --vivid: 212 90% 58%;
+    --vivid-foreground: 220 45% 8%;
+    --vivid-soft: 212 90% 58% / 0.16;
+    --mesh-1: 212 90% 58%;
+    --mesh-2: 190 75% 52%;
+    --mesh-3: 258 70% 62%;
+    --mesh-4: 28 88% 60%;
   }
 }
 
@@ -603,6 +706,11 @@ All colors MUST be HSL.
     letter-spacing: -0.01em;
   }
 
+  /* Optical tracking: the larger a heading gets, the tighter it needs to set.
+     Without this a 60px title looks loose and unresolved next to a 44px metric. */
+  h1 { letter-spacing: -0.025em; }
+  h2 { letter-spacing: -0.02em; }
+
   strong, b {
     font-weight: var(--font-medium);  /* Medium weight for emphasis (500) */
   }
@@ -611,28 +719,35 @@ All colors MUST be HSL.
     font-weight: var(--font-normal);  /* Regular weight for body text */
   }
 
-  /* ===== GLOBAL LIGHTER FONT WEIGHT OVERRIDES ===== */
-  /* Make all bold/semibold/medium classes lighter across the entire app */
-  /* This ensures consistency without changing every component manually */
+  /* ===== GLOBAL FONT WEIGHT COMPRESSION (relaxed 2026-08-12) =====
+     These rules used to flatten EVERY emphasis class to 300/400, so the whole
+     app rendered inside a single 300-400 weight band — no `font-bold` anywhere
+     could actually be bold. Combined with a type scale that topped out at 18px
+     for page titles, that is the mechanical reason every screen read as flat.
+
+     They are RELAXED one notch rather than deleted: deleting them would snap
+     866 `font-semibold` and 331 `font-bold` call sites straight to 600/700 in a
+     single commit. One notch restores real hierarchy while keeping the platform's
+     light character. Revert this block alone to restore the old flatness. */
 
   .font-black {
-    font-weight: var(--font-light) !important;  /* 300 instead of 900 */
+    font-weight: 700 !important;  /* was 300 */
   }
 
   .font-extrabold {
-    font-weight: var(--font-light) !important;  /* 300 instead of 800 */
+    font-weight: 700 !important;  /* was 300 */
   }
 
   .font-bold {
-    font-weight: var(--font-light) !important;  /* 300 instead of 700 */
+    font-weight: var(--font-semibold) !important;  /* 600 — was 300 */
   }
 
   .font-semibold {
-    font-weight: var(--font-normal) !important;  /* 400 instead of 600 */
+    font-weight: var(--font-medium) !important;  /* 500 — was 400 */
   }
 
   .font-medium {
-    font-weight: var(--font-normal) !important;  /* 400 instead of 500 */
+    font-weight: var(--font-medium) !important;  /* 500 — was 400 */
   }
 
   /* Hide number input spinners - we use custom +/- buttons instead */
@@ -1485,6 +1600,285 @@ html.light .msg-assistant [class*="border-white"] { border-color: hsl(var(--bord
 html.light .msg-assistant a { color: hsl(var(--primary)); }
 
 /* ============================================================
+   2026 COMMAND-CENTER LANGUAGE
+   ------------------------------------------------------------
+   The vocabulary the redesign is built from. Every class here is
+   theme-token driven, so light/dark/blue all inherit for free.
+   ============================================================ */
+@layer components {
+
+  /* --- MICRO LABEL -----------------------------------------------------
+     The tiny uppercase caption that sits ABOVE a metric. This is what makes a
+     big number read as instrumentation rather than decoration. */
+  .micro-label {
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;          /* 11px */
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  /* --- METRIC ----------------------------------------------------------
+     Oversized numerals. Averta (grotesque) not Aleo (slab) — a slab at 88px
+     reads editorial, not instrumental. Tabular figures so digits do not jitter
+     as values refresh. The !important weights are deliberate: they have to beat
+     the global .font-* compression in the base layer. */
+  .metric {
+    font-family: var(--font-metric);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1, 'lnum' 1;
+    letter-spacing: -0.04em;
+    line-height: 0.92;
+    color: hsl(var(--foreground));
+    display: inline-flex;
+    align-items: baseline;
+    white-space: nowrap;
+  }
+  .metric-sm { font-size: var(--metric-sm); font-weight: 600 !important; }
+  .metric-md { font-size: var(--metric-md); font-weight: 500 !important; }
+  .metric-lg { font-size: var(--metric-lg); font-weight: 400 !important; }
+  .metric-xl { font-size: var(--metric-xl); font-weight: 300 !important; }
+
+  /* The trailing group of a two-tone numeral (decimals / thousands) drops to a
+     muted tone so the eye lands on the magnitude first — straight from the
+     Business Central reference ("$ 23,876" with 876 in grey). */
+  .metric-trail { color: hsl(var(--muted-foreground)); font-weight: inherit; }
+
+  /* The currency mark / unit rides small and high, never at numeral size. */
+  .metric-affix {
+    font-size: 0.42em;
+    font-weight: 500 !important;
+    color: hsl(var(--muted-foreground));
+    letter-spacing: 0;
+    align-self: flex-start;
+    padding-top: 0.35em;
+  }
+
+  /* --- DISPLAY HEADLINE ------------------------------------------------ */
+  .display-hero {
+    font-family: var(--font-display);
+    font-size: var(--display-lg);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    font-weight: 700 !important;
+  }
+  .display-page {
+    font-family: var(--font-display);
+    font-size: var(--display-sm);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    font-weight: 700 !important;
+  }
+
+  /* --- ELEVATION SURFACES ---------------------------------------------
+     Replaces "every surface is the same glass panel". A recessed panel GROUPS
+     tiles; a raised card holds ONE idea. That distinction is the hierarchy the
+     old system never had. */
+  .surface-recessed {
+    background: var(--surface-recess);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--elev-recess);
+    border: 1px solid transparent;
+  }
+  .surface-raised {
+    background: hsl(var(--card));
+    border-radius: var(--radius-xl);
+    box-shadow: var(--elev-raise);
+    border: 1px solid hsl(var(--border) / 0.6);
+  }
+  .surface-float {
+    background: hsl(var(--card));
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--elev-float);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  /* --- MESH CARD -------------------------------------------------------
+     The ONE loud surface per screen. Four blurred radial blobs over a base
+     tint, exactly the "Insights" panel in the reference. Keep it to a single
+     instance per view or it stops being a focal point. */
+  .mesh-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-radius: var(--radius-2xl);
+    background-color: hsl(var(--mesh-3) / 0.9);
+    background-image:
+      radial-gradient(120% 90% at 8% 8%,    hsl(var(--mesh-4) / 0.95), transparent 55%),
+      radial-gradient(110% 85% at 92% 4%,   hsl(var(--mesh-1) / 0.85), transparent 58%),
+      radial-gradient(120% 95% at 78% 96%,  hsl(var(--mesh-2) / 0.90), transparent 60%),
+      radial-gradient(130% 100% at 15% 92%, hsl(var(--mesh-3) / 0.95), transparent 62%);
+    color: hsl(var(--mesh-ink));
+    box-shadow: var(--elev-float);
+  }
+
+  /* A soft dark scrim over the lower half only, so white copy stays legible
+     wherever the blobs happen to land bright. */
+  .mesh-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(180deg, transparent 35%, rgba(0, 0, 0, 0.28) 100%);
+    pointer-events: none;
+  }
+
+  /* --- HATCH BAR -------------------------------------------------------
+     The striped "last period" bar that a solid "this period" bar is compared
+     against. Diagonal stripes read as historic/inactive without a legend. */
+  .hatch-bar {
+    background-color: var(--hatch-bg);
+    background-image: repeating-linear-gradient(
+      -45deg,
+      var(--hatch-color) 0 1px,
+      transparent 1px 6px
+    );
+    border-radius: var(--radius-sm);
+  }
+
+  /* --- CIRCLE ACTION ---------------------------------------------------
+     The round "open this" affordance in a card corner. */
+  .circle-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-full);
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--muted-foreground));
+    background: transparent;
+    transition: var(--transition-smooth);
+    flex-shrink: 0;
+  }
+  .circle-action:hover {
+    background: hsl(var(--vivid));
+    border-color: hsl(var(--vivid));
+    color: hsl(var(--vivid-foreground));
+    transform: rotate(45deg);
+  }
+
+  /* --- PILL ACTION -----------------------------------------------------
+     The outlined "+ Sales Quote" quick-action row. */
+  .pill-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem 0.5rem 0.6rem;
+    border-radius: var(--radius-full);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card) / 0.6);
+    color: hsl(var(--foreground));
+    font-size: var(--text-sm);
+    line-height: 1;
+    white-space: nowrap;
+    transition: var(--transition-smooth);
+  }
+  .pill-action:hover {
+    border-color: hsl(var(--vivid));
+    background: hsl(var(--vivid) / 0.10);
+  }
+
+  /* --- DELTA CHIP ------------------------------------------------------
+     The small +2 / -12% marker riding beside a metric. */
+  .delta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: var(--radius-full);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.35;
+    font-variant-numeric: tabular-nums;
+  }
+  .delta-up   { background: hsl(var(--vivid) / 0.18); color: hsl(var(--vivid)); }
+  .delta-down { background: hsl(var(--error) / 0.16); color: hsl(var(--error)); }
+  .delta-flat { background: hsl(var(--muted));        color: hsl(var(--muted-foreground)); }
+
+  /* In light mode the acid lime is too pale to read as text on its own tint,
+     so the chip borrows the deep-lime primary for its ink. */
+  html.light .delta-up { background: hsl(var(--vivid) / 0.30); color: hsl(var(--primary)); }
+
+  /* --- METER -----------------------------------------------------------
+     The track + fill + dot marker under a KPI (the ClientIQ pattern). */
+  .meter-track {
+    position: relative;
+    height: 4px;
+    border-radius: var(--radius-full);
+    background: hsl(var(--muted-foreground) / 0.18);
+    overflow: visible;
+  }
+  .meter-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: var(--radius-full);
+    background: hsl(var(--vivid));
+  }
+  .meter-dot {
+    position: absolute;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: hsl(var(--foreground));
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 3px hsl(var(--card));
+  }
+
+  /* --- FOLDER TAB ------------------------------------------------------
+     The notched section tab from the reference: the tab and the panel share one
+     surface, joined by a concave corner. The ::after mask carves the inverse
+     radius; because the tab and the panel are both translucent over the same
+     page ground, the rendered colours match exactly. */
+  .tab-notch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 1.5rem 0.85rem 1.5rem;
+    background: var(--surface-recess);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+  .tab-notch::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 100%;
+    width: 18px;
+    height: 18px;
+    background: var(--surface-recess);
+    -webkit-mask: radial-gradient(circle 18px at 100% 0, transparent 0 18px, #000 18px);
+            mask: radial-gradient(circle 18px at 100% 0, transparent 0 18px, #000 18px);
+    pointer-events: none;
+  }
+  .tab-notch-panel {
+    background: var(--surface-recess);
+    border-radius: 0 var(--radius-xl) var(--radius-xl) var(--radius-xl);
+    box-shadow: var(--elev-recess);
+  }
+
+  /* --- VIVID FILL ------------------------------------------------------
+     The single loud control on a screen (primary CTA, active pill). Always
+     near-black ink on acid lime — never white. */
+  .vivid-fill {
+    background: hsl(var(--vivid));
+    color: hsl(var(--vivid-foreground));
+    border-color: hsl(var(--vivid));
+  }
+  .vivid-fill:hover { background: hsl(var(--vivid) / 0.88); }
+
+  /* Sparkline stroke colours, so the SVG component stays token-driven. */
+  .spark-stroke { stroke: hsl(var(--foreground)); }
+  .spark-stroke-vivid { stroke: hsl(var(--vivid)); }
+}
+
+/* ============================================================
    BRAND GRADIENT ON PRIMARY FILLS — global
    ------------------------------------------------------------
    Every solid `bg-primary` fill (primary buttons, active tabs,
@@ -1503,8 +1897,8 @@ html.light .msg-assistant a { color: hsl(var(--primary)); }
    APP ATMOSPHERE — command-center depth behind every page.
    A fixed brand-aurora mesh + film grain sit over the solid body
    ground and below all page content (main is relative z-10). The
-   aurora is driven by --primary so it adapts per theme: a magenta
-   glow on the plum-black dark ground, a soft olive glow on cream.
+   aurora is driven by --primary so it adapts per theme: an acid-lime
+   glow on the near-black dark ground, a deep-lime glow on cream.
    ============================================================ */
 .app-aurora {
   position: fixed;
