@@ -299,9 +299,11 @@ export const RoomPlannerPanel: React.FC = () => {
     } catch { void loadLayouts(); }
   };
 
-  // Model URLs, fetched once per set of products in the layout — not per item, and not per frame.
+  // Image + model URLs, fetched once per set of products in the layout — not per item, and not per
+  // frame. The bail-out clears BOTH maps: this effect owns them together, and clearing only the
+  // models left the previous layout's photos in state for the next one to draw from.
   useEffect(() => {
-    if (!activeWorkspaceId || items.length === 0) { setModelUrls(new Map()); return; }
+    if (!activeWorkspaceId || items.length === 0) { setImageUrls(new Map()); setModelUrls(new Map()); return; }
     let cancelled = false;
     roomPlannerService.imageUrlsForProducts(activeWorkspaceId, items.map((i) => i.product_id))
       .then((m) => { if (!cancelled) setImageUrls(m); })
