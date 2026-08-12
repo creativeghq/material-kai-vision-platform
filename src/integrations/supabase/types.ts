@@ -35996,6 +35996,10 @@ export type Database = {
           unique_users: number
         }[]
       }
+      campaign_materialize_recipients: {
+        Args: { p_campaign_id: string }
+        Returns: number
+      }
       cancel_stock_count: { Args: { p_count_id: string }; Returns: undefined }
       capture_counterparty_snapshot: {
         Args: { p_company_id: string; p_contact_id: string }
@@ -39156,6 +39160,7 @@ export type Database = {
               statement: string
             }[]
           }
+      person_merge_vars: { Args: { p_display_name: string }; Returns: Json }
       plpgsql_check_pragma: { Args: { name: string[] }; Returns: number }
       plpgsql_check_profiler: { Args: { enable?: boolean }; Returns: boolean }
       plpgsql_check_tracer: {
@@ -39868,6 +39873,18 @@ export type Database = {
       resolve_brand_company: {
         Args: { p_name: string; p_workspace_id: string }
         Returns: string
+      }
+      resolve_campaign_audience: {
+        Args: { p_audience: Json; p_workspace_id: string }
+        Returns: {
+          crm_company_id: string
+          crm_contact_id: string
+          display_name: string
+          email: string
+          member_kind: string
+          merge_vars: Json
+          user_id: string
+        }[]
       }
       resolve_embedding_backfill_entities: {
         Args: { p_deficiency: string; p_entity_type: string; p_ids: string[] }

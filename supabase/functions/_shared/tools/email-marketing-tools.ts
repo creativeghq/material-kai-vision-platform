@@ -161,27 +161,17 @@ export const createManageEmailCampaignTool = (
           return JSON.stringify({ success: false, error: `only draft/paused campaigns can be sent (this one is "${camp.status}")` });
         }
 
-        // Resolve the audience now (membership-guarded RPC → needs the user client). Include BOTH
-        // the category members AND any manual_emails on the campaign (the Email page sends both;
-        // dropping manual_emails here silently under-sent the campaign). Dedupe by email.
-        const categoryIds: string[] = Array.isArray(camp.audience_filter?.category_ids) ? camp.audience_filter.category_ids : [];
-        const manualEmails: string[] = Array.isArray(camp.audience_filter?.manual_emails) ? camp.audience_filter.manual_emails : [];
+        // Resolve the audience through the ONE derivation the pages use — every source, deduped by
+        // address, unsubscribes dropped. Membership-guarded, so it needs the user client. This tool
+        // used to rebuild that union by hand and shipped for a while dropping manual_emails
+        // outright; the count in the approval card is now the count that gets materialized.
         const usb = userClient(jwt);
-        const byEmail = new Map<string, { email: string; crm_contact_id: string | null; display_name: string | null }>();
-        if (categoryIds.length) {
-          const { data } = await usb.rpc('crm_categories_resolve_recipients_ws', { p_workspace_id: workspaceId, p_category_ids: categoryIds });
-          for (const r of (Array.isArray(data) ? data : []) as any[]) {
-            const e = String(r?.email ?? '').trim().toLowerCase();
-            if (!e || byEmail.has(e)) continue;
-            byEmail.set(e, { email: r.email, crm_contact_id: r.crm_contact_id ?? null, display_name: r.display_name ?? null });
-          }
-        }
-        for (const em of manualEmails) {
-          const e = String(em ?? '').trim().toLowerCase();
-          if (!e || byEmail.has(e)) continue;
-          byEmail.set(e, { email: em, crm_contact_id: null, display_name: null });
-        }
-        const recipients = [...byEmail.values()];
+        const { data: resolved, error: resolveErr } = await usb.rpc('resolve_campaign_audience', {
+          p_workspace_id: workspaceId,
+          p_audience: camp.audience_filter ?? {},
+        });
+        if (resolveErr) return JSON.stringify({ success: false, error: `audience resolve failed: ${resolveErr.message}` });
+        const recipients = (Array.isArray(resolved) ? resolved : []) as { email: string }[];
         if (recipients.length === 0) {
           return JSON.stringify({ success: false, error: 'This campaign resolves to 0 recipients — set an audience on the Email page before sending.' });
         }
@@ -201,28 +191,15 @@ export const createManageEmailCampaignTool = (
           return JSON.stringify({ success: true, awaiting_confirmation: true, recipient_count: recipients.length, message: 'Awaiting the user\'s approval to send. Do not retry.' });
         }
 
-        // Confirmed → insert recipients (dedupe safety: only if none yet) + flip to sending (cron sends).
-        const { count: existing } = await sb.from('campaign_recipients').select('id', { count: 'exact', head: true }).eq('campaign_id', campaign_id);
-        if (!existing) {
-          const nameVars = (dn: string | null | undefined) => {
-            const full = (dn || '').trim();
-            if (!full) return {};
-            const parts = full.split(/\s+/);
-            return { fullName: full, firstName: parts[0], lastName: parts.length > 1 ? parts.slice(1).join(' ') : '' };
-          };
-          const rows = recipients.map((r: any) => ({
-            campaign_id, email: r.email, contact_id: r.crm_contact_id ?? null,
-            variables: nameVars(r.display_name), status: 'pending',
-          }));
-          for (let i = 0; i < rows.length; i += 500) {
-            const { error: recErr } = await sb.from('campaign_recipients').insert(rows.slice(i, i + 500));
-            if (recErr) return JSON.stringify({ success: false, error: `recipient insert failed: ${recErr.message}` });
-          }
-        }
-        const { error: upErr } = await sb.from('campaigns').update({ status: 'sending', recipient_count: recipients.length }).eq('id', campaign_id).eq('workspace_id', workspaceId);
+        // Confirmed → materialize + flip to sending (cron sends). Materialization is the same RPC
+        // the pages call: idempotent, merge vars built in SQL, recipient_count refreshed there.
+        const { data: materialized, error: matErr } = await usb.rpc('campaign_materialize_recipients', { p_campaign_id: campaign_id });
+        if (matErr) return JSON.stringify({ success: false, error: `recipient materialization failed: ${matErr.message}` });
+        const recipientCount = (materialized as number) ?? 0;
+        const { error: upErr } = await sb.from('campaigns').update({ status: 'sending' }).eq('id', campaign_id).eq('workspace_id', workspaceId);
         if (upErr) return JSON.stringify({ success: false, error: upErr.message });
-        onChunk?.({ type: 'email_campaign_sent', campaign_id, name: camp.name, recipient_count: recipients.length, timestamp: Date.now() });
-        return JSON.stringify({ success: true, sent: true, campaign_id, recipient_count: recipients.length });
+        onChunk?.({ type: 'email_campaign_sent', campaign_id, name: camp.name, recipient_count: recipientCount, timestamp: Date.now() });
+        return JSON.stringify({ success: true, sent: true, campaign_id, recipient_count: recipientCount });
       }
 
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });

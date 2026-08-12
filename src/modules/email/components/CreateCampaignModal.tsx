@@ -1,6 +1,13 @@
 /**
  * Create Campaign Modal
- * Form to create a new email campaign
+ * Form to create a new email campaign.
+ *
+ * The audience radio is a WRITER for the one canonical audience shape (`CampaignAudience`); the
+ * resolve and the recipient insert both happen in SQL. This page used to store its own
+ * `{ type, emails, recipients }` variant in the same jsonb column and materialize recipients with a
+ * private copy of the logic — so a campaign created here resolved to zero recipients everywhere
+ * else, its "estimate" counted rows the send would not use, an address held by both a user and a
+ * contact was emailed twice, and no recipient ever got merge vars.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -14,6 +21,8 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Badge } from '@/components/core/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { marketingService, type CampaignAudience } from '@/modules/email-marketing/services/marketingService';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 
@@ -83,6 +92,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
   const [loadingRecipients, setLoadingRecipients] = useState(false);
 
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
 
   useEffect(() => {
     loadTemplates();
@@ -145,47 +155,36 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
     }
   };
 
+  /** The audience radio, expressed as the one canonical shape the resolver reads. */
+  const buildAudience = (): CampaignAudience => {
+    const t = formData.audience_type;
+    return {
+      category_ids: [],
+      manual_emails: t === 'specific'
+        ? formData.specific_emails.split('\n').map(e => e.trim()).filter(Boolean)
+        : [],
+      contact_ids: t === 'selected'
+        ? selectedRecipients.filter(r => r.type === 'contact').map(r => r.id)
+        : [],
+      member_user_ids: t === 'selected'
+        ? selectedRecipients.filter(r => r.type === 'user').map(r => r.id)
+        : [],
+      include_all_contacts: t === 'all_contacts' || t === 'both',
+      include_all_members: t === 'all_users' || t === 'both',
+    };
+  };
+
+  /** Estimate = the real resolve. Counting the source tables by hand is how the estimate came to
+   *  disagree with the send: it double-counted an address held by both a user and a contact, never
+   *  dropped unsubscribes, and counted every tenant's users rather than this workspace's. */
   const estimateAudience = async () => {
+    if (!activeWorkspaceId) { setEstimatedRecipients(0); return; }
     try {
-      let count = 0;
-
-      if (formData.audience_type === 'all_users') {
-        const { count: userCount, error } = await supabase
-          .from('user_profiles')
-          .select('*', { count: 'exact', head: true });
-
-        if (error) throw error;
-        count = userCount || 0;
-      } else if (formData.audience_type === 'all_contacts') {
-        const { count: contactCount, error } = await supabase
-          .from('crm_contacts')
-          .select('*', { count: 'exact', head: true });
-
-        if (error) throw error;
-        count = contactCount || 0;
-      } else if (formData.audience_type === 'both') {
-        const [usersResult, contactsResult] = await Promise.all([
-          supabase.from('user_profiles').select('*', { count: 'exact', head: true }),
-          supabase.from('crm_contacts').select('*', { count: 'exact', head: true }),
-        ]);
-
-        if (usersResult.error) throw usersResult.error;
-        if (contactsResult.error) throw contactsResult.error;
-
-        count = (usersResult.count || 0) + (contactsResult.count || 0);
-      } else if (formData.audience_type === 'specific') {
-        const emails = formData.specific_emails
-          .split('\n')
-          .map(e => e.trim())
-          .filter(e => e.length > 0);
-        count = emails.length;
-      } else if (formData.audience_type === 'selected') {
-        count = selectedRecipients.length;
-      }
-
-      setEstimatedRecipients(count);
+      const rows = await marketingService.resolveAudience(activeWorkspaceId, buildAudience());
+      setEstimatedRecipients(rows.length);
     } catch (error) {
       console.error('Error estimating audience:', error);
+      setEstimatedRecipients(0);
     }
   };
 
@@ -244,21 +243,6 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
 
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Prepare audience filter
-      let audienceFilter: any = { type: formData.audience_type };
-      if (formData.audience_type === 'specific') {
-        audienceFilter.emails = formData.specific_emails
-          .split('\n')
-          .map(e => e.trim())
-          .filter(e => e.length > 0);
-      } else if (formData.audience_type === 'selected') {
-        audienceFilter.recipients = selectedRecipients.map(r => ({
-          id: r.id,
-          email: r.email,
-          type: r.type,
-        }));
-      }
-
       // Determine status based on schedule
       const status = formData.schedule_type === 'now' ? 'draft' : 'scheduled';
       const scheduledAt = formData.schedule_type === 'later' ? formData.scheduled_at : null;
@@ -266,6 +250,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
       const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
         .insert({
+          workspace_id: activeWorkspaceId,
           name: formData.name,
           description: formData.description || null,
           template_id: formData.template_id,
@@ -274,7 +259,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
           from_name: formData.from_name || null,
           from_email: formData.from_email || null,
           reply_to: formData.reply_to || null,
-          audience_filter: audienceFilter,
+          audience_filter: buildAudience() as unknown as never,
           status: status,
           scheduled_at: scheduledAt,
           created_by: user?.id,
@@ -284,8 +269,8 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
 
       if (campaignError) throw campaignError;
 
-      // Create campaign recipients
-      await createCampaignRecipients(campaign.id);
+      // Materialize through the shared derivation — the same rows the estimate showed.
+      await marketingService.ensureRecipients(campaign.id);
 
       toast({
         title: 'Success',
@@ -302,90 +287,6 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const createCampaignRecipients = async (campaignId: string) => {
-    try {
-      let recipients: { email: string; user_id?: string; contact_id?: string }[] = [];
-
-      if (formData.audience_type === 'all_users') {
-        // Get all users
-        const { data: users, error } = await supabase
-          .from('user_profiles')
-          .select('user_id, email:users(email)');
-
-        if (error) throw error;
-        recipients = users?.map((u: any) => ({
-          email: u.email?.email || '',
-          user_id: u.user_id,
-        })).filter((r: any) => r.email) || [];
-      } else if (formData.audience_type === 'all_contacts') {
-        // Get all contacts
-        const { data: contacts, error } = await supabase
-          .from('crm_contacts')
-          .select('id, email');
-
-        if (error) throw error;
-        recipients = contacts?.map(c => ({
-          email: c.email,
-          contact_id: c.id,
-        })) || [];
-      } else if (formData.audience_type === 'both') {
-        // Get both users and contacts
-        const [usersResult, contactsResult] = await Promise.all([
-          supabase.from('user_profiles').select('user_id, email:users(email)'),
-          supabase.from('crm_contacts').select('id, email'),
-        ]);
-
-        if (usersResult.error) throw usersResult.error;
-        if (contactsResult.error) throw contactsResult.error;
-
-        const userRecipients = usersResult.data?.map((u: any) => ({
-          email: u.email?.email || '',
-          user_id: u.user_id,
-        })).filter((r: any) => r.email) || [];
-
-        const contactRecipients = contactsResult.data?.map(c => ({
-          email: c.email,
-          contact_id: c.id,
-        })) || [];
-
-        recipients = [...userRecipients, ...contactRecipients];
-      } else if (formData.audience_type === 'selected') {
-        // Use selected recipients
-        recipients = selectedRecipients.map(r => ({
-          email: r.email,
-          user_id: r.type === 'user' ? r.id : undefined,
-          contact_id: r.type === 'contact' ? r.id : undefined,
-        }));
-      } else if (formData.audience_type === 'specific') {
-        // Parse specific emails
-        const emails = formData.specific_emails
-          .split('\n')
-          .map(e => e.trim())
-          .filter(e => e.length > 0);
-
-        recipients = emails.map(email => ({ email }));
-      }
-
-      // Insert recipients
-      const recipientRecords = recipients.map(r => ({
-        campaign_id: campaignId,
-        email: r.email,
-        user_id: r.user_id || null,
-        contact_id: r.contact_id || null,
-        status: 'pending',
-      }));
-
-      const { error } = await supabase
-        .from('campaign_recipients')
-        .insert(recipientRecords);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error creating recipients:', error);
-      throw error;
     }
   };
 

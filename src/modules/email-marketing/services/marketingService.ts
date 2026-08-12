@@ -2,11 +2,14 @@
  * Email Marketing service — workspace-scoped campaigns + templates for the tenant module.
  *
  * All reads/writes carry the active workspace_id; RLS (is_workspace_member) enforces tenancy.
- * Audience resolution goes through the membership-guarded crm_categories_resolve_recipients_ws RPC.
+ * Audience resolution and recipient materialization go through resolve_campaign_audience /
+ * campaign_materialize_recipients — the single SQL derivation of "who does this campaign go to".
+ * SQL derives, this file formats; do not rebuild the union/dedupe here.
  * Sends are driven by the campaign-processor cron via email-api with strict BYOK — nothing here
  * calls Resend directly.
  */
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { edgeError } from '@/utils/edgeError';
 
 export type CampaignStatus =
@@ -52,6 +55,21 @@ export interface AudienceRecipient {
   crm_contact_id: string | null;
   crm_company_id: string | null;
   display_name: string | null;
+}
+
+/**
+ * What a campaign is addressed to — stored verbatim as `campaigns.audience_filter` and resolved by
+ * `resolve_campaign_audience`. This is the ONLY audience shape; the admin page's old
+ * `{ type, emails, recipients }` variant is retired (two schemas in one jsonb column meant a
+ * campaign created on one page resolved to zero recipients on the other).
+ */
+export interface CampaignAudience {
+  category_ids: string[];
+  manual_emails: string[];
+  contact_ids?: string[];
+  member_user_ids?: string[];
+  include_all_contacts?: boolean;
+  include_all_members?: boolean;
 }
 
 function randomSlugSuffix(): string {
@@ -112,36 +130,19 @@ class MarketingService {
     return (data || []) as CrmCategory[];
   }
 
-  async resolveAudience(workspaceId: string, categoryIds: string[]): Promise<AudienceRecipient[]> {
-    if (!categoryIds.length) return [];
-    const { data, error } = await supabase.rpc('crm_categories_resolve_recipients_ws', {
+  /**
+   * THE audience read. One RPC resolves every source (category members, whole-contact-book,
+   * workspace members, hand-picked records, typed addresses), deduped by address, unsubscribe-
+   * suppressed and workspace-scoped — so the preview a user approves is exactly the row set that
+   * gets materialized. Never union or de-dupe audience sources in TypeScript.
+   */
+  async resolveAudience(workspaceId: string, audience: CampaignAudience): Promise<AudienceRecipient[]> {
+    const { data, error } = await supabase.rpc('resolve_campaign_audience', {
       p_workspace_id: workspaceId,
-      p_category_ids: categoryIds,
+      p_audience: audience as unknown as Json,
     });
     if (error) throw error;
     return (data || []) as AudienceRecipient[];
-  }
-
-  /** All CRM contacts in the workspace that have an email — the full addressable audience, not just
-   *  category members. crm_contacts is workspace-RLS-scoped, so a direct select is safe + tenant-correct. */
-  async listContacts(workspaceId: string): Promise<AudienceRecipient[]> {
-    const { data, error } = await supabase
-      .from('crm_contacts')
-      .select('crm_contact_id:id, email, display_name:name')
-      .eq('workspace_id', workspaceId)
-      .not('email', 'is', null)
-      .neq('email', '')
-      .order('name', { ascending: true })
-      .limit(5000);
-    if (error) throw error;
-    // Normalize + de-dupe by email (a workspace can hold the same address on multiple contact rows).
-    const byEmail = new Map<string, AudienceRecipient>();
-    for (const r of (data || []) as any[]) {
-      const email = String(r.email).trim().toLowerCase();
-      if (!email || byEmail.has(email)) continue;
-      byEmail.set(email, { email, member_kind: 'crm_contact', crm_contact_id: r.crm_contact_id, crm_company_id: null, display_name: r.display_name });
-    }
-    return [...byEmail.values()];
   }
 
   // ── Campaigns ──────────────────────────────────────────────────────────────
@@ -169,8 +170,7 @@ class MarketingService {
       template_id: string;
       subject_line?: string;
       preview_text?: string;
-      audience: { category_ids: string[]; manual_emails: string[] };
-      recipients: AudienceRecipient[];
+      audience: CampaignAudience;
       schedule: 'now' | 'draft' | 'later';
       scheduled_at?: string | null;
     },
@@ -191,10 +191,10 @@ class MarketingService {
         template_id: input.template_id,
         subject_line: input.subject_line?.trim() || null,
         preview_text: input.preview_text?.trim() || null,
-        audience_filter: { category_ids: input.audience.category_ids, manual_emails: input.audience.manual_emails },
+        audience_filter: input.audience as unknown as Json,
         status,
         scheduled_at: scheduledAt,
-        recipient_count: input.recipients.length,
+        recipient_count: 0,
         created_by: user?.id ?? null,
       })
       .select('id')
@@ -202,23 +202,9 @@ class MarketingService {
     if (campErr) throw campErr;
 
     const campaignId = campaign.id as string;
-
-    if (input.recipients.length) {
-      const rows = input.recipients.map((r) => ({
-        campaign_id: campaignId,
-        email: r.email,
-        contact_id: r.crm_contact_id ?? null,
-        variables: this.nameVars(r.display_name),
-        status: 'pending',
-      }));
-      // Chunk to keep the insert payload reasonable for large audiences.
-      const CHUNK = 500;
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        const { error: recErr } = await supabase.from('campaign_recipients').insert(rows.slice(i, i + CHUNK));
-        if (recErr) throw recErr;
-      }
-    }
-
+    // Materialize from the stored filter, not from a client-built list: the two can disagree, and
+    // when they did the campaign sent to whatever the page happened to be holding.
+    await this.ensureRecipients(campaignId);
     return campaignId;
   }
 
@@ -230,43 +216,14 @@ class MarketingService {
     if (error) throw error;
   }
 
-  /** Merge-vars for one recipient — fullName plus first/last split (templates use all three; the
-   *  send path only ever set fullName, so {{firstName}}/{{lastName}} rendered blank). */
-  private nameVars(displayName: string | null | undefined): Record<string, string> {
-    const full = (displayName || '').trim();
-    if (!full) return {};
-    const parts = full.split(/\s+/);
-    return { fullName: full, firstName: parts[0], lastName: parts.length > 1 ? parts.slice(1).join(' ') : '' };
-  }
-
-  /** Ensure a campaign has recipient rows before it sends. Agent-created drafts (and any campaign
-   *  whose recipients weren't materialized at create time) have none — the page's "send" was just a
-   *  status flip, so the processor found 0 pending and marked it `sent` with nobody emailed. Resolve
-   *  from the campaign's own audience_filter (category members + manual_emails, deduped) exactly like
-   *  the create modal + the agent tool, so the three paths agree. Returns the recipient count. */
+  /** Ensure a campaign has recipient rows before it sends, from its OWN stored audience_filter.
+   *  Idempotent and additive — safe to call on every create and every start. Agent-created drafts
+   *  used to reach the processor with no rows at all, so "send" was a status flip that emailed
+   *  nobody; that is why this exists. Returns the recipient count. */
   async ensureRecipients(campaignId: string): Promise<number> {
-    const { count } = await supabase.from('campaign_recipients').select('id', { count: 'exact', head: true }).eq('campaign_id', campaignId);
-    if ((count ?? 0) > 0) return count ?? 0;
-    const { data: camp } = await supabase.from('campaigns').select('workspace_id, audience_filter').eq('id', campaignId).maybeSingle();
-    if (!camp) return 0;
-    const af = ((camp as any).audience_filter || {}) as { category_ids?: string[]; manual_emails?: string[] };
-    const categoryIds = Array.isArray(af.category_ids) ? af.category_ids : [];
-    const manualEmails = Array.isArray(af.manual_emails) ? af.manual_emails : [];
-    const byEmail = new Map<string, AudienceRecipient>();
-    if (categoryIds.length) {
-      const cats = await this.resolveAudience((camp as any).workspace_id, categoryIds);
-      for (const r of cats) { const e = String(r.email ?? '').trim().toLowerCase(); if (!e || byEmail.has(e)) continue; byEmail.set(e, r); }
-    }
-    for (const em of manualEmails) { const e = String(em ?? '').trim().toLowerCase(); if (!e || byEmail.has(e)) continue; byEmail.set(e, { email: em, member_kind: 'manual', crm_contact_id: null, crm_company_id: null, display_name: null }); }
-    const recipients = [...byEmail.values()];
-    if (recipients.length === 0) return 0;
-    const rows = recipients.map((r) => ({ campaign_id: campaignId, email: r.email, contact_id: r.crm_contact_id ?? null, variables: this.nameVars(r.display_name), status: 'pending' }));
-    for (let i = 0; i < rows.length; i += 500) {
-      const { error } = await supabase.from('campaign_recipients').insert(rows.slice(i, i + 500));
-      if (error) throw error;
-    }
-    await supabase.from('campaigns').update({ recipient_count: recipients.length }).eq('id', campaignId);
-    return recipients.length;
+    const { data, error } = await supabase.rpc('campaign_materialize_recipients', { p_campaign_id: campaignId });
+    if (error) throw error;
+    return (data as number) ?? 0;
   }
 
   async startCampaign(id: string) {

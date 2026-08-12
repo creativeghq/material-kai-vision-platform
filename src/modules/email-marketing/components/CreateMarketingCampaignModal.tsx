@@ -1,6 +1,7 @@
 /**
- * Create a workspace-scoped email campaign. Audience = CRM categories (resolved via the
- * membership-guarded RPC) + optional manual emails. Recipients are de-duped by email before insert.
+ * Create a workspace-scoped email campaign. The audience is DESCRIBED here and RESOLVED in SQL:
+ * `resolve_campaign_audience` unions the sources, de-dupes by address and drops unsubscribes, so the
+ * count shown is the row set that will actually be materialized. Do not merge sources here.
  * Sending is BYOK-only, so "Send now" is disabled until the workspace Resend is configured.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -15,7 +16,7 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
-import { marketingService, type CrmCategory, type MarketingTemplate, type AudienceRecipient } from '../services/marketingService';
+import { marketingService, type CampaignAudience, type CrmCategory, type MarketingTemplate, type AudienceRecipient } from '../services/marketingService';
 
 interface Props {
   workspaceId: string;
@@ -34,7 +35,6 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
   const [manualEmails, setManualEmails] = useState('');
   const [resolved, setResolved] = useState<AudienceRecipient[]>([]);
   const [resolving, setResolving] = useState(false);
-  const [contacts, setContacts] = useState<AudienceRecipient[]>([]);
   const [includeAllContacts, setIncludeAllContacts] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -51,16 +51,14 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
   useEffect(() => {
     (async () => {
       // Load independently — a failure in one source (e.g. a categories RPC hiccup) must not blank
-      // the others (templates / the full contacts list).
-      const [tpls, cats, cts] = await Promise.allSettled([
+      // the other.
+      const [tpls, cats] = await Promise.allSettled([
         marketingService.listTemplates(workspaceId),
         marketingService.listCategories(),
-        marketingService.listContacts(workspaceId),
       ]);
       if (tpls.status === 'fulfilled') setTemplates(tpls.value.filter((t) => t.is_active));
       if (cats.status === 'fulfilled') setCategories(cats.value);
-      if (cts.status === 'fulfilled') setContacts(cts.value);
-      const failed = [tpls, cats, cts].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+      const failed = [tpls, cats].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
       if (failed) {
         console.error('[email-marketing] audience load partial failure:', failed.reason);
         toast({ title: 'Some audience data failed to load', description: failed.reason?.message || 'Try reopening the dialog.', variant: 'destructive' });
@@ -69,14 +67,28 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
 
-  // Resolve CRM-category recipients whenever the selection changes.
+  const manualList = useMemo(
+    () => manualEmails.split(/[\n,]/).map((e) => e.trim().toLowerCase()).filter((e) => EMAIL_RE.test(e)),
+    [manualEmails],
+  );
+
+  // The audience as it will be STORED on the campaign — the same object the resolver reads at send
+  // time, so the preview cannot disagree with the send.
+  const audience = useMemo<CampaignAudience>(
+    () => ({ category_ids: selectedCategoryIds, manual_emails: manualList, include_all_contacts: includeAllContacts }),
+    [selectedCategoryIds, manualList, includeAllContacts],
+  );
+  const audienceIsEmpty = !selectedCategoryIds.length && !manualList.length && !includeAllContacts;
+
+  // Preview = one resolve of the whole audience. Union, de-dupe by address and unsubscribe
+  // suppression all live in SQL; this component only renders the answer.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!selectedCategoryIds.length) { setResolved([]); return; }
+      if (audienceIsEmpty) { setResolved([]); return; }
       setResolving(true);
       try {
-        const r = await marketingService.resolveAudience(workspaceId, selectedCategoryIds);
+        const r = await marketingService.resolveAudience(workspaceId, audience);
         if (!cancelled) setResolved(r);
       } catch (e: any) {
         if (!cancelled) { setResolved([]); toast({ title: 'Error', description: e?.message || 'Failed to resolve audience', variant: 'destructive' }); }
@@ -86,23 +98,7 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategoryIds, workspaceId]);
-
-  const manualList = useMemo(
-    () => manualEmails.split(/[\n,]/).map((e) => e.trim().toLowerCase()).filter((e) => EMAIL_RE.test(e)),
-    [manualEmails],
-  );
-
-  // Merge all-contacts + category members + manual, de-dupe by email.
-  const finalRecipients = useMemo<AudienceRecipient[]>(() => {
-    const byEmail = new Map<string, AudienceRecipient>();
-    if (includeAllContacts) for (const c of contacts) byEmail.set(c.email.toLowerCase(), c);
-    for (const r of resolved) byEmail.set(r.email.toLowerCase(), r);
-    for (const e of manualList) {
-      if (!byEmail.has(e)) byEmail.set(e, { email: e, member_kind: null, crm_contact_id: null, crm_company_id: null, display_name: null });
-    }
-    return [...byEmail.values()];
-  }, [includeAllContacts, contacts, resolved, manualList]);
+  }, [audience, audienceIsEmpty, workspaceId]);
 
   const toggleCategory = (id: string) => {
     setSelectedCategoryIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
@@ -111,7 +107,7 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
   const submit = async () => {
     if (!form.name.trim()) { toast({ title: 'Campaign name is required', variant: 'destructive' }); return; }
     if (!form.template_id) { toast({ title: 'Select a template', variant: 'destructive' }); return; }
-    if (finalRecipients.length === 0) { toast({ title: 'Add at least one recipient', variant: 'destructive' }); return; }
+    if (resolved.length === 0) { toast({ title: 'Add at least one recipient', variant: 'destructive' }); return; }
     if (form.schedule === 'later' && !form.scheduled_at) { toast({ title: 'Pick a send time', variant: 'destructive' }); return; }
     if ((form.schedule === 'now' || form.schedule === 'later') && !byokReady) {
       toast({ title: 'Resend not configured', description: 'Configure your workspace Resend account before sending.', variant: 'destructive' });
@@ -126,8 +122,7 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
         template_id: form.template_id,
         subject_line: form.subject_line,
         preview_text: form.preview_text,
-        audience: { category_ids: selectedCategoryIds, manual_emails: manualList },
-        recipients: finalRecipients,
+        audience,
         schedule: form.schedule,
         scheduled_at: form.schedule === 'later' ? new Date(form.scheduled_at).toISOString() : null,
       });
@@ -148,7 +143,7 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
         <Tabs defaultValue="details" className="w-full">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="audience"><Users className="h-4 w-4 mr-2" /> Audience ({finalRecipients.length})</TabsTrigger>
+            <TabsTrigger value="audience"><Users className="h-4 w-4 mr-2" /> Audience ({resolved.length})</TabsTrigger>
             <TabsTrigger value="schedule"><Calendar className="h-4 w-4 mr-2" /> Schedule</TabsTrigger>
           </TabsList>
 
@@ -184,7 +179,7 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
           {/* Audience */}
           <TabsContent value="audience" className="space-y-4">
             <div className="p-3 rounded-lg border bg-muted/50 text-sm">
-              <span className="font-medium">{finalRecipients.length}</span> unique recipient{finalRecipients.length === 1 ? '' : 's'}
+              <span className="font-medium">{resolved.length}</span> unique recipient{resolved.length === 1 ? '' : 's'}
               {resolving && <span className="text-muted-foreground"> · resolving…</span>}
             </div>
 
@@ -194,7 +189,7 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
               <div className="flex-1">
                 <p className="text-sm font-medium">All CRM contacts with an email</p>
                 <p className="text-xs text-muted-foreground">
-                  {contacts.length > 0 ? `${contacts.length} contact${contacts.length === 1 ? '' : 's'} in this workspace` : 'No CRM contacts with an email yet'}
+                  Every contact in this workspace that has an email address
                 </p>
               </div>
             </label>

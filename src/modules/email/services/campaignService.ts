@@ -159,23 +159,6 @@ class CampaignService {
   }
 
   /**
-   * Add recipients to a campaign
-   */
-  async addRecipients(campaignId: string, emails: string[]): Promise<void> {
-    const recipients = emails.map(email => ({
-      campaign_id: campaignId,
-      email: email.trim(),
-      status: 'pending',
-    }));
-
-    const { error } = await supabase
-      .from('campaign_recipients')
-      .insert(recipients);
-
-    if (error) throw error;
-  }
-
-  /**
    * Remove a recipient from a campaign
    */
   async removeRecipient(recipientId: string): Promise<void> {
