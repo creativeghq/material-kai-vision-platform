@@ -25,7 +25,7 @@
   product-id="YOUR-PRODUCT-ID"&gt;
 &lt;/materialkai-product&gt;</code></pre>
 
-  <p>That renders the product in 3D with orbit controls, an <strong>AR button</strong> on phones that support it, its price, and — if the product has configurable options — swatches that repaint the model and update the price as they're picked.</p>
+  <p>That renders the product in 3D with orbit controls, an <strong>AR button on Android</strong> (Scene Viewer, straight from the <code>.glb</code>; iPhones get the 3D viewer without an AR button), its price, and — if the product has configurable options — swatches that repaint the model and update the price as they're picked.</p>
 
   <div class="table-wrap"><table>
     <thead><tr><th>Attribute</th><th>What it does</th></tr></thead>
@@ -119,8 +119,7 @@
   <h2>What you need first</h2>
   <ul class="feat">
     <li>A product <strong>published to your online store</strong> — that's the same switch the storefront uses.</li>
-    <li>A <strong>3D model</strong> uploaded to that product, if you want 3D rather than a photo. We read its real-world size straight from the file.</li>
-    <li>A <strong>USDZ</strong> as well, for AR on iPhones and iPads. Android AR works from the same glb.</li>
+    <li>A <strong>3D model</strong> (a <code>.glb</code>) uploaded to that product, if you want 3D rather than a photo. We read its real-world size straight from the file. The same file drives <strong>AR on Android</strong> (Scene Viewer) — no separate AR file is needed.</li>
     <li><strong>Options</strong> on the product, if you want configurable finishes.</li>
   </ul>
   <p>Without a model the widget falls back to the product's photo, so it's still worth embedding before your 3D work is finished.</p>
