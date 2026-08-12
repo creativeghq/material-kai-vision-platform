@@ -245,6 +245,12 @@ export const createSEOResearchKeywordTool = (
           ...(effectiveDomain ? ['domain_snapshot'] : []),
         ],
         limit_per_type: limit_per_type ?? 5,
+        // WHOSE research this is. The stateless path has no tracked-subject row for MIVAA to read
+        // an owner off, so without this the DataForSEO Labs spend it triggers lands in
+        // `ai_usage_logs` with no workspace — invisible to per-tenant cost views and to that
+        // table's own `is_workspace_admin(workspace_id)` policy. Sent from the session's
+        // workspace, never from anything the model supplied.
+        workspace_id: ctx?.workspaceId ?? undefined,
       });
 
       if (!r.ok) {
