@@ -2,34 +2,20 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-/** Elevation is the hierarchy the old system lacked: every surface was the same
- *  glass panel, so a grouping container, a single-idea card and a hero all read
- *  identically. `glass` stays the default so the 307 existing call sites are
- *  unchanged in kind — only sharpened. */
-export type CardElevation = 'glass' | 'flat' | 'raised' | 'float';
-
-const ELEVATION_SHADOW: Record<CardElevation, string> = {
-  glass: 'var(--glass-shadow), inset 0 1px 0 rgba(255,255,255,0.045)',
-  flat: 'var(--elev-flat)',
-  raised: 'var(--elev-raise)',
-  float: 'var(--elev-float)',
-};
-
 const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { elevation?: CardElevation }
->(({ className, style, elevation = 'glass', ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, style, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      'gradient-border rounded-[1.25rem] transition-all duration-300',
+      'gradient-border rounded-2xl transition-all duration-300',
       className,
     )}
     style={{
-      background: elevation === 'glass' ? 'var(--glass-background)' : 'hsl(var(--card))',
-      backdropFilter: elevation === 'glass' ? 'blur(var(--glass-blur))' : undefined,
+      background: 'var(--glass-background)',
+      backdropFilter: 'blur(var(--glass-blur))',
       border: '1px solid transparent',
-      boxShadow: ELEVATION_SHADOW[elevation],
       ...style,
     }}
     {...props}
