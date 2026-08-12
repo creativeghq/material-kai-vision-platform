@@ -352,7 +352,7 @@ const MyOfficeImpl: React.FC = () => {
             for the typical set at that width, and anything longer scrolls. Still a
             constant per width: nothing the endpoint returns can change it. All three
             states (loading / pro-tip / resolved) occupy exactly this box. */}
-        <div className="h-[15.5rem] sm:h-[13.5rem] lg:h-[16.5rem] xl:h-[14.5rem] 2xl:h-[13.5rem] overflow-y-auto">
+        <div className="h-[15.5rem] sm:h-[13.5rem] lg:h-[16.5rem] xl:h-[14.5rem] 2xl:h-[13.5rem] scroll-y-clean">
           {insightsLoading ? (
             /* Shaped like a real insight row (icon chip + title + two-line body), not thin
                bars — a skeleton that doesn't match the row it stands in for is what let the

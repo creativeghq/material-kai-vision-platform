@@ -82,6 +82,26 @@ body {
 }
 
 /* Scrollbar class — applied on containers that need thin scrollbars */
+/* Vertical scroll with NO visible scrollbar chrome.
+   Two things are going on, and both matter:
+
+   1. `overflow-y: auto` alone is not enough. Per the CSS overflow spec, when one
+      axis is not `visible` the OTHER axis computes from `visible` to `auto` — so
+      a box with only `overflow-y: auto` set silently gets a horizontal scrollbar
+      too. That is the stray bar along the bottom of the insights panel; nothing
+      actually overflows sideways. `overflow-x: hidden` is the fix, not cosmetics.
+   2. The bars themselves are hidden the same way the tab strips do it
+      (`scrollbar-width` + the webkit pseudo-element), so the content still
+      scrolls by wheel, trackpad, touch and keyboard — only the chrome is gone. */
+.scroll-y-clean {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.scroll-y-clean::-webkit-scrollbar { display: none; }
+
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
