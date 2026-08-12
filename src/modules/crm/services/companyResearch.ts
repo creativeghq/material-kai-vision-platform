@@ -296,10 +296,17 @@ export async function researchCompany(opts: CompanyResearchOptions): Promise<Com
         fields = { ...fields, ...gemiFields(g, { ...base, ...fields }) };
         steps.push({ step: 'gemi', status: 'ok' });
       } else {
+        // "No ΓΕΜΗ record" is a NORMAL answer, not a failure. ΓΕΜΗ is the COMMERCIAL registry:
+        // free professionals (engineers, lawyers, doctors), many sole traders, and foreign
+        // companies whose VAT happens to be 9 digits are legitimately absent from it while ΑΑΔΕ
+        // answers fine. Reporting that as "ΓΕΜΗ failed" sends the operator hunting an outage
+        // that is not there — reserve `failed` for a key/network/HTTP fault they can act on.
+        const err = g as { ok?: boolean; error?: string; message?: string; http_status?: number };
+        const notInRegistry = ('ok' in g && g.ok) || err.error === 'gemi_not_found' || err.http_status === 404;
         steps.push({
           step: 'gemi',
-          status: 'ok' in g && g.ok ? 'skipped' : 'failed',
-          detail: 'ok' in g && g.ok ? 'Not found in ΓΕΜΗ' : ((g as { message?: string; error?: string }).message ?? (g as { error?: string }).error),
+          status: notInRegistry ? 'skipped' : 'failed',
+          detail: notInRegistry ? 'No registry record' : (err.message ?? err.error),
         });
       }
     } catch (e) {
@@ -367,6 +374,13 @@ export async function researchCompany(opts: CompanyResearchOptions): Promise<Com
 
 const STEP_LABEL: Record<ResearchStepName, string> = { aade: 'ΑΑΔΕ', gemi: 'ΓΕΜΗ', enrich: 'Business info' };
 
+/**
+ * Lowercase a detail so it reads mid-sentence — but only when it opens with an ordinary English
+ * word. A blanket `.toLowerCase()` also flattened the Greek acronyms the details are full of,
+ * printing "needs a 9-digit greek αφμ".
+ */
+const decapitalize = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
+
 /** `apollo (no APOLLO_API_KEY)` → `Apollo (not configured)` — a reason an operator can act on. */
 function providerLabel(raw: string): string {
   const m = raw.match(/^([^\s(]+)(?:\s*\(no ([A-Z0-9_]+)\))?/);
@@ -391,7 +405,7 @@ export function summarizeResearch(steps: ResearchStep[]): string {
     if (s.status === 'failed') {
       parts.push(`${STEP_LABEL[s.step]} failed${s.detail ? `: ${s.detail}` : ''}.`);
     } else if (s.status === 'skipped') {
-      parts.push(`${STEP_LABEL[s.step]} skipped${s.detail ? ` — ${s.detail.toLowerCase()}` : ''}.`);
+      parts.push(`${STEP_LABEL[s.step]} skipped${s.detail ? ` — ${decapitalize(s.detail)}` : ''}.`);
     }
   }
 

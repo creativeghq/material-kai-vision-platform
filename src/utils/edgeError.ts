@@ -41,9 +41,16 @@ export async function parseEdgeError(error: unknown, fallback = 'Request failed'
   try {
     const body = await anyErr?.context?.json?.();
     if (body) {
-      code = body.code;
+      // Across the edge functions `error` is the MACHINE code (`gemi_not_found`,
+      // `insufficient_credits`, `kiosk_disabled`) and `message` is the human sentence. Preferring
+      // `error` printed the slug at the operator and threw the sentence away — "ΓΕΜΗ failed:
+      // gemi_not_found" instead of "No ΓΕΜΗ record for this ΑΦΜ." A few functions instead put
+      // prose straight in `error` and carry no slug, so only step over `error` when it is
+      // slug-SHAPED; that keeps both conventions readable.
+      const slug = typeof body.error === 'string' && /^[a-z][a-z0-9_]*$/.test(body.error) ? body.error : undefined;
+      code = body.code ?? slug;
       module = body.module;
-      message = body.error ?? body.message;
+      message = slug ? (body.message ?? slug) : (body.error ?? body.message);
     }
   } catch {
     // body wasn't JSON (HTML 502, empty body, already-consumed) — fall through

@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { edgeErrorMessage } from '@/utils/edgeError';
+import { parseEdgeError } from '@/utils/edgeError';
 
 /**
  * ΓΕΜΗ (GEMI) OpenData client — Greek Commercial Registry enrichment.
@@ -63,7 +63,14 @@ export const gemiService = {
         reason: args.reason,
       },
     });
-    if (error) return { error: await edgeErrorMessage(error) };
+    // Keep the MACHINE code, not just a sentence: a caller must be able to tell "this ΑΦΜ has no
+    // ΓΕΜΗ record" — the normal answer for sole traders, free professionals and foreign VATs that
+    // happen to be 9 digits — apart from a real ΓΕΜΗ outage. `invoke` turns the 404 into `error`,
+    // so collapsing it to a bare string here is what made a not-found read as a failure.
+    if (error) {
+      const parsed = await parseEdgeError(error, 'ΓΕΜΗ lookup failed');
+      return { error: parsed.code ?? parsed.message, message: parsed.message, http_status: parsed.status };
+    }
     if (data?.error) return data as GemiLookupError;
     return data as GemiLookupResult;
   },
