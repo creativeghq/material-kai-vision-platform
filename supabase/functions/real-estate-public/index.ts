@@ -17,6 +17,7 @@ import { toPublic, matchesCriteria, estimateFromMedianPerSqm, withRentSettlement
 import { embedText } from '../_shared/real-estate-embedding.ts';
 import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
+import { recordPageEvent } from '../_shared/document-events.ts';
 
 
 /** RE T1-1 — per-IP throttle for the anonymous lead-capture writes. Returns a 429 Response when the
@@ -445,7 +446,14 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
         vrWorld = { splat_url_100k: w.splat_url_100k, splat_url_500k: w.splat_url_500k, splat_url_full: w.splat_url_full, panorama_url: w.panorama_url, caption: w.caption };
       }
     }
-    // Fire-and-forget view counter (never blocks the render).
+    // Delivery trail (the source the listing list reads) + the legacy counter the
+    // property UI still renders. Both fire-and-forget; neither blocks the render.
+    recordPageEvent(supabase, req, 'viewed', {
+      entityType: 'property_listing',
+      entityId: property.id,
+      workspaceId: property.workspace_id,
+      metadata: { surface: 'public_listing' },
+    }).catch(() => {});
     supabase.rpc('increment_property_view_count', { p_property_id: property.id }).then(() => {}, () => {});
     return json({ listing: toPublic(property), photos: signed, vr_world: vrWorld });
   }

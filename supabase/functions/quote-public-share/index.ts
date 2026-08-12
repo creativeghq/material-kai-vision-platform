@@ -19,6 +19,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
+import { recordPageEvent } from '../_shared/document-events.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -129,6 +130,16 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     });
     if (apprErr) return jsonResponse({ error: 'Failed to record approval' }, 500);
 
+    // Terminal outcome on the trail. Ranks above every view, so a signed quote
+    // shows "Accepted" in the list rather than "viewed 5x".
+    recordPageEvent(supabase, req, 'accepted', {
+      entityType: 'quote',
+      entityId: quote.id,
+      workspaceId: quote.workspace_id,
+      actorEmail: (typeof signer_email === 'string' && signer_email.trim()) ? signer_email.trim() : null,
+      metadata: { signer_name: signer_name.trim(), version_hash },
+    }).catch(() => {});
+
     if (quote.status !== 'accepted') {
       await supabase.from('quotes').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', quote.id);
       if (plan?.id) await supabase.from('project_plans').update({ status: 'approved' }).eq('id', plan.id);
@@ -191,6 +202,20 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   const sid = (typeof session_id === 'string' && session_id.length > 0)
     ? session_id
     : crypto.randomUUID();
+
+  // Delivery trail — the source the quote LIST reads. Bot filtering and the
+  // 30-minute collapse happen inside record_document_event, so a mail scanner
+  // following the share link no longer reads as the customer opening it.
+  recordPageEvent(supabase, req, eventType, {
+    entityType: 'quote',
+    entityId: quote.id,
+    workspaceId: quote.workspace_id,
+    metadata: { surface: 'public_share', session_id: sid },
+  }).catch(() => {});
+
+  // `quote_analytics_events` stays as the quote module's own funnel analytics
+  // (view_context, source_page, session stitching) — a different question from
+  // "did the customer open it", which now has exactly one answer.
   supabase
     .from('quote_analytics_events')
     .insert({

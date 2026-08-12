@@ -10,6 +10,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 // re-checked server-side at charge time; the client only expresses an intent.
 import { dispatchToProvider, resolveWorkspacePaymentProviders } from '../_shared/payments/registry.ts';
 import { ensureInvoiceRf } from '../_shared/payments/invoice-rf.ts';
+import { recordPageEvent } from '../_shared/document-events.ts';
 
 // Sales/Finance — create a Stripe Checkout session for an invoice.
 // Two entry modes:
@@ -284,6 +285,17 @@ Deno.serve(withApiLogging('finance-pay-invoice', async (req) => {
     const minAmount = Math.max(depositAmount ?? amountDue, MIN_CHARGE);
 
     if (pb.info_only) {
+      // Delivery trail: this branch IS the /pay/:token page render — the customer
+      // has the invoice open in front of them. Recorded here rather than on the
+      // checkout call, which is an intent to pay, not a view. Fire-and-forget: a
+      // failed analytics write must never stop someone paying an invoice.
+      recordPageEvent(supabase, req, 'viewed', {
+        entityType: 'invoice',
+        entityId: row.invoice_id,
+        workspaceId: row.workspace_id,
+        metadata: { internal_number: row.internal_number ?? null, surface: 'pay_link' },
+      }).catch(() => {});
+
       // Which providers can this seller actually charge with right now?
       // `configuredOnly` matters on a customer-facing surface: a buyer must never be
       // offered a method that cannot take their money.

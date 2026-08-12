@@ -14,6 +14,49 @@ import { authenticate, isAdminAccess, userCanAccessWorkspace, listUserWorkspaceI
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { notConfiguredResponse } from '../_shared/api-provider-errors.ts';
 import { resolveWorkspaceEmailSender, checkWorkspaceSendQuota } from '../_shared/email-sender.ts';
+import { recordEmailEvent, DOCUMENT_ENTITY_TYPES } from '../_shared/document-events.ts';
+import type { DocumentEntityType } from '../_shared/document-events.ts';
+
+/**
+ * Which document is this email about?
+ *
+ * Two accepted spellings, because the callers predate the delivery trail:
+ *  - explicit `entityType` / `entityId` on the request body (new callers), and
+ *  - the `tags` those callers already send — `{ feature:'invoice_email', invoice_id }`
+ *    from finance-send-invoice-email, `{ feature:'quotes', quote_id }` from
+ *    send-quote-email — so they gain a trail without being edited.
+ *
+ * An unrecognised type is dropped rather than passed through: it would violate
+ * email_logs_entity_type_check and take down the send itself, which is a far
+ * worse outcome than a missing trail.
+ */
+function resolveEntityLink(body: SendEmailRequest): { entityType: DocumentEntityType | null; entityId: string | null } {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const known = new Set<string>(DOCUMENT_ENTITY_TYPES);
+
+  let type = body.entityType ?? null;
+  let id = body.entityId ?? null;
+
+  if (!type || !id) {
+    const tags = body.tags ?? {};
+    // Ordered: the first tag that names a document wins. `statement` has no id of
+    // its own on the send (it is party-scoped), so it is resolved by the caller.
+    const TAG_KEYS: Array<[string, DocumentEntityType]> = [
+      ['invoice_id', 'invoice'],
+      ['quote_id', 'quote'],
+      ['contract_id', 'contract'],
+      ['order_id', 'order'],
+      ['catalog_id', 'catalog'],
+      ['property_id', 'property_listing'],
+    ];
+    for (const [key, mapped] of TAG_KEYS) {
+      if (tags[key]) { type = mapped; id = tags[key]; break; }
+    }
+  }
+
+  if (!type || !id || !known.has(type) || !UUID_RE.test(id)) return { entityType: null, entityId: null };
+  return { entityType: type as DocumentEntityType, entityId: id };
+}
 
 const resendApiKey = () => Deno.env.get('RESEND_API_KEY') || '';
 
@@ -36,6 +79,13 @@ interface SendEmailRequest {
   bcc?: string[];
   replyTo?: string;
   tags?: Record<string, string>;
+  /**
+   * Delivery trail (#delivery-trail): which document this email is about. Set
+   * these and the invoice/quote/contract list shows sent → delivered → opened
+   * for it. Falls back to the `tags` a caller already sends — see resolveEntityLink.
+   */
+  entityType?: DocumentEntityType;
+  entityId?: string;
   /**
    * The send CLASS, declared rather than inferred from which function happened to call
    * (#229 §6 / #342). `agent_reply` is an Inbox/assistant reply on an email thread: it must
@@ -563,6 +613,13 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         const replyTo = body.replyTo || sender.replyTo || undefined;
         const toAddresses = Array.isArray(body.to) ? body.to : [body.to];
 
+        // Delivery trail: accept the document link either as first-class fields
+        // or from the `tags` the existing senders already pass (finance-send-invoice-email
+        // sends `{ feature:'invoice_email', invoice_id }`), so those keep working
+        // unchanged. Validated against the registry — an unknown type would fail
+        // the email_logs CHECK and take the whole send down with it.
+        const { entityType, entityId } = resolveEntityLink(body);
+
         // Get domain for tracking
         const domain = fromEmail.split('@')[1];
         const { data: domainData } = await supabaseClient
@@ -591,6 +648,12 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             tags: body.tags || {},
             variables: body.variables || {},
             workspace_id: attributionWorkspaceId,
+            // Delivery trail: which document this email is about. Real columns,
+            // not a `tags` jsonb probe — the webhook fans provider events to
+            // document_events off this pair, and a list page joins on it.
+            // Both or neither (CHECK email_logs_entity_pair_check).
+            entity_type: entityType,
+            entity_id: entityId,
             // Server-to-server callers (Flows send_email, send-quote-email, price/
             // mention alerts, …) authenticate with the secret key and carry no user,
             // so auth.user is null. created_by is nullable for exactly these system
@@ -634,6 +697,28 @@ Deno.serve(withApiLogging('email-api', async (req) => {
           .from('email_logs')
           .update({ message_id: messageId, status: 'sent', sent_at: new Date().toISOString() })
           .eq('id', logData.id);
+
+        // Open the delivery trail. This is the ONLY event we can record ourselves —
+        // delivered/opened/clicked/bounced all arrive later from the webhook. Without
+        // it a document that was emailed but whose webhook never fired would read
+        // 'not_sent', which is the silent-zero shape this platform keeps hitting:
+        // the operator would re-send an invoice the customer already has.
+        if (entityType && entityId) {
+          await recordEmailEvent(supabaseClient, 'sent', {
+            entityType,
+            entityId,
+            workspaceId: attributionWorkspaceId,
+            // A send with no resolvable workspace still needs SOME tenancy or the
+            // row is unreadable by anyone (document_events_scope_ck / RLS). Fall
+            // back to the sender only when there is no workspace — setting both
+            // would leave the trail readable to someone later removed from it.
+            ownerUserId: attributionWorkspaceId ? null : (user?.id ?? null),
+            actorEmail: toAddresses[0],
+            actorUserId: user?.id ?? null,
+            emailLogId: logData.id,
+            metadata: { subject, email_type: body.emailType || 'transactional' },
+          });
+        }
 
         return new Response(
           JSON.stringify({ success: true, messageId, logId: logData.id }),

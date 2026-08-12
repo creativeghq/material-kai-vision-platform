@@ -269,6 +269,82 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_email_inbound_log: {
+        Row: {
+          created_at: string
+          dkim: string | null
+          dmarc: string | null
+          error: string | null
+          from_addr: string | null
+          id: string
+          matched_address_id: string | null
+          message_id: string | null
+          outcome: string
+          size_bytes: number | null
+          spf: string | null
+          storage_path: string | null
+          thread_id: string | null
+          to_addr: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          dkim?: string | null
+          dmarc?: string | null
+          error?: string | null
+          from_addr?: string | null
+          id?: string
+          matched_address_id?: string | null
+          message_id?: string | null
+          outcome: string
+          size_bytes?: number | null
+          spf?: string | null
+          storage_path?: string | null
+          thread_id?: string | null
+          to_addr?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          dkim?: string | null
+          dmarc?: string | null
+          error?: string | null
+          from_addr?: string | null
+          id?: string
+          matched_address_id?: string | null
+          message_id?: string | null
+          outcome?: string
+          size_bytes?: number | null
+          spf?: string | null
+          storage_path?: string | null
+          thread_id?: string | null
+          to_addr?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_email_inbound_log_matched_address_id_fkey"
+            columns: ["matched_address_id"]
+            isOneToOne: false
+            referencedRelation: "user_email_addresses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_email_inbound_log_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_email_inbound_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_inbox_messages: {
         Row: {
           channel: string
@@ -308,33 +384,63 @@ export type Database = {
         Row: {
           agent_id: string
           content: string
+          content_hash: string | null
           conversation_id: string | null
           created_at: string
+          embedding: unknown
+          embedding_model: string | null
+          expires_at: string | null
           id: string
+          last_recalled_at: string | null
           memory_type: string
           metadata: Json | null
+          provenance: Json
+          recall_count: number
+          superseded_at: string | null
+          superseded_by: string | null
+          updated_at: string
           user_id: string
           workspace_id: string
         }
         Insert: {
           agent_id: string
           content: string
+          content_hash?: string | null
           conversation_id?: string | null
           created_at?: string
+          embedding?: unknown
+          embedding_model?: string | null
+          expires_at?: string | null
           id?: string
+          last_recalled_at?: string | null
           memory_type: string
           metadata?: Json | null
+          provenance?: Json
+          recall_count?: number
+          superseded_at?: string | null
+          superseded_by?: string | null
+          updated_at?: string
           user_id: string
           workspace_id: string
         }
         Update: {
           agent_id?: string
           content?: string
+          content_hash?: string | null
           conversation_id?: string | null
           created_at?: string
+          embedding?: unknown
+          embedding_model?: string | null
+          expires_at?: string | null
           id?: string
+          last_recalled_at?: string | null
           memory_type?: string
           metadata?: Json | null
+          provenance?: Json
+          recall_count?: number
+          superseded_at?: string | null
+          superseded_by?: string | null
+          updated_at?: string
           user_id?: string
           workspace_id?: string
         }
@@ -344,6 +450,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "agent_chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_memories_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "agent_memories"
             referencedColumns: ["id"]
           },
         ]
@@ -1887,6 +2000,7 @@ export type Database = {
           blueprint_id: string
           created_at: string
           default_quantity: number
+          default_selected: boolean
           id: string
           is_allowance: boolean
           kind: string
@@ -1913,6 +2027,7 @@ export type Database = {
           blueprint_id: string
           created_at?: string
           default_quantity?: number
+          default_selected?: boolean
           id?: string
           is_allowance?: boolean
           kind?: string
@@ -1939,6 +2054,7 @@ export type Database = {
           blueprint_id?: string
           created_at?: string
           default_quantity?: number
+          default_selected?: boolean
           id?: string
           is_allowance?: boolean
           kind?: string
@@ -4798,6 +4914,7 @@ export type Database = {
           rehomed_at: string | null
           rehomed_from_workspace_id: string | null
           responsible_sales_user_ids: string[]
+          search_fold: string | null
           state: string | null
           street: string | null
           street_number: string | null
@@ -4877,6 +4994,7 @@ export type Database = {
           rehomed_at?: string | null
           rehomed_from_workspace_id?: string | null
           responsible_sales_user_ids?: string[]
+          search_fold?: string | null
           state?: string | null
           street?: string | null
           street_number?: string | null
@@ -4956,6 +5074,7 @@ export type Database = {
           rehomed_at?: string | null
           rehomed_from_workspace_id?: string | null
           responsible_sales_user_ids?: string[]
+          search_fold?: string | null
           state?: string | null
           street?: string | null
           street_number?: string | null
@@ -5135,6 +5254,7 @@ export type Database = {
           rehomed_at: string | null
           rehomed_from_workspace_id: string | null
           responsible_sales_user_ids: string[]
+          search_fold: string | null
           state: string | null
           status: string | null
           street: string | null
@@ -5205,6 +5325,7 @@ export type Database = {
           rehomed_at?: string | null
           rehomed_from_workspace_id?: string | null
           responsible_sales_user_ids?: string[]
+          search_fold?: string | null
           state?: string | null
           status?: string | null
           street?: string | null
@@ -5275,6 +5396,7 @@ export type Database = {
           rehomed_at?: string | null
           rehomed_from_workspace_id?: string | null
           responsible_sales_user_ids?: string[]
+          search_fold?: string | null
           state?: string | null
           status?: string | null
           street?: string | null
@@ -5494,27 +5616,488 @@ export type Database = {
       }
       cron_billing_registry: {
         Row: {
+          caller_ref: string | null
           credit_cost: number
           cron_key: string
           description: string | null
+          expected_module_slug: string | null
           metered: boolean
           updated_at: string
         }
         Insert: {
+          caller_ref?: string | null
           credit_cost?: number
           cron_key: string
           description?: string | null
+          expected_module_slug?: string | null
           metered?: boolean
           updated_at?: string
         }
         Update: {
+          caller_ref?: string | null
           credit_cost?: number
           cron_key?: string
           description?: string | null
+          expected_module_slug?: string | null
           metered?: boolean
           updated_at?: string
         }
         Relationships: []
+      }
+      customer_asset_service_events: {
+        Row: {
+          asset_id: string
+          completed_on: string | null
+          cost: number | null
+          created_at: string
+          due_on: string
+          id: string
+          linked_order_id: string | null
+          notes: string | null
+          overdue_reminded_at: string | null
+          performed_by_name: string | null
+          performed_by_user_id: string | null
+          plan_id: string | null
+          plan_title: string | null
+          reminded_at: string | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          asset_id: string
+          completed_on?: string | null
+          cost?: number | null
+          created_at?: string
+          due_on: string
+          id?: string
+          linked_order_id?: string | null
+          notes?: string | null
+          overdue_reminded_at?: string | null
+          performed_by_name?: string | null
+          performed_by_user_id?: string | null
+          plan_id?: string | null
+          plan_title?: string | null
+          reminded_at?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          asset_id?: string
+          completed_on?: string | null
+          cost?: number | null
+          created_at?: string
+          due_on?: string
+          id?: string
+          linked_order_id?: string | null
+          notes?: string | null
+          overdue_reminded_at?: string | null
+          performed_by_name?: string | null
+          performed_by_user_id?: string | null
+          plan_id?: string | null
+          plan_title?: string | null
+          reminded_at?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_asset_service_events_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "customer_asset_service_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_events_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "customer_asset_service_history"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_events_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "customer_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_events_linked_order_id_fkey"
+            columns: ["linked_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_events_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "customer_asset_service_due"
+            referencedColumns: ["plan_id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_events_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "customer_asset_service_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_asset_service_plans: {
+        Row: {
+          asset_id: string
+          assignee_user_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          instructions: string | null
+          interval_days: number | null
+          interval_months: number | null
+          is_active: boolean
+          lead_days: number
+          notify_customer: boolean
+          notify_internal: boolean
+          source_default_id: string | null
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          asset_id: string
+          assignee_user_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructions?: string | null
+          interval_days?: number | null
+          interval_months?: number | null
+          is_active?: boolean
+          lead_days?: number
+          notify_customer?: boolean
+          notify_internal?: boolean
+          source_default_id?: string | null
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          asset_id?: string
+          assignee_user_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructions?: string | null
+          interval_days?: number | null
+          interval_months?: number | null
+          is_active?: boolean
+          lead_days?: number
+          notify_customer?: boolean
+          notify_internal?: boolean
+          source_default_id?: string | null
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_asset_service_plans_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "customer_asset_service_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_plans_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "customer_asset_service_history"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_plans_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "customer_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_plans_source_default_id_fkey"
+            columns: ["source_default_id"]
+            isOneToOne: false
+            referencedRelation: "product_service_defaults"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_plans_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_asset_warranties: {
+        Row: {
+          asset_id: string
+          coverage_notes: string | null
+          created_at: string
+          created_by: string | null
+          document_bucket: string | null
+          document_path: string | null
+          ends_on: string
+          id: string
+          kind: string
+          policy_number: string | null
+          provider_company_id: string | null
+          provider_name: string | null
+          remind_days_before: number[]
+          reminded_at: Json
+          starts_on: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          asset_id: string
+          coverage_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_bucket?: string | null
+          document_path?: string | null
+          ends_on: string
+          id?: string
+          kind?: string
+          policy_number?: string | null
+          provider_company_id?: string | null
+          provider_name?: string | null
+          remind_days_before?: number[]
+          reminded_at?: Json
+          starts_on: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          asset_id?: string
+          coverage_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_bucket?: string | null
+          document_path?: string | null
+          ends_on?: string
+          id?: string
+          kind?: string
+          policy_number?: string | null
+          provider_company_id?: string | null
+          provider_name?: string | null
+          remind_days_before?: number[]
+          reminded_at?: Json
+          starts_on?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_asset_warranties_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "customer_asset_service_due"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "customer_asset_warranties_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "customer_asset_service_history"
+            referencedColumns: ["asset_id"]
+          },
+          {
+            foreignKeyName: "customer_asset_warranties_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "customer_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_asset_warranties_provider_company_id_fkey"
+            columns: ["provider_company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_asset_warranties_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_assets: {
+        Row: {
+          brand: string | null
+          created_at: string
+          created_by: string | null
+          customer_company_id: string | null
+          customer_contact_id: string | null
+          id: string
+          installed_on: string | null
+          location_note: string | null
+          model: string | null
+          name: string
+          notes: string | null
+          product_id: string | null
+          project_id: string | null
+          purchased_on: string | null
+          quantity: number
+          room_id: string | null
+          serial_number: string | null
+          source_order_id: string | null
+          source_order_item_id: string | null
+          status: string
+          supplier_company_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_company_id?: string | null
+          customer_contact_id?: string | null
+          id?: string
+          installed_on?: string | null
+          location_note?: string | null
+          model?: string | null
+          name: string
+          notes?: string | null
+          product_id?: string | null
+          project_id?: string | null
+          purchased_on?: string | null
+          quantity?: number
+          room_id?: string | null
+          serial_number?: string | null
+          source_order_id?: string | null
+          source_order_item_id?: string | null
+          status?: string
+          supplier_company_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_company_id?: string | null
+          customer_contact_id?: string | null
+          id?: string
+          installed_on?: string | null
+          location_note?: string | null
+          model?: string | null
+          name?: string
+          notes?: string | null
+          product_id?: string | null
+          project_id?: string | null
+          purchased_on?: string | null
+          quantity?: number
+          room_id?: string | null
+          serial_number?: string | null
+          source_order_id?: string | null
+          source_order_item_id?: string | null
+          status?: string
+          supplier_company_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_assets_customer_company_id_fkey"
+            columns: ["customer_company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_customer_contact_id_fkey"
+            columns: ["customer_contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "customer_assets_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "customer_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "project_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_source_order_id_fkey"
+            columns: ["source_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_source_order_item_id_fkey"
+            columns: ["source_order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_supplier_company_id_fkey"
+            columns: ["supplier_company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dashboard_insights_cache: {
         Row: {
@@ -6516,6 +7099,75 @@ export type Database = {
         }
         Relationships: []
       }
+      document_events: {
+        Row: {
+          actor_email: string | null
+          actor_user_id: string | null
+          channel: string
+          created_at: string
+          email_log_id: string | null
+          entity_id: string
+          entity_type: string
+          event_type: string
+          id: string
+          metadata: Json
+          occurred_at: string
+          owner_user_id: string | null
+          user_agent: string | null
+          visitor_hash: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          actor_email?: string | null
+          actor_user_id?: string | null
+          channel: string
+          created_at?: string
+          email_log_id?: string | null
+          entity_id: string
+          entity_type: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          owner_user_id?: string | null
+          user_agent?: string | null
+          visitor_hash?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          actor_email?: string | null
+          actor_user_id?: string | null
+          channel?: string
+          created_at?: string
+          email_log_id?: string | null
+          entity_id?: string
+          entity_type?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          owner_user_id?: string | null
+          user_agent?: string | null
+          visitor_hash?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_events_email_log_id_fkey"
+            columns: ["email_log_id"]
+            isOneToOne: false
+            referencedRelation: "email_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_images: {
         Row: {
           alt_text: string | null
@@ -7336,6 +7988,8 @@ export type Database = {
           delivered_at: string | null
           domain_id: string | null
           email_type: string
+          entity_id: string | null
+          entity_type: string | null
           error_message: string | null
           from_email: string
           from_name: string | null
@@ -7370,6 +8024,8 @@ export type Database = {
           delivered_at?: string | null
           domain_id?: string | null
           email_type?: string
+          entity_id?: string | null
+          entity_type?: string | null
           error_message?: string | null
           from_email: string
           from_name?: string | null
@@ -7404,6 +8060,8 @@ export type Database = {
           delivered_at?: string | null
           domain_id?: string | null
           email_type?: string
+          entity_id?: string | null
+          entity_type?: string | null
           error_message?: string | null
           from_email?: string
           from_name?: string | null
@@ -16771,6 +17429,7 @@ export type Database = {
           payment_status: string
           project_id: string | null
           source_quote_id: string | null
+          source_thread_id: string | null
           status: string
           subtotal_net: number
           supplier_acknowledged_at: string | null
@@ -16805,6 +17464,7 @@ export type Database = {
           payment_status?: string
           project_id?: string | null
           source_quote_id?: string | null
+          source_thread_id?: string | null
           status?: string
           subtotal_net?: number
           supplier_acknowledged_at?: string | null
@@ -16839,6 +17499,7 @@ export type Database = {
           payment_status?: string
           project_id?: string | null
           source_quote_id?: string | null
+          source_thread_id?: string | null
           status?: string
           subtotal_net?: number
           supplier_acknowledged_at?: string | null
@@ -16908,6 +17569,13 @@ export type Database = {
             columns: ["source_quote_id"]
             isOneToOne: false
             referencedRelation: "vw_quote_followup_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_source_thread_id_fkey"
+            columns: ["source_thread_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_threads"
             referencedColumns: ["id"]
           },
           {
@@ -19605,6 +20273,93 @@ export type Database = {
           },
         ]
       }
+      product_material_maps: {
+        Row: {
+          albedo_path: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_selected: boolean
+          model: string
+          normal_path: string | null
+          option_value_id: string | null
+          product_id: string
+          roughness_path: string | null
+          source: string
+          source_image_url: string | null
+          storage_bucket: string
+          workspace_id: string
+        }
+        Insert: {
+          albedo_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_selected?: boolean
+          model: string
+          normal_path?: string | null
+          option_value_id?: string | null
+          product_id: string
+          roughness_path?: string | null
+          source?: string
+          source_image_url?: string | null
+          storage_bucket?: string
+          workspace_id: string
+        }
+        Update: {
+          albedo_path?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_selected?: boolean
+          model?: string
+          normal_path?: string | null
+          option_value_id?: string | null
+          product_id?: string
+          roughness_path?: string | null
+          source?: string
+          source_image_url?: string | null
+          storage_bucket?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_material_maps_option_value_id_fkey"
+            columns: ["option_value_id"]
+            isOneToOne: false
+            referencedRelation: "product_option_values"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_material_maps_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_material_maps_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_material_maps_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_material_maps_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_merge_history: {
         Row: {
           created_at: string | null
@@ -20203,6 +20958,92 @@ export type Database = {
           },
         ]
       }
+      product_service_defaults: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          instructions: string | null
+          interval_days: number | null
+          interval_months: number | null
+          is_active: boolean
+          lead_days: number
+          notify_customer: boolean
+          notify_internal: boolean
+          position: number
+          product_category: string | null
+          product_id: string | null
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructions?: string | null
+          interval_days?: number | null
+          interval_months?: number | null
+          is_active?: boolean
+          lead_days?: number
+          notify_customer?: boolean
+          notify_internal?: boolean
+          position?: number
+          product_category?: string | null
+          product_id?: string | null
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          instructions?: string | null
+          interval_days?: number | null
+          interval_months?: number | null
+          is_active?: boolean
+          lead_days?: number
+          notify_customer?: boolean
+          notify_internal?: boolean
+          position?: number
+          product_category?: string | null
+          product_id?: string | null
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_service_defaults_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "product_service_defaults_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_service_defaults_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_service_defaults_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_similarity_cache: {
         Row: {
           computation_method: string | null
@@ -20412,6 +21253,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           created_from_type: string | null
+          default_warranty_months: number | null
           description: string | null
           embedding_metadata: Json | null
           embedding_model: string | null
@@ -20420,6 +21262,7 @@ export type Database = {
           facet_canonicalization_version: number
           id: string
           import_batch_id: string | null
+          is_serviceable: boolean
           item_type: string
           layout_analyzed: boolean | null
           layout_detected: boolean | null
@@ -20494,6 +21337,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           created_from_type?: string | null
+          default_warranty_months?: number | null
           description?: string | null
           embedding_metadata?: Json | null
           embedding_model?: string | null
@@ -20502,6 +21346,7 @@ export type Database = {
           facet_canonicalization_version?: number
           id?: string
           import_batch_id?: string | null
+          is_serviceable?: boolean
           item_type?: string
           layout_analyzed?: boolean | null
           layout_detected?: boolean | null
@@ -20576,6 +21421,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           created_from_type?: string | null
+          default_warranty_months?: number | null
           description?: string | null
           embedding_metadata?: Json | null
           embedding_model?: string | null
@@ -20584,6 +21430,7 @@ export type Database = {
           facet_canonicalization_version?: number
           id?: string
           import_batch_id?: string | null
+          is_serviceable?: boolean
           item_type?: string
           layout_analyzed?: boolean | null
           layout_detected?: boolean | null
@@ -20776,6 +21623,7 @@ export type Database = {
           created_by: string | null
           embed_ffe: boolean
           embed_lighting: boolean
+          embed_room_plan: boolean
           embed_vr: boolean
           error_message: string | null
           feedback_enabled: boolean
@@ -20789,6 +21637,7 @@ export type Database = {
           public_share_enabled: boolean
           public_share_token: string | null
           quote_id: string | null
+          room_layout_id: string | null
           share_expires_at: string | null
           share_view_count: number
           sheet_ids: string[]
@@ -20802,6 +21651,7 @@ export type Database = {
           created_by?: string | null
           embed_ffe?: boolean
           embed_lighting?: boolean
+          embed_room_plan?: boolean
           embed_vr?: boolean
           error_message?: string | null
           feedback_enabled?: boolean
@@ -20815,6 +21665,7 @@ export type Database = {
           public_share_enabled?: boolean
           public_share_token?: string | null
           quote_id?: string | null
+          room_layout_id?: string | null
           share_expires_at?: string | null
           share_view_count?: number
           sheet_ids?: string[]
@@ -20828,6 +21679,7 @@ export type Database = {
           created_by?: string | null
           embed_ffe?: boolean
           embed_lighting?: boolean
+          embed_room_plan?: boolean
           embed_vr?: boolean
           error_message?: string | null
           feedback_enabled?: boolean
@@ -20841,6 +21693,7 @@ export type Database = {
           public_share_enabled?: boolean
           public_share_token?: string | null
           quote_id?: string | null
+          room_layout_id?: string | null
           share_expires_at?: string | null
           share_view_count?: number
           sheet_ids?: string[]
@@ -20868,6 +21721,13 @@ export type Database = {
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "vw_quote_followup_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_client_views_room_layout_id_fkey"
+            columns: ["room_layout_id"]
+            isOneToOne: false
+            referencedRelation: "room_layouts"
             referencedColumns: ["id"]
           },
           {
@@ -25209,6 +26069,7 @@ export type Database = {
           created_at: string | null
           customer_contact_id: string | null
           embed_key_id: string | null
+          generated_image_url: string | null
           id: string
           items_count: number | null
           notes: string | null
@@ -25225,6 +26086,7 @@ export type Database = {
           created_at?: string | null
           customer_contact_id?: string | null
           embed_key_id?: string | null
+          generated_image_url?: string | null
           id?: string
           items_count?: number | null
           notes?: string | null
@@ -25241,6 +26103,7 @@ export type Database = {
           created_at?: string | null
           customer_contact_id?: string | null
           embed_key_id?: string | null
+          generated_image_url?: string | null
           id?: string
           items_count?: number | null
           notes?: string | null
@@ -26592,14 +27455,85 @@ export type Database = {
           },
         ]
       }
+      room_layout_surfaces: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          layout_id: string
+          product_id: string
+          surface: string
+          waste_pct: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          layout_id: string
+          product_id: string
+          surface: string
+          waste_pct?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          layout_id?: string
+          product_id?: string
+          surface?: string
+          waste_pct?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_layout_surfaces_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "room_layouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_layout_surfaces_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "room_layout_surfaces_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_layout_surfaces_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "room_layout_surfaces_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       room_layouts: {
         Row: {
           created_at: string
           created_by: string | null
           id: string
+          lighting_preset: string
           name: string
           notes: string | null
           room_depth_m: number
+          room_height_m: number
           room_width_m: number
           updated_at: string
           workspace_id: string
@@ -26608,9 +27542,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          lighting_preset?: string
           name?: string
           notes?: string | null
           room_depth_m?: number
+          room_height_m?: number
           room_width_m?: number
           updated_at?: string
           workspace_id: string
@@ -26619,9 +27555,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          lighting_preset?: string
           name?: string
           notes?: string | null
           room_depth_m?: number
+          room_height_m?: number
           room_width_m?: number
           updated_at?: string
           workspace_id?: string
@@ -26784,6 +27722,84 @@ export type Database = {
           },
           {
             foreignKeyName: "saved_searches_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scene_settings: {
+        Row: {
+          camera_zoom: number | null
+          created_at: string
+          created_by: string | null
+          embed_key_id: string | null
+          exposure: number
+          id: string
+          preset: string
+          product_id: string | null
+          show_background: boolean
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          camera_zoom?: number | null
+          created_at?: string
+          created_by?: string | null
+          embed_key_id?: string | null
+          exposure?: number
+          id?: string
+          preset?: string
+          product_id?: string | null
+          show_background?: boolean
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          camera_zoom?: number | null
+          created_at?: string
+          created_by?: string | null
+          embed_key_id?: string | null
+          exposure?: number
+          id?: string
+          preset?: string
+          product_id?: string | null
+          show_background?: boolean
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_settings_embed_key_id_fkey"
+            columns: ["embed_key_id"]
+            isOneToOne: false
+            referencedRelation: "material_kai_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scene_settings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "scene_settings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scene_settings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "scene_settings_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -30776,6 +31792,53 @@ export type Database = {
         }
         Relationships: []
       }
+      user_email_addresses: {
+        Row: {
+          agent_ref: string | null
+          auto_reply_enabled: boolean
+          created_at: string
+          full_address: string
+          id: string
+          is_active: boolean
+          local_part: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          agent_ref?: string | null
+          auto_reply_enabled?: boolean
+          created_at?: string
+          full_address: string
+          id?: string
+          is_active?: boolean
+          local_part: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          agent_ref?: string | null
+          auto_reply_enabled?: boolean
+          created_at?: string
+          full_address?: string
+          id?: string
+          is_active?: boolean
+          local_part?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_email_addresses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_follows: {
         Row: {
           created_at: string | null
@@ -33659,6 +34722,145 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_asset_service_due: {
+        Row: {
+          asset_id: string | null
+          asset_name: string | null
+          asset_status: string | null
+          assignee_user_id: string | null
+          customer_company_id: string | null
+          customer_contact_id: string | null
+          customer_email: string | null
+          customer_name: string | null
+          days_until_due: number | null
+          due_on: string | null
+          event_id: string | null
+          instructions: string | null
+          is_overdue: boolean | null
+          is_within_lead_time: boolean | null
+          lead_days: number | null
+          location_note: string | null
+          notify_customer: boolean | null
+          notify_internal: boolean | null
+          overdue_reminded_at: string | null
+          plan_id: string | null
+          plan_title: string | null
+          project_id: string | null
+          project_name: string | null
+          reminded_at: string | null
+          serial_number: string | null
+          workspace_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_asset_service_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_customer_company_id_fkey"
+            columns: ["customer_company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_customer_contact_id_fkey"
+            columns: ["customer_contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_asset_service_history: {
+        Row: {
+          asset_id: string | null
+          asset_name: string | null
+          completed_on: string | null
+          cost: number | null
+          customer_company_id: string | null
+          customer_contact_id: string | null
+          customer_name: string | null
+          due_on: string | null
+          event_id: string | null
+          happened_on: string | null
+          linked_order_id: string | null
+          location_note: string | null
+          notes: string | null
+          performed_by_name: string | null
+          performed_by_user_id: string | null
+          plan_id: string | null
+          plan_removed: boolean | null
+          plan_title: string | null
+          project_id: string | null
+          project_name: string | null
+          serial_number: string | null
+          status: string | null
+          was_late: boolean | null
+          workspace_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_asset_service_events_linked_order_id_fkey"
+            columns: ["linked_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_events_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "customer_asset_service_due"
+            referencedColumns: ["plan_id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_events_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "customer_asset_service_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_asset_service_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_customer_company_id_fkey"
+            columns: ["customer_company_id"]
+            isOneToOne: false
+            referencedRelation: "crm_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_customer_contact_id_fkey"
+            columns: ["customer_contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_research_summary: {
         Row: {
           applied_total: number | null
@@ -33992,6 +35194,56 @@ export type Database = {
           },
           {
             foreignKeyName: "room_layout_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      room_layout_surfaces_resolved: {
+        Row: {
+          area_m2: number | null
+          id: string | null
+          layout_id: string | null
+          order_qty_m2: number | null
+          product_id: string | null
+          product_name: string | null
+          surface: string | null
+          waste_pct: number | null
+          workspace_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_layout_surfaces_layout_id_fkey"
+            columns: ["layout_id"]
+            isOneToOne: false
+            referencedRelation: "room_layouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_layout_surfaces_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_master_price_drift"
+            referencedColumns: ["operator_product_id"]
+          },
+          {
+            foreignKeyName: "room_layout_surfaces_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "room_layout_surfaces_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products_effective_facts"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "room_layout_surfaces_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -34418,6 +35670,10 @@ export type Database = {
         Args: { p_product_id: string; p_workspace_id: string }
         Returns: number
       }
+      _recompute_order_totals_core: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       _record_stock_movement_core: {
         Args: {
           p_direction: string
@@ -34485,6 +35741,10 @@ export type Database = {
           p_quantity?: number
           p_quote_id: string
         }
+        Returns: Json
+      }
+      add_layout_to_quote: {
+        Args: { p_layout_id: string; p_quote_id: string }
         Returns: Json
       }
       admin_agent_chat_stats: { Args: never; Returns: Json }
@@ -34566,6 +35826,10 @@ export type Database = {
         Args: { p_event: Json; p_job_id: string }
         Returns: undefined
       }
+      apply_asset_service_defaults: {
+        Args: { p_asset_id: string }
+        Returns: number
+      }
       apply_inbox_delivery_receipt: {
         Args: { p_at?: string; p_status: string; p_wamid: string }
         Returns: number
@@ -34622,6 +35886,10 @@ export type Database = {
           is_prefix: boolean
           ref: string
         }[]
+      }
+      bump_legacy_view_counter: {
+        Args: { p_id: string; p_table: string }
+        Returns: undefined
       }
       bump_template_usage: {
         Args: { p_template_id: string }
@@ -34735,6 +36003,17 @@ export type Database = {
         Args: { p_company_id: string; p_days?: number }
         Returns: Json
       }
+      complete_asset_service: {
+        Args: {
+          p_completed_on?: string
+          p_cost?: number
+          p_event_id: string
+          p_notes?: string
+          p_performed_by_name?: string
+          p_skip?: boolean
+        }
+        Returns: string
+      }
       compute_three_way_match: { Args: { p_order_id: string }; Returns: Json }
       consume_embed_generation_quota: {
         Args: { p_cap: number; p_key_id: string }
@@ -34807,6 +36086,10 @@ export type Database = {
           p_title?: string
           p_warehouse_item_id: string
         }
+        Returns: string
+      }
+      create_order_from_thread_intake: {
+        Args: { p_thread_id: string }
         Returns: string
       }
       create_project_progress_invoice: {
@@ -34966,6 +36249,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      crm_fold: { Args: { t: string }; Returns: string }
       crm_record_timeline: {
         Args: { p_limit?: number; p_target_id: string; p_target_kind: string }
         Returns: {
@@ -35022,6 +36306,10 @@ export type Database = {
           new_balance: number
           status: string
         }[]
+      }
+      cron_has_internal_subjects: {
+        Args: { p_cron_key: string }
+        Returns: boolean
       }
       cron_refund_workspace: {
         Args: {
@@ -35347,6 +36635,51 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      dic_detect__ops_asset_reminders_silent_zero: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__ops_cron_key_unwired: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__ops_cron_reported_success_but_no_effect: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__ops_email_delivery_failing: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__ops_flow_condition_edge_unrouted: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
       dic_detect__ops_flow_sends_skipped_no_recipient: {
         Args: never
         Returns: {
@@ -35465,6 +36798,15 @@ export type Database = {
         }[]
       }
       dic_detect__ops_unsent_queue_backlog: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
+      dic_detect__ops_upsert_arbiter_uninferable: {
         Args: never
         Returns: {
           detail: Json
@@ -35608,6 +36950,10 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      dic_finish_run: {
+        Args: { p_domains: string[]; p_healed: number; p_run_id: string }
+        Returns: undefined
+      }
       dic_heal__finance_order_item_net_mismatch: {
         Args: never
         Returns: number
@@ -35632,6 +36978,15 @@ export type Database = {
       dismiss_pending_warehouse_item: {
         Args: { p_id: string }
         Returns: undefined
+      }
+      embed_scope_covers_product: {
+        Args: {
+          p_product_id: string
+          p_scope_type: string
+          p_scope_values: string[]
+          p_workspace_id: string
+        }
+        Returns: boolean
       }
       enable_workspace: { Args: { p_workspace_id: string }; Returns: Json }
       ensure_default_warehouse: {
@@ -35845,6 +37200,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           created_from_type: string | null
+          default_warranty_months: number | null
           description: string | null
           embedding_metadata: Json | null
           embedding_model: string | null
@@ -35853,6 +37209,7 @@ export type Database = {
           facet_canonicalization_version: number
           id: string
           import_batch_id: string | null
+          is_serviceable: boolean
           item_type: string
           layout_analyzed: boolean | null
           layout_detected: boolean | null
@@ -35965,12 +37322,14 @@ export type Database = {
           failures_24h: number
           jobid: number
           jobname: string
+          last_invocation_status: number
           last_run_duration_ms: number
           last_run_message: string
           last_run_started_at: string
           last_run_status: string
           runs_24h: number
           schedule: string
+          target_function: string
         }[]
       }
       get_cron_run_history: {
@@ -36011,6 +37370,32 @@ export type Database = {
         Returns: {
           name: string
           source: string
+        }[]
+      }
+      get_document_delivery: {
+        Args: { p_entity_ids: string[]; p_entity_type: string }
+        Returns: {
+          bounce_reason: string
+          bounced_at: string
+          click_count: number
+          completed_at: string
+          completed_event: string
+          delivered_at: string
+          distinct_viewers: number
+          download_count: number
+          email_status: string
+          entity_id: string
+          first_opened_at: string
+          first_viewed_at: string
+          last_opened_at: string
+          last_viewed_at: string
+          legacy_view_count: number
+          open_count: number
+          page_status: string
+          recipients: string[]
+          send_count: number
+          sent_at: string
+          view_count: number
         }[]
       }
       get_embed_analytics_summary: {
@@ -36287,6 +37672,22 @@ export type Database = {
         Returns: {
           category: string
           product_count: number
+        }[]
+      }
+      get_product_embed_readiness: {
+        Args: { p_product_ids: string[] }
+        Returns: {
+          attribute_count: number
+          covering_key_ids: string[]
+          has_attributes: boolean
+          has_model: boolean
+          has_published_price: boolean
+          has_usdz: boolean
+          model_formats: string[]
+          option_group_count: number
+          option_groups_matching_model: number
+          product_id: string
+          workspace_id: string
         }[]
       }
       get_product_embedding_status: {
@@ -37344,6 +38745,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      match_agent_memories: {
+        Args: {
+          p_agent_id?: string
+          p_match_count?: number
+          p_min_similarity?: number
+          p_pinned_types?: string[]
+          p_query_embedding?: unknown
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          content: string
+          created_at: string
+          id: string
+          match_reason: string
+          memory_type: string
+          provenance: Json
+          similarity: number
+        }[]
+      }
       match_document_chunks_semantic: {
         Args: {
           filter_document_ids?: string[]
@@ -37496,12 +38917,24 @@ export type Database = {
         }[]
       }
       next_invoice_number: { Args: { p_workspace_id: string }; Returns: string }
+      next_service_due: {
+        Args: {
+          p_from: string
+          p_interval_days: number
+          p_interval_months: number
+        }
+        Returns: string
+      }
       next_supplier_credit_note_number: {
         Args: { p_workspace_id: string }
         Returns: string
       }
       normalize_catalog_sku: { Args: { p_sku: string }; Returns: string }
       normalize_unit: { Args: { p_unit: string }; Returns: string }
+      open_next_service_event: {
+        Args: { p_from: string; p_plan_id: string }
+        Returns: string
+      }
       open_pos_session: {
         Args: {
           p_branch_code?: number
@@ -37833,6 +39266,20 @@ export type Database = {
         Args: { p_product_id: string; p_quantity: number; p_unit?: string }
         Returns: number
       }
+      promote_agent_memory: {
+        Args: {
+          p_agent_id: string
+          p_content: string
+          p_conversation_id?: string
+          p_expires_at?: string
+          p_memory_type: string
+          p_provenance?: Json
+          p_supersedes?: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       property_kyc_status: {
         Args: { p_contact_id: string; p_workspace_id: string }
         Returns: {
@@ -37939,6 +39386,28 @@ export type Database = {
       }
       reconcile_stuck_generation_videos: { Args: never; Returns: number }
       reconcile_stuck_vr_worlds: { Args: never; Returns: number }
+      record_agent_memory_recall: {
+        Args: { p_conversation_id?: string; p_memory_ids: string[] }
+        Returns: number
+      }
+      record_document_event: {
+        Args: {
+          p_actor_email?: string
+          p_actor_user_id?: string
+          p_channel: string
+          p_client_ip?: string
+          p_email_log_id?: string
+          p_entity_id: string
+          p_entity_type: string
+          p_event_type: string
+          p_metadata?: Json
+          p_occurred_at?: string
+          p_owner_user_id?: string
+          p_user_agent?: string
+          p_workspace_id?: string
+        }
+        Returns: string
+      }
       record_embedding_backfill_attempts: {
         Args: {
           p_deficiency: string
@@ -38013,6 +39482,30 @@ export type Database = {
           success: boolean
           transaction_id: string
         }[]
+      }
+      register_customer_asset: {
+        Args: {
+          p_apply_defaults?: boolean
+          p_brand?: string
+          p_customer_company_id?: string
+          p_customer_contact_id?: string
+          p_installed_on?: string
+          p_location_note?: string
+          p_model?: string
+          p_name: string
+          p_notes?: string
+          p_product_id?: string
+          p_project_id?: string
+          p_purchased_on?: string
+          p_quantity?: number
+          p_room_id?: string
+          p_serial_number?: string
+          p_source_order_id?: string
+          p_source_order_item_id?: string
+          p_supplier_company_id?: string
+          p_workspace_id: string
+        }
+        Returns: string
       }
       reject_reseller_application: {
         Args: { p_application_id: string; p_notes?: string }
@@ -38347,6 +39840,14 @@ export type Database = {
           p_limit?: number
           p_product_ids?: string[]
           p_spec?: Json
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      resolve_scene_settings: {
+        Args: {
+          p_embed_key_id?: string
+          p_product_id?: string
           p_workspace_id: string
         }
         Returns: Json
@@ -38736,6 +40237,10 @@ export type Database = {
         Args: { p_refresh_run_id: string; p_tracked_mention_id: string }
         Returns: undefined
       }
+      stamp_order_line_suppliers_from_cover: {
+        Args: { p_order_id: string }
+        Returns: number
+      }
       stock_overview: { Args: { p_workspace_id: string }; Returns: Json }
       stock_valuation: { Args: { p_workspace_id: string }; Returns: Json }
       storage_audit_summary: {
@@ -39099,6 +40604,10 @@ export type Database = {
           name: string
         }[]
       }
+      warranty_end_date: {
+        Args: { p_months: number; p_start: string }
+        Returns: string
+      }
       wipe_unprotected_kb_docs: { Args: never; Returns: number }
       withdraw_listing: { Args: { p_id: string }; Returns: undefined }
       workspace_can_view_factory: {
@@ -39178,7 +40687,7 @@ export type Database = {
         | "ocr"
         | "voice"
         | "combined"
-      inbox_channel: "internal" | "whatsapp"
+      inbox_channel: "internal" | "whatsapp" | "email"
       inbox_message_type: "text" | "system" | "agent" | "note"
       inbox_participant_status: "active" | "left" | "removed"
       inbox_participant_type: "member" | "customer" | "agent"
@@ -39504,7 +41013,7 @@ export const Constants = {
         "voice",
         "combined",
       ],
-      inbox_channel: ["internal", "whatsapp"],
+      inbox_channel: ["internal", "whatsapp", "email"],
       inbox_message_type: ["text", "system", "agent", "note"],
       inbox_participant_status: ["active", "left", "removed"],
       inbox_participant_type: ["member", "customer", "agent"],

@@ -30,6 +30,7 @@ import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { recordPageEvent } from '../_shared/document-events.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -192,7 +193,10 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
 
       const { data: catalog } = await supabase
         .from('presentation_catalogs')
-        .select('id, slug, status')
+        // workspace_id / owner_user_id are needed for the delivery trail's tenancy —
+        // record_document_event rejects an event with neither, and a catalog row
+        // predating the workspace backfill still has an owner.
+        .select('id, slug, status, workspace_id, owner_user_id')
         .eq('id', log.catalog_id)
         .maybeSingle();
       if (!catalog || catalog.status !== 'published' || catalog.slug !== slug) {
@@ -215,6 +219,20 @@ Deno.serve(withApiLogging('catalog-access', async (req) => {
         user_agent: ua,
         metadata: body.metadata || {},
       });
+
+      // Delivery trail — the source the catalog list reads. `catalog_view_events`
+      // stays as the catalog module's own funnel detail (access-log correlation,
+      // cookie stitching, matched_kind); this answers the narrower question the
+      // list column asks, in the same shape as every other document.
+      recordPageEvent(supabase, req, eventType === 'page_view' ? 'viewed' : 'downloaded', {
+        entityType: 'catalog',
+        entityId: catalog.id,
+        workspaceId: catalog.workspace_id,
+        ownerUserId: catalog.workspace_id ? null : catalog.owner_user_id,
+        actorEmail: log.email,
+        actorUserId: log.matched_user_id,
+        metadata: { surface: 'public_catalog', matched_kind: log.matched_kind },
+      }).catch(() => {});
 
       // Atomic view counter — only bumped on page_view events; pdf_download
       // is a separate dimension shown alongside on the operations screen.

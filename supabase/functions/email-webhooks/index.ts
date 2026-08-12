@@ -17,6 +17,8 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveSecret } from '../_shared/secrets.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { recordEmailEvent } from '../_shared/document-events.ts';
+import type { DocumentEntityType, EmailEventType } from '../_shared/document-events.ts';
 import {
   RAW_EMAIL_BUCKET,
   alreadyProcessed,
@@ -36,6 +38,25 @@ import {
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, svix-id, svix-timestamp, svix-signature, x-inbound-secret',
+};
+
+/**
+ * Resend event → delivery-trail event (`document_events.event_type`).
+ *
+ * Deliberately NOT the same map as RESEND_EVENT_MAP: that one feeds
+ * `email_events`, whose vocabulary is the provider's ('delivery', 'open'). The
+ * trail's vocabulary is past-tense and shared with the page channel
+ * ('delivered', 'opened'), so one <DeliveryTrail> renders both. `delivery_delayed`
+ * is intentionally absent — a delay is not an outcome and must not displace the
+ * real one on the status ladder.
+ */
+const DOCUMENT_EVENT_BY_RESEND: Record<string, EmailEventType> = {
+  'email.sent': 'sent',
+  'email.delivered': 'delivered',
+  'email.bounced': 'bounced',
+  'email.complained': 'complained',
+  'email.opened': 'opened',
+  'email.clicked': 'clicked',
 };
 
 // Map Resend event types to our internal event_type values
@@ -392,7 +413,7 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
     // Find the email log entry by Resend's email ID
     const { data: emailLog, error: logError } = await supabaseClient
       .from('email_logs')
-      .select('id, workspace_id, to_email, tags')
+      .select('id, workspace_id, to_email, tags, entity_type, entity_id')
       .eq('message_id', messageId)
       .single();
 
@@ -456,6 +477,29 @@ Deno.serve(withApiLogging('email-webhooks', async (req) => {
         .from('email_logs')
         .update({ clicked_at: event.created_at })
         .eq('id', emailLog.id);
+    }
+
+    // Fan the provider event out to the document's delivery trail, so the
+    // invoice/quote/contract list can show "delivered, opened 10:02" without a
+    // jsonb scan over email_logs.tags. Only emails that declared an entity carry
+    // a trail; a system email has no document and correctly records nothing.
+    if (emailLog.entity_type && emailLog.entity_id) {
+      const trailEvent = DOCUMENT_EVENT_BY_RESEND[event.type];
+      if (trailEvent) {
+        await recordEmailEvent(supabaseClient, trailEvent, {
+          entityType: emailLog.entity_type as DocumentEntityType,
+          entityId: emailLog.entity_id,
+          workspaceId: emailLog.workspace_id,
+          actorEmail: emailLog.to_email,
+          emailLogId: emailLog.id,
+          occurredAt: event.created_at,
+          metadata: event.type === 'email.bounced'
+            ? { reason: event.data.bounce?.message ?? null, bounce_type: (event.data as any)?.bounce?.type ?? null }
+            : event.type === 'email.clicked'
+            ? { link: event.data.click?.link ?? null }
+            : {},
+        });
+      }
     }
 
     // Email#1 — a spam complaint or a PERMANENT (hard) bounce is a mandatory opt-out. Add the address

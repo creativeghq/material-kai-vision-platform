@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { recordPageEvent } from '../_shared/document-events.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -143,7 +144,14 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       return jsonResponse({ success: true });
     }
 
-    // Read path
+    // Read path — delivery trail first (the source the project list reads),
+    // then the legacy counter the client-view UI still renders.
+    recordPageEvent(supabase, req, 'viewed', {
+      entityType: 'client_view',
+      entityId: view.id,
+      ownerUserId: view.created_by ?? null,
+      metadata: { surface: 'client_view', project_id: view.project_id },
+    }).catch(() => {});
     supabase.rpc('increment_client_view_count', { p_view_id: view.id }).then(() => {}, () => {});
 
     const { data: project } = await supabase
@@ -300,7 +308,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
   // ---------- 2. SINGLE SHEET token ----------
   const { data: sheet, error } = await supabase
     .from('moodboard_presentation_sheets')
-    .select('id, moodboard_id, sheet_type, title, status, page_count, pdf_storage_path, share_expires_at, share_view_count')
+    .select('id, moodboard_id, sheet_type, title, status, page_count, pdf_storage_path, share_expires_at, share_view_count, created_by')
     .eq('share_token', token)
     .maybeSingle();
 
@@ -313,11 +321,25 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
     return jsonResponse({ sheet: null, pdf_url: null, expired: true });
   }
 
-  supabase
-    .from('moodboard_presentation_sheets')
-    .update({ share_view_count: (sheet.share_view_count ?? 0) + 1 })
-    .eq('id', sheet.id)
-    .then(() => {});
+  // Delivery trail. This REPLACES a read-modify-write `share_view_count = x + 1`,
+  // which lost every concurrent view: two clients opening the sheet in the same
+  // moment both read N and both wrote N+1. The append-only trail cannot lose a
+  // write, and dedupe/bot-filtering now happen once, in SQL.
+  recordPageEvent(supabase, req, 'viewed', {
+    entityType: 'moodboard_sheet',
+    entityId: sheet.id,
+    ownerUserId: sheet.created_by ?? null,
+    metadata: { surface: 'sheet_share', sheet_type: sheet.sheet_type },
+  }).catch(() => {});
+
+  // Legacy counter kept in step for the existing sheet UI, now via an atomic
+  // increment rather than read-modify-write. It is a CACHED COPY — the derived
+  // answer is get_document_delivery(), and finance.document_view_count_drift
+  // compares the two.
+  supabase.rpc('bump_legacy_view_counter', {
+    p_table: 'moodboard_presentation_sheets',
+    p_id: sheet.id,
+  }).then(() => {}, () => {});
 
   const pdf_url = await ensureDeliverablePdf(
     supabase,

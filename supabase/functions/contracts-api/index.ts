@@ -19,6 +19,7 @@ import { assertEntitled } from '../_shared/entitlement.ts';
 import { isModuleEnabled } from '../_shared/modules/registry.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { escapeHtml } from '../_shared/html.ts';
+import { recordPageEvent } from '../_shared/document-events.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -68,6 +69,17 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
     if (action === 'resolve_token') {
       if (c.status === 'signed') return json({ signed: true, contract: { title: c.title } });
       if (c.status === 'void' || c.status === 'declined' || expired) return json({ not_found: true });
+
+      // Delivery trail: the counterparty has the contract open. Recorded only on
+      // the branch that actually returns the body — a lookup that resolves to
+      // "voided" or "expired" is not someone reading the contract.
+      recordPageEvent(service, req, 'viewed', {
+        entityType: 'contract',
+        entityId: c.id,
+        workspaceId: c.workspace_id,
+        metadata: { surface: 'sign_link', title: c.title },
+      }).catch(() => {});
+
       return json({
         contract: {
           title: c.title,
@@ -100,6 +112,16 @@ Deno.serve(withApiLogging('contracts-api', async (req: Request) => {
     });
     if (sigErr) return json({ error: 'Could not record signature' }, 500);
     await service.from('contracts').update({ status: 'signed', signed_at: new Date().toISOString() }).eq('id', c.id);
+
+    // Terminal outcome on the trail: 'signed' outranks every view, so the list
+    // shows the result rather than "viewed 3x" next to a completed contract.
+    recordPageEvent(service, req, 'signed', {
+      entityType: 'contract',
+      entityId: c.id,
+      workspaceId: c.workspace_id,
+      actorEmail: typeof body?.signer_email === 'string' ? body.signer_email.slice(0, 200) : null,
+      metadata: { signer_name: signerName },
+    }).catch(() => {});
 
     // Flows — notify the contract owner. Best-effort.
     try {

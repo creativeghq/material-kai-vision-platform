@@ -27,6 +27,8 @@ import { CreateQuoteModal } from '../components/CreateQuoteModal';
 import { RequestsInboxPanel } from '../components/RequestsInboxPanel';
 import { quotesService, QuoteWithItems } from '../services/QuotesService';
 import { formatDate } from '@/utils/datetime';
+import { DeliveryTrailCell } from '@/components/features/finance/DeliveryTrailCell';
+import { fetchDeliveryTrails, type DeliveryTrail } from '@/services/documentDeliveryService';
 
 type QuotesTab = 'quotes' | 'requests' | 'settings';
 
@@ -98,6 +100,20 @@ export const QuotesPage: React.FC = () => {
   // Narrowing the filter or deleting a quote can shrink the list under the current page.
   useEffect(() => { setPage(1); }, [filterValues]);
   useEffect(() => { setPage((p) => clampPage(p, filteredQuotes.length)); }, [filteredQuotes.length]);
+
+  // Delivery trail for the VISIBLE page only — one round trip per page, not per row.
+  const visibleQuoteIds = useMemo(
+    () => paginate(filteredQuotes, page).map((q) => q.id),
+    [filteredQuotes, page],
+  );
+  const [trails, setTrails] = useState<Record<string, DeliveryTrail>>({});
+  useEffect(() => {
+    if (visibleQuoteIds.length === 0) { setTrails({}); return; }
+    let cancelled = false;
+    void fetchDeliveryTrails('quote', visibleQuoteIds).then((t) => { if (!cancelled) setTrails(t); });
+    return () => { cancelled = true; };
+    // Keyed on the ids themselves: a re-render yielding the same set must not re-fetch.
+  }, [visibleQuoteIds.join(',')]);
 
 
   // Handle quote click - navigate to detail page
@@ -268,6 +284,7 @@ export const QuotesPage: React.FC = () => {
                     <th className="text-left px-3 py-2.5 font-medium">Items</th>
                     <th className="text-left px-3 py-2.5 font-medium">Created</th>
                     <th className="text-left px-3 py-2.5 font-medium">Expires</th>
+                    <th className="text-center px-3 py-2.5 font-medium">Sent</th>
                     <th className="text-right px-6 py-2.5 font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -294,6 +311,7 @@ export const QuotesPage: React.FC = () => {
                       <td className="px-3 py-2.5 tabular-nums">{quote.total_items || quote.items?.length || 0}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{formatDate(quote.created_at)}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{formatDate(quote.expires_at)}</td>
+                      <td className="px-3 py-2.5 text-center"><DeliveryTrailCell trail={trails[quote.id]} /></td>
                       <td className="px-6 py-2.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button

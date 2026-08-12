@@ -48,6 +48,8 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { FilterBar, useFilters } from '@/components/core/filters';
 import { buildDocumentFilters, type DocFilterType } from '@/modules/finance/components/documentFilters';
 import { formatDate } from '@/utils/datetime';
+import { DeliveryTrailCell } from '@/components/features/finance/DeliveryTrailCell';
+import { fetchDeliveryTrails, type DeliveryTrail } from '@/services/documentDeliveryService';
 
 type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'dispatch' | 'delivery_notes' | 'cheques' | 'expenses';
 
@@ -295,6 +297,23 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   const filteredInbound = activeRows as InboundDocument[];
   const filteredPayments = activeRows as PaymentWithAllocation[];
 
+  // Delivery trail for the VISIBLE page only — one round trip per page, not per
+  // row, and never for the whole (unbounded) result set.
+  const visibleInvoiceIds = useMemo(
+    () => (type === 'invoices' ? paginate(rows, page).map((i) => i.id) : []),
+    [type, rows, page],
+  );
+  const [trails, setTrails] = useState<Record<string, DeliveryTrail>>({});
+  useEffect(() => {
+    if (visibleInvoiceIds.length === 0) { setTrails({}); return; }
+    let cancelled = false;
+    void fetchDeliveryTrails('invoice', visibleInvoiceIds)
+      .then((t) => { if (!cancelled) setTrails(t); });
+    return () => { cancelled = true; };
+    // Keyed on the ids themselves: paging or filtering changes the set, a
+    // re-render that yields the same ids must not re-fetch.
+  }, [visibleInvoiceIds.join(',')]);
+
   // Issuing/dismissing a document shrinks the list — clamp so the last page never goes blank.
   useEffect(() => { setPage((p) => clampPage(p, activeRows.length)); }, [activeRows.length]);
 
@@ -459,12 +478,13 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                         <th className="px-4 py-2 text-right">Due</th>
                         <th className="px-4 py-2 text-center">Status</th>
                         <th className="px-4 py-2 text-center">mD</th>
+                        <th className="px-4 py-2 text-center">Sent</th>
                         <th className="px-4 py-2 w-10"><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
                     <tbody>
                       {rows.length === 0 && (
-                        <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No {DOC_LABEL[type].toLowerCase()} yet.</td></tr>
+                        <tr><td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">No {DOC_LABEL[type].toLowerCase()} yet.</td></tr>
                       )}
                       {paginate(rows, page).map((i) => (
                         <tr
@@ -490,6 +510,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                           <td className="px-4 py-2 text-right font-medium">{formatMoney(i.amount_due, i.currency)}</td>
                           <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(i.status)}`}>{humanizeLabel(i.status)}</span></td>
                           <td className="px-4 py-2 text-center"><FiscalCell status={(i as any).fiscal_status} error={(i as any).fiscal_error} /></td>
+                          <td className="px-4 py-2 text-center"><DeliveryTrailCell trail={trails[i.id]} /></td>
                           <td className="px-4 py-2 text-right">
                             <InvoiceActionsMenu invoiceId={i.id} financeBase={financeBase} status={i.status} fiscalStatus={(i as any).fiscal_status ?? null} fiscalMark={(i as any).fiscal_mark ?? null} onChanged={load} />
                           </td>

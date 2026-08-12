@@ -19,6 +19,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
 import { getStripe } from '../_shared/stripe-clients.ts';
+import { recordPageEvent } from '../_shared/document-events.ts';
 
 // Sales/Finance — render and email a party (customer or supplier) running ledger
 // statement (Καρτέλα) PDF.
@@ -748,7 +749,10 @@ async function mintShare(
 // Resolve a share token + VAT/email → the recipient's ledger. Generic errors so a
 // wrong VAT/email can't be distinguished from a bad token (no enumeration).
 async function resolveShareView(
-  supabase: DbClient, body: any, publicAppUrl: string,
+  // `req` is threaded in purely for the delivery trail: the bot filter and the
+  // visitor hash both read request headers, and resolving them at the call site
+  // instead would duplicate that logic per caller.
+  supabase: DbClient, body: any, publicAppUrl: string, req: Request,
 ): Promise<{ status: number; payload: any }> {
   const token = String(body.token ?? '');
   const GENERIC = { status: 401, payload: { ok: false, error: 'The VAT number or email does not match our records.' } };
@@ -876,7 +880,18 @@ async function resolveShareView(
     pdfUrl = signed?.signedUrl ?? null;
   } catch (e) { console.error('share PDF gen failed', (e as any)?.message); }
 
+  // Delivery trail — the source the statement list reads. The customer has
+  // unlocked and is looking at the statement.
+  recordPageEvent(supabase, req, 'viewed', {
+    entityType: 'statement',
+    entityId: share.id,
+    workspaceId: share.workspace_id,
+    metadata: { surface: 'statement_share', party_type: partyType, side },
+  }).catch(() => {});
+
   // Successful unlock → reset the failed-attempt counter + bump view stats.
+  // view_count/last_viewed_at are now a CACHED COPY of the trail, kept because
+  // the existing share-admin UI reads them; document_view_count_drift compares.
   await supabase.from('finance_statement_shares')
     .update({ view_count: (share.view_count ?? 0) + 1, last_viewed_at: new Date().toISOString(), failed_attempts: 0 })
     .eq('id', share.id);
@@ -925,7 +940,7 @@ Deno.serve(withApiLogging('finance-send-statement', async (req) => {
     // ---- Public statement view (no auth; gated by VAT + email) ----
     if (body.mode === 'share_view') {
       await bootstrapForFunction(); // resolve STRIPE_SECRET_KEY for the balance Payment Link
-      const { status, payload } = await resolveShareView(supabase, body, publicAppUrl);
+      const { status, payload } = await resolveShareView(supabase, body, publicAppUrl, req);
       return json(payload, status);
     }
 
