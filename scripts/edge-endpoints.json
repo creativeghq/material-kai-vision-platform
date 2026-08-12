@@ -1972,7 +1972,7 @@
     "name": "generate-interior-video-v2",
     "tag": "AI Generation",
     "summary": "Multi-model interior design video generation with async polling fallback",
-    "description": "Generates interior design videos via veo-2 (30cr), kling-v3.0 (20cr), wan2.1-i2v-720p (12cr), or runway-gen4-turbo (40cr). Model is auto-selected from video_type when not specified. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.",
+    "description": "Generates interior design videos via veo-2 (30cr), kling-v3.0 (20cr), or runway-gen4-turbo (40cr). Model is auto-selected from video_type when not specified. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.",
     "security": [
       "supabaseJwt"
     ],
@@ -2004,7 +2004,6 @@
           "enum": [
             "veo-2",
             "kling-v3.0",
-            "wan2.1-i2v-720p",
             "runway-gen4-turbo"
           ],
           "description": "Explicit model override; if omitted, auto-selected from video_type"
@@ -2639,7 +2638,7 @@
     "name": "generate-social-video",
     "tag": "Social",
     "summary": "Generate a short-form social video via Kling or Veo-2",
-    "description": "Generates social media videos: kling-3.0 (20cr), kling-1.6-pro (15cr) via Replicate, or veo-2 (30cr) delegated to generate-interior-video-v2. For Replicate models polls up to 50s and returns prediction_id if still processing. Credits debited upfront, non-refundable.",
+    "description": "Generates social media videos: kling-3.0 (20cr) via Replicate, or veo-2 (30cr) delegated to generate-interior-video-v2. For Replicate models polls up to 50s and returns prediction_id if still processing. Credits debited upfront, non-refundable.",
     "security": [
       "supabaseJwt"
     ],
@@ -2662,7 +2661,6 @@
           "type": "string",
           "enum": [
             "kling-3.0",
-            "kling-1.6-pro",
             "veo-2"
           ],
           "default": "kling-3.0"

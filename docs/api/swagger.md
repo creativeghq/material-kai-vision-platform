@@ -2154,7 +2154,7 @@ Body: { "prefixes": ["path/to/file.jpg"] }
 |-------|------|----------|-------------|
 | `source_image_url` | string | Yes | Public URL of source image |
 | `video_type` | string | No | `walkthrough` \| `product_spotlight` \| `before_after` \| `floorplan_flythrough` \| `social_reel`. Default: `walkthrough` |
-| `model` | string | No | `veo-2` \| `kling-v3.0` \| `wan2.1-i2v-720p` \| `runway-gen4-turbo`. Auto-selected by type if omitted |
+| `model` | string | No | `veo-2` \| `kling-v3.0` \| `runway-gen4-turbo`. Auto-selected by type if omitted |
 | `prompt` | string | No | Video description |
 | `aspect_ratio` | string | No | `16:9` \| `9:16` \| `1:1`. Default: `16:9` |
 | `duration_seconds` | number | No | Default 8, max 8 (veo) or 10 (kling) |
@@ -2166,7 +2166,6 @@ Body: { "prefixes": ["path/to/file.jpg"] }
 |-------|---------|
 | `veo-2` | 30 |
 | `kling-v3.0` | 20 |
-| `wan2.1-i2v-720p` | 12 |
 | `runway-gen4-turbo` | 40 |
 
 ### Response `200`
@@ -2398,7 +2397,7 @@ When `async_job: true`, poll the `generation_videos` table by `job_id` for `stat
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `source_image_url` | string | Yes | Source image URL |
-| `model` | string | No | `kling-3.0` \| `kling-1.6-pro` \| `veo-2`. Default: `kling-3.0` |
+| `model` | string | No | `kling-3.0` \| `veo-2`. Default: `kling-3.0` |
 | `prompt` | string | No | Video description |
 | `aspect_ratio` | string | No | Default: `9:16` |
 | `duration_seconds` | number | No | Default: 10 |
@@ -2408,7 +2407,6 @@ When `async_job: true`, poll the `generation_videos` table by `job_id` for `stat
 | Model | Credits |
 |-------|---------|
 | `kling-3.0` | 20 |
-| `kling-1.6-pro` | 15 |
 | `veo-2` | 30 |
 
 ### Response `200`

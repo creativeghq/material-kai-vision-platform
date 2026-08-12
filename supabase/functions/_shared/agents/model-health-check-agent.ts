@@ -26,8 +26,9 @@ const ALL_MODELS = [
   'rocketdigitalai/interior-design-sdxl',
   'davisbrown/designer-architecture',
   'stability-ai/stable-diffusion',
-  'runwayml/stable-diffusion-v1-5',
-  'threestudio-project/threestudio',
+  // 'runwayml/stable-diffusion-v1-5' and 'threestudio-project/threestudio' removed 2026-08-12
+  // (issue #4) — both 404 on GET /v1/models, i.e. deleted upstream. Testing them could only ever
+  // report a permanent failure.
 ];
 
 interface ModelTestResult {

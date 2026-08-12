@@ -108,7 +108,7 @@ The platform's core differentiator is not a single AI model — it is the orches
 | WorldLabs | Marble mini + plus | 3D Gaussian Splat VR world generation | 50/200 credits per world |
 | Google Gemini | gemini-3.1-flash-image-preview, gemini-3-pro-image-preview | Interior image generation (4 modes) | 6/15 credits |
 | xAI (Grok) | grok-2-aurora | Masked inpainting for region editing, social images | 10–20 credits |
-| Kling | kling-v3.0, kling-1.6-pro | Interior + social video generation | 15–20 credits |
+| Kling | kling-v3.0 | Interior + social video generation | 20 credits |
 
 ### 7-Vector Embedding Fusion — The Search Backbone
 

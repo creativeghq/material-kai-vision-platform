@@ -1761,11 +1761,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       const resolvedVideoType = videoType || 'walkthrough';
       const resolvedModel = videoModel === 'auto' ? undefined : videoModel;
-      const isAsyncModel = resolvedModel && ['wan2.1-i2v-720p', 'runway-gen4-turbo'].includes(resolvedModel);
+      const isAsyncModel = resolvedModel && ['runway-gen4-turbo'].includes(resolvedModel);
 
       const modelLabels: Record<string, string> = {
         'veo-2': 'Veo 2.0', 'kling-v3.0': 'Kling v3.0 Pro',
-        'wan2.1-i2v-720p': 'Wan2.1 720p', 'runway-gen4-turbo': 'Runway Gen-4',
+        'runway-gen4-turbo': 'Runway Gen-4',
       };
       const modelLabel = resolvedModel ? modelLabels[resolvedModel] : 'auto-selected model';
       toast({

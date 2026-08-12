@@ -36,7 +36,7 @@ Pass `video_type` for auto-routing, or pass `model` explicitly:
 | `before_after` | `kling-v3.0` | 20 |
 | `social_reel` | `kling-v3.0` | 20 |
 
-Manual override: `"model": "wan2.1-i2v-720p"` (12cr) or `"runway-gen4-turbo"` (40cr)
+Manual override: `"model": "runway-gen4-turbo"` (40cr)
 
 ### Aspect ratios
 `16:9` (default) · `9:16` · `1:1`
@@ -86,7 +86,7 @@ POST /functions/v1/generate-social-video
 {
   "prompt": "...",
   "image_url": "...",
-  "model": "kling-1.6-pro",
+  "model": "kling-3.0",
   "aspect_ratio": "9:16",
   "workspace_id": "uuid"
 }
@@ -94,7 +94,6 @@ POST /functions/v1/generate-social-video
 
 | Model | Credits |
 |---|---|
-| `kling-1.6-pro` | 15 |
 | `veo-2` | 30 |
 
 ## Errors
@@ -104,3 +103,5 @@ POST /functions/v1/generate-social-video
 | `400` | Missing `image_url`, `prompt`, or no `video_type`/`model` provided |
 | `402` | Insufficient credits |
 | `500` | Model API error |
+
+> **Removed 2026-08-12 (issue #4):** `wan2.1-i2v-720p` and `kling-1.6-pro` were deleted upstream by Replicate (HTTP 404 on `GET /v1/models`, a read that needs no credit — distinct from our unfunded-account 402). Both were user-selectable and always hard-failed. The budget video tier stays vacant until `wan-video/wan-2.2-i2v-fast` is verified against a funded account (issue #4 Phase 5).

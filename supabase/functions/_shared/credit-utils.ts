@@ -43,8 +43,8 @@ const FALLBACK_PRICING: Record<string, ServicePricing> = {
   'flux-2-pro':           { cost_per_unit: 0.04,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER },
   'flux-dev':             { cost_per_unit: 0.04,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER },
   'kling-3.0':            { cost_per_unit: 0.10,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
-  'kling-1.6-pro':        { cost_per_unit: 0.08,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
-  'wan2.1-i2v':           { cost_per_unit: 0.05,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
+  // 'kling-1.6-pro' and 'wan2.1-i2v' removed 2026-08-12 (issue #4) — both models 404 upstream,
+  // so no call can reach these prices. Their ai_model_pricing rows are deactivated to match.
   'runway-gen4-turbo':    { cost_per_unit: 0.15,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER },
   'social-caption':       { cost_per_unit: 0.002,  unit: 'generation',  markup_multiplier: MARKUP_MULTIPLIER },
   'zernio-publish':       { cost_per_unit: 0.0,    unit: 'post',        markup_multiplier: MARKUP_MULTIPLIER },

@@ -148,8 +148,16 @@
       "description": "Marketplace functions."
     },
     {
+      "name": "Products",
+      "description": "Products functions."
+    },
+    {
       "name": "Stock",
       "description": "Stock functions."
+    },
+    {
+      "name": "Webhooks",
+      "description": "Webhooks functions."
     }
   ],
   "paths": {
@@ -3450,6 +3458,271 @@
         }
       }
     },
+    "/products-3d-api": {
+      "get": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Public product + 3D model read for the website embed SDK",
+        "operationId": "get_products_3d_api",
+        "description": "Anonymous read API for the <materialkai-product> embed (#321 M1 / #258). Authenticated by a publishable embed key (material_kai_keys) sent as the x-embed-key header or ?key= query param; the key resolves the workspace, so no caller-supplied workspace id is ever trusted. The key's allowed_origins drives per-request CORS (browser-enforced) and its rate_limit_per_minute is consumed atomically per call. Serves only products with a storefront-published price row — the same publication gate as the online storefront. Each key additionally carries a catalog scope (all | categories | products) enforced server-side on BOTH actions: a scoped key naming an out-of-scope product_id gets the same 404 as another tenant's id, and request params can only narrow the scope, never widen it.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Products"
+        ],
+        "summary": "Public product + 3D model read for the website embed SDK",
+        "operationId": "post_products_3d_api",
+        "description": "Anonymous read API for the <materialkai-product> embed (#321 M1 / #258). Authenticated by a publishable embed key (material_kai_keys) sent as the x-embed-key header or ?key= query param; the key resolves the workspace, so no caller-supplied workspace id is ever trusted. The key's allowed_origins drives per-request CORS (browser-enforced) and its rate_limit_per_minute is consumed atomically per call. Serves only products with a storefront-published price row — the same publication gate as the online storefront. Each key additionally carries a catalog scope (all | categories | products) enforced server-side on BOTH actions: a scoped key naming an out-of-scope product_id gets the same 404 as another tenant's id, and request params can only narrow the scope, never widen it.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list"
+                        ],
+                        "description": "List published products with the 3D formats each one has"
+                      },
+                      "limit": {
+                        "type": "number",
+                        "description": "Page size, 1-60 (default 24)."
+                      },
+                      "offset": {
+                        "type": "number",
+                        "description": "Pagination offset (default 0)."
+                      },
+                      "only_3d": {
+                        "type": "boolean",
+                        "description": "When 'true', return only products that have a ready 3D model."
+                      }
+                    },
+                    "description": "Returns: {ok, products: [{product_id, name, description, unit, item_type, price, currency, images[], model_formats[]}]}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "product_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "product"
+                        ],
+                        "description": "One published product with its media, gross price and 3D models"
+                      },
+                      "product_id": {
+                        "type": "string",
+                        "description": "Product id. Returns 404 when unpublished or owned by another workspace — the two are deliberately indistinguishable. (uuid)"
+                      }
+                    },
+                    "description": "Returns: {ok, product: {product_id, name, description, unit, item_type, price, currency, images[], models: [{format, url, file_size_bytes, width_m, height_m, depth_m}]}}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "product_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "configure"
+                        ],
+                        "description": "Price a set of configurator choices for an anonymous visitor (#258 Phase 2)"
+                      },
+                      "product_id": {
+                        "type": "string",
+                        "description": "Must be published AND in the key's scope, else 404. (uuid)"
+                      },
+                      "option_value_ids": {
+                        "type": "string",
+                        "description": "Chosen product_option_values. Non-uuids are dropped and the list is capped at 40; ids belonging to another product contribute nothing and are reported via options_applied. (uuid[] or comma-separated string)"
+                      }
+                    },
+                    "description": "Returns: {ok, configured_price (GROSS, like every other price here), currency, options_applied, options_requested}. Priced with the BUYER audience and no company/contact — an anonymous visitor never receives a negotiated price, cost or margin. The derivation is SECURITY DEFINER and NOT granted to anon; the embed reaches it through this function's service-role client after the key is checked."
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "event_type",
+                      "product_id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "event"
+                        ],
+                        "description": "Record an embed analytics event (the only write on this anonymous surface)"
+                      },
+                      "event_type": {
+                        "type": "string",
+                        "description": "One of embed_view, embed_model_load, embed_ar_launch, embed_add_to_cart. An allowlist, not free text."
+                      },
+                      "product_id": {
+                        "type": "string",
+                        "description": "Must be published AND within the key's scope, else 404 — otherwise any key holder could write events against arbitrary products and pollute another tenant's dashboard. (uuid)"
+                      },
+                      "session_id": {
+                        "type": "string",
+                        "description": "Per-visit id from the widget. Replaced server-side when absent or not a uuid; an analytics event never fails the visitor's page. (uuid)"
+                      },
+                      "source_page": {
+                        "type": "string",
+                        "description": "Page the widget is embedded on. Truncated to 500 chars (attacker-controlled free text)."
+                      }
+                    },
+                    "description": "Returns: {ok: true}. workspace_id is set from the key, never the body. Accepts a bodyless POST — the beacon sends everything in the query string."
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "spec"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "resolve"
+                        ],
+                        "description": "Resolve a built specification to a real product, or report that nothing matches (#337)"
+                      },
+                      "spec": {
+                        "type": "object",
+                        "description": "The visitor’s specification as {facet_key: value}. Matched by jsonb containment against products.attributes — every specified facet must equal the product’s. Capped at 25 facets."
+                      }
+                    },
+                    "description": "Returns: {ok, match_kind: exact|near|none, product (ONLY when exact — its absence is the instruction to offer a quote), near_matches[] (no price, on purpose), spec_facets}. Only storefront-published products in the key’s scope are considered."
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "name",
+                      "email"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "request_quote"
+                        ],
+                        "description": "Record a quote request for a specification nothing matched (#337)"
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Requester name."
+                      },
+                      "email": {
+                        "type": "string",
+                        "description": "Requester email. Find-or-create a crm_contact in the key’s workspace, like guest checkout."
+                      },
+                      "spec": {
+                        "type": "object",
+                        "description": "What they built. Stored on the request; NEVER creates a products row."
+                      },
+                      "message": {
+                        "type": "string",
+                        "description": "Free text, truncated to 1000 chars."
+                      },
+                      "turnstile_token": {
+                        "type": "string",
+                        "description": "Bot gate, verified BEFORE any row is created — this mints a CRM contact from an anonymous caller."
+                      }
+                    },
+                    "description": "Returns: {ok, quote_request_id}. No total_estimated is written: a request nobody has priced must not carry a number."
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flow-engine": {
       "post": {
         "tags": [
@@ -3920,7 +4193,7 @@
         ],
         "summary": "Multi-model interior design video generation with async polling fallback",
         "operationId": "post_generate_interior_video_v2",
-        "description": "Generates interior design videos via veo-2 (30cr), kling-v3.0 (20cr), wan2.1-i2v-720p (12cr), or runway-gen4-turbo (40cr). Model is auto-selected from video_type when not specified. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.\n\n**Response:** `[object Object]`\n\n📖 [docs/docs/api/generate-interior-video-v2-api.md](docs/api/generate-interior-video-v2-api.md)",
+        "description": "Generates interior design videos via veo-2 (30cr), kling-v3.0 (20cr), or runway-gen4-turbo (40cr). Model is auto-selected from video_type when not specified. Replicate-based models poll for up to 50s and return async job_id if not done; frontend polls generation_videos table. Accepts service-role key for agent-chat internal calls.\n\n**Response:** `[object Object]`\n\n📖 [docs/docs/api/generate-interior-video-v2-api.md](docs/api/generate-interior-video-v2-api.md)",
         "security": [
           {
             "supabaseJwt": []
@@ -4929,7 +5202,7 @@
         ],
         "summary": "Generate a short-form social video via Kling or Veo-2",
         "operationId": "post_generate_social_video",
-        "description": "Generates social media videos: kling-3.0 (20cr), kling-1.6-pro (15cr) via Replicate, or veo-2 (30cr) delegated to generate-interior-video-v2. For Replicate models polls up to 50s and returns prediction_id if still processing. Credits debited upfront, non-refundable.\n\n**Response:** `[object Object]`",
+        "description": "Generates social media videos: kling-3.0 (20cr) via Replicate, or veo-2 (30cr) delegated to generate-interior-video-v2. For Replicate models polls up to 50s and returns prediction_id if still processing. Credits debited upfront, non-refundable.\n\n**Response:** `[object Object]`",
         "security": [
           {
             "supabaseJwt": []
@@ -20382,6 +20655,397 @@
                     "type": "string",
                     "description": "Delivery surface: workspace whose signing secret verifies this delivery. (uuid (query))"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace-webhooks-api": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Manage a workspace's outbound webhook endpoints",
+        "operationId": "post_workspace_webhooks_api",
+        "description": "Tenant-facing CRUD for outbound webhook subscriptions (#330). Actions: list, create, update, rotate_secret, delete, deliveries. The HMAC signing secret is generated server-side and returned exactly once (on create and rotate_secret) - the column is revoked from the authenticated role and cannot be read back. Endpoint URLs are https-only and pass the shared SSRF guard before they are stored. Event types are validated against SUBSCRIBABLE_EVENT_TYPES. workspace_id is always reconciled against the caller's JWT; an endpoint belonging to another workspace returns 404, not 403.\n\n**Response:** `{ok, webhooks[]|webhook|deliveries[]|secret, available_events[]}`\n\n📖 [docs/docs/outbound-webhooks.md](docs/outbound-webhooks.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace-webhook-dispatcher": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Deliver queued outbound webhook events to tenant endpoints",
+        "operationId": "post_workspace_webhook_dispatcher",
+        "description": "Cron function that POSTs queued deliveries to tenant endpoints (#330). Signs each request HMAC-SHA256 over '{timestamp}.{body}' and sends it as X-MaterialKai-Signature, with the timestamp inside the signed string so a captured delivery cannot be replayed later. Re-runs the shared SSRF guard at delivery time (not just at registration - DNS behind a stored hostname can be re-pointed) and refuses to follow redirects. Retries with exponential backoff to a hard attempt cap; an SSRF rejection fails immediately rather than retrying. An endpoint that fails enough consecutive deliveries is auto-disabled.\n\n**Response:** `{ok, claimed, delivered, retrying, failed, dropped, endpoints_disabled}`\n\n📖 [docs/docs/outbound-webhooks.md](docs/outbound-webhooks.md)",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/page-watch-webhook": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Receives Firecrawl Monitoring callbacks for watched non-price pages and records the diff.",
+        "operationId": "post_page_watch_webhook",
+        "description": "Ingests `monitor.page` (one entry per page per check) and `monitor.check.completed` (reconciliation summary) from Firecrawl Monitoring. Firecrawl does NOT sign its webhooks, so authentication is a shared secret sent in the `x-firecrawl-webhook-secret` header, set on the monitor at creation time and compared in constant time. Fails closed with 503 when FIRECRAWL_WEBHOOK_SECRET is unset. The tenant is resolved from `page_watches` by `firecrawl_monitor_id` — never from the payload. Replays are absorbed by a unique index on (page_watch_id, firecrawl_check_id, url).\n\n**Response:** `[object Object]`\n\n📖 [docs/docs/page-monitoring.md](docs/page-monitoring.md)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/page-watches": {
+      "post": {
+        "tags": [
+          "Monitoring Crons"
+        ],
+        "summary": "CRUD for watched pages, mirrored to Firecrawl monitors.",
+        "operationId": "post_page_watches",
+        "description": "Action-dispatched endpoint backing the Page Monitoring UI. Creates, updates and deletes a Firecrawl monitor alongside each `page_watches` row so the two never drift — a row deleted without its monitor would keep billing on its schedule. Requires a user JWT; the supplied workspace_id is verified against the caller's membership before any read or write. `run` debits a Firecrawl credit before starting the check and refuses with 402 if the debit fails. Gated on the `page-monitoring` module.\n\n**Response:** `[object Object]`\n\n📖 [docs/docs/page-monitoring.md](docs/page-monitoring.md)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customer-assets-api": {
+      "post": {
+        "tags": [
+          "CRM"
+        ],
+        "summary": "Installed base: a customer's equipment, its warranties and its recurring service schedules (#343).",
+        "operationId": "post_customer_assets_api",
+        "description": "Action-discriminated JWT endpoint over customer_assets, customer_asset_warranties, customer_asset_service_plans and customer_asset_service_events, plus the per-product defaults in product_service_defaults. Reads and writes run through the caller's own RLS context; registration and service completion go through SECURITY DEFINER RPCs that call assert_workspace_member. There is no next_due_on field anywhere: the next due date IS the plan's single open service event, served by the customer_asset_service_due view. Ownership mismatches return 404, never 403. Warranty certificates upload through this function (service-role write to the private pdf-documents bucket under warranties/, after ownership is proven on the RLS-bound client) and are read via a short-lived signed URL; the row stores bucket + path and never a URL. Deleting an asset that has logged service returns 409 - the DB refuses it so the history cannot be erased.\n\n**Response:** `{ assets } | { asset, warranties, plans, events } | { asset_id } | { due } | { history } | { next_event_id } | { defaults } | { warranty } | { url } | { success }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/asset-service-reminders-cron": {
+      "post": {
+        "tags": [
+          "CRM"
+        ],
+        "summary": "Cron: emit equipment service-due, service-overdue and warranty-expiring flow events (#343).",
+        "operationId": "post_asset_service_reminders_cron",
+        "description": "Runs daily via pg_cron (x-cron-secret via isCronAuthorized). Scans the customer_asset_service_due view for open occurrences inside their lead-time window and customer_asset_warranties approaching ends_on, then emits asset.service_due, asset.service_overdue and asset.warranty_expiring flow events with the recipient resolved from the plan assignee, the customer's responsible sales users, or the workspace owners/admins. It never writes a user_notifications row or calls email-api directly — the seeded system-default flows deliver. Each reminder is stamped on its row so it fires once, and only after the emit actually succeeded; a transient failure leaves the row unstamped for the next tick. Backed by the ops.asset_reminders_silent_zero integrity probe.\n\n**Response:** `{ success, scanned_due, scanned_warranties, serviceDue, serviceOverdue, warrantyExpiring, failed }`",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

@@ -1157,7 +1157,6 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                             // advertised at 10 while the generator charges 12.
                             { value: 'veo-2',             label: 'Veo 2',          description: 'Google Veo 2 — high quality',        credits: 30 },
                             { value: 'kling-v3.0',        label: 'Kling 3.0',     description: 'Kling 3.0 — cinematic + audio',      credits: 20 },
-                            { value: 'wan2.1-i2v-720p',   label: 'Wan 2.1',        description: 'Wan2.1 — open-source quality',       credits: 12 },
                             { value: 'runway-gen4-turbo', label: 'Runway Gen-4',   description: 'Runway Gen-4 — premium output',      credits: 40 },
                           ].map(vm => (
                             <DropdownMenuItem key={vm.value} onClick={(e) => { e.preventDefault(); setVideoModel(vm.value); }} className="gap-1.5">

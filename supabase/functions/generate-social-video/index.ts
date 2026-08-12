@@ -59,17 +59,18 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 
-type VideoModel = 'kling-3.0' | 'kling-1.6-pro' | 'veo-2';
+// 'kling-1.6-pro' removed 2026-08-12 (issue #4): `klingai/kling-1.6-pro` returns 404 from
+// GET /v1/models — a read that needs no credit, so it is deleted upstream, not a symptom of
+// our unfunded account's 402. It was selectable at 15 credits and always hard-failed.
+type VideoModel = 'kling-3.0' | 'veo-2';
 
 const CREDIT_COSTS: Record<VideoModel, number> = {
   'kling-3.0':     20,
-  'kling-1.6-pro': 15,
   'veo-2':         30,
 };
 
 const REPLICATE_MODELS: Record<string, string> = {
   'kling-3.0':     'kwaivgi/kling-v3-video',
-  'kling-1.6-pro': 'klingai/kling-1.6-pro',
 };
 
 

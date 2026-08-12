@@ -233,24 +233,9 @@ const ModelDebuggingPanel: React.FC<ModelDebuggingPanelProps> = ({ embedded = fa
         versionHash: 'latest',
         description: 'Stable Diffusion text-to-image generation',
       },
-      {
-        name: 'runwayml/stable-diffusion-v1-5',
-        displayName: 'Stable Diffusion v1.5',
-        type: 'text-to-image',
-        status: 'untested',
-        recentLogs: [],
-        versionHash: 'latest',
-        description: 'Stable Diffusion v1.5 text-to-image generation',
-      },
-      {
-        name: 'threestudio-project/threestudio',
-        displayName: 'ThreeStudio 3D',
-        type: 'text-to-image',
-        status: 'untested',
-        recentLogs: [],
-        versionHash: 'latest',
-        description: '3D object generation from text',
-      },
+      // 'runwayml/stable-diffusion-v1-5' and 'threestudio-project/threestudio' removed 2026-08-12
+      // (issue #4) — deleted upstream (404 on GET /v1/models). Operators were being shown models
+      // that could never run.
     ];
     setModels(initialModels);
   }, []);

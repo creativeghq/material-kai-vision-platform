@@ -75,7 +75,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - WorldLabs Marble (3D Gaussian Splat VR world generation)
 - Google Gemini (gemini-3.1-flash-image-preview, gemini-3-pro-image-preview — interior generation)
 - xAI Aurora (grok-2-aurora — region edit inpainting, social image generation)
-- Kling (kling-v3.0, kling-1.6-pro — interior and social video generation)
+- Kling (kling-v3.0 — interior and social video generation)
 - Zernio (social media OAuth broker + publishing platform)
 
 ### System Flow

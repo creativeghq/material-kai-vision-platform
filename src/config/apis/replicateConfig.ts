@@ -271,47 +271,12 @@ export const replicateConfig: ReplicateApiConfig = {
       category: 'text-to-image',
     },
 
-    'runwayml/stable-diffusion-v1-5': {
-      version: 'latest',
-      inputSchema: commonImageParams,
-      outputSchema: imageOutputSchema,
-      defaultParams: {
-        width: 512,
-        height: 512,
-        num_inference_steps: 20,
-        guidance_scale: 7.5,
-      },
-      description: 'Stable Diffusion v1.5 text-to-image generation',
-      category: 'text-to-image',
-    },
-
-    // 3D Generation Models
-    'threestudio-project/threestudio': {
-      version: 'latest',
-      inputSchema: z.object({
-        prompt: z.string().min(1, 'Prompt is required'),
-        negative_prompt: z.string().optional(),
-        guidance_scale: z.number().min(1).max(20).default(7.5),
-        num_inference_steps: z.number().int().min(10).max(100).default(50),
-        seed: z.number().int().optional(),
-      }),
-      outputSchema: z.object({
-        output: z
-          .object({
-            mesh: z.string().url().optional(),
-            video: z.string().url().optional(),
-            images: z.array(z.string().url()).optional(),
-          })
-          .optional(),
-        error: z.string().optional(),
-      }),
-      defaultParams: {
-        guidance_scale: 7.5,
-        num_inference_steps: 50,
-      },
-      description: '3D object generation from text',
-      category: '3d-generation',
-    },
+    // NOTE: 'runwayml/stable-diffusion-v1-5' and 'threestudio-project/threestudio' were removed
+    // 2026-08-12 (issue #4). Both return HTTP 404 from GET /v1/models/{owner}/{name} — a read that
+    // needs no credit — while other models return 200 on the same token, so this is model-level
+    // deletion upstream, not our unfunded-account 402. threestudio was the only '3d-generation'
+    // entry, which is what made this config look like the platform had 3D. It does not; real
+    // image->mesh is Phase 4 of #4.
 
     'davisbrown/designer-architecture': {
       version: 'latest',

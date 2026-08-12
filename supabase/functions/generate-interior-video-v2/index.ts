@@ -7,7 +7,7 @@
  * Models:
  *   veo-2           → 30 credits (Google, cinematic walkthroughs)
  *   kling-v3.0      → 20 credits (native SDK, cinematic + audio)
- *   wan2.1-i2v      → 10 credits (Replicate, budget option)
+ *   (budget tier vacant — wan2.1-i2v-720p was deleted upstream by Replicate; see issue #4)
  *   runway-gen4-turbo → 40 credits (Replicate, premium quality)
  *
  * Async handling: Replicate models can take 3-5 min. If polling times out
@@ -29,14 +29,18 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const REPLICATE_API_KEY = () => Deno.env.get('REPLICATE_API_KEY') || '';
 
-type VideoModel = 'veo-2' | 'kling-v3.0' | 'wan2.1-i2v-720p' | 'runway-gen4-turbo';
+// 'wan2.1-i2v-720p' removed 2026-08-12 (issue #4): `wan-video/wan2.1-i2v-720p` returns 404 from
+// GET /v1/models — a read that needs no credit, so this is upstream deletion, NOT our 402
+// Insufficient-credit state. It was user-selectable at 12 credits and always hard-failed.
+// The budget tier stays vacant until `wan-video/wan-2.2-i2v-fast` can be verified against a
+// funded account (issue #4 Phase 5) — an unverified replacement would repeat the same bug.
+type VideoModel = 'veo-2' | 'kling-v3.0' | 'runway-gen4-turbo';
 type VideoType = 'walkthrough' | 'product_spotlight' | 'before_after' | 'floorplan_flythrough' | 'social_reel';
 type AspectRatio = '16:9' | '9:16' | '1:1';
 
 const CREDIT_COSTS: Record<VideoModel, number> = {
   'veo-2':              30,
   'kling-v3.0':         20,
-  'wan2.1-i2v-720p':    12,
   'runway-gen4-turbo':  40,
 };
 
@@ -52,7 +56,6 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
 const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
   'veo-2':              8,
   'kling-v3.0':         10,
-  'wan2.1-i2v-720p':    5,
   'runway-gen4-turbo':  10,
 };
 
@@ -67,7 +70,6 @@ const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = {
 
 // Replicate model identifiers (Kling now uses native SDK, not Replicate)
 const REPLICATE_MODELS: Record<string, string> = {
-  'wan2.1-i2v-720p':   'wan-video/wan2.1-i2v-720p',
   'runway-gen4-turbo': 'runwayml/gen4-turbo',
 };
 
@@ -210,11 +212,10 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     : Math.min(8, MAX_DURATION_SECONDS[resolvedModel]);
 
   // `ai_model_pricing` keys differ from the model ids this function uses: the price
-  // table carries `kling-3.0` and `wan2.1-i2v`, here they are `kling-v3.0` and
-  // `wan2.1-i2v-720p`. Identity map only — no prices are defined here.
+  // table carries `kling-3.0`, here it is `kling-v3.0`. Identity map only — no prices
+  // are defined here. (Issue #4 Phase 1 deletes this map by making the id the key everywhere.)
   const PRICING_KEY_BY_MODEL: Record<string, string> = {
     'kling-v3.0': 'kling-3.0',
-    'wan2.1-i2v-720p': 'wan2.1-i2v',
   };
 
   // This function debited credits per video but wrote NO ai_usage_logs row at all, so

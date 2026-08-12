@@ -2494,7 +2494,6 @@ export const TOOLKITS: ToolkitDefinition[] = [
           { key: 'model', label: 'Model', kind: 'select', default: 'veo-2', options: [
             { value: 'veo-2', label: 'Veo 2 — 30 credits' },
             { value: 'kling-v3.0', label: 'Kling v3.0 — 20 credits' },
-            { value: 'wan2.1-i2v-720p', label: 'Wan 2.1 720p — 12 credits' },
             { value: 'runway-gen4-turbo', label: 'Runway Gen-4 Turbo — 40 credits' },
           ] },
           { key: 'aspect_ratio', label: 'Aspect ratio', kind: 'select', default: '16:9', options: [

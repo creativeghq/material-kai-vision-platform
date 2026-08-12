@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (120)
+## 1. Supabase Edge Functions (127)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -140,9 +140,11 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `asset-service-reminders-cron` | cron | Cron: emit equipment service-due, service-overdue and warranty-expiring flow events (#343). |
 | `crm-api` _(GET + POST)_ | JWT / secret | REST CRM resource router for companies, contacts, users, and Stripe. |
 | `crm-lead-score` | JWT | AI lead + health scoring for any CRM contact (canonical platform scorer) |
 | `crm-meeting-reminders` | cron | Cron: send reminders for upcoming CRM meetings whose reminder time has arrived. |
+| `customer-assets-api` | JWT | Installed base: a customer's equipment, its warranties and its recurring service schedules (#343). |
 
 **Business Profile**
 
@@ -270,6 +272,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `monitoring-cron` | cron | Unified monitoring dispatcher — one function behind all five price / mention / job cron tasks |
+| `page-watches` | JWT | CRUD for watched pages, mirrored to Firecrawl monitors. |
 
 **Background Agents**
 
@@ -329,11 +332,25 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `marketplace-price-check` | JWT | Check a surplus-listing price against the Operator's market cap |
 
+**Products**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `products-3d-api` _(GET + POST)_ | public | Public product + 3D model read for the website embed SDK |
+
 **Stock**
 
 | Function | Auth | Summary |
 |---|---|---|
 | `stock-api` | JWT | Stock / warehouse module - inventory, movements, counts, shipments and forecasting |
+
+**Webhooks**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `page-watch-webhook` | sharedSecretHeader | Receives Firecrawl Monitoring callbacks for watched non-price pages and records the diff. |
+| `workspace-webhook-dispatcher` | cron | Deliver queued outbound webhook events to tenant endpoints |
+| `workspace-webhooks-api` | JWT | Manage a workspace's outbound webhook endpoints |
 
 <!-- END AUTO-INDEX -->
 

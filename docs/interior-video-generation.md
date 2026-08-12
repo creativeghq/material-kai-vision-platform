@@ -18,7 +18,6 @@ The `generate-interior-video-v2` edge function routes to the optimal AI video mo
 |---|---|---|---|
 | `veo-2` | 30 | ~2-3 min | Cinematic walkthroughs, floor-plan flythroughs |
 | `kling-v3.0` | 20 | ~60-90s | Product spotlights, before/after, social reels |
-| `wan2.1-i2v-720p` | 12 | ~90s | Budget option, general purpose |
 | `runway-gen4-turbo` | 40 | ~2-3 min | Premium quality output |
 
 Kling uses the native Kling SDK. Wan and Runway use Replicate. Veo-2 uses Google's API.
@@ -152,7 +151,6 @@ For social-media-specific short videos, the separate `generate-social-video` edg
 
 | Model | Credits |
 |---|---|
-| `kling-1.6-pro` | 15 |
 | `veo-2` (delegated to `generate-interior-video-v2`) | 30 |
 
 ```
@@ -160,7 +158,7 @@ POST /functions/v1/generate-social-video
 {
   "prompt": "...",
   "image_url": "...",
-  "model": "kling-1.6-pro",
+  "model": "kling-3.0",
   "aspect_ratio": "9:16",
   "workspace_id": "uuid"
 }
@@ -169,3 +167,5 @@ POST /functions/v1/generate-social-video
 ---
 
 **Last Updated:** March 2026
+
+> **Removed 2026-08-12 (issue #4):** `wan2.1-i2v-720p` and `kling-1.6-pro` were deleted upstream by Replicate (HTTP 404 on `GET /v1/models`, a read that needs no credit — distinct from our unfunded-account 402). Both were user-selectable and always hard-failed. The budget video tier stays vacant until `wan-video/wan-2.2-i2v-fast` is verified against a funded account (issue #4 Phase 5).
