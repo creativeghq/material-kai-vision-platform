@@ -233,6 +233,7 @@ async function handleRequest(
 
     await supabase.from('ai_usage_logs').insert({
       user_id: userId,
+      workspace_id: body.workspace_id ?? null,
       operation_type: 'virtual_staging',
       model_name: PRICING_KEY,
       credits_debited: CREDIT_COST,

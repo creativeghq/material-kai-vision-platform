@@ -230,6 +230,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     const rawCostUsd = pricing ? pricing.cost_per_unit * units : null;
     await supabase.from('ai_usage_logs').insert({
       user_id: userId,
+      workspace_id: workspace_id ?? null,
       operation_type: 'interior_video_generation_v2',
       model_name: key,
       credits_debited: creditCost,

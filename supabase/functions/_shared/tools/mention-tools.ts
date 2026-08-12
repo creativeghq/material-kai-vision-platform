@@ -58,7 +58,7 @@ async function isModuleEnabled(): Promise<boolean> {
   }
 }
 
-async function debit(userId: string, amount: number, op: string, productId?: string): Promise<boolean> {
+async function debit(userId: string, workspaceId: string | null, amount: number, op: string, productId?: string): Promise<boolean> {
   if (amount <= 0) return true;
   try {
     const sb = svcClient();
@@ -87,6 +87,10 @@ async function debit(userId: string, amount: number, op: string, productId?: str
     // the platform (operations dashboard groups by operation_type).
     sb.from('ai_usage_logs').insert({
       user_id: userId,
+      // Attribution, not payment: the fee below is charged personally on purpose. Without this
+      // the mirrored row was owned by nobody and the operations dashboard could not group it
+      // by tenant at all.
+      workspace_id: workspaceId,
       product_id: productId ?? null,
       operation_type: op,
       model_name: 'mention-monitoring-agent-tool',
@@ -112,7 +116,7 @@ async function debit(userId: string, amount: number, op: string, productId?: str
   }
 }
 
-async function refund(userId: string, amount: number, op: string, productId?: string): Promise<void> {
+async function refund(userId: string, workspaceId: string | null, amount: number, op: string, productId?: string): Promise<void> {
   if (amount <= 0) return;
   try {
     const sb = svcClient();
@@ -134,6 +138,7 @@ async function refund(userId: string, amount: number, op: string, productId?: st
     // Mirror refund as a negative-credit row so dashboard nets out correctly.
     sb.from('ai_usage_logs').insert({
       user_id: userId,
+      workspace_id: workspaceId,
       product_id: productId ?? null,
       operation_type: `${op}.refund`,
       model_name: 'mention-monitoring-agent-tool',
@@ -328,6 +333,8 @@ export const createGetMentionSummaryTool = (
 
 export const createCheckLlmVisibilityTool = (
   userId: string,
+  /** Attribution for the usage row; the probe fee stays on the personal balance. */
+  workspaceId: string | null,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => {
@@ -338,7 +345,7 @@ export const createCheckLlmVisibilityTool = (
       }
       // If force_run, debit + run probe; otherwise return latest cached snapshot
       if (force_run) {
-        const ok = await debit(userId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
+        const ok = await debit(userId, workspaceId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
         if (!ok) return JSON.stringify({ success: false, error: 'insufficient credits' });
         onChunk?.({ type: 'tool_progress', status: 'Running LLM visibility probe across models...', timestamp: Date.now() });
         let r: { ok: boolean; status: number; data?: any; error?: string };
@@ -349,11 +356,11 @@ export const createCheckLlmVisibilityTool = (
           );
         } catch (probeErr) {
           // Network or unexpected error — refund and surface
-          await refund(userId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
+          await refund(userId, workspaceId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
           return JSON.stringify({ success: false, error: probeErr instanceof Error ? probeErr.message : 'probe-llm failed' });
         }
         if (!r.ok) {
-          await refund(userId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
+          await refund(userId, workspaceId, LLM_PROBE_CREDITS, 'mention.llm_probe', product_id);
           return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
         }
       }

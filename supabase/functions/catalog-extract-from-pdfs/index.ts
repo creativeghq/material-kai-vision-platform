@@ -268,7 +268,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
           if (allCandidates.length >= maxResults) break;
         }
 
-        await logCost(supabase, body.caller_user_id, body.catalog_id, pdf.id, data?.usage);
+        await logCost(supabase, body.caller_user_id, pdf.workspace_id ?? null, body.catalog_id, pdf.id, data?.usage);
 
         if (allCandidates.length >= maxResults) break;
       } catch (perPdfErr) {
@@ -337,7 +337,9 @@ async function rasterizeAll(supabase: any, candidates: Candidate[]): Promise<voi
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, rasterizable.length) }, () => worker()));
 }
 
-async function logCost(supabase: any, userId: string | undefined, catalogId: string, sourcePdfId: string, usage: any) {
+// `workspaceId` comes from the source PDF row, the same place the refund path reads it.
+// Without it this cost was billed against a tenant and reported against nobody.
+async function logCost(supabase: any, userId: string | undefined, workspaceId: string | null, catalogId: string, sourcePdfId: string, usage: any) {
   if (!userId || !usage) return;
   const inputTokens = usage.input_tokens ?? 0;
   const outputTokens = usage.output_tokens ?? 0;
@@ -348,6 +350,7 @@ async function logCost(supabase: any, userId: string | undefined, catalogId: str
   try {
     await supabase.from('ai_usage_logs').insert({
       user_id: userId,
+      workspace_id: workspaceId,
       operation_type: 'catalog_extract_from_pdf',
       model_name: MODEL,
       api_provider: 'anthropic',

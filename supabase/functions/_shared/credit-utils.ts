@@ -165,6 +165,11 @@ export async function debitExternalServiceCredits(
 
     const { error: logError } = await supabase.from('ai_usage_logs').insert({
       user_id: userId,
+      // The same value the debit above used. It was in scope the whole time and simply never
+      // reached the log row, so the spend was billed to a workspace pool and then reported
+      // against nobody — invisible to per-tenant cost views and to this table's own
+      // `is_workspace_admin(workspace_id)` policy.
+      workspace_id: workspaceId ?? null,
       operation_type: operationType,
       model_name: serviceName,
       api_provider: serviceName.split('-')[0],
@@ -302,6 +307,15 @@ export async function debitAgentChatTurn(
   userId: string,
   agentId: string,
   metadata: Record<string, unknown> = {},
+  /**
+   * The partner key's workspace, for the USAGE row only.
+   *
+   * Deliberately NOT passed to the debit below: the per-turn partner fee always comes out of the
+   * partner's personal balance, which is what `p_workspace_id: null` says. Attribution and payment
+   * are different questions — this one answers "whose tenant did this run in", which is what
+   * decides whether a workspace admin can see the row at all.
+   */
+  workspaceId?: string | null,
 ): Promise<AgentTurnDebitResult> {
   const credits = getAgentTurnCost(agentId);
   if (credits <= 0) {
@@ -337,6 +351,7 @@ export async function debitAgentChatTurn(
   // Log to ai_usage_logs for partner cost transparency
   supabase.from('ai_usage_logs').insert({
     user_id: userId,
+    workspace_id: workspaceId ?? null,
     operation_type: 'agent_chat_turn',
     model_name: `agent-${agentId}`,
     api_provider: 'agent-chat',

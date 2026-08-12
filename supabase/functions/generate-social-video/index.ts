@@ -310,6 +310,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
 
       await supabase.from('ai_usage_logs').insert({
         user_id: userId,
+        workspace_id: workspace_id ?? null,
         operation_type: 'social_video_generation',
         model_name: model,
         api_provider: 'replicate',

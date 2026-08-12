@@ -24,6 +24,7 @@ import { TOOLKIT_CLUSTERS } from '../_shared/toolkitClusters.generated.ts';
 // Type-only — erased at compile time, so it costs nothing at boot. The implementation is
 // loaded inside initRuntime() alongside the other lazy modules.
 import type { AgentMemory as AgentMemoryType } from '../_shared/agent-memory.ts';
+import { runInBackground } from '../_shared/background.ts';
 
 // Runtime singletons — initialized once on first request
 let _initialized = false;
@@ -1816,7 +1817,7 @@ async function executeAgent(
     tools.push(createGetMentionSummaryTool(userId, userJwt, onChunk));
   }
   if (config.tools.includes('check_llm_visibility') && createCheckLlmVisibilityTool) {
-    tools.push(createCheckLlmVisibilityTool(userId, userJwt, onChunk));
+    tools.push(createCheckLlmVisibilityTool(userId, workspaceId ?? null, userJwt, onChunk));
   }
   if (config.tools.includes('find_negative_mentions') && createFindNegativeMentionsTool) {
     tools.push(createFindNegativeMentionsTool(userId, userJwt, onChunk));
@@ -2113,10 +2114,10 @@ async function executeAgent(
     // emit workflow_plan / workflow_step_progress / workflow_finished chunks
     // for the b2b-research wizard.
     if (config.tools.includes('b2b_manufacturer_search')) {
-      tools.push(createB2BManufacturerSearchTool(userId, sendProgress, onChunk));
+      tools.push(createB2BManufacturerSearchTool(userId, workspaceId ?? null, sendProgress, onChunk));
     }
     if (config.tools.includes('company_website_scrape')) {
-      tools.push(createCompanyWebsiteScrapeTool(userId, sendProgress));
+      tools.push(createCompanyWebsiteScrapeTool(userId, workspaceId ?? null, sendProgress));
     }
     if (config.tools.includes('company_enrichment')) {
       tools.push(createCompanyEnrichmentTool(userId, sendProgress));
@@ -2892,6 +2893,8 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
         userId!,
         agentId,
         { api_key_id: auth.apiKey?.api_key_id, conversation_id },
+        // Attribution only — the fee still comes from the partner's personal balance.
+        auth.apiKey?.workspace_id ?? null,
       );
       if (!debit.success) {
         const status = debit.error === 'insufficient_credits' ? 402 : 500;
@@ -3083,9 +3086,17 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             throw new Error('Agent execution failed to return a valid result');
           }
 
-          // 🧠 Promotion gate: distil this turn into long-term memory (non-blocking)
-          promoteTurnToMemory(userId, workspaceId, agentId, userInput, finalResult.text, conversation_id)
-            .catch(err => console.warn('⚠️ Memory promotion failed:', err));
+          // 🧠 Promotion gate: distil this turn into long-term memory (non-blocking).
+          //
+          // `runInBackground`, not a bare `.catch()`: this fires a real Haiku call plus an RPC
+          // AFTER the turn's response is done, and an un-kept-alive promise is killed when the
+          // isolate winds down. `ops.silent_zero` caught the symptom — 27 chat turns in 30 days
+          // and not one promoted memory, with nothing logged either way, because the work never
+          // got to fail. The payments webhook already used this pattern for the same reason.
+          void runInBackground(
+            promoteTurnToMemory(userId, workspaceId, agentId, userInput, finalResult.text, conversation_id),
+            'agent-memory',
+          );
 
           // 🔄 Emit flow events based on tool results (fire-and-forget)
           if (finalResult.toolResults?.length) {

@@ -180,6 +180,9 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
 
     await supabase.from('ai_usage_logs').insert({
       user_id: userId,
+      // Same value the debit above used. It was in scope and never reached the log row, so
+      // this spend was charged to a tenant and then reported against nobody.
+      workspace_id: body.workspace_id ?? null,
       operation_type: 'region_edit',
       model_name: PRICING_KEY,
       credits_debited: CREDITS_REQUIRED,

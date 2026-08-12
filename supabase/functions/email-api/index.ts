@@ -58,6 +58,20 @@ interface SendEmailRequest {
    *  NO platform-key fallback. Returns 503 (code=workspace_sender_required) when the workspace has
    *  no verified BYOK config, so the campaign never goes out from the platform domain. */
   requireWorkspaceSender?: boolean;
+  /**
+   * WHOSE email this is, for the log row only — never for sender selection or quota.
+   *
+   * `workspace_id` above means three things at once: which BYOK sender to use, whose daily cap to
+   * count against, and who owns the log row. An operator flow emailing a tenant's customer from
+   * the PLATFORM sender must not take the first two (that is the deliberate "platform-sent and
+   * unmetered" path), and so it was passing none of them — leaving 144 of 146 `email_logs` rows
+   * with no workspace. `email_logs_member_select` is
+   * `workspace_id IS NOT NULL AND is_workspace_member(workspace_id)`, so those tenants could not
+   * see their own customers' order and payment emails at all.
+   *
+   * Ignored when `workspace_id` is set; that one already carries the attribution.
+   */
+  attribution_workspace_id?: string;
 }
 
 async function sendViaResend(apiKey: string, payload: {
@@ -316,8 +330,12 @@ Deno.serve(withApiLogging('email-api', async (req) => {
         // send from workspace B's verified domain — billed to B's key, counted against
         // B's quota, stamped to B. Require membership when a workspace_id is supplied
         // (server-to-server admin-secret callers are exempt — trusted system sends).
-        if (!isAdminAccess(auth) && body.workspace_id) {
-          if (!(await userCanAccessWorkspace(supabaseClient, auth.userId, body.workspace_id))) {
+        // Attribution is bound to the caller on exactly the same terms as the sender. It is a
+        // weaker capability — it names an owner rather than spending one's quota — but an
+        // unbound one would let anyone drop a row into a stranger's email history.
+        const attributionWorkspaceId = body.workspace_id ?? body.attribution_workspace_id ?? null;
+        if (!isAdminAccess(auth) && attributionWorkspaceId) {
+          if (!(await userCanAccessWorkspace(supabaseClient, auth.userId, attributionWorkspaceId))) {
             return new Response(
               JSON.stringify({ success: false, error: 'Not authorized for the requested workspace sender' }),
               { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -572,7 +590,7 @@ Deno.serve(withApiLogging('email-api', async (req) => {
             email_type: body.emailType || 'transactional',
             tags: body.tags || {},
             variables: body.variables || {},
-            workspace_id: body.workspace_id ?? null,
+            workspace_id: attributionWorkspaceId,
             // Server-to-server callers (Flows send_email, send-quote-email, price/
             // mention alerts, …) authenticate with the secret key and carry no user,
             // so auth.user is null. created_by is nullable for exactly these system

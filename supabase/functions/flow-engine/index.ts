@@ -397,6 +397,10 @@ async function executeAction(
       //    gracefully rather than failing.
       const emailIsTenant = !!scope?.workspaceId && !scope?.isGlobal;
       let emailWorkspaceId: string | null = null;
+      // WHOSE email this is, which is a different question from whose SENDER goes out. An
+      // operator flow reacting to a tenant event sends from the platform address (unmetered,
+      // by design) but the mail still belongs to that tenant's history.
+      let eventWorkspaceId: string | null = null;
       if (emailIsTenant) {
         // A tenant automation MUST send from the workspace's own domain. If no BYOK sender is
         // connected, FAIL LOUDLY with an actionable reason (stored on flow_runs.error_message)
@@ -421,6 +425,7 @@ async function executeAction(
         // Operator flow: divert to the event's workspace sender ONLY when that workspace has BYOK
         // (so a no-BYOK / platform-level email stays platform-sent AND unmetered — no daily cap).
         const eventWs = (context.trigger as { data?: Record<string, unknown> } | undefined)?.data?.workspace_id;
+        if (typeof eventWs === 'string' && eventWs) eventWorkspaceId = eventWs;
         if (typeof eventWs === 'string' && eventWs && await workspaceHasByok(supabase, eventWs)) {
           emailWorkspaceId = eventWs;
         }
@@ -436,6 +441,11 @@ async function executeAction(
           // (subject/body) are rendered from `variables` server-side.
           templateSlug: resolved.template_id || resolved.template_slug || undefined,
           variables: emailVariables,
+          // Attribution travels even when the SENDER does not. An operator flow emailing a
+          // tenant's customer from the platform address still belongs to that tenant's history —
+          // and until now it was logged against nobody, so the tenant could not see the order and
+          // payment mail going out in their name. Ignored by email-api when `workspace_id` is set.
+          ...(eventWorkspaceId ? { attribution_workspace_id: eventWorkspaceId } : {}),
           ...(emailWorkspaceId
             ? {
                 workspace_id: emailWorkspaceId,

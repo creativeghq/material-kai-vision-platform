@@ -206,7 +206,7 @@ export class AgentMemory {
     query: string,
     opts?: { limit?: number; minSimilarity?: number; conversationId?: string | null },
   ): Promise<RecalledMemory[]> {
-    const queryEmbedding = await this.embed(query, 'query');
+    const queryEmbedding = await this.embed(query, 'query', { userId, workspaceId });
 
     const { data, error } = await this.supabase.rpc('match_agent_memories', {
       p_user_id: userId,
@@ -393,7 +393,7 @@ export class AgentMemory {
       if (typeof data === 'string') written.push({ id: data, content: c.content });
     }
 
-    result.embedded = await this.embedWritten(written);
+    result.embedded = await this.embedWritten(written, { userId: args.userId, workspaceId: args.workspaceId });
     return result;
   }
 
@@ -430,10 +430,13 @@ export class AgentMemory {
    * row in the recency-fallback tier and trips the `agent_memory_never_embedded` probe if
    * it becomes the norm.
    */
-  private async embedWritten(written: Array<{ id: string; content: string }>): Promise<number> {
+  private async embedWritten(
+    written: Array<{ id: string; content: string }>,
+    owner: { userId?: string | null; workspaceId?: string | null } = {},
+  ): Promise<number> {
     let embedded = 0;
     for (const row of written) {
-      const vec = await this.embed(row.content, 'document');
+      const vec = await this.embed(row.content, 'document', owner);
       if (!vec) continue;
       const { error } = await this.supabase
         .from('agent_memories')
@@ -456,13 +459,27 @@ export class AgentMemory {
    * platform_secrets into Deno.env. Loading it here — inside a request — is what makes
    * that capture read a populated value.
    */
-  private async embed(text: string, inputType: 'document' | 'query'): Promise<number[] | null> {
+  /**
+   * `owner` is passed PER CALL, never held on the instance.
+   *
+   * agent-chat constructs this class once at module init and reuses it for every request, so an
+   * instance-held workspace would attribute one tenant's embedding spend to whichever tenant
+   * happened to be first. Both callers already receive the ids as arguments; the only reason
+   * these rows reached `ai_usage_logs` with no owner at all is that nothing passed them on.
+   */
+  private async embed(
+    text: string,
+    inputType: 'document' | 'query',
+    owner: { userId?: string | null; workspaceId?: string | null } = {},
+  ): Promise<number[] | null> {
     const trimmed = (text ?? '').trim();
     if (!trimmed) return null;
     try {
       const { generateStandardEmbedding } = await import('./embedding-utils.ts');
       return await generateStandardEmbedding(trimmed.slice(0, 8000), inputType, {
         operationType: `agent_memory_${inputType}`,
+        userId: owner.userId,
+        workspaceId: owner.workspaceId,
       });
     } catch (e) {
       console.warn(`[agent-memory] ${inputType} embedding unavailable (recall degrades to recency):`, e);

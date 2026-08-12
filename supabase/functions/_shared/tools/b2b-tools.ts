@@ -149,7 +149,18 @@ const B2B_REGIONS: Record<string, { label: string; countries: string[] }> = {
 
 const B2B_ALL_COUNTRIES = Object.values(B2B_REGIONS).flatMap((r) => r.countries);
 
-export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (status: string) => void, onChunk?: B2BChunkSink) => {
+export const createB2BManufacturerSearchTool = (
+  userId: string,
+  /**
+   * The workspace this tool is running in — for ATTRIBUTION on the usage row, not for the
+   * debit. The per-call fee here deliberately comes from the caller's personal balance
+   * (`p_workspace_id: null` below); this answers the separate question of whose tenant the
+   * call belongs to, which is what decides whether a workspace admin can see it at all.
+   */
+  workspaceId: string | null,
+  onProgress?: (status: string) => void,
+  onChunk?: B2BChunkSink,
+) => {
   return tool(
     async ({ country, region, category, limit = 30, _workflow_run_id }) => {
       const _blocked = await b2bAffordabilityGate(userId, 5, 'b2b_manufacturer_search');
@@ -235,6 +246,7 @@ export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (st
 
           await supabase.from('ai_usage_logs').insert({
             user_id: userId,
+            workspace_id: workspaceId,
             operation_type: 'b2b_manufacturer_search',
             model_name: 'claude-haiku-4-5',
             api_provider: 'anthropic',
@@ -302,7 +314,12 @@ export const createB2BManufacturerSearchTool = (userId: string, onProgress?: (st
  * B2B Research Tool: Company Website Scrape
  * Uses Firecrawl API to extract structured information from company websites
  */
-export const createCompanyWebsiteScrapeTool = (userId: string, onProgress?: (status: string) => void) => {
+export const createCompanyWebsiteScrapeTool = (
+  userId: string,
+  /** Attribution only — see createB2BManufacturerSearchTool. */
+  workspaceId: string | null,
+  onProgress?: (status: string) => void,
+) => {
   return tool(
     async ({ url, extract }) => {
       const _blocked = await b2bAffordabilityGate(userId, 15, 'company_website_scrape');
@@ -453,6 +470,7 @@ ${markdown.substring(0, 15000)}`;
               });
               await supabase.from('ai_usage_logs').insert({
                 user_id: userId,
+                workspace_id: workspaceId,
                 operation_type: 'company_website_scrape_analysis',
                 model_name: 'claude-opus-4-8',
                 api_provider: 'anthropic',

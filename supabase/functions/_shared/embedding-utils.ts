@@ -116,6 +116,14 @@ async function _logEmbeddingUsage(
   latencyMs: number,
   operationType: string,
   jobId?: string,
+  /**
+   * Who the embedding was for. This row is the billing record and it carried NEITHER id — not
+   * even a user — so it was owned by nobody: invisible to per-tenant cost views and to this
+   * table's own `auth.uid() = user_id OR is_workspace_admin(workspace_id)` policy, which cannot
+   * match when both are null. Optional because some callers genuinely have no tenant (a query
+   * embedding on a public search path); null must keep meaning "no owner", never "we had one".
+   */
+  owner?: { userId?: string | null; workspaceId?: string | null },
 ): Promise<void> {
   try {
     const supabaseUrl = getEnv('SUPABASE_URL');
@@ -129,6 +137,8 @@ async function _logEmbeddingUsage(
     const billedCost = rawCost * MARKUP_MULTIPLIER;
 
     const { error } = await supabase.from('ai_usage_logs').insert({
+      user_id: owner?.userId ?? null,
+      workspace_id: owner?.workspaceId ?? null,
       operation_type: operationType,
       model_name: 'voyage-4',
       input_tokens: estimatedTokens,
@@ -154,7 +164,7 @@ async function _logEmbeddingUsage(
 export async function generateStandardEmbedding(
   text: string,
   inputType: 'document' | 'query' = 'document',
-  logCtx?: { operationType?: string; jobId?: string },
+  logCtx?: { operationType?: string; jobId?: string; userId?: string | null; workspaceId?: string | null },
 ): Promise<number[]> {
   if (!MIVAA_CONFIG.apiKey) {
     throw new Error('MIVAA_API_KEY environment variable is required');
@@ -221,6 +231,7 @@ export async function generateStandardEmbedding(
         elapsedMs,
         logCtx?.operationType ?? `embedding:${inputType}`,
         logCtx?.jobId,
+        { userId: logCtx?.userId, workspaceId: logCtx?.workspaceId },
       ).catch(() => {});
 
       return embedding;

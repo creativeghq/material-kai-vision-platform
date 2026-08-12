@@ -420,7 +420,7 @@ export async function handlePipeline(req: Request, body: any): Promise<Response>
 
     // Site-aware inter-linking: match this article's plan against the user's
     // indexed website pages (if they've connected one in profile settings).
-    const siteArticles = await buildSiteMatches(supabase, userId, plan, finalMarkdown, websiteId);
+    const siteArticles = await buildSiteMatches(supabase, userId, workspaceId ?? null, plan, finalMarkdown, websiteId);
 
     // ── Phase 5 — auto-interlink from Google's "related searches" block ──
     // Each term in serpSignals.relatedSearches is a query Google clusters
@@ -991,6 +991,9 @@ function extractInternalLinks(
 async function buildSiteMatches(
   supabase: any,
   userId: string,
+  // Carried purely so the interlink embedding's cost lands on the tenant that asked for the
+  // article, rather than on nobody.
+  workspaceId: string | null,
   plan: ArticlePlan,
   finalMarkdown: string,
   preferredWebsiteId?: string | null,
@@ -1031,7 +1034,9 @@ async function buildSiteMatches(
 
     let embedding: number[];
     try {
-      embedding = await generateStandardEmbedding(summary, 'query', { operationType: 'seo_interlink_match' });
+      embedding = await generateStandardEmbedding(summary, 'query', {
+        operationType: 'seo_interlink_match', userId, workspaceId,
+      });
     } catch (e) {
       console.warn('[seo-pipeline] interlink embedding failed:', (e as Error).message);
       return [];

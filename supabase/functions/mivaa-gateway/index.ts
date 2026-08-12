@@ -549,6 +549,9 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
         // Log to ai_usage_logs (non-blocking)
         supabaseAdmin.from('ai_usage_logs').insert({
           user_id: auth.userId,
+          // Read from the payload exactly as the debit above reads it, so the two cannot
+          // disagree about which tenant this gateway call belonged to.
+          workspace_id: (payload && typeof payload.workspace_id === 'string' ? payload.workspace_id : null),
           operation_type: pricing.operationType,
           model_name: `mivaa-${action}`,
           input_tokens: 0,

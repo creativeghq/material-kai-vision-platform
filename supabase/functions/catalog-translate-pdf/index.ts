@@ -148,7 +148,9 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
 
     const { data: pdf, error: pdfErr } = await supabase
       .from('catalog_source_pdfs')
-      .select('id, original_filename, manufacturer_name, storage_path, page_count')
+      // `workspace_id` is selected for cost attribution — the AI usage row for this run had
+      // no tenant on it, so it was invisible to every per-workspace cost view.
+      .select('id, original_filename, manufacturer_name, storage_path, page_count, workspace_id')
       .eq('id', body.source_pdf_id)
       .single();
     if (pdfErr || !pdf) return jsonResponse({ success: false, error: 'Source PDF not found' }, 404);
@@ -279,7 +281,7 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
       return jsonResponse({ success: false, error: upErr.message }, 500);
     }
 
-    await logCost(supabase, body.caller_user_id, body.target_catalog_id, pdf.id, data?.usage);
+    await logCost(supabase, body.caller_user_id, (pdf as { workspace_id?: string | null }).workspace_id ?? null, body.target_catalog_id, pdf.id, data?.usage);
 
     return jsonResponse({
       success: true,
@@ -342,7 +344,7 @@ async function rasterizeAllMaterials(supabase: any, sections: any[]): Promise<vo
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
 }
 
-async function logCost(supabase: any, userId: string | undefined, catalogId: string, sourcePdfId: string, usage: any) {
+async function logCost(supabase: any, userId: string | undefined, workspaceId: string | null, catalogId: string, sourcePdfId: string, usage: any) {
   if (!userId || !usage) return;
   const inputTokens = usage.input_tokens ?? 0;
   const outputTokens = usage.output_tokens ?? 0;
@@ -352,6 +354,7 @@ async function logCost(supabase: any, userId: string | undefined, catalogId: str
   try {
     await supabase.from('ai_usage_logs').insert({
       user_id: userId,
+      workspace_id: workspaceId,
       operation_type: 'catalog_translate_pdf',
       model_name: MODEL,
       api_provider: 'anthropic',

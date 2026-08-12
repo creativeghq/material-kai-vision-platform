@@ -143,6 +143,7 @@ Deno.serve(withApiLogging('generate-vr-world', async (req) => {
 
     await supabase.from('ai_usage_logs').insert({
       user_id: userId,
+      workspace_id: wsId,
       operation_type: 'vr_generation',
       model_name: model,
       credits_debited: creditCost,

@@ -326,10 +326,13 @@ export async function runRadarForSubject(
   return { summary: research.summary, ...persisted, rawCostUsd: research.rawCostUsd };
 }
 
-async function logUsage(sb: ReturnType<typeof svcClient>, userId: string | null, cost: number, meta: Record<string, unknown>, creditsDebited = 0) {
+async function logUsage(sb: ReturnType<typeof svcClient>, userId: string | null, workspaceId: string | null, cost: number, meta: Record<string, unknown>, creditsDebited = 0) {
   try {
     await sb.from('ai_usage_logs').insert({
       user_id: userId,
+      // The credit reserve/settle path already scopes to a workspace; the usage row did not,
+      // so tech-radar spend was invisible to the tenant that paid for it.
+      workspace_id: workspaceId,
       operation_type: 'tech_radar_review',
       model_name: RESEARCH_MODEL,
       api_provider: 'anthropic',
@@ -415,7 +418,7 @@ export const createReviewSolutionTool = (
         // Settle: actual = raw cost × 1.5 markup, 1 credit = $0.01. Refund the unused surplus.
         const actualCredits = Math.max(1, Math.ceil(result.rawCostUsd * 1.5 * 100));
         await settleCredits(sb, userId, workspaceId, REVIEW_CREDIT_CEILING, actualCredits, 'tech_radar_review', { subject_id: subject.id });
-        await logUsage(sb, userId, result.rawCostUsd, { subject_id: subject.id, title: subject.title, finding_count: result.total }, actualCredits);
+        await logUsage(sb, userId, workspaceId, result.rawCostUsd, { subject_id: subject.id, title: subject.title, finding_count: result.total }, actualCredits);
 
         onChunk?.({
           type: 'tech_radar_findings',
