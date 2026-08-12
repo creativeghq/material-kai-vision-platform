@@ -321,3 +321,56 @@ what it found. Fifteen of twenty-five qualify. That is the gap.
 3. Wire the "make it fail" case in as a permanent self-test, so a future edit that breaks detection breaks the build instead of going quiet.
 4. Add a row here, with the date you watched it fire.
 5. If it needs a baseline, ratchet **down** only. A baseline edited upward is how a gate dies.
+
+---
+
+## Integrity-detector verification sweep — 2026-08-12
+
+The 57-check `data_integrity_checks` registry had never been held to the rule at the top of this
+file. Of 57 enabled checks, **9 had ever produced a finding** in 59 sweeps since 2026-06-26; the
+other 48 were clean and unproven — indistinguishable states.
+
+Method: plant the defect inside a transaction, run the detector, `ROLLBACK`. Verified in one call,
+no trace left. Where a write-time trigger blocks the plant (`enforce_allocation_not_over_total`),
+`ALTER TABLE … DISABLE TRIGGER USER` inside the same transaction — which is what proves the detector
+is a genuine *backstop* rather than a restatement of the constraint.
+
+**Watched to fire (defect planted, detector returned it, rolled back):**
+
+| Check | Planted |
+|---|---|
+| `tenancy.order_item_workspace` | order_item whose `workspace_id` ≠ its order's |
+| `tenancy.payment_order_workspace` | payment in workspace A tagged to an order in workspace B |
+| `finance.order_item_net_mismatch` | `net_value` ≠ qty × unit_price |
+| `finance.order_payment_status_drift` | cached `payment_status='paid'` on an unsettled order |
+| `finance.order_over_settled` | allocation > order total (trigger disabled in-txn) |
+| `finance.payment_over_allocated` | allocation 500 against a payment of 100 |
+| `finance.quote_totals_drift` | `grand_total` moved off its derivation |
+| `ops.integrity_registry_broken` | registry row naming a `detect_fn` that does not exist |
+| `ops.cron_reported_success_but_no_effect` | fired on the real 2026-08-12 sweep failure; cleared on the fix |
+| `ops_upsert_arbiter_uninferable` | fired on `uq_customer_assets_order_item`; cleared on the fix |
+
+**Two checks were found broken by this exercise — the reason it was worth doing:**
+
+- **`ops.monitoring_stalled` (job-research:digest) was VACUOUS.** It watched
+  `job_listings.digest_included_at`, a column nothing writes: delivery in that design is a *purge*
+  (row deleted, tombstone written to `job_research_sent`). It read all-null forever and could not
+  distinguish a working digest from a dead one — it had been firing for weeks as a true statement
+  about a meaningless number, occupying the place a real check should have had. Rewritten to watch
+  in-window matches left unpurged after a digest ran, plus a separate signal for matches that aged
+  out undelivered.
+- **`finance.money_fn_bypasses_derivation` matched a variable name, not a defect.** Its predicate
+  required `v_quote.grand_total` — the local used by the one historical offender. Proven brittle:
+  two functions planted in a rolled-back transaction, doing the identical wrong thing, differing
+  only in whether the local was `v_quote` or `q` — it found exactly one. This is the same
+  false-negative [tests/unit/moneyDerivation.test.ts](../tests/unit/moneyDerivation.test.ts)
+  documents in its own header ("a text pattern rule is only ever as strong as the names people
+  happen to pick"). Re-keyed on the shape. **Broadening it immediately surfaced two live violations
+  the narrow rule had been missing for as long as it existed** — `generate_order_from_quote` and
+  `materialize_upstream_orders`, both minting invoice `subtotal_net` / `vat_amount` / `total`
+  straight from the cached `quotes` columns. Both open findings.
+
+**Still unproven:** the remaining ~13 `critical` checks (catalog ×3, credits, embed,
+`finance.derived_doc_drift`, `finance.stock_bypasses_document_gate`, `ops.email_delivery_failing`,
+`ops.storage_paths_unregistered`, `realestate.commission_over_allocated`, `stock.reservation_missing`)
+and all `warning`-severity checks. A clean run from any of them still means nothing.
