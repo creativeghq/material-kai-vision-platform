@@ -204,8 +204,39 @@ export const ProductMaterialMapsCard: React.FC<Props> = ({
                 <div className="flex items-center justify-between gap-1">
                   <span className="text-[10px] text-muted-foreground truncate">{c.model}</span>
                   {c.is_selected ? (
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-                      <Check className="h-3 w-3" /> in use
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
+                        <Check className="h-3 w-3" /> in use
+                      </span>
+                      {/* Only offered on the candidate the renderer actually uses, and only once —
+                          deriving relief for a texture nobody sees spends time on nothing. */}
+                      {!c.normal_path && (
+                        <button
+                          className="text-[10px] text-primary hover:underline disabled:opacity-50"
+                          disabled={busy === `normal-${c.id}`}
+                          onClick={async () => {
+                            setBusy(`normal-${c.id}`);
+                            try {
+                              await productMaterialMapsService.deriveNormal({
+                                workspaceId, candidate: c,
+                              });
+                              load();
+                              toast({ title: 'Relief derived from this texture' });
+                            } catch (e) {
+                              toast({
+                                title: 'Could not derive the relief',
+                                description: e instanceof Error ? e.message : String(e),
+                                variant: 'destructive',
+                              });
+                            } finally { setBusy(null); }
+                          }}
+                        >
+                          {busy === `normal-${c.id}` ? 'deriving…' : '+ relief'}
+                        </button>
+                      )}
+                      {c.normal_path && (
+                        <span className="text-[10px] text-muted-foreground">+ relief</span>
+                      )}
                     </span>
                   ) : (
                     <div className="flex items-center gap-1">

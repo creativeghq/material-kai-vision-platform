@@ -24,6 +24,7 @@
  * which already ships numpy/opencv/Pillow, and lands separately.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { MIVAA_API_URL } from '@/config/mivaa';
 
 export interface MaterialMapCandidate {
   id: string;
@@ -191,6 +192,43 @@ export const productMaterialMapsService = {
     const existing = await this.listCandidates(params.productId, params.optionValueId ?? null);
     if (!existing.some((c) => c.is_selected)) await this.select(candidate.id);
     return candidate;
+  },
+
+  /**
+   * Derive a normal map for a candidate from its albedo (#321).
+   *
+   * MIVAA, not an edge function and not a model: edge functions have no image decoding, and a
+   * diffusion model asked for a normal map returns a picture that LOOKS like one — RGB that are not
+   * surface directions, so the renderer lights the surface wrongly and it reads as plastic. This is
+   * derived from the albedo the tenant already picked, so it is an approximation of the real image
+   * rather than an invention, and it costs no credits.
+   */
+  async deriveNormal(params: {
+    workspaceId: string;
+    candidate: MaterialMapCandidate;
+    strength?: number;
+  }): Promise<void> {
+    const albedoUrl = publicUrl(params.candidate.storage_bucket, params.candidate.albedo_path);
+    if (!albedoUrl) throw new Error('That candidate has no albedo to derive from.');
+
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${MIVAA_API_URL}/api/material-maps/normal`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
+      body: JSON.stringify({
+        workspace_id: params.workspaceId,
+        material_map_id: params.candidate.id,
+        albedo_url: albedoUrl,
+        strength: params.strength ?? 1.0,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err?.detail || 'Could not derive the normal map.');
+    }
   },
 
   /** Make one candidate the renderer's. The partial unique index enforces one per product/option. */
