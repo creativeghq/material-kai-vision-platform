@@ -2,6 +2,9 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
 
+import { Metric } from './Metric';
+import { MicroLabel, DeltaChip } from './MetricParts';
+
 interface StatCardProps {
   title: string;
   value: string | number;
@@ -35,28 +38,27 @@ export const StatCard: React.FC<StatCardProps> = ({
 }) => {
   return (
     <div className={cn('stat-card', className)}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm text-muted-foreground mb-2">{title}</p>
-          <p className="text-2xl font-light text-foreground">{value}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          {/* Micro-label above, oversized numeral below — the order that makes a
+              number read as instrumentation. Was a 14px caption over a 24px value. */}
+          <MicroLabel className="mb-3">{title}</MicroLabel>
+          <Metric value={String(value)} size="md" />
           {change && (
-            <div className="mt-2">
-              <span
-                className={cn(
-                  'text-sm font-medium',
-                  change.type === 'increase' && 'text-success',
-                  change.type === 'decrease' && 'text-error',
-                  change.type === 'neutral' && 'text-muted-foreground',
-                )}
-              >
-                {change.value}
-              </span>
+            <div className="mt-3">
+              <DeltaChip
+                label={change.value}
+                direction={
+                  change.type === 'increase' ? 'up' : change.type === 'decrease' ? 'down' : 'flat'
+                }
+                showIcon
+              />
             </div>
           )}
         </div>
         {Icon && (
-          <div className={cn('p-3 rounded-lg bg-secondary/50', iconColor)}>
-            <Icon className="w-6 h-6" />
+          <div className={cn('p-2.5 rounded-xl bg-secondary/50 shrink-0', iconColor)}>
+            <Icon className="w-5 h-5" />
           </div>
         )}
       </div>
