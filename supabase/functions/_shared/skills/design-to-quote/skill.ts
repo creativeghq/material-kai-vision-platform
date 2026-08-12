@@ -21,11 +21,12 @@ The website widget walks a visitor through four steps and always ends somewhere 
 1  what are you after   the noun: product_type
 2  configure            the adjectives: facets — material, finish, colour, dimensions
 3  see it               a picture, when they want one
-4  price it             price_my_spec  → exact  = quote the price
+4  place it             room planner, at real size — only when the match has a model
+5  price it             price_my_spec  → exact  = quote the price
                                        → near / none = raise_quote_request
 \`\`\`
 
-**Step 4 is not optional.** Every conversation that reaches a specification ends either with a derived price or with a recorded request. Ending it any other way — "we probably don't stock that", "that'd be somewhere around €400" — is the failure this skill exists to prevent.
+**Step 5 is not optional.** Every conversation that reaches a specification ends either with a derived price or with a recorded request. Ending it any other way — "we probably don't stock that", "that'd be somewhere around €400" — is the failure this skill exists to prevent.
 
 ## The three rules the model breaks by default
 
@@ -50,7 +51,21 @@ Facet keys are per-tenant and you cannot guess them. Asked for a navy armchair y
 - Label it as an impression, every time. A generated picture presented as a catalogue photo is a promise about a thing that may not exist.
 - Generating an impression of something we already own a model of spends the merchant's credits inventing what they already have.
 
-**Step 4 — price it, or record it.**
+**Step 4 — place it, when there is something to place.**
+
+\`price_my_spec\` returns \`planner_url\` on an exact match that has a 3D model. Offer it before you
+quote: "want to see it in the room at its real size?" — that is the stage that answers *will it
+fit*, and it is the one question a price cannot answer.
+
+- **Offer it only when \`planner_url\` is present.** Null means the product has no model, so the
+  planner has nothing to place and no size to place it at. Linking anyway sends the customer to an
+  empty grid, which reads as a broken feature rather than a missing model.
+- **Never build the URL yourself.** It comes back from the tool. A hand-assembled link is a second
+  copy of a route that will move.
+- It is optional and it does not block step 5. Someone who does not want to arrange a room still
+  gets a price.
+
+**Step 5 — price it, or record it.**
 
 | verdict | what you do |
 |---|---|

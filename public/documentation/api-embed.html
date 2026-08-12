@@ -18,12 +18,13 @@
   <div class="callout"><p><strong>See it running:</strong> <a href="embed-demo.html">a live demo page</a> — a real product, a real 3D model, real prices, and a compatibility rule you can trigger.</p></div>
 
   <h2>The two-line version</h2>
+  <p>There is <strong>one tag</strong>. Give it a <code>product-id</code> for a page that is already about one product; leave it off and it asks the visitor what they're after instead.</p>
   <pre><code>&lt;script src="https://app.materialshub.gr/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
 
-&lt;materialkai-product
+&lt;materialkai-builder
   api-key="mk_embed_…"
   product-id="YOUR-PRODUCT-ID"&gt;
-&lt;/materialkai-product&gt;</code></pre>
+&lt;/materialkai-builder&gt;</code></pre>
 
   <p>That renders the product in 3D with orbit controls, an <strong>AR button on Android</strong> (Scene Viewer, straight from the <code>.glb</code>; iPhones get the 3D viewer without an AR button), its price, and — if the product has configurable options — swatches that repaint the model and update the price as they're picked.</p>
 
@@ -38,12 +39,12 @@
     </tbody>
   </table></div>
 
-  <h2>One tag, two situations</h2>
-  <p><code>&lt;materialkai-builder&gt;</code> is the same embed for the case where the visitor <em>doesn't know</em> which product they want. It asks what they're after, lets them pick materials and finishes, shows them the result — the real 3D model when one exists, an AI impression when it doesn't — and ends in a price if the catalogue matches, or a quote request if it doesn't.</p>
+  <h2>The other situation: they don't know what they want yet</h2>
+  <p>Drop the <code>product-id</code> and the same tag handles the case where the visitor <em>doesn't know</em> which product they want. It asks what they're after, lets them pick materials and finishes, shows them the result — the real 3D model when one exists, an AI impression when it doesn't — and ends in a price if the catalogue matches, or a quote request if it doesn't.</p>
   <pre><code>&lt;script src="https://app.materialshub.gr/embed/materialkai-product.js" defer&gt;&lt;/script&gt;
 
 &lt;materialkai-builder api-key="mk_embed_…"&gt;&lt;/materialkai-builder&gt;</code></pre>
-  <p>Give it a <code>product-id</code> and it skips straight to that product — the same thing <code>&lt;materialkai-product&gt;</code> does, so you can use one tag everywhere and let the attributes decide:</p>
+  <p>With a <code>product-id</code> it skips straight to that product, which is the first example above. <code>&lt;materialkai-product&gt;</code> also still works on its own and is what the builder mounts internally — but there is no reason to reach for it: the attributes decide.</p>
   <pre><code>&lt;materialkai-builder api-key="mk_embed_…" product-id="YOUR-PRODUCT-ID"&gt;&lt;/materialkai-builder&gt;</code></pre>
   <div class="callout"><p><strong>The fallback is the point, not the error case.</strong> A visitor who asks for something you don't stock becomes a <a href="quotes-requests.html">quote request</a> with everything they specified — and the picture they were looking at when they asked. A configurator bound to one product can only ever sell what somebody already photographed, modelled and priced.</p></div>
 

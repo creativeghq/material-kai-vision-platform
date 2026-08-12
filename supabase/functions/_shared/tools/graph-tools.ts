@@ -480,11 +480,27 @@ export const createPriceMySpecTool = (
           p_audience: 'buyer',
         });
         const row = (p ?? {}) as Record<string, unknown>;
+        // STAGE 4 OF THE FLOW — "place it" (#341 join 4).
+        //
+        // The room planner was built, tested and reachable from nothing but its own nav tile, so
+        // the flow went straight from "here is a picture" to "here is a price" and the one stage
+        // that answers "will it actually fit" never happened. It is only ever offered for a
+        // product that HAS a model: the planner places things at their real size, and a product
+        // with no model has no size to place. Answered here rather than left to the agent, which
+        // would otherwise guess — and a link to an empty planner is worse than no link.
+        const { data: models } = await sb.from('product_3d_models')
+          .select('format').eq('product_id', matches[0].product_id).limit(1);
+        const hasModel = Array.isArray(models) && models.length > 0;
+        const appOrigin = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/$/, '');
         priced = {
           product_id: matches[0].product_id,
           name: matches[0].name,
           net_price: row.configured_price ?? null,
           currency: row.currency ?? 'EUR',
+          has_model: hasModel,
+          // Present iff there is something to place. Its ABSENCE is the instruction not to offer
+          // the stage, in the same way a missing `product` means "offer a quote request".
+          planner_url: hasModel ? `${appOrigin}/room-planner?product=${matches[0].product_id}` : null,
         };
       }
 
@@ -523,6 +539,8 @@ export const createPriceMySpecTool = (
         // What the agent should do next, stated rather than inferred: this is the whole point of
         // the tool, and leaving it implicit is how "quote it" turns into "invent a price".
         next_step: priced ? 'quote_the_price' : 'offer_a_quote_request',
+        // The card shows the planner button only when the server said there is a model to place.
+        planner_url: (priced as Record<string, unknown> | null)?.planner_url ?? null,
         timestamp: Date.now(),
       });
 
@@ -534,7 +552,10 @@ export const createPriceMySpecTool = (
         near_matches: res.near_matches ?? [],
         available_vocabulary: vocabulary,
         guidance: priced
-          ? 'An exact match exists. Quote this price.'
+          ? 'An exact match exists. If `planner_url` is present, offer to place it in the room at '
+            + 'real size BEFORE quoting — that is stage 4 of the flow and it is the stage that '
+            + 'answers "will it fit". A null `planner_url` means there is no model to place: skip '
+            + 'the offer rather than linking to an empty planner. Then quote this price.'
           : 'No match for the keys you used. FIRST check `available_vocabulary` above — it lists the '
             + 'facet keys and in-stock values this catalogue actually uses, and your key names may '
             + 'simply differ (e.g. "color" vs "available_colors"). Retry once with the real keys. '

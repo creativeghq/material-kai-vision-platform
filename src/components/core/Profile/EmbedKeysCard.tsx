@@ -62,40 +62,26 @@ function scopeLabel(key: EmbedKey): string {
 }
 
 /**
- * The snippet a tenant copies into their own site.
+ * The snippet a tenant copies into their own site. ONE tag (#341 entry point 2).
  *
- * `PRODUCT_ID` is left as a literal placeholder rather than pre-filled with a real id: a key is
- * not tied to one product, and quietly baking in whichever product happened to be first would be
- * a worse guess than an obvious blank.
+ * `<materialkai-builder>` is the entry and naming a product is a MODE of it, not a second
+ * component — the builder already mounts `<materialkai-product>` internally, both on a match and
+ * on the deep-link path. The platform used to hand out two snippets, which made a merchant choose
+ * between them before they understood either, and the one that captures demand for things the
+ * catalogue cannot satisfy was the one nothing offered.
+ *
+ * `<materialkai-product>` is still exported and still works for anyone already using it.
  */
 function usageSnippet(apiKey: string): string {
   const base = window.location.origin;
   return `<script src="${base}/embed/materialkai-product.js" defer></script>
 
-<materialkai-product
-  api-key="${apiKey}"
-  product-id="PRODUCT_ID">
-</materialkai-product>`;
-}
+<!-- Asks the visitor what they are after, prices it if you stock it,
+     and captures the request if you don't. -->
+<materialkai-builder api-key="${apiKey}"></materialkai-builder>
 
-/**
- * The OTHER tag, which nothing in the platform used to offer.
- *
- * `<materialkai-builder>` ships in the same bundle as the product widget and is registered by the
- * same script tag — but it was documented only, so the only way a merchant learned it existed was
- * by reading the API page. That is the likeliest reason the whole spec-builder feature has never
- * recorded a single quote request: not that visitors did not convert, but that the tag was never on
- * anybody's website. A feature reachable only through documentation is a feature that is off.
- *
- * No `product-id` here: the builder starts from a question, not a product. It accepts one as an
- * optional deep link, which is a different use and does not belong in the first snippet a merchant
- * copies.
- */
-function builderSnippet(apiKey: string): string {
-  const base = window.location.origin;
-  return `<script src="${base}/embed/materialkai-product.js" defer></script>
-
-<materialkai-builder api-key="${apiKey}"></materialkai-builder>`;
+<!-- Or pin it to one product, for a page that is already about that product: -->
+<materialkai-builder api-key="${apiKey}" product-id="PRODUCT_ID"></materialkai-builder>`;
 }
 
 /** For anyone wiring their own storefront instead of using the tag. */
@@ -432,12 +418,8 @@ export const EmbedKeysCard: React.FC = () => {
                       <Copy className="h-3.5 w-3.5 mr-1" />Copy
                     </Button>
                     <Button size="sm" variant="outline" className="rounded-full shrink-0"
-                      onClick={() => copy(usageSnippet(key.api_key), 'Product snippet')}>
-                      Product code
-                    </Button>
-                    <Button size="sm" variant="outline" className="rounded-full shrink-0"
-                      onClick={() => copy(builderSnippet(key.api_key), 'Builder snippet')}>
-                      Builder code
+                      onClick={() => copy(usageSnippet(key.api_key), 'Embed snippet')}>
+                      Embed code
                     </Button>
                     <Button size="sm" variant="ghost" className="rounded-full shrink-0"
                       onClick={() => copy(apiSnippet(key.api_key), 'API snippet')}>

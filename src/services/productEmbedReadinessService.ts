@@ -134,6 +134,9 @@ export async function embedSnippetFor(r: ProductEmbedReadiness, appOrigin: strin
   if (error || !data?.api_key) return null;
   return [
     `<script src="${appOrigin}/embed/materialkai-product.js" defer></script>`,
-    `<materialkai-product api-key="${data.api_key}" product-id="${r.product_id}"></materialkai-product>`,
+  // ONE tag (#341 entry point 2). Naming a product is deep-link MODE of the builder, not a
+  // different component, so a merchant who starts here and later wants the full wizard removes
+  // an attribute rather than learning a second tag. It mounts the same product widget inside.
+    `<materialkai-builder api-key="${data.api_key}" product-id="${r.product_id}"></materialkai-builder>`,
   ].join('\n');
 }

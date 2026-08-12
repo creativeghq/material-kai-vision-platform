@@ -54,20 +54,25 @@ function appOrigin(): string {
   return (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/$/, '');
 }
 
+/**
+ * ONE tag, in both shapes (#341 entry point 2).
+ *
+ * `<materialkai-builder>` is the entry; naming a product is deep-link MODE of it, not a second
+ * component. The merchant learns one thing and drops an attribute to get the other.
+ */
 function productSnippet(origin: string, apiKey: string, productId: string): string {
   return [
     `<script src="${origin}/embed/materialkai-product.js" defer></script>`,
-    `<materialkai-product api-key="${apiKey}" product-id="${productId}"></materialkai-product>`,
+    `<materialkai-builder api-key="${apiKey}" product-id="${productId}"></materialkai-builder>`,
   ].join('\n');
 }
 
 /**
- * The builder tag, which the app itself did not offer until now.
+ * The same tag with no product id: the wizard, starting from a question.
  *
- * Same script, no product id: the builder starts from a question rather than a product, and its
- * whole point is capturing the specs the catalogue CANNOT satisfy. On a catalogue this thin that
- * is most of them, which makes this the more valuable of the two snippets for a merchant just
- * starting out — and it was the one nothing in the platform ever mentioned.
+ * This is the shape to offer a merchant who is starting out. Its whole point is capturing the
+ * specs the catalogue CANNOT satisfy, and on a thin catalogue that is most of them — those are
+ * the leads the feature exists for, not its failure case.
  */
 function builderSnippet(origin: string, apiKey: string): string {
   return [
@@ -300,7 +305,7 @@ export const createEmbedOverviewTool = (
         guidance: !keys || keys.length === 0
           ? 'This workspace has no embed key, so nothing can be shown on an outside website yet. Point them at Profile → Keys to create one — it takes one field and a list of their own domains.'
           : (s.total ?? 0) === 0
-            ? 'Keys exist but nothing has ever loaded the widget, so it is probably not on any page yet. Offer the snippets: <materialkai-product> shows one product in 3D, <materialkai-builder> walks a visitor through a specification and captures a quote request when the catalogue cannot match it. Replace PRODUCT_ID with a real product — embed_readiness gives a product-specific snippet.'
+            ? 'Keys exist but nothing has ever loaded the widget, so it is probably not on any page yet. There is ONE tag to teach: <materialkai-builder> walks a visitor through a specification, prices it when the catalogue matches and captures a quote request when it does not. Adding product-id pins it to a single product for a page that is already about that product — embed_readiness returns that snippet with a real id in it. Do not offer <materialkai-product> as an alternative; it is what the builder mounts internally.'
             : 'The embed is live. Use the activity figures to answer what it is doing, and `cost` to answer what it costs — only AI impressions cost credits; catalogue reads are free.',
       });
     },

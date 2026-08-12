@@ -415,11 +415,23 @@ export class MaterialKaiBuilder extends HTMLElement {
     el.setAttribute('api-key', this.apiKey);
     el.setAttribute('product-id', productId);
     if (this.getAttribute('api-base')) el.setAttribute('api-base', this.getAttribute('api-base')!);
-    // A match is BUYABLE — that is the whole distinction this widget draws. "Matched → price and
-    // add to cart, no match → request a quote" is the rule, so mounting the product without its
-    // cart button leaves the matched half of it unfinished: a price you cannot act on. Opt out with
-    // `no-cart` for a merchant who only wants enquiries.
-    if (!this.hasAttribute('no-cart')) el.setAttribute('show-add-to-cart', '');
+    // THE CART DEFAULT DIFFERS BY MODE, because the two modes sit on different pages.
+    //
+    // After the WIZARD, a match is BUYABLE — that is the whole distinction this widget draws.
+    // "Matched → price and add to cart, no match → request a quote" is the rule, so mounting the
+    // product without its cart button leaves the matched half unfinished: a price you cannot act
+    // on. Default on; opt out with `no-cart` for a merchant who only wants enquiries.
+    //
+    // In DEEP-LINK mode the tag sits on the merchant's own product page, which already has their
+    // buy button, and the merchant may not have wired `materialkai:add-to-cart` at all. So it
+    // follows the product widget's own rule instead (materialkai-product.ts: "a merchant who has
+    // not wired the event should not be shown a button that does nothing") and stays OFF until
+    // `show-add-to-cart` is asked for. Forcing it here is how the snippet the platform hands out
+    // would have shipped a dead button to every merchant who pasted it.
+    const cartOn = this.deepLinkProductId
+      ? this.hasAttribute('show-add-to-cart')
+      : !this.hasAttribute('no-cart');
+    if (cartOn) el.setAttribute('show-add-to-cart', '');
     host.appendChild(el);
   }
 
