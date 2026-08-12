@@ -129,7 +129,7 @@ export const MaterialReviews: React.FC<MaterialReviewsProps> = ({ productId, cur
               body: form.text.trim()
                 ? `"${form.text.trim().slice(0, 80)}"`
                 : `${form.rating} star review received.`,
-              action_url: `/products/${productId}`,
+              action_url: `/discover?product=${productId}`,
             });
           });
       }

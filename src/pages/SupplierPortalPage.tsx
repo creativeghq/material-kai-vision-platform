@@ -147,7 +147,7 @@ export default function SupplierPortalPage({ embedded = false }: { embedded?: bo
                   workspace — fulfil it with the normal order machinery, don't retype it. */}
               {o.linked_order_id && (
                 <Button size="sm" variant="ghost" className="rounded-full h-8" asChild>
-                  <Link to={`/finance?tab=orders&order=${o.linked_order_id}`}>
+                  <Link to={`/finance/orders/${o.linked_order_id}`}>
                     <FileText className="h-3.5 w-3.5 mr-1" /> Open draft order
                   </Link>
                 </Button>
