@@ -171,13 +171,6 @@ export function DeliveryTrailCell({ trail, hasPublicPage = true, className }: Pr
                         First {when(t.firstViewedAt)} · last {when(t.lastViewedAt)}
                       </p>
                     )}
-                    {/* The old counters had no timestamps. Say so, rather than
-                        implying we know when those views happened. */}
-                    {(t?.legacyViewCount ?? 0) > 0 && (
-                      <p className="text-muted-foreground/70">
-                        {t!.legacyViewCount} of these predate detailed tracking (no date recorded).
-                      </p>
-                    )}
                     {(t?.downloadCount ?? 0) > 0 && (
                       <p className="text-muted-foreground">Downloaded {t!.downloadCount}×</p>
                     )}

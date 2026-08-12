@@ -66,7 +66,6 @@ export async function fetchDeliveryTrails(
       recipients: r.recipients ?? [],
       pageStatus: r.page_status as PageStatus,
       viewCount: r.view_count ?? 0,
-      legacyViewCount: r.legacy_view_count ?? 0,
       firstViewedAt: r.first_viewed_at,
       lastViewedAt: r.last_viewed_at,
       distinctViewers: r.distinct_viewers ?? 0,

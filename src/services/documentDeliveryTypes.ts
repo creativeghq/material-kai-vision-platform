@@ -52,13 +52,8 @@ export interface DeliveryTrail {
   sendCount: number;
   recipients: string[];
   pageStatus: PageStatus;
+  /** Observed page hits, after the bot filter and the 30-minute collapse window. */
   viewCount: number;
-  /**
-   * How much of `viewCount` predates per-hit tracking. The old counters carried
-   * no timestamps, so these views are real but have no known moment — the UI
-   * says so rather than implying we know when they happened.
-   */
-  legacyViewCount: number;
   firstViewedAt: string | null;
   lastViewedAt: string | null;
   distinctViewers: number;
@@ -74,7 +69,7 @@ export function emptyTrail(entityId: string): DeliveryTrail {
     emailStatus: 'not_sent', sentAt: null, deliveredAt: null,
     firstOpenedAt: null, lastOpenedAt: null, openCount: 0, clickCount: 0,
     bouncedAt: null, bounceReason: null, sendCount: 0, recipients: [],
-    pageStatus: 'not_viewed', viewCount: 0, legacyViewCount: 0,
+    pageStatus: 'not_viewed', viewCount: 0,
     firstViewedAt: null, lastViewedAt: null, distinctViewers: 0,
     downloadCount: 0, completedEvent: null, completedAt: null,
   };

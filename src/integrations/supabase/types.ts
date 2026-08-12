@@ -1189,6 +1189,7 @@ export type Database = {
           cost_per_generation: number | null
           cost_per_unit: number | null
           created_at: string | null
+          credits: number | null
           gpu_type: string | null
           hourly_rate_usd: number | null
           id: string
@@ -1214,6 +1215,7 @@ export type Database = {
           cost_per_generation?: number | null
           cost_per_unit?: number | null
           created_at?: string | null
+          credits?: number | null
           gpu_type?: string | null
           hourly_rate_usd?: number | null
           id?: string
@@ -1239,6 +1241,7 @@ export type Database = {
           cost_per_generation?: number | null
           cost_per_unit?: number | null
           created_at?: string | null
+          credits?: number | null
           gpu_type?: string | null
           hourly_rate_usd?: number | null
           id?: string
@@ -10331,6 +10334,80 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "generation_3d"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      generation_models: {
+        Row: {
+          adapter: string | null
+          capability: string
+          created_at: string
+          display_name: string
+          enabled: boolean
+          id: string
+          input_mapping: Json
+          input_requirements: Json
+          last_verified_at: string | null
+          notes: string | null
+          pricing_key: string | null
+          provider: string
+          slug: string | null
+          sort_order: number
+          status: string
+          sub_capability: string | null
+          tier: string | null
+          updated_at: string
+          version: string | null
+        }
+        Insert: {
+          adapter?: string | null
+          capability: string
+          created_at?: string
+          display_name: string
+          enabled?: boolean
+          id: string
+          input_mapping?: Json
+          input_requirements?: Json
+          last_verified_at?: string | null
+          notes?: string | null
+          pricing_key?: string | null
+          provider: string
+          slug?: string | null
+          sort_order?: number
+          status?: string
+          sub_capability?: string | null
+          tier?: string | null
+          updated_at?: string
+          version?: string | null
+        }
+        Update: {
+          adapter?: string | null
+          capability?: string
+          created_at?: string
+          display_name?: string
+          enabled?: boolean
+          id?: string
+          input_mapping?: Json
+          input_requirements?: Json
+          last_verified_at?: string | null
+          notes?: string | null
+          pricing_key?: string | null
+          provider?: string
+          slug?: string | null
+          sort_order?: number
+          status?: string
+          sub_capability?: string | null
+          tier?: string | null
+          updated_at?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generation_models_pricing_key_fkey"
+            columns: ["pricing_key"]
+            isOneToOne: false
+            referencedRelation: "ai_model_pricing"
+            referencedColumns: ["model_key"]
           },
         ]
       }
@@ -36662,6 +36739,15 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      dic_detect__ops_document_view_count_drift: {
+        Args: never
+        Returns: {
+          detail: Json
+          entity_id: string
+          entity_table: string
+          workspace_id: string
+        }[]
+      }
       dic_detect__ops_email_delivery_failing: {
         Args: never
         Returns: {
@@ -37389,7 +37475,6 @@ export type Database = {
           first_viewed_at: string
           last_opened_at: string
           last_viewed_at: string
-          legacy_view_count: number
           open_count: number
           page_status: string
           recipients: string[]
