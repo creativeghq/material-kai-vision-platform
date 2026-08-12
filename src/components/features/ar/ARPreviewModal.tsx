@@ -28,6 +28,8 @@ import {
 import { useARSupport } from './useARSupport';
 import { ProductModelStage } from './ProductModelViewer';
 import { PresetLighting, DEFAULT_PRESET, PRESET_OPTIONS } from '@/components/features/lighting/PresetLighting';
+import { sceneSettingsService, type SceneSettings } from '@/services/sceneSettingsService';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import type { PresetKey } from '@/components/features/lighting/lightingPresets';
 import {
   productMaterialMapsService,
@@ -137,12 +139,13 @@ interface SceneProps {
   tileScale: number;
   /** Shared preset (#335) — a material is judged under light, so this is the control that matters. */
   lighting: PresetKey;
+  exposure?: number;
 }
 
 const Scene: React.FC<SceneProps> = (props) => {
   return (
     <>
-      <PresetLighting preset={props.lighting} castShadow />
+      <PresetLighting preset={props.lighting} castShadow exposure={props.exposure} />
 
       <MaterialSwatch {...props} />
 
@@ -173,6 +176,24 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
   const { mode, isMobile } = useARSupport();
   const [tileScale, setTileScale] = useState(2);
   const [lighting, setLighting] = useState<PresetKey>(DEFAULT_PRESET);
+  // The workspace's own look (#335), resolved through the one ladder. The picker below still
+  // overrides it for this session — a merchant setting a default should not stop somebody
+  // checking a material under a different light.
+  const { activeWorkspaceId } = useWorkspace();
+  const [scene, setScene] = useState<SceneSettings | null>(null);
+  useEffect(() => {
+    if (!isOpen || !activeWorkspaceId || !productId) return;
+    let live = true;
+    sceneSettingsService
+      .resolve(activeWorkspaceId, productId)
+      .then((s2) => {
+        if (!live) return;
+        setScene(s2);
+        setLighting(s2.preset);
+      })
+      .catch(() => { if (live) setScene(null); });
+    return () => { live = false; };
+  }, [isOpen, activeWorkspaceId, productId]);
   const linkRef = useRef<HTMLAnchorElement>(null);
 
   // Real 3D models for this product, if any. null = still loading — the swatch
@@ -273,7 +294,12 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
                 style={{ width: '100%', height: '100%' }}
               >
                 {modelUrl ? (
-                  <ProductModelStage url={modelUrl} lighting={lighting} />
+                  <ProductModelStage
+                    url={modelUrl}
+                    lighting={lighting}
+                    exposure={scene?.exposure}
+                    showBackground={scene?.show_background}
+                  />
                 ) : (
                   <Scene
                     albedoUrl={albedoUrl}
@@ -281,6 +307,7 @@ export const ARPreviewModal: React.FC<ARPreviewModalProps> = ({
                     roughnessUrl={maps?.roughness_url ?? undefined}
                     tileScale={tileScale}
                     lighting={lighting}
+                    exposure={scene?.exposure}
                   />
                 )}
               </Canvas>

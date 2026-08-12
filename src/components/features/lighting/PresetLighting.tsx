@@ -11,8 +11,9 @@
  * their scenes from the same source instead of from literals. Nothing new is invented here; the
  * numbers are the ones already written down.
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Environment } from '@react-three/drei';
+import { useThree } from '@react-three/fiber';
 import { LIGHTING_PRESETS, type PresetKey, type LightingPreset } from './lightingPresets';
 
 /** The sun's direction from its altitude, so a low golden-hour sun actually rakes across a room. */
@@ -27,9 +28,41 @@ interface Props {
   preset?: PresetKey;
   /** Scenes with a floor want shadows; a floating product on a plinth does not need them. */
   castShadow?: boolean;
+  /**
+   * Tone-mapping exposure (#335). 1 is the renderer's own default, so an unset value changes
+   * nothing — a workspace that never opens the settings sees exactly what it saw before.
+   */
+  exposure?: number;
+  /**
+   * Show the environment BEHIND the product, not just as light.
+   *
+   * Off by default: a product shot on a merchant's page usually wants that page's background, and
+   * a sudden photographic backdrop is the kind of change a tenant should ask for.
+   */
+  showBackground?: boolean;
 }
 
-export const PresetLighting: React.FC<Props> = ({ preset = DEFAULT_PRESET, castShadow = false }) => {
+/**
+ * Exposure lives on the renderer, not on a light, so it has to be set imperatively.
+ *
+ * Written every time it changes rather than once on mount: the settings UI shows the result live,
+ * and a value applied only at mount would need a remount to be seen — which is exactly the sort of
+ * "it didn't work" that makes someone stop adjusting.
+ */
+const Exposure: React.FC<{ value: number }> = ({ value }) => {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    gl.toneMappingExposure = value;
+  }, [gl, value]);
+  return null;
+};
+
+export const PresetLighting: React.FC<Props> = ({
+  preset = DEFAULT_PRESET,
+  castShadow = false,
+  exposure = 1,
+  showBackground = false,
+}) => {
   // Typed as the interface, not inferred: the catalogue is a plain const, so TS narrows each entry
   // to its own literal shape and `spotlights` then "does not exist" on the presets that omit it.
   const p: LightingPreset =
@@ -37,7 +70,8 @@ export const PresetLighting: React.FC<Props> = ({ preset = DEFAULT_PRESET, castS
 
   return (
     <>
-      <Environment preset={p.hdri as never} background={false} />
+      <Exposure value={exposure} />
+      <Environment preset={p.hdri as never} background={showBackground} />
       <ambientLight intensity={p.ambientIntensity} />
       {p.sunEnabled && (
         <directionalLight

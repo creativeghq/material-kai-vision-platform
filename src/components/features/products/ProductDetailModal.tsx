@@ -41,6 +41,7 @@ import { ProductPackagingCard } from '@/components/business/marketplace/ProductP
 import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
 import { ProductEmbedReadinessCard } from '@/components/features/products/ProductEmbedReadinessCard';
 import { ProductMaterialMapsCard } from '@/components/features/products/ProductMaterialMapsCard';
+import { ProductSceneCard } from '@/components/features/products/ProductSceneCard';
 import { ProductConfigurator } from '@/components/features/configurator/ProductConfigurator';
 import { ProductOptionsEditor } from '@/components/features/configurator/ProductOptionsEditor';
 import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
@@ -2609,6 +2610,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {isOwnProduct && activeWorkspaceId && (
             <div className="mt-6">
               <Product3DModelCard productId={product.id} workspaceId={activeWorkspaceId} />
+            </div>
+          )}
+
+          {/* How it is lit and framed (#335). After the model and the texture, because it is the
+              setting you adjust once you can see something. */}
+          {isOwnProduct && activeWorkspaceId && (
+            <div className="mt-6">
+              <ProductSceneCard productId={product.id} workspaceId={activeWorkspaceId} />
             </div>
           )}
 

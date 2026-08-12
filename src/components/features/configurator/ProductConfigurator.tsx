@@ -26,6 +26,7 @@ import { ProductModelStage } from '@/components/features/ar/ProductModelViewer';
 import { CanvasLoader, ThreeErrorBoundary } from '@/components/features/ar/CanvasChrome';
 import { product3dService, modelPublicUrl } from '@/services/product3dService';
 import { productMaterialMapsService } from '@/services/productMaterialMapsService';
+import { sceneSettingsService, type SceneSettings } from '@/services/sceneSettingsService';
 import {
   productConfiguratorService, selectionToValueIds, describeViolation,
   type OptionGroupWithValues, type ConfiguredPrice,
@@ -110,6 +111,17 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
   // Per-option textures (#321). A velvet and a linen at the same hue are identical until one
   // carries its own weave; without this the swap can only move three scalars.
+  const [scene, setScene] = useState<SceneSettings | null>(null);
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    let cancelled = false;
+    sceneSettingsService
+      .resolve(activeWorkspaceId, productId)
+      .then((s2) => { if (!cancelled) setScene(s2); })
+      .catch(() => { if (!cancelled) setScene(null); });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId, productId]);
+
   const [optionTextures, setOptionTextures] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     let cancelled = false;
@@ -214,6 +226,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     <ProductModelStage
                       url={resolvedModelUrl}
                       overrides={overrides}
+                      lighting={scene?.preset}
+                      exposure={scene?.exposure}
+                      showBackground={scene?.show_background}
                       onUnmatchedTargets={handleUnmatched}
                     />
                   </Canvas>

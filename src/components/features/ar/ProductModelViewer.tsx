@@ -64,13 +64,17 @@ interface ProductModelStageProps {
   onUnmatchedTargets?: (names: string[]) => void;
   /** Which of the shared lighting presets to light this with (#335). */
   lighting?: PresetKey;
+  /** Tone-mapping exposure. 1 is the renderer's default, so unset changes nothing. */
+  exposure?: number;
+  /** Show the environment behind the product rather than only using it as light. */
+  showBackground?: boolean;
 }
 
 export const ProductModelStage: React.FC<ProductModelStageProps> = ({
-  url, overrides, onUnmatchedTargets, lighting = DEFAULT_PRESET,
+  url, overrides, onUnmatchedTargets, lighting = DEFAULT_PRESET, exposure, showBackground,
 }) => (
   <>
-    <PresetLighting preset={lighting} castShadow />
+    <PresetLighting preset={lighting} castShadow exposure={exposure} showBackground={showBackground} />
 
     <ProductModel url={url} overrides={overrides} onUnmatchedTargets={onUnmatchedTargets} />
 
