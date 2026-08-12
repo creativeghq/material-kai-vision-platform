@@ -135,6 +135,13 @@ export async function rerankResults<T>(
     model?: string;
     /** Shows up in ai_usage_logs so rerank spend is attributable per search path. */
     task?: string;
+    /**
+     * WHO the search was for. `task` said which FEATURE spent; without these, nothing said which
+     * tenant did — so 473 rerank calls sat in `ai_usage_logs` owned by nobody, invisible to the
+     * table's own `is_workspace_admin(workspace_id)` policy and to every per-tenant cost view.
+     */
+    userId?: string;
+    workspaceId?: string;
   } = {},
 ): Promise<RerankOutcome<T>> {
   const trimmed = (query ?? '').trim();
@@ -232,6 +239,8 @@ export async function rerankResults<T>(
         systemPrompt,
         temperature: 0,
         task: opts.task ?? 'search_rerank',
+        userId: opts.userId,
+        workspaceId: opts.workspaceId,
       },
     );
 

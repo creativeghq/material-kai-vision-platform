@@ -631,6 +631,10 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         style: body.style,
         materials: body.material_images ? undefined : undefined,
         user_prompt: body.prompt,
+        // The same pair the debit above used, so the prompt-build call and the image it feeds
+        // land on the same tenant's cost line instead of one of them landing on nobody's.
+        user_id: resolvedUserId,
+        workspace_id: body.workspace_id,
       });
 
       // If material_images provided, fetch them as reference inputs

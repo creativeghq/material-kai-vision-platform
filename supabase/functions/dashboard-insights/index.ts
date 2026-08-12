@@ -381,6 +381,7 @@ serve(
           temperature: 0.5,
           maxTokens: 900,
           task: 'dashboard_insights',
+          userId, workspaceId,
         });
         insights = result.output;
         model = result.model;

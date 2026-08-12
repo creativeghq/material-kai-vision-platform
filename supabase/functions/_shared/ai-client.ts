@@ -82,6 +82,8 @@ async function _logTrackedCall(opts: {
   outputTokens: number;
   latencyMs: number;
   errorMessage?: string;
+  userId?: string;
+  workspaceId?: string;
 }): Promise<void> {
   if (!_logSupabase) return;
   try {
@@ -111,7 +113,12 @@ async function _logTrackedCall(opts: {
     });
 
     // ai_usage_logs (dashboard-facing)
+    //
+    // `ai_call_logs` above deliberately gets neither id: it has no such columns and is the
+    // developer-facing latency/fallback trace, not the billing record. This is the billing record.
     await _logSupabase.from('ai_usage_logs').insert({
+      user_id: opts.userId ?? null,
+      workspace_id: opts.workspaceId ?? null,
       operation_type: opts.task,
       model_name: opts.model,
       input_tokens: opts.inputTokens,
@@ -202,6 +209,23 @@ export interface AIGenerateConfig {
    * label if omitted, but callers should always pass one.
    */
   task?: string;
+  /**
+   * WHO the spend belongs to. Both optional, both should be passed whenever the call is made on
+   * behalf of somebody.
+   *
+   * Every row this client wrote carried `user_id = NULL` and `workspace_id = NULL` — 1233
+   * health checks, 473 reranks, 605 expense extractions and more, all attributed to nobody.
+   * Two things failed silently as a result. No per-tenant cost view could see any of it, so
+   * "what is this workspace costing us" answered with a fraction of the truth. And the RLS
+   * policy on `ai_usage_logs` is `auth.uid() = user_id OR is_workspace_admin(workspace_id)` —
+   * with both columns null, neither branch can ever match, so these rows were invisible to
+   * every non-platform-admin in the product, including the people paying for them.
+   *
+   * Genuinely unattributed calls exist and must stay null: `anthropic_health_check` runs on a
+   * timer for nobody. Null here means "no owner", never "we had one and did not pass it".
+   */
+  userId?: string;
+  workspaceId?: string;
 }
 
 export interface AIGenerateResult<T = string> {
@@ -252,6 +276,8 @@ export async function generateWithGemini(
     // Auto-track every Gemini call (fire-and-forget)
     void _logTrackedCall({
       task: config?.task ?? 'gemini_text_generation',
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
       model: modelId,
       inputTokens,
       outputTokens,
@@ -271,6 +297,8 @@ export async function generateWithGemini(
   } catch (err) {
     void _logTrackedCall({
       task: config?.task ?? 'gemini_text_generation',
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
       model: modelId,
       inputTokens: 0,
       outputTokens: 0,
@@ -315,6 +343,8 @@ export async function generateStructuredWithGemini<T>(
 
     void _logTrackedCall({
       task: config?.task ?? 'gemini_structured_generation',
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
       model: modelId,
       inputTokens,
       outputTokens,
@@ -334,6 +364,8 @@ export async function generateStructuredWithGemini<T>(
   } catch (err) {
     void _logTrackedCall({
       task: config?.task ?? 'gemini_structured_generation',
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
       model: modelId,
       inputTokens: 0,
       outputTokens: 0,
@@ -367,6 +399,8 @@ export async function generateWithClaude(
 
     void _logTrackedCall({
       task: config?.task ?? 'claude_text_generation',
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
       model: modelId,
       inputTokens,
       outputTokens,
@@ -386,6 +420,8 @@ export async function generateWithClaude(
   } catch (err) {
     void _logTrackedCall({
       task: config?.task ?? 'claude_text_generation',
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
       model: modelId,
       inputTokens: 0,
       outputTokens: 0,
@@ -430,6 +466,8 @@ export async function generateWithClaudeTools(
 
     void _logTrackedCall({
       task: config.task ?? 'claude_tool_generation',
+      userId: config.userId,
+      workspaceId: config.workspaceId,
       model: modelId,
       inputTokens,
       outputTokens,
@@ -445,6 +483,8 @@ export async function generateWithClaudeTools(
   } catch (err) {
     void _logTrackedCall({
       task: config.task ?? 'claude_tool_generation',
+      userId: config.userId,
+      workspaceId: config.workspaceId,
       model: modelId,
       inputTokens: 0,
       outputTokens: 0,
@@ -480,6 +520,8 @@ export async function generateStructuredWithClaude<T>(
 
     void _logTrackedCall({
       task: config?.task ?? 'claude_structured_generation',
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
       model: modelId,
       inputTokens,
       outputTokens,
@@ -499,6 +541,8 @@ export async function generateStructuredWithClaude<T>(
   } catch (err) {
     void _logTrackedCall({
       task: config?.task ?? 'claude_structured_generation',
+      userId: config?.userId,
+      workspaceId: config?.workspaceId,
       model: modelId,
       inputTokens: 0,
       outputTokens: 0,

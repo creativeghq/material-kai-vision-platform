@@ -18,6 +18,13 @@ export interface DesignParams {
   sqm?: number;
   is_edit?: boolean;
   edit_instruction?: string;
+  /**
+   * Who the generation is for. This helper runs one paid Haiku call INSIDE a request whose image
+   * generation is already billed to a workspace, so the ids are always available at the call site —
+   * they simply were not passed, and the prompt-build half of the cost was attributed to nobody.
+   */
+  user_id?: string;
+  workspace_id?: string;
 }
 
 export interface FloorPlanParams {
@@ -80,6 +87,8 @@ ${editContext}`.trim();
   try {
     const { output } = await generateWithClaude(inputPrompt, {
       task: 'interior_prompt_build',
+      userId: params.user_id,
+      workspaceId: params.workspace_id,
       model: 'claude-haiku-4-5',
       systemPrompt,
       maxTokens: 250,

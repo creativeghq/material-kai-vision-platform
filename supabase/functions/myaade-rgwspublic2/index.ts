@@ -38,6 +38,7 @@ import {
   type BasicRec,
 } from '../_shared/aade/rgwspublic2.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
+import { userCanAccessWorkspace } from '../_shared/auth.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -114,6 +115,11 @@ function parseActivities(xml: string): FirmActivity[] {
 async function translateBasicRec(
   basicRec: BasicRec,
   primaryActivityDescr: string | null,
+  // Who this translation is billed to. The caller resolves the workspace by VERIFYING the
+  // body-supplied id against membership rather than passing it through — the debit already
+  // falls back to the personal wallet for a non-member, so stamping the claimed workspace on
+  // the usage row would credit a tenant that did not pay (CLAUDE.md invariant 1).
+  billedTo: { userId?: string; workspaceId?: string } = {},
 ): Promise<BasicRecEn | null> {
   const src = {
     onomasia: basicRec.onomasia,
@@ -153,6 +159,8 @@ ${JSON.stringify(src, null, 2)}`,
         model: 'claude-haiku-4-5-20251001',
         temperature: 0,
         task: 'aade_field_translation',
+        userId: billedTo.userId,
+        workspaceId: billedTo.workspaceId,
         systemPrompt: 'You are a precise Greek→Latin transliterator for business-registry data (names/addresses transliterated verbatim, only activity descriptions translated). Output only the requested JSON.',
       },
     );
@@ -428,7 +436,16 @@ Deno.serve(withApiLogging('myaade-rgwspublic2', async (req: Request) => {
       });
       const drow = Array.isArray(dd) ? dd[0] : dd;
       if (!de && drow?.success) {
-        basicRecEn = await translateBasicRec(basicRec, primaryActDescr);
+        // Attribute to the workspace only when this caller is genuinely a member of it. The
+        // debit above already refuses to touch a stranger's pool; this keeps the usage row honest
+        // in the other direction, where the pool silently fell back to personal credits.
+        const claimedWs = body.workspace_id ?? null;
+        const billedWs = await userCanAccessWorkspace(admin, user.id, claimedWs)
+          ? claimedWs ?? undefined
+          : undefined;
+        basicRecEn = await translateBasicRec(basicRec, primaryActDescr, {
+          userId: user.id, workspaceId: billedWs,
+        });
         if (!basicRecEn) {
           // Translation failed (returned null) → refund.
           try {

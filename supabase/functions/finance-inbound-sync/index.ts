@@ -401,6 +401,9 @@ Deno.serve(withApiLogging('finance-inbound-sync', async (req) => {
         try {
           const suggestions = await extractProductsFromLines(
             usable.map((l: any, i: number) => ({ index: i, description: String(l.item_description), quantity: l.quantity ?? null })),
+            // The same pair the debit above used. Billing already knew who was paying; the usage
+            // log did not, so the cost of this feature was unattributable to any tenant.
+            { userId: meta?.created_by ?? undefined, workspaceId: workspaceId ?? undefined },
           );
           const byIdx = new Map(suggestions.map((s) => [s.index, s]));
           const pendingRows = usable.map((l: any, i: number) => {

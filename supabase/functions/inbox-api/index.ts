@@ -16,7 +16,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate } from '../_shared/auth.ts';
-import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { sendWhatsAppReply, sendWhatsAppMessage } from '../_shared/zernio.ts';
 import {
   allocateUserEmailAddress,
@@ -498,7 +498,7 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
 
     let replyText: string;
     try {
-      replyText = await buildAgentDraft(db, thread);
+      replyText = await buildAgentDraft(db, thread, { userId: owner, task: 'inbox_agent_reply' });
     } catch (draftErr) {
       await refundReply();
       throw draftErr;
@@ -539,7 +539,20 @@ async function maybeRunAgentReply(db: DbClient, threadId: string): Promise<void>
  * Pure: reads the transcript + (injection-proof, thread-scoped) account tools and returns the text.
  * Does NOT post, bill, or guard — the callers own that.
  */
-async function buildAgentDraft(db: DbClient, thread: Record<string, unknown>): Promise<string> {
+/**
+ * `billedTo` is who the draft is FOR, and which of the two entry points asked for it.
+ *
+ * Both callers debit credits — the auto-reply bills the workspace owner as `inbox_agent_reply`,
+ * "help me write" bills the requesting member as `inbox_agent_suggest` — and neither told the AI
+ * usage log any of it. So the rows landed with no user, no workspace, and BOTH labelled
+ * `inbox_agent_reply`, which meant `credit_transactions` and `ai_usage_logs` disagreed about which
+ * feature had run. The workspace is read off the thread below; the rest has to be passed.
+ */
+async function buildAgentDraft(
+  db: DbClient,
+  thread: Record<string, unknown>,
+  billedTo: { userId?: string; task: 'inbox_agent_reply' | 'inbox_agent_suggest' },
+): Promise<string> {
   const threadId = String(thread.id);
   const workspaceId = String(thread.workspace_id);
   const { data: history } = await db
@@ -573,7 +586,10 @@ async function buildAgentDraft(db: DbClient, thread: Record<string, unknown>): P
       : 'You do not have access to account data in this conversation.');
   const result = await generateWithClaudeTools(
     `Conversation so far:\n${transcript}\n\nWrite the next reply to the customer.`,
-    { systemPrompt, maxTokens: 700, temperature: 0.4, task: 'inbox_agent_reply', tools, maxSteps: 6 },
+    {
+      systemPrompt, maxTokens: 700, temperature: 0.4, tools, maxSteps: 6,
+      task: billedTo.task, userId: billedTo.userId, workspaceId,
+    },
   );
   return (result.text || '').trim();
 }
@@ -968,26 +984,20 @@ async function insertMessageAndNotify(
       .not('user_id', 'is', null);
     const preview = (body || '[attachment]').slice(0, 200);
     const subject = (thread.subject as string) || 'New message';
-    for (const p of (parts || []) as Array<{ user_id: string; participant_type: string }>) {
-      if (p.user_id === opts.senderUserId) continue;
-      if (messageType === 'note' && p.participant_type !== 'member') continue;
-      // Resolve the recipient's email so the general inbox flow can email + bell.
-      let email: string | undefined;
-      try { const { data: u } = await db.auth.admin.getUserById(p.user_id); email = u?.user?.email ?? undefined; }
-      catch { /* email is optional; the bell still fires */ }
-      await emitFlowEvent('inbox.message_received', {
-        user_id: p.user_id,
-        email,
-        type: 'inbox_message',
-        title: `${opts.senderLabel || 'New message'} · ${subject}`,
-        subject: `New message · ${subject}`,
-        body: preview,
-        action_url: `/inbox?thread=${threadId}`,
-        thread_id: threadId,
-        // Carry the thread's workspace so tenant flows can scope to it.
-        workspace_id: (thread as { workspace_id?: string }).workspace_id,
-      }).catch(() => {});
-    }
+    // Notes go to members only; nobody is told about their own message.
+    const recipients = ((parts || []) as Array<{ user_id: string; participant_type: string }>)
+      .filter((p) => p.user_id !== opts.senderUserId)
+      .filter((p) => messageType !== 'note' || p.participant_type === 'member')
+      .map((p) => p.user_id);
+    await emitInboxMessageEvent({
+      userIds: recipients,
+      threadId,
+      // Carry the thread's workspace so tenant flows can scope to it.
+      workspaceId: (thread as { workspace_id?: string }).workspace_id ?? null,
+      title: `${opts.senderLabel || 'New message'} · ${subject}`,
+      subject: `New message · ${subject}`,
+      body: preview,
+    });
   }
 
   return msg as Record<string, unknown>;
@@ -2181,7 +2191,7 @@ async function handleJwtAction(
       const debitRes = Array.isArray(debit) ? debit[0] : debit;
       if (!debitRes?.success) throw new HttpError(402, 'Not enough credits for an AI draft');
 
-      const draft = await buildAgentDraft(db, thread);
+      const draft = await buildAgentDraft(db, thread, { userId, task: 'inbox_agent_suggest' });
       if (!draft) {
         // Nothing to say — refund the debit so a blank draft isn't charged.
         await db.rpc('refund_credits', {
@@ -2467,7 +2477,7 @@ async function handleJwtAction(
           currency: (orderRow as { currency?: string } | null)?.currency ?? 'EUR',
           title: `Order created from the Inbox${orderNumber ? ` #${orderNumber}` : ''}`,
           body: 'Approved from a customer conversation. It is a pre-order until confirmed.',
-          action_url: '/finance?tab=orders',
+          action_url: `/finance/orders/${orderId}`,
         }),
       ).catch(() => {});
 

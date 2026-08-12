@@ -23,7 +23,16 @@ const Schema = z.object({
 const MODEL = 'claude-haiku-4-5';
 
 /** Returns one suggestion per input line (best-effort; empty array on failure). */
-export async function extractProductsFromLines(lines: ExpenseLineInput[]): Promise<ProductSuggestion[]> {
+/**
+ * `owner` is who the extraction is FOR, and it is required rather than optional on purpose.
+ * This runs inside a per-document loop that has already debited that workspace's credits, so the
+ * ids are always in hand — and 605 rows reached `ai_usage_logs` owned by nobody because nothing
+ * asked for them. An optional parameter would have been left off exactly as often.
+ */
+export async function extractProductsFromLines(
+  lines: ExpenseLineInput[],
+  owner: { userId?: string; workspaceId?: string },
+): Promise<ProductSuggestion[]> {
   const usable = lines.filter((l) => String(l.description ?? '').trim());
   if (usable.length === 0) return [];
 
@@ -44,6 +53,7 @@ ${lineText}`;
   try {
     const res = await generateStructuredWithClaude(prompt, Schema, {
       model: MODEL, task: 'expense_product_extraction', temperature: 0.2, maxTokens: 1500,
+      userId: owner.userId, workspaceId: owner.workspaceId,
     });
     return res.output?.suggestions ?? [];
   } catch {

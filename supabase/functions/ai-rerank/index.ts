@@ -16,7 +16,7 @@
  */
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate } from '../_shared/auth.ts';
+import { authenticate, userCanAccessWorkspace } from '../_shared/auth.ts';
 import { rerankResults, RERANK_MODEL, type RerankCandidate } from '../_shared/rerank.ts';
 
 interface SearchResult {
@@ -35,6 +35,11 @@ interface ReRankRequest {
   maxResults?: number;
   includeExplanations?: boolean;
   model?: string;
+  /**
+   * Optional, and VERIFIED before it is used — see the call below. Declared here so the check is
+   * a membership test rather than a cast: the value decides whose cost line this call lands on.
+   */
+  workspace_id?: string;
 }
 
 Deno.serve(withApiLogging('ai-rerank', async (req: Request) => {
@@ -63,6 +68,11 @@ Deno.serve(withApiLogging('ai-rerank', async (req: Request) => {
   // ranking parameter.
   if (results.length > 200) throw new HttpError(400, '`results` is limited to 200 items');
 
+  const claimedWorkspaceId = typeof body.workspace_id === 'string' ? body.workspace_id : null;
+  const billedWorkspaceId = await userCanAccessWorkspace(auth.supabase, auth.userId, claimedWorkspaceId)
+    ? claimedWorkspaceId ?? undefined
+    : undefined;
+
   const outcome = await rerankResults<SearchResult>(
     query,
     results,
@@ -82,6 +92,13 @@ Deno.serve(withApiLogging('ai-rerank', async (req: Request) => {
       includeExplanations: body.includeExplanations === true,
       model: body.model || RERANK_MODEL,
       task: 'ai_rerank_endpoint',
+      // 473 rerank rows reached `ai_usage_logs` owned by nobody. The user is known here and always
+      // was; the workspace is optional because a rerank is a search, and a search does not require
+      // one — so it is taken from the body only after VERIFYING membership, never on the caller's
+      // word (CLAUDE.md invariant 1). Unverified, it stays null: no attribution beats wrong
+      // attribution, which is a cost line pointing at a tenant that did not spend it.
+      userId: auth.userId,
+      workspaceId: billedWorkspaceId,
     },
   );
 
