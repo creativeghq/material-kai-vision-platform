@@ -387,3 +387,39 @@ is a genuine *backstop* rather than a restatement of the constraint.
 `finance.derived_doc_drift`, `finance.stock_bypasses_document_gate`, `ops.email_delivery_failing`,
 `ops.storage_paths_unregistered`, `realestate.commission_over_allocated`, `stock.reservation_missing`)
 and all `warning`-severity checks. A clean run from any of them still means nothing.
+
+### Completing the sweep — 21 of 22 `critical` checks now watched to fire
+
+Same method (plant inside a transaction, detect, `ROLLBACK`). Added to the ten recorded above:
+
+| Check | Planted |
+|---|---|
+| `stock.reservation_missing` | confirmed sales line with free stock, allocation deleted to simulate the reserve that never ran |
+| `finance.derived_doc_drift` | supplier bill of 9,999 against a 2,580 purchase order |
+| `finance.stock_bypasses_document_gate` | a non-document function calling `_deliver_order_line_core(..., true)` |
+| `credits.pool_ledger_drift` | pool balance moved away from its transaction sum |
+| `catalog.price_world_readable` | a `*_cost` column added to the world-readable `catalog_master_products` |
+| `catalog.publish_writes_cost` | a `publish_*` function writing `supplier_products` |
+| `catalog.claim_without_contact` | supplier claimed with `claim_contact_id` null |
+| `realestate.commission_over_allocated` | a 999,999 fixed split against a 2,000 commission base |
+| `ops.storage_paths_unregistered` | a new table with a `storage_path` column, absent from `build_storage_reference_set()` |
+| `ops.email_delivery_failing` | 20 sends, 2 delivered, in-window |
+
+**Still unverified: `embed.spec_offer_match_drift`.** Not for lack of trying — the offering
+(`get_embed_spec_options`) and the matcher (`resolve_product_spec`) both derive from the same
+product data, so clearing a product's attributes removes the value from *both* and they stay
+consistent. Planting a genuine divergence needs the `in_catalog` computation understood well enough
+to desynchronise the two halves deliberately. Its clean run still means nothing.
+
+**Two things the sweep incidentally established:**
+
+- The **auto-reserve trigger works.** The first `stock.reservation_missing` plant did not fire
+  because inserting a confirmed sales line *correctly* created a reserved `stock_allocations` row
+  and decremented free stock (10 → 8). The detector only fired once that allocation was deleted —
+  which is the right behaviour, and confirms both halves.
+- **`ops.email_delivery_failing` has no workspace scope.** Its 14-day window aggregates
+  `email_logs` platform-wide, so one tenant's outbound collapsing is diluted by everyone else's
+  successful sends. With a single active workspace this is invisible; with fifty tenants a
+  workspace whose sender domain has been dropped will never reach the <20% global threshold. It had
+  to be isolated (delete in-window rows inside the transaction) before it would fire at all. Worth
+  scoping per workspace before onboarding.
