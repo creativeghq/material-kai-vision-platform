@@ -28,7 +28,7 @@ import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../_shared/http.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
+import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -322,13 +322,14 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<void> 
   const { data: members } = await supabase
     .from('inbox_participants').select('user_id')
     .eq('thread_id', threadId).eq('participant_type', 'member').eq('status', 'active').not('user_id', 'is', null);
-  for (const m of (members || []) as Array<{ user_id: string }>) {
-    await emitFlowEvent('inbox.message_received', {
-      user_id: m.user_id, type: 'inbox_message',
-      title: `WhatsApp · ${contactName || phone}`,
-      body: preview, action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
-    }).catch(() => {});
-  }
+  await emitInboxMessageEvent({
+    userIds: ((members || []) as Array<{ user_id: string }>).map((m) => m.user_id),
+    threadId,
+    // Was omitted entirely, so a tenant-scoped flow could not match a WhatsApp message.
+    workspaceId,
+    title: `WhatsApp · ${contactName || phone}`,
+    body: preview,
+  });
 
   // Phase-2 agent takeover: if the thread is handed to the AI, let inbox-api generate + relay
   // the reply (it owns the Claude call + credit metering). Service-role, best-effort.

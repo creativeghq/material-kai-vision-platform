@@ -48,6 +48,10 @@ interface CronJobRow {
   last_run_message: string | null;
   runs_24h: number;
   failures_24h: number;
+  /** The edge function this job POSTs to, or null for a pure-SQL job. */
+  target_function: string | null;
+  /** What that invocation ACTUALLY returned. Null = no record; see StatusBadge. */
+  last_invocation_status: number | null;
 }
 
 interface CronRunHistoryRow {
@@ -81,9 +85,51 @@ const formatDuration = (ms: number | null): string => {
   return `${(ms / 60000).toFixed(1)}m`;
 };
 
-const StatusBadge: React.FC<{ status: string | null }> = ({ status }) => {
+/**
+ * What a cron's status actually means.
+ *
+ * pg_cron marks a `SELECT net.http_post(...)` job succeeded the moment the request is ENQUEUED —
+ * it never sees the response. 38 of this platform's 70 jobs are that shape, so "Success" here was
+ * never evidence that the work happened. The nightly integrity sweep 500'd for two days behind a
+ * green badge, and the panel had no way to know.
+ *
+ * So three distinct states, not two:
+ *   • the invocation returned <400  → Success (verified — we saw the response)
+ *   • the invocation returned >=400 → Function failed, RED, whatever pg_cron claims
+ *   • no invocation recorded        → "not confirmed", neutral. 19 of 38 jobs sit here, so this
+ *     must NOT read as an alarm; it reads as the honest "we don't know" it is.
+ */
+const StatusBadge: React.FC<{
+  status: string | null;
+  invocationStatus?: number | null;
+  targetFunction?: string | null;
+}> = ({ status, invocationStatus, targetFunction }) => {
   if (!status) return <span className="text-xs text-muted-foreground">Never run</span>;
+  // The function's own answer outranks pg_cron's, in both directions.
+  if (invocationStatus != null && invocationStatus >= 400) {
+    return (
+      <span
+        className="text-xs inline-flex items-center text-red-500 dark:text-red-400"
+        title={`pg_cron reported "${status}" because the request was enqueued. ${targetFunction ?? 'The function'} actually returned ${invocationStatus}.`}
+      >
+        <XCircle className="h-3 w-3 mr-1" />
+        Function failed · {invocationStatus}
+      </span>
+    );
+  }
   if (status === 'succeeded') {
+    const verified = invocationStatus != null;
+    if (!verified && targetFunction) {
+      return (
+        <span
+          className="text-xs inline-flex items-center text-muted-foreground"
+          title={`pg_cron enqueued the request to ${targetFunction}, but no invocation was recorded, so whether the work ran is unknown.`}
+        >
+          <Clock className="h-3 w-3 mr-1" />
+          Sent · not confirmed
+        </span>
+      );
+    }
     return (
       <span className="text-xs inline-flex items-center text-emerald-600 dark:text-emerald-400">
         <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -244,7 +290,11 @@ export const CronJobsPanel: React.FC = () => {
                       {formatRelative(j.last_run_started_at)}
                     </td>
                     <td className="px-3 py-3">
-                      <StatusBadge status={j.last_run_status} />
+                      <StatusBadge
+                        status={j.last_run_status}
+                        invocationStatus={j.last_invocation_status}
+                        targetFunction={j.target_function}
+                      />
                     </td>
                     <td className="px-3 py-3 text-muted-foreground">
                       {formatDuration(j.last_run_duration_ms)}

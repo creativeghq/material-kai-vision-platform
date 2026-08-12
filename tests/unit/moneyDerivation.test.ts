@@ -173,6 +173,49 @@ describe('order settlement has exactly one derivation', () => {
       '`ordersService.orderBalances()` so there stays exactly one copy of it.\n' + offenders.join('\n'),
     ).toEqual([]);
   });
+
+  /**
+   * The DISPLAY half of the same invariant, and the one that kept slipping.
+   *
+   * `orders.payment_status` is a CACHE of what `get_order_settlements` derives, maintained by
+   * `recompute_order_payment_status`. Reading it is not arithmetic, so none of the rules above can
+   * see it — and every rule above passed while three different screens rendered it. The orders LIST
+   * was fixed to read the derivation ("Paid" was appearing beside a non-zero Outstanding); the order
+   * DETAIL header and the finance dashboard's Recent-orders card were not, so the same order read
+   * one way in the table and another way one click deeper.
+   *
+   * The claim: every site that indexes the label map must consult the derivation. Falling back to
+   * the cached column when the balance has not loaded yet is fine — leading with it is not.
+   * Scanned across all of `src`, not just the finance dirs: two of the three offenders lived
+   * outside them, which is why a finance-scoped scan reported this clean.
+   */
+  it('renders the order payment badge from the derivation, never the cached column', () => {
+    const offenders: string[] = [];
+    // The index expression is the whole question — `ORDER_PAYMENT_LABEL[s]` in a filter-options
+    // builder maps over the map's own keys and is not a status read at all.
+    const SITE = /ORDER_PAYMENT_LABEL\[([^\]]*)\]/g;
+    // Consulted the derivation: `fin?.payment_status`, `balances.get(id)?.payment_status`,
+    // `balanceById.get(r.id)?.…`, `settlement.payment_status`.
+    const DERIVED = /\b(fin|balance|balances|balanceById|settlement|settled|derived)\w*\s*[?.]/i;
+    for (const f of walk(join(ROOT, 'src'))) {
+      const src = stripComments(readFileSync(f, 'utf8'));
+      for (const [i, line] of src.split('\n').entries()) {
+        for (const m of line.matchAll(SITE)) {
+          const idx = m[1];
+          if (!/\.payment_status\b/.test(idx)) continue;
+          if (DERIVED.test(idx)) continue;
+          offenders.push(`${relative(ROOT, f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'The payment word comes from `get_order_settlements`, not from the cached ' +
+      '`orders.payment_status` column. Read `fin.payment_status` (getOrderFinance) or ' +
+      '`ordersService.orderBalances(ids).get(id)?.payment_status`, falling back to the column only ' +
+      'while that load is in flight.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
 });
 
 /**

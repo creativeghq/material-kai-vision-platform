@@ -16,7 +16,7 @@
 // quoted-printable are exactly where a bespoke parser silently loses a customer's order.
 import PostalMime from 'postal-mime';
 import type { DbClient } from './supabase-client.ts';
-import { emitFlowEvent, emitFlowEventToWorkspaceRoles } from './flow-events.ts';
+import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from './flow-events.ts';
 
 /** Private bucket for the raw `.eml`. Registered in `build_storage_reference_set()`. */
 export const RAW_EMAIL_BUCKET = 'pdf-documents';
@@ -736,13 +736,13 @@ export async function deliverToInbox(
     .eq('thread_id', threadId).eq('participant_type', 'member').eq('status', 'active')
     .not('user_id', 'is', null);
   const preview = (parsed.text || parsed.subject || '[no content]').replace(/\s+/g, ' ').slice(0, 200);
-  for (const m of (members || []) as Array<{ user_id: string }>) {
-    await emitFlowEvent('inbox.message_received', {
-      user_id: m.user_id, type: 'inbox_message', workspace_id: workspaceId,
-      title: `Email · ${parsed.from.name || args.fromAddress}`,
-      body: preview, action_url: `/inbox?thread=${threadId}`, thread_id: threadId,
-    }).catch(() => {});
-  }
+  await emitInboxMessageEvent({
+    userIds: ((members || []) as Array<{ user_id: string }>).map((m) => m.user_id),
+    threadId,
+    workspaceId,
+    title: `Email · ${parsed.from.name || args.fromAddress}`,
+    body: preview,
+  });
 
   return { threadId, created };
 }

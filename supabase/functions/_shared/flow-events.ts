@@ -141,6 +141,59 @@ async function activeTriggerTypes(): Promise<Set<string> | null> {
   }
 }
 
+/**
+ * The ONE emitter for `inbox.message_received`.
+ *
+ * Every inbound channel notifies the same way, so the payload has to be built the same way — and it
+ * was not. The seeded default flow ("Inbox Message → Notify Recipient") addresses its send to
+ * `{{trigger.data.email}}`. The in-app path resolved that address; the inbound-EMAIL path and the
+ * WhatsApp webhook both omitted it. So a customer emailing or messaging in produced a flow run that
+ * resolved no recipient and delivered nothing — `ops.flow_sends_skipped_no_recipient` counted the
+ * skips while the operator just saw silence. Nothing errored; the notification simply never arrived.
+ *
+ * Resolving the address HERE is what makes that unrepeatable: callers pass user ids, never an
+ * address, so a channel added later cannot forget the key. Same reason `workspace_id` is carried —
+ * the WhatsApp path dropped it and tenant-scoped flows could not match.
+ */
+export async function emitInboxMessageEvent(opts: {
+  /** Who to notify. Ids only — the address is resolved here. */
+  userIds: string[];
+  threadId: string;
+  workspaceId?: string | null;
+  title: string;
+  /** Email subject when it differs from the in-app title. Defaults to the title. */
+  subject?: string;
+  body: string;
+  /** Defaults to the thread itself. */
+  actionUrl?: string;
+}): Promise<void> {
+  const supabase = getSupabase();
+  const actionUrl = opts.actionUrl ?? `/inbox?thread=${opts.threadId}`;
+  for (const userId of opts.userIds) {
+    if (!userId) continue;
+    // Optional by design: with no address the bell still fires, which is strictly better than
+    // dropping the event. What is NOT acceptable is silently addressing a send to nothing.
+    let email: string | undefined;
+    if (supabase) {
+      try {
+        const { data } = await supabase.auth.admin.getUserById(userId);
+        email = data?.user?.email ?? undefined;
+      } catch { /* bell-only */ }
+    }
+    await emitFlowEvent('inbox.message_received', {
+      user_id: userId,
+      email,
+      type: 'inbox_message',
+      title: opts.title,
+      subject: opts.subject ?? opts.title,
+      body: opts.body,
+      action_url: actionUrl,
+      thread_id: opts.threadId,
+      workspace_id: opts.workspaceId ?? undefined,
+    }).catch(() => {});
+  }
+}
+
 export async function emitFlowEvent(
   eventType: string,
   data: Record<string, unknown>,

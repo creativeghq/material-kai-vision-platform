@@ -911,6 +911,14 @@ export const ordersService = {
     settled_out: number;
     settled: number;
     outstanding: number;
+    /**
+     * The payment status the LEDGER implies, off the same `get_order_settlements` row as
+     * `settled`/`outstanding` — NOT the cached `orders.payment_status` column. Render this: a
+     * screen that shows Outstanding from the derivation and the word "Paid" from the cache is the
+     * exact pair `finance.order_payment_status_drift` exists to catch, and it was already fixed
+     * once in the orders LIST while the detail header kept reading the cache.
+     */
+    payment_status: OrderPaymentStatus;
     // Money re-homed onto this order from a payment that is NOT tagged to it (an on-account credit
     // applied here). Shown read-only in the Payments list so a credit-settled order isn't blank.
     creditApplied: Array<{ allocation_id: string; payment_id: string; direction: 'in' | 'out'; amount: number; currency: string; paid_at: string; counterparty_name: string | null }>;
@@ -967,6 +975,7 @@ export const ordersService = {
       payments, received, paid_out, profit: received - paid_out,
       settled_in: Number(b?.settled_in ?? 0), settled_out: Number(b?.settled_out ?? 0),
       settled: Number(b?.settled ?? 0), outstanding: Number(b?.outstanding ?? 0),
+      payment_status: (b?.payment_status ?? 'unpaid') as OrderPaymentStatus,
       creditApplied,
     };
   },

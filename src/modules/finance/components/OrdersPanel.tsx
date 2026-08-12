@@ -2172,9 +2172,16 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // the SHARED rule — never from `customer_company_id`, which calls a sole trader (a contact
   // carrying an ΑΦΜ) retail and proposes an ΑΛΠ to a business.
   const salesDocKind: SalesDocumentKind = salesDocumentKindFor(buyerIdentity);
-  // Remaining owed per supplier (from the what-we-owe rollup) → drives per-line "Mark paid" visibility:
-  // once a line's supplier is fully settled, its "Mark paid" button hides (nothing left to pay).
-  const supplierOwedById = new Map(supExposure.map((s) => [s.supplier_company_id, s.owed]));
+  // Remaining owed per supplier → drives per-line "Mark paid" visibility: once a line's supplier is
+  // fully settled, its "Mark paid" button hides (nothing left to pay).
+  //
+  // Deferred to the covering purchase order through `supplierOwedAfterCover`, exactly like the
+  // rollup below. Reading the RAW `s.owed` here was a second answer to one money question: the sale
+  // sees none of the cash that settled a covering PO (that bill and that payment carry the
+  // PURCHASE's order_id), so a line whose supplier had been paid in full still showed a live red
+  // "Mark paid" — and pressing it books a SECOND payable for one delivery, the precise mistake the
+  // rollup's own Pay button was already fixed to stop making.
+  const supplierOwedById = new Map(supExposure.map((s) => [s.supplier_company_id, supplierOwedAfterCover(s).owed]));
 
   // The CRM record this order is with — same derivation the name fetch used.
   const party = order ? orderPartyRef(order) : null;
@@ -2207,7 +2214,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
             {/* Status + actions sit ON TOP of the products (then the document + totals below). */}
             <div className="flex flex-wrap items-center gap-2">
               <span className={`text-sm font-semibold capitalize ${order.order_type === 'sales' ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`}>{order.order_type}</span>
-              <span className="text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[order.payment_status]}</span>
+              {/* DERIVED, not the cached `orders.payment_status` column. The list one click up has
+                  read the derivation since the "Paid beside a non-zero Outstanding" fix; this header
+                  kept reading the cache, which is the same bug one screen deeper — and it sits
+                  directly above an Outstanding figure that comes from `get_order_settlements`. Same
+                  row, so the two cannot disagree. */}
+              <span className="text-xs text-muted-foreground">{ORDER_PAYMENT_LABEL[fin?.payment_status ?? order.payment_status]}</span>
               {/* Supplier round-trip on a PO: paired = sent in-app; supplier_status comes back from
                   their portal ack/ship or their mirror order's progress. Plain colored words. */}
               {order.order_type === 'purchase' && (order.paired_order_id || order.supplier_status) && (
@@ -2497,6 +2509,16 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     const lineProfit = lineCost != null ? Number(it.net_value) - lineCost : null;
                     const del = Number(it.quantity_delivered); const q = Number(it.quantity);
                     const delTone = del >= q && q > 0 ? 'text-emerald-600' : del > 0 ? 'text-amber-600' : 'text-muted-foreground';
+                    // What this line's supplier is still owed, AFTER a covering purchase order is
+                    // taken into account. `?? 1` keeps the button for a supplier the rollup does not
+                    // know about — an unknown is not a settlement.
+                    const lineSupplierOwed = it.supplier_company_id ? (supplierOwedById.get(it.supplier_company_id) ?? 1) : 1;
+                    // Settled BY that purchase order rather than by cash on this sale. Worth naming
+                    // on the line: this order's own ledger shows nothing, so saying nothing here
+                    // reads as "the supplier has not been paid".
+                    const linePaidOnPo = lineSupplierOwed <= 0.005
+                      ? coveredBy.find((c) => c.supplier_company_id === it.supplier_company_id) ?? null
+                      : null;
                     return (
                     <div key={it.id} className={`grid ${isSalesOrder ? 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_94px_88px_84px_96px]' : 'grid-cols-[minmax(240px,1.7fr)_44px_52px_120px_82px_92px_84px_96px]'} gap-2 border-t border-border/40 px-3 py-1.5 text-sm items-center ${isSalesOrder ? 'min-w-[1040px]' : 'min-w-[760px]'}`}>
                       <span className="min-w-0">
@@ -2533,13 +2555,20 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                               {supName ? <><Building2 className="h-2.5 w-2.5" /> {supName}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
                             </button>
                           )}
-                          {/* Mark this line's cost as paid → records a supplier bill + payment on the order.
-                              Hidden once the line's supplier is fully settled (owed ≤ 0 in the rollup). */}
-                          {lineCost != null && lineCost > 0.005 && order.order_type === 'sales'
-                            && !(it.supplier_company_id && (supplierOwedById.get(it.supplier_company_id) ?? 1) <= 0.005) && (
-                            <button type="button" className="text-[10px] text-red-400 hover:text-foreground inline-flex items-center gap-0.5" title="Record a payment to this line's supplier" onClick={() => openLinePayment(it)}>
-                              <Receipt className="h-2.5 w-2.5" /> Mark paid
-                            </button>
+                          {/* Mark this line's cost as paid → records a supplier bill + payment on the
+                              order. Once the line's supplier is settled this becomes WHERE it was
+                              settled, because on a covered sale that is a different order entirely. */}
+                          {lineCost != null && lineCost > 0.005 && order.order_type === 'sales' && (
+                            lineSupplierOwed > 0.005 ? (
+                              <button type="button" className="text-[10px] text-red-400 hover:text-foreground inline-flex items-center gap-0.5" title="Record a payment to this line's supplier" onClick={() => openLinePayment(it)}>
+                                <Receipt className="h-2.5 w-2.5" /> Mark paid
+                              </button>
+                            ) : linePaidOnPo ? (
+                              <Link to={`${financeBase}/orders/${linePaidOnPo.id}`} className="text-[10px] text-emerald-500 hover:underline inline-flex items-center gap-0.5"
+                                title="This line's cost is settled on the purchase order raised to cover this sale">
+                                <Receipt className="h-2.5 w-2.5" /> paid on {linePaidOnPo.order_number ?? 'the purchase order'}
+                              </Link>
+                            ) : null
                           )}
                         </span>
                       </span>
@@ -3271,6 +3300,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         open={!!payInOpen}
         onOpenChange={(o) => { if (!o) setPayInOpen(null); }}
         orderId={order.id}
+        orderLabel={order.order_number ?? undefined}
         side={order.order_type === 'purchase' ? 'supplier' : 'customer'}
         initialCounterparty={order.order_type === 'purchase'
           ? { companyId: order.supplier_company_id, contactId: order.supplier_contact_id }

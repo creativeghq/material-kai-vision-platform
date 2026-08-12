@@ -19,6 +19,7 @@
  */
 
 import { emitFlowEvent } from '../flow-events.ts';
+import { runInBackground as sharedRunInBackground } from '../background.ts';
 
 export type PaymentMethod = 'card' | 'bank_transfer' | 'cash' | 'check' | 'other';
 
@@ -261,7 +262,7 @@ export async function recordInvoicePayment(
       type: 'invoice_paid',
       title: `Invoice ${inv.internal_number} paid`,
       body: `${currency} ${src.amount.toFixed(2)} received via ${src.method === 'card' ? 'card' : src.providerLabel}.`,
-      action_url: `/admin/finance/invoices/${inv.id}`,
+      action_url: `/finance/invoices/${inv.id}`,
       invoice_id: inv.id,
       amount: src.amount,
       currency,
@@ -472,11 +473,5 @@ export function receiptLineFor(url: string | null): string {
  * worker alive past the response. Falls back to awaiting inline where unsupported.
  */
 export function runInBackground(work: Promise<unknown>): Promise<void> {
-  const guarded = work.catch((err) => console.error('[payments] background task failed', err));
-  const rt = (globalThis as any).EdgeRuntime;
-  if (rt && typeof rt.waitUntil === 'function') {
-    rt.waitUntil(guarded);
-    return Promise.resolve();
-  }
-  return guarded as Promise<void>;
+  return sharedRunInBackground(work, 'payments');
 }

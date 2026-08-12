@@ -53,6 +53,9 @@ export const RecordPaymentDialog: React.FC<{
   /** Attach the payment to an order (tags order_id → shows + settles on that order) and seed the
    *  amount / target invoice. Used so the order's "Record payment" uses THIS modal, not an inline view. */
   orderId?: string;
+  /** The order's human number (ORD-2026-0005), shown in the "For" picker so the operator can see
+   *  WHICH order the default target is. Label only — `orderId` is what binds the payment. */
+  orderLabel?: string;
   defaultAmount?: number;
   presetInvoiceId?: string;
   /** Settle THIS expense (a `supplier_bills` id): opens on the money-out branch with the expense
@@ -81,7 +84,7 @@ export const RecordPaymentDialog: React.FC<{
    * showed Unpaid with full Outstanding forever while the cash sat in the bank ledger.
    */
   orderCurrency?: string;
-}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, defaultAmount, presetInvoiceId, presetExpenseId, fiscalDocKind, fiscalDocReason, onIssueDoc, side = 'customer', payableBills = [], orderCurrency }) => {
+}> = ({ workspaceId, open, onOpenChange, onSaved, initialCounterparty, orderId, orderLabel, defaultAmount, presetInvoiceId, presetExpenseId, fiscalDocKind, fiscalDocReason, onIssueDoc, side = 'customer', payableBills = [], orderCurrency }) => {
   const { toast } = useToast();
   const [kind, setKind] = useState<Kind>('received');
   const [amount, setAmount] = useState('');
@@ -132,6 +135,20 @@ export const RecordPaymentDialog: React.FC<{
   const [billId, setBillId] = useState('');
   const selectedBill = payableBills.find((b) => b.id === billId) ?? null;
   const showOrderPicker = kind === 'received' && !orderId;
+  /**
+   * What "None" MEANS depends on where the dialog was opened, and the label used to claim the
+   * standalone meaning in both places.
+   *
+   * Standalone it is on-account credit. Opened FROM an order the payment already carries
+   * `order_id`, and `record_payment_fx` books everything not allocated to a document as an
+   * allocation ON THAT ORDER (capped at what it still owes) — which is exactly what
+   * `get_order_settlements` counts. So "None" there settles the order and the money is never loose;
+   * "None — unallocated credit" read as "this payment will not touch the order" on the one screen
+   * where it always does.
+   */
+  const noTargetLabel = orderId
+    ? `The order itself${orderLabel ? ` — ${orderLabel}` : ''}`
+    : 'None — unallocated credit';
   const effectiveOrderId = orderId ?? (pickedOrderId || undefined);
   /**
    * Settling a cost that ALREADY exists — entered only from that cost's own row (an expense in
@@ -210,14 +227,24 @@ export const RecordPaymentDialog: React.FC<{
       }
       setInvoices(invoiceRows);
       setBankAccounts(banks);
-      // Attachable = not cancelled and not already fully paid.
-      const attachable = ords.filter((o) => o.status !== 'cancelled' && o.payment_status !== 'paid');
+      // Attachable = not cancelled, and still owed something. What each one still owes comes from
+      // the shared SQL derivation — the picker must never offer `total` as "what's left" on a
+      // part-paid order.
+      //
+      // The "still owed" test reads that derivation too. It used to read the CACHED
+      // `orders.payment_status` column, so the gate and the figure beside it came from two
+      // different answers: an order the ledger still showed as owing was dropped from the list
+      // entirely whenever the column had drifted to 'paid' — and the one screen that could have
+      // recorded the money to correct it was the screen refusing to offer it.
+      const live = ords.filter((o) => o.status !== 'cancelled');
+      const bals = live.length
+        ? await ordersService.orderBalances(live.map((o) => o.id)).catch(() => new Map<string, OrderBalance>())
+        : new Map<string, OrderBalance>();
+      // No balance row means the derivation could not be read, not that the order is settled — keep
+      // it and let the operator decide. An unknown is not a zero.
+      const attachable = live.filter((o) => (bals.get(o.id)?.outstanding ?? Number(o.total)) > 0.005);
       setOrders(attachable);
-      // What each one still owes comes from the shared SQL derivation — the picker must never
-      // offer `total` as "what's left" on a part-paid order.
-      setOrderBalances(attachable.length
-        ? await ordersService.orderBalances(attachable.map((o) => o.id)).catch(() => new Map<string, OrderBalance>())
-        : new Map<string, OrderBalance>());
+      setOrderBalances(bals);
       // Default to the workspace's default account so cash location is always captured.
       setBankAccountId(banks.find((b) => b.is_default)?.bank_account_id ?? '');
     })();
@@ -609,9 +636,9 @@ export const RecordPaymentDialog: React.FC<{
             <div className="space-y-1">
               <Label>For (optional)</Label>
               <Select value={forValue} onValueChange={pickFor}>
-                <SelectTrigger><SelectValue placeholder="None — unallocated credit" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={noTargetLabel} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None — unallocated credit</SelectItem>
+                  <SelectItem value="none">{noTargetLabel}</SelectItem>
                   {pickableInvoices.length > 0 && (
                     <SelectGroup>
                       <SelectLabel>Invoices</SelectLabel>
@@ -639,7 +666,7 @@ export const RecordPaymentDialog: React.FC<{
                     </SelectGroup>
                   )}
                   {pickableInvoices.length === 0 && !(showOrderPicker && orders.length > 0) && (
-                    <div className="px-2 py-1 text-xs text-muted-foreground">No open invoices or orders</div>
+                    <div className="px-2 py-1 text-xs text-muted-foreground">{orderId ? 'No invoice on this order yet' : 'No open invoices or orders'}</div>
                   )}
                 </SelectContent>
               </Select>
@@ -648,7 +675,9 @@ export const RecordPaymentDialog: React.FC<{
                   ? 'Settling this invoice will mark it paid when fully covered.'
                   : pickedOrderId
                     ? 'Attaches the payment to this order and updates its paid status. Use this for a deposit or a payment on an order not yet invoiced.'
-                    : 'Leave as None to hold the money as on-account customer credit.'}
+                    : orderId
+                      ? 'Recorded against this order and counted towards what it still owes — not held as loose credit. Pick an invoice only to settle a specific one.'
+                      : 'Leave as None to hold the money as on-account customer credit.'}
               </p>
             </div>
           )}

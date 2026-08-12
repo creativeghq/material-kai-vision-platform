@@ -63,6 +63,7 @@ import {
   ORDER_STATUS_LABEL,
   ORDER_PAYMENT_LABEL,
   type OrderListRow,
+  type OrderBalance,
 } from '@/modules/finance/services/ordersService';
 import { OrderAgingInlineEditor } from '@/modules/finance/components/OrderAgingInlineEditor';
 import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
@@ -193,6 +194,8 @@ const FinancePage: React.FC = () => {
   const [topProducts, setTopProducts] = useState<SalesPerProductRow[]>([]);
   const [topOutstanding, setTopOutstanding] = useState<TopOutstandingRow[]>([]);
   const [recentOrders, setRecentOrders] = useState<OrderListRow[]>([]);
+  /** Derived settlement for the rows this card shows — the payment word never comes off the cache. */
+  const [recentOrderBalances, setRecentOrderBalances] = useState<Map<string, OrderBalance>>(new Map());
   const [insightsLoading, setInsightsLoading] = useState(false);
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
@@ -290,6 +293,13 @@ const FinancePage: React.FC = () => {
       setTopProducts(prods);
       setTopOutstanding(outstanding);
       setRecentOrders(orders);
+      // The payment word on those rows is DERIVED (`get_order_settlements`), the same rule the
+      // orders list follows — reading `OrderListRow.payment_status` is reading the cached column.
+      // Only the handful the card actually renders are fetched.
+      const shown = orders.slice(0, RECENT_ORDERS_SHOWN);
+      setRecentOrderBalances(shown.length
+        ? await ordersService.orderBalances(shown.map((o) => o.id)).catch(() => new Map<string, OrderBalance>())
+        : new Map<string, OrderBalance>());
     } catch { /* insights are best-effort — the core dashboard still renders */ }
     finally { setInsightsLoading(false); }
   };
@@ -860,7 +870,7 @@ const FinancePage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <RecentOrdersCard rows={recentOrders} onViewAll={() => onTabChange('doc_orders')} />
+              <RecentOrdersCard rows={recentOrders} balances={recentOrderBalances} onViewAll={() => onTabChange('doc_orders')} />
               <TopOutstandingCard rows={topOutstanding} onViewAll={() => onTabChange('ar')} />
             </div>
           </TabsContent>
@@ -1916,9 +1926,12 @@ const TopProductsCard: React.FC<{ rows: SalesPerProductRow[]; onViewAll?: () => 
   );
 };
 
+/** How many rows the card shows — also what `loadInsights` fetches derived balances for. */
+const RECENT_ORDERS_SHOWN = 6;
+
 /** Most recent sales orders with fulfilment + payment status. */
-const RecentOrdersCard: React.FC<{ rows: OrderListRow[]; onViewAll?: () => void }> = ({ rows, onViewAll }) => {
-  const recent = useMemo(() => rows.slice(0, 6), [rows]);
+const RecentOrdersCard: React.FC<{ rows: OrderListRow[]; balances: Map<string, OrderBalance>; onViewAll?: () => void }> = ({ rows, balances, onViewAll }) => {
+  const recent = useMemo(() => rows.slice(0, RECENT_ORDERS_SHOWN), [rows]);
   return (
     <InsightCard title="Recent orders" icon={ShoppingCart} onViewAll={onViewAll} isEmpty={recent.length === 0} empty="No sales orders yet.">
       <ul className="divide-y divide-border/40">
@@ -1934,7 +1947,12 @@ const RecentOrdersCard: React.FC<{ rows: OrderListRow[]; onViewAll?: () => void 
               <div className="flex flex-col items-end gap-1">
                 <div className="flex items-center gap-1">
                   <span className={`text-[10px] ${statusTone(o.status)}`}>{ORDER_STATUS_LABEL[o.status]}</span>
-                  <span className={`text-[10px] ${statusTone(o.payment_status)}`}>{ORDER_PAYMENT_LABEL[o.payment_status]}</span>
+                  {/* DERIVED, never `OrderListRow.payment_status` (the cached column) — see the
+                      same rule in the orders list and the order detail header. */}
+                  {(() => {
+                    const paid = balances.get(o.id)?.payment_status ?? o.payment_status;
+                    return <span className={`text-[10px] ${statusTone(paid)}`}>{ORDER_PAYMENT_LABEL[paid]}</span>;
+                  })()}
                 </div>
                 <div className="text-sm font-medium">{formatMoney(Number(o.total || 0), o.currency)}</div>
               </div>
