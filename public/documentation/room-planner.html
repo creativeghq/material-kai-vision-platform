@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Room Planner | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / Room Planner</div>
+  <h1>Room Planner</h1>
+  <div class="routes"><span class="badge route">/room-planner</span></div>
+  <p class="lead">The Room Planner is a <strong>top-down floor-plan planner</strong>, driven entirely by your own product catalogue. You draw a room to real dimensions, drop catalogue products onto it <strong>at their true size</strong>, apply finishes (flooring, paint, tiles) to the walls and floor, and then turn the whole arrangement into a <strong>quote</strong> in one click — with the surface quantities worked out for you. It's a standalone design surface, not a tab inside Projects or MoodBoards, and it's free to use.</p>
+
+  <div class="callout"><p><strong>Where:</strong> the <strong>Room Planner</strong> item in the Studio area of the navigation (alongside MoodBoards and Interior Design), at <span class="badge route">/room-planner</span>. It's part of your workspace — no extra module, no credits.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/room-planner/room-planner.png" alt="The Room Planner">
+    <figcaption>The Room Planner — a 2D floor plan you arrange products on at real size, a Surfaces panel for finishes, and <strong>Add to quote</strong>. A 3D view toggle gives an optional walkthrough of the same layout.</figcaption>
+  </figure>
+
+  <h2>Two ways in</h2>
+  <ul class="feat">
+    <li><strong>From the menu</strong> — open <strong>Room Planner</strong> and start a blank room.</li>
+    <li><strong>From a product</strong> — a product that has a 3D model shows a <strong>“Place in a room”</strong> link, which opens the planner with that product already dropped in the middle of the room. (The link only appears when the product has a model, because without one the planner can't place it to scale.)</li>
+  </ul>
+
+  <h2>The room</h2>
+  <p>A layout starts as a rectangular room you size in metres — <strong>width, depth and height</strong>. Everything on the canvas is drawn to that scale, so what you see is what will fit. You can keep several named layouts, each its own room.</p>
+
+  <h2>Placing products — objects at real size</h2>
+  <p><strong>Add a product</strong> from your catalogue and it drops onto the floor at its real footprint. On the 2D canvas you:</p>
+  <ul class="feat">
+    <li><strong>Drag</strong> to position (it snaps to a grid and stays inside the room; the move is saved when you let go).</li>
+    <li><strong>Rotate</strong> in 45° steps and <strong>delete</strong> from the controls on the selected item.</li>
+    <li>See <strong>overlaps flagged in red</strong>, so two things can't silently occupy the same spot.</li>
+  </ul>
+  <div class="callout"><p><strong>“Measured” vs “placeholder” size.</strong> An item's footprint is taken from its <strong>3D model's real dimensions</strong> where it has one, or an explicit size override, otherwise a neutral default — and the planner <strong>labels which</strong>. A product with no model is shown at an assumed size marked <em>placeholder</em>, so you never mistake a default box for a real measurement.</p></div>
+
+  <h3>The 3D view</h3>
+  <p>Toggle to a <strong>3D walkthrough</strong> of the same layout — the products rendered from their models (ones without a model appear as simple placeholder boxes). You still <em>arrange</em> in 2D; 3D is for seeing it. You can pick and save a <strong>lighting preset</strong>, because a room reads very differently under different light.</p>
+
+  <h2>Surfaces — finishes you apply, not place</h2>
+  <p>A tile, a paint or a wallcovering has no footprint — you <strong>apply</strong> it to a face of the room rather than dropping it on the floor. The <strong>Surfaces</strong> panel lists the room's six faces — <strong>floor, ceiling and the four walls</strong> — and for each you pick a catalogue product (or leave it as None).</p>
+  <div class="callout"><p><strong>The quantity is worked out for you.</strong> Each applied surface's ordered area is <strong>derived from the room's dimensions</strong> — you never type square metres — and it automatically adds <strong>+10% for waste</strong> (cuts and breakage). So a floor finish on a 4×5 m room orders the right amount without a hand calculation.</p></div>
+
+  <h2>Configurable products</h2>
+  <p>If a product has <strong>options</strong> (a finish, a fabric, a colour), you configure it with <strong>swatches that repaint the model live</strong> and update the price as you pick — the price is always re-checked on the server, never guessed in the browser, and any invalid combination is blocked before it can be added. Because materials render from real <strong>AI-generated textures</strong> (not just a flat colour), a velvet and a linen in the same navy actually look different on screen. The merchant sets these options up on the product; see the embed <a href="api-embed.html">configurator</a> for the same engine on your own website.</p>
+
+  <h2>Turning the plan into a quote</h2>
+  <p>When the room has products or surfaces on it, <strong>Add to quote</strong> does the commercial part:</p>
+  <ul class="feat">
+    <li>It adds every item and surface to your most-recent <strong>open quote</strong>, or — if you have none — <strong>creates a new quote named after the room</strong>, so you're never asked “which quote?”.</li>
+    <li>Prices are <strong>read and frozen onto the lines together</strong>; repeated items <strong>collapse into one line with a quantity</strong>.</li>
+    <li>You land on the <a href="quotes.html">quote</a> ready to send.</li>
+  </ul>
+  <div class="callout warn"><p><strong>“Call for price” lines.</strong> If a product has no price the resolver can use, it's still added — as a <strong>call-for-price</strong> line that contributes nothing to the total (rather than being dropped or erroring). The confirmation tells you how many lines came through that way, so a quote that looks finished but is missing prices doesn't slip out under-quoted. Fill those prices, or send them as an RFQ.</p></div>
+
+  <h2>How it relates to Projects &amp; MoodBoards</h2>
+  <p>The Room Planner is <strong>its own thing</strong>, deliberately separate from:</p>
+  <ul class="feat">
+    <li><a href="projects-rooms.html">Projects → Rooms</a> — a <em>budgeting</em> unit inside a project (name, type, budget, deadline), not a scale layout.</li>
+    <li><a href="projects-technical-plans.html">Technical Plans</a> (the electrical/plumbing/lighting sheets) — services <em>drawings</em>, not a catalogue layout.</li>
+  </ul>
+  <p>The Room Planner is the one that arranges real products to scale and turns them into a priced quote.</p>
+
+  <div class="callout tip"><p><strong>Worked example — a living room.</strong> Open <strong>Room Planner</strong> → set the room to 5 × 4 m → <strong>Add</strong> a sofa and an armchair (they drop in at their real size), drag them into place, rotate the sofa to face the window. In <strong>Surfaces</strong>, set the <em>floor</em> to an oak plank and a <em>wall</em> to a paint — the areas (plus 10% waste) are computed for you. Configure the sofa's fabric with the swatches. Click <strong>Add to quote</strong> → a quote named after the room opens with the furniture and the finishes on it, ready to send.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

@@ -11,7 +11,7 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Inbox</div>
   <h1>Inbox</h1>
   <div class="routes"><span class="badge route">/inbox</span> <span class="badge gated">inbox.use</span></div>
-  <p class="lead">The Inbox is one place for every conversation your team relies on — internal chats between colleagues, customer threads, and WhatsApp messages — organised, searchable, and assigned to the right person. An <strong>AI assistant</strong> can also answer customer threads automatically and step aside the moment a human replies. This guide walks every part of it: what each control is, why it matters, exactly how to use it, and what it changes elsewhere in the platform.</p>
+  <p class="lead">The Inbox is one place for every conversation your team relies on — internal chats between colleagues, customer threads, <strong>WhatsApp</strong> messages and <strong>email</strong> — organised, searchable, and assigned to the right person. Every member even gets their <strong>own email address</strong> that files straight into the Inbox, and an order that arrives as a message can be turned into a <strong>real order</strong> without re-typing it. An <strong>AI assistant</strong> can answer customer threads (and, if you switch it on, your email) automatically and step aside the moment a human replies. This guide walks every part of it: what each control is, why it matters, exactly how to use it, and what it changes elsewhere in the platform.</p>
 
   <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Inbox</strong>.</p></div>
 
@@ -19,7 +19,7 @@
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/inbox.png" alt="The Inbox showing the conversation list, search box, and All / Internal / WhatsApp filters">
-    <figcaption>The Inbox with the conversation count, the <em>Search conversations</em> box, the All / Internal / WhatsApp filters, and the conversation list.</figcaption>
+    <figcaption>The Inbox with the conversation count, the <em>Search conversations</em> box, the All / Internal / WhatsApp / Email filters, and the conversation list.</figcaption>
   </figure>
 
   <h2>What this page is for</h2>
@@ -28,22 +28,23 @@
   <h2>Layout &amp; the header controls</h2>
   <p><strong>What it is —</strong> the conversation list on the left and the open conversation on the right; the header holds everything you need to find and start conversations. Selecting a conversation opens it on the right, where you read the message history and reply. <strong>Why it matters —</strong> these controls are how you cut a long list down to exactly the thread you need, and how you decide whether you're looking at one workspace or all of them.</p>
   <ul class="feat">
-    <li><strong>Conversation list with count</strong> — every conversation you can see, with the total shown so you know how many are in the current view.</li>
-    <li><strong>Search conversations</strong> — a search box to filter the list by what you're looking for.</li>
-    <li><strong>Filters: All / Internal / WhatsApp</strong> — narrow the list to everything, to internal team threads only, or to WhatsApp threads only. <em>All</em> is the default catch-all; <em>Internal</em> isolates colleague-to-colleague threads; <em>WhatsApp</em> isolates customer threads on a connected number.</li>
-    <li><strong>All workspaces</strong> — a toggle to switch between a single workspace and a combined view across the workspaces you're allowed to see. If you only belong to one workspace, this has no effect.</li>
-    <li><strong>New conversation</strong> — start a fresh thread.</li>
+    <li><strong>The rail (left)</strong> — <strong>Compose</strong> to start a thread, then <strong>All Inboxes</strong> (with an unread count), <strong>Unread</strong> and <strong>Archived</strong> to switch what the list shows, and a <strong>Labels</strong> section for your own tags.</li>
+    <li><strong>Status tabs — Open / Follow-Up / Done</strong> — above the list, these move a thread through its lifecycle: work it in <em>Open</em>, park it in <em>Follow-Up</em>, close it to <em>Done</em>.</li>
+    <li><strong>Search</strong> — a box to filter the list by what you're looking for.</li>
+    <li><strong>Filters</strong> — the Filters button narrows the list by <strong>channel</strong> (All / Internal / WhatsApp / Email) and isolates threads that carry a detected <strong>Order</strong>. Each thread in the list shows a <strong>channel badge</strong> (e.g. <em>Email</em>) so you can tell at a glance where it came from.</li>
+    <li><strong>All workspaces</strong> — a toggle (top-right) to switch between a single workspace and a combined view across the workspaces you're allowed to see. If you only belong to one workspace, this has no effect.</li>
   </ul>
-  <p><strong>What it affects:</strong> the filters and search only change what's shown to you — they don't move or hide anything for teammates. The <strong>All workspaces</strong> toggle changes the scope of the whole list, so a thread you can't find in one workspace may simply be in another.</p>
-  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/new-conversation.png" alt="New internal conversation dialog"><figcaption>Starting a new internal conversation.</figcaption></figure>
+  <p><strong>What it affects:</strong> the tabs, filters and search only change what's shown to you — they don't move or hide anything for teammates. The <strong>All workspaces</strong> toggle changes the scope of the whole list, so a thread you can't find in one workspace may simply be in another.</p>
+  <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/new-conversation.png" alt="Starting a conversation from the Inbox"><figcaption>Starting a conversation from <strong>Compose</strong>.</figcaption></figure>
 
   <div class="callout tip"><p><strong>Tip —</strong> reach for the <strong>filters</strong> first and the <strong>search</strong> second: filtering to WhatsApp (or Internal) shortens the list before you type, so the search has less to wade through.</p></div>
 
-  <h2>The three conversation types</h2>
-  <p><strong>What it is —</strong> every thread in the Inbox is one of three kinds. <strong>Why it matters —</strong> knowing the type tells you who can see it and how to reach the other party.</p>
+  <h2>The conversation channels</h2>
+  <p><strong>What it is —</strong> every thread in the Inbox belongs to one channel. <strong>Why it matters —</strong> knowing the channel tells you who can see it and how to reach the other party.</p>
   <div class="cards">
     <div class="card"><div class="ico">👥</div><h3>Internal</h3><p>Discussions between members of your team — questions, hand-offs, and notes that stay inside the workspace.</p></div>
     <div class="card"><div class="ico">💬</div><h3>WhatsApp</h3><p>Messages exchanged with customers over a connected WhatsApp number, read and answered in the Inbox.</p></div>
+    <div class="card"><div class="ico">✉️</div><h3>Email</h3><p>Mail sent to your personal workspace address lands here as a thread you can reply to — see below.</p></div>
     <div class="card"><div class="ico">🔗</div><h3>Customer / shared</h3><p>Threads opened to an outside party through a link, so they can take part without creating an account.</p></div>
   </div>
 
@@ -51,7 +52,7 @@
   <p><strong>What it is —</strong> a private thread between members of your team that stays inside the workspace. <strong>Why it matters —</strong> it keeps questions, hand-offs and notes alongside your customer and WhatsApp threads instead of in a separate chat app, so context isn't lost.</p>
   <h3>How to start one</h3>
   <ol>
-    <li>Open the <span class="badge route">/inbox</span> and click <strong>New conversation</strong> — this opens the <em>New internal conversation</em> dialog.</li>
+    <li>Open the <span class="badge route">/inbox</span> and click <strong>Compose</strong> — this opens the new-conversation dialog.</li>
     <li>Give the conversation a <strong>subject</strong> so colleagues can recognise it in the list.</li>
     <li>Pick the <strong>participants</strong> — the team members who should take part.</li>
     <li>Send your <strong>first message</strong> to start the thread; it appears in the conversation list under the <strong>Internal</strong> filter.</li>
@@ -83,6 +84,26 @@
   </ol>
   <p><strong>What it affects:</strong> connecting a number makes its threads appear under the <strong>WhatsApp</strong> filter; incoming replies are assigned automatically, and whether a send goes free-form or via template depends entirely on the 24-hour window above.</p>
 
+  <h2>Email — your own address, in the Inbox</h2>
+  <p><strong>What it is —</strong> every member gets a <strong>personal email address</strong> that delivers straight into the Inbox as a thread. <strong>Why it matters —</strong> customer email stops living in a separate mail client — it's threaded, searchable and assignable alongside your WhatsApp and internal chats, and the AI assistant can help with it too.</p>
+  <ul class="feat">
+    <li><strong>You get it just by opening the Inbox.</strong> The address is created the first time you open the Inbox — there's no button to press and nothing to set up. It takes the form <code>firstname.lastname@mail.materialshub.gr</code>, derived from your profile name (Greek names are transliterated automatically).</li>
+    <li><strong>If your name's taken, you pick your own.</strong> Because everyone shares the one receiving domain, a name clash means you're asked to choose your own local part — the platform never appends a number, so you'll never get <em>firstname.lastname2@…</em>.</li>
+    <li><strong>Find it in Inbox settings.</strong> The <strong>gear (Settings)</strong> popover shows <em>“Your email address”</em> with a copy button.</li>
+    <li><strong>Already have an address customers use?</strong> Keep it — just <strong>forward</strong> that mailbox here, rather than changing your MX records.</li>
+  </ul>
+  <p><strong>Replying —</strong> answer an email thread straight from the Inbox composer; your reply goes out by email and stays threaded (a hidden reply tag keeps the customer's responses landing back on the same conversation). If a send can't be delivered, the Inbox tells you clearly rather than silently dropping it.</p>
+  <div class="callout"><p><strong>One-time operator setup.</strong> Receiving mail on <code>mail.materialshub.gr</code> relies on a small mail worker your operator sets up once (DNS + a sending domain). Once that's in place, every member's address just works. Sending stays outbound-only through the platform's mail provider — inbound and outbound are separate paths.</p></div>
+
+  <h2>Orders that arrive as a message → real orders</h2>
+  <p><strong>What it is —</strong> when a customer emails or WhatsApps you what is effectively an order (“send me 2 boxes of the grey 60×60 and a tube of adhesive”), the platform reads it into a <strong>proposed order</strong> attached to the thread — which a member can turn into a real <a href="finance-doc-orders.html">order</a> in a click. <strong>Why it matters —</strong> it takes the retyping (and the transcription errors) out of turning an enquiry into a sale, while keeping a human in charge of what actually gets raised.</p>
+  <ul class="feat">
+    <li><strong>It's a proposal, not an order yet.</strong> The extracted lines live on the thread — nothing is written to your orders, no number is burned — until someone approves it. Threads with a detected order show an <strong>Order</strong> badge and appear under the <strong>Order</strong> filter.</li>
+    <li><strong>Lines are matched and priced from your catalogue.</strong> Each requested item is matched against your products (by text, and even by a photo the customer sent — “2 boxes of <em>this</em>”) and priced with <em>your</em> pricing rules. An item that can't be matched or priced is <strong>flagged for review</strong>, never guessed.</li>
+    <li><strong>Approve as a pre-order.</strong> The thread's <strong>Order</strong> panel shows the proposed lines, a customer picker and needs-review markers. <strong>Approve as pre-order</strong> creates a draft sales order you then confirm the normal way; <strong>Dismiss</strong> drops the proposal. Approving can also send the customer a confirmation on whichever channel is open.</li>
+  </ul>
+  <div class="callout"><p><strong>Who can approve &amp; turning it on.</strong> Order intake is a <strong>workspace opt-in</strong> (reading each message into a proposal spends credits, so it's off until you enable it). The <strong>Approve</strong> button is limited to <strong>owner / admin / sales / sales-manager</strong> — other members see the proposal but can't raise the order.</p></div>
+
   <h2>The AI assistant in the Inbox (auto-replies)</h2>
   <p><strong>What it is —</strong> an AI assistant that can <strong>answer customer threads for you automatically</strong>. When a customer message comes in (in-app customer thread or WhatsApp), the assistant replies first — grounded in <em>that customer's own data</em> (their statement, invoices and quotes, scoped to the thread's customer) — so routine questions are handled instantly, day or night. <strong>Why it matters —</strong> it covers first response when no one's at the desk, but is built to <strong>step aside the moment a human steps in</strong>, so it never talks over your team.</p>
 
@@ -107,6 +128,7 @@
   </table>
   </div>
   <div class="callout"><p><strong>Editable persona.</strong> The assistant's tone and instructions (its system prompt) are <strong>configurable without a redeploy</strong> — an admin can tune the inbox assistant's persona the same way the main KAI agent's prompt is edited. There's a sensible built-in default if you change nothing.</p></div>
+  <div class="callout"><p><strong>“Assistant answers email” is a separate, per-person switch.</strong> The two settings above cover <em>customer chats and WhatsApp</em> for the whole workspace. Automatic replies to <em>your</em> email address are controlled by a <strong>per-member</strong> toggle on your own <em>“Your email address”</em> section in the same settings popover — and it's <strong>off by default</strong>. Turn it on and mail sent to your address gets an automatic first reply (grounded in the customer's own data, like the chat assistant); leave it off and your email waits for you.</p></div>
   <div class="callout tip"><p>Auto-respond is <strong>on by default</strong> per workspace. Each auto-reply uses credits; pausing (a human reply) or turning off <em>Auto-respond</em> stops the charges.</p></div>
 
   <h2>Sharing a customer / public thread</h2>

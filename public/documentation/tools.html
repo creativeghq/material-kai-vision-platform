@@ -27,12 +27,13 @@
   <p><strong>What it is —</strong> a landing page with one card per tool, grouped by kind. <strong>Why it matters —</strong> the grouping tells you up front which tools are free-and-instant and which consume your daily scan allowance, so there are no surprises. The four public tools split into two kinds:</p>
   <ul class="feat">
     <li><strong>Instant calculators</strong> — the <em>Heat-pump sizer</em> and <em>Heating cost comparison</em>. These run entirely in your browser, update live as you type, and have no daily limit and no bot check.</li>
+    <li><strong>Kitchen cost calculator</strong> — at <span class="badge route">/tools/kitchen-cost</span>: configure a kitchen (run length, cabinet finish, worktop, drawers, mechanisms) and watch the price update. Trying it is free; only the optional <em>“Get this quoted”</em> lead-send has a bot check and daily cap. See <a href="#kitchen">below</a>.</li>
     <li><strong>Live web scans</strong> — <em>Price scan</em> and <em>Mention scan</em>. These call real sources across the web, so they're protected by a small daily allowance, a quick bot check, and short-term caching of identical queries (see <a href="#fair-use">Fair use</a> below).</li>
     <li><strong>Project plan estimator</strong> — at <span class="badge route">/tools/project-plan</span>: a <strong>value-first, fully editable</strong> estimator. It leads with a <strong>Full Home Renovation</strong> and shows the <em>whole priced scope of works up front</em> — <em>“Free, instant, no sign-up to try.”</em> You enter the measurements, then <strong>edit rows, add tasks, change units, and drop in whole sections from the library</strong>, watching the price update. <strong>Save &amp; create free account</strong> keeps your plan and imports it into your workspace after sign-up. (Other project types prompt sign-up; figures are a ballpark using standard rates.) It's the public on-ramp to the full <a href="projects-plan.html">Plan &amp; Estimating</a> engine.</li>
     <li><strong>Material search</strong> — a public <strong>Material Search</strong> on <span class="badge route">/tools</span>: describe a material and get matching catalogue products. It's <strong>free for a daily allowance</strong>; beyond that each search costs <strong>1 credit</strong> — the public taste of the assistant's full <a href="agent-tools.html">material search</a>.</li>
   </ul>
   <p>You don't need an account to use any of them. The header shows your remaining free scans for the day; signing in raises the limit and unlocks ongoing, tracked monitoring with alerts.</p>
-  <p><strong>What it unlocks when signed in:</strong> the hub adds a third group — <strong>Catalog tools</strong> — which work against your workspace catalogue (so they require a login): <a href="recognition.html">Material Recognition</a> and <a href="compare.html">Material Comparison</a> (see <a href="#catalog">section 6</a>).</p>
+  <p><strong>What it unlocks when signed in:</strong> the hub adds a third group — <strong>Catalog tools</strong> — which work against your workspace catalogue (so they require a login): <a href="recognition.html">Material Recognition</a> and <a href="compare.html">Material Comparison</a> (see <a href="#catalog">section 7</a>).</p>
 
   <!-- Heat-pump sizer -->
   <h2>2. Heat-pump sizer</h2>
@@ -107,7 +108,26 @@
   <div class="callout"><p>The comparison covers <strong>running cost only</strong> — it excludes the price of the equipment, installation and maintenance. Use it to weigh ongoing fuel/energy spend, not total cost of ownership.</p></div>
 
   <!-- Price scan -->
-  <h2>4. Price scan</h2>
+  <h2 id="kitchen">4. Kitchen cost calculator</h2>
+  <div class="routes"><span class="badge route">/tools/kitchen-cost</span> <span class="badge public">Public</span></div>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/kitchen-cost.png" alt="Kitchen cost calculator — configure the kitchen on the left, running total on the right">
+    <figcaption>The Kitchen cost calculator — set the run length and pick a cabinet finish, worktop and extras; the estimated total updates as you go.</figcaption>
+  </figure>
+  <p><strong>What it is —</strong> a live <strong>kitchen configurator</strong>: set your run length, pick a cabinet model and finish and a worktop, toggle extras like drawer banks, corner mechanisms and “removal of the old kitchen,” and watch the <strong>estimated total update as you go</strong>. <strong>Why it matters —</strong> it gives a homeowner a realistic ballpark in a minute, and gives you a warm lead with the exact configuration attached. Unlike the pure browser calculators, its choices are <strong>priced on the server from a shared price list</strong>, so the number you see is the number that gets recorded.</p>
+  <div class="callout"><p><strong>One price list, everywhere.</strong> This tool, the <a href="projects-plan.html">Projects estimator</a>, the Inbox kitchen-lead panel and the AI assistant all price a kitchen from the <strong>same “New Kitchen” blueprint</strong> through one engine — so a configurator total, a saved lead and an agent's answer for the same kitchen all agree. Re-pricing it in the admin reflows every surface with no deploy.</p></div>
+  <h3>How to run it</h3>
+  <ol>
+    <li>Set the <strong>measurements</strong> — run length (and, where relevant, the wall/hanging-unit run and worktop length) with the sliders, in metres.</li>
+    <li>Pick one option per <strong>section</strong> — cabinet model/finish, worktop — from the cards.</li>
+    <li>Toggle any <strong>extras</strong> (drawer banks, corner mechanisms, removal &amp; disposal of the old kitchen). Extras start <em>off</em> so the first figure isn't inflated.</li>
+    <li>Read the <strong>Estimated total</strong> and per-section subtotals. It's labelled <em>excluding VAT, appliances and sink not included</em> — a ballpark at standard rates, firmed up by a survey.</li>
+    <li>Click <strong>Get this quoted</strong> → enter your name and email or phone, optionally pick a kitchen <em>shape</em> (one-wall, L, galley, U, island — context only, never priced) and add notes, pass the quick bot check, and <strong>Send my estimate</strong>. You get a reference like <strong>KC-XXXXXX</strong>. Only your <em>choices</em> are sent — the server re-prices them, so a tampered total can't become the recorded one.</li>
+  </ol>
+  <p><strong>Where the lead lands:</strong> it creates a CRM contact and arrives as a proposal in the merchant's <a href="inbox.html">Inbox</a> (a <em>“Kitchen estimate”</em> panel), where a member can turn it into a <strong>project &amp; plan</strong> and then a <a href="quotes.html">quote</a> — nothing is created in projects or quotes until they do.</p>
+  <div class="callout tip"><p><strong>Also in chat.</strong> The assistant can price a kitchen for you with the <code>calculate_kitchen_cost</code> tool (<a href="agent-tools.html">Agent tools</a>): ask it and it lists every model, worktop and add-on with what each costs for your run length, then totals your picks — and it always tells you if a finish you named wasn't on the price list rather than quietly quoting something else. It's free (no credits).</p></div>
+
+  <h2>5. Price scan</h2>
   <div class="routes"><span class="badge route">/tools/price-scan</span> <span class="badge public">Public</span></div>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/price-scan.png" alt="Price scan results listing retailers with prices and lowest/median/highest stats">
@@ -125,7 +145,7 @@
   <p><strong>What it leads to:</strong> this is a free taste of the platform's full <strong>price monitoring</strong>. Once you sign in you can keep tracking a product over time and be alerted to price drops, new retailers and promotions, rather than running a one-off scan. See <a href="agent-tools.html">Tools &amp; Capabilities</a> for what the assistant can do with tracked pricing.</p>
 
   <!-- Mention scan -->
-  <h2>5. Mention scan</h2>
+  <h2>6. Mention scan</h2>
   <div class="routes"><span class="badge route">/tools/mention-scan</span> <span class="badge public">Public</span></div>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/tools/mention-scan.png" alt="Mention scan listing recent press mentions grouped with top outlets">
@@ -143,7 +163,7 @@
   <p><strong>What it leads to:</strong> it's a preview of the platform's <strong>mention monitoring</strong>. Signing in lets you track a subject continuously and get alerted to spikes in coverage, negative sentiment from reputable outlets, and brand-new outlets picking up the story — instead of a single snapshot. The same capability is available to the assistant in <a href="agent-tools.html">Tools &amp; Capabilities</a>.</p>
 
   <!-- Catalog tools -->
-  <h2 id="catalog">6. Catalog tools (signed in)</h2>
+  <h2 id="catalog">7. Catalog tools (signed in)</h2>
   <div class="routes"><span class="badge gated">Signed in</span></div>
   <p><strong>What it is —</strong> a third group that appears in the hub once you're logged in. <strong>Why it matters —</strong> unlike the public tools above, these work against <em>your workspace catalogue</em> (and the AI vision/search backend), so they require an account and open their own dedicated screens rather than a <code>/tools/&lt;slug&gt;</code> page. They were previously reachable only by typing the URL — now they're grouped here and in the <strong>Profile → Tools</strong> menu.</p>
   <ul class="feat">
@@ -153,7 +173,7 @@
   <div class="callout"><p>These are kept separate from the free public tools so the "no login needed" promise still holds for the public utilities. The free scans show your remaining daily allowance in the header; Catalog tools simply require being signed in.</p></div>
 
   <!-- Fair use -->
-  <h2 id="fair-use">7. Fair use &amp; limits</h2>
+  <h2 id="fair-use">8. Fair use &amp; limits</h2>
   <p><strong>What it is —</strong> the light guards on the two web scans. <strong>Why it matters —</strong> the price and mention scans call real, paid sources on every run, so these rules keep the free service sustainable and abuse-free while staying out of your way:</p>
   <ul class="feat">
     <li><strong>Daily allowance</strong> — a small number of free scans per visitor each day, shared across both scan types. The header badge shows how many you have left, and the count resets daily.</li>

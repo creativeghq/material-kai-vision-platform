@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM: Equipment & Service | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Equipment &amp; Service</div>
+  <h1>CRM · Equipment &amp; Service <span class="badge">Installed base</span></h1>
+  <div class="routes"><span class="badge route">/crm/companies/:id?tab=equipment</span> <span class="badge route">/crm/contacts/:id?tab=equipment</span> <span class="badge gated">crm.view</span></div>
+  <p class="lead">The <strong>Equipment</strong> tab tracks your <strong>installed base</strong> — the units you've sold and installed at a customer's site that keep needing service: an air-conditioner whose filters need cleaning, a boiler, a water heater. It answers "what have we got out there, is it still under warranty, and what's due next?" — and it does the scheduling for you, so the AC you sold two summers ago still gets its service booked. This is <em>recurring, planned</em> maintenance on a customer's own equipment, distinct from the internal <a href="company-assets.html">Company Assets</a> register (your own vehicles/tools) and from reactive repair tickets.</p>
+
+  <div class="callout"><p><strong>Where:</strong> open a <a href="crm-companies.html">CRM company</a> or <a href="crm-contacts.html">contact</a> and pick the <strong>Equipment</strong> tab (the wrench icon). It's part of the CRM — no extra module or credits. Service-reminder notifications link straight to this tab.</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/equipment-tab.png" alt="The Equipment & Service tab on a CRM customer">
+    <figcaption>The Equipment tab — a <strong>Service coming up</strong> worklist (only when something's due), the <strong>Equipment</strong> register of units, and the customer's whole <strong>Service history</strong>.</figcaption>
+  </figure>
+
+  <h2>What's on the tab — three cards</h2>
+  <ul class="feat">
+    <li><strong>Service coming up</strong> — a worklist that appears only when something is due, with a count of what's <em>overdue</em> and what's <em>inside the reminder window</em>. Each row has one-click <strong>Done</strong> and <strong>Skip</strong> buttons.</li>
+    <li><strong>Equipment</strong> — the register of units (name, serial, installed date, next service, status), with an <strong>Add equipment</strong> button.</li>
+    <li><strong>Service history</strong> — every visit across <em>all</em> this customer's units in one ledger (when, which unit, what service, outcome, who, cost) — so you can read the whole relationship at once, not one unit at a time.</li>
+  </ul>
+
+  <h2>Registering a unit</h2>
+  <p>A unit gets onto the register two ways:</p>
+  <ul class="feat">
+    <li><strong>Automatically, when you deliver a serviceable product.</strong> If a product is marked <em>serviceable</em> (see below) and it's <strong>delivered on a sales <a href="finance-doc-orders.html">order</a></strong>, a unit is created for that customer automatically — inheriting the customer, project, purchase date and supplier from the order. This is how "the AC you sold" lands in the installed base without anyone re-typing it.</li>
+    <li><strong>Manually,</strong> with <strong>Add equipment</strong> — for a unit you didn't sell them, or one delivered before you started tracking. You fill in name, brand, model, serial, install date, location and notes.</li>
+  </ul>
+  <p>Each unit carries a <strong>status</strong> — <em>Active</em>, <em>Removed</em>, <em>Replaced</em> or <em>Decommissioned</em> — and can be tied to a <a href="projects.html">project</a> and room (e.g. "the AC in the second-floor bedroom of the Kolonaki renovation").</p>
+  <div class="callout warn"><p><strong>You retire a unit, you don't delete it.</strong> Once a unit has any service history, deleting it is <strong>blocked</strong> — erasing the unit would erase the record of what you did to it. Instead, set its status to <em>Removed</em> / <em>Replaced</em> / <em>Decommissioned</em>: the unit stops appearing as live, but its history stays intact.</p></div>
+
+  <h2>Warranties &amp; certificates</h2>
+  <p>Each unit can carry one or more <strong>warranties</strong> — <em>manufacturer</em>, <em>extended</em>, <em>installer</em> or <em>insurance</em> — with the provider, policy number, start/end dates, coverage notes and reminder offsets. A product's default warranty length is copied onto the manufacturer warranty at registration, counted from the install date, so you don't set it each time. The tab shows each warranty's state (active / expiring / expired) computed from its end date.</p>
+  <div class="callout"><p><strong>The “certificate” is the document you attach.</strong> A warranty certificate here is the <strong>scan you upload</strong> (PDF or image, up to 5&nbsp;MB) — the platform doesn't generate one. It's stored <strong>privately</strong> and opened through a short-lived signed link, so the URL can't leak or rot. Attach it with the paperclip on the warranty row; view or detach it there too.</p></div>
+
+  <h2>The service schedule — one thing due at a time</h2>
+  <p>A unit's <strong>service schedule</strong> is what makes this more than a list. You set, per unit: <strong>what needs doing</strong> (“Clean the filters”), <strong>how often</strong> (every N months), how many <strong>days before</strong> to remind you, and whether to <strong>email the customer too</strong>.</p>
+  <p><strong>The key idea:</strong> a schedule always has <strong>exactly one open occurrence</strong> — the next service. There's no separate “next due” field being calculated; the next date <em>is</em> that one open row. When you mark a service <strong>Done</strong> (or <strong>Skip</strong>), the platform closes it and <strong>opens the next one in the same step</strong>, anchored on <em>when the work actually happened</em> — so a service done late pushes the whole cycle along rather than silently drifting. That's why completing a service is the only thing that schedules the next: the worklist can never show two of the same job, and it can never run dry while a unit is still in service.</p>
+  <div class="callout"><p><strong>History outlives the schedule.</strong> If you remove a schedule, the visits it already produced stay in the service history (tagged so you can see the schedule was removed). You lose the future occurrences, never the past record.</p></div>
+
+  <h2>Reminders &amp; the customer email</h2>
+  <p>A daily job raises a <strong>service-due</strong> (and <strong>overdue</strong>) event as each occurrence enters its reminder window, and a <strong>warranty-expiring</strong> event ahead of a warranty's end. These flow through <a href="flows.html">Flows</a>, so <em>how</em> they're delivered is yours to edit — an in-app notification to the responsible person by default, and, when you tick <strong>“Email the customer too”</strong> on the schedule, an email to the customer as well (“your AC is due for a filter clean on …”). Because it's a Flow, an admin can retarget or add a channel without a deploy.</p>
+  <div class="callout tip"><p><strong>Note:</strong> the warranty-expiring reminder goes to <em>you</em> (a prompt to call about renewal), not to the customer — only the service-due reminder has a customer email branch, and only when you've asked for it.</p></div>
+
+  <h2>Making a product serviceable — the defaults</h2>
+  <p><strong>What it is —</strong> on a product you own, a <strong>Warranty &amp; service defaults</strong> tab lets you mark it <em>serviceable</em> and set the defaults every installed unit should inherit: the default <strong>warranty months</strong> and a default <strong>service schedule</strong> (what/every-how-often/remind/email-the-customer). <strong>Why it matters —</strong> set it once on the product and every future sale of it registers a unit with the right warranty and service plan already attached. Editing this tab needs a management permission (pricing, warehouse or finance) — using a customer's equipment doesn't.</p>
+
+  <h2>What it connects to</h2>
+  <ul class="feat">
+    <li><strong>CRM</strong> — the whole feature is a tab on the customer record; reminders fall back to the customer's responsible sales users.</li>
+    <li><strong>Orders</strong> — delivering a serviceable product on a sale creates the unit and remembers the source order and supplier.</li>
+    <li><strong>Projects</strong> — a unit can be tied to a project and room.</li>
+    <li><strong>Flows</strong> — service-due, overdue and warranty-expiring events are delivered through editable flows.</li>
+  </ul>
+  <p>A completed service records a <strong>cost</strong>, but this feature doesn't auto-issue an invoice — bill a service the normal way in <a href="finance.html">Finance</a> if you charge for it.</p>
+
+  <div class="callout tip"><p><strong>Worked example — the AC you installed.</strong> Mark your AC product <em>serviceable</em> with a 24-month warranty and a “Clean filters, every 6 months” schedule. Sell and deliver one to a customer → a unit appears on their <strong>Equipment</strong> tab with the warranty and the first service already scheduled. Six months on it shows in <strong>Service coming up</strong>; you (and, if you asked, the customer) are reminded; you click <strong>Done</strong> and the next one is booked automatically. Attach the manufacturer's warranty PDF to the unit so it's on file if a claim comes up.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>
