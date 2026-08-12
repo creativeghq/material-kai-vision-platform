@@ -45,6 +45,7 @@ export const RoomPlannerPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'2d' | '3d'>('2d');
   const [modelUrls, setModelUrls] = useState<Map<string, string>>(new Map());
+  const [imageUrls, setImageUrls] = useState<Map<string, string>>(new Map());
   const [surfaces, setSurfaces] = useState<LayoutSurface[]>([]);
   const [quoting, setQuoting] = useState(false);
   const navigate = useNavigate();
@@ -302,6 +303,9 @@ export const RoomPlannerPanel: React.FC = () => {
   useEffect(() => {
     if (!activeWorkspaceId || items.length === 0) { setModelUrls(new Map()); return; }
     let cancelled = false;
+    roomPlannerService.imageUrlsForProducts(activeWorkspaceId, items.map((i) => i.product_id))
+      .then((m) => { if (!cancelled) setImageUrls(m); })
+      .catch(() => { if (!cancelled) setImageUrls(new Map()); });
     roomPlannerService.modelUrlsForProducts(activeWorkspaceId, items.map((i) => i.product_id))
       .then((m) => { if (!cancelled) setModelUrls(m); })
       .catch(() => { if (!cancelled) setModelUrls(new Map()); });
@@ -437,6 +441,7 @@ export const RoomPlannerPanel: React.FC = () => {
           <>
             {view === '2d' ? (
               <RoomPlannerCanvas
+                  imageUrls={imageUrls}
                 room={{ widthM: Number(layout.room_width_m), depthM: Number(layout.room_depth_m) }}
                 items={items}
                 selectedId={selectedId}

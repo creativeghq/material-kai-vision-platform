@@ -11,6 +11,7 @@
  * Writes go to the base table, which is the only thing that has authored columns at all.
  */
 import { supabase } from '@/integrations/supabase/client';
+import { PRODUCT_IMAGE_SELECT, getProductImageUrl } from '@/utils/productMetadata';
 import type { Tables } from '@/integrations/supabase/types';
 import { modelPublicUrl } from '@/services/product3dService';
 
@@ -221,6 +222,32 @@ export const roomPlannerService = {
       // so its measurements are the ones a user has actually seen.
       if (out.has(row.product_id) && row.format !== 'glb') continue;
       out.set(row.product_id, modelPublicUrl(row));
+    }
+    return out;
+  },
+
+  /**
+   * Product image per product id, for the plan's thumbnails (#259 item 1).
+   *
+   * Uses the CANONICAL accessor rather than reading a metadata key: "which image represents this
+   * product" is decided by `image_product_associations.overall_score`, and picking a different one
+   * here would draw a different photo on the plan than the catalogue shows for the same item.
+   *
+   * One query for the whole layout, like the model URLs above.
+   */
+  async imageUrlsForProducts(workspaceId: string, productIds: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    const ids = [...new Set(productIds.filter(Boolean))];
+    if (ids.length === 0) return out;
+    const { data, error } = await supabase
+      .from('products')
+      .select(`id, metadata, ${PRODUCT_IMAGE_SELECT}`)
+      .eq('workspace_id', workspaceId)
+      .in('id', ids);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const url = getProductImageUrl(row);
+      if (url) out.set((row as { id: string }).id, url);
     }
     return out;
   },

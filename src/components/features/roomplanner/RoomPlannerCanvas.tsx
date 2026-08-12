@@ -30,6 +30,15 @@ interface RoomPlannerCanvasProps {
   onMoveCommit: (id: string, at: { xM: number; yM: number }) => void;
   onRotate: (id: string, rotationDeg: number) => void;
   onRemove: (id: string) => void;
+  /**
+   * Product image per product id (#259 item 1).
+   *
+   * The plan drew labelled rectangles, and a name truncated to 18 characters is not how anyone
+   * recognises furniture — three grey boxes reading "Lounge Armchair —" tell a client nothing. The
+   * image is clipped to the item's real footprint, so it still reads as the space the thing takes
+   * rather than as a photo floating on a plan.
+   */
+  imageUrls?: Map<string, string>;
 }
 
 const CANVAS_W = 720;
@@ -46,7 +55,7 @@ function toPlacement(item: ResolvedLayoutItem, override?: { xM: number; yM: numb
 }
 
 export const RoomPlannerCanvas: React.FC<RoomPlannerCanvasProps> = ({
-  room, items, selectedId, onSelect, onMoveCommit, onRotate, onRemove,
+  room, items, selectedId, onSelect, onMoveCommit, onRotate, onRemove, imageUrls,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   // Position while a drag is in flight. Null when nothing is being dragged.
@@ -169,9 +178,38 @@ export const RoomPlannerCanvas: React.FC<RoomPlannerCanvasProps> = ({
                 slightly different rectangle. */}
             <line x1={0} y1={-d / 2} x2={0} y2={-d / 2 + Math.min(10, d / 3)}
               className="stroke-foreground/60" strokeWidth={1.5} />
-            <text textAnchor="middle" y={4} fontSize={11} className="pointer-events-none fill-foreground">
-              {item.product_name?.slice(0, 18) ?? ''}
-            </text>
+            {(() => {
+              const img = item.product_id ? imageUrls?.get(item.product_id) : null;
+              if (!img) {
+                // No photo: the name is still better than an unlabelled box.
+                return (
+                  <text textAnchor="middle" y={4} fontSize={11} className="pointer-events-none fill-foreground">
+                    {item.product_name?.slice(0, 18) ?? ''}
+                  </text>
+                );
+              }
+              return (
+                <>
+                  <image
+                    href={img}
+                    x={-w / 2 + 1} y={-d / 2 + 1}
+                    width={Math.max(0, w - 2)} height={Math.max(0, d - 2)}
+                    preserveAspectRatio="xMidYMid slice"
+                    className="pointer-events-none"
+                    opacity={0.9}
+                  />
+                  {/* The name stays, on a scrim. A photo at plan scale is often 40px across and
+                      two beige sofas are indistinguishable at that size. */}
+                  <text
+                    textAnchor="middle" y={d / 2 - 4} fontSize={10}
+                    className="pointer-events-none fill-foreground"
+                    style={{ paintOrder: 'stroke', stroke: 'var(--background)', strokeWidth: 3 }}
+                  >
+                    {item.product_name?.slice(0, 16) ?? ''}
+                  </text>
+                </>
+              );
+            })()}
           </g>
         );
       })}
