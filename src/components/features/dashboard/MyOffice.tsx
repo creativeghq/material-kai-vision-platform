@@ -1,20 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
-import { Link } from 'react-router-dom';
 import {
   Wallet,
-  FolderKanban,
-  ListChecks,
-  Inbox as InboxIcon,
   Sparkles,
   AlertTriangle,
   TrendingUp,
   Lightbulb,
   Info,
   RefreshCw,
-  ArrowRight,
+  ShoppingCart,
+  FileText,
+  Building2,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { StatBlock } from './StatBlock';
+import { QuickAccess } from './QuickAccess';
+import { usePipelineCounts, useCrmCounts } from './useDashboardBlocks';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { inboxApi } from '@/services/inboxApi';
@@ -51,52 +52,6 @@ const EMPTY_STATS: StatState = {
   inbox: 0,
 };
 
-function StatTile({
-  icon: Icon,
-  to,
-  value,
-  label,
-  accent,
-  loading,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  to: string;
-  value: React.ReactNode;
-  label: string;
-  accent?: boolean;
-  loading: boolean;
-}) {
-  return (
-    <Link
-      to={to}
-      className="group flex flex-col gap-1 rounded-xl border border-white/8 bg-background/50 p-3 transition-colors hover:border-primary/40 hover:bg-background/80"
-    >
-      <div className="flex items-center justify-between">
-        <Icon className={`h-4 w-4 ${accent ? 'text-amber-400' : 'text-primary'}`} />
-        <ArrowRight className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-      </div>
-      {loading ? (
-        /* h-5, no margin: exactly the box the resolved value occupies (text-xl +
-           leading-none = 20px, and the <p> below has no margin of its own). The old
-           h-6 + mt-0.5 was 6px taller, so all four tiles shrank a little the moment
-           the numbers landed. */
-        <div className="h-5 w-2/3 rounded bg-primary/10 animate-pulse" />
-      ) : (
-        <p className="text-xl font-display leading-none tracking-tight tabular-nums" style={{ fontWeight: 700 }}>
-          {value}
-        </p>
-      )}
-      {/* Two lines, always. The label is derived from the STATS, not skeletoned with
-          them: it reads "All settled" / "0 open tasks" while the queries are in flight
-          and "outstanding · 12 invoices" after — which wraps to a second line on any
-          column narrower than ~1400px, growing all four tiles the moment the numbers
-          land. Reserving both lines costs one blank line on wide screens and
-          removes the shift everywhere. */}
-      <p className="text-[11px] text-muted-foreground leading-snug min-h-[1.9rem] line-clamp-2">{label}</p>
-    </Link>
-  );
-}
-
 // ── main panel ──────────────────────────────────────────────────────────────
 const MyOfficeImpl: React.FC = () => {
   const { activeWorkspaceId, loading: workspaceLoading } = useWorkspace();
@@ -105,6 +60,12 @@ const MyOfficeImpl: React.FC = () => {
   const [companyName, setCompanyName] = useState('');
   const [stats, setStats] = useState<StatState>(EMPTY_STATS);
   const [statsLoading, setStatsLoading] = useState(true);
+
+  // New operational blocks. Separate hooks so each lands independently without
+  // blocking the others — and each block reserves its own height, so a late one
+  // fills in place rather than resizing the panel.
+  const { counts: pipeline, loading: pipelineLoading } = usePipelineCounts();
+  const { counts: crm, loading: crmLoading } = useCrmCounts();
 
   const [insights, setInsights] = useState<DashboardInsights | null>(null);
   const [insightsLoading, setInsightsLoading] = useState(true);
@@ -281,42 +242,66 @@ const MyOfficeImpl: React.FC = () => {
         </h2>
       </div>
 
-      {/* Personal stats */}
+      {/* Operational blocks — every panel carries a figure, what it is made of,
+          and a way into the detail. Replaces four bare counters, three of which
+          read zero because `projects`, `project_tasks` and `invoices` are empty
+          in this workspace while `orders`, `quotes` and `crm_companies` are not. */}
       <div className="grid grid-cols-2 gap-2.5">
-        <StatTile
+        <StatBlock
+          icon={ShoppingCart}
+          title="Orders"
+          loading={pipelineLoading}
+          value={pipeline.ordersOpen}
+          caption={pipeline.ordersOpen === 1 ? 'open order' : 'open orders'}
+          rows={[
+            { label: 'Draft', value: pipeline.orders.draft ?? 0 },
+            { label: 'Confirmed', value: pipeline.orders.confirmed ?? 0 },
+            { label: 'Fulfilled', value: pipeline.orders.fulfilled ?? 0 },
+          ]}
+          linkTo="/finance"
+        />
+        <StatBlock
+          icon={FileText}
+          title="Quotes"
+          loading={pipelineLoading}
+          value={pipeline.quotesActive}
+          caption={pipeline.quotesActive === 1 ? 'in play' : 'in play'}
+          rows={[
+            { label: 'Draft', value: pipeline.quotes.draft ?? 0 },
+            { label: 'Submitted', value: pipeline.quotes.submitted ?? 0 },
+            { label: 'Accepted', value: pipeline.quotes.accepted ?? 0 },
+          ]}
+          linkTo="/quotes"
+        />
+        <StatBlock
           icon={Wallet}
-          to="/finance"
+          title="Finance"
           loading={statsLoading}
           value={stats.finance.count === 0 ? '—' : money(stats.finance.total, stats.finance.currency)}
-          label={
-            stats.finance.count === 0
-              ? 'All settled'
-              : `outstanding · ${stats.finance.count} invoice${stats.finance.count !== 1 ? 's' : ''}`
-          }
-          accent={stats.finance.overdue > 0}
+          caption={stats.finance.count === 0 ? 'All settled' : 'outstanding'}
+          rows={[
+            { label: 'Open invoices', value: stats.finance.count },
+            { label: 'Overdue', value: stats.finance.overdue, alert: stats.finance.overdue > 0 },
+            { label: 'Conversations', value: stats.inbox },
+          ]}
+          linkTo="/finance"
         />
-        <StatTile
-          icon={FolderKanban}
-          to="/projects"
-          loading={statsLoading}
-          value={stats.projects}
-          label={`active project${stats.projects !== 1 ? 's' : ''}`}
-        />
-        <StatTile
-          icon={ListChecks}
-          to="/projects"
-          loading={statsLoading}
-          value={stats.tasks}
-          label={`open task${stats.tasks !== 1 ? 's' : ''}`}
-        />
-        <StatTile
-          icon={InboxIcon}
-          to="/inbox"
-          loading={statsLoading}
-          value={stats.inbox}
-          label={`open conversation${stats.inbox !== 1 ? 's' : ''}`}
+        <StatBlock
+          icon={Building2}
+          title="Customers"
+          loading={crmLoading}
+          value={crm.total}
+          caption={crm.total === 1 ? 'company' : 'companies'}
+          rows={[
+            { label: 'Customers', value: crm.customers },
+            { label: 'Suppliers', value: crm.suppliers },
+            { label: 'Active projects', value: stats.projects },
+          ]}
+          linkTo="/crm"
         />
       </div>
+
+      <QuickAccess />
 
       {/* KAI insights */}
       <div className="mt-1 pt-4 border-t border-white/8 flex-1 flex flex-col">

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { HeroSection } from './HeroSection';
 import { LatestWidgets } from './LatestWidgets';
 import { MyOffice } from './MyOffice';
+import { RecentActivity } from './RecentActivity';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -16,10 +17,16 @@ export const Dashboard: React.FC = () => {
           <HeroSection onNavigate={navigate} />
         </div>
 
-        {/* My Office — greeting + personal numbers (finance/projects/tasks/inbox)
-            + KAI live insights, all in one command panel (per-workspace, cached). */}
+        {/* My Office — greeting, the four operational blocks (orders / quotes /
+            finance / customers, each with its breakdown and a way in), quick
+            access, and KAI live insights. Per-workspace. */}
         <MyOffice />
       </div>
+
+      {/* What actually moved lately, merged across orders, quotes and CRM. Sits
+          above the "latest content" widgets because it is workspace-specific:
+          your orders before the platform's newest materials. */}
+      <RecentActivity />
 
       {/* Latest content across the platform (generated areas) */}
       <LatestWidgets />
