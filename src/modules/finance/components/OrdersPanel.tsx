@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
-import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare } from 'lucide-react';
+import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
@@ -43,6 +43,7 @@ import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemp
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { PaidFromSelect } from '@/modules/finance/components/PaidFromSelect';
 import { linkOrderToDocument } from '@/modules/finance/utils/inboundToOrder';
+import { activeCover, customerAssetsService, warrantyEndDate, type OrderAssetRow, type WarrantyKind } from '@/services/customerAssetsService';
 import { parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
 import { edgeErrorMessage } from '@/utils/edgeError';
@@ -1475,6 +1476,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   const [supplierPick, setSupplierPick] = useState<{ itemId: string; productId: string | null; label: string; currentId: string | null } | null>(null);
   // Per-LINE warehouse identity (which catalog product / is it stock at all) — see LineStockDialog.
   const [stockPick, setStockPick] = useState<OrderItem | null>(null);
+  // Per-LINE warranty: which lines of this order already have a registered unit in the customer's
+  // installed base, keyed by order_item_id. The link has always been stored (`source_order_item_id`)
+  // and never read, so a sold-and-covered line looked identical to one nobody had registered.
+  const [lineAssets, setLineAssets] = useState<Map<string, OrderAssetRow>>(new Map());
+  const [warrantyPick, setWarrantyPick] = useState<OrderItem | null>(null);
   // Catalog names for linked lines, so a linked line can SAY what it points at rather than just
   // being silently unlinkable.
   const [productNames, setProductNames] = useState<Map<string, string>>(new Map());
@@ -1503,7 +1509,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       // Everything the panel needs, in ONE wave. `getThreeWayMatch` used to be awaited after this
       // block, so opening an order cost two sequential round-trips where one would do — the
       // straggler depended on nothing in here.
-      const [finance, lp, names, exposure, accounts, audit, buyer, party, prodNames, threeWay, handoffInfo] = await Promise.all([
+      const [finance, lp, names, exposure, accounts, audit, buyer, party, prodNames, threeWay, handoffInfo, assetRows] = await Promise.all([
         ordersService.getOrderFinance(id),
         ordersService.getListPrices(productIds).catch(() => new Map<string, number>()),
         ordersService.getCompanyNames(supplierIds).catch(() => new Map<string, string>()),
@@ -1528,8 +1534,17 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         res.order.order_type === 'purchase' && !res.order.paired_order_id
           ? ordersService.supplierHandoffAvailable(id).catch(() => null)
           : Promise.resolve(null),
+        // Only a sale puts a unit into a CUSTOMER's installed base; a purchase order has no
+        // customer to register it against. Best-effort: a workspace without the module still gets
+        // its order, just without the warranty column.
+        res.order.order_type === 'sales'
+          ? customerAssetsService.listByOrder(id).catch(() => [] as OrderAssetRow[])
+          : Promise.resolve([] as OrderAssetRow[]),
       ]);
       setProductNames(prodNames);
+      setLineAssets(new Map(
+        assetRows.filter((a) => a.source_order_item_id).map((a) => [a.source_order_item_id as string, a]),
+      ));
       setOrder(res.order); setItems(res.items); setFin(finance); setListPrices(lp); setSupplierNames(names); setSupExposure(exposure);
       setBankAccounts(accounts);
       setPayAudit(audit.rows);
@@ -1543,7 +1558,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   };
 
   useEffect(() => {
-    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setHandoff(null); setPartyName(null); return; }
+    if (!orderId) { setOrder(null); setItems([]); setFin(null); setExpenseOpen(false); setPayInOpen(null); setListPrices(new Map()); setSupplierNames(new Map()); setSupplierPick(null); setSupExposure([]); setMatch(null); setHandoff(null); setPartyName(null); setLineAssets(new Map()); setWarrantyPick(null); return; }
     void load(orderId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
@@ -2131,6 +2146,12 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
   // (its price is its cost) and no money-in half, so everything derived from those is hidden
   // rather than rendered as a permanent zero.
   const isSalesOrder = order?.order_type === 'sales';
+
+  /** Which cover this line reports — `activeCover` decides, here and in the Warranties tab alike. */
+  const lineWarranty = useCallback(
+    (it: OrderItem) => activeCover(lineAssets.get(it.id)?.warranties),
+    [lineAssets],
+  );
   /**
    * Deliveries do nothing on a draft or cancelled order.
    *
@@ -2553,6 +2574,26 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                           {order.order_type === 'sales' && (
                             <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => setSupplierPick({ itemId: it.id, productId: it.product_id ?? null, label: it.description, currentId: it.supplier_company_id ?? null })}>
                               {supName ? <><Building2 className="h-2.5 w-2.5" /> {supName}</> : <><Plus className="h-2.5 w-2.5" /> supplier</>}
+                            </button>
+                          )}
+                          {/* Under warranty? A sold unit the customer still owns is the installed
+                              base's whole subject, and THIS is where an operator knows it: at the
+                              moment they are looking at what was sold. Registering here writes the
+                              order + line onto the unit, so the customer's Warranties tab can say
+                              where it came from and the order can say it is covered. Purchases are
+                              excluded — a purchase order has no customer to register against. */}
+                          {isSalesOrder && lineWarranty(it) && (
+                            <button type="button" className="text-[10px] text-emerald-500 hover:underline inline-flex items-center gap-0.5"
+                              title={`Registered in the customer's installed base — covered to ${lineWarranty(it)!.ends_on}`}
+                              onClick={() => setWarrantyPick(it)}>
+                              <ShieldCheck className="h-2.5 w-2.5" /> covered to {lineWarranty(it)!.ends_on}
+                            </button>
+                          )}
+                          {isSalesOrder && !lineWarranty(it) && (
+                            <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5"
+                              title="Register this line in the customer's installed base with a warranty period"
+                              onClick={() => setWarrantyPick(it)}>
+                              <ShieldCheck className="h-2.5 w-2.5" /> {lineAssets.has(it.id) ? 'registered — no cover' : 'warranty'}
                             </button>
                           )}
                           {/* Mark this line's cost as paid → records a supplier bill + payment on the
@@ -3213,6 +3254,15 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
         />
       )}
 
+      {warrantyPick && order && (
+        <LineWarrantyDialog
+          order={order}
+          item={warrantyPick}
+          existing={lineAssets.get(warrantyPick.id) ?? null}
+          onClose={() => setWarrantyPick(null)}
+          onSaved={() => { setWarrantyPick(null); void load(order.id); }}
+        />
+      )}
       {stockPick && order && (
         <LineStockDialog
           workspaceId={order.workspace_id}
@@ -3321,6 +3371,176 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     )}
     {connectEmailGate}
     </>
+  );
+};
+
+/**
+ * Put one sold line under warranty — the order-side half of the installed base (#343).
+ *
+ * The cover period is entered as a NUMBER OF MONTHS and the end date is shown as the consequence,
+ * because "24 months" is how a warranty is sold and quoted while `ends_on` is how it is enforced.
+ * Only one of the two is stored: the date. Months is an input, never a column, so there is no
+ * second copy of the period to drift out of step with the date the reminders actually fire on.
+ *
+ * The prefill comes from `products.default_warranty_months` when the line points at a catalogue
+ * product. That is the same number `apply_asset_service_defaults` would have used had the delivery
+ * trigger registered this unit, so agreeing with it here keeps one answer to "how long is this
+ * covered for" rather than inventing a second at the order.
+ */
+const LineWarrantyDialog: React.FC<{
+  order: Order;
+  item: OrderItem;
+  existing: OrderAssetRow | null;
+  onClose: () => void;
+  onSaved: () => void;
+}> = ({ order, item, existing, onClose, onSaved }) => {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [months, setMonths] = useState('');
+  const [startsOn, setStartsOn] = useState(() => new Date().toISOString().slice(0, 10));
+  // `ends_on` is the FIELD, not a computed display: it is what gets stored and what the customer
+  // can hold us to. "Cover (months)" below is a convenience that asks the database to fill it in.
+  const [endsOn, setEndsOn] = useState('');
+  const [kind, setKind] = useState<WarrantyKind>('manufacturer');
+  const [resolving, setResolving] = useState(false);
+
+  // Adopt whatever is already on record: the existing cover when this line has one, otherwise the
+  // product's declared default. An existing period loads its STORED dates — no months are
+  // back-derived from them, because "how many months is 2026-01-31 → 2026-02-28" has no single
+  // right answer and guessing one would silently move the end date on the next save.
+  useEffect(() => {
+    let cancelled = false;
+    // Deliberately NOT `activeCover`: this is an edit form, so a lapsed period must still load —
+    // extending an expired warranty is the reason you would open it.
+    const current = (existing?.warranties ?? [])
+      .slice()
+      .sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0] ?? null;
+    if (current) {
+      setKind(current.kind); setStartsOn(current.starts_on); setEndsOn(current.ends_on);
+      return () => { cancelled = true; };
+    }
+    if (!item.product_id) return () => { cancelled = true; };
+    void (async () => {
+      const { data } = await supabase.from('products')
+        .select('default_warranty_months').eq('id', item.product_id as string).maybeSingle();
+      const d = (data as { default_warranty_months?: number | null } | null)?.default_warranty_months;
+      if (cancelled || d == null || d <= 0) return;
+      setMonths(String(d));
+      const end = await warrantyEndDate(startsOn, d).catch(() => null);
+      if (!cancelled && end) setEndsOn(end);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.product_id, existing]);
+
+  /** Fill the end date from a month count — the DATABASE does the arithmetic, never this file. */
+  const applyMonths = async (raw: string, from: string) => {
+    const n = Number(raw);
+    if (!from || !Number.isFinite(n) || n <= 0) return;
+    setResolving(true);
+    try {
+      const end = await warrantyEndDate(from, n);
+      if (end) setEndsOn(end);
+    } catch {
+      /* leave the operator's own end date alone; it is the field that counts */
+    } finally { setResolving(false); }
+  };
+
+  // A unit has to belong to somebody. An order with neither a customer company nor a contact has
+  // nobody to register it against, and saying so up front beats a 400 from the RPC.
+  const hasCustomer = !!(order.customer_company_id || order.customer_contact_id);
+
+  const save = async () => {
+    if (!endsOn || !hasCustomer) return;
+    setSaving(true);
+    try {
+      await customerAssetsService.warrantOrderLine({
+        order_id: order.id,
+        order_item_id: item.id,
+        name: item.description,
+        customer_company_id: order.customer_company_id,
+        customer_contact_id: order.customer_contact_id,
+        project_id: order.project_id ?? null,
+        product_id: item.product_id ?? null,
+        supplier_company_id: item.supplier_company_id ?? null,
+        quantity: Number(item.quantity) || 1,
+        purchased_on: (order.created_at ?? '').slice(0, 10) || null,
+        starts_on: startsOn,
+        ends_on: endsOn,
+        kind,
+      });
+      toast({ title: 'Warranty recorded', description: `${item.description} — covered to ${endsOn}.` });
+      onSaved();
+    } catch (err: any) {
+      toast({ title: 'Could not record the warranty', description: err?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{existing ? 'Warranty' : 'Add warranty'}</DialogTitle>
+          <DialogDescription>
+            {hasCustomer
+              ? <>Registers <span className="text-foreground">{item.description}</span> in the customer’s installed base, linked to this order and line.</>
+              : 'This order has no customer, so there is nobody to register the unit against. Set a customer on the order first.'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="wr-kind">Type</Label>
+              <Select value={kind} onValueChange={(v) => setKind(v as WarrantyKind)}>
+                <SelectTrigger id="wr-kind" className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manufacturer">Manufacturer</SelectItem>
+                  <SelectItem value="extended">Extended</SelectItem>
+                  <SelectItem value="installer">Installer / labour</SelectItem>
+                  <SelectItem value="insurance">Insurance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="wr-months">Cover (months)</Label>
+              <Input id="wr-months" type="number" min="1" step="1" className="h-9" value={months}
+                placeholder="24"
+                onChange={(e) => setMonths(e.target.value)}
+                onBlur={(e) => void applyMonths(e.target.value, startsOn)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="wr-start">Starts on</Label>
+              <Input id="wr-start" type="date" className="h-9" value={startsOn}
+                onChange={(e) => setStartsOn(e.target.value)}
+                onBlur={(e) => void applyMonths(months, e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="wr-end">Ends on</Label>
+              <Input id="wr-end" type="date" className="h-9" value={endsOn}
+                disabled={resolving}
+                onChange={(e) => setEndsOn(e.target.value)} />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Enter a month count to fill the end date, or set the end date directly — that date is
+            what gets stored.
+          </p>
+          {existing && (
+            <p className="text-xs text-muted-foreground">
+              Already registered as <span className="text-foreground">{existing.name}</span>. Saving updates its {kind} cover.
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => void save()} disabled={saving || !endsOn || !hasCustomer}>
+            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

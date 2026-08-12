@@ -76,8 +76,8 @@ const addDays = (iso: string, n: number) => {
  * route — a notification whose link goes nowhere is worse than no notification.
  */
 function assetActionUrl(companyId: string | null, contactId: string | null): string {
-  if (companyId) return `/crm/companies/${companyId}?tab=equipment`;
-  if (contactId) return `/crm/contacts/${contactId}?tab=equipment`;
+  if (companyId) return `/crm/companies/${companyId}?tab=warranties`;
+  if (contactId) return `/crm/contacts/${contactId}?tab=warranties`;
   return '/crm';
 }
 

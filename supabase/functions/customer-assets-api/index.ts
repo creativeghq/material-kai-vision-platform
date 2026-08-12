@@ -75,7 +75,13 @@ const ASSET_SELECT =
   'id, workspace_id, customer_company_id, customer_contact_id, project_id, room_id, product_id, ' +
   'name, brand, model, serial_number, quantity, status, purchased_on, installed_on, ' +
   'location_note, notes, source_order_id, source_order_item_id, supplier_company_id, ' +
-  'created_at, updated_at';
+  'created_at, updated_at, ' +
+  // The order this unit came off, embedded rather than left as a bare id. The column was written
+  // by the delivery trigger from day one and never read by anything, so a unit we sold was
+  // indistinguishable on screen from one the customer already owned. The FK is named explicitly
+  // because `customer_assets` points at `orders` only once today — and an unqualified embed turns
+  // ambiguous the moment a second one is added.
+  'source_order:orders!customer_assets_source_order_id_fkey(id, order_number, order_type)';
 
 /**
  * Map a Postgres error from one of the RPCs onto an HTTP status. P0002 (the id was not in this
@@ -117,15 +123,47 @@ Deno.serve(withApiLogging('customer-assets-api', async (req: Request) => {
   switch (action) {
     // ── Assets ──────────────────────────────────────────────────────────────
     case 'list': {
-      let q = db.from('customer_assets').select(ASSET_SELECT)
+      // Cover periods come back WITH the list. The register is the warranty screen, so fetching
+      // them per row on open would be one round trip per unit to render the column the page is
+      // named after. `get` still returns its own copy for the detail dialog.
+      let q = db.from('customer_assets')
+        .select(
+          ASSET_SELECT +
+          ', warranties:customer_asset_warranties!customer_asset_warranties_asset_id_fkey' +
+          '(id, kind, starts_on, ends_on)',
+        )
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(Math.min(Number(body.limit ?? 200), 500));
       if (body.customer_company_id) q = q.eq('customer_company_id', String(body.customer_company_id));
       if (body.customer_contact_id) q = q.eq('customer_contact_id', String(body.customer_contact_id));
       if (body.project_id) q = q.eq('project_id', String(body.project_id));
+      if (body.source_order_id) q = q.eq('source_order_id', String(body.source_order_id));
       if (body.status) q = q.eq('status', String(body.status));
       const { data, error } = await q;
+      if (error) throw new HttpError(400, error.message);
+      return json({ assets: data ?? [] });
+    }
+
+    /**
+     * Every unit registered off one order, each with its cover periods — what the order page needs
+     * to say "this line is covered until March 2028" per line, in one round trip rather than one
+     * per line. Scoped by `workspace_id` on the RLS-bound client like every other read here, so an
+     * order id from another tenant simply returns nothing.
+     */
+    case 'by_order': {
+      const orderId = String(body.order_id ?? '');
+      if (!orderId) throw new HttpError(400, 'order_id is required');
+      const { data, error } = await db.from('customer_assets')
+        .select(
+          'id, name, product_id, source_order_id, source_order_item_id, status, ' +
+          'customer_company_id, customer_contact_id, ' +
+          'warranties:customer_asset_warranties!customer_asset_warranties_asset_id_fkey' +
+          '(id, kind, starts_on, ends_on)',
+        )
+        .eq('workspace_id', workspaceId)
+        .eq('source_order_id', orderId)
+        .order('created_at', { ascending: true });
       if (error) throw new HttpError(400, error.message);
       return json({ assets: data ?? [] });
     }

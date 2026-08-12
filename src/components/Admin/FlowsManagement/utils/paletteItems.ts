@@ -391,11 +391,11 @@ export const paletteItems: NodePaletteItem[] = [
 
   // Installed base (#343) — a customer's equipment needs work, or its cover is running out
   { type: 'triggerNode', category: 'trigger', subType: 'asset.service_due', group: 'CRM',
-    label: 'Equipment Service Due', description: 'A unit of customer equipment is inside its reminder window for a scheduled service (e.g. clean the AC filters)', icon: 'Wrench', color: 'emerald',
-    defaultData: { label: 'Equipment Service Due', category: 'trigger', triggerType: 'asset.service_due', config: {} } as TriggerNodeData },
+    label: 'Service Due', description: 'A unit in a customer’s installed base is inside its reminder window for a scheduled service (e.g. clean the AC filters)', icon: 'Wrench', color: 'emerald',
+    defaultData: { label: 'Service Due', category: 'trigger', triggerType: 'asset.service_due', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'asset.service_overdue', group: 'CRM',
-    label: 'Equipment Service Overdue', description: 'A scheduled service passed its due date and is still open', icon: 'AlarmClock', color: 'emerald',
-    defaultData: { label: 'Equipment Service Overdue', category: 'trigger', triggerType: 'asset.service_overdue', config: {} } as TriggerNodeData },
+    label: 'Service Overdue', description: 'A scheduled service passed its due date and is still open', icon: 'AlarmClock', color: 'emerald',
+    defaultData: { label: 'Service Overdue', category: 'trigger', triggerType: 'asset.service_overdue', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'asset.warranty_expiring', group: 'CRM',
     label: 'Warranty Expiring', description: 'A customer equipment warranty is approaching its end date', icon: 'ShieldCheck', color: 'emerald',
     defaultData: { label: 'Warranty Expiring', category: 'trigger', triggerType: 'asset.warranty_expiring', config: {} } as TriggerNodeData },

@@ -31,10 +31,12 @@ const stripComments = (src: string) =>
 const CRON = 'supabase/functions/asset-service-reminders-cron/index.ts';
 const API = 'supabase/functions/customer-assets-api/index.ts';
 const SERVICE = 'src/services/customerAssetsService.ts';
-const TAB = 'src/components/business/crm/EquipmentServiceTab.tsx';
+const TAB = 'src/components/business/crm/WarrantiesTab.tsx';
 const PRODUCT_PANEL = 'src/components/features/products/ProductServiceDefaultsPanel.tsx';
+/** The order-side half: registering a sold line into the installed base with a cover period. */
+const ORDERS_PANEL = 'src/modules/finance/components/OrdersPanel.tsx';
 
-const ALL_SOURCES = [CRON, API, SERVICE, TAB, PRODUCT_PANEL];
+const ALL_SOURCES = [CRON, API, SERVICE, TAB, PRODUCT_PANEL, ORDERS_PANEL];
 
 describe('one derivation of "next due"', () => {
   it('no installed-base source stores or reads a cached next-due field', () => {
@@ -58,11 +60,33 @@ describe('one derivation of "next due"', () => {
     // setMonth/setDate/addMonths on the frontend would be a second implementation of
     // `next_service_due(...)`. The only date maths allowed client-side is "today", used for
     // form defaults and for classifying a warranty the server already dated.
-    const dateMaths = /\.setMonth\(|\.setFullYear\(|addMonths\(|\baddDays\(/;
-    for (const p of [SERVICE, TAB, PRODUCT_PANEL]) {
+    //
+    // The UTC spellings are matched too, and that is not hypothetical tidiness: the order-side
+    // warranty dialog first shipped its end date as `d.setUTCMonth(d.getUTCMonth() + n)`, which
+    // the original pattern waved straight through. Postgres and JavaScript disagree there —
+    // 2026-01-31 + 1 month is 2026-02-28 in `make_interval`, 2026-03-03 in `Date` — so the twin
+    // was a real second answer, not a stylistic one. `warranty_end_date(date, integer)` is now
+    // the single implementation and both the trigger path and the client call it.
+    // `setDate` stays permitted: `warrantyState` uses "today + 60 days" to CLASSIFY a period the
+    // server already dated, which is the sanctioned case above. Producing a stored date is not.
+    const dateMaths = /\.set(UTC)?(Month|FullYear)\(|addMonths\(|\baddDays\(/;
+    for (const p of [SERVICE, TAB, PRODUCT_PANEL, ORDERS_PANEL]) {
       const src = stripComments(read(p));
-      expect(dateMaths.test(src), `${p} computes a date; the server owns due dates`).toBe(false);
+      const hit = src.match(dateMaths);
+      expect(hit?.[0] ?? null, `${p} computes a date; the server owns cover and due dates`).toBe(null);
     }
+  });
+
+  it('a cover end date is derived in SQL, by one function, on both paths', () => {
+    // The automatic path (`apply_asset_service_defaults`, off the delivery trigger) and the
+    // operator path (the order line dialog) must land on the same date for the same input.
+    const service = stripComments(read(SERVICE));
+    expect(
+      service.includes("rpc('warranty_end_date'"),
+      'the client should ask the database for a cover end date, not compute one',
+    ).toBe(true);
+    // And the order panel must go through that helper rather than growing its own.
+    expect(stripComments(read(ORDERS_PANEL))).toContain('warrantyEndDate(');
   });
 
   it('completing an occurrence is the only client path that advances a plan', () => {

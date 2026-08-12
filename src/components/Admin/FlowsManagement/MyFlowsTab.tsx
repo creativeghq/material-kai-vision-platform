@@ -342,8 +342,8 @@ const triggerLabels: Record<TriggerType, string> = {
   'seo.backlink_movement': 'SEO Backlinks Moved',
   'seo.site_health_changed': 'SEO Site Health Changed',
   page_watch_changed: 'Watched Page Changed',
-  'asset.service_due': 'Equipment Service Due',
-  'asset.service_overdue': 'Equipment Service Overdue',
+  'asset.service_due': 'Service Due',
+  'asset.service_overdue': 'Service Overdue',
   'asset.warranty_expiring': 'Warranty Expiring',
 };
 

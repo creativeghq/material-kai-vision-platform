@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { ordersService } from '@/modules/finance/services/ordersService';
 import {
   AlarmClock, CheckCircle2, Download, History, Loader2, Paperclip, Plus, ShieldCheck,
   Trash2, Wrench, SkipForward,
@@ -21,13 +24,13 @@ import {
 import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
 import {
-  customerAssetsService, describeInterval, warrantyState,
+  activeCover, customerAssetsService, describeInterval, warrantyState,
   type AssetDetail, type AssetWarranty, type CustomerAsset, type ServiceDueRow,
   type ServiceHistoryRow, type WarrantyKind,
 } from '@/services/customerAssetsService';
 
-interface EquipmentServiceTabProps {
-  /** Exactly one of these identifies whose equipment this is. */
+interface WarrantiesTabProps {
+  /** Exactly one of these identifies whose units these are. */
   companyId?: string;
   contactId?: string;
   /** Optional: scope the list to one project (used from the project workbench). */
@@ -54,13 +57,13 @@ function dueLabel(row: { due_on: string; days_until_due: number; is_overdue: boo
 }
 
 /**
- * Equipment & Service — the customer's installed base (#343).
+ * Warranties — the customer's installed base (#343): what they own, its cover, its service.
  *
  * Shows what they own, whether it is still under warranty, and what maintenance is coming up.
  * "Next due" is never computed here: it is the open occurrence the server returns, because a
  * second derivation of it on the client is exactly the drift CLAUDE.md forbids.
  */
-export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
+export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
   companyId, contactId, projectId,
 }) => {
   const { toast } = useToast();
@@ -71,6 +74,9 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
   const [openAsset, setOpenAsset] = useState<AssetDetail | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  // The CRM record pages exist at both /crm/… and /admin/crm/…, and an order link has to stay
+  // inside whichever shell the operator is already in.
+  const financeBase = useLocation().pathname.startsWith('/admin') ? '/admin/finance' : '/finance';
 
   const scope = useMemo(() => ({
     ...(companyId ? { customer_company_id: companyId } : {}),
@@ -91,7 +97,7 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
       setHistory(h);
     } catch (err) {
       toast({
-        title: 'Could not load equipment',
+        title: 'Could not load warranties',
         description: err instanceof Error ? err.message : 'Unknown error',
         variant: 'destructive',
       });
@@ -101,6 +107,16 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
   }, [scope, toast]);
 
   useEffect(() => { void load(); }, [load]);
+
+  /**
+   * Order lines that already produced a unit. A partial unique index on `source_order_item_id`
+   * makes a second registration for the same line a 23505, so the picker has to know which lines
+   * are spoken for rather than offering them and failing on save.
+   */
+  const takenLineIds = useMemo(
+    () => new Set(assets.map((a) => a.source_order_item_id).filter(Boolean) as string[]),
+    [assets],
+  );
 
   const dueByAsset = useMemo(() => {
     const m = new Map<string, ServiceDueRow[]>();
@@ -117,7 +133,7 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
       setOpenAsset(await customerAssetsService.get(assetId));
     } catch (err) {
       toast({
-        title: 'Could not open equipment',
+        title: 'Could not open the unit',
         description: err instanceof Error ? err.message : 'Unknown error',
         variant: 'destructive',
       });
@@ -167,7 +183,7 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Equipment</TableHead>
+                  <TableHead>Unit</TableHead>
                   <TableHead>Service</TableHead>
                   <TableHead>Due</TableHead>
                   <TableHead>Where</TableHead>
@@ -214,14 +230,14 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
       <Card className="dashboard-card">
         <CardHeader className="flex flex-row items-start justify-between gap-2 flex-wrap">
           <div>
-            <CardTitle>Equipment</CardTitle>
+            <CardTitle>Warranties</CardTitle>
             <CardDescription>
               Units this customer owns. Anything sold on a delivered order is registered
               automatically when the product is marked serviceable.
             </CardDescription>
           </div>
           <Button size="sm" onClick={() => setAddOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />Add equipment
+            <Plus className="h-4 w-4 mr-1" />Add unit
           </Button>
         </CardHeader>
         <CardContent className="p-0">
@@ -231,13 +247,15 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
             </div>
           ) : assets.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">
-              No equipment registered yet.
+              No units registered yet.
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Cover</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>Serial</TableHead>
                   <TableHead>Installed</TableHead>
                   <TableHead>Next service</TableHead>
@@ -247,6 +265,7 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
               <TableBody>
                 {assets.map((a) => {
                   const next = (dueByAsset.get(a.id) ?? [])[0];
+                  const cover = activeCover(a.warranties);
                   return (
                     <TableRow key={a.id} className="cursor-pointer" onClick={() => void openDetail(a.id)}>
                       <TableCell className="font-medium">
@@ -256,6 +275,27 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
                             {[a.brand, a.model].filter(Boolean).join(' ')}
                           </div>
                         )}
+                      </TableCell>
+                      {/* The column the tab is named after. `expiring` is its own tone because a
+                          warranty two months from lapsing is the one worth a phone call. */}
+                      <TableCell className="text-xs">
+                        {cover
+                          ? <span className={statusTone(warrantyState(cover))}>to {cover.ends_on}</span>
+                          : (a.warranties?.length ?? 0) > 0
+                            ? <span className={statusTone('expired')}>expired</span>
+                            : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      {/* Where this unit came from. The link has been stored on every
+                          automatically-registered unit since day one and shown nowhere, so a unit
+                          we sold looked exactly like one the customer already owned. */}
+                      <TableCell className="text-xs" onClick={(e) => e.stopPropagation()}>
+                        {a.source_order
+                          ? (
+                            <Link to={`${financeBase}/orders/${a.source_order.id}`} className="text-primary hover:underline">
+                              {a.source_order.order_number || 'Order'}
+                            </Link>
+                          )
+                          : <span className="text-muted-foreground">manual</span>}
                       </TableCell>
                       <TableCell className="font-mono text-xs">{a.serial_number || '—'}</TableCell>
                       <TableCell className="text-xs">{a.installed_on || a.purchased_on || '—'}</TableCell>
@@ -283,7 +323,7 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
               Service history
             </CardTitle>
             <CardDescription>
-              Every visit logged against this customer's equipment. Entries survive the removal
+              Every visit logged against this customer's units. Entries survive the removal
               of the schedule that produced them.
             </CardDescription>
           </CardHeader>
@@ -292,7 +332,7 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
               <TableHeader>
                 <TableRow>
                   <TableHead>When</TableHead>
-                  <TableHead>Equipment</TableHead>
+                  <TableHead>Unit</TableHead>
                   <TableHead>Service</TableHead>
                   <TableHead>Outcome</TableHead>
                   <TableHead>By</TableHead>
@@ -330,12 +370,13 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
         </Card>
       )}
 
-      <AddEquipmentDialog
+      <AddUnitDialog
         open={addOpen}
         onOpenChange={setAddOpen}
         companyId={companyId}
         contactId={contactId}
         projectId={projectId}
+        takenLineIds={takenLineIds}
         onSaved={() => { setAddOpen(false); void load(); }}
       />
 
@@ -348,21 +389,52 @@ export const EquipmentServiceTab: React.FC<EquipmentServiceTabProps> = ({
   );
 };
 
-// ── Add equipment ──────────────────────────────────────────────────────────
-const AddEquipmentDialog: React.FC<{
+// ── Add unit ──────────────────────────────────────────────────────────
+const AddUnitDialog: React.FC<{
   open: boolean;
   onOpenChange: (o: boolean) => void;
   companyId?: string;
   contactId?: string;
   projectId?: string;
+  takenLineIds: Set<string>;
   onSaved: () => void;
-}> = ({ open, onOpenChange, companyId, contactId, projectId, onSaved }) => {
+}> = ({ open, onOpenChange, companyId, contactId, projectId, takenLineIds, onSaved }) => {
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: '', brand: '', model: '', serial_number: '',
     installed_on: today(), location_note: '', notes: '',
   });
+  // Which sale this unit came off, when it came off one. Optional by design: the dialog exists
+  // precisely for units we did NOT sell, so demanding an order would shut out its main case.
+  const [saleLines, setSaleLines] = useState<Awaited<ReturnType<typeof ordersService.listCustomerSaleLines>>>([]);
+  const [linkedLineId, setLinkedLineId] = useState<string>('');
+
+  useEffect(() => {
+    if (!open || !activeWorkspaceId) return;
+    let cancelled = false;
+    ordersService.listCustomerSaleLines({ workspaceId: activeWorkspaceId, companyId, contactId })
+      .then((rows) => { if (!cancelled) setSaleLines(rows); })
+      .catch(() => { if (!cancelled) setSaleLines([]); });
+    return () => { cancelled = true; };
+  }, [open, activeWorkspaceId, companyId, contactId]);
+
+  /** The picked line, and the order it belongs to — both ids get written onto the unit. */
+  const picked = useMemo(() => {
+    for (const o of saleLines) {
+      const it = o.items.find((i) => i.id === linkedLineId);
+      if (it) return { order: o, item: it };
+    }
+    return null;
+  }, [saleLines, linkedLineId]);
+
+  // Naming the unit after the line it came off is what the delivery trigger does, so a manual
+  // registration off the same line lands on the same name instead of an empty box.
+  useEffect(() => {
+    if (picked && !form.name.trim()) setForm((f) => ({ ...f, name: picked.item.description }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picked]);
 
   const save = async () => {
     if (!form.name.trim()) return;
@@ -379,13 +451,20 @@ const AddEquipmentDialog: React.FC<{
         installed_on: form.installed_on || null,
         location_note: form.location_note.trim() || null,
         notes: form.notes.trim() || null,
+        // Both ids or neither. `source_order_id` alone would say the unit came off an order
+        // without saying which line, which is exactly the half-link the register already had.
+        source_order_id: picked?.order.id ?? null,
+        source_order_item_id: picked?.item.id ?? null,
+        product_id: picked?.item.product_id ?? null,
+        supplier_company_id: picked?.item.supplier_company_id ?? null,
       });
-      toast({ title: 'Equipment registered' });
+      toast({ title: 'Unit registered' });
       setForm({ name: '', brand: '', model: '', serial_number: '', installed_on: today(), location_note: '', notes: '' });
+      setLinkedLineId('');
       onSaved();
     } catch (err) {
       toast({
-        title: 'Could not register the equipment',
+        title: 'Could not register the unit',
         description: err instanceof Error ? err.message : 'Unknown error',
         variant: 'destructive',
       });
@@ -398,13 +477,34 @@ const AddEquipmentDialog: React.FC<{
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add equipment</DialogTitle>
+          <DialogTitle>Add unit</DialogTitle>
           <DialogDescription>
             A unit this customer owns that we did not sell them, or one delivered before
             the register existed.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
+          {saleLines.length > 0 && (
+            <div>
+              <Label htmlFor="eq-order">From an order</Label>
+              <Select value={linkedLineId || 'none'} onValueChange={(v) => setLinkedLineId(v === 'none' ? '' : v)}>
+                <SelectTrigger id="eq-order"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not from an order</SelectItem>
+                  {saleLines.map((o) => o.items.map((it) => (
+                    <SelectItem key={it.id} value={it.id} disabled={takenLineIds.has(it.id)}>
+                      {(o.order_number || 'Order')} · {it.description}
+                      {takenLineIds.has(it.id) ? ' — already registered' : ''}
+                    </SelectItem>
+                  )))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Links the unit to the sale it came off, so the order can show its cover and this
+                row can point back at the order.
+              </p>
+            </div>
+          )}
           <div>
             <Label htmlFor="eq-name">Name</Label>
             <Input id="eq-name" value={form.name} placeholder="Split air conditioner, living room"
@@ -793,4 +893,4 @@ const WarrantyDocumentCell: React.FC<{
   );
 };
 
-export default EquipmentServiceTab;
+export default WarrantiesTab;

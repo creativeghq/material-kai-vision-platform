@@ -365,6 +365,49 @@ export const ordersService = {
   },
 
   /**
+   * What we have SOLD one customer, line by line — the menu behind "which order did this unit come
+   * off?" in the installed base (#343).
+   *
+   * Sales only, and drafts excluded: a unit the customer owns came off an order that actually
+   * happened, and offering a draft would let a warranty be attached to a sale still being typed.
+   * Party matching is deliberately narrow — `customer_*` only, never the `or(customer,supplier)`
+   * of `listPage` — because a company we also buy from would otherwise offer its own purchase
+   * orders as the origin of the customer's equipment.
+   */
+  async listCustomerSaleLines(opts: {
+    workspaceId: string;
+    companyId?: string | null;
+    contactId?: string | null;
+    limit?: number;
+  }): Promise<Array<{
+    id: string; order_number: string | null; created_at: string; status: OrderStatus;
+    items: Array<{ id: string; description: string; product_id: string | null; quantity: number; supplier_company_id: string | null }>;
+  }>> {
+    if (!opts.companyId && !opts.contactId) return [];
+    let q = supabase
+      .from('orders')
+      .select('id, order_number, created_at, status, order_items(id, description, product_id, quantity, supplier_company_id)')
+      .eq('workspace_id', opts.workspaceId)
+      .eq('order_type', 'sales')
+      .not('status', 'in', '(draft,cancelled)')
+      .order('created_at', { ascending: false })
+      .limit(opts.limit ?? 50);
+    q = opts.companyId
+      ? q.eq('customer_company_id', opts.companyId)
+      : q.eq('customer_contact_id', opts.contactId as string);
+    const { data, error } = await q;
+    if (error) throw error;
+    // deno-lint-ignore no-explicit-any
+    return ((data ?? []) as any[]).map((o) => ({
+      id: o.id,
+      order_number: o.order_number ?? null,
+      created_at: o.created_at,
+      status: o.status,
+      items: (o.order_items ?? []) as Array<{ id: string; description: string; product_id: string | null; quantity: number; supplier_company_id: string | null }>,
+    })).filter((o) => o.items.length > 0);
+  },
+
+  /**
    * Confirmed orders that carry real money owed but are NOT yet an invoice/supplier bill —
    * i.e. un-invoiced receivables (sales) / payables (purchase). Single source of truth used by
    * BOTH the CRM party Account tab and the global Finance AR/AP tabs so the two stay identical.

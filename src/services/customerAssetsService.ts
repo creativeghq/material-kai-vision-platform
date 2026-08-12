@@ -37,6 +37,60 @@ export interface CustomerAsset {
   supplier_company_id: string | null;
   created_at: string;
   updated_at: string;
+  /** The order this unit was sold on, embedded by the API. Null for a manually registered unit. */
+  source_order?: { id: string; order_number: string | null; order_type: string } | null;
+  /** Cover periods, embedded by `list` so the register can show them without a call per row. */
+  warranties?: Array<Pick<AssetWarranty, 'id' | 'kind' | 'starts_on' | 'ends_on'>>;
+}
+
+/**
+ * "Starts on X, runs N months — when does it end?", answered by the DATABASE.
+ *
+ * The obvious client-side `d.setMonth(d.getMonth() + n)` is a second implementation of the
+ * expression `apply_asset_service_defaults` uses when it opens a manufacturer warranty from
+ * `products.default_warranty_months`, and the two disagree on real inputs: 2026-01-31 + 1 month is
+ * 2026-02-28 in Postgres and 2026-03-03 in JavaScript. A cover end date is a date the customer can
+ * hold us to, and a wrong date is a valid date — nothing downstream would ever notice the drift.
+ * So the client asks; it does not calculate. Null when either input is missing or months <= 0.
+ */
+export async function warrantyEndDate(startsOn: string, months: number): Promise<string | null> {
+  if (!startsOn || !Number.isFinite(months) || months <= 0) return null;
+  const { data, error } = await supabase.rpc('warranty_end_date', {
+    p_start: startsOn,
+    p_months: Math.trunc(months),
+  });
+  if (error) throw error;
+  return (data as string | null) ?? null;
+}
+
+/**
+ * The cover to NAME for a unit: the one running longest that has not expired.
+ *
+ * A unit can hold a manufacturer period and an extended one at once, and what the customer can
+ * hold us to is whichever ends last — reporting the first row would show a lapsed manufacturer
+ * year on a unit still covered for four more. Every surface that says "covered to …" reads this,
+ * so the answer is picked once.
+ */
+export function activeCover(
+  warranties: Array<Pick<AssetWarranty, 'id' | 'kind' | 'starts_on' | 'ends_on'>> | null | undefined,
+): Pick<AssetWarranty, 'id' | 'kind' | 'starts_on' | 'ends_on'> | null {
+  const today = new Date().toISOString().slice(0, 10);
+  return (warranties ?? [])
+    .filter((w) => w.ends_on >= today)
+    .sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0] ?? null;
+}
+
+/** One unit registered off an order, with its cover — what an order line needs to describe itself. */
+export interface OrderAssetRow {
+  id: string;
+  name: string;
+  product_id: string | null;
+  source_order_id: string | null;
+  source_order_item_id: string | null;
+  status: AssetStatus;
+  customer_company_id: string | null;
+  customer_contact_id: string | null;
+  warranties: Array<Pick<AssetWarranty, 'id' | 'kind' | 'starts_on' | 'ends_on'>>;
 }
 
 export interface AssetWarranty {
@@ -222,10 +276,16 @@ export const customerAssetsService = {
     customer_company_id?: string;
     customer_contact_id?: string;
     project_id?: string;
+    source_order_id?: string;
     status?: AssetStatus;
     limit?: number;
   } = {}) {
     return call<{ assets: CustomerAsset[] }>('list', filter).then((r) => r.assets);
+  },
+
+  /** Units registered off one order, with their cover periods — one call for a whole order page. */
+  listByOrder(orderId: string) {
+    return call<{ assets: OrderAssetRow[] }>('by_order', { order_id: orderId }).then((r) => r.assets);
   },
 
   get(assetId: string) {
@@ -248,9 +308,68 @@ export const customerAssetsService = {
     location_note?: string | null;
     notes?: string | null;
     supplier_company_id?: string | null;
+    source_order_id?: string | null;
+    source_order_item_id?: string | null;
     apply_defaults?: boolean;
   }) {
     return call<{ asset_id: string }>('register', input).then((r) => r.asset_id);
+  },
+
+  /**
+   * Put an order line under warranty: register the unit against that order + line, then make its
+   * manufacturer cover say what the operator chose.
+   *
+   * The two steps cannot collapse into one. `register` runs `apply_asset_service_defaults`, which
+   * already opens a manufacturer warranty when the product declares `default_warranty_months` — so
+   * inserting ours unconditionally would leave the unit with two manufacturer covers and no way to
+   * tell which one the reminders mean. We adopt the row the defaults created when there is one and
+   * only insert when there is not.
+   *
+   * `ends_on` is the operator's answer and is passed through, never recomputed here: a cover period
+   * is a date the customer can hold us to, not a number this client is entitled to derive.
+   */
+  async warrantOrderLine(input: {
+    order_id: string;
+    order_item_id: string;
+    name: string;
+    customer_company_id?: string | null;
+    customer_contact_id?: string | null;
+    project_id?: string | null;
+    product_id?: string | null;
+    supplier_company_id?: string | null;
+    quantity?: number;
+    purchased_on?: string | null;
+    starts_on: string;
+    ends_on: string;
+    kind?: WarrantyKind;
+    policy_number?: string | null;
+  }): Promise<{ asset_id: string; warranty: AssetWarranty }> {
+    const kind = input.kind ?? 'manufacturer';
+    const assetId = await this.register({
+      name: input.name,
+      customer_company_id: input.customer_company_id ?? null,
+      customer_contact_id: input.customer_contact_id ?? null,
+      project_id: input.project_id ?? null,
+      product_id: input.product_id ?? null,
+      supplier_company_id: input.supplier_company_id ?? null,
+      quantity: input.quantity ?? 1,
+      purchased_on: input.purchased_on ?? null,
+      installed_on: input.starts_on,
+      source_order_id: input.order_id,
+      source_order_item_id: input.order_item_id,
+      apply_defaults: true,
+    });
+
+    const detail = await this.get(assetId);
+    const existing = detail.warranties.find((w) => w.kind === kind) ?? null;
+    const warranty = await this.saveWarranty({
+      ...(existing ? { warranty_id: existing.id } : { asset_id: assetId }),
+      kind,
+      starts_on: input.starts_on,
+      ends_on: input.ends_on,
+      ...(input.policy_number ? { policy_number: input.policy_number } : {}),
+    });
+    return { asset_id: assetId, warranty };
   },
 
   update(assetId: string, patch: Partial<Pick<CustomerAsset,

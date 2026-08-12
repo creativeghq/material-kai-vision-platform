@@ -231,6 +231,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     if (!next) next = rows.find((m) => m.workspace.isRoot)?.workspaceId ?? rows[0]?.workspaceId ?? null;
     setActiveWorkspaceId(next);
+    // PERSIST the resolved answer, not only an explicit switch. Services do not read this context
+    // — `getActiveWorkspaceId` reads this localStorage key directly — so until the user happened to
+    // click the workspace switcher, every one of them saw `null` while the app itself knew perfectly
+    // well which workspace was active. Most shrugged it off with `?? undefined` and quietly wrote an
+    // unscoped row; `customerAssetsService` threw "No active workspace" outright. Writing the
+    // default here makes the two stores agree from the first load.
+    if (next) {
+      try { localStorage.setItem(activeKey(user.id), next); } catch { /* private mode — in-memory only */ }
+    }
     setLoading(false);
   }, [user?.id]);
 
