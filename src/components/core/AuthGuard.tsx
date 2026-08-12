@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { PageLoader } from '@/components/core/PageLoader';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -19,11 +19,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   }, [user, loading, navigate]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin" />
-      </div>
-    );
+    // The SAME loader the route-level <Suspense> fallback uses. These two phases run
+    // back to back on every authenticated page load (session check, then the route's
+    // lazy chunk); with two different spinners at two different vertical positions the
+    // handover read as a flicker before any content had even been requested.
+    return <PageLoader />;
   }
 
   if (!user) {

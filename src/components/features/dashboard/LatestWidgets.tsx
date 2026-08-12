@@ -243,7 +243,11 @@ function KnowledgeWidget() {
           key={doc.id}
           to={`/knowledge-base/${doc.slug || doc.id}`}
           aria-label={`Read knowledge base article: ${doc.title || 'Untitled'}`}
-          className="flex items-center gap-2 min-w-0 rounded-lg hover:bg-accent/40 transition-colors -mx-1 px-1 py-0.5"
+          /* No vertical padding: every other widget's row is exactly the 32px thumbnail,
+             which is what the 6-item skeleton reserves. py-0.5 made these rows 36px, so
+             this widget alone outgrew the reserved box by 12px when it resolved and took
+             the whole four-widget row with it. */
+          className="flex items-center gap-2 min-w-0 rounded-lg hover:bg-accent/40 transition-colors -mx-1 px-1"
         >
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <FileText className="h-3.5 w-3.5 text-primary" />

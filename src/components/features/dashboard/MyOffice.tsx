@@ -76,13 +76,23 @@ function StatTile({
         <ArrowRight className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
       </div>
       {loading ? (
-        <div className="h-6 w-2/3 rounded bg-primary/10 animate-pulse mt-0.5" />
+        /* h-5, no margin: exactly the box the resolved value occupies (text-xl +
+           leading-none = 20px, and the <p> below has no margin of its own). The old
+           h-6 + mt-0.5 was 6px taller, so all four tiles shrank a little the moment
+           the numbers landed. */
+        <div className="h-5 w-2/3 rounded bg-primary/10 animate-pulse" />
       ) : (
         <p className="text-xl font-display leading-none tracking-tight tabular-nums" style={{ fontWeight: 700 }}>
           {value}
         </p>
       )}
-      <p className="text-[11px] text-muted-foreground leading-snug">{label}</p>
+      {/* Two lines, always. The label is derived from the STATS, not skeletoned with
+          them: it reads "All settled" / "0 open tasks" while the queries are in flight
+          and "outstanding · 12 invoices" after — which wraps to a second line on any
+          column narrower than ~1400px, growing all four tiles the moment the numbers
+          land. Reserving both lines costs one blank line on wide screens and
+          removes the shift everywhere. */}
+      <p className="text-[11px] text-muted-foreground leading-snug min-h-[1.9rem] line-clamp-2">{label}</p>
     </Link>
   );
 }
@@ -107,7 +117,11 @@ const MyOfficeImpl: React.FC = () => {
   //                 finance issuer (finance_settings.business_name) → branding.
   // The workspace label ("Default Workspace") is a system name and never used.
   useEffect(() => {
-    if (!user) return;
+    // Wait for the workspace to settle. The panel now mounts DURING that resolution
+    // (see Index), and `activeWorkspaceId` is in the dep list, so running early just
+    // buys a throwaway round of the same three queries with no workspace to read the
+    // issuer name from.
+    if (!user || workspaceLoading) return;
     let alive = true;
     (async () => {
       const metaName = (user.user_metadata?.display_name as string | undefined)?.trim() || '';
@@ -152,7 +166,7 @@ const MyOfficeImpl: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [user, activeWorkspaceId]);
+  }, [user, activeWorkspaceId, workspaceLoading]);
 
   // ── stats ──
   useEffect(() => {
@@ -325,41 +339,63 @@ const MyOfficeImpl: React.FC = () => {
           )}
         </div>
 
-        {insightsLoading ? (
-          <div className="space-y-3 animate-pulse">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="space-y-1.5">
-                <div className="h-2.5 bg-primary/10 rounded w-1/3" />
-                <div className="h-2 bg-primary/10 rounded w-full" />
-              </div>
-            ))}
-          </div>
-        ) : !insights ? (
-          <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
-            <span className="text-[11px] font-medium text-primary uppercase tracking-wider">Pro tip</span>
-            <p className="text-sm mt-1 leading-snug">
-              Ask JARVIS to compare technical specs across brands, or prepare a quote from your catalog.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {insights.insights.map((ins, i) => {
-              const t = TONE_STYLES[ins.tone] ?? TONE_STYLES.info;
-              const Icon = t.icon;
-              return (
-                <div key={i} className="flex gap-2.5 items-start p-1.5 -mx-1.5 rounded-xl hover:bg-white/5 transition-colors">
-                  <span className={`w-7 h-7 rounded-lg grid place-items-center shrink-0 ${t.chip}`}>
-                    <Icon className={`h-3.5 w-3.5 ${t.cls}`} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm leading-tight" style={{ fontWeight: 500 }}>{ins.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{ins.body}</p>
+        {/* FIXED height, not min-height, and it scrolls. Insights come from an LLM edge
+            function — the slowest thing on the dashboard — and the endpoint returns
+            anywhere from 2 to 5 of them with one-to-two-sentence bodies, so the resolved
+            height is genuinely unknowable at paint time: a reserve big enough for five
+            three-line insights would be mostly dead space, and anything smaller grows the
+            panel when the call lands. This panel is the tallest thing in the top grid row,
+            so its height IS the row's height — any growth here shoves LatestWidgets down
+            the page seconds into the load. The height steps with the breakpoint because
+            the COLUMN steps with it — a 3-insight set measures 263px in the 264px-wide
+            lg column and 214px in the 459px-wide one — so each step is the measured fit
+            for the typical set at that width, and anything longer scrolls. Still a
+            constant per width: nothing the endpoint returns can change it. All three
+            states (loading / pro-tip / resolved) occupy exactly this box. */}
+        <div className="h-[15.5rem] sm:h-[13.5rem] lg:h-[16.5rem] xl:h-[14.5rem] 2xl:h-[13.5rem] overflow-y-auto">
+          {insightsLoading ? (
+            /* Shaped like a real insight row (icon chip + title + two-line body), not thin
+               bars — a skeleton that doesn't match the row it stands in for is what let the
+               height gap open up in the first place. */
+            <div className="space-y-2.5 animate-pulse">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex gap-2.5 items-start p-1.5 -mx-1.5">
+                  <span className="w-7 h-7 rounded-lg bg-primary/10 shrink-0" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="h-3 bg-primary/10 rounded w-1/2" />
+                    <div className="h-2.5 bg-primary/10 rounded w-full" />
+                    <div className="h-2.5 bg-primary/10 rounded w-4/5" />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              ))}
+            </div>
+          ) : !insights ? (
+            <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+              <span className="text-[11px] font-medium text-primary uppercase tracking-wider">Pro tip</span>
+              <p className="text-sm mt-1 leading-snug">
+                Ask JARVIS to compare technical specs across brands, or prepare a quote from your catalog.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {insights.insights.map((ins, i) => {
+                const t = TONE_STYLES[ins.tone] ?? TONE_STYLES.info;
+                const Icon = t.icon;
+                return (
+                  <div key={i} className="flex gap-2.5 items-start p-1.5 -mx-1.5 rounded-xl hover:bg-white/5 transition-colors">
+                    <span className={`w-7 h-7 rounded-lg grid place-items-center shrink-0 ${t.chip}`}>
+                      <Icon className={`h-3.5 w-3.5 ${t.cls}`} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm leading-tight" style={{ fontWeight: 500 }}>{ins.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{ins.body}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
