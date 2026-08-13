@@ -58,6 +58,19 @@ import { researchCompany, summarizeResearch, greekAfm } from '@/modules/crm/serv
 import { flowEventService } from '@/services/flows/flowEventService';
 import { formatDate } from '@/utils/datetime';
 
+/**
+ * The Company tab is a signpost, not a second copy of the company record: a
+ * business-linked contact's orders, invoices, VAT and balance all live on the
+ * company. These are the parts of that record worth a direct way in — every
+ * `tab` value is one the company page actually renders (see `resolveRecordTab`).
+ */
+const COMPANY_RECORD_LINKS: { tab: string; label: string; hint: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { tab: 'account', label: 'Account', hint: 'Orders, invoices & balance', icon: Wallet },
+  { tab: 'details', label: 'Details', hint: 'Address, tax & VAT', icon: Receipt },
+  { tab: 'contacts', label: 'Contacts', hint: 'Everyone at this company', icon: User },
+  { tab: 'projects', label: 'Projects', hint: 'All company projects', icon: FolderKanban },
+];
+
 interface Contact {
   id: string;
   name: string;
@@ -640,6 +653,14 @@ export const ContactDetailPage: React.FC = () => {
   // A contact attached to a business has no separate commercial identity — the
   // business owns pricing / VAT / tax, so those sections are hidden when attached.
   const hasCompany = !!primaryCompany;
+  // Registry facts worth showing on the Company tab so it identifies the business
+  // rather than just naming it. ΑΦΜ only when the number really is a Greek one.
+  const companyAfm = greekAfm(primaryCompany?.vat_number, primaryCompany?.country_code);
+  const companyMeta: string[] = [
+    companyAfm ? `ΑΦΜ ${companyAfm}` : (primaryCompany?.vat_number ? `VAT ${primaryCompany.vat_number}` : ''),
+    [primaryCompany?.city, primaryCompany?.country].filter(Boolean).join(', '),
+    [primaryCompany?.is_customer ? 'Customer' : '', primaryCompany?.is_supplier ? 'Supplier' : ''].filter(Boolean).join(' & '),
+  ].filter(Boolean);
   const initials = (contact.name || '?').trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
   // The differentiator for the shared Activity element: a contact's only person is itself.
   const timelinePeople: TimelinePerson[] = contact.id
@@ -1060,14 +1081,60 @@ export const ContactDetailPage: React.FC = () => {
                 </TabsContent>
               )}
 
-              {/* Company — business-linked: financials are managed on the company. */}
+              {/* Company — business-linked: financials are managed on the company.
+                  One card carries the whole handoff: who the company is, why the
+                  money lives there and not here, and a way into each part of its
+                  record. A bare sentence plus a floating button read as an error
+                  state; this reads as the account it is. */}
               {hasCompany && primaryCompany?.id && (
                 <TabsContent value="company" className="space-y-4">
-                  <Card><CardContent className="p-4 flex items-start gap-3">
-                    <Wallet className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                    <p className="text-sm text-muted-foreground">This contact belongs to <button type="button" className="font-medium text-primary hover:underline" onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}>{primaryCompany.name}</button> — orders, invoices, VAT &amp; balance are managed on the company record.</p>
-                  </CardContent></Card>
-                  <Button variant="outline" onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}><Building2 className="h-4 w-4 mr-2" />Open {primaryCompany.name}</Button>
+                  <Card className="overflow-hidden">
+                    <CardContent className="p-0">
+                      {/* Identity — the company, its registry facts, and the way in. */}
+                      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <Building2 className="h-6 w-6" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Company Account</p>
+                          <h3 className="font-display text-xl leading-tight truncate">{primaryCompany.name}</h3>
+                          {companyMeta.length > 0 && (
+                            <p className="mt-1 text-xs text-muted-foreground truncate">{companyMeta.join(' · ')}</p>
+                          )}
+                        </div>
+                        <Button className="w-full shrink-0 sm:w-auto" onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}`)}>
+                          Open company
+                          <ArrowLeft className="ml-2 h-4 w-4 rotate-180" />
+                        </Button>
+                      </div>
+
+                      {/* Why this tab is a signpost, and where each part of the record sits. */}
+                      <div className="space-y-3 border-t bg-muted/20 p-5 sm:p-6">
+                        <p className="text-sm text-muted-foreground">
+                          {contact.name || 'This contact'} is a person on this company — orders, invoices, VAT &amp; balance are managed on the company record, not here.
+                        </p>
+                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                          {COMPANY_RECORD_LINKS.map((link) => (
+                            <button
+                              key={link.tab}
+                              type="button"
+                              onClick={() => navigate(`/admin/crm/companies/${primaryCompany.id}?tab=${link.tab}`)}
+                              className="group flex items-center gap-3 rounded-xl border bg-card p-3 text-left transition-colors hover:border-primary/50"
+                            >
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <link.icon className="h-4 w-4" />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm leading-tight truncate">{link.label}</span>
+                                <span className="block text-[11px] text-muted-foreground truncate">{link.hint}</span>
+                              </span>
+                              <ArrowLeft className="h-3.5 w-3.5 shrink-0 rotate-180 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
               )}
               {/* Projects — the same shared element the company record mounts. */}
