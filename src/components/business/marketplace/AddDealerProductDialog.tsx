@@ -19,7 +19,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { warehouseService, type OperatorCatalogMatch } from '@/services/warehouseService';
 import { catalogGrantsService } from '@/services/catalogGrantsService';
 import {
-  dealerProductsService, COMMON_FACET_KEYS, type CategoryField, type ManualImageRef,
+  dealerProductsService, type CategoryField, type ManualImageRef,
 } from '@/services/dealerProductsService';
 
 const CATEGORY_SUGGESTIONS = [
@@ -105,21 +105,28 @@ export const AddDealerProductDialog: React.FC<{
     return () => { cancelled = true; };
   }, [category]);
 
-  // The full set of attribute keys shown: common facets + category spec fields + custom.
+  // The full set of attribute keys shown: everything the registry says applies to this
+  // category (global + category-scoped) plus whatever custom keys the user added.
+  //
+  // There used to be a hardcoded COMMON_FACET_KEYS list here, unioned on top. It was a
+  // second copy of registry knowledge that drifted from it: it named `finish` and `style`
+  // as universal when the registry scopes them to 8 and 2 categories, and it omitted
+  // `application_areas`, which the registry marks global and canonicalizable. One registry,
+  // one read — #347 phase 3.4.
   const attrKeys = useMemo(() => {
-    const keys = new Set<string>([...COMMON_FACET_KEYS, ...categoryFields.map((f) => f.field_name)]);
+    const keys = new Set<string>(categoryFields.map((f) => f.field_name));
     Object.keys(attrs).forEach((k) => keys.add(k));
     return Array.from(keys);
   }, [categoryFields, attrs]);
 
-  // Lazy-load canonical-value autocomplete for whitelist facets.
+  // Lazy-load canonical-value autocomplete for the facets the registry marks canonicalize.
   useEffect(() => {
-    COMMON_FACET_KEYS.forEach(async (k) => {
-      if (facetOptions[k]) return;
-      const vals = await dealerProductsService.loadFacetValues(k);
-      if (vals.length) setFacetOptions((prev) => ({ ...prev, [k]: vals }));
+    categoryFields.filter((f) => f.canonicalize).forEach(async (f) => {
+      if (facetOptions[f.field_name]) return;
+      const vals = await dealerProductsService.loadFacetValues(f.field_name);
+      if (vals.length) setFacetOptions((prev) => ({ ...prev, [f.field_name]: vals }));
     });
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, categoryFields]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const labelFor = (key: string) =>
     categoryFields.find((f) => f.field_name === key)?.label
@@ -292,7 +299,7 @@ export const AddDealerProductDialog: React.FC<{
                 <div key={k} className="space-y-1">
                   <Label className="text-xs flex items-center justify-between">
                     {labelFor(k)}
-                    {!COMMON_FACET_KEYS.includes(k) && !categoryFields.some((f) => f.field_name === k) && (
+                    {!categoryFields.some((f) => f.field_name === k) && (
                       <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => removeAttr(k)}><X className="h-3 w-3" /></button>
                     )}
                   </Label>

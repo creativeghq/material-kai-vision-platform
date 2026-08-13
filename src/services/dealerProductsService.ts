@@ -13,6 +13,8 @@ export interface CategoryField {
   field_name: string;
   label: string;
   field_type: string; // 'text' | 'number' | 'boolean' | 'select' | ...
+  /** Registry's `canonicalize` — this facet has canonical values worth autocompleting. */
+  canonicalize: boolean;
 }
 
 export interface ManualImageRef {
@@ -48,9 +50,6 @@ export interface ManualProductPayload {
   source?: string;
 }
 
-/** Descriptive facet keys every product can carry (the whitelist's NL keys). */
-export const COMMON_FACET_KEYS = ['color', 'available_colors', 'finish', 'material', 'style', 'application', 'room'];
-
 export const dealerProductsService = {
   /** Spec fields expected for a material_category (best-effort — reference data). */
   async loadCategoryFields(materialCategory: string): Promise<CategoryField[]> {
@@ -58,19 +57,28 @@ export const dealerProductsService = {
     try {
       const { data } = await supabase
         .from('material_metadata_fields')
-        .select('field_name, display_name, field_type, applies_to_categories');
+        .select('field_name, display_name, field_type, applies_to_categories, is_global, canonicalize, status')
+        .eq('status', 'active');
       const rows = (data ?? []) as any[];
       return rows
         .filter((r) => {
+          // `is_global` is THE universal flag. This used to infer universality from an
+          // EMPTY `applies_to_categories` instead, and never read is_global at all — two
+          // conflicting conventions for one concept inside the registry Phase 3 unifies.
+          // The seed had 16 fields unscoped-and-not-global, so sanitary's bowl_shape and
+          // flush_type were offered on tiles, and wood_type / weave / upholstery on
+          // lighting. Empty scope now means the field applies to NOTHING; a field that is
+          // neither global nor scoped is a data bug, and categoryFieldRegistry.test.ts
+          // fails the build on one rather than letting it surface as stray form inputs.
+          if (r.is_global === true) return true;
           const cats = r.applies_to_categories;
-          if (!cats) return true; // applies to all when unscoped
-          const arr = Array.isArray(cats) ? cats : [];
-          return arr.length === 0 || arr.includes(materialCategory);
+          return Array.isArray(cats) && cats.includes(materialCategory);
         })
         .map((r) => ({
           field_name: r.field_name,
           label: r.display_name || r.field_name,
           field_type: r.field_type || 'text',
+          canonicalize: r.canonicalize === true,
         }));
     } catch {
       return [];
